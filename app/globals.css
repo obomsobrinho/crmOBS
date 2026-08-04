@@ -1,26 +1,242 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ─────────────────────────────────────────────────────────────
+   Tema do CRM — sistema de trabalho, estética profissional neutra
+   em light + dark. Base neutra (branco no light / PRETO no dark) +
+   acento AZUL da marca. A cor vive com significado: azul = IA/acento,
+   verde = você (humano), âmbar = precisa de você (IA pausada),
+   vermelho = erro. Ver memory/design-identity.md.
+   ───────────────────────────────────────────────────────────── */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-chat: var(--chat-bg);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-dim: var(--ink-dim);
+  --color-accent: var(--accent);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ia: var(--ia);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-manrope), sans-serif;
+
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  /* Light — v-mista: base #f3f3f6, sidebar branco, balões estilo WhatsApp. */
+  --canvas: #f3f3f6;
+  --surface: #ffffff;
+  --panel: #f1edfb;
+  --chat-bg: #f3f3f6;
+  --input-bg: #f3f3f6;
+  --ink: #1a1330;
+  --ink-muted: #5b5478;
+  --ink-dim: #8b84a6;
+  --accent: #6d28d9;
+  --grad: linear-gradient(135deg, #6d28d9, #8b46f6);
+  --line: rgba(90, 50, 180, 0.14);
+  --line-strong: rgba(90, 50, 180, 0.24);
+  --ia: #16a34a;
+  --warn: #b45309;
+  --danger: #dc2626;
+
+  --active-bg: rgba(20, 10, 40, 0.05);
+  /* Conversa aberta na lista (mesmo fundo do chat). */
+  --selected-bg: #f3f3f6;
+  --accent-bg: rgba(109, 40, 217, 0.1);
+  --accent-border: rgba(109, 40, 217, 0.3);
+  --accent-contrast: #ffffff;
+  /* Sombra suave dos painéis sobre o canvas (só no light). */
+  --panel-shadow: 0 6px 20px -12px rgba(60, 40, 120, 0.28);
+  /* Relevo bem leve dos balões (padrão WhatsApp), só no light. */
+  --bubble-shadow: 0 1px 1.5px rgba(11, 20, 26, 0.1);
+  --ia-bg: rgba(22, 163, 74, 0.1);
+  --ia-border: rgba(22, 163, 74, 0.28);
+  --warn-bg: rgba(180, 83, 9, 0.1);
+  --warn-border: rgba(180, 83, 9, 0.3);
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --danger-border: rgba(220, 38, 38, 0.3);
+
+  /* Balões WhatsApp: recebido branco, você verde-claro, IA roxo-claro. */
+  --bubble-in-bg: #ffffff;
+  --bubble-in-fg: #1a1330;
+  --bubble-you-bg: #d9fdd3;
+  --bubble-you-fg: #0b3d2e;
+  --bubble-ia-bg: #ece2ff;
+  --bubble-ia-fg: #4a2c9e;
+  --send: #2f9e6a;
+
+  /* Nav rail no LIGHT = branco (igual à listagem). */
+  --rail-bg: #ffffff;
+  --rail-fg: #1a1330;
+  --rail-fg-dim: #5b5478;
+  --rail-hover: rgba(20, 10, 40, 0.05);
+  --rail-active-bg: rgba(20, 10, 40, 0.06);
+  --rail-active-fg: #1a1330;
+  --rail-border: rgba(20, 10, 40, 0.1);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  /* Dark — v-mista aprovado: preto neutro + acento roxo vivo. */
+  --canvas: #0a0b10;
+  --surface: #15161d;
+  --panel: #1f2029;
+  --chat-bg: #0c0d12;
+  --input-bg: #1b1d23;
+  --ink: #eef0f5;
+  --ink-muted: #a6a8bc;
+  --ink-dim: #6e7089;
+  --accent: #8b46f6;
+  --grad: linear-gradient(135deg, #6d28e0, #9b4dff);
+  --line: rgba(160, 158, 196, 0.12);
+  --line-strong: rgba(160, 158, 196, 0.22);
+  --ia: #22c55e;
+  --warn: #f9a63a;
+  --danger: #ef4444;
+
+  --active-bg: rgba(255, 255, 255, 0.05);
+  --selected-bg: #191a22;
+  --accent-bg: rgba(139, 70, 246, 0.16);
+  --accent-border: rgba(139, 70, 246, 0.4);
+  --accent-contrast: #ffffff;
+  --panel-shadow: none;
+  --bubble-shadow: none;
+  --ia-bg: rgba(34, 197, 94, 0.14);
+  --ia-border: rgba(34, 197, 94, 0.3);
+  --warn-bg: rgba(249, 166, 58, 0.16);
+  --warn-border: rgba(249, 166, 58, 0.4);
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.3);
+
+  /* Balões (dark): recebido cinza, você verde escuro, IA roxo escuro. */
+  --bubble-in-bg: #212530;
+  --bubble-in-fg: #e7e8ee;
+  --bubble-you-bg: #123f2f;
+  --bubble-you-fg: #c9ffe6;
+  --bubble-ia-bg: #382a6e;
+  --bubble-ia-fg: #e7ddff;
+  --send: #2f9e6a;
+
+  /* Nav rail no DARK = quase-preto. */
+  --rail-bg: #0c0d12;
+  --rail-fg: #eef0f5;
+  --rail-fg-dim: #9297a3;
+  --rail-hover: rgba(255, 255, 255, 0.06);
+  --rail-active-bg: rgba(255, 255, 255, 0.06);
+  --rail-active-fg: #eef0f5;
+  --rail-border: rgba(255, 255, 255, 0.1);
+
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+/* Painel sólido — superfície + borda fina (sem vidro/blur). Nome
+   "glass" mantido para não quebrar os componentes que já usam. */
+.glass,
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--panel-shadow);
+}
+
+/* Botão primário da marca (acento azul + texto branco). */
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+/* Botão de enviar mensagem — verde (padrão WhatsApp, = sua mensagem). */
+.btn-send {
+  background: var(--send);
+  color: #fff;
+}
+.btn-send:hover {
+  filter: brightness(1.08);
+}
+
+/* Gradiente da marca (logo, chip ativo). */
+.brand-grad {
+  background-image: var(--grad);
+  color: #fff;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* Scrollbar discreta em overlay (a nativa com setinhas denuncia UI "crua"). */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-dim);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* Tailwind v4 não põe cursor:pointer em <button> por padrão. Restaura em
+   tudo que é clicável (exceto desabilitado). */
+button:not(:disabled),
+[role="button"]:not(:disabled),
+[role="switch"]:not(:disabled),
+a[href],
+label[for],
+summary {
+  cursor: pointer;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.msg-in {
+  animation: msg-in 0.24s ease-out both;
 }

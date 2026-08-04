@@ -1,0 +1,53 @@
+import { User } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { getMyClient } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
+
+function fmtDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+export default async function PerfilPage() {
+  const client = await getMyClient();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const rows: { label: string; value: string }[] = [
+    { label: "Empresa", value: client?.name ?? "—" },
+    { label: "E-mail", value: user?.email ?? "—" },
+    { label: "Instância WhatsApp", value: client?.evolution_instance ?? "—" },
+    { label: "Conta criada em", value: fmtDate(user?.created_at) },
+  ];
+
+  return (
+    <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+      <div className="mb-1 flex items-center gap-2">
+        <User size={20} className="text-accent" />
+        <h1 className="font-display text-xl font-bold">Perfil</h1>
+      </div>
+      <p className="mb-5 text-sm text-ink-muted">Dados da sua conta.</p>
+
+      <div className="max-w-xl overflow-y-auto rounded-xl border border-line bg-surface">
+        {rows.map((r, i) => (
+          <div
+            key={r.label}
+            className={`flex items-center justify-between px-4 py-3 ${
+              i > 0 ? "border-t border-line" : ""
+            }`}
+          >
+            <span className="text-sm text-ink-muted">{r.label}</span>
+            <span className="text-sm font-medium">{r.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

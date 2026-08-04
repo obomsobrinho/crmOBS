@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# inspeção visual (Playwright / screenshots de revisão de design)
+/.playwright-mcp/
+/v*-light.png
+/v*-dark*.png
+/design-*.png
+
+# Playwright (testes e2e)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/e2e/.auth/
