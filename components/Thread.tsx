@@ -22,14 +22,30 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
   for (const r of rows) {
     const media = r.media_url ?? null;
     const mediaType = r.media_type ?? null;
-    // Mídia recebida (do contato): balão "in". Também cobre imagem/áudio sem
-    // legenda (user_message null) desde que não seja mídia enviada pelo bot.
-    if (r.user_message || (media && !r.bot_message)) {
+    // O que decide o lado é o message_type: 'manual' = enviado pelo CRM (balão
+    // "out"), qualquer outro = recebido do contato (balão "in"). Não dá para
+    // usar bot_message, porque mídia enviada sem legenda tem bot_message ''.
+    const isManual = r.message_type === "manual";
+    // Balão recebido: tem texto do contato, ou é mídia recebida (não manual e
+    // sem resposta do bot na mesma linha).
+    if (r.user_message || (media && !isManual && !r.bot_message)) {
       bubbles.push({
         key: `u${r.id}`,
         side: "in",
         author: "cliente",
         content: r.user_message ?? "",
+        created_at: r.created_at,
+        mediaUrl: isManual ? null : media,
+        mediaType: isManual ? null : mediaType,
+      });
+    }
+    // Envio manual só com mídia (sem legenda): balão enviado com a mídia.
+    if (isManual && media && !r.bot_message) {
+      bubbles.push({
+        key: `m${r.id}`,
+        side: "out",
+        author: "voce",
+        content: "",
         created_at: r.created_at,
         mediaUrl: media,
         mediaType,
