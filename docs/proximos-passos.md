@@ -2,7 +2,7 @@
 
 Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estrategia-2026-07.md).
 
-Última revisão: 31/07/2026.
+Última revisão: 06/08/2026.
 
 ## Direção travada
 
@@ -46,8 +46,7 @@ estabilidade e suporte.
 - [x] Tags, notas internas, respostas rápidas (tabelas próprias do CRM, RLS por tenant).
 - [x] Não-lidas e contadores (filtro no inbox + badge no rail).
 - [x] Edição de contato + campos personalizados (dados_cliente.display_name + custom_fields).
-- [~] Mídia: render pronto (media_url/media_type). Receber/enviar + Storage **movido para a Fase 2**
-      (lote de mudanças no n8n; botão de anexo segue desativado por ora).
+- [x] Mídia: render pronto (media_url/media_type). Receber/enviar + Storage feito na Fase 2.
 - [x] Busca dentro das mensagens (busca no conteúdo de chat_messages, com trecho na lista).
 
 **Fase 2 — IA competitiva (eixo de superioridade)**
@@ -64,8 +63,10 @@ estabilidade e suporte.
 > Lote de mudanças no n8n desta fase (fazer coordenado, `validateOnly` + confirmação por mudança):
 > qualificação, base de conhecimento e **mídia (receber/enviar + Storage)**, que veio da Fase 1.
 
-- [ ] Mídia de verdade: receber (n8n grava `media_url`/`media_type` + arquivo no Storage) e enviar
-      pelo composer (upload -> Storage -> webhook). O render na UI já está pronto. ⚠️ toca o n8n.
+- [x] Mídia de verdade: receber (n8n sobe o base64 via `/api/inbound-media` -> Storage e grava
+      `media_url`/`media_type` nos dois caminhos de salvamento) e enviar pelo composer (upload ->
+      Storage -> webhook -> Evolution sendMedia por tipo). Render na UI decide o lado por
+      `message_type='manual'`. Documento/vídeo reconhecidos no nó `Dados`.
 - [x] Persistir a qualificação (`summary`, `action`, `preferencia_horario`) e expor na lista
       "Precisa de você". Gravada por `/api/agent` (não pelo n8n) em `conversation_qualifications`;
       lida no card "Resumo da IA" da conversa e no motivo da lista.
