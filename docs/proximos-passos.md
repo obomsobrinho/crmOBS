@@ -36,7 +36,12 @@ estabilidade e suporte.
 - [x] Colunas `sender_user_id`, `media_url`, `media_type` em `chat_messages`.
 - [x] `user_clients.role`.
 - [ ] Parar de gravar resposta da IA como `"msg1 | msg2"` numa linha só. ⚠️ toca o n8n.
-- [ ] Limpar resíduo hardcoded do nó `Rotas` no n8n (número pessoal, `TreinoIA1212:`).
+      NOTA (06/08): baixa prioridade. O envio usa o array (`Prep messages`/`Split messages`),
+      então o `" | "` só existe no armazenamento; a exibição só quebraria se uma mensagem
+      contivesse literalmente " | ". Fix correto (uma linha por mensagem) é invasivo no fluxo
+      quente; revisar junto com o modelo de dados na Fase 3.
+- [x] Limpar resíduo hardcoded do nó `Rotas` no n8n (removidas as regras do número pessoal
+      553173374875 e do prefixo `TreinoIA1212:`; sobrou só a "Rota normal").
 - [x] Destino de notificação pela UI (notify_group_jid configurável no /agente, dono-only).
 
 **Fase 1 — Inbox de equipe (cobre base + habilita pricing por assento)**
