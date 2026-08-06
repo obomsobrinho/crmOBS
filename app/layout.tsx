@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
@@ -19,24 +20,24 @@ export const metadata: Metadata = {
   description: "Inbox de conversas de WhatsApp com agente de IA",
 };
 
-// Define o tema antes da hidratação (evita flash). Preferência salva →
-// senão o sistema → fallback dark (obm2.0 é dark-native).
-const themeInit = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`;
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Tema definido no servidor a partir do cookie (escrito pelo ThemeToggle).
+  // Assim o data-theme já vem no HTML e não há flash nem timing de script no
+  // refresh. Sem cookie, cai no dark (obm2.0 é dark-native).
+  const theme =
+    (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
+
   return (
     <html
       lang="pt-BR"
+      data-theme={theme}
       suppressHydrationWarning
       className={`${manrope.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
-      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );

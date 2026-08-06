@@ -2,24 +2,24 @@
 
 import { useEffect, useState } from "react";
 
-// Alterna light/dark, persistindo em localStorage. O tema inicial já é
-// aplicado pelo script em app/layout.tsx (antes da hidratação).
+// Alterna light/dark, persistindo em cookie. O tema inicial já vem do
+// servidor (o layout lê o cookie e põe data-theme no <html>).
 export default function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
+    // Sincroniza com o data-theme que o servidor já colocou no <html>.
     const current = document.documentElement.getAttribute("data-theme");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(current === "light" ? "light" : "dark");
   }, []);
 
   function toggle() {
     const next = theme === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem("theme", next);
-    } catch {
-      // sem persistência se o storage estiver bloqueado
-    }
+    // Cookie é a fonte de verdade: o layout (servidor) lê no refresh e já
+    // renderiza o data-theme certo, sem flash. 1 ano, escopo do app.
+    document.cookie = `theme=${next}; path=/; max-age=31536000; SameSite=Lax`;
     setTheme(next);
   }
 
