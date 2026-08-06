@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { Send, Paperclip, Bot, Hand, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import QuickReplyPicker from "./QuickReplyPicker";
 
 export type OutgoingMedia = {
   bucket: string;
@@ -38,10 +37,6 @@ export default function MessageComposer({
   const [attachError, setAttachError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const canSend = !!text.trim();
-
-  function insertReply(body: string) {
-    setText((t) => (t.trim() ? `${t}\n${body}` : body));
-  }
 
   const submit = () => {
     const t = text.trim();
@@ -154,7 +149,6 @@ export default function MessageComposer({
             <Paperclip size={18} />
           )}
         </button>
-        <QuickReplyPicker clientId={clientId} onPick={insertReply} />
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
