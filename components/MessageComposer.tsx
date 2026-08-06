@@ -1,20 +1,42 @@
 "use client";
 
-import { useState } from "react";
-import { Send, Paperclip, Bot, Hand } from "lucide-react";
+import { useRef, useState } from "react";
+import { Send, Paperclip, Bot, Hand, Loader2 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import QuickReplyPicker from "./QuickReplyPicker";
+
+export type OutgoingMedia = {
+  bucket: string;
+  path: string;
+  type: "image" | "audio" | "video" | "document";
+  mime: string;
+  filename: string;
+};
+
+function mediaTypeFromMime(mime: string): OutgoingMedia["type"] {
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("audio/")) return "audio";
+  if (mime.startsWith("video/")) return "video";
+  return "document";
+}
 
 export default function MessageComposer({
   onSend,
+  onSendMedia,
   iaAtiva,
   clientId,
 }: {
   onSend: (text: string) => void | Promise<void>;
+  onSendMedia?: (media: OutgoingMedia) => void | Promise<void>;
   iaAtiva?: boolean;
   clientId: string;
 }) {
+  const supabase = createClient();
   const [text, setText] = useState("");
   const [focused, setFocused] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const canSend = !!text.trim();
 
   function insertReply(body: string) {
@@ -27,6 +49,57 @@ export default function MessageComposer({
     void onSend(t);
     setText("");
   };
+
+  // Anexo: sobe o arquivo direto pro Storage (URL assinada) e dispara o envio.
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file || !onSendMedia) return;
+
+    setUploading(true);
+    setAttachError(null);
+    try {
+      const r = await fetch(`/api/clients/${clientId}/whatsapp-media/upload-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename: file.name,
+          mime: file.type,
+          size: file.size,
+        }),
+      });
+      const d = (await r.json()) as {
+        error?: string;
+        bucket?: string;
+        path?: string;
+        token?: string;
+      };
+      if (!r.ok || !d.bucket || !d.path || !d.token) {
+        setAttachError(d.error ?? "Falha ao preparar o envio do arquivo.");
+        setUploading(false);
+        return;
+      }
+      const up = await supabase.storage
+        .from(d.bucket)
+        .uploadToSignedUrl(d.path, d.token, file);
+      if (up.error) {
+        setAttachError("Falha ao enviar o arquivo.");
+        setUploading(false);
+        return;
+      }
+      await onSendMedia({
+        bucket: d.bucket,
+        path: d.path,
+        type: mediaTypeFromMime(file.type),
+        mime: file.type || "application/octet-stream",
+        filename: file.name,
+      });
+      setUploading(false);
+    } catch {
+      setAttachError("Não foi possível enviar o arquivo.");
+      setUploading(false);
+    }
+  }
 
   return (
     <div className="border-t border-line bg-surface px-3 pb-3 pt-2.5">
@@ -47,6 +120,12 @@ export default function MessageComposer({
         </div>
       )}
 
+      {attachError && (
+        <div className="mb-2 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-[12.5px] text-danger">
+          {attachError}
+        </div>
+      )}
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -54,14 +133,26 @@ export default function MessageComposer({
         }}
         className="flex items-end gap-2"
       >
+        <input
+          ref={fileRef}
+          type="file"
+          onChange={onPickFile}
+          className="hidden"
+          aria-hidden
+        />
         <button
           type="button"
-          disabled
-          title="Anexos em breve"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading || !onSendMedia}
+          title={onSendMedia ? "Anexar arquivo" : "Anexos indisponíveis"}
           aria-label="Anexar"
-          className="flex h-[34px] w-[34px] shrink-0 cursor-not-allowed items-center justify-center rounded-lg text-ink-dim/60"
+          className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg text-ink-dim transition-colors hover:bg-[var(--active-bg)] hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Paperclip size={18} />
+          {uploading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <Paperclip size={18} />
+          )}
         </button>
         <QuickReplyPicker clientId={clientId} onPick={insertReply} />
         <textarea

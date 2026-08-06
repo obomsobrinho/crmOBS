@@ -6,13 +6,15 @@ import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarColor } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
-import MessageComposer from "./MessageComposer";
+import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 
 type Pending = {
   tempId: string;
   content: string;
   created_at: string;
   status: "pending" | "failed";
+  // Preenchido quando o pendente é um envio de mídia (reconcilia pelo caminho).
+  mediaPath?: string;
 };
 
 function rowsToBubbles(rows: ChatRow[]): Bubble[] {
@@ -116,13 +118,15 @@ export default function Thread({
     if (!data) return;
     const fresh = data as ChatRow[];
     setRows(fresh);
-    // Reconcilia: remove pendentes que já viraram linha 'manual' no banco.
+    // Reconcilia: remove pendentes que já viraram linha no banco. Mídia casa pelo
+    // media_url (o caminho no Storage); texto casa pela mensagem 'manual'.
     setPending((prev) =>
-      prev.filter(
-        (p) =>
-          !fresh.some(
-            (r) => r.message_type === "manual" && r.bot_message === p.content
-          )
+      prev.filter((p) =>
+        p.mediaPath
+          ? !fresh.some((r) => r.media_url === p.mediaPath)
+          : !fresh.some(
+              (r) => r.message_type === "manual" && r.bot_message === p.content
+            )
       )
     );
   }, [phone, supabase]);
@@ -183,6 +187,37 @@ export default function Thread({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone, text }),
+        });
+        if (!res.ok) throw new Error("send failed");
+      } catch {
+        setPending((prev) =>
+          prev.map((p) => (p.tempId === tempId ? { ...p, status: "failed" } : p))
+        );
+      }
+    },
+    [phone]
+  );
+
+  // Envio de mídia: o arquivo já subiu pro Storage (composer); aqui só dispara o
+  // envio e mostra um pendente. A linha real chega pelo realtime (o n8n grava).
+  const handleSendMedia = useCallback(
+    async (media: OutgoingMedia) => {
+      const tempId = crypto.randomUUID();
+      setPending((prev) => [
+        ...prev,
+        {
+          tempId,
+          content: media.filename,
+          created_at: new Date().toISOString(),
+          status: "pending",
+          mediaPath: media.path,
+        },
+      ]);
+      try {
+        const res = await fetch("/api/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone, media }),
         });
         if (!res.ok) throw new Error("send failed");
       } catch {
@@ -323,6 +358,7 @@ export default function Thread({
 
       <MessageComposer
         onSend={handleSend}
+        onSendMedia={handleSendMedia}
         iaAtiva={iaState !== null && !iaPausada}
         clientId={clientId}
       />
@@ -369,28 +405,57 @@ function RowAvatar({
   );
 }
 
-// Renderiza a mídia da mensagem (imagem/áudio/vídeo/documento) a partir do
-// media_url (Supabase Storage). Só exibe; o envio de mídia ainda não existe.
+// Renderiza a mídia da mensagem (imagem/áudio/vídeo/documento). O bucket
+// whatsapp-media é privado: quando media_url é um caminho do Storage, resolve
+// para uma URL assinada temporária (RLS por tenant). Se já for uma URL http
+// (compatibilidade), usa direto.
 function MediaView({ url, type }: { url: string; type: string | null }) {
+  const isHttp = /^https?:\/\//.test(url);
+  const [resolved, setResolved] = useState<string | null>(isHttp ? url : null);
+
+  useEffect(() => {
+    // http já vem resolvido pelo estado inicial; só resolve caminho do Storage.
+    if (isHttp) return;
+    let cancelled = false;
+    void (async () => {
+      const supabase = createClient();
+      const { data } = await supabase.storage
+        .from("whatsapp-media")
+        .createSignedUrl(url, 3600);
+      if (!cancelled) setResolved(data?.signedUrl ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [url, isHttp]);
+
+  if (!resolved) {
+    return (
+      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-ink-muted">
+        <FileText size={15} /> carregando mídia…
+      </div>
+    );
+  }
+
   if (type === "image") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={url}
-        alt="Imagem recebida"
+        src={resolved}
+        alt="Imagem"
         className="mb-1 max-h-64 w-auto rounded-lg object-cover"
       />
     );
   }
   if (type === "audio") {
-    return <audio controls src={url} className="mb-1 w-56 max-w-full" />;
+    return <audio controls src={resolved} className="mb-1 w-56 max-w-full" />;
   }
   if (type === "video") {
-    return <video controls src={url} className="mb-1 max-h-64 rounded-lg" />;
+    return <video controls src={resolved} className="mb-1 max-h-64 rounded-lg" />;
   }
   return (
     <a
-      href={url}
+      href={resolved}
       target="_blank"
       rel="noopener noreferrer"
       className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] font-medium underline"

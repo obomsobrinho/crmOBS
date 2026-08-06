@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/service";
 
 // Recebe { phone, text } do composer e repassa para o webhook do n8n.
 // NÃO grava nada no banco — quem grava a mensagem 'out' é o n8n, depois de
@@ -26,19 +27,44 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { phone?: string; text?: string };
+  let body: {
+    phone?: string;
+    text?: string;
+    media?: { bucket?: string; path?: string; type?: string; mime?: string; filename?: string };
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { phone, text } = body;
-  if (!phone || !text) {
+  const { phone, text, media } = body;
+  const hasMedia = !!(media && media.path);
+  if (!phone || (!text && !hasMedia)) {
     return NextResponse.json(
-      { error: "phone e text são obrigatórios" },
+      { error: "phone e (text ou media) são obrigatórios" },
       { status: 400 }
     );
+  }
+
+  // O bucket whatsapp-media é privado. Para a Evolution baixar o arquivo, o
+  // servidor (service_role) gera uma URL assinada de curta duração e manda
+  // pronta pro n8n. O n8n NÃO acessa o Storage: só repassa a URL pra Evolution
+  // e grava chat_messages.media_url = path (permanente; o CRM re-assina ao exibir).
+  let signedUrl: string | null = null;
+  if (hasMedia) {
+    const bucket = media!.bucket ?? "whatsapp-media";
+    const svc = createServiceClient();
+    const { data: signed, error: signErr } = await svc.storage
+      .from(bucket)
+      .createSignedUrl(media!.path!, 3600);
+    if (signErr || !signed?.signedUrl) {
+      return NextResponse.json(
+        { error: "falha ao preparar a mídia para envio" },
+        { status: 500 }
+      );
+    }
+    signedUrl = signed.signedUrl;
   }
 
   try {
@@ -47,9 +73,22 @@ export async function POST(req: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         phone,
-        text,
+        // text vira legenda quando há mídia; senão, mensagem de texto normal.
+        text: text ?? "",
         instance: client.evolution_instance,
         client_id: client.id,
+        // Quando presente, o n8n manda a mídia pela Evolution usando `url`
+        // (assinada) e grava chat_messages.media_url = `path` (permanente).
+        media: hasMedia
+          ? {
+              bucket: media!.bucket ?? "whatsapp-media",
+              path: media!.path,
+              url: signedUrl,
+              type: media!.type ?? "document",
+              mime: media!.mime ?? null,
+              filename: media!.filename ?? null,
+            }
+          : null,
       }),
     });
     if (!res.ok) {
