@@ -34,7 +34,7 @@ export default async function ThreadPage({
         .maybeSingle(),
       supabase
         .from("conversations")
-        .select("id, assigned_user_id")
+        .select("id, assigned_user_id, pending_instruction")
         .eq("phone", phone)
         .maybeSingle(),
       fetchMembers(supabase),
@@ -51,7 +51,11 @@ export default async function ThreadPage({
     cleanName(contato?.nomewpp) ??
     bestName(initialRows);
   const firstMessageAt = initialRows[0]?.created_at ?? null;
-  const convRow = conv as { id: number; assigned_user_id: string | null } | null;
+  const convRow = conv as {
+    id: number;
+    assigned_user_id: string | null;
+    pending_instruction: string | null;
+  } | null;
 
   return (
     <ConversationView
@@ -65,10 +69,12 @@ export default async function ThreadPage({
       members={members}
       myUserId={client?.userId ?? ""}
       conversationId={convRow?.id ?? null}
+      pendingInstruction={convRow?.pending_instruction ?? null}
       clientId={client?.id ?? ""}
       displayName={contato?.display_name ?? null}
       customFields={contato?.custom_fields ?? null}
       contactExists={!!contato}
+      readOnly={client?.access.blocked ?? false}
     />
   );
 }

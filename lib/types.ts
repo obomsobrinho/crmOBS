@@ -35,6 +35,8 @@ export interface InboxItem {
   unread: number;
   /** Atendente humano responsável (conversations.assigned_user_id) ou null. */
   assignedUserId: string | null;
+  /** Estágio do pipeline (conversations.stage) ou null (= coluna default). */
+  stage: string | null;
 }
 
 // Balão renderizado na thread (uma linha vira 1–2 balões).

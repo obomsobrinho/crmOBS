@@ -43,11 +43,11 @@ const MEMBERS: Member[] = [
 ];
 
 const LIST: InboxItem[] = [
-  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: T(11, 55), unread: 0, assignedUserId: ME },
-  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: T(11, 58), unread: 2, assignedUserId: null },
-  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: T(21, 28, 27), unread: 0, assignedUserId: "u2" },
-  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: T(17, 18, 27), unread: 1, assignedUserId: null },
-  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: T(9, 20, 27), unread: 0, assignedUserId: null },
+  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: T(11, 55), unread: 0, assignedUserId: ME, stage: null },
+  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: T(11, 58), unread: 2, assignedUserId: null, stage: null },
+  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: T(21, 28, 27), unread: 0, assignedUserId: "u2", stage: null },
+  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: T(17, 18, 27), unread: 1, assignedUserId: null, stage: null },
+  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: T(9, 20, 27), unread: 0, assignedUserId: null, stage: null },
 ];
 
 export default function DesignPreview() {
@@ -78,6 +78,7 @@ export default function DesignPreview() {
               members={MEMBERS}
               myUserId={ME}
               conversationId={1}
+              pendingInstruction={null}
               clientId="00000000-0000-0000-0000-0000000000cc"
               displayName={null}
               customFields={{ Origem: "QR Code", Interesse: "Plano anual" }}

@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import BrandMark from "./BrandMark";
 import {
   MessagesSquare,
+  KanbanSquare,
+  LayoutDashboard,
   Bot,
   BookOpen,
+  FlaskConical,
   Users,
   User,
   Calendar,
@@ -27,8 +31,11 @@ const NAV: {
   donoOnly?: boolean;
 }[] = [
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
+  { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+  { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, donoOnly: true },
+  { href: "/playground", label: "Playground", icon: FlaskConical, donoOnly: true },
   { href: "/equipe", label: "Equipe", icon: Users },
 ];
 
@@ -140,16 +147,7 @@ export default function NavRail({
           collapsed ? "justify-center" : "justify-between"
         }`}
       >
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="brand-grad flex h-7 w-7 items-center justify-center rounded-lg font-display text-sm font-bold">
-              D
-            </div>
-            <span className="font-display text-base font-bold tracking-tight">
-              DeskCRM
-            </span>
-          </div>
-        )}
+        {!collapsed && <BrandMark size="sm" />}
         <button
           onClick={toggle}
           title={collapsed ? "Expandir menu" : "Recolher menu"}

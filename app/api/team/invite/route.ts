@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  billableSeats,
+  extraSeatsPriceBRL,
+  planFor,
+  seatState,
+} from "@/lib/billing";
 
 // Convida um usuário para o tenant do dono logado.
 // - Só o dono convida (gate por user_clients.role).
@@ -37,6 +43,34 @@ export async function POST(req: NextRequest) {
   const role = body.role;
 
   const svc = createServiceClient();
+
+  // Limite de atendente do plano (o dono não conta). Contado por service_role
+  // porque a policy de user_clients só mostra a PRÓPRIA linha ao browser: contar
+  // pela sessão daria sempre 1. É aqui que o plano vira regra de verdade, e não
+  // numa mensagem na tela que dá para ignorar.
+  //
+  // Atendente extra É VENDIDO como adicional, então isto não é uma parede
+  // definitiva: é uma parede ENQUANTO não existe checkout. Cobrar o adicional
+  // hoje é operação manual, e liberar antes de cobrar seria dar assento de graça.
+  const { count: membros } = await svc
+    .from("user_clients")
+    .select("user_id", { count: "exact", head: true })
+    .eq("client_id", mine.id);
+  const plano = planFor(mine.billingPlan);
+  const seats = seatState(plano, billableSeats(membros ?? 0));
+  if (plano && !seats.withinPlan) {
+    return NextResponse.json(
+      {
+        error: `${seats.message} Para incluir mais gente agora, fale com a gente.`,
+        seats: {
+          used: seats.used,
+          included: seats.included,
+          extraCostBRL: extraSeatsPriceBRL(seats.extra + 1),
+        },
+      },
+      { status: 409 }
+    );
+  }
   const origin = new URL(req.url).origin;
   const redirectTo = `${origin}/auth/confirm?next=/definir-senha`;
 

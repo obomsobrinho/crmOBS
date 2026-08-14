@@ -1,0 +1,777 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  KanbanSquare,
+  Search,
+  User,
+  Bot,
+  Settings2,
+  Plus,
+  ChevronUp,
+  ChevronDown,
+  Archive,
+  ArchiveRestore,
+  X,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { formatTime, prettyPhone } from "@/lib/format";
+import {
+  buildInbox,
+  initials,
+  avatarPair,
+  type ConvRow,
+  type ContatoRow,
+} from "@/lib/inbox";
+import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
+import {
+  buildCards,
+  lastQualByPhone,
+  rowToStage,
+  stageColumns,
+  stageColor,
+  slugifyStage,
+  STAGE_COLOR_KEYS,
+  type PipelineCard,
+  type Stage,
+  type StageRow,
+} from "@/lib/pipeline";
+
+const STAGE_SELECT =
+  "id, key, name, position, is_canonical, is_default, archived, color";
+
+export default function PipelineBoard({
+  clientId,
+  myRole,
+  initialStages,
+  initialCards,
+  preview = false,
+  previewMembers = [],
+}: {
+  clientId: string;
+  myRole: string | null;
+  initialStages: Stage[];
+  initialCards: PipelineCard[];
+  /** No /design (sem login) usa mocks e simula as ações em memória. */
+  preview?: boolean;
+  previewMembers?: Member[];
+}) {
+  const router = useRouter();
+  const isOwner = myRole === "dono";
+  const supabase = useMemo(() => (preview ? null : createClient()), [preview]);
+
+  const [stages, setStages] = useState<Stage[]>(initialStages);
+  const [cards, setCards] = useState<PipelineCard[]>(initialCards);
+  const [membersById, setMembersById] = useState<Record<string, Member>>(
+    Object.fromEntries(previewMembers.map((m) => [m.userId, m]))
+  );
+  const [search, setSearch] = useState("");
+  const [attFilter, setAttFilter] = useState<string>("all"); // all | none | userId
+  const [stageFilter, setStageFilter] = useState<string>("all");
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [managing, setManaging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Recarrega os cards a partir das mesmas 3 tabelas do inbox.
+  const refetchCards = useCallback(async () => {
+    if (!supabase) return;
+    const [{ data: convs }, { data: contatos }, { data: quals }] =
+      await Promise.all([
+        supabase
+          .from("conversations")
+          .select(
+            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage"
+          )
+          .order("last_message_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("dados_cliente")
+          .select("telefone, nomewpp, atendimento_ia, display_name"),
+        supabase
+          .from("conversation_qualifications")
+          .select("phone, summary")
+          .order("created_at", { ascending: false })
+          .limit(300),
+      ]);
+    const { items, ia } = buildInbox(
+      (convs ?? []) as ConvRow[],
+      (contatos ?? []) as ContatoRow[]
+    );
+    const qual = lastQualByPhone(
+      (quals ?? []) as { phone: string; summary: string | null }[]
+    );
+    setCards(buildCards(items, ia, qual));
+  }, [supabase]);
+
+  const refetchStages = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from("pipeline_stages")
+      .select(STAGE_SELECT)
+      .order("position");
+    if (data) setStages((data as StageRow[]).map(rowToStage));
+  }, [supabase]);
+
+  // Realtime: conversas/contatos/qualificações mudam os cards; pipeline_stages
+  // muda as colunas.
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase
+      .channel("pipeline")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
+        () => void refetchCards()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "dados_cliente" },
+        () => void refetchCards()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversation_qualifications" },
+        () => void refetchCards()
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "pipeline_stages" },
+        () => void refetchStages()
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, refetchCards, refetchStages]);
+
+  // Membros do time (para nomear o atendente de cada card).
+  useEffect(() => {
+    if (!supabase) return;
+    void (async () => {
+      const list = await fetchMembers(supabase);
+      setMembersById(Object.fromEntries(list.map((m) => [m.userId, m])));
+    })();
+  }, [supabase]);
+
+  const members = useMemo(() => Object.values(membersById), [membersById]);
+  const activeStages = useMemo(
+    () =>
+      stages.filter((s) => !s.archived).sort((a, b) => a.position - b.position),
+    [stages]
+  );
+
+  const filteredCards = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return cards.filter((c) => {
+      if (attFilter === "none" && c.assignedUserId) return false;
+      if (attFilter !== "all" && attFilter !== "none" && c.assignedUserId !== attFilter)
+        return false;
+      if (q) {
+        const name = (c.name ?? "").toLowerCase();
+        if (!name.includes(q) && !c.phone.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [cards, search, attFilter]);
+
+  const columns = useMemo(() => {
+    const cols = stageColumns(stages, filteredCards);
+    return stageFilter === "all"
+      ? cols
+      : cols.filter((c) => c.stage.key === stageFilter);
+  }, [stages, filteredCards, stageFilter]);
+
+  const shownCount = useMemo(
+    () => columns.reduce((n, c) => n + c.cards.length, 0),
+    [columns]
+  );
+
+  // Move o card para outro estágio (arrastar-soltar). Marca stage_source=human
+  // (a IA nunca sobrescreve um estágio definido por humano).
+  const moveCard = useCallback(
+    async (phone: string, toKey: string) => {
+      const card = cards.find((c) => c.phone === phone);
+      if (!card) return;
+      const defaultKey = activeStages.find((s) => s.isDefault)?.key ?? null;
+      const currentKey =
+        card.stage && activeStages.some((s) => s.key === card.stage)
+          ? card.stage
+          : defaultKey;
+      if (currentKey === toKey) return;
+
+      const prev = cards;
+      setCards((list) =>
+        list.map((c) => (c.phone === phone ? { ...c, stage: toKey } : c))
+      );
+      if (!supabase) return; // preview: só memória
+      const { error: err } = await supabase
+        .from("conversations")
+        .update({
+          stage: toKey,
+          stage_source: "human",
+          stage_changed_at: new Date().toISOString(),
+        })
+        .eq("client_id", clientId)
+        .eq("phone", phone);
+      if (err) {
+        setCards(prev); // reverte
+        setError("não foi possível mover o card. Tente de novo.");
+      }
+    },
+    [cards, activeStages, supabase, clientId]
+  );
+
+  // ---- Gestão de estágios (dono) ----
+  const takenKeys = useMemo(() => stages.map((s) => s.key), [stages]);
+
+  const addStage = useCallback(
+    async (name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
+      const key = slugifyStage(clean, takenKeys);
+      const position = stages.reduce((m, s) => Math.max(m, s.position), -1) + 1;
+      if (!supabase) {
+        setStages((s) => [
+          ...s,
+          {
+            id: -Date.now(),
+            key,
+            name: clean,
+            position,
+            isCanonical: false,
+            isDefault: false,
+            archived: false,
+            color: "gray",
+          },
+        ]);
+        return;
+      }
+      const { error: err } = await supabase.from("pipeline_stages").insert({
+        client_id: clientId,
+        key,
+        name: clean,
+        position,
+        color: "gray",
+      });
+      if (err) setError("não foi possível criar o estágio.");
+      else await refetchStages();
+    },
+    [stages, takenKeys, supabase, clientId, refetchStages]
+  );
+
+  const patchStage = useCallback(
+    async (id: number, patch: Partial<StageRow>) => {
+      if (!supabase) {
+        setStages((s) =>
+          s.map((st) =>
+            st.id === id
+              ? {
+                  ...st,
+                  name: patch.name ?? st.name,
+                  color: patch.color ?? st.color,
+                  position: patch.position ?? st.position,
+                  archived: patch.archived ?? st.archived,
+                }
+              : st
+          )
+        );
+        return;
+      }
+      const { error: err } = await supabase
+        .from("pipeline_stages")
+        .update(patch)
+        .eq("id", id);
+      if (err) setError("não foi possível salvar o estágio.");
+      else await refetchStages();
+    },
+    [supabase, refetchStages]
+  );
+
+  // Reordena trocando a posição com o vizinho (entre os não arquivados).
+  const moveStage = useCallback(
+    async (id: number, dir: -1 | 1) => {
+      const ordered = [...activeStages];
+      const i = ordered.findIndex((s) => s.id === id);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= ordered.length) return;
+      const a = ordered[i];
+      const b = ordered[j];
+      if (!supabase) {
+        setStages((s) =>
+          s.map((st) =>
+            st.id === a.id
+              ? { ...st, position: b.position }
+              : st.id === b.id
+                ? { ...st, position: a.position }
+                : st
+          )
+        );
+        return;
+      }
+      const r1 = await supabase
+        .from("pipeline_stages")
+        .update({ position: b.position })
+        .eq("id", a.id);
+      const r2 = await supabase
+        .from("pipeline_stages")
+        .update({ position: a.position })
+        .eq("id", b.id);
+      if (r1.error || r2.error) setError("não foi possível reordenar.");
+      await refetchStages();
+    },
+    [activeStages, supabase, refetchStages]
+  );
+
+  return (
+    <div className="panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+      {/* Cabeçalho + filtros */}
+      <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
+        <div className="mr-1 flex items-center gap-2">
+          <KanbanSquare size={20} className="text-accent" />
+          <h1 className="font-display text-lg font-bold">Pipeline</h1>
+          <span className="text-xs text-ink-dim">{shownCount}</span>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5">
+          <Search size={15} className="shrink-0 text-ink-dim" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar nome ou telefone"
+            aria-label="Buscar cards"
+            className="w-44 bg-transparent text-sm outline-none placeholder:text-ink-dim"
+          />
+        </div>
+
+        <select
+          value={attFilter}
+          onChange={(e) => setAttFilter(e.target.value)}
+          aria-label="Filtrar por atendente"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-line-strong"
+        >
+          <option value="all">Todos os atendentes</option>
+          <option value="none">Sem atendente</option>
+          {members.map((m) => (
+            <option key={m.userId} value={m.userId}>
+              {memberName(m.email)}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={stageFilter}
+          onChange={(e) => setStageFilter(e.target.value)}
+          aria-label="Filtrar por estágio"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-line-strong"
+        >
+          <option value="all">Todos os estágios</option>
+          {activeStages.map((s) => (
+            <option key={s.key} value={s.key}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setManaging(true)}
+            className="ml-auto flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
+          >
+            <Settings2 size={15} /> Gerenciar estágios
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="flex items-center justify-between gap-2 border-b border-line bg-[var(--danger-bg)] px-4 py-2 text-sm text-danger">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="Fechar aviso"
+            className="rounded p-0.5 hover:opacity-70"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Colunas */}
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+        {columns.length === 0 && (
+          <div className="m-auto text-sm text-ink-dim">
+            Nenhum estágio ativo. {isOwner ? "Crie um em Gerenciar estágios." : ""}
+          </div>
+        )}
+        {columns.map(({ stage, cards: colCards }) => {
+          const over = dragOverKey === stage.key;
+          return (
+            <div
+              key={stage.key}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragOverKey !== stage.key) setDragOverKey(stage.key);
+              }}
+              onDragLeave={(e) => {
+                // só limpa se saiu de fato da coluna (não ao passar por um filho)
+                if (!e.currentTarget.contains(e.relatedTarget as Node))
+                  setDragOverKey((k) => (k === stage.key ? null : k));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const phone = e.dataTransfer.getData("text/plain");
+                setDragOverKey(null);
+                if (phone) void moveCard(phone, stage.key);
+              }}
+              className={`flex w-72 shrink-0 flex-col rounded-xl border bg-surface transition-colors ${
+                over ? "border-accent ring-1 ring-[var(--accent)]" : "border-line"
+              }`}
+            >
+              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: stageColor(stage.color) }}
+                  aria-hidden
+                />
+                <span className="truncate text-sm font-semibold">{stage.name}</span>
+                <span className="ml-auto text-xs tabular-nums text-ink-dim">
+                  {colCards.length}
+                </span>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+                {colCards.length === 0 && (
+                  <div className="px-2 py-6 text-center text-xs text-ink-dim">
+                    Vazio
+                  </div>
+                )}
+                {colCards.map((c) => (
+                  <CardItem
+                    key={c.phone}
+                    card={c}
+                    member={c.assignedUserId ? membersById[c.assignedUserId] : null}
+                    onOpen={() =>
+                      router.push(`/inbox/${encodeURIComponent(c.phone)}`)
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {managing && (
+        <StageManager
+          stages={stages}
+          onClose={() => setManaging(false)}
+          onAdd={addStage}
+          onPatch={patchStage}
+          onMove={moveStage}
+        />
+      )}
+    </div>
+  );
+}
+
+function CardItem({
+  card,
+  member,
+  onOpen,
+}: {
+  card: PipelineCard;
+  member: Member | null | undefined;
+  onOpen: () => void;
+}) {
+  const label = card.name || prettyPhone(card.phone);
+  const ini = initials(card.name);
+  const preview = card.lastPreview.replace(/ \| /g, "  ");
+  return (
+    <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", card.phone);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="cursor-pointer rounded-lg border border-line bg-canvas p-2.5 transition-colors hover:border-line-strong"
+    >
+      <div className="flex items-center gap-2">
+        <div className="relative shrink-0">
+          <div
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold"
+            style={avatarPair(card.phone)}
+          >
+            {ini ?? <User size={14} />}
+          </div>
+          {card.paused && (
+            <span
+              title="Você está atendendo (IA pausada)"
+              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-warn ring-2 ring-canvas"
+            />
+          )}
+        </div>
+        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+          {label}
+        </span>
+        {card.unread > 0 && (
+          <span className="brand-grad flex h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums">
+            {card.unread > 99 ? "99+" : card.unread}
+          </span>
+        )}
+      </div>
+
+      {card.summary ? (
+        <div className="mt-1.5 flex items-start gap-1 text-[12px] text-warn">
+          <Bot size={12} className="mt-0.5 shrink-0 opacity-80" />
+          <span className="line-clamp-2">{card.summary}</span>
+        </div>
+      ) : (
+        <div className="mt-1.5 truncate text-[12px] text-ink-muted">
+          {card.lastFrom === "out" ? `Você: ${preview}` : preview}
+        </div>
+      )}
+
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <span className="text-[11px] tabular-nums text-ink-dim" suppressHydrationWarning>
+          {formatTime(card.lastMessageAt)}
+        </span>
+        {member && (
+          <span
+            title={`Atendente: ${memberName(member.email)}`}
+            className="flex items-center gap-1 text-[11px] text-ink-dim"
+          >
+            <span
+              className="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold"
+              style={avatarPair(member.email)}
+            >
+              {memberInitials(member.email).slice(0, 1)}
+            </span>
+            {memberName(member.email)}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StageManager({
+  stages,
+  onClose,
+  onAdd,
+  onPatch,
+  onMove,
+}: {
+  stages: Stage[];
+  onClose: () => void;
+  onAdd: (name: string) => void;
+  onPatch: (id: number, patch: Partial<StageRow>) => void;
+  onMove: (id: number, dir: -1 | 1) => void;
+}) {
+  const [newName, setNewName] = useState("");
+  const ordered = [...stages]
+    .filter((s) => !s.archived)
+    .sort((a, b) => a.position - b.position);
+  const archived = stages.filter((s) => s.archived);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--panel-shadow)]"
+      >
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+          <div className="flex items-center gap-2">
+            <Settings2 size={18} className="text-accent" />
+            <h3 className="font-display text-base font-bold">Estágios do pipeline</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fechar"
+            className="rounded-lg p-1.5 text-ink-dim transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onAdd(newName);
+              setNewName("");
+            }}
+            className="flex gap-2"
+          >
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Novo estágio (ex.: Proposta enviada)"
+              aria-label="Nome do novo estágio"
+              maxLength={40}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+            />
+            <button
+              type="submit"
+              disabled={!newName.trim()}
+              className="btn-primary flex shrink-0 items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-60"
+            >
+              <Plus size={15} /> Criar
+            </button>
+          </form>
+
+          <ul className="flex flex-col gap-2">
+            {ordered.map((s, i) => (
+              <StageRowItem
+                key={s.id}
+                stage={s}
+                canUp={i > 0}
+                canDown={i < ordered.length - 1}
+                onMove={onMove}
+                onPatch={onPatch}
+              />
+            ))}
+          </ul>
+
+          {archived.length > 0 && (
+            <div>
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
+                Arquivados
+              </div>
+              <ul className="flex flex-col gap-2">
+                {archived.map((s) => (
+                  <li
+                    key={s.id}
+                    className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full opacity-60"
+                      style={{ background: stageColor(s.color) }}
+                    />
+                    <span className="flex-1 truncate text-sm text-ink-muted">
+                      {s.name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onPatch(s.id, { archived: false })}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
+                    >
+                      <ArchiveRestore size={13} /> Restaurar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <p className="text-xs text-ink-dim">
+            Os estágios Novo, Qualificado e Aguardando atendimento são usados pela
+            IA para mover o card sozinha. Você pode renomeá-los e reordená-los.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StageRowItem({
+  stage,
+  canUp,
+  canDown,
+  onMove,
+  onPatch,
+}: {
+  stage: Stage;
+  canUp: boolean;
+  canDown: boolean;
+  onMove: (id: number, dir: -1 | 1) => void;
+  onPatch: (id: number, patch: Partial<StageRow>) => void;
+}) {
+  const [name, setName] = useState(stage.name);
+
+  function commitName() {
+    const clean = name.trim();
+    if (clean && clean !== stage.name) onPatch(stage.id, { name: clean });
+    else setName(stage.name);
+  }
+
+  return (
+    <li className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-2 py-2">
+      <div className="flex flex-col">
+        <button
+          type="button"
+          disabled={!canUp}
+          onClick={() => onMove(stage.id, -1)}
+          aria-label="Subir"
+          className="rounded p-0.5 text-ink-dim transition-colors hover:text-ink disabled:opacity-30"
+        >
+          <ChevronUp size={14} />
+        </button>
+        <button
+          type="button"
+          disabled={!canDown}
+          onClick={() => onMove(stage.id, 1)}
+          aria-label="Descer"
+          className="rounded p-0.5 text-ink-dim transition-colors hover:text-ink disabled:opacity-30"
+        >
+          <ChevronDown size={14} />
+        </button>
+      </div>
+
+      <button
+        type="button"
+        aria-label="Trocar cor"
+        title="Trocar cor"
+        onClick={() => {
+          const i = STAGE_COLOR_KEYS.indexOf(stage.color);
+          const next = STAGE_COLOR_KEYS[(i + 1) % STAGE_COLOR_KEYS.length];
+          onPatch(stage.id, { color: next });
+        }}
+        className="h-4 w-4 shrink-0 cursor-pointer rounded-full ring-1 ring-line"
+        style={{ background: stageColor(stage.color) }}
+      />
+
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+        maxLength={40}
+        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none transition-colors hover:border-line focus:border-line-strong"
+      />
+
+      {stage.isDefault ? (
+        <span className="shrink-0 rounded-full bg-[var(--active-bg)] px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+          default
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onPatch(stage.id, { archived: true })}
+          aria-label="Arquivar estágio"
+          title="Arquivar"
+          className="shrink-0 rounded-md p-1.5 text-ink-dim transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
+        >
+          <Archive size={14} />
+        </button>
+      )}
+    </li>
+  );
+}

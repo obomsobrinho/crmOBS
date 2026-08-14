@@ -2,15 +2,16 @@
 
 import { MessageCircle, User, UserCheck } from "lucide-react";
 import { prettyPhone, phoneDigits } from "@/lib/format";
-import { initials, avatarColor } from "@/lib/inbox";
+import { initials, avatarPair } from "@/lib/inbox";
 import { memberName, memberInitials, type Member } from "@/lib/team";
 import ContactTags from "./ContactTags";
 import ContactNotes from "./ContactNotes";
 import ContactFields from "./ContactFields";
 import AiSummary from "./AiSummary";
+import AiCoach from "./AiCoach";
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "Não informado";
   return new Date(iso).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
@@ -30,6 +31,7 @@ export default function ContextPanel({
   myUserId,
   onAssign,
   conversationId,
+  pendingInstruction,
   clientId,
   editableName,
   customFields,
@@ -46,6 +48,7 @@ export default function ContextPanel({
   myUserId: string;
   onAssign: (userId: string | null) => void;
   conversationId: number | null;
+  pendingInstruction: string | null;
   clientId: string;
   editableName: string | null;
   customFields: Record<string, unknown> | null;
@@ -65,8 +68,8 @@ export default function ContextPanel({
       <div>
         <div className="flex items-center gap-2.5">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-            style={{ background: avatarColor(phone) }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+            style={avatarPair(phone)}
           >
             {ini ?? <User size={16} />}
           </div>
@@ -93,7 +96,7 @@ export default function ContextPanel({
           <span
             className={`h-2 w-2 rounded-full ${paused ? "bg-warn" : "bg-accent"}`}
           />
-          <span className={paused ? "text-warn" : "text-accent"}>
+          <span className={paused ? "text-warn-ink" : "text-brand-ink"}>
             {paused ? "Pausada · você atende" : "Ativa · IA respondendo"}
           </span>
         </div>
@@ -107,13 +110,21 @@ export default function ContextPanel({
 
       <AiSummary phone={phone} clientId={clientId} />
 
+      <AiCoach
+        phone={phone}
+        clientId={clientId}
+        myUserId={myUserId}
+        paused={paused}
+        initialInstruction={pendingInstruction}
+      />
+
       <Section title="Atendimento">
         <div className="flex items-center gap-2 rounded-lg bg-panel px-3 py-2.5 text-sm">
           {attendant ? (
             <>
               <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-                style={{ background: avatarColor(attendant.email) }}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                style={avatarPair(attendant.email)}
               >
                 {memberInitials(attendant.email).slice(0, 1)}
               </div>

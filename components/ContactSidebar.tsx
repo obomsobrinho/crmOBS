@@ -9,7 +9,7 @@ import { formatTime, prettyPhone } from "@/lib/format";
 import {
   buildInbox,
   initials,
-  avatarColor,
+  avatarPair,
   type ConvRow,
   type ContatoRow,
 } from "@/lib/inbox";
@@ -304,8 +304,8 @@ export default function ContactSidebar({
                 >
                   <div className="relative shrink-0">
                     <div
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold text-white"
-                      style={{ background: avatarColor(phone) }}
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold"
+                      style={avatarPair(phone)}
                     >
                       {ini ?? <User size={16} />}
                     </div>
@@ -318,8 +318,8 @@ export default function ContactSidebar({
                     {att && (
                       <span
                         title={`Atendente: ${memberName(att.email)}`}
-                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold text-white ring-2 ring-surface"
-                        style={{ background: avatarColor(att.email) }}
+                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold ring-2 ring-surface"
+                        style={avatarPair(att.email)}
                       >
                         {memberInitials(att.email).slice(0, 1)}
                       </span>

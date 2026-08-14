@@ -1,140 +1,366 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   Tema do CRM — sistema de trabalho, estética profissional neutra
-   em light + dark. Base neutra (branco no light / PRETO no dark) +
-   acento AZUL da marca. A cor vive com significado: azul = IA/acento,
-   verde = você (humano), âmbar = precisa de você (IA pausada),
-   vermelho = erro. Ver memory/design-identity.md.
+   Sistema de design do CRM (OBS).
+
+   Fonte da verdade: design system "OBS CRM" no Claude Design, rodada 1
+   ("Diagnóstico e proposta de tokens"). Regras que valem em toda a UI:
+
+   1. SEMÂNTICA DA COR, e ela não muda de significado:
+      roxo = marca e IA · verde = humano ("você" respondeu) e enviar
+      âmbar = precisa de você (IA pausada, aviso) · vermelho = erro e bloqueio
+      Verde, âmbar e vermelho são cores de ESTADO: nunca decorativas.
+
+   2. CADA MATIZ TEM QUATRO PAPÉIS, e é a escolha do papel que garante
+      contraste: `fill` (fundo cheio), `on` (tinta sobre o fill), `ink` (a cor
+      como texto ou ícone sobre superfície) e `surface`/`line` (fundo tingido e
+      borda). NUNCA usar `fill` como cor de texto, NUNCA usar `ink` como fundo.
+
+   3. TINTA em quatro níveis: `ink` > `ink-2` > `ink-3` (piso de texto, mínimo
+      12px) > `ink-faint` (NUNCA texto: só ícone e divisor).
+
+   4. O AZUL (--brand-grad-end) existe só porque a logo termina nele. Escopo
+      fechado: gradiente de marca, símbolo e superfície decorativa a partir de
+      28px. Não pinta texto, não pinta ícone, não pinta estado.
+
+   Light e dark são cidadãos de primeira classe. Ver memory/design-identity.md.
    ───────────────────────────────────────────────────────────── */
 
 @theme inline {
+  /* Superfícies em quatro camadas (novo sistema). */
   --color-canvas: var(--canvas);
+  --color-sunken: var(--sunken);
+  --color-raised: var(--raised);
+  --color-inset: var(--inset);
+
+  /* Aliases de superfície mantidos: os componentes ainda usam estes nomes. */
   --color-surface: var(--surface);
   --color-panel: var(--panel);
   --color-chat: var(--chat-bg);
+
+  /* Tinta. */
   --color-ink: var(--ink);
-  --color-ink-muted: var(--ink-muted);
-  --color-ink-dim: var(--ink-dim);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-faint: var(--ink-faint);
+  /* Aliases legados: ink-muted = ink-2, ink-dim = ink-3. */
+  --color-ink-muted: var(--ink-2);
+  --color-ink-dim: var(--ink-3);
+
+  /* Marca e IA. */
+  --color-brand: var(--brand-fill);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-line: var(--brand-line);
+  /* Alias legado: --accent era o fill da marca. */
   --color-accent: var(--accent);
+
+  /* Humano e enviar. */
+  --color-human: var(--human-fill);
+  --color-human-ink: var(--human-ink);
+  --color-human-surface: var(--human-surface);
+  --color-human-line: var(--human-line);
+  /* Alias legado: --ia era usado como fill e como texto. */
+  --color-ia: var(--ia);
+
+  /* Precisa de você. */
+  --color-warn: var(--warn-fill);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-surface: var(--warn-surface);
+  --color-warn-line: var(--warn-line);
+
+  /* Erro e bloqueio. */
+  --color-danger: var(--danger-fill);
+  --color-danger-ink: var(--danger-ink);
+  --color-danger-surface: var(--danger-surface);
+  --color-danger-line: var(--danger-line);
+
+  /* Linhas estruturais. */
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-ia: var(--ia);
-  --color-warn: var(--warn);
-  --color-danger: var(--danger);
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-manrope), sans-serif;
 
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
+  /* Seis papéis tipográficos. Tamanho e entrelinha travados juntos, para que o
+     mesmo tamanho nunca mais apareça com dois ritmos. O peso fica na marcação
+     em `corpo` e `apoio`, que têm variante forte em 600. Piso absoluto da
+     interface: 12px (papel legenda). */
+  --text-display: 24px;
+  --text-display--line-height: 28px;
+  --text-display--letter-spacing: -0.015em;
+  --text-display--font-weight: 600;
+
+  --text-titulo: 18px;
+  --text-titulo--line-height: 24px;
+  --text-titulo--letter-spacing: -0.01em;
+  --text-titulo--font-weight: 600;
+
+  --text-corpo: 15px;
+  --text-corpo--line-height: 22px;
+
+  --text-apoio: 13px;
+  --text-apoio--line-height: 18px;
+
+  --text-legenda: 12px;
+  --text-legenda--line-height: 16px;
+  --text-legenda--font-weight: 500;
+
+  --text-rotulo: 11px;
+  --text-rotulo--line-height: 14px;
+  --text-rotulo--letter-spacing: 0.08em;
+  --text-rotulo--font-weight: 600;
+
+  /* Raio. Cinco degraus mais o balão, que é assinatura do produto. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  /* Alias legado: --radius-2xl era a superfície principal. */
+  --radius-2xl: 16px;
 }
 
 :root {
-  /* Light — v-mista: base #f3f3f6, sidebar branco, balões estilo WhatsApp. */
+  /* ── Superfícies, do fundo para cima ──
+     Menu e conversa em `sunken`, lista e painel em `raised` com sombra,
+     campos em `inset`. É a hierarquia do escuro, invertida.
+     ⚠️ `--canvas` ainda NÃO desceu para #dedbe9: no desenho novo o menu e a
+     conversa recuam junto, e fazer só o fundo escurecer deixaria a tela pela
+     metade. A troca acontece na rodada das telas, junto com os componentes. */
   --canvas: #f3f3f6;
-  --surface: #ffffff;
-  --panel: #f1edfb;
-  --chat-bg: #f3f3f6;
-  --input-bg: #f3f3f6;
-  --ink: #1a1330;
-  --ink-muted: #5b5478;
-  --ink-dim: #8b84a6;
-  --accent: #6d28d9;
-  --grad: linear-gradient(135deg, #6d28d9, #8b46f6);
-  --line: rgba(90, 50, 180, 0.14);
-  --line-strong: rgba(90, 50, 180, 0.24);
-  --ia: #16a34a;
-  --warn: #b45309;
-  --danger: #dc2626;
+  --sunken: #eceaf3;
+  --raised: #ffffff;
+  --inset: #f1eff7;
 
-  --active-bg: rgba(20, 10, 40, 0.05);
-  /* Conversa aberta na lista (mesmo fundo do chat). */
-  --selected-bg: #f3f3f6;
-  --accent-bg: rgba(109, 40, 217, 0.1);
-  --accent-border: rgba(109, 40, 217, 0.3);
+  /* Aliases em uso pelos componentes (migram na rodada das telas). */
+  --surface: #ffffff;
+  --panel: #f1eff7;
+  --chat-bg: #f3f3f6;
+  --input-bg: #f1eff7;
+
+  /* ── Tinta ── */
+  --ink: #171128; /* 15,8:1 */
+  --ink-2: #4b4468; /* 8,1:1, texto secundário */
+  --ink-3: #6b6486; /* 5,5:1, piso de texto (mínimo 12px) */
+  --ink-faint: #a9a2c0; /* NUNCA texto: ícone e divisor */
+  /* Aliases legados. */
+  --ink-muted: #4b4468;
+  --ink-dim: #6b6486;
+
+  /* ── Marca e IA ── */
+  --brand-fill: #6b21e8; /* 6,9:1 com tinta branca */
+  --brand-on: #ffffff;
+  --brand-ink: #5b17d4; /* 8,4:1 sobre superfície */
+  --brand-surface: rgba(107, 33, 232, 0.09);
+  --brand-line: rgba(107, 33, 232, 0.28);
+  /* Alias legado. */
+  --accent: #6b21e8;
+  --accent-bg: rgba(107, 33, 232, 0.09);
+  --accent-border: rgba(107, 33, 232, 0.28);
   --accent-contrast: #ffffff;
-  /* Sombra suave dos painéis sobre o canvas (só no light). */
-  --panel-shadow: 0 6px 20px -12px rgba(60, 40, 120, 0.28);
-  /* Relevo bem leve dos balões (padrão WhatsApp), só no light. */
-  --bubble-shadow: 0 1px 1.5px rgba(11, 20, 26, 0.1);
+
+  /* Gradiente da marca. O azul só vive aqui. */
+  --brand-grad-start: #8c2ce7;
+  --brand-grad-mid: #5806c9;
+  --brand-grad-end: #4464d4;
+  --grad: linear-gradient(135deg, #8c2ce7, #4464d4);
+
+  /* ── Humano e enviar ── */
+  --human-fill: #2fb872; /* 6,8:1 com tinta escura */
+  --human-on: #06251b;
+  --human-ink: #10714a; /* 5,0:1 sobre superfície */
+  --human-surface: rgba(47, 184, 114, 0.12);
+  --human-line: rgba(16, 113, 74, 0.3);
+  /* Aliases legados. ⚠️ Mantidos nos valores antigos de propósito: os
+     componentes ainda usam `--ia` como COR DE TEXTO (`text-ia`), e o fill novo
+     é mais claro, o que pioraria o contraste. Quem for texto migra para
+     `--human-ink` na rodada das telas. */
+  --ia: #16a34a;
   --ia-bg: rgba(22, 163, 74, 0.1);
   --ia-border: rgba(22, 163, 74, 0.28);
+  --send: #2f9e6a;
+
+  /* ── Precisa de você ── */
+  --warn-fill: #b45309; /* 5,0:1 com tinta branca */
+  --warn-on: #ffffff;
+  --warn-ink: #8f4308; /* 6,3:1 sobre superfície */
+  --warn-surface: rgba(180, 83, 9, 0.1);
+  --warn-line: rgba(180, 83, 9, 0.3);
+  /* Aliases legados. */
+  --warn: #b45309;
   --warn-bg: rgba(180, 83, 9, 0.1);
   --warn-border: rgba(180, 83, 9, 0.3);
+
+  /* ── Erro e bloqueio ── */
+  --danger-fill: #c81e1e; /* 5,5:1 com tinta branca */
+  --danger-on: #ffffff;
+  --danger-ink: #b91c1c; /* 6,5:1 sobre superfície */
+  --danger-surface: rgba(200, 30, 30, 0.09);
+  --danger-line: rgba(200, 30, 30, 0.3);
+  /* Aliases legados, mantidos nos valores antigos pelo mesmo motivo do verde. */
+  --danger: #dc2626;
   --danger-bg: rgba(220, 38, 38, 0.1);
   --danger-border: rgba(220, 38, 38, 0.3);
 
-  /* Balões WhatsApp: recebido branco, você verde-claro, IA roxo-claro. */
-  --bubble-in-bg: #ffffff;
-  --bubble-in-fg: #1a1330;
-  --bubble-you-bg: #d9fdd3;
-  --bubble-you-fg: #0b3d2e;
-  --bubble-ia-bg: #ece2ff;
-  --bubble-ia-fg: #4a2c9e;
-  --send: #2f9e6a;
+  /* ── Estrutura ── */
+  --line: rgba(90, 50, 180, 0.14);
+  --line-strong: rgba(90, 50, 180, 0.24);
+  --active-bg: rgba(20, 10, 40, 0.05);
+  --selected-bg: #f3f3f6;
+  --panel-shadow: 0 6px 20px -14px rgba(60, 40, 120, 0.3);
+  --bubble-shadow: 0 1px 1.5px rgba(11, 20, 26, 0.1);
 
-  /* Nav rail no LIGHT = branco (igual à listagem). */
+  /* ── Balões: recebido branco, você verde claro, IA roxo claro ──
+     A tinta já é escura nos três, então os três passam AA. */
+  --bubble-in-bg: #ffffff;
+  --bubble-in-fg: #171128;
+  --bubble-you-bg: #d9fdd3;
+  --bubble-you-fg: #06251b;
+  --bubble-ia-bg: #e6dcfd;
+  --bubble-ia-fg: #4310a8;
+
+  /* ── Nav rail ── */
   --rail-bg: #ffffff;
-  --rail-fg: #1a1330;
-  --rail-fg-dim: #5b5478;
+  --rail-fg: #171128;
+  --rail-fg-dim: #4b4468;
   --rail-hover: rgba(20, 10, 40, 0.05);
   --rail-active-bg: rgba(20, 10, 40, 0.06);
-  --rail-active-fg: #1a1330;
+  --rail-active-fg: #171128;
   --rail-border: rgba(20, 10, 40, 0.1);
+
+  /* ── Avatar: par de fundo tingido e tinta do mesmo matiz ──
+     Substitui branco sobre cor cheia, que dava 2,80:1. */
+  --av-1-bg: #fde6c7;
+  --av-1-fg: #7a4406;
+  --av-2-bg: #cdeeea;
+  --av-2-fg: #0b5f57;
+  --av-3-bg: #e6dcfd;
+  --av-3-fg: #5222a8;
+  --av-4-bg: #cfe9f5;
+  --av-4-fg: #0d5670;
+  --av-5-bg: #fbd9e6;
+  --av-5-fg: #8a1c48;
+  --av-6-bg: #d5edd6;
+  --av-6-fg: #1b5b2c;
+  --av-7-bg: #e3e2fb;
+  --av-7-fg: #34309b;
+  --av-8-bg: #fadfd6;
+  --av-8-fg: #8a3418;
+
+  /* ── Movimento ── */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   color-scheme: light;
 }
 
 [data-theme="dark"] {
-  /* Dark — v-mista aprovado: preto neutro + acento roxo vivo. */
+  /* Mesmos papéis do claro. O canvas escurece para o painel principal ganhar
+     borda de luz e a moldura sumir. */
+  /* ⚠️ Mesma ressalva do claro: `--canvas` só desce para #08090d quando os
+     componentes migrarem para as quatro camadas. */
   --canvas: #0a0b10;
+  --sunken: #0c0d12;
+  --raised: #15161d;
+  --inset: #1b1d23;
+
   --surface: #15161d;
   --panel: #1f2029;
   --chat-bg: #0c0d12;
   --input-bg: #1b1d23;
-  --ink: #eef0f5;
-  --ink-muted: #a6a8bc;
-  --ink-dim: #6e7089;
-  --accent: #8b46f6;
-  --grad: linear-gradient(135deg, #6d28e0, #9b4dff);
-  --line: rgba(160, 158, 196, 0.12);
-  --line-strong: rgba(160, 158, 196, 0.22);
-  --ia: #22c55e;
-  --warn: #f9a63a;
-  --danger: #ef4444;
 
-  --active-bg: rgba(255, 255, 255, 0.05);
-  --selected-bg: #191a22;
-  --accent-bg: rgba(139, 70, 246, 0.16);
-  --accent-border: rgba(139, 70, 246, 0.4);
+  --ink: #eef0f5; /* 15,0:1 */
+  --ink-2: #b6b8ca; /* 9,3:1 */
+  --ink-3: #8b8ea6; /* 5,7:1, piso de texto */
+  --ink-faint: #5a5c72; /* NUNCA texto */
+  --ink-muted: #b6b8ca;
+  --ink-dim: #8b8ea6;
+
+  --brand-fill: #7b35f0; /* 5,8:1 com tinta branca */
+  --brand-on: #ffffff;
+  --brand-ink: #b98cff; /* 7,1:1 sobre superfície */
+  --brand-surface: rgba(139, 70, 246, 0.18);
+  --brand-line: rgba(139, 70, 246, 0.42);
+  --accent: #8b46f6;
+  --accent-bg: rgba(139, 70, 246, 0.18);
+  --accent-border: rgba(139, 70, 246, 0.42);
   --accent-contrast: #ffffff;
-  --panel-shadow: none;
-  --bubble-shadow: none;
+
+  --brand-grad-start: #8c2ce7;
+  --brand-grad-mid: #5806c9;
+  --brand-grad-end: #4464d4;
+  --grad: linear-gradient(135deg, #8c2ce7, #4464d4);
+
+  --human-fill: #22c55e; /* 7,6:1 com tinta escura */
+  --human-on: #06251b;
+  --human-ink: #4ade80; /* 8,9:1 sobre superfície */
+  --human-surface: rgba(34, 197, 94, 0.16);
+  --human-line: rgba(74, 222, 128, 0.4);
+  --ia: #22c55e;
   --ia-bg: rgba(34, 197, 94, 0.14);
   --ia-border: rgba(34, 197, 94, 0.3);
+  --send: #2f9e6a;
+
+  --warn-fill: #f9a63a; /* 8,7:1 com tinta escura */
+  --warn-on: #241403;
+  --warn-ink: #fbbf5c; /* 11:1 sobre superfície */
+  --warn-surface: rgba(249, 166, 58, 0.16);
+  --warn-line: rgba(249, 166, 58, 0.42);
+  --warn: #f9a63a;
   --warn-bg: rgba(249, 166, 58, 0.16);
-  --warn-border: rgba(249, 166, 58, 0.4);
+  --warn-border: rgba(249, 166, 58, 0.42);
+
+  --danger-fill: #cc2b2b; /* 5,3:1 com tinta branca */
+  --danger-on: #ffffff;
+  --danger-ink: #ff9b9b; /* 9,0:1 sobre superfície */
+  --danger-surface: rgba(239, 68, 68, 0.14);
+  --danger-line: rgba(239, 68, 68, 0.42);
+  /* Alias legado no valor antigo: #cc2b2b como TEXTO sobre surface daria
+     3,45:1, contra 4,87:1 do #ef4444. Ele é fill, não tinta. */
+  --danger: #ef4444;
   --danger-bg: rgba(239, 68, 68, 0.12);
   --danger-border: rgba(239, 68, 68, 0.3);
 
-  /* Balões (dark): recebido cinza, você verde escuro, IA roxo escuro. */
+  --line: rgba(160, 158, 196, 0.12);
+  --line-strong: rgba(160, 158, 196, 0.22);
+  --active-bg: rgba(255, 255, 255, 0.05);
+  --selected-bg: #191a22;
+  --panel-shadow: none;
+  --bubble-shadow: none;
+
   --bubble-in-bg: #212530;
   --bubble-in-fg: #e7e8ee;
   --bubble-you-bg: #123f2f;
   --bubble-you-fg: #c9ffe6;
   --bubble-ia-bg: #382a6e;
   --bubble-ia-fg: #e7ddff;
-  --send: #2f9e6a;
 
-  /* Nav rail no DARK = quase-preto. */
   --rail-bg: #0c0d12;
   --rail-fg: #eef0f5;
-  --rail-fg-dim: #9297a3;
+  --rail-fg-dim: #b6b8ca;
   --rail-hover: rgba(255, 255, 255, 0.06);
   --rail-active-bg: rgba(255, 255, 255, 0.06);
   --rail-active-fg: #eef0f5;
   --rail-border: rgba(255, 255, 255, 0.1);
+
+  --av-1-bg: #3a2a10;
+  --av-1-fg: #f3c07a;
+  --av-2-bg: #10312e;
+  --av-2-fg: #7fd8cf;
+  --av-3-bg: #2a2050;
+  --av-3-fg: #c0a4fb;
+  --av-4-bg: #102b38;
+  --av-4-fg: #86cbe6;
+  --av-5-bg: #3a1428;
+  --av-5-fg: #f4a2c1;
+  --av-6-bg: #14301b;
+  --av-6-fg: #93d79c;
+  --av-7-bg: #1f1f45;
+  --av-7-fg: #a9a6f0;
+  --av-8-bg: #3a1d12;
+  --av-8-fg: #f0a98d;
 
   color-scheme: dark;
 }
@@ -153,34 +379,36 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-/* Painel sólido — superfície + borda fina (sem vidro/blur). Nome
-   "glass" mantido para não quebrar os componentes que já usam. */
+/* Superfície elevada: painel sólido com borda fina e sombra sobre o canvas.
+   `.glass` é alias legado (o nome mentia, nunca houve vidro nem blur). */
+.surface-raised,
 .glass,
 .panel {
-  background: var(--surface);
+  background: var(--raised);
   border: 1px solid var(--line);
   box-shadow: var(--panel-shadow);
 }
 
-/* Botão primário da marca (acento azul + texto branco). */
+/* Botão primário: fill da marca com a tinta que o acompanha. */
 .btn-primary {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--brand-fill);
+  color: var(--brand-on);
 }
 .btn-primary:hover {
   filter: brightness(1.08);
 }
 
-/* Botão de enviar mensagem — verde (padrão WhatsApp, = sua mensagem). */
+/* Enviar mensagem: a única ação verde do produto, sempre com tinta escura.
+   Branco sobre este verde dava 3,38:1 e reprovava AA. */
 .btn-send {
-  background: var(--send);
-  color: #fff;
+  background: var(--human-fill);
+  color: var(--human-on);
 }
 .btn-send:hover {
   filter: brightness(1.08);
 }
 
-/* Gradiente da marca (logo, chip ativo). */
+/* Gradiente da marca. Único lugar autorizado a usar o azul. */
 .brand-grad {
   background-image: var(--grad);
   color: #fff;
@@ -204,7 +432,7 @@ h3 {
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-dim);
+  background: var(--ink-faint);
 }
 ::-webkit-scrollbar-button {
   display: none;
@@ -221,10 +449,11 @@ summary {
   cursor: pointer;
 }
 
+/* Ancorado em brand-ink para funcionar também sobre superfície tingida. */
 *:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-ink);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 @keyframes msg-in {
@@ -238,5 +467,5 @@ summary {
   }
 }
 .msg-in {
-  animation: msg-in 0.24s ease-out both;
+  animation: msg-in var(--dur-slow) var(--ease-out) both;
 }

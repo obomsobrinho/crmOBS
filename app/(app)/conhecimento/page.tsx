@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyClient } from "@/lib/auth";
+import { requireActiveTenant } from "@/lib/auth";
 import KnowledgeManager from "@/components/KnowledgeManager";
 import type { KnowledgeDoc } from "@/lib/crm";
 
 export const dynamic = "force-dynamic";
 
 export default async function ConhecimentoPage() {
-  const client = await getMyClient();
+  const client = await requireActiveTenant();
   // A base de conhecimento é do dono, igual à configuração do agente.
   if (!client || client.role !== "dono") redirect("/inbox");
 

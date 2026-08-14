@@ -17,7 +17,7 @@ import {
   roleLabel,
   type Member,
 } from "@/lib/team";
-import { avatarColor } from "@/lib/inbox";
+import { avatarPair } from "@/lib/inbox";
 
 // Gestão de equipe: dono convida por e-mail, define papel e remove membros.
 // Atendente vê a lista mas não age. Writes vão por /api/team/* (service_role);
@@ -174,8 +174,8 @@ export default function TeamManager({
                 }`}
               >
                 <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
-                  style={{ background: avatarColor(m.email) }}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  style={avatarPair(m.email)}
                 >
                   {memberInitials(m.email)}
                 </div>

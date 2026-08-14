@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import BrandMark from "@/components/BrandMark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,14 +38,7 @@ export default function LoginPage() {
         onSubmit={handleSubmit}
         className="glass w-full max-w-sm space-y-5 rounded-2xl p-7"
       >
-        <div className="flex items-center gap-2">
-          <div className="brand-grad flex h-8 w-8 items-center justify-center rounded-lg font-display text-base font-bold">
-            D
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight">
-            DeskCRM
-          </span>
-        </div>
+        <BrandMark />
 
         <div>
           <h1 className="font-display text-xl font-bold">Entrar</h1>
@@ -66,9 +61,17 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="password" className="text-sm font-medium">
-            Senha
-          </label>
+          <div className="flex items-baseline justify-between">
+            <label htmlFor="password" className="text-sm font-medium">
+              Senha
+            </label>
+            <Link
+              href="/recuperar-senha"
+              className="text-xs text-ink-muted transition-colors hover:text-ink"
+            >
+              Esqueci minha senha
+            </Link>
+          </div>
           <input
             id="password"
             type="password"
@@ -89,6 +92,16 @@ export default function LoginPage() {
         >
           {loading ? "Entrando…" : "Entrar"}
         </button>
+
+        <div className="border-t border-line pt-4 text-center">
+          <span className="text-xs text-ink-muted">Ainda não tem conta? </span>
+          <Link
+            href="/cadastro"
+            className="text-xs font-medium text-accent transition-colors hover:underline"
+          >
+            Criar conta
+          </Link>
+        </div>
       </form>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Paperclip, Bot, Hand, Loader2 } from "lucide-react";
+import { Send, Paperclip, Bot, Hand, Loader2, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export type OutgoingMedia = {
@@ -24,11 +24,14 @@ export default function MessageComposer({
   onSendMedia,
   iaAtiva,
   clientId,
+  readOnly,
 }: {
   onSend: (text: string) => void | Promise<void>;
   onSendMedia?: (media: OutgoingMedia) => void | Promise<void>;
   iaAtiva?: boolean;
   clientId: string;
+  /** Conta bloqueada por assinatura: some com a caixa de texto. */
+  readOnly?: boolean;
 }) {
   const supabase = createClient();
   const [text, setText] = useState("");
@@ -96,22 +99,39 @@ export default function MessageComposer({
     }
   }
 
+  // Conta bloqueada: a conversa continua visível (as mensagens seguem chegando),
+  // mas não existe caixa de texto. Melhor tirar o campo do que deixar a pessoa
+  // escrever e levar erro do servidor depois de ter escrito.
+  if (readOnly) {
+    return (
+      <div className="border-t border-line bg-surface px-3 pb-3 pt-2.5">
+        <div className="flex items-center gap-2 rounded-lg border-l-[3px] border-l-[var(--danger)] bg-[var(--danger-bg)] px-3 py-2.5 text-[12.5px] text-ink">
+          <Lock size={14} className="shrink-0 text-danger" />
+          <span>
+            Envio pausado enquanto a conta não está em dia. Você continua vendo
+            as mensagens que chegam.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="border-t border-line bg-surface px-3 pb-3 pt-2.5">
-      {/* Estado do atendimento — é o aviso mais importante da tela, então tem
+      {/* Estado do atendimento: é o aviso mais importante da tela, então tem
           peso de banner (não rodapé cinza). */}
       {iaAtiva === true && (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-[3px] border-l-[var(--accent)] bg-[var(--input-bg)] px-3 py-2 text-[12.5px] text-ink">
           <Bot size={14} className="shrink-0 text-accent" />
           <span>
-            A IA está atendendo — ao enviar, <strong className="font-semibold">você assume</strong> a conversa.
+            A IA está atendendo. Ao enviar, <strong className="font-semibold">você assume</strong> a conversa.
           </span>
         </div>
       )}
       {iaAtiva === false && (
         <div className="mb-2 flex items-center gap-2 rounded-lg border-l-[3px] border-l-[var(--ia)] bg-[var(--ia-bg)] px-3 py-2 text-[12.5px] text-ink">
           <Hand size={14} className="shrink-0 text-ia" />
-          <span>Você está atendendo — a IA não responde nesta conversa.</span>
+          <span>Você está atendendo. A IA não responde nesta conversa.</span>
         </div>
       )}
 

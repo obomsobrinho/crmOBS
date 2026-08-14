@@ -20,6 +20,15 @@ export async function POST(req: Request) {
   if (!client) {
     return NextResponse.json({ error: "não autenticado" }, { status: 401 });
   }
+  // Gate de assinatura no servidor: conta bloqueada não manda mensagem. O layout
+  // do app já barra as telas, mas a rota checa por conta própria (é ela que faz
+  // o trabalho, e esconder botão no client não é bloqueio).
+  if (client.access.blocked) {
+    return NextResponse.json(
+      { error: client.access.message },
+      { status: 402 }
+    );
+  }
   if (!client.evolution_instance) {
     return NextResponse.json(
       { error: "cliente sem instância WhatsApp conectada" },

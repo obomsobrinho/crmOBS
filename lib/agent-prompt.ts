@@ -377,7 +377,7 @@ export function buildPersona(cfg: AgentConfig): string {
     "- A pessoa pedir explicitamente pra falar com alguém do time.",
     "- Faltar uma informação necessária pra continuar e você não tiver de onde tirar.",
     "- A conversa virar reclamação séria, cobrança ou assunto delicado.",
-    "Ao pausar, mande uma mensagem avisando que alguém do time continua por ali. Nunca pause em silêncio.",
+    "Ao pausar, o time assume a conversa a partir daí. Não responda a dúvida nem ofereça nada nesse mesmo turno: foque em preencher o summary com o que a pessoa precisa.",
   ].join("\n");
 
   const casosLimite = [
@@ -490,7 +490,7 @@ export function buildPersona(cfg: AgentConfig): string {
       : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca conversas.',
     "- summary: vazio quando action for none. Em " +
       (wantsAgendar ? "agendar ou pausar" : "pausar") +
-      ", escreva direto o que a pessoa precisa e o contexto útil pra quem vai continuar. Sem floreio.",
+      ", escreva direto o que a pessoa precisa e o contexto útil pra quem vai continuar. Sem floreio. Descreva só o que a pessoa pediu ou disse; nunca inclua o que você ofereceu ou sugeriu.",
     wantsAgendar
       ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça à tarde".'
       : "- preferencia_horario: nunca preencha.",

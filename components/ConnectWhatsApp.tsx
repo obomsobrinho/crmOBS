@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "./LogoutButton";
+import ConnectionRiskNotice from "./ConnectionRiskNotice";
 
 type Phase = "idle" | "loading" | "waiting" | "importing" | "connected" | "error";
 
@@ -91,7 +92,7 @@ export default function ConnectWhatsApp({
   }, [hasInstance, startPolling, stopPolling]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-4 lg:flex-row lg:items-start lg:justify-center lg:py-10">
       <div className="glass w-full max-w-md space-y-5 rounded-2xl p-6 text-center">
         <div className="flex items-center justify-between">
           <div className="text-left">
@@ -165,6 +166,10 @@ export default function ConnectWhatsApp({
           </>
         )}
       </div>
+
+      {/* Transparência sobre o QR: só faz sentido antes de conectar. Depois de
+          conectado a tela está de saída (redireciona), então sai da frente. */}
+      {phase !== "connected" && phase !== "importing" && <ConnectionRiskNotice />}
     </div>
   );
 }

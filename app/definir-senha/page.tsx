@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import BrandMark from "@/components/BrandMark";
 
 // Convidado define a própria senha depois de abrir o link do e-mail (a sessão
 // já foi gravada em /auth/confirm). O CRM nunca define a senha por ninguém.
@@ -51,14 +52,7 @@ export default function DefinirSenhaPage() {
         onSubmit={handleSubmit}
         className="glass w-full max-w-sm space-y-5 rounded-2xl p-7"
       >
-        <div className="flex items-center gap-2">
-          <div className="brand-grad flex h-8 w-8 items-center justify-center rounded-lg font-display text-base font-bold">
-            D
-          </div>
-          <span className="font-display text-xl font-bold tracking-tight">
-            DeskCRM
-          </span>
-        </div>
+        <BrandMark />
 
         <div>
           <h1 className="font-display text-xl font-bold">Definir senha</h1>

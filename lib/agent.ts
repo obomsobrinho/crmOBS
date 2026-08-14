@@ -46,6 +46,17 @@ export function agoraBlock(now: Date = new Date()): string {
   return `### AGORA\nData e hora atuais (São Paulo): ${quando}.`;
 }
 
+// Orientação do operador (handoff coach): um humano do time disse o que a IA
+// deve fazer no próximo turno. É instrução prioritária e confiável (vem do time,
+// não do cliente). Injetada no system para a IA retomar sozinha a conversa.
+export function operatorBlock(instruction: string): string {
+  return [
+    "### ORIENTAÇÃO DO OPERADOR",
+    "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação nesta resposta, com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
+    `Orientação: ${instruction.trim()}`,
+  ].join("\n");
+}
+
 // Trechos recuperados da base de conhecimento (RAG), injetados no system. A
 // seção FONTES E HONESTIDADE da persona já manda tratar isto como fonte de
 // verdade e não ir além do que estiver aqui.
@@ -94,6 +105,23 @@ const OUTPUT_SCHEMA = {
 
 export class AgentError extends Error {}
 
+/**
+ * Consumo do turno, como a API do modelo informa. Existe porque é o único jeito
+ * de saber o custo real por conversa (a coluna mais chutada da tabela de preços).
+ * `null` quando a resposta não trouxe `usage`.
+ */
+export interface TurnUsage {
+  inputTokens: number | null;
+  outputTokens: number | null;
+}
+
+export interface AgentRun {
+  output: AgentOutput;
+  usage: TurnUsage | null;
+  /** Modelo que atendeu de fato (o env pode trocar). */
+  model: string;
+}
+
 // Roda um turno do agente. Lança AgentError em falha (a rota mapeia para 502).
 export async function runAgent(params: {
   persona: string;
@@ -102,9 +130,11 @@ export async function runAgent(params: {
   apiKey: string;
   /** Trechos recuperados da base de conhecimento (RAG), se houver. */
   knowledge?: string[];
+  /** Orientação do operador para este turno (handoff coach), se houver. */
+  operatorInstruction?: string | null;
   model?: string;
   now?: Date;
-}): Promise<AgentOutput> {
+}): Promise<AgentRun> {
   const { persona, history, message, apiKey } = params;
   const model = params.model || AGENT_MODEL;
 
@@ -113,6 +143,11 @@ export async function runAgent(params: {
     parts.push(knowledgeBlock(params.knowledge));
   }
   parts.push(agoraBlock(params.now));
+  // A orientação do operador vai por último (recência): é o que a IA deve
+  // priorizar neste turno.
+  if (params.operatorInstruction && params.operatorInstruction.trim()) {
+    parts.push(operatorBlock(params.operatorInstruction));
+  }
   const system = parts.join("\n\n");
   const messages = [
     { role: "system", content: system },
@@ -148,6 +183,7 @@ export async function runAgent(params: {
 
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new AgentError("o modelo não retornou resposta");
@@ -159,7 +195,20 @@ export async function runAgent(params: {
     throw new AgentError("o modelo não seguiu o formato esperado");
   }
 
-  return normalizeOutput(parsed);
+  // O consumo vem de graça na resposta. Registrar é o que permite saber o custo
+  // real por conversa em vez de estimar.
+  const usage: TurnUsage | null = data.usage
+    ? {
+        inputTokens:
+          typeof data.usage.prompt_tokens === "number" ? data.usage.prompt_tokens : null,
+        outputTokens:
+          typeof data.usage.completion_tokens === "number"
+            ? data.usage.completion_tokens
+            : null,
+      }
+    : null;
+
+  return { output: normalizeOutput(parsed), usage, model };
 }
 
 // Blindagem: garante 1 a 2 mensagens não vazias e um action válido, mesmo que o

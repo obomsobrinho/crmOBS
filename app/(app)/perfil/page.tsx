@@ -1,6 +1,8 @@
 import { User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
+import ChangePassword from "@/components/ChangePassword";
+import { statusLabel } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,10 @@ export default async function PerfilPage() {
     { label: "E-mail", value: user?.email ?? "—" },
     { label: "Instância WhatsApp", value: client?.evolution_instance ?? "—" },
     { label: "Conta criada em", value: fmtDate(user?.created_at) },
+    {
+      label: "Assinatura",
+      value: client ? statusLabel(client.subscriptionStatus) : "—",
+    },
   ];
 
   return (
@@ -35,18 +41,22 @@ export default async function PerfilPage() {
       </div>
       <p className="mb-5 text-sm text-ink-muted">Dados da sua conta.</p>
 
-      <div className="max-w-xl overflow-y-auto rounded-xl border border-line bg-surface">
-        {rows.map((r, i) => (
-          <div
-            key={r.label}
-            className={`flex items-center justify-between px-4 py-3 ${
-              i > 0 ? "border-t border-line" : ""
-            }`}
-          >
-            <span className="text-sm text-ink-muted">{r.label}</span>
-            <span className="text-sm font-medium">{r.value}</span>
-          </div>
-        ))}
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+        <div className="max-w-xl rounded-xl border border-line bg-surface">
+          {rows.map((r, i) => (
+            <div
+              key={r.label}
+              className={`flex items-center justify-between px-4 py-3 ${
+                i > 0 ? "border-t border-line" : ""
+              }`}
+            >
+              <span className="text-sm text-ink-muted">{r.label}</span>
+              <span className="text-sm font-medium">{r.value}</span>
+            </div>
+          ))}
+        </div>
+
+        <ChangePassword email={user?.email ?? ""} />
       </div>
     </div>
   );

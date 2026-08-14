@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bot, User, CheckCheck, PanelRight, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
-import { initials, avatarColor } from "@/lib/inbox";
+import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 
@@ -103,6 +103,7 @@ export default function Thread({
   onToggleContext,
   contextOpen,
   clientId,
+  readOnly,
 }: {
   phone: string;
   name: string | null;
@@ -112,6 +113,8 @@ export default function Thread({
   onToggleContext?: () => void;
   contextOpen?: boolean;
   clientId: string;
+  /** Conta bloqueada por assinatura: só leitura (sem envio, sem ligar a IA). */
+  readOnly?: boolean;
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
@@ -305,18 +308,21 @@ export default function Thread({
         {iaState !== null && (
           <button
             onClick={onToggleIa}
+            disabled={readOnly}
             role="switch"
             aria-checked={!iaPausada}
             title={
-              iaPausada
-                ? "IA pausada — clique para reativar (a IA volta a responder)"
-                : "IA ativa — clique para assumir (a IA para de responder)"
+              readOnly
+                ? "Conta bloqueada: a IA não atende enquanto a assinatura não estiver em dia"
+                : iaPausada
+                ? "IA pausada, clique para reativar (a IA volta a responder)"
+                : "IA ativa, clique para assumir (a IA para de responder)"
             }
-            className="flex shrink-0 items-center gap-2 rounded-full border border-line px-2.5 py-1 transition-colors hover:bg-[var(--active-bg)]"
+            className="flex shrink-0 items-center gap-2 rounded-full border border-line px-2.5 py-1 transition-colors hover:bg-[var(--active-bg)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
           >
             <span
               className={`text-xs font-medium ${
-                iaPausada ? "text-ia" : "text-accent"
+                iaPausada ? "text-human-ink" : "text-brand-ink"
               }`}
             >
               {iaPausada ? "Você atende" : "IA ativa"}
@@ -377,6 +383,7 @@ export default function Thread({
         onSendMedia={handleSendMedia}
         iaAtiva={iaState !== null && !iaPausada}
         clientId={clientId}
+        readOnly={readOnly}
       />
     </>
   );
@@ -407,7 +414,7 @@ function RowAvatar({
     style = { background: "var(--send)" };
     content = <User size={14} />;
   } else {
-    style = { background: avatarColor(phone) };
+    style = avatarPair(phone);
     content = initials(contactName) ?? <User size={14} />;
   }
 

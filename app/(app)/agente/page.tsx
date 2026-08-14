@@ -1,16 +1,18 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyClient } from "@/lib/auth";
+import { requireActiveTenant } from "@/lib/auth";
 import AgentConfigForm from "@/components/AgentConfigForm";
 import NotifyTargetCard from "@/components/NotifyTargetCard";
+import AgentPublishCard from "@/components/AgentPublishCard";
 import { validateConfig, type AgentConfig } from "@/lib/agent-prompt";
+import { publishBlockers } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
 type Mode = "guiado" | "avancado";
 
 export default async function AgentePage() {
-  const client = await getMyClient();
+  const client = await requireActiveTenant();
   // Configurar o agente é só do dono. Atendente não vê nem acessa.
   if (!client || client.role !== "dono") redirect("/inbox");
   const supabase = await createClient();
@@ -39,6 +41,18 @@ export default async function AgentePage() {
 
   return (
     <div className="glass flex min-h-0 flex-1 flex-col gap-4 overflow-hidden rounded-2xl p-6">
+      <AgentPublishCard
+        clientId={client!.id}
+        published={!!client!.agentPublishedAt}
+        blockers={publishBlockers({
+          hasInstance: !!client!.evolution_instance,
+          agentConfigured: !!client!.onboarding.steps.find(
+            (s) => s.key === "configurar"
+          )?.done,
+          tested: !!client!.onboarding.steps.find((s) => s.key === "testar")?.done,
+          published: !!client!.agentPublishedAt,
+        })}
+      />
       <NotifyTargetCard clientId={client!.id} initialJid={notifyGroup} />
       <AgentConfigForm
         clientId={client!.id}

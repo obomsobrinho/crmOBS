@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -16,8 +17,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "DeskCRM",
-  description: "Inbox de conversas de WhatsApp com agente de IA",
+  title: BRAND.name,
+  description: BRAND.tagline,
 };
 
 export default async function RootLayout({

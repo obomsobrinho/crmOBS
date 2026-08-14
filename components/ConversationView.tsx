@@ -21,10 +21,12 @@ export default function ConversationView({
   members,
   myUserId,
   conversationId,
+  pendingInstruction,
   clientId,
   displayName,
   customFields,
   contactExists,
+  readOnly,
 }: {
   phone: string;
   name: string | null;
@@ -36,10 +38,13 @@ export default function ConversationView({
   members: Member[];
   myUserId: string;
   conversationId: number | null;
+  pendingInstruction: string | null;
   clientId: string;
   displayName: string | null;
   customFields: Record<string, unknown> | null;
   contactExists: boolean;
+  /** Conta bloqueada por assinatura: a conversa é visível, mas não se trabalha. */
+  readOnly?: boolean;
 }) {
   const supabase = createClient();
   const [showContext, setShowContext] = useState(true);
@@ -134,6 +139,9 @@ export default function ConversationView({
   }, [phone, supabase]);
 
   const toggleIa = useCallback(async () => {
+    // Conta bloqueada não liga nem desliga a IA. A guarda fica aqui (e não só no
+    // botão) porque o mesmo callback é usado pelo header e pelo painel lateral.
+    if (readOnly) return;
     const pausada = iaState === "pause";
     const next = pausada ? "ativa" : "pause";
     const prev = iaState;
@@ -143,7 +151,7 @@ export default function ConversationView({
       .update({ atendimento_ia: next })
       .eq("telefone", phone);
     if (error) setIaState(prev); // reverte em caso de falha
-  }, [iaState, phone, supabase]);
+  }, [iaState, phone, supabase, readOnly]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
@@ -157,6 +165,7 @@ export default function ConversationView({
           onToggleContext={() => setShowContext((v) => !v)}
           contextOpen={showContext}
           clientId={clientId}
+          readOnly={readOnly}
         />
       </div>
       {showContext && (
@@ -173,6 +182,7 @@ export default function ConversationView({
             myUserId={myUserId}
             onAssign={assign}
             conversationId={conversationId}
+            pendingInstruction={pendingInstruction}
             clientId={clientId}
             editableName={displayName}
             customFields={customFields}

@@ -35,6 +35,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic =
     pathname.startsWith("/login") ||
+    // Cadastro self-service e recuperação de senha: quem chega aqui não tem
+    // sessão por definição.
+    pathname.startsWith("/cadastro") ||
+    pathname.startsWith("/recuperar-senha") ||
     pathname.startsWith("/auth") ||
     // Página de preview de design — só existe em desenvolvimento.
     (process.env.NODE_ENV !== "production" && pathname.startsWith("/design")) ||

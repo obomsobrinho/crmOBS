@@ -18,6 +18,7 @@ export interface ConvRow {
   last_message_from: string | null;
   unread_count: number | null;
   assigned_user_id: string | null;
+  stage?: string | null; // pipeline (só o board seleciona esta coluna)
 }
 
 // Linha crua de `dados_cliente` usada para resolver nome e estado da IA.
@@ -51,6 +52,7 @@ export function buildInbox(
     lastMessageAt: c.last_message_at,
     unread: c.unread_count ?? 0,
     assignedUserId: c.assigned_user_id ?? null,
+    stage: c.stage ?? null,
   }));
   return { items, ia };
 }
@@ -67,23 +69,24 @@ export function bestName(rows: ChatRow[]): string | null {
 // Iniciais para avatar. Retorna null quando não há nome real (a UI mostra um
 // ícone de pessoa em vez de "55" derivado do telefone). Centraliza a lógica que
 // estava duplicada em ContactSidebar/Thread/ContextPanel.
-// Cor de avatar determinística (sólida, sem gradiente) a partir de uma chave
-// (telefone/nome). Paleta com saturação controlada — cor sem virar arco-íris.
-const AVATAR_COLORS = [
-  "#7c4dff",
-  "#f97316",
-  "#14b8a6",
-  "#3b82f6",
-  "#e0498a",
-  "#0ea5a4",
-  "#8b5cf6",
-  "#ef6f53",
-];
+// Avatar determinístico a partir de uma chave (telefone ou e-mail).
+// Devolve um PAR de fundo tingido e tinta do mesmo matiz, não uma cor sólida:
+// inicial branca sobre cor cheia dava 2,80:1 e reprovava WCAG AA. Os oito pares
+// vivem no globals.css (--av-N-bg / --av-N-fg) porque cada tema tem os seus, e
+// o componente não sabe qual tema está ativo no momento da renderização.
+const AVATAR_SLOTS = 8;
 
-export function avatarColor(key: string): string {
+export function avatarPair(key: string): {
+  background: string;
+  color: string;
+} {
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+  const slot = (h % AVATAR_SLOTS) + 1;
+  return {
+    background: `var(--av-${slot}-bg)`,
+    color: `var(--av-${slot}-fg)`,
+  };
 }
 
 export function initials(name: string | null): string | null {
