@@ -38,6 +38,22 @@
   --color-panel: var(--panel);
   --color-chat: var(--chat-bg);
 
+  /* Superfícies nomeadas por FUNÇÃO (tela de atendimento, rodada 5). Cada
+     coluna tem a sua porque a hierarquia do claro é invertida no escuro: no
+     claro o menu sobe (branco) e a conversa recua; no escuro o menu é o mais
+     claro da tela e a conversa é o mais escuro. Um único `surface` não dava
+     conta de menu, lista, conversa, composer e painel ao mesmo tempo. */
+  --color-menu: var(--s-menu);
+  --color-conteudo: var(--s-conteudo);
+  --color-lista: var(--s-lista);
+  --color-lista-sel: var(--s-lista-sel);
+  --color-msg: var(--s-msg);
+  --color-composer: var(--s-composer);
+  --color-sub: var(--s-sub);
+  --color-painel: var(--s-painel);
+  --color-bloco: var(--s-bloco);
+  --color-campo: var(--s-campo);
+
   /* Tinta. */
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -123,14 +139,33 @@
 :root {
   /* ── Superfícies, do fundo para cima ──
      Menu e conversa em `sunken`, lista e painel em `raised` com sombra,
-     campos em `inset`. É a hierarquia do escuro, invertida.
-     ⚠️ `--canvas` ainda NÃO desceu para #dedbe9: no desenho novo o menu e a
-     conversa recuam junto, e fazer só o fundo escurecer deixaria a tela pela
-     metade. A troca acontece na rodada das telas, junto com os componentes. */
+     campos em `inset`. É a hierarquia do escuro, invertida. */
   --canvas: #f3f3f6;
   --sunken: #eceaf3;
   --raised: #ffffff;
   --inset: #f1eff7;
+
+  /* Superfícies. São TRÊS, e a contenção é o ponto: lista, conversa e painel
+     dividem `--s-conteudo`, e o que separa as colunas é uma linha de 1px, nunca
+     meio tom. A versão anterior dava um cinza de matiz diferente para cada
+     coluna (lavanda, quase branco, cinza) e o resultado lia como escolha
+     aleatória em vez de hierarquia. */
+  --s-menu: #ffffff;
+  --s-conteudo: #ffffff;
+  --s-msg: #f3f3f6;
+  --s-campo: #ffffff;
+  /* Barra da linha selecionada: o roxo da marca. Era a tinta principal, um
+     preto que não existia em mais nada no produto. */
+  --sel-bar: #6b21e8;
+  /* Relevo do balão. Sem ele, balão branco sobre a conversa dá 1,05:1 e some. */
+  --b-shadow: 0 1px 1px rgba(23, 17, 40, 0.16);
+  /* Aliases de compatibilidade: as telas fora do atendimento ainda os usam. */
+  --s-lista: #ffffff;
+  --s-lista-sel: #ffffff;
+  --s-composer: #f3f3f6;
+  --s-sub: #ffffff;
+  --s-painel: #ffffff;
+  --s-bloco: #f1eff8;
 
   /* Aliases em uso pelos componentes (migram na rodada das telas). */
   --surface: #ffffff;
@@ -180,6 +215,14 @@
   --ia-border: rgba(22, 163, 74, 0.28);
   --send: #2f9e6a;
 
+  /* Botão de enviar. A tinta é BRANCA no claro, e por isso o verde aqui é um
+     degrau mais escuro que `--human-fill`: branco sobre #2fb872 dá 2,45:1 e
+     sobre #2f9e6a dá 2,9:1, os dois abaixo do mínimo de 3:1 para elemento
+     gráfico. Sobre #1a8f52 dá 4,1:1. O verde claro segue valendo para ponto de
+     estado e superfície tingida, onde não carrega tinta branca. */
+  --send-fill: #1a8f52;
+  --send-on: #ffffff;
+
   /* ── Precisa de você ── */
   --warn-fill: #b45309; /* 5,0:1 com tinta branca */
   --warn-on: #ffffff;
@@ -214,10 +257,13 @@
      A tinta já é escura nos três, então os três passam AA. */
   --bubble-in-bg: #ffffff;
   --bubble-in-fg: #171128;
+  --bubble-in-hora: #6b6486;
   --bubble-you-bg: #d9fdd3;
   --bubble-you-fg: #06251b;
+  --bubble-you-hora: #2c6b4f;
   --bubble-ia-bg: #e6dcfd;
   --bubble-ia-fg: #4310a8;
+  --bubble-ia-hora: #6236c0;
 
   /* ── Nav rail ── */
   --rail-bg: #ffffff;
@@ -247,6 +293,25 @@
   --av-8-bg: #fadfd6;
   --av-8-fg: #8a3418;
 
+  /* ── Chip neutro: contador de conversas e filtros da lista ──
+     No escuro é o carvão da marca (#242424); no claro, a superfície recuada.
+     Existe para tirar da tela o azul quase preto, que virava buraco. */
+  --chip-bg: #e6e3f0;
+  --chip-fg: #4b4468;
+  --chip-line: rgba(58, 31, 122, 0.16);
+
+  /* ── Escala de controle (altura) ──
+     Quatro degraus, e não sete controles todos em 40px. Quem for do mesmo
+     degrau tem a MESMA altura, sempre; o que muda é o peso visual.
+     field   campo de digitar, o único que pode crescer
+     primary ação principal de um bloco (assumir, convidar)
+     control ação secundária, aba, enviar, chip de filtro
+     chrome  botão só de ícone da moldura (clipe, painel, tema) */
+  --h-field: 40px;
+  --h-primary: 36px;
+  --h-control: 32px;
+  --h-chrome: 28px;
+
   /* ── Movimento ── */
   --dur-fast: 120ms;
   --dur: 200ms;
@@ -259,12 +324,27 @@
 [data-theme="dark"] {
   /* Mesmos papéis do claro. O canvas escurece para o painel principal ganhar
      borda de luz e a moldura sumir. */
-  /* ⚠️ Mesma ressalva do claro: `--canvas` só desce para #08090d quando os
-     componentes migrarem para as quatro camadas. */
   --canvas: #0a0b10;
   --sunken: #0c0d12;
   --raised: #15161d;
   --inset: #1b1d23;
+
+  /* Mesmas três superfícies do claro, com a hierarquia invertida: aqui o
+     conteúdo é MAIS CLARO que o fundo, e a conversa é o ponto mais escuro da
+     tela. É o que faz a área de mensagens ler como fundo nos dois temas usando
+     a mesma marcação. */
+  --s-menu: #1b1d23;
+  --s-conteudo: #1b1d23;
+  --s-msg: #0c0d12;
+  --s-campo: #22242c;
+  --sel-bar: #b98cff;
+  --b-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --s-lista: #1b1d23;
+  --s-lista-sel: #1b1d23;
+  --s-composer: #0c0d12;
+  --s-sub: #1b1d23;
+  --s-painel: #1b1d23;
+  --s-bloco: #22232c;
 
   --surface: #15161d;
   --panel: #1f2029;
@@ -303,6 +383,11 @@
   --ia-border: rgba(34, 197, 94, 0.3);
   --send: #2f9e6a;
 
+  /* No escuro a conta se inverte: branco sobre #22c55e dá 1,99:1, enquanto a
+     tinta escura dá 7,6:1. Aqui o verde fica claro e a tinta escura. */
+  --send-fill: #22c55e;
+  --send-on: #06251b;
+
   --warn-fill: #f9a63a; /* 8,7:1 com tinta escura */
   --warn-on: #241403;
   --warn-ink: #fbbf5c; /* 11:1 sobre superfície */
@@ -332,12 +417,21 @@
 
   --bubble-in-bg: #212530;
   --bubble-in-fg: #e7e8ee;
+  --bubble-in-hora: #8b8ea6;
   --bubble-you-bg: #123f2f;
   --bubble-you-fg: #c9ffe6;
+  --bubble-you-hora: #7fd4a8;
   --bubble-ia-bg: #382a6e;
   --bubble-ia-fg: #e7ddff;
+  --bubble-ia-hora: #c3a1ff;
 
-  --rail-bg: #0c0d12;
+  /* Carvão da marca: o mesmo #242424 do bloco da logo. Lê como degrau acima
+     do rail sem virar o azul quase preto que reprovou. */
+  --chip-bg: #242424;
+  --chip-fg: #c6c8d6;
+  --chip-line: rgba(255, 255, 255, 0.09);
+
+  --rail-bg: #20222b;
   --rail-fg: #eef0f5;
   --rail-fg-dim: #b6b8ca;
   --rail-hover: rgba(255, 255, 255, 0.06);
@@ -398,11 +492,12 @@ h3 {
   filter: brightness(1.08);
 }
 
-/* Enviar mensagem: a única ação verde do produto, sempre com tinta escura.
-   Branco sobre este verde dava 3,38:1 e reprovava AA. */
+/* Enviar mensagem: a única ação verde do produto. O par fill/tinta vem de
+   `--send-fill`/`--send-on`, que se invertem por tema para o contraste fechar
+   nos dois (branco no claro, tinta escura no escuro). */
 .btn-send {
-  background: var(--human-fill);
-  color: var(--human-on);
+  background: var(--send-fill);
+  color: var(--send-on);
 }
 .btn-send:hover {
   filter: brightness(1.08);
@@ -412,6 +507,18 @@ h3 {
 .brand-grad {
   background-image: var(--grad);
   color: #fff;
+}
+
+/* Selo da marca: as duas artes ficam no DOM e o CSS escolhe pelo tema. O padrão
+   é a arte clara, porque o tema claro é o estado sem atributo. */
+.mark-dark {
+  display: none;
+}
+[data-theme="dark"] .mark-dark {
+  display: block;
+}
+[data-theme="dark"] .mark-light {
+  display: none;
 }
 
 * {
@@ -454,6 +561,52 @@ summary {
   outline: 2px solid var(--brand-ink);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* Campo de texto NÃO usa o anel. Um retângulo destacado em volta de um campo
+   que já é um retângulo lê como erro, e era ele que aparecia a cada clique.
+   O foco continua visível: a moldura do próprio campo assume a cor da marca.
+   Botão e link seguem com o anel, porque não têm moldura para acender. */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible,
+[contenteditable]:focus,
+[contenteditable]:focus-visible {
+  outline: none;
+  border-color: var(--brand-line);
+}
+
+/* Cartão de seção. O atendimento tem TRÊS: o menu, a lista de conversas e a
+   conversa com os detalhes do contato. Dentro de um cartão a separação é linha
+   de 1px, nunca outro cartão. */
+.cartao {
+  background: var(--s-conteudo);
+  border: 1px solid var(--line);
+  box-shadow: var(--panel-shadow);
+}
+
+/* Sombra de rolagem: acende sob o cabeçalho quando a conversa passa por baixo
+   dele, e acima da caixa de escrita enquanto sobra conversa embaixo. É o que
+   diferencia "acabou" de "tem mais, continue rolando". */
+:root {
+  --sombra-rolagem: 0 10px 16px -14px rgba(23, 17, 40, 0.65);
+  --sombra-rolagem-topo: 0 -10px 16px -14px rgba(23, 17, 40, 0.65);
+}
+[data-theme="dark"] {
+  --sombra-rolagem: 0 10px 18px -14px rgba(0, 0, 0, 0.9);
+  --sombra-rolagem-topo: 0 -10px 18px -14px rgba(0, 0, 0, 0.9);
+}
+/* Classe própria, e não `shadow-[var(--x)]`: o utilitário do Tailwind compõe a
+   sombra a partir das partes dele e não aceita uma lista pronta vinda de
+   variável, então o valor chegava zerado. */
+.sombra-rolagem {
+  box-shadow: var(--sombra-rolagem);
+}
+.sombra-rolagem-topo {
+  box-shadow: var(--sombra-rolagem-topo);
 }
 
 @keyframes msg-in {

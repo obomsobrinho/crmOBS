@@ -51,16 +51,25 @@ export default function ConversationView({
   const [iaState, setIaState] = useState<string | null>(atendimentoIa);
   const [assigned, setAssigned] = useState<string | null>(assignedUserId);
   const [assignedProp, setAssignedProp] = useState<string | null>(assignedUserId);
+  const [instruction, setInstruction] = useState<string | null>(pendingInstruction);
+  const [instructionProp, setInstructionProp] = useState<string | null>(
+    pendingInstruction
+  );
 
   // Ressincroniza ao navegar entre conversas.
   useEffect(() => {
     setIaState(atendimentoIa);
   }, [atendimentoIa]);
-  // Ajuste em tempo de render (sem efeito) quando a atribuição vinda do servidor
-  // muda ao trocar de conversa. Ver react.dev "adjusting state when a prop changes".
+  // Ajuste em tempo de render (sem efeito) quando a atribuição ou a orientação
+  // vindas do servidor mudam ao trocar de conversa. Ver react.dev "adjusting
+  // state when a prop changes".
   if (assignedProp !== assignedUserId) {
     setAssignedProp(assignedUserId);
     setAssigned(assignedUserId);
+  }
+  if (instructionProp !== pendingInstruction) {
+    setInstructionProp(pendingInstruction);
+    setInstruction(pendingInstruction);
   }
 
   // Realtime da atribuição desta conversa (outro atendente pode assumir).
@@ -138,6 +147,61 @@ export default function ConversationView({
     };
   }, [phone, supabase]);
 
+  // Nota interna e orientação da IA vêm das abas da caixa de escrita. Estavam
+  // as duas na coluna da direita, cada uma com a sua própria caixa de texto,
+  // então havia três lugares para escrever na mesma tela.
+  const addNote = useCallback(
+    async (body: string) => {
+      if (conversationId == null) return;
+      await supabase.from("conversation_notes").insert({
+        client_id: clientId,
+        conversation_id: conversationId,
+        author_user_id: myUserId,
+        body,
+      });
+    },
+    [supabase, clientId, conversationId, myUserId]
+  );
+
+  // Orienta a IA e reativa: ela consome a orientação na PRÓXIMA mensagem do
+  // cliente (consumo único em /api/agent) e segue sozinha.
+  const instruct = useCallback(
+    async (text: string) => {
+      const { error } = await supabase
+        .from("conversations")
+        .update({
+          pending_instruction: text,
+          pending_instruction_at: new Date().toISOString(),
+          pending_instruction_by: myUserId,
+        })
+        .eq("client_id", clientId)
+        .eq("phone", phone);
+      if (error) return;
+      await supabase
+        .from("dados_cliente")
+        .update({ atendimento_ia: "reativada" })
+        .eq("telefone", phone);
+      setInstruction(text);
+      setIaState("reativada");
+    },
+    [supabase, clientId, phone, myUserId]
+  );
+
+  const cancelInstruction = useCallback(async () => {
+    const prev = instruction;
+    setInstruction(null); // otimista
+    const { error } = await supabase
+      .from("conversations")
+      .update({
+        pending_instruction: null,
+        pending_instruction_at: null,
+        pending_instruction_by: null,
+      })
+      .eq("client_id", clientId)
+      .eq("phone", phone);
+    if (error) setInstruction(prev); // reverte
+  }, [supabase, clientId, phone, instruction]);
+
   const toggleIa = useCallback(async () => {
     // Conta bloqueada não liga nem desliga a IA. A guarda fica aqui (e não só no
     // botão) porque o mesmo callback é usado pelo header e pelo painel lateral.
@@ -155,7 +219,10 @@ export default function ConversationView({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Conversa e contato dividem o cartão com a lista. Cartão dentro de
+          cartão não é hierarquia, é sujeira: o que separa as colunas é uma
+          linha de 1px, e só a área de mensagens tem superfície própria. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-msg">
         <Thread
           phone={phone}
           name={name}
@@ -166,23 +233,27 @@ export default function ConversationView({
           contextOpen={showContext}
           clientId={clientId}
           readOnly={readOnly}
+          onAddNote={conversationId != null ? addNote : undefined}
+          onInstruct={instruct}
+          pendingInstruction={instruction}
+          onCancelInstruction={cancelInstruction}
+          assignedUserId={assigned}
+          members={members}
+          myUserId={myUserId}
+          onAssign={assign}
+          conversationId={conversationId}
         />
       </div>
       {showContext && (
-        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l border-line lg:block">
+        <aside className="hidden w-[296px] shrink-0 overflow-y-auto border-l border-line bg-conteudo lg:block">
           <ContextPanel
             name={name}
             phone={phone}
-            iaState={iaState}
-            onToggleIa={toggleIa}
             firstMessageAt={firstMessageAt}
             messageCount={messageCount}
-            assignedUserId={assigned}
             members={members}
             myUserId={myUserId}
-            onAssign={assign}
             conversationId={conversationId}
-            pendingInstruction={pendingInstruction}
             clientId={clientId}
             editableName={displayName}
             customFields={customFields}

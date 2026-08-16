@@ -1,37 +1,39 @@
 "use client";
 
-import { MessageCircle, User, UserCheck } from "lucide-react";
+import { User } from "lucide-react";
 import { prettyPhone, phoneDigits } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
-import { memberName, memberInitials, type Member } from "@/lib/team";
-import ContactTags from "./ContactTags";
+import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields from "./ContactFields";
 import AiSummary from "./AiSummary";
-import AiCoach from "./AiCoach";
 
+// "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
+// ponto final, que numa legenda de rodapé vira ruído.
 function fmtDate(iso: string | null): string {
-  if (!iso) return "Não informado";
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  if (!iso) return "sempre";
+  return new Date(iso)
+    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+    .replace(" de ", " ")
+    .replace(".", "");
 }
 
+// Coluna da direita: quem é a pessoa e o que se sabe dela.
+//
+// A ordem é uma decisão, não acaso: Entendimento (o que ela quer), Notas (o que
+// o time já descobriu) e Dados (o cadastro). Tudo aberto, sem sanfona, porque
+// há espaço de sobra e esconder três linhas atrás de um clique não economiza
+// nada. A seção "Atendimento" saiu daqui: quem atende agora é um chip no
+// cabeçalho da conversa, junto da conversa, e ter os dois era a mesma decisão
+// em dois lugares.
 export default function ContextPanel({
   name,
   phone,
-  iaState,
-  onToggleIa,
   firstMessageAt,
   messageCount,
-  assignedUserId,
   members,
   myUserId,
-  onAssign,
   conversationId,
-  pendingInstruction,
   clientId,
   editableName,
   customFields,
@@ -39,16 +41,12 @@ export default function ContextPanel({
 }: {
   name: string | null;
   phone: string;
-  iaState: string | null;
-  onToggleIa: () => void;
   firstMessageAt: string | null;
   messageCount: number;
-  assignedUserId: string | null;
+  /** Só para nomear o autor de cada nota. */
   members: Member[];
   myUserId: string;
-  onAssign: (userId: string | null) => void;
   conversationId: number | null;
-  pendingInstruction: string | null;
   clientId: string;
   editableName: string | null;
   customFields: Record<string, unknown> | null;
@@ -56,129 +54,40 @@ export default function ContextPanel({
 }) {
   const displayName = name || prettyPhone(phone);
   const ini = initials(name);
-  const paused = iaState === "pause";
   const number = prettyPhone(phone);
-  const attendant = assignedUserId
-    ? members.find((m) => m.userId === assignedUserId) ?? null
-    : null;
-  const mineAssigned = assignedUserId === myUserId;
 
   return (
-    <div className="flex flex-col gap-4 p-4">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-            style={avatarPair(phone)}
+    <div className="flex min-h-full flex-col gap-3.5 p-3.5">
+      {/* Identidade do contato. O nome também está no cabeçalho, mas aqui ele
+          ancora a coluna: sem isso a lateral abre direto em texto solto e não
+          se sabe de quem é. O telefone entra porque é o dado que mais se copia.
+          O bloco "Status da IA", os rótulos e o botão verde de WhatsApp saíram:
+          os três já existem no cabeçalho, a dois centímetros daqui. */}
+      <div className="flex items-center gap-2.5">
+        <div
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-apoio font-semibold"
+          style={avatarPair(phone)}
+        >
+          {ini ?? <User size={18} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-corpo font-semibold">{displayName}</div>
+          <a
+            href={`https://wa.me/${phoneDigits(phone)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Abrir esta conversa no WhatsApp"
+            className="block truncate text-legenda font-normal text-ink-3 transition-colors hover:text-brand-ink"
           >
-            {ini ?? <User size={16} />}
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold">{displayName}</div>
-            <div className="text-[12px] text-ink-muted">Contato</div>
-          </div>
+            {number}
+          </a>
         </div>
-        <a
-          href={`https://wa.me/${phoneDigits(phone)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-send mt-3 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium transition"
-        >
-          <MessageCircle size={14} />
-          Abrir no WhatsApp
-        </a>
       </div>
-
-      <ContactTags conversationId={conversationId} clientId={clientId} />
-
-      <Section title="Status da IA">
-        <div className="flex items-center gap-2 rounded-lg bg-panel px-3 py-2.5 text-sm">
-          <span
-            className={`h-2 w-2 rounded-full ${paused ? "bg-warn" : "bg-accent"}`}
-          />
-          <span className={paused ? "text-warn-ink" : "text-brand-ink"}>
-            {paused ? "Pausada · você atende" : "Ativa · IA respondendo"}
-          </span>
-        </div>
-        <button
-          onClick={onToggleIa}
-          className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-        >
-          {paused ? "Reativar IA" : "Assumir (pausar IA)"}
-        </button>
-      </Section>
 
       <AiSummary phone={phone} clientId={clientId} />
 
-      <AiCoach
-        phone={phone}
-        clientId={clientId}
-        myUserId={myUserId}
-        paused={paused}
-        initialInstruction={pendingInstruction}
-      />
-
-      <Section title="Atendimento">
-        <div className="flex items-center gap-2 rounded-lg bg-panel px-3 py-2.5 text-sm">
-          {attendant ? (
-            <>
-              <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-                style={avatarPair(attendant.email)}
-              >
-                {memberInitials(attendant.email).slice(0, 1)}
-              </div>
-              <span className="min-w-0 truncate">
-                {mineAssigned ? "Você está atendendo" : memberName(attendant.email)}
-              </span>
-            </>
-          ) : (
-            <>
-              <UserCheck size={15} className="shrink-0 text-ink-dim" />
-              <span className="text-ink-muted">Ninguém assumiu ainda</span>
-            </>
-          )}
-        </div>
-
-        {mineAssigned ? (
-          <button
-            onClick={() => onAssign(null)}
-            className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-          >
-            Soltar conversa
-          </button>
-        ) : (
-          <button
-            onClick={() => onAssign(myUserId)}
-            className="btn-primary mt-2 w-full rounded-lg px-3 py-2 text-sm font-medium transition"
-          >
-            Assumir conversa
-          </button>
-        )}
-
-        {members.length > 1 && (
-          <label className="mt-2 block">
-            <span className="sr-only">Transferir atendimento</span>
-            <select
-              value={assignedUserId ?? ""}
-              onChange={(e) => onAssign(e.target.value || null)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
-            >
-              <option value="">Sem atendente</option>
-              {members.map((m) => (
-                <option key={m.userId} value={m.userId}>
-                  {memberName(m.email)}
-                  {m.userId === myUserId ? " (você)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </Section>
-
       <ContactNotes
         conversationId={conversationId}
-        clientId={clientId}
         myUserId={myUserId}
         members={members}
       />
@@ -190,39 +99,15 @@ export default function ContextPanel({
         editable={contactExists}
       />
 
-      <Section title="Dados">
-        <Row label="Telefone" value={number} />
-        <Row label="Primeira mensagem" value={fmtDate(firstMessageAt)} />
-        <Row label="Mensagens" value={String(messageCount)} />
-      </Section>
-    </div>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-        {title}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mb-2.5 last:mb-0">
-      <div className="text-[11px] uppercase tracking-wide text-ink-dim">
-        {label}
-      </div>
-      <div className="text-[13.5px] font-medium">{value}</div>
+      {/* Histórico em uma linha, no pé da coluna. Eram duas linhas rotuladas
+          numa seção "Dados" que competia com o cadastro de verdade. */}
+      <span
+        className="mt-auto border-t border-line pt-3 text-legenda text-ink-3"
+        suppressHydrationWarning
+      >
+        Cliente desde {fmtDate(firstMessageAt)} · {messageCount}{" "}
+        {messageCount === 1 ? "mensagem" : "mensagens"}
+      </span>
     </div>
   );
 }

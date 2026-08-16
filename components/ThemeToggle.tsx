@@ -1,10 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Sun, Moon } from "lucide-react";
 
 // Alterna light/dark, persistindo em cookie. O tema inicial já vem do
 // servidor (o layout lê o cookie e põe data-theme no <html>).
-export default function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
+export default function ThemeToggle({
+  collapsed,
+  iconOnly,
+}: {
+  collapsed?: boolean;
+  /** Botão quadrado no degrau `chrome`, sem rótulo. Usado na faixa do rail. */
+  iconOnly?: boolean;
+}) {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
@@ -24,19 +32,33 @@ export default function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   }
 
   const isDark = theme === "dark";
+  const label = isDark ? "Tema claro" : "Tema escuro";
+  const glyph = isDark ? <Sun size={15} /> : <Moon size={15} />;
+
+  if (iconOnly) {
+    return (
+      <button
+        onClick={toggle}
+        title={label}
+        aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
+        className="flex h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg border border-line-strong bg-menu text-ink-2 transition-colors hover:text-ink"
+      >
+        {glyph}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={toggle}
-      title={isDark ? "Tema claro" : "Tema escuro"}
+      title={label}
       aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
-      className={`flex items-center gap-2 rounded-lg px-2 py-2 text-sm text-[var(--rail-fg-dim)] transition-colors hover:bg-[var(--rail-hover)] hover:text-[var(--rail-fg)] ${
-        collapsed ? "justify-center" : ""
+      className={`flex h-9 items-center gap-3 rounded-lg text-corpo text-ink-2 transition-colors hover:bg-[var(--rail-hover)] hover:text-ink ${
+        collapsed ? "w-9 justify-center" : "px-2.5"
       }`}
     >
-      <span aria-hidden className="text-base leading-none">
-        {isDark ? "☀" : "☾"}
-      </span>
-      {!collapsed && <span>{isDark ? "Tema claro" : "Tema escuro"}</span>}
+      <span className="flex w-[18px] shrink-0 justify-center">{glyph}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
     </button>
   );
 }

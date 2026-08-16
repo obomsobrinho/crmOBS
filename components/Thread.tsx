@@ -1,12 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bot, User, CheckCheck, PanelRight, FileText } from "lucide-react";
+import {
+  Bot,
+  User,
+  UserPlus,
+  Check,
+  CheckCheck,
+  ChevronDown,
+  PanelRight,
+  FileText,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
+import ContactTags from "./ContactTags";
+import { memberName, memberInitials, type Member } from "@/lib/team";
 
 type Pending = {
   tempId: string;
@@ -104,6 +115,15 @@ export default function Thread({
   contextOpen,
   clientId,
   readOnly,
+  onAddNote,
+  onInstruct,
+  assignedUserId,
+  members,
+  myUserId,
+  onAssign,
+  conversationId,
+  pendingInstruction,
+  onCancelInstruction,
 }: {
   phone: string;
   name: string | null;
@@ -115,10 +135,36 @@ export default function Thread({
   clientId: string;
   /** Conta bloqueada por assinatura: só leitura (sem envio, sem ligar a IA). */
   readOnly?: boolean;
+  /** Repassados à caixa de mensagem (abas "Nota interna" e "Orientar"). */
+  onAddNote?: (body: string) => void | Promise<void>;
+  onInstruct?: (text: string) => void | Promise<void>;
+  /* A segunda linha do cabeçalho carrega quem é o dono da conversa e como ela
+     está classificada. São decisões sobre a conversa, então moram junto dela e
+     não a duas colunas de distância, no painel. */
+  assignedUserId?: string | null;
+  members?: Member[];
+  myUserId?: string;
+  onAssign?: (userId: string | null) => void;
+  conversationId?: number | null;
+  /** Orientação pendente da IA, mostrada colada na caixa de escrita. */
+  pendingInstruction?: string | null;
+  onCancelInstruction?: () => void | Promise<void>;
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
   const [pending, setPending] = useState<Pending[]>([]);
+  const [assignOpen, setAssignOpen] = useState(false);
+  // Rolagem: `rolou` = há conversa passando por baixo do cabeçalho; `temMais` =
+  // ainda há conversa por baixo da caixa de escrita. Cada um acende uma sombra
+  // do lado certo, que é o jeito de a borda de 1px dizer "tem mais aqui".
+  const [rolou, setRolou] = useState(false);
+  const [temMais, setTemMais] = useState(false);
+
+  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    setRolou(el.scrollTop > 4);
+    setTemMais(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
+  }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef(phone);
 
@@ -292,70 +338,238 @@ export default function Thread({
 
   const displayName = name || prettyPhone(phone);
   const ini = initials(name);
+  // Hora da última mensagem publicada, para o subcabeçalho. Vem dos balões (e
+  // não de `rows`) porque uma linha pode render dois balões e o que interessa
+  // é o que a pessoa realmente viu por último.
+  const lastAt = bubbles.length ? bubbles[bubbles.length - 1].created_at : null;
+  const attendant =
+    assignedUserId && members
+      ? (members.find((m) => m.userId === assignedUserId) ?? null)
+      : null;
 
   return (
     <>
-      <header className="flex items-center gap-3 border-b border-line px-4 py-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-medium text-ink-muted ring-1 ring-line">
+      {/* Cabeçalho em DUAS faixas. Antes o nome, o telefone, o estado da IA e a
+          hora da última mensagem dividiam o mesmo bloco, e o resultado lia como
+          um amontoado. Em cima fica quem é a pessoa e o que dá para fazer; a
+          faixa de baixo é referência, num tom próprio e com tipo menor. */}
+      <header
+        className={`relative z-10 shrink-0 border-b border-line bg-conteudo transition-shadow ${
+          rolou ? "sombra-rolagem" : ""
+        }`}
+      >
+      <div className="flex items-center gap-3 px-4 pb-2 pt-2.5">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-legenda font-semibold"
+          style={avatarPair(phone)}
+        >
           {ini ?? <User size={16} />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-medium">{displayName}</div>
-          <div className="text-xs text-ink-muted">{prettyPhone(phone)}</div>
-        </div>
-
-        {/* Toggle claro de liga/desliga da IA nesta conversa. */}
-        {iaState !== null && (
-          <button
-            onClick={onToggleIa}
-            disabled={readOnly}
-            role="switch"
-            aria-checked={!iaPausada}
-            title={
-              readOnly
-                ? "Conta bloqueada: a IA não atende enquanto a assinatura não estiver em dia"
-                : iaPausada
-                ? "IA pausada, clique para reativar (a IA volta a responder)"
-                : "IA ativa, clique para assumir (a IA para de responder)"
-            }
-            className="flex shrink-0 items-center gap-2 rounded-full border border-line px-2.5 py-1 transition-colors hover:bg-[var(--active-bg)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+        </span>
+        <span className="min-w-0 flex-1">
+          <b
+            className="block truncate text-titulo"
+            style={{ color: avatarPair(phone).color }}
           >
-            <span
-              className={`text-xs font-medium ${
-                iaPausada ? "text-human-ink" : "text-brand-ink"
+            {displayName}
+          </b>
+          {/* Metadados numa linha só, com ponto médio. Isto ocupava uma faixa
+              inteira de 34px logo abaixo, e o que ela carregava era referência
+              passiva que ninguém aciona. */}
+          <span
+            className="block truncate text-legenda font-normal text-ink-3"
+            suppressHydrationWarning
+          >
+            {prettyPhone(phone)}
+            {lastAt ? ` · última mensagem ${formatTime(lastAt)}` : ""}
+          </span>
+        </span>
+
+        <span className="flex shrink-0 items-center gap-2">
+          {/* Interruptor da IA. Estava em 40px e dominava a faixa; agora é um
+              controle do degrau `control`, do mesmo tamanho dos outros. */}
+          {iaState !== null && (
+            <button
+              onClick={onToggleIa}
+              disabled={readOnly}
+              role="switch"
+              aria-checked={!iaPausada}
+              title={
+                readOnly
+                  ? "Conta bloqueada: a IA não atende enquanto a assinatura não estiver em dia"
+                  : iaPausada
+                    ? "IA pausada, clique para reativar (a IA volta a responder)"
+                    : "IA ativa, clique para assumir (a IA para de responder)"
+              }
+              className={`flex h-[var(--h-control)] shrink-0 items-center gap-2 rounded-lg border pl-2.5 pr-2 text-legenda font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                iaPausada
+                  ? "border-line-strong bg-[var(--active-bg)] text-ink-2"
+                  : "border-brand-line bg-brand-surface text-brand-ink"
               }`}
             >
-              {iaPausada ? "Você atende" : "IA ativa"}
-            </span>
-            <span
-              className={`relative h-4 w-8 rounded-full transition-colors ${
-                iaPausada ? "bg-[var(--ia)]" : "bg-[var(--accent)]"
-              }`}
-            >
+              {iaPausada ? "IA pausada" : "IA ligada"}
               <span
-                className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
-                  iaPausada ? "left-0.5" : "left-4"
+                className={`relative flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors ${
+                  iaPausada
+                    ? "border-line-strong bg-campo"
+                    : "border-transparent bg-brand"
                 }`}
-              />
-            </span>
-          </button>
+              >
+                <span
+                  className={`h-3 w-3 rounded-full transition-transform duration-[var(--dur-fast)] ease-[var(--ease-out)] ${
+                    iaPausada
+                      ? "translate-x-[1px] bg-[var(--ink-3)]"
+                      : "translate-x-[13px] bg-white"
+                  }`}
+                />
+              </span>
+            </button>
+          )}
+
+          {onToggleContext && (
+            <>
+              <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
+              <button
+                onClick={onToggleContext}
+                title={contextOpen ? "Ocultar contato" : "Ver contato"}
+                aria-label={contextOpen ? "Ocultar contato" : "Ver contato"}
+                className={`hidden h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--active-bg)] lg:flex ${
+                  contextOpen ? "text-brand-ink" : "text-ink-2"
+                }`}
+              >
+                <PanelRight size={16} />
+              </button>
+            </>
+          )}
+        </span>
+      </div>
+
+      {/* Segunda linha: quem é o dono da conversa e como ela está classificada.
+          Tudo em chip de 28px com ponto colorido sobre fundo neutro, nunca
+          bloco de cor cheia. */}
+      <div className="flex flex-wrap items-center gap-2 px-4 pb-2.5">
+        {onAssign && myUserId && (
+          // Menu, e não interruptor: assumir, soltar e TRANSFERIR são a mesma
+          // decisão (de quem é esta conversa), então moram no mesmo controle.
+          // Transferir era um <select> perdido no painel da direita.
+          <span
+            className="relative shrink-0"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setAssignOpen(false);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setAssignOpen(false);
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setAssignOpen((v) => !v)}
+              aria-haspopup="menu"
+              aria-expanded={assignOpen}
+              title="Quem atende esta conversa"
+              className={`flex h-7 shrink-0 items-center gap-1.5 rounded-full text-legenda transition-colors ${
+                attendant
+                  ? "border border-line bg-bloco pl-1 pr-2.5 text-ink-2 hover:bg-[var(--active-bg)]"
+                  : "border border-dashed border-line-strong px-2.5 text-ink-3 hover:text-ink-2"
+              }`}
+            >
+              {attendant ? (
+                <>
+                  <span
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                    style={avatarPair(attendant.email)}
+                  >
+                    {memberInitials(attendant.email).slice(0, 1)}
+                  </span>
+                  {attendant.userId === myUserId
+                    ? "Você"
+                    : memberName(attendant.email)}
+                </>
+              ) : (
+                <>
+                  <UserPlus size={13} className="shrink-0" />
+                  Ninguém assumiu ainda
+                </>
+              )}
+              <ChevronDown size={12} className="shrink-0 opacity-60" />
+            </button>
+
+            {assignOpen && (
+              <span
+                role="menu"
+                className="absolute left-0 top-8 z-20 flex w-56 flex-col rounded-xl border border-line bg-conteudo p-1 shadow-[0_10px_30px_-12px_rgba(23,17,40,0.45)]"
+              >
+                {(members ?? []).map((m) => (
+                  <button
+                    key={m.userId}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onAssign(m.userId);
+                      setAssignOpen(false);
+                    }}
+                    className="flex h-8 items-center gap-2 rounded-lg px-2 text-left text-legenda text-ink-2 transition-colors hover:bg-[var(--active-bg)]"
+                  >
+                    <span
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
+                      style={avatarPair(m.email)}
+                    >
+                      {memberInitials(m.email).slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {m.userId === myUserId
+                        ? "Você"
+                        : memberName(m.email)}
+                    </span>
+                    {m.userId === assignedUserId && (
+                      <Check size={13} className="shrink-0 text-brand-ink" />
+                    )}
+                  </button>
+                ))}
+                {attendant && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      onAssign(null);
+                      setAssignOpen(false);
+                    }}
+                    className="mt-1 flex h-8 items-center gap-2 rounded-lg border-t border-line px-2 pt-1 text-left text-legenda text-ink-3 transition-colors hover:bg-[var(--active-bg)] hover:text-ink-2"
+                  >
+                    Soltar a conversa
+                  </button>
+                )}
+              </span>
+            )}
+          </span>
         )}
 
-        {onToggleContext && (
-          <button
-            onClick={onToggleContext}
-            title={contextOpen ? "Ocultar contato" : "Ver contato"}
-            aria-label={contextOpen ? "Ocultar contato" : "Ver contato"}
-            className={`hidden shrink-0 rounded-lg p-1.5 transition-colors hover:bg-[var(--active-bg)] lg:block ${
-              contextOpen ? "text-accent" : "text-ink-muted"
-            }`}
+        {iaState !== null && (
+          <span
+            title="Estado do agente de IA"
+            className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-line bg-bloco px-2.5 text-legenda font-normal text-ink-2"
           >
-            <PanelRight size={18} />
-          </button>
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                iaPausada ? "bg-warn" : "bg-brand"
+              }`}
+            />
+            {iaPausada ? "IA pausada" : "IA respondendo"}
+          </span>
         )}
+
+        {conversationId != null && (
+          <>
+            <span aria-hidden className="h-4 w-px shrink-0 bg-line" />
+            <ContactTags conversationId={conversationId} clientId={clientId} />
+          </>
+        )}
+      </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto bg-chat p-4">
+      <div className="flex-1 overflow-y-auto bg-msg p-4" onScroll={onScroll}>
         {items.map((item) =>
           item.kind === "day" ? (
             <div key={item.key} className="flex justify-center py-3">
@@ -378,13 +592,24 @@ export default function Thread({
         <div ref={bottomRef} />
       </div>
 
+      <div
+        className={`relative z-10 shrink-0 transition-shadow ${
+          temMais ? "sombra-rolagem-topo" : ""
+        }`}
+      >
       <MessageComposer
         onSend={handleSend}
         onSendMedia={handleSendMedia}
+        onAddNote={onAddNote}
+        onInstruct={onInstruct}
+        pendingInstruction={pendingInstruction}
+        onCancelInstruction={onCancelInstruction}
         iaAtiva={iaState !== null && !iaPausada}
+        contactName={displayName}
         clientId={clientId}
         readOnly={readOnly}
       />
+      </div>
     </>
   );
 }

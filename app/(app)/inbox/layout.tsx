@@ -45,11 +45,19 @@ export default async function InboxLayout({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       {needsImport && client && <AutoImport clientId={client.id} />}
-      {/* Casco único: lista + conversa + contato dividem um cartão só, com
-          divisórias internas de 1px (evita 3 bordas duplas e moldura extra). */}
-      <div className="panel flex min-h-0 flex-1 overflow-hidden rounded-2xl">
-        <ContactSidebar initial={initial} initialIa={initialIa} />
-        <main className="flex min-w-0 flex-1 overflow-hidden">{children}</main>
+      {/* TRÊS seções: o menu, a lista de conversas e a conversa com os detalhes
+          do contato. Cada uma é um cartão, separada por espaço de verdade. A
+          conversa e os detalhes dividem o mesmo cartão de propósito: quem está
+          respondendo olha para os dois ao mesmo tempo. */}
+      <div className="flex min-h-0 flex-1 gap-3">
+        <ContactSidebar
+          initial={initial}
+          initialIa={initialIa}
+          myUserId={client?.userId}
+        />
+        <main className="cartao flex min-w-0 flex-1 overflow-hidden rounded-2xl">
+          {children}
+        </main>
       </div>
     </div>
   );

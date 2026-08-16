@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import BrandMark from "./BrandMark";
+import { BRAND } from "@/lib/brand";
 import {
   MessagesSquare,
   KanbanSquare,
@@ -16,8 +17,6 @@ import {
   Calendar,
   Megaphone,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
   ChevronUp,
   type LucideIcon,
 } from "lucide-react";
@@ -48,12 +47,17 @@ export default function NavRail({
   clientName,
   activeHref,
   role,
+  whatsappConnected = true,
 }: {
   clientName: string;
   /** Só para o preview de design (/design): força o item ativo. */
   activeHref?: string;
   /** Papel do usuário: 'dono' | 'atendente'. Esconde itens só-do-dono. */
   role?: string;
+  /** Estado do canal. Hoje chega sempre `true`: consultar a Evolution a cada
+      navegação ficou para uma rodada própria, então a faixa existe e está no
+      lugar certo, mas ainda não mede nada. */
+  whatsappConnected?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -62,8 +66,14 @@ export default function NavRail({
   const [unreadConvos, setUnreadConvos] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
+  // no estado inicial: o servidor não tem localStorage e o HTML sairia com um
+  // menu e o cliente com outro. A regra do lint mira renderização em cascata;
+  // aqui é leitura única de um sistema externo, que é o caso que o próprio
+  // texto da regra permite.
   useEffect(() => {
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCollapsed(localStorage.getItem("nav-collapsed") === "1");
     } catch {
       // sem persistência
@@ -138,25 +148,24 @@ export default function NavRail({
 
   return (
     <nav
-      className={`flex shrink-0 flex-col gap-1 rounded-xl border border-[var(--rail-border)] bg-[var(--rail-bg)] p-2 text-[var(--rail-fg)] shadow-[var(--panel-shadow)] ${
-        collapsed ? "w-14 items-center" : "w-60"
+      className={`flex shrink-0 flex-col gap-1 rounded-xl border border-line bg-menu p-2 shadow-[var(--panel-shadow)] transition-[width] duration-200 ease-[var(--ease-out)] ${
+        collapsed ? "w-16 items-center" : "w-[212px]"
       }`}
     >
-      <div
-        className={`flex items-center gap-2 px-1 pb-2 pt-1 ${
-          collapsed ? "justify-center" : "justify-between"
+      {/* A própria marca recolhe e expande o menu. Antes havia um botão de seta
+          só para isso, o que dava três alvos clicáveis num canto que trata de
+          um assunto só. */}
+      <button
+        onClick={toggle}
+        title={collapsed ? "Expandir menu" : "Recolher menu"}
+        aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+        aria-expanded={!collapsed}
+        className={`flex h-11 shrink-0 items-center rounded-lg text-left transition-colors hover:bg-[var(--rail-hover)] ${
+          collapsed ? "w-11 justify-center" : "px-2"
         }`}
       >
-        {!collapsed && <BrandMark size="sm" />}
-        <button
-          onClick={toggle}
-          title={collapsed ? "Expandir menu" : "Recolher menu"}
-          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          className="rounded-lg p-1.5 text-[var(--rail-fg-dim)] transition-colors hover:bg-[var(--rail-hover)] hover:text-[var(--rail-fg)]"
-        >
-          {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
-      </div>
+        {collapsed ? <MarkOnly /> : <BrandMark size="sm" />}
+      </button>
 
       {NAV.map(({ href, label, icon: Icon, donoOnly }) => {
         // Item só-do-dono some para atendente (role definido e diferente de dono).
@@ -164,78 +173,113 @@ export default function NavRail({
         const active = activeHref
           ? activeHref === href
           : pathname === href || pathname.startsWith(href + "/");
+        const unread = href === "/inbox" && unreadConvos > 0;
         return (
           <Link
             key={href}
             href={href}
             title={collapsed ? label : undefined}
-            className={`relative flex items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm transition-colors ${
-              collapsed ? "justify-center" : ""
+            aria-current={active ? "page" : undefined}
+            className={`relative flex h-10 shrink-0 items-center gap-3 rounded-lg text-corpo transition-colors ${
+              collapsed ? "w-10 justify-center" : "px-3"
             } ${
               active
-                ? "bg-[var(--rail-active-bg)] font-semibold text-[var(--rail-active-fg)] shadow-[inset_2px_0_0_var(--accent)]"
-                : "text-[var(--rail-fg-dim)] hover:bg-[var(--rail-hover)] hover:text-[var(--rail-fg)]"
+                ? "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]"
+                : "text-ink-2 hover:bg-[var(--rail-hover)] hover:text-ink"
             }`}
           >
-            <Icon size={18} strokeWidth={2} className="shrink-0" />
-            {!collapsed && <span className="flex-1">{label}</span>}
-            {href === "/inbox" && unreadConvos > 0 && !collapsed && (
-              <span className="brand-grad flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums">
+            <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+            {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
+            {/* Expandido, pílula com o número; recolhido, só o ponto. A pílula
+                encolhida virava um círculo escuro sem nada legível dentro. */}
+            {unread && !collapsed && (
+              <span className="ml-auto min-w-5 shrink-0 rounded-full bg-ink px-2 py-0.5 text-center text-legenda font-semibold tabular-nums text-[var(--s-menu)]">
                 {unreadConvos > 99 ? "99+" : unreadConvos}
               </span>
             )}
-            {href === "/inbox" && unreadConvos > 0 && collapsed && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[var(--accent)] ring-2 ring-[var(--rail-bg)]" />
+            {unread && collapsed && (
+              <span
+                title={`${unreadConvos} conversas não lidas`}
+                className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink"
+              />
             )}
           </Link>
         );
       })}
 
-      <div className="my-2 h-px w-full bg-[var(--rail-border)]" />
-      {!collapsed && (
-        <div className="px-2.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-[var(--rail-fg-dim)]">
-          Em breve
-        </div>
-      )}
       {SOON.map(({ label, icon: Icon }) => (
         <div
           key={label}
-          title={collapsed ? `${label} (em breve)` : undefined}
-          className={`flex cursor-not-allowed items-center gap-3 rounded-lg px-2.5 py-2.5 text-sm text-[var(--rail-fg-dim)] opacity-55 ${
-            collapsed ? "justify-center" : ""
+          title={`${label} (em breve)`}
+          className={`flex h-10 shrink-0 cursor-not-allowed items-center gap-3 rounded-full text-corpo text-ink-3 opacity-60 ${
+            collapsed ? "w-10 justify-center" : "px-3"
           }`}
         >
-          <Icon size={18} strokeWidth={2} className="shrink-0" />
-          {!collapsed && label}
+          <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+          {!collapsed && <span className="truncate">{label}</span>}
         </div>
       ))}
 
       <div
         ref={menuRef}
-        className="relative mt-auto flex w-full flex-col gap-1 border-t border-[var(--rail-border)] pt-2"
+        className="relative mt-auto flex w-full flex-col gap-2 pt-2"
       >
+        {/* Estado do canal e tema. É o que decide se vale a pena escrever
+            qualquer coisa agora, então fica sempre à vista, em vez de escondido
+            atrás do avatar. Sem moldura e sem fundo: é um indicador, não um
+            botão, e a caixa em volta prometia um clique que não existe. */}
+        <div
+          className={`flex h-9 items-center ${
+            collapsed ? "w-full justify-center px-0" : "gap-2 px-1"
+          }`}
+          title={whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+        >
+          <span
+            aria-hidden
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              whatsappConnected ? "bg-human" : "bg-danger"
+            }`}
+          />
+          {collapsed ? (
+            <span className="sr-only">
+              {whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+            </span>
+          ) : (
+            <span
+              className={`min-w-0 flex-1 truncate text-legenda ${
+                whatsappConnected ? "text-human-ink" : "text-danger-ink"
+              }`}
+            >
+              {whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+            </span>
+          )}
+        </div>
+
+        {/* Tema entre o canal e o perfil. Recolhido, fica centralizado como os
+            demais alvos da coluna; o perfil é sempre o último item. */}
+        <div className={collapsed ? "flex justify-center" : ""}>
+          <ThemeToggle collapsed={collapsed} />
+        </div>
+
         {menuOpen && (
           <div
             role="menu"
-            className={`absolute bottom-full z-20 mb-2 w-48 overflow-hidden rounded-xl border border-[var(--rail-border)] bg-[var(--rail-bg)] p-1 shadow-lg ${
-              collapsed ? "left-0" : "left-1 right-1 w-auto"
+            className={`absolute bottom-full z-20 mb-2 overflow-hidden rounded-xl border border-line bg-menu p-1 shadow-lg ${
+              collapsed ? "left-0 w-48" : "left-0 right-0"
             }`}
           >
             <Link
               href="/perfil"
               role="menuitem"
               onClick={() => setMenuOpen(false)}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--rail-fg-dim)] transition-colors hover:bg-[var(--rail-hover)] hover:text-[var(--rail-fg)]"
+              className="flex h-9 items-center gap-2 rounded-lg px-3 text-apoio text-ink-2 transition-colors hover:bg-[var(--rail-hover)] hover:text-ink"
             >
               <User size={16} /> Perfil
             </Link>
-            <div className="px-1 py-0.5">
-              <ThemeToggle />
-            </div>
             <button
               onClick={logout}
               role="menuitem"
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[var(--rail-fg-dim)] transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
+              className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-apoio text-ink-2 transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
             >
               <LogOut size={16} /> Sair
             </button>
@@ -247,28 +291,52 @@ export default function NavRail({
           title={collapsed ? clientName : undefined}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          className={`flex items-center gap-2 rounded-lg px-1 py-1.5 transition-colors hover:bg-[var(--rail-hover)] ${
+          className={`flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-[var(--rail-hover)] ${
             collapsed ? "justify-center" : ""
-          } ${perfilActive || menuOpen ? "bg-[var(--rail-active-bg)]" : ""}`}
+          } ${perfilActive || menuOpen ? "bg-[var(--rail-hover)]" : ""}`}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--rail-hover)] text-xs font-medium text-[var(--rail-fg)] ring-1 ring-[var(--rail-border)]">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bloco text-legenda font-semibold text-ink-2 ring-1 ring-line">
             {initials}
-          </div>
+          </span>
           {!collapsed && (
             <>
-              <div className="min-w-0 flex-1 text-left">
-                <div className="truncate text-sm font-medium text-[var(--rail-fg)]">
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block truncate text-corpo font-semibold">
                   {clientName}
-                </div>
-                <div className="text-[11px] text-[var(--rail-fg-dim)]">
+                </span>
+                <span className="block text-legenda font-normal text-ink-3">
                   Ver perfil
-                </div>
-              </div>
-              <ChevronUp size={15} className="shrink-0 text-[var(--rail-fg-dim)]" />
+                </span>
+              </span>
+              <ChevronUp size={15} className="shrink-0 text-ink-3" />
             </>
           )}
         </button>
       </div>
     </nav>
+  );
+}
+
+// Só o selo, sem o nome: é o que sobra do BrandMark quando o menu recolhe.
+function MarkOnly() {
+  return (
+    <span className="relative block h-8 w-8 shrink-0" aria-hidden>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={BRAND.markLight}
+        alt=""
+        width={32}
+        height={32}
+        className="mark-light h-full w-full object-contain"
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={BRAND.markDark}
+        alt=""
+        width={32}
+        height={32}
+        className="mark-dark h-full w-full object-contain"
+      />
+    </span>
   );
 }

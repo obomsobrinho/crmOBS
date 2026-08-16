@@ -1,13 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Hand, Clock } from "lucide-react";
+import { Sparkles, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
 
-// Resumo da IA para a conversa: o que a IA entendeu e por que passou para uma
-// pessoa. Lê a qualificação mais recente (conversation_qualifications, gravada
-// por /api/agent). Só leitura; nada aqui escreve. Some quando não há handoff.
+// "Entendimento": o que a IA entendeu desta conversa. Lê a qualificação mais
+// recente (conversation_qualifications, gravada por /api/agent). Só leitura.
+//
+// Abre o painel de propósito, mesmo sem qualificação nenhuma: a primeira coisa
+// que a coluna responde é "o que essa pessoa quer". Antes isso era um cartão
+// tingido chamado "Resumo da IA" que sumia quando não havia handoff, e a
+// lateral começava em texto solto.
 export default function AiSummary({
   phone,
   clientId,
@@ -56,34 +60,35 @@ export default function AiSummary({
     };
   }, [load, supabase, phone]);
 
-  // Sem qualificação relevante: não ocupa espaço no painel.
-  if (!qual || qual.action === "none") return null;
-
-  const isAgendar = qual.action === "agendar";
-  const Icon = isAgendar ? CalendarClock : Hand;
-  const tone = isAgendar ? "text-ia" : "text-warn";
-  const bg = isAgendar ? "bg-[var(--ia-bg)]" : "bg-[var(--warn-bg)]";
+  // O pedido é a linha grande. Sem qualificação, ou com action "none", a IA
+  // ainda não concluiu nada: dizer isso é mais útil que esconder o bloco.
+  const pedido = qual ? qualReasonLabel(qual.action) : "";
+  const horario = qual?.preferenciaHorario ?? "";
+  const resumo = qual?.summary ?? "";
 
   return (
-    <div>
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-        Resumo da IA
-      </div>
-      <div className={`rounded-lg ${bg} px-3 py-2.5`}>
-        <div className={`flex items-center gap-1.5 text-[12.5px] font-medium ${tone}`}>
-          <Icon size={14} className="shrink-0" />
-          {qualReasonLabel(qual.action)}
-        </div>
-        {qual.summary && (
-          <p className="mt-1.5 text-[13px] leading-snug text-ink">{qual.summary}</p>
-        )}
-        {isAgendar && qual.preferenciaHorario && (
-          <p className="mt-1 flex items-center gap-1 text-[12px] text-ink-muted">
-            <Clock size={12} className="shrink-0" />
-            {qual.preferenciaHorario}
-          </p>
-        )}
-      </div>
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      <span className="flex items-center gap-1.5 text-legenda font-semibold uppercase tracking-[0.08em] text-brand-ink">
+        <Sparkles size={13} className="shrink-0" />
+        Entendimento
+      </span>
+
+      <b className="text-titulo text-ink" style={{ textWrap: "pretty" }}>
+        {pedido || "Ainda não disse"}
+      </b>
+
+      {horario && (
+        <span className="flex items-center gap-1.5 text-apoio font-semibold text-ink-2">
+          <Clock size={14} className="shrink-0 text-ink-3" />
+          {horario}
+        </span>
+      )}
+
+      {resumo && (
+        <p className="text-apoio text-ink-3" style={{ textWrap: "pretty" }}>
+          {resumo}
+        </p>
+      )}
     </div>
   );
 }

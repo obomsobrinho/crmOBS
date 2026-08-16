@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -10,9 +10,14 @@ import {
   type CustomField,
 } from "@/lib/crm";
 
-// Edita o contato: nome de exibição (display_name, precede o pushName do
-// WhatsApp) e campos personalizados (custom_fields jsonb). Escrita direta na
-// dados_cliente (grant de coluna). Só quando a linha do contato existe.
+// "Dados": nome de exibição (display_name, precede o pushName do WhatsApp) e
+// campos personalizados (custom_fields jsonb). Escrita direta na dados_cliente
+// (grant de coluna). Só quando a linha do contato existe.
+//
+// Edição NO LUGAR: cada linha é o próprio campo, e grava quando perde o foco.
+// O modo anterior era um botão "Editar" que trocava a lista inteira por um
+// formulário com Cancelar e Salvar, ou seja, três cliques para corrigir uma
+// letra.
 export default function ContactFields({
   phone,
   initialDisplayName,
@@ -26,13 +31,18 @@ export default function ContactFields({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [open, setOpen] = useState(false);
   const [name, setName] = useState(initialDisplayName ?? "");
   const [fields, setFields] = useState<CustomField[]>(
     customFieldsToList(initialCustomFields)
   );
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState<"idle" | "salvando" | "salvo" | "erro">(
+    "idle"
+  );
+
+  // O que já está no banco, para não gravar a cada foco perdido sem mudança.
+  const gravado = useRef(
+    marca(initialDisplayName ?? "", customFieldsToList(initialCustomFields))
+  );
 
   if (!editable) return null;
 
@@ -40,128 +50,153 @@ export default function ContactFields({
     setFields((f) => f.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   }
 
-  async function save() {
-    setSaving(true);
-    setSaved(false);
+  async function salvar(nome: string, lista: CustomField[]) {
+    const atual = marca(nome, lista);
+    if (atual === gravado.current) return;
+    setStatus("salvando");
     const { error } = await supabase
       .from("dados_cliente")
       .update({
-        display_name: name.trim() || null,
-        custom_fields: listToCustomFields(fields),
+        display_name: nome.trim() || null,
+        custom_fields: listToCustomFields(lista),
       })
       .eq("telefone", phone);
-    setSaving(false);
-    if (!error) {
-      setSaved(true);
-      setOpen(false);
-      router.refresh(); // re-resolve o nome no cabeçalho e na lista
+    if (error) {
+      setStatus("erro");
+      return;
     }
+    gravado.current = atual;
+    setStatus("salvo");
+    router.refresh(); // re-resolve o nome no cabeçalho e na lista
   }
 
-  const savedFields = customFieldsToList(initialCustomFields);
+  function remover(i: number) {
+    const lista = fields.filter((_, idx) => idx !== i);
+    setFields(lista);
+    void salvar(name, lista);
+  }
 
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-          Contato
+    <div className="flex flex-col gap-0.5 border-t border-line pt-3">
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-legenda font-semibold uppercase tracking-[0.08em] text-ink-3">
+          Dados
         </span>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex items-center gap-1 text-[11px] font-medium text-ink-muted transition-colors hover:text-ink"
-        >
-          <Pencil size={12} /> Editar
-        </button>
+        {status !== "idle" && (
+          <span
+            className={`ml-auto text-legenda ${
+              status === "erro" ? "text-danger" : "text-ink-3"
+            }`}
+          >
+            {status === "salvando"
+              ? "salvando"
+              : status === "salvo"
+                ? "salvo"
+                : "não deu para salvar"}
+          </span>
+        )}
       </div>
 
-      {!open ? (
-        savedFields.length > 0 ? (
-          <div className="space-y-1.5">
-            {savedFields.map((f) => (
-              <div key={f.key}>
-                <div className="text-[11px] uppercase tracking-wide text-ink-dim">
-                  {f.key}
-                </div>
-                <div className="text-[13px] font-medium">{f.value || "-"}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-[12.5px] text-ink-dim">
-            {saved ? "Salvo." : "Sem campos personalizados."}
-          </p>
-        )
+      <Linha
+        rotulo="Nome"
+        valor={name}
+        placeholder="Como você chama este contato"
+        onChange={setName}
+        onCommit={() => void salvar(name, fields)}
+      />
+
+      {fields.map((f, i) => (
+        <Linha
+          key={i}
+          rotulo={f.key}
+          rotuloEditavel
+          onRotulo={(v) => setField(i, { key: v })}
+          valor={f.value}
+          placeholder="Não informado"
+          onChange={(v) => setField(i, { value: v })}
+          onCommit={() => void salvar(name, fields)}
+          onRemover={() => remover(i)}
+        />
+      ))}
+
+      <button
+        type="button"
+        onClick={() => setFields((f) => [...f, { key: "", value: "" }])}
+        className="mt-1 flex h-[var(--h-chrome)] shrink-0 items-center gap-1 self-start rounded-lg px-2 text-legenda font-semibold text-brand-ink transition-colors hover:bg-[var(--active-bg)]"
+      >
+        <Plus size={13} /> Adicionar campo
+      </button>
+    </div>
+  );
+}
+
+// Assinatura do que de fato vai para o banco (chave vazia é descartada por
+// listToCustomFields, então uma linha em branco recém-criada não conta).
+function marca(nome: string, lista: CustomField[]): string {
+  return JSON.stringify([nome.trim(), listToCustomFields(lista)]);
+}
+
+function Linha({
+  rotulo,
+  rotuloEditavel,
+  onRotulo,
+  valor,
+  placeholder,
+  onChange,
+  onCommit,
+  onRemover,
+}: {
+  rotulo: string;
+  rotuloEditavel?: boolean;
+  onRotulo?: (v: string) => void;
+  valor: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+  onCommit: () => void;
+  onRemover?: () => void;
+}) {
+  return (
+    <div className="group -mx-1.5 flex items-baseline gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-[var(--active-bg)]">
+      {rotuloEditavel ? (
+        <input
+          value={rotulo}
+          onChange={(e) => onRotulo?.(e.target.value)}
+          onBlur={onCommit}
+          placeholder="Campo"
+          aria-label="Nome do campo"
+          className="w-[92px] shrink-0 rounded bg-transparent text-legenda text-ink-3 placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
+        />
       ) : (
-        <div className="rounded-lg border border-line bg-surface p-2.5">
-          <label className="block">
-            <span className="text-[11px] text-ink-dim">Nome de exibição</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Como você chama este contato"
-              className="mt-0.5 w-full rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[12.5px] outline-none transition-colors focus:border-line-strong"
-            />
-          </label>
-
-          <div className="mt-2.5 text-[11px] text-ink-dim">Campos personalizados</div>
-          <div className="mt-1 space-y-1.5">
-            {fields.map((f, i) => (
-              <div key={i} className="flex items-center gap-1.5">
-                <input
-                  value={f.key}
-                  onChange={(e) => setField(i, { key: e.target.value })}
-                  placeholder="Campo"
-                  className="w-2/5 min-w-0 rounded-lg border border-line bg-canvas px-2 py-1.5 text-[12px] outline-none transition-colors focus:border-line-strong"
-                />
-                <input
-                  value={f.value}
-                  onChange={(e) => setField(i, { value: e.target.value })}
-                  placeholder="Valor"
-                  className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2 py-1.5 text-[12px] outline-none transition-colors focus:border-line-strong"
-                />
-                <button
-                  type="button"
-                  onClick={() => setFields((list) => list.filter((_, idx) => idx !== i))}
-                  aria-label="Remover campo"
-                  className="shrink-0 rounded p-1 text-ink-dim transition-colors hover:text-danger"
-                >
-                  <X size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setFields((f) => [...f, { key: "", value: "" }])}
-            className="mt-1.5 flex items-center gap-1 text-[12px] font-medium text-ink-muted transition-colors hover:text-ink"
-          >
-            <Plus size={13} /> Campo
-          </button>
-
-          <div className="mt-2.5 flex justify-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                setName(initialDisplayName ?? "");
-                setFields(customFieldsToList(initialCustomFields));
-              }}
-              className="rounded-lg border border-line px-3 py-1.5 text-[12.5px] font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={() => void save()}
-              disabled={saving}
-              className="btn-primary rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-50"
-            >
-              {saving ? "Salvando…" : "Salvar"}
-            </button>
-          </div>
-        </div>
+        <span className="w-[92px] shrink-0 text-legenda text-ink-3">
+          {rotulo}
+        </span>
+      )}
+      <input
+        value={valor}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onCommit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        placeholder={placeholder}
+        aria-label={rotulo || "Valor do campo"}
+        className="min-w-0 flex-1 rounded bg-transparent text-apoio font-medium text-ink placeholder:font-normal placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
+      />
+      {onRemover ? (
+        <button
+          type="button"
+          onClick={onRemover}
+          aria-label="Remover campo"
+          className="shrink-0 text-ink-3 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+        >
+          <X size={13} />
+        </button>
+      ) : (
+        <Pencil
+          size={13}
+          aria-hidden
+          className="shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100"
+        />
       )}
     </div>
   );

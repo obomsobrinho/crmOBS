@@ -132,8 +132,9 @@ promovidos de "Candidatos novos".
       (`lib/agent-turn.ts`). Teste unitário 16/16.
 - [x] **Handoff "coach" (copiloto).** `conversations.pending_instruction` (grant de coluna, browser
       direto) guarda a orientação do operador; `/api/agent` consome no próximo turno e limpa (a IA
-      retoma sozinha). No inbox, o card "Orientar a IA" (`components/AiCoach.tsx`) aparece no handoff
-      aberto e reativa a IA. **Regra geral nova: handoff silencioso**, em `action=pausar` o
+      retoma sozinha). No inbox, orientar é a aba "Orientar" da caixa de escrita
+      (`components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
+      consumida, ela aparece colada no topo da própria caixa, com a opção de cancelar. **Regra geral nova: handoff silencioso**, em `action=pausar` o
       `/api/agent` devolve `messages` vazio (a IA não responde, só abre o handoff) e **pausa a IA
       ele mesmo** (com messages vazio o n8n não alcança o nó que pausaria). Nós do n8n aguentam
       array vazio; nenhuma mudança no n8n foi necessária.

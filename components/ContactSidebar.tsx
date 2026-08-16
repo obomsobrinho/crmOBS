@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, User, Bot } from "lucide-react";
+import {
+  Search,
+  User,
+  Bot,
+  SlidersHorizontal,
+  ChevronDown,
+  Check,
+  TriangleAlert,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
 import {
@@ -20,6 +28,18 @@ function isPaused(state: string | null | undefined): boolean {
   return state === "pause";
 }
 
+// Os quatro cortes da lista. Viraram UM seletor com menu, e não quatro chips
+// lado a lado: com quatro rótulos a fila quebrava em duas linhas numa coluna de
+// 296px, e duas linhas de chip no topo é o que dava aspecto de rascunho.
+type FiltroKey = "all" | "unanswered" | "mine" | "needs";
+
+const ROTULO: Record<FiltroKey, string> = {
+  all: "Todas",
+  unanswered: "Sem resposta",
+  mine: "Suas",
+  needs: "Precisa de você",
+};
+
 // Trecho curto ao redor do termo encontrado, para mostrar onde bateu.
 function makeSnippet(text: string, q: string): string {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
@@ -35,11 +55,14 @@ export default function ContactSidebar({
   initial,
   initialIa,
   activePhone,
+  myUserId,
 }: {
   initial: InboxItem[];
   initialIa: Record<string, string | null>;
   /** Só para o preview de design (/design): força a conversa "aberta". */
   activePhone?: string;
+  /** Sem ele o filtro "Suas" não aparece (não dá para saber o que é seu). */
+  myUserId?: string;
 }) {
   const supabase = createClient();
   const [items, setItems] = useState<InboxItem[]>(initial);
@@ -49,7 +72,10 @@ export default function ContactSidebar({
   // phone -> resumo da IA (motivo do handoff), da última qualificação.
   const [qualByPhone, setQualByPhone] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "unread" | "needs">("all");
+  // "unanswered" = a última mensagem foi do contato, ou seja, a bola está com a
+  // gente. É o corte que o operador realmente faz ao abrir a tela.
+  const [filter, setFilter] = useState<FiltroKey>("all");
+  const [filtroAberto, setFiltroAberto] = useState(false);
   // phone -> texto da mensagem que casou com a busca (conteúdo, não só nome).
   const [msgMatches, setMsgMatches] = useState<Record<string, string>>({});
   const pathname = usePathname();
@@ -177,17 +203,29 @@ export default function ContactSidebar({
     () => items.filter((it) => isPaused(iaByPhone[it.phone])).length,
     [items, iaByPhone]
   );
-  const unreadCount = useMemo(
-    () => items.filter((it) => it.unread > 0).length,
+  const unansweredCount = useMemo(
+    () => items.filter((it) => it.lastFrom === "in").length,
     [items]
   );
+  const mineCount = useMemo(
+    () => (myUserId ? items.filter((it) => it.assignedUserId === myUserId).length : 0),
+    [items, myUserId]
+  );
+
+  const contagem: Record<FiltroKey, number> = {
+    all: items.length,
+    unanswered: unansweredCount,
+    mine: mineCount,
+    needs: needsCount,
+  };
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items
       .filter((it) => {
         if (filter === "needs" && !isPaused(iaByPhone[it.phone])) return false;
-        if (filter === "unread" && it.unread <= 0) return false;
+        if (filter === "unanswered" && it.lastFrom !== "in") return false;
+        if (filter === "mine" && it.assignedUserId !== myUserId) return false;
         if (!q) return true;
         const name = (it.name ?? "").toLowerCase();
         if (name.includes(q) || it.phone.includes(q)) return true;
@@ -204,62 +242,111 @@ export default function ContactSidebar({
             : null;
         return { it, snippet };
       });
-  }, [items, iaByPhone, query, filter, msgMatches]);
+  }, [items, iaByPhone, query, filter, msgMatches, myUserId]);
 
   return (
-    <aside className="flex w-72 shrink-0 flex-col overflow-hidden border-r border-line">
-      <div className="border-b border-line p-3">
-        <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
-            Conversas
+    <aside className="cartao flex w-[296px] shrink-0 flex-col overflow-hidden rounded-2xl">
+      <div className="relative border-b border-line p-3">
+        <div className="mb-2.5 flex items-center gap-2">
+          <h2 className="text-titulo">Conversas</h2>
+          {/* Só o número: "abertas" não informa nada que o título já não diga. */}
+          <span className="rounded-md bg-[var(--chip-bg)] px-1.5 py-0.5 text-legenda tabular-nums text-[var(--chip-fg)]">
+            {items.length}
           </span>
-          <span className="text-[11px] text-ink-dim">{items.length}</span>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2">
-          <Search size={15} className="shrink-0 text-ink-dim" />
+
+        {/* Seletor de filtro mais o atalho de urgente. "Precisa de você" ganha
+            botão próprio porque é o corte que faz alguém largar o que está
+            fazendo; os outros três moram no menu. */}
+        <div
+          className="flex items-center gap-1.5"
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+              setFiltroAberto(false);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setFiltroAberto(false);
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setFiltroAberto((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={filtroAberto}
+            className="flex h-[var(--h-control)] min-w-0 flex-1 items-center gap-2 rounded-lg border border-line px-2.5 text-legenda font-semibold text-ink transition-colors hover:bg-[var(--active-bg)]"
+          >
+            <SlidersHorizontal size={14} className="shrink-0 text-ink-3" />
+            <span className="min-w-0 truncate">{ROTULO[filter]}</span>
+            <span className="shrink-0 tabular-nums text-ink-3">
+              {contagem[filter]}
+            </span>
+            <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3" />
+          </button>
+
+          {needsCount > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                setFilter((f) => (f === "needs" ? "all" : "needs"))
+              }
+              aria-pressed={filter === "needs"}
+              title="Precisa de você"
+              className={`flex h-[var(--h-control)] shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-legenda font-semibold text-warn-ink transition-colors ${
+                filter === "needs"
+                  ? "border-[var(--warn-line)] bg-[var(--warn-surface)]"
+                  : "border-line hover:bg-[var(--warn-surface)]"
+              }`}
+            >
+              <TriangleAlert size={14} className="shrink-0" />
+              <span className="tabular-nums">{needsCount}</span>
+            </button>
+          )}
+
+          {filtroAberto && (
+            <div
+              role="menu"
+              className="absolute left-3 right-3 top-[88px] z-20 flex flex-col rounded-xl border border-line bg-conteudo p-1 shadow-[0_12px_28px_-12px_rgba(20,12,45,0.45)]"
+            >
+              {(["all", "unanswered", "mine", "needs"] as FiltroKey[])
+                .filter((k) => k !== "mine" || myUserId)
+                .map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setFilter(k);
+                      setFiltroAberto(false);
+                    }}
+                    className={`flex h-[34px] items-center gap-2 rounded-lg px-2 text-left text-legenda transition-colors hover:bg-[var(--active-bg)] ${
+                      filter === k ? "font-semibold text-ink" : "text-ink-2"
+                    }`}
+                  >
+                    <span className="flex w-3.5 shrink-0 text-brand-ink">
+                      {filter === k && <Check size={14} />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">{ROTULO[k]}</span>
+                    <span className="shrink-0 tabular-nums text-ink-3">
+                      {contagem[k]}
+                    </span>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+
+        {/* Busca depois dos filtros: recortar por estado é o gesto de todo dia,
+            buscar é a exceção. */}
+        <div className="mt-1.5 flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line">
+          <Search size={15} className="shrink-0 text-ink-faint" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar nome ou mensagem"
             aria-label="Buscar conversas e mensagens"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-ink-dim"
+            className="w-full bg-transparent text-apoio placeholder:text-ink-3"
           />
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-          <button
-            onClick={() => setFilter("all")}
-            aria-pressed={filter === "all"}
-            className={`rounded-md px-2.5 py-1 font-medium transition-colors ${
-              filter === "all"
-                ? "brand-grad"
-                : "text-ink-muted hover:bg-[var(--active-bg)]"
-            }`}
-          >
-            Todas <span className="opacity-70">{items.length}</span>
-          </button>
-          <button
-            onClick={() => setFilter("unread")}
-            aria-pressed={filter === "unread"}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors ${
-              filter === "unread"
-                ? "bg-[var(--selected-bg)] text-accent ring-1 ring-[var(--accent)]"
-                : "text-ink-muted hover:bg-[var(--active-bg)]"
-            }`}
-          >
-            Não lidas <span className="opacity-70">{unreadCount}</span>
-          </button>
-          <button
-            onClick={() => setFilter("needs")}
-            aria-pressed={filter === "needs"}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-colors ${
-              filter === "needs"
-                ? "bg-[var(--warn-bg)] text-warn ring-1 ring-[var(--warn-border)]"
-                : "text-ink-muted hover:bg-[var(--warn-bg)]"
-            }`}
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-warn" aria-hidden />
-            Precisa de você <span className="opacity-70">{needsCount}</span>
-          </button>
         </div>
       </div>
 
@@ -270,9 +357,11 @@ export default function ContactSidebar({
               ? "Nada encontrado."
               : filter === "needs"
                 ? "Nenhuma conversa precisa de você."
-                : filter === "unread"
-                  ? "Nenhuma conversa não lida."
-                  : "Nenhuma conversa ainda."}
+                : filter === "unanswered"
+                  ? "Nenhuma conversa esperando resposta."
+                  : filter === "mine"
+                    ? "Nenhuma conversa atribuída a você."
+                    : "Nenhuma conversa ainda."}
           </div>
         )}
         <ul>
@@ -298,7 +387,7 @@ export default function ContactSidebar({
                   aria-current={active ? "page" : undefined}
                   className={`flex gap-2.5 border-b border-line border-l-[3px] px-3 py-2.5 transition-colors duration-100 ${
                     active
-                      ? "border-l-[var(--accent)] bg-[var(--selected-bg)]"
+                      ? "border-l-[var(--sel-bar)] bg-[var(--active-bg)]"
                       : "border-l-transparent hover:bg-[var(--active-bg)]"
                   }`}
                 >

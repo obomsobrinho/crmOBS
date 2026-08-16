@@ -58,15 +58,16 @@ export default function DesignPreview() {
 
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
-      <NavRail clientName="OBM" activeHref="/inbox" />
+      <NavRail clientName="O Bom Sobrinho" activeHref="/inbox" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="panel flex min-h-0 flex-1 overflow-hidden rounded-2xl">
+        <div className="flex min-h-0 flex-1 gap-3">
           <ContactSidebar
             initial={items}
             initialIa={initialIa}
             activePhone="553584774753@s.whatsapp.net"
+            myUserId={ME}
           />
-          <main className="flex min-w-0 flex-1 overflow-hidden">
+          <main className="cartao flex min-w-0 flex-1 overflow-hidden rounded-2xl">
             <ConversationView
               phone="553584774753@s.whatsapp.net"
               name="Franck Antonny"

@@ -1,27 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { StickyNote, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
 
+const VISIVEIS = 3;
+
 // Notas internas da conversa (visíveis só ao time, nunca vão ao WhatsApp).
+//
+// Aqui é só LEITURA, em linha do tempo. Escrever nota agora é a aba "Nota
+// interna" do campo de escrita: manter uma segunda caixa de texto na lateral
+// era pedir para a pessoa escolher entre dois lugares que fazem a mesma coisa.
+// O realtime existe justamente por isso: a nota escrita no rodapé aparece aqui
+// sem recarregar a página.
 export default function ContactNotes({
   conversationId,
-  clientId,
   myUserId,
   members,
 }: {
   conversationId: number | null;
-  clientId: string;
   myUserId: string;
   members: Member[];
 }) {
   const supabase = createClient();
   const [notes, setNotes] = useState<ConversationNote[]>([]);
-  const [draft, setDraft] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [todas, setTodas] = useState(false);
 
   const authorLabel = useCallback(
     (userId: string | null) => {
@@ -61,22 +66,26 @@ export default function ContactNotes({
     })();
   }, [load]);
 
-  async function add() {
-    const body = draft.trim();
-    if (!body || conversationId == null) return;
-    setSaving(true);
-    const { error } = await supabase.from("conversation_notes").insert({
-      client_id: clientId,
-      conversation_id: conversationId,
-      author_user_id: myUserId,
-      body,
-    });
-    setSaving(false);
-    if (!error) {
-      setDraft("");
-      await load();
-    }
-  }
+  // Nota escrita na aba "Nota interna" do rodapé cai aqui na hora.
+  useEffect(() => {
+    if (conversationId == null) return;
+    const channel = supabase
+      .channel(`notes-${conversationId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "conversation_notes",
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => void load()
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [supabase, conversationId, load]);
 
   async function remove(id: number) {
     setNotes((n) => n.filter((x) => x.id !== id));
@@ -89,70 +98,76 @@ export default function ContactNotes({
 
   if (conversationId == null) return null;
 
+  const mostradas = todas ? notes : notes.slice(0, VISIVEIS);
+  const restantes = notes.length - mostradas.length;
+
   return (
-    <div>
-      <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-        Notas internas
+    <div className="flex flex-col gap-2.5 border-t border-line pt-3">
+      <div className="flex items-baseline gap-2">
+        <span className="text-legenda font-semibold uppercase tracking-[0.08em] text-ink-3">
+          Notas
+        </span>
+        <span className="ml-auto text-legenda text-ink-3">
+          {notes.length > 0 ? notes.length : "nenhuma"}
+        </span>
       </div>
 
-      <div className="flex gap-1.5">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              void add();
-            }
-          }}
-          rows={2}
-          placeholder="Anotar algo sobre este contato…"
-          className="min-w-0 flex-1 resize-none rounded-lg border border-line bg-surface px-2.5 py-1.5 text-[12.5px] outline-none transition-colors focus:border-line-strong"
-        />
-      </div>
-      <button
-        type="button"
-        onClick={() => void add()}
-        disabled={!draft.trim() || saving}
-        className="btn-primary mt-1.5 w-full rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-50"
-      >
-        {saving ? "Salvando…" : "Adicionar nota"}
-      </button>
-
-      {notes.length > 0 ? (
-        <ul className="mt-2.5 space-y-2">
-          {notes.map((n) => (
-            <li
-              key={n.id}
-              className="group rounded-lg border border-line bg-[var(--warn-bg)]/40 px-2.5 py-2"
+      {mostradas.map((n, i) => (
+        <div key={n.id} className="group flex gap-2.5">
+          {/* Ponto âmbar e fio: nota é assunto interno do time, e âmbar é a cor
+              que já marca isso na caixa de escrita. O fio some na última para a
+              linha do tempo não terminar no vazio. */}
+          <span className="flex shrink-0 flex-col items-center pt-1.5">
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--warn-fill)]"
+            />
+            {i < mostradas.length - 1 && (
+              <span aria-hidden className="mt-1 w-px flex-1 bg-line" />
+            )}
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5 pb-1.5">
+            <span
+              className="whitespace-pre-wrap break-words text-apoio font-medium text-ink-2"
+              style={{ textWrap: "pretty" }}
             >
-              <div className="whitespace-pre-wrap break-words text-[12.5px] text-ink">
-                {n.body}
-              </div>
-              <div className="mt-1 flex items-center justify-between text-[10.5px] text-ink-dim">
-                <span suppressHydrationWarning>
-                  {authorLabel(n.authorUserId)} ·{" "}
-                  {new Date(n.createdAt).toLocaleDateString("pt-BR", {
-                    day: "2-digit",
-                    month: "short",
-                  })}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => remove(n.id)}
-                  aria-label="Remover nota"
-                  className="rounded p-0.5 text-ink-dim opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-2 flex items-center gap-1.5 text-[12.5px] text-ink-dim">
-          <StickyNote size={13} /> Sem notas ainda.
-        </p>
+              {n.body}
+            </span>
+            <span className="flex items-center gap-1.5 text-legenda text-ink-3">
+              <span suppressHydrationWarning>
+                {authorLabel(n.authorUserId)} ·{" "}
+                {new Date(n.createdAt).toLocaleDateString("pt-BR", {
+                  day: "2-digit",
+                  month: "short",
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={() => remove(n.id)}
+                aria-label="Remover nota"
+                className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+              >
+                <Trash2 size={12} />
+              </button>
+            </span>
+          </span>
+        </div>
+      ))}
+
+      {notes.length === 0 && (
+        <span className="text-apoio text-ink-3">
+          Nenhuma nota ainda. Use a aba Nota interna no campo de escrita.
+        </span>
+      )}
+
+      {restantes > 0 && (
+        <button
+          type="button"
+          onClick={() => setTodas(true)}
+          className="self-start text-legenda font-semibold text-brand-ink transition-opacity hover:opacity-80"
+        >
+          ver todas as {notes.length}
+        </button>
       )}
     </div>
   );
