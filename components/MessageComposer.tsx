@@ -13,6 +13,15 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
 export type OutgoingMedia = {
@@ -181,7 +190,7 @@ export default function MessageComposer({
   const ActionIcon = skin.Icon;
 
   return (
-    <div className="shrink-0 bg-msg px-3 pb-3 pt-2">
+    <div className="shrink-0 bg-msg px-3 pb-3 pt-0">
       {attachError && (
         <div className="mb-2 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-apoio text-danger">
           {attachError}
@@ -218,15 +227,20 @@ export default function MessageComposer({
               </span>
             </span>
             {onCancelInstruction && (
-              <button
-                type="button"
-                onClick={() => void onCancelInstruction()}
-                title="Cancelar orientação"
-                aria-label="Cancelar orientação"
-                className="flex h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-              >
-                <X size={15} />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-chrome"
+                    onClick={() => void onCancelInstruction()}
+                    aria-label="Cancelar orientação"
+                    className="text-ink-3"
+                  >
+                    <X size={15} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top">Cancelar orientação</TooltipContent>
+              </Tooltip>
             )}
           </div>
         )}
@@ -234,38 +248,38 @@ export default function MessageComposer({
         {/* Abas DENTRO da casa, no topo. A versão anterior tinha a moldura das
             abas por fora da moldura do campo, o que empilhava duas bordas e
             fazia o conjunto parecer duas peças aparafusadas. */}
-        <div className="flex items-center gap-1 px-2 pt-1.5">
-          <Tab
-            label="Responder"
-            bar="var(--human-fill)"
-            selected={mode === "responder"}
-            onClick={() => setMode("responder")}
-            on={SKIN.responder.tab}
-          />
-          {onAddNote && (
-            <Tab
-              label="Nota interna"
-              bar="var(--warn-fill)"
-              selected={mode === "nota"}
-              onClick={() => setMode("nota")}
-              on={SKIN.nota.tab}
-            />
-          )}
-          {onInstruct && (
-            <Tab
-              label="Orientar"
-              bar="var(--brand-fill)"
-              selected={mode === "orientar"}
-              onClick={() => setMode("orientar")}
-              on={SKIN.orientar.tab}
-            />
-          )}
-        </div>
+        {/* `contents` no Root: o Radix precisa de um elemento para segurar o
+            contexto das abas, mas ele não pode participar do layout, senão a
+            fila de abas passaria a viver dentro de uma caixa que a moldura do
+            composer não previa. Com display:contents o Root some do fluxo e a
+            lista continua sendo filha direta da moldura, como sempre foi. */}
+        <Tabs
+          value={mode}
+          onValueChange={(v) => setMode(v as Mode)}
+          className="contents"
+        >
+          <TabsList className="gap-1 px-2 pt-1.5">
+            <TabsTrigger value="responder" barra="var(--human-fill)">
+              Responder
+            </TabsTrigger>
+            {onAddNote && (
+              <TabsTrigger value="nota" barra="var(--warn-fill)">
+                Nota interna
+              </TabsTrigger>
+            )}
+            {onInstruct && (
+              <TabsTrigger value="orientar" barra="var(--brand-fill)">
+                Orientar
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
 
         {/* Área de escrita alta: é um lugar para escrever, não um campo de uma
             linha que cresce. Três linhas de partida cobrem a mensagem típica
             sem obrigar a pessoa a redimensionar nada. */}
-        <textarea
+        <Textarea
+          variant="limpo"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -277,7 +291,7 @@ export default function MessageComposer({
           rows={3}
           aria-label={skin.placeholder}
           placeholder={skin.placeholder}
-          className="block w-full resize-none bg-transparent px-3 pt-2.5 text-corpo outline-none placeholder:text-ink-3"
+          className="block px-3 pt-2.5 text-corpo"
         />
 
         {/* A dica mora dentro da casa, junto do texto, e não como faixa colada
@@ -302,44 +316,61 @@ export default function MessageComposer({
           {/* Anexo só existe no modo Responder: nota e orientação não vão ao
               WhatsApp, então não há o que anexar. */}
           {mode === "responder" && (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading || !onSendMedia}
-              title={onSendMedia ? "Anexar arquivo" : "Anexos indisponíveis"}
-              aria-label="Anexar"
-              className="flex h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg text-ink-3 transition-colors hover:bg-[var(--active-bg)] hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {uploading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Paperclip size={16} />
-              )}
-            </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-chrome"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading || !onSendMedia}
+                  aria-label="Anexar"
+                  className="text-ink-3"
+                >
+                  {uploading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Paperclip size={16} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {onSendMedia ? "Anexar arquivo" : "Anexos indisponíveis"}
+              </TooltipContent>
+            </Tooltip>
           )}
           {/* Ação principal à direita, com rótulo e o atalho no próprio botão.
               A dica de teclado vivia solta embaixo do campo, aparecendo e
               sumindo no foco; no rótulo ela está onde é usada. */}
-          <button
-            type="submit"
-            disabled={!canSend}
-            title={skin.action}
-            className={`ml-auto flex h-[var(--h-control)] shrink-0 items-center gap-2 rounded-lg px-3 text-legenda font-semibold transition ${
-              canSend
-                ? skin.button
-                : "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3"
-            }`}
-          >
-            {saving ? (
-              <Loader2 size={15} className="animate-spin" />
-            ) : (
-              <ActionIcon size={15} />
-            )}
-            {skin.action}
-            <span aria-hidden className="opacity-70">
-              ⏎
-            </span>
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="submit"
+                variant={skin.variant}
+                size="control"
+                disabled={!canSend}
+                className={cn(
+                  // `disabled:opacity-100` e não `opacity-100`: com modificador
+                  // diferente o tailwind-merge não considera as duas classes
+                  // conflitantes, e a da base venceria. Este botão desabilitado
+                  // não desbota, ele troca de cor.
+                  "ml-auto px-3 transition",
+                  !canSend &&
+                  "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3 disabled:opacity-100",
+                )}
+              >
+                {saving ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <ActionIcon size={15} />
+                )}
+                {skin.action}
+                <span aria-hidden className="opacity-70">
+                  ⏎
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">{skin.action}</TooltipContent>
+          </Tooltip>
         </div>
       </form>
 
@@ -350,13 +381,15 @@ export default function MessageComposer({
 // Cada modo pinta o bloco inteiro (moldura, aviso, aba e botão) com o seu
 // matiz, porque a cor é o que diz para onde o texto vai antes de a pessoa ler.
 // Verde é ação humana no WhatsApp, âmbar é interno do time, roxo é a IA.
+// `button` (a classe do botão) virou `variant` (o nome da variante do Button),
+// e `tab` sumiu: era "font-semibold text-ink" nos três modos, ou seja, não
+// variava, e quem pinta a aba ativa agora é o `data-[state=active]` da base.
 const SKIN: Record<
   Mode,
   {
     frame: string;
     hint: string;
-    tab: string;
-    button: string;
+    variant: React.ComponentProps<typeof Button>["variant"];
     placeholder: string;
     action: string;
     Icon: LucideIcon;
@@ -365,8 +398,7 @@ const SKIN: Record<
   responder: {
     frame: "border border-[var(--human-line)]",
     hint: "text-human-ink",
-    tab: "font-semibold text-ink",
-    button: "btn-send",
+    variant: "send",
     placeholder: "Escreva uma mensagem",
     action: "Enviar mensagem",
     Icon: Send,
@@ -374,8 +406,7 @@ const SKIN: Record<
   nota: {
     frame: "border border-[var(--warn-line)]",
     hint: "text-warn-ink",
-    tab: "font-semibold text-ink",
-    button: "bg-[var(--warn-fill)] text-[var(--warn-on)] hover:brightness-110",
+    variant: "warn",
     placeholder: "Anotar algo sobre este contato",
     action: "Salvar nota interna",
     Icon: StickyNote,
@@ -383,47 +414,13 @@ const SKIN: Record<
   orientar: {
     frame: "border border-[var(--brand-line)]",
     hint: "text-brand-ink",
-    tab: "font-semibold text-ink",
-    button: "btn-primary",
+    variant: "brand",
     placeholder: "Diga o que a IA deve responder",
     action: "Orientar e reativar a IA",
     Icon: Sparkles,
   },
 };
 
-// Aba com sublinhado. A ativa é rótulo em negrito com uma barra sólida embaixo,
-// sem fundo nenhum; a barra é quem carrega a cor do modo. Pílula e bloco cheio
-// de cor já foram tentados e os dois gritavam mais que o campo de escrita.
-function Tab({
-  label,
-  bar,
-  selected,
-  onClick,
-  on,
-}: {
-  label: string;
-  /** Cor da barra quando a aba está ativa. */
-  bar: string;
-  selected: boolean;
-  onClick: () => void;
-  on: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      onClick={onClick}
-      aria-selected={selected}
-      className={`flex flex-col items-center gap-1.5 px-2.5 pt-1 text-legenda transition-colors ${
-        selected ? on : "text-ink-3 hover:text-ink-2"
-      }`}
-    >
-      {label}
-      <span
-        aria-hidden
-        className="h-[3px] w-full rounded-t-[3px] transition-colors"
-        style={{ background: selected ? bar : "transparent" }}
-      />
-    </button>
-  );
-}
+// O componente `Tab` local morava aqui. Ele virou `TabsTrigger`
+// (components/ui/tabs.tsx), que desenha a mesma barra de 3px e ainda traz o
+// `role="tablist"` que faltava, navegação por seta e foco itinerante.

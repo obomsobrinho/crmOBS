@@ -2,17 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { Sun, Moon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 // Alterna light/dark, persistindo em cookie. O tema inicial já vem do
 // servidor (o layout lê o cookie e põe data-theme no <html>).
-export default function ThemeToggle({
-  collapsed,
-  iconOnly,
-}: {
-  collapsed?: boolean;
-  /** Botão quadrado no degrau `chrome`, sem rótulo. Usado na faixa do rail. */
-  iconOnly?: boolean;
-}) {
+export default function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
   const [theme, setTheme] = useState<"light" | "dark">("dark");
 
   useEffect(() => {
@@ -35,30 +35,26 @@ export default function ThemeToggle({
   const label = isDark ? "Tema claro" : "Tema escuro";
   const glyph = isDark ? <Sun size={15} /> : <Moon size={15} />;
 
-  if (iconOnly) {
-    return (
-      <button
-        onClick={toggle}
-        title={label}
-        aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
-        className="flex h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg border border-line-strong bg-menu text-ink-2 transition-colors hover:text-ink"
-      >
-        {glyph}
-      </button>
-    );
-  }
+  const aria = isDark ? "Ativar tema claro" : "Ativar tema escuro";
 
   return (
-    <button
-      onClick={toggle}
-      title={label}
-      aria-label={isDark ? "Ativar tema claro" : "Ativar tema escuro"}
-      className={`flex h-9 items-center gap-3 rounded-lg text-corpo text-ink-2 transition-colors hover:bg-[var(--rail-hover)] hover:text-ink ${
-        collapsed ? "w-9 justify-center" : "px-2.5"
-      }`}
-    >
-      <span className="flex w-[18px] shrink-0 justify-center">{glyph}</span>
-      {!collapsed && <span className="truncate">{label}</span>}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="rail"
+          size="none"
+          onClick={toggle}
+          aria-label={aria}
+          className={cn(
+            "h-9 gap-3 rounded-lg text-corpo",
+            collapsed ? "w-9 justify-center" : "px-2.5",
+          )}
+        >
+          <span className="flex w-[18px] shrink-0 justify-center">{glyph}</span>
+          {!collapsed && <span className="truncate">{label}</span>}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   );
 }

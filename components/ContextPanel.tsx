@@ -1,6 +1,12 @@
 "use client";
 
 import { User } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { prettyPhone, phoneDigits } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Member } from "@/lib/team";
@@ -64,23 +70,26 @@ export default function ContextPanel({
           O bloco "Status da IA", os rótulos e o botão verde de WhatsApp saíram:
           os três já existem no cabeçalho, a dois centímetros daqui. */}
       <div className="flex items-center gap-2.5">
-        <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-apoio font-semibold"
-          style={avatarPair(phone)}
-        >
+        <Avatar size="xl" style={avatarPair(phone)}>
           {ini ?? <User size={18} />}
-        </div>
+        </Avatar>
         <div className="min-w-0 flex-1">
           <div className="truncate text-corpo font-semibold">{displayName}</div>
-          <a
-            href={`https://wa.me/${phoneDigits(phone)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Abrir esta conversa no WhatsApp"
-            className="block truncate text-legenda font-normal text-ink-3 transition-colors hover:text-brand-ink"
-          >
-            {number}
-          </a>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href={`https://wa.me/${phoneDigits(phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block truncate text-legenda font-normal text-ink-3 transition-colors hover:text-brand-ink"
+              >
+                {number}
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Abrir esta conversa no WhatsApp
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

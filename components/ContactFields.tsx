@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import {
   customFieldsToList,
@@ -79,7 +81,7 @@ export default function ContactFields({
   return (
     <div className="flex flex-col gap-0.5 border-t border-line pt-3">
       <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-legenda font-semibold uppercase tracking-[0.08em] text-ink-3">
+        <span className="text-rotulo uppercase text-ink-3">
           Dados
         </span>
         {status !== "idle" && (
@@ -119,13 +121,14 @@ export default function ContactFields({
         />
       ))}
 
-      <button
-        type="button"
+      <Button
+        variant="brand-ghost"
+        size="chrome"
         onClick={() => setFields((f) => [...f, { key: "", value: "" }])}
-        className="mt-1 flex h-[var(--h-chrome)] shrink-0 items-center gap-1 self-start rounded-lg px-2 text-legenda font-semibold text-brand-ink transition-colors hover:bg-[var(--active-bg)]"
+        className="mt-1 gap-1 self-start"
       >
         <Plus size={13} /> Adicionar campo
-      </button>
+      </Button>
     </div>
   );
 }
@@ -158,20 +161,22 @@ function Linha({
   return (
     <div className="group -mx-1.5 flex items-baseline gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-[var(--active-bg)]">
       {rotuloEditavel ? (
-        <input
+        <Input
+          variant="limpo"
           value={rotulo}
           onChange={(e) => onRotulo?.(e.target.value)}
           onBlur={onCommit}
           placeholder="Campo"
           aria-label="Nome do campo"
-          className="w-[92px] shrink-0 rounded bg-transparent text-legenda text-ink-3 placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
+          className="w-[92px] shrink-0 rounded text-legenda text-ink-3 focus:bg-[var(--active-bg)]"
         />
       ) : (
         <span className="w-[92px] shrink-0 text-legenda text-ink-3">
           {rotulo}
         </span>
       )}
-      <input
+      <Input
+        variant="limpo"
         value={valor}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onCommit}
@@ -180,17 +185,18 @@ function Linha({
         }}
         placeholder={placeholder}
         aria-label={rotulo || "Valor do campo"}
-        className="min-w-0 flex-1 rounded bg-transparent text-apoio font-medium text-ink placeholder:font-normal placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
+        className="w-auto flex-1 rounded text-apoio font-medium text-ink placeholder:font-normal focus:bg-[var(--active-bg)]"
       />
       {onRemover ? (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           onClick={onRemover}
           aria-label="Remover campo"
-          className="shrink-0 text-ink-3 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+          className="text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger group-hover:opacity-100"
         >
           <X size={13} />
-        </button>
+        </Button>
       ) : (
         <Pencil
           size={13}

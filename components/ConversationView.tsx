@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
 import ContextPanel from "./ContextPanel";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase/client";
 import type { Member } from "@/lib/team";
 import type { ChatRow } from "@/lib/types";
@@ -245,20 +246,22 @@ export default function ConversationView({
         />
       </div>
       {showContext && (
-        <aside className="hidden w-[296px] shrink-0 overflow-y-auto border-l border-line bg-conteudo lg:block">
-          <ContextPanel
-            name={name}
-            phone={phone}
-            firstMessageAt={firstMessageAt}
-            messageCount={messageCount}
-            members={members}
-            myUserId={myUserId}
-            conversationId={conversationId}
-            clientId={clientId}
-            editableName={displayName}
-            customFields={customFields}
-            contactExists={contactExists}
-          />
+        <aside className="hidden w-[296px] shrink-0 border-l border-line bg-conteudo lg:block">
+          <ScrollArea fade className="h-full">
+            <ContextPanel
+              name={name}
+              phone={phone}
+              firstMessageAt={firstMessageAt}
+              messageCount={messageCount}
+              members={members}
+              myUserId={myUserId}
+              conversationId={conversationId}
+              clientId={clientId}
+              editableName={displayName}
+              customFields={customFields}
+              contactExists={contactExists}
+            />
+          </ScrollArea>
         </aside>
       )}
     </div>

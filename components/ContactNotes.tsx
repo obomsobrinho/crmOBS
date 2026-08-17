@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
@@ -104,7 +105,7 @@ export default function ContactNotes({
   return (
     <div className="flex flex-col gap-2.5 border-t border-line pt-3">
       <div className="flex items-baseline gap-2">
-        <span className="text-legenda font-semibold uppercase tracking-[0.08em] text-ink-3">
+        <span className="text-rotulo uppercase text-ink-3">
           Notas
         </span>
         <span className="ml-auto text-legenda text-ink-3">
@@ -141,14 +142,15 @@ export default function ContactNotes({
                   month: "short",
                 })}
               </span>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="none"
                 onClick={() => remove(n.id)}
                 aria-label="Remover nota"
-                className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
+                className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger group-hover:opacity-100"
               >
                 <Trash2 size={12} />
-              </button>
+              </Button>
             </span>
           </span>
         </div>
@@ -161,13 +163,14 @@ export default function ContactNotes({
       )}
 
       {restantes > 0 && (
-        <button
-          type="button"
+        <Button
+          variant="brand-ghost"
+          size="none"
           onClick={() => setTodas(true)}
-          className="self-start text-legenda font-semibold text-brand-ink transition-opacity hover:opacity-80"
+          className="self-start text-legenda transition-opacity hover:bg-transparent hover:opacity-80"
         >
           ver todas as {notes.length}
-        </button>
+        </Button>
       )}
     </div>
   );

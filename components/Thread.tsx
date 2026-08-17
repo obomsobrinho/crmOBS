@@ -11,6 +11,24 @@ import {
   PanelRight,
   FileText,
 } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
@@ -160,12 +178,21 @@ export default function Thread({
   const [rolou, setRolou] = useState(false);
   const [temMais, setTemMais] = useState(false);
 
-  const onScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    const el = e.currentTarget;
+  const medirRolagem = useCallback((el: HTMLElement | null) => {
+    if (!el) return;
     setRolou(el.scrollTop > 4);
     setTemMais(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
   }, []);
+  const onScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => medirRolagem(e.currentTarget),
+    [medirRolagem],
+  );
+  // O esmaecimento das pontas mora no ScrollArea (prop `fade`), porque as três
+  // listas da tela precisam dele. Aqui ficam só `rolou` e `temMais`, que servem
+  // a outra coisa: acender a sombra no cabeçalho e na caixa de escrita.
   const bottomRef = useRef<HTMLDivElement>(null);
+  /** O elemento que rola de verdade, dentro do ScrollArea. */
+  const viewportRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef(phone);
 
   // Ressincroniza ao navegar entre conversas (o componente é reaproveitado).
@@ -190,8 +217,8 @@ export default function Thread({
         p.mediaPath
           ? !fresh.some((r) => r.media_url === p.mediaPath)
           : !fresh.some(
-              (r) => r.message_type === "manual" && r.bot_message === p.content
-            )
+            (r) => r.message_type === "manual" && r.bot_message === p.content
+          )
       )
     );
   }, [phone, supabase]);
@@ -233,12 +260,29 @@ export default function Thread({
 
   // Ao trocar de conversa, pula pro fim sem animar; mensagens novas na mesma
   // conversa rolam suave.
+  //
+  // Rola o VIEWPORT direto, em vez de `bottomRef.scrollIntoView()`. Motivo
+  // medido: o scrollIntoView precisa encontrar um ancestral rolável no instante
+  // em que o efeito roda, e o Radix ainda não aplicou o layout do viewport
+  // (o wrapper interno é `display: table`, injetado por ele na montagem). O
+  // resultado era a conversa abrindo no TOPO em vez de na última mensagem.
+  // O rAF garante que a medida acontece depois da pintura.
   useEffect(() => {
     const behavior: ScrollBehavior =
       phoneRef.current === phone ? "smooth" : "auto";
     phoneRef.current = phone;
-    bottomRef.current?.scrollIntoView({ behavior });
-  }, [bubbles, phone]);
+    const id = requestAnimationFrame(() => {
+      const el = viewportRef.current;
+      if (!el) return;
+      el.scrollTo({ top: el.scrollHeight, behavior });
+      // Mede aqui também: `rolou` e `temMais` só nasceriam no primeiro evento
+      // de rolagem, e até lá a máscara de esmaecimento ficaria errada (sem
+      // desbotar em cima, apesar de já haver conversa escondida atrás do
+      // cabeçalho).
+      medirRolagem(el);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [bubbles, phone, medirRolagem]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -302,11 +346,11 @@ export default function Thread({
     type Item =
       | { kind: "day"; label: string; key: string }
       | {
-          kind: "bubble";
-          bubble: Bubble;
-          showLabel: boolean;
-          lastOfGroup: boolean;
-        };
+        kind: "bubble";
+        bubble: Bubble;
+        showLabel: boolean;
+        lastOfGroup: boolean;
+      };
     const result: Item[] = [];
     let lastDay = "";
     let lastAuthor = "";
@@ -354,228 +398,215 @@ export default function Thread({
           um amontoado. Em cima fica quem é a pessoa e o que dá para fazer; a
           faixa de baixo é referência, num tom próprio e com tipo menor. */}
       <header
-        className={`relative z-10 shrink-0 border-b border-line bg-conteudo transition-shadow ${
-          rolou ? "sombra-rolagem" : ""
-        }`}
+        className={`relative z-10 shrink-0 border-b border-line bg-conteudo transition-shadow ${rolou ? "sombra-rolagem" : ""
+          }`}
       >
-      <div className="flex items-center gap-3 px-4 pb-2 pt-2.5">
-        <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-legenda font-semibold"
-          style={avatarPair(phone)}
-        >
-          {ini ?? <User size={16} />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <b
-            className="block truncate text-titulo"
-            style={{ color: avatarPair(phone).color }}
-          >
-            {displayName}
-          </b>
-          {/* Metadados numa linha só, com ponto médio. Isto ocupava uma faixa
+        <div className="flex items-center gap-3 px-4 pb-2 pt-2.5">
+          <Avatar size="lg" style={avatarPair(phone)}>
+            {ini ?? <User size={16} />}
+          </Avatar>
+          <span className="min-w-0 flex-1">
+            <b
+              className="block truncate text-titulo"
+              style={{ color: avatarPair(phone).color }}
+            >
+              {displayName}
+            </b>
+            {/* Metadados numa linha só, com ponto médio. Isto ocupava uma faixa
               inteira de 34px logo abaixo, e o que ela carregava era referência
               passiva que ninguém aciona. */}
-          <span
-            className="block truncate text-legenda font-normal text-ink-3"
-            suppressHydrationWarning
-          >
-            {prettyPhone(phone)}
-            {lastAt ? ` · última mensagem ${formatTime(lastAt)}` : ""}
+            <span
+              className="block truncate text-legenda font-normal text-ink-3"
+              suppressHydrationWarning
+            >
+              {prettyPhone(phone)}
+              {lastAt ? ` · última mensagem ${formatTime(lastAt)}` : ""}
+            </span>
           </span>
-        </span>
 
-        <span className="flex shrink-0 items-center gap-2">
-          {/* Interruptor da IA. Estava em 40px e dominava a faixa; agora é um
+          <span className="flex shrink-0 items-center gap-2">
+            {/* Interruptor da IA. Estava em 40px e dominava a faixa; agora é um
               controle do degrau `control`, do mesmo tamanho dos outros. */}
-          {iaState !== null && (
-            <button
-              onClick={onToggleIa}
-              disabled={readOnly}
-              role="switch"
-              aria-checked={!iaPausada}
-              title={
-                readOnly
-                  ? "Conta bloqueada: a IA não atende enquanto a assinatura não estiver em dia"
-                  : iaPausada
-                    ? "IA pausada, clique para reativar (a IA volta a responder)"
-                    : "IA ativa, clique para assumir (a IA para de responder)"
-              }
-              className={`flex h-[var(--h-control)] shrink-0 items-center gap-2 rounded-lg border pl-2.5 pr-2 text-legenda font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                iaPausada
-                  ? "border-line-strong bg-[var(--active-bg)] text-ink-2"
-                  : "border-brand-line bg-brand-surface text-brand-ink"
-              }`}
-            >
-              {iaPausada ? "IA pausada" : "IA ligada"}
-              <span
-                className={`relative flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors ${
-                  iaPausada
-                    ? "border-line-strong bg-campo"
-                    : "border-transparent bg-brand"
-                }`}
-              >
-                <span
-                  className={`h-3 w-3 rounded-full transition-transform duration-[var(--dur-fast)] ease-[var(--ease-out)] ${
-                    iaPausada
-                      ? "translate-x-[1px] bg-[var(--ink-3)]"
-                      : "translate-x-[13px] bg-white"
-                  }`}
-                />
-              </span>
-            </button>
-          )}
-
-          {onToggleContext && (
-            <>
-              <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-              <button
-                onClick={onToggleContext}
-                title={contextOpen ? "Ocultar contato" : "Ver contato"}
-                aria-label={contextOpen ? "Ocultar contato" : "Ver contato"}
-                className={`hidden h-[var(--h-chrome)] w-[var(--h-chrome)] shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--active-bg)] lg:flex ${
-                  contextOpen ? "text-brand-ink" : "text-ink-2"
-                }`}
-              >
-                <PanelRight size={16} />
-              </button>
-            </>
-          )}
-        </span>
-      </div>
-
-      {/* Segunda linha: quem é o dono da conversa e como ela está classificada.
-          Tudo em chip de 28px com ponto colorido sobre fundo neutro, nunca
-          bloco de cor cheia. */}
-      <div className="flex flex-wrap items-center gap-2 px-4 pb-2.5">
-        {onAssign && myUserId && (
-          // Menu, e não interruptor: assumir, soltar e TRANSFERIR são a mesma
-          // decisão (de quem é esta conversa), então moram no mesmo controle.
-          // Transferir era um <select> perdido no painel da direita.
-          <span
-            className="relative shrink-0"
-            onBlur={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                setAssignOpen(false);
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setAssignOpen(false);
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setAssignOpen((v) => !v)}
-              aria-haspopup="menu"
-              aria-expanded={assignOpen}
-              title="Quem atende esta conversa"
-              className={`flex h-7 shrink-0 items-center gap-1.5 rounded-full text-legenda transition-colors ${
-                attendant
-                  ? "border border-line bg-bloco pl-1 pr-2.5 text-ink-2 hover:bg-[var(--active-bg)]"
-                  : "border border-dashed border-line-strong px-2.5 text-ink-3 hover:text-ink-2"
-              }`}
-            >
-              {attendant ? (
-                <>
-                  <span
-                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-                    style={avatarPair(attendant.email)}
-                  >
-                    {memberInitials(attendant.email).slice(0, 1)}
-                  </span>
-                  {attendant.userId === myUserId
-                    ? "Você"
-                    : memberName(attendant.email)}
-                </>
-              ) : (
-                <>
-                  <UserPlus size={13} className="shrink-0" />
-                  Ninguém assumiu ainda
-                </>
-              )}
-              <ChevronDown size={12} className="shrink-0 opacity-60" />
-            </button>
-
-            {assignOpen && (
-              <span
-                role="menu"
-                className="absolute left-0 top-8 z-20 flex w-56 flex-col rounded-xl border border-line bg-conteudo p-1 shadow-[0_10px_30px_-12px_rgba(23,17,40,0.45)]"
-              >
-                {(members ?? []).map((m) => (
-                  <button
-                    key={m.userId}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onAssign(m.userId);
-                      setAssignOpen(false);
-                    }}
-                    className="flex h-8 items-center gap-2 rounded-lg px-2 text-left text-legenda text-ink-2 transition-colors hover:bg-[var(--active-bg)]"
-                  >
-                    <span
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-                      style={avatarPair(m.email)}
-                    >
-                      {memberInitials(m.email).slice(0, 1)}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">
-                      {m.userId === myUserId
-                        ? "Você"
-                        : memberName(m.email)}
-                    </span>
-                    {m.userId === assignedUserId && (
-                      <Check size={13} className="shrink-0 text-brand-ink" />
+            {/* A pílula INTEIRA é a chave: o Root do Radix é ela, não o trilho.
+              Assim o rótulo continua dentro do alvo de clique e o anel de foco
+              cerca a pílula, como sempre cercou. Ver components/ui/switch.tsx. */}
+            {iaState !== null && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Switch
+                    checked={!iaPausada}
+                    onCheckedChange={onToggleIa}
+                    disabled={readOnly}
+                    className={cn(
+                      "flex h-[var(--h-control)] shrink-0 items-center gap-2 rounded-lg border pl-2.5 pr-2 text-legenda font-semibold transition-colors",
+                      iaPausada
+                        ? "border-line-strong bg-[var(--active-bg)] text-ink-2"
+                        : "border-brand-line bg-brand-surface text-brand-ink",
                     )}
-                  </button>
-                ))}
-                {attendant && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      onAssign(null);
-                      setAssignOpen(false);
-                    }}
-                    className="mt-1 flex h-8 items-center gap-2 rounded-lg border-t border-line px-2 pt-1 text-left text-legenda text-ink-3 transition-colors hover:bg-[var(--active-bg)] hover:text-ink-2"
                   >
-                    Soltar a conversa
-                  </button>
-                )}
-              </span>
+                    {iaPausada ? "IA pausada" : "IA ligada"}
+                    <SwitchTrack checked={!iaPausada}>
+                      <SwitchThumb checked={!iaPausada} />
+                    </SwitchTrack>
+                  </Switch>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {readOnly
+                    ? "Conta bloqueada: a IA não atende enquanto a assinatura não estiver em dia"
+                    : iaPausada
+                      ? "IA pausada, clique para reativar (a IA volta a responder)"
+                      : "IA ativa, clique para assumir (a IA para de responder)"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {onToggleContext && (
+              <>
+                <Separator
+                  orientation="vertical"
+                  className="h-5 bg-line"
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-chrome"
+                      onClick={onToggleContext}
+                      aria-label={contextOpen ? "Ocultar contato" : "Ver contato"}
+                      className={cn(
+                        "hidden lg:flex",
+                        contextOpen ? "text-brand-ink" : "text-ink-2",
+                      )}
+                    >
+                      <PanelRight size={16} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {contextOpen ? "Ocultar contato" : "Ver contato"}
+                  </TooltipContent>
+                </Tooltip>
+              </>
             )}
           </span>
-        )}
+        </div>
 
-        {iaState !== null && (
-          <span
-            title="Estado do agente de IA"
-            className="flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-line bg-bloco px-2.5 text-legenda font-normal text-ink-2"
-          >
+        {/* Segunda linha: quem é o dono da conversa e como ela está classificada.
+          Tudo em chip de 28px com ponto colorido sobre fundo neutro, nunca
+          bloco de cor cheia. */}
+        <div className="flex flex-wrap items-center gap-2 px-4 pb-2.5">
+          {onAssign && myUserId && (
+            // Menu, e não interruptor: assumir, soltar e TRANSFERIR são a mesma
+            // decisão (de quem é esta conversa), então moram no mesmo controle.
+            // Transferir era um <select> perdido no painel da direita.
             <span
-              aria-hidden
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                iaPausada ? "bg-warn" : "bg-brand"
-              }`}
-            />
-            {iaPausada ? "IA pausada" : "IA respondendo"}
-          </span>
-        )}
+              className="relative shrink-0"
+            >
+              {/* Os dois Roots (DropdownMenu e Tooltip) NÃO renderizam elemento.
+                Por isso os dois gatilhos se encadeiam por asChild até chegarem
+                ao mesmo <button>: se o DropdownMenuTrigger envolvesse o
+                <Tooltip>, ele estaria clonando props num nada e o menu não
+                abriria. */}
+              <DropdownMenu open={assignOpen} onOpenChange={setAssignOpen}>
+                <Tooltip>
+                  <DropdownMenuTrigger asChild>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        asChild
+                        variant={attendant ? "contorno" : "tracejado"}
+                        className={cn(
+                          "cursor-pointer transition-colors",
+                          attendant
+                            ? "pl-1 pr-2.5 hover:bg-[var(--active-bg)]"
+                            : "hover:text-ink-2",
+                        )}
+                      >
+                        <button type="button">
+                          {attendant ? (
+                            <>
+                              <Avatar
+                                size="2xs"
+                                style={avatarPair(attendant.email)}
+                              >
+                                {memberInitials(attendant.email).slice(0, 1)}
+                              </Avatar>
+                              {attendant.userId === myUserId
+                                ? "Você"
+                                : memberName(attendant.email)}
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus size={13} className="shrink-0" />
+                              Ninguém assumiu ainda
+                            </>
+                          )}
+                          <ChevronDown size={12} className="shrink-0 opacity-60" />
+                        </button>
+                      </Badge>
+                    </TooltipTrigger>
+                  </DropdownMenuTrigger>
+                  <TooltipContent side="bottom">
+                    Quem atende esta conversa
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="start"
+                  sideOffset={4}
+                  className="w-56"
+                >
+                  {(members ?? []).map((m) => (
+                    <DropdownMenuItem
+                      key={m.userId}
+                      onSelect={() => onAssign(m.userId)}
+                    >
+                      <Avatar size="2xs" style={avatarPair(m.email)}>
+                        {memberInitials(m.email).slice(0, 1)}
+                      </Avatar>
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.userId === myUserId ? "Você" : memberName(m.email)}
+                      </span>
+                      {m.userId === assignedUserId && (
+                        <Check size={13} className="shrink-0 text-brand-ink" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                  {attendant && (
+                    <DropdownMenuItem
+                      onSelect={() => onAssign(null)}
+                      className="mt-1 border-t border-line pt-1 text-ink-3 hover:text-ink-2 focus:text-ink-2"
+                    >
+                      Soltar a conversa
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-        {conversationId != null && (
-          <>
-            <span aria-hidden className="h-4 w-px shrink-0 bg-line" />
+            </span>
+          )}
+
+          {/* O chip "IA respondendo" morava aqui e dizia a MESMA coisa que a
+            chave logo acima, a dois centímetros de distância: o estado da IA
+            aparecia duas vezes na mesma faixa. Quem manda é a chave, que além
+            de informar deixa agir. */}
+          {conversationId != null && (
             <ContactTags conversationId={conversationId} clientId={clientId} />
-          </>
-        )}
-      </div>
+          )}
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto bg-msg p-4" onScroll={onScroll}>
+      {/* ⚠️ Aqui a conversa GANHA largura, por decisão registrada: a barra
+          nativa reservava 10px de layout e a do Radix é sobreposta. É a única
+          mudança de pixel assumida nesta rodada. */}
+      <ScrollArea
+        className="min-h-0 flex-1 bg-msg"
+        viewportClassName="p-4"
+        viewportRef={viewportRef}
+        fade
+        onViewportScroll={onScroll}
+      >
         {items.map((item) =>
           item.kind === "day" ? (
             <div key={item.key} className="flex justify-center py-3">
-              <span className="rounded-full bg-panel px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-                {item.label}
-              </span>
+              <Badge variant="dia">{item.label}</Badge>
             </div>
           ) : (
             <BubbleView
@@ -590,25 +621,24 @@ export default function Thread({
           )
         )}
         <div ref={bottomRef} />
-      </div>
+      </ScrollArea>
 
       <div
-        className={`relative z-10 shrink-0 transition-shadow ${
-          temMais ? "sombra-rolagem-topo" : ""
-        }`}
+        className={`relative z-10 shrink-0 transition-shadow ${temMais ? "sombra-rolagem-topo" : ""
+          }`}
       >
-      <MessageComposer
-        onSend={handleSend}
-        onSendMedia={handleSendMedia}
-        onAddNote={onAddNote}
-        onInstruct={onInstruct}
-        pendingInstruction={pendingInstruction}
-        onCancelInstruction={onCancelInstruction}
-        iaAtiva={iaState !== null && !iaPausada}
-        contactName={displayName}
-        clientId={clientId}
-        readOnly={readOnly}
-      />
+        <MessageComposer
+          onSend={handleSend}
+          onSendMedia={handleSendMedia}
+          onAddNote={onAddNote}
+          onInstruct={onInstruct}
+          pendingInstruction={pendingInstruction}
+          onCancelInstruction={onCancelInstruction}
+          iaAtiva={iaState !== null && !iaPausada}
+          contactName={displayName}
+          clientId={clientId}
+          readOnly={readOnly}
+        />
       </div>
     </>
   );
@@ -644,12 +674,9 @@ function RowAvatar({
   }
 
   return (
-    <div
-      className={`flex h-7 w-7 shrink-0 items-center justify-center self-end rounded-full text-[10px] font-semibold text-white ${cls}`}
-      style={style}
-    >
+    <Avatar size="xs" className={cn("self-end text-white", cls)} style={style}>
       {content}
-    </div>
+    </Avatar>
   );
 }
 
@@ -679,7 +706,7 @@ function MediaView({ url, type }: { url: string; type: string | null }) {
 
   if (!resolved) {
     return (
-      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] text-ink-muted">
+      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio text-ink-muted">
         <FileText size={15} /> carregando mídia…
       </div>
     );
@@ -706,7 +733,7 @@ function MediaView({ url, type }: { url: string; type: string | null }) {
       href={resolved}
       target="_blank"
       rel="noopener noreferrer"
-      className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-[13px] font-medium underline"
+      className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio font-medium underline"
     >
       <FileText size={15} /> Abrir arquivo
     </a>
@@ -752,9 +779,8 @@ function BubbleView({
 
   return (
     <div
-      className={`msg-in flex items-end gap-2 ${newGroup ? "mt-4" : "mt-1"} ${
-        out ? "justify-end" : "justify-start"
-      }`}
+      className={`msg-in flex items-end gap-2 ${newGroup ? "mt-4" : "mt-1"} ${out ? "justify-end" : "justify-start"
+        }`}
     >
       {!out && (
         <RowAvatar
@@ -765,12 +791,11 @@ function BubbleView({
         />
       )}
       <div
-        className={`max-w-[min(74%,560px)] whitespace-pre-wrap break-words rounded-[11px] px-3.5 py-2.5 text-[14.5px] leading-[21px] shadow-[var(--bubble-shadow)] ${tail} ${bubbleClass} ${
-          b.status === "pending" ? "opacity-60" : ""
-        }`}
+        className={`max-w-[min(74%,560px)] whitespace-pre-wrap break-words rounded-[11px] px-3.5 py-2.5 text-corpo leading-[21px] shadow-[var(--bubble-shadow)] ${tail} ${bubbleClass} ${b.status === "pending" ? "opacity-60" : ""
+          }`}
       >
         {b.author !== "cliente" && showLabel && (
-          <span className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold opacity-70">
+          <span className="mb-0.5 flex items-center gap-1 text-legenda font-semibold opacity-70">
             {b.author === "ia" ? <Bot size={12} /> : <User size={12} />}
             {b.author === "ia" ? "IA" : "Você"}
           </span>
@@ -779,7 +804,7 @@ function BubbleView({
         {b.content}
         {/* Hora inline (float) — evita que "Olá" ocupe duas linhas. */}
         <span
-          className="float-right ml-2.5 translate-y-[6px] text-[11px] tabular-nums opacity-55"
+          className="float-right ml-2.5 translate-y-[6px] text-legenda tabular-nums opacity-55"
           suppressHydrationWarning
         >
           {b.status === "pending" ? (

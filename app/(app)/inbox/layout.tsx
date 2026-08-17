@@ -1,4 +1,5 @@
 import ContactSidebar from "@/components/ContactSidebar";
+import { Card } from "@/components/ui/card";
 import AutoImport from "@/components/AutoImport";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
@@ -55,9 +56,9 @@ export default async function InboxLayout({
           initialIa={initialIa}
           myUserId={client?.userId}
         />
-        <main className="cartao flex min-w-0 flex-1 overflow-hidden rounded-2xl">
-          {children}
-        </main>
+        <Card asChild className="flex min-w-0 flex-1 overflow-hidden">
+          <main>{children}</main>
+        </Card>
       </div>
     </div>
   );

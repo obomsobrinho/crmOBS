@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Tag as TagIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import {
   tagColor,
@@ -86,28 +90,30 @@ export default function ContactTags({
   const appliedTags = all.filter((t) => applied.includes(t.id));
   const available = all.filter((t) => !applied.includes(t.id));
 
+  // Uma linha só, e não rótulo empilhado sobre conteúdo: isto vive na segunda
+  // faixa do cabeçalho da conversa, onde sobra largura. Empilhado, ele criava
+  // uma quebra de linha com metade da faixa vazia ao lado.
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-          Tags
-        </span>
-        <button
-          type="button"
+    <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 text-rotulo uppercase text-ink-dim">Tags</span>
+        <Button
+          variant="ghost"
+          size="none"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex items-center gap-1 text-[11px] font-medium text-ink-muted transition-colors hover:text-ink"
+          className="shrink-0 gap-1 text-legenda font-medium text-ink-muted hover:bg-transparent"
         >
           <Plus size={13} /> Adicionar
-        </button>
-      </div>
+        </Button>
 
-      {appliedTags.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {appliedTags.map((t) => (
-            <span
+        {appliedTags.length > 0 ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            {appliedTags.map((t) => (
+            <Badge
               key={t.id}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-0.5 pl-2 pr-1 text-[12px]"
+              variant="tag"
+              className="bg-surface pl-2 pr-1"
             >
               <span
                 className="h-2 w-2 rounded-full"
@@ -115,35 +121,38 @@ export default function ContactTags({
                 aria-hidden
               />
               {t.name}
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="none"
                 onClick={() => unapply(t.id)}
                 aria-label={`Remover tag ${t.name}`}
-                className="rounded-full p-0.5 text-ink-dim transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
+                className="rounded-full p-0.5 text-ink-dim hover:bg-[var(--danger-bg)] hover:text-danger"
               >
-                <X size={12} />
-              </button>
-            </span>
-          ))}
-        </div>
-      ) : (
-        !open && (
-          <p className="flex items-center gap-1.5 text-[12.5px] text-ink-dim">
-            <TagIcon size={13} /> Nenhuma tag ainda.
-          </p>
-        )
-      )}
+                  <X size={12} />
+                </Button>
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          !open && (
+            <p className="flex min-w-0 items-center gap-1.5 text-apoio text-ink-dim">
+              <TagIcon size={13} className="shrink-0" /> Nenhuma tag ainda.
+            </p>
+          )
+        )}
+      </div>
 
       {open && (
         <div className="mt-2 rounded-lg border border-line bg-surface p-2.5">
           {available.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {available.map((t) => (
-                <button
+                <Button
                   key={t.id}
-                  type="button"
+                  variant="ghost"
+                  size="none"
                   onClick={() => apply(t.id)}
-                  className="flex items-center gap-1.5 rounded-full border border-line py-0.5 px-2 text-[12px] transition-colors hover:bg-[var(--active-bg)]"
+                  className="gap-1.5 rounded-full border border-line px-2 py-0.5 text-legenda text-ink"
                 >
                   <span
                     className="h-2 w-2 rounded-full"
@@ -151,28 +160,35 @@ export default function ContactTags({
                     aria-hidden
                   />
                   {t.name}
-                </button>
+                </Button>
               ))}
             </div>
           )}
           <div className="flex items-center gap-1.5">
             <div className="flex gap-1">
               {TAG_COLOR_KEYS.map((c) => (
-                <button
+                <Button
                   key={c}
-                  type="button"
+                  variant="ghost"
+                  size="none"
                   onClick={() => setNewColor(c)}
                   aria-label={`Cor ${c}`}
-                  className={`h-4 w-4 rounded-full transition-transform ${
-                    newColor === c ? "ring-2 ring-offset-1 ring-offset-surface" : ""
-                  }`}
-                  style={{ background: tagColor(c), boxShadow: newColor === c ? `0 0 0 1px ${tagColor(c)}` : undefined }}
+                  className={cn(
+                    "h-4 w-4 rounded-full transition-transform hover:bg-transparent",
+                    newColor === c && "ring-2 ring-offset-1 ring-offset-surface",
+                  )}
+                  style={{
+                    background: tagColor(c),
+                    boxShadow:
+                      newColor === c ? `0 0 0 1px ${tagColor(c)}` : undefined,
+                  }}
                 />
               ))}
             </div>
           </div>
           <div className="mt-1.5 flex gap-1.5">
-            <input
+            <Input
+              variant="limpo"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
@@ -182,16 +198,17 @@ export default function ContactTags({
                 }
               }}
               placeholder="Nova tag"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[12.5px] outline-none transition-colors focus:border-line-strong"
+              className="w-auto flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-legenda transition-colors"
             />
-            <button
-              type="button"
+            <Button
+              variant="brand"
+              size="none"
               onClick={() => void createAndApply()}
               disabled={!newName.trim()}
-              className="btn-primary shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-50"
+              className="rounded-lg px-3 py-1.5 text-apoio font-medium disabled:opacity-50"
             >
               Criar
-            </button>
+            </Button>
           </div>
         </div>
       )}

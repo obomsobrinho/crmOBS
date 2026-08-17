@@ -1,5 +1,6 @@
 import NavRail from "@/components/NavRail";
 import ContactSidebar from "@/components/ContactSidebar";
+import { Card } from "@/components/ui/card";
 import ConversationView from "@/components/ConversationView";
 import type { Member } from "@/lib/team";
 import type { ChatRow, InboxItem } from "@/lib/types";
@@ -67,7 +68,8 @@ export default function DesignPreview() {
             activePhone="553584774753@s.whatsapp.net"
             myUserId={ME}
           />
-          <main className="cartao flex min-w-0 flex-1 overflow-hidden rounded-2xl">
+          <Card asChild className="flex min-w-0 flex-1 overflow-hidden">
+            <main>
             <ConversationView
               phone="553584774753@s.whatsapp.net"
               name="Franck Antonny"
@@ -83,9 +85,10 @@ export default function DesignPreview() {
               clientId="00000000-0000-0000-0000-0000000000cc"
               displayName={null}
               customFields={{ Origem: "QR Code", Interesse: "Plano anual" }}
-              contactExists
-            />
-          </main>
+                contactExists
+              />
+            </main>
+          </Card>
         </div>
       </div>
     </div>

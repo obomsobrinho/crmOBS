@@ -68,7 +68,7 @@ export default function AiSummary({
 
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">
-      <span className="flex items-center gap-1.5 text-legenda font-semibold uppercase tracking-[0.08em] text-brand-ink">
+      <span className="flex items-center gap-1.5 text-rotulo uppercase text-brand-ink">
         <Sparkles size={13} className="shrink-0" />
         Entendimento
       </span>

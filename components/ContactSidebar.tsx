@@ -12,6 +12,24 @@ import {
   Check,
   TriangleAlert,
 } from "lucide-react";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { formatTime, prettyPhone } from "@/lib/format";
 import {
@@ -245,83 +263,55 @@ export default function ContactSidebar({
   }, [items, iaByPhone, query, filter, msgMatches, myUserId]);
 
   return (
-    <aside className="cartao flex w-[296px] shrink-0 flex-col overflow-hidden rounded-2xl">
+    <Card asChild className="flex w-[296px] shrink-0 flex-col overflow-hidden">
+      <aside>
       <div className="relative border-b border-line p-3">
         <div className="mb-2.5 flex items-center gap-2">
           <h2 className="text-titulo">Conversas</h2>
           {/* Só o número: "abertas" não informa nada que o título já não diga. */}
-          <span className="rounded-md bg-[var(--chip-bg)] px-1.5 py-0.5 text-legenda tabular-nums text-[var(--chip-fg)]">
-            {items.length}
-          </span>
+          <Badge variant="contagem">{items.length}</Badge>
         </div>
 
         {/* Seletor de filtro mais o atalho de urgente. "Precisa de você" ganha
             botão próprio porque é o corte que faz alguém largar o que está
             fazendo; os outros três moram no menu. */}
-        <div
-          className="flex items-center gap-1.5"
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-              setFiltroAberto(false);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setFiltroAberto(false);
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setFiltroAberto((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={filtroAberto}
-            className="flex h-[var(--h-control)] min-w-0 flex-1 items-center gap-2 rounded-lg border border-line px-2.5 text-legenda font-semibold text-ink transition-colors hover:bg-[var(--active-bg)]"
-          >
-            <SlidersHorizontal size={14} className="shrink-0 text-ink-3" />
-            <span className="min-w-0 truncate">{ROTULO[filter]}</span>
-            <span className="shrink-0 tabular-nums text-ink-3">
-              {contagem[filter]}
-            </span>
-            <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3" />
-          </button>
-
-          {needsCount > 0 && (
-            <button
-              type="button"
-              onClick={() =>
-                setFilter((f) => (f === "needs" ? "all" : "needs"))
-              }
-              aria-pressed={filter === "needs"}
-              title="Precisa de você"
-              className={`flex h-[var(--h-control)] shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-legenda font-semibold text-warn-ink transition-colors ${
-                filter === "needs"
-                  ? "border-[var(--warn-line)] bg-[var(--warn-surface)]"
-                  : "border-line hover:bg-[var(--warn-surface)]"
-              }`}
-            >
-              <TriangleAlert size={14} className="shrink-0" />
-              <span className="tabular-nums">{needsCount}</span>
-            </button>
-          )}
-
-          {filtroAberto && (
-            <div
-              role="menu"
-              className="absolute left-3 right-3 top-[88px] z-20 flex flex-col rounded-xl border border-line bg-conteudo p-1 shadow-[0_12px_28px_-12px_rgba(20,12,45,0.45)]"
+        <div className="flex items-center gap-1.5">
+          {/* O painel abria por `absolute top-[88px]` ancorado no AVÔ, um número
+              mágico que só funcionava porque o cabeçalho tem altura fixa, e
+              ainda ficava preso dentro do cartão por causa do overflow-hidden.
+              Agora sai em portal. Os 270px são a largura útil do cartão (296
+              menos a borda de 1px de cada lado e o respiro de 12px), e os 10px
+              de deslocamento são a distância que o painel já tinha do gatilho. */}
+          <DropdownMenu open={filtroAberto} onOpenChange={setFiltroAberto}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="control"
+                className="min-w-0 flex-1 shrink"
+              >
+                <SlidersHorizontal size={14} className="shrink-0 text-ink-3" />
+                <span className="min-w-0 truncate">{ROTULO[filter]}</span>
+                <span className="shrink-0 tabular-nums text-ink-3">
+                  {contagem[filter]}
+                </span>
+                <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              sideOffset={10}
+              className="w-[270px]"
             >
               {(["all", "unanswered", "mine", "needs"] as FiltroKey[])
                 .filter((k) => k !== "mine" || myUserId)
                 .map((k) => (
-                  <button
+                  <DropdownMenuItem
                     key={k}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setFilter(k);
-                      setFiltroAberto(false);
-                    }}
-                    className={`flex h-[34px] items-center gap-2 rounded-lg px-2 text-left text-legenda transition-colors hover:bg-[var(--active-bg)] ${
-                      filter === k ? "font-semibold text-ink" : "text-ink-2"
-                    }`}
+                    onSelect={() => setFilter(k)}
+                    className={cn(
+                      "h-[34px]",
+                      filter === k && "font-semibold text-ink",
+                    )}
                   >
                     <span className="flex w-3.5 shrink-0 text-brand-ink">
                       {filter === k && <Check size={14} />}
@@ -330,9 +320,34 @@ export default function ContactSidebar({
                     <span className="shrink-0 tabular-nums text-ink-3">
                       {contagem[k]}
                     </span>
-                  </button>
+                  </DropdownMenuItem>
                 ))}
-            </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {needsCount > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="control"
+                  onClick={() =>
+                    setFilter((f) => (f === "needs" ? "all" : "needs"))
+                  }
+                  aria-pressed={filter === "needs"}
+                  className={cn(
+                    "gap-1.5 text-warn-ink",
+                    filter === "needs"
+                      ? "border-[var(--warn-line)] bg-[var(--warn-surface)]"
+                      : "hover:bg-[var(--warn-surface)]",
+                  )}
+                >
+                  <TriangleAlert size={14} className="shrink-0" />
+                  <span className="tabular-nums">{needsCount}</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Precisa de você</TooltipContent>
+            </Tooltip>
           )}
         </div>
 
@@ -340,19 +355,20 @@ export default function ContactSidebar({
             buscar é a exceção. */}
         <div className="mt-1.5 flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line">
           <Search size={15} className="shrink-0 text-ink-faint" />
-          <input
+          <Input
+            variant="limpo"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Buscar nome ou mensagem"
             aria-label="Buscar conversas e mensagens"
-            className="w-full bg-transparent text-apoio placeholder:text-ink-3"
+            className="text-apoio"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea fade className="min-h-0 flex-1">
         {results.length === 0 && (
-          <div className="p-4 text-sm text-ink-dim">
+          <div className="p-4 text-apoio text-ink-dim">
             {query.trim()
               ? "Nada encontrado."
               : filter === "needs"
@@ -392,39 +408,51 @@ export default function ContactSidebar({
                   }`}
                 >
                   <div className="relative shrink-0">
-                    <div
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold"
-                      style={avatarPair(phone)}
-                    >
+                    <Avatar size="md" style={avatarPair(phone)}>
                       {ini ?? <User size={16} />}
-                    </div>
+                    </Avatar>
                     {paused && (
-                      <span
-                        title="Você está atendendo (IA pausada)"
-                        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-warn ring-2 ring-surface"
-                      />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            tabIndex={0}
+                            className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-warn ring-2 ring-surface"
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          Você está atendendo (IA pausada)
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                     {att && (
-                      <span
-                        title={`Atendente: ${memberName(att.email)}`}
-                        className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold ring-2 ring-surface"
-                        style={avatarPair(att.email)}
-                      >
-                        {memberInitials(att.email).slice(0, 1)}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Avatar
+                            size="3xs"
+                            tabIndex={0}
+                            className="absolute -right-1 -top-1 ring-2 ring-surface"
+                            style={avatarPair(att.email)}
+                          >
+                            {memberInitials(att.email).slice(0, 1)}
+                          </Avatar>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          Atendente: {memberName(att.email)}
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <span
-                        className={`truncate text-[14.5px] ${
+                        className={`truncate text-corpo ${
                           active || unread > 0 ? "font-semibold" : "font-medium"
                         }`}
                       >
                         {label}
                       </span>
                       <span
-                        className={`shrink-0 text-[11.5px] tabular-nums ${
+                        className={`shrink-0 text-legenda tabular-nums ${
                           paused ? "font-medium text-warn" : "text-ink-dim"
                         }`}
                         suppressHydrationWarning
@@ -434,18 +462,18 @@ export default function ContactSidebar({
                     </div>
                     <div className="mt-0.5 flex items-center justify-between gap-2">
                       {snippet ? (
-                        <span className="flex min-w-0 flex-1 items-center gap-1 text-[12.5px] text-ink-muted">
+                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-ink-muted">
                           <Search size={11} className="shrink-0 opacity-70" />
                           <span className="truncate italic">{snippet}</span>
                         </span>
                       ) : reason ? (
-                        <span className="flex min-w-0 flex-1 items-center gap-1 text-[12.5px] text-warn">
+                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-warn">
                           <Bot size={11} className="shrink-0 opacity-80" />
                           <span className="truncate">{reason}</span>
                         </span>
                       ) : (
                         <span
-                          className={`block truncate text-[13px] ${
+                          className={`block truncate text-apoio ${
                             unread > 0 ? "text-ink" : "text-ink-muted"
                           }`}
                         >
@@ -453,9 +481,9 @@ export default function ContactSidebar({
                         </span>
                       )}
                       {unread > 0 && (
-                        <span className="brand-grad flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-semibold tabular-nums">
+                        <Badge variant="nao-lidas">
                           {unread > 99 ? "99+" : unread}
-                        </span>
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -463,8 +491,9 @@ export default function ContactSidebar({
               </li>
             );
           })}
-        </ul>
-      </div>
-    </aside>
+          </ul>
+        </ScrollArea>
+      </aside>
+    </Card>
   );
 }

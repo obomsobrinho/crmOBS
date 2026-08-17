@@ -1,4 +1,5 @@
 import { BRAND } from "@/lib/brand";
+import { cn } from "@/lib/utils";
 
 // Selo + nome da marca. Estava copiado em 6 telas; agora é um componente, então
 // trocar a marca é editar `lib/brand.ts` (nome e caminho das artes) e os tokens
@@ -41,7 +42,7 @@ export default function BrandMark({
           className="mark-dark h-full w-full object-contain"
         />
       </span>
-      <span className={`truncate font-semibold ${label}`}>{BRAND.name}</span>
+      <span className={cn("truncate font-semibold", label)}>{BRAND.name}</span>
     </div>
   );
 }

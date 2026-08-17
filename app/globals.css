@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* O shadcn assume a classe `.dark` no <html>. Aqui o tema vem de cookie e é
+   `data-theme` no <html> (app/layout.tsx), então esta é a tradução. É ela, e só
+   ela, que faz o tema escuro alcançar todo componente da camada base: sem esta
+   linha, `dark:` não casaria com nada e a base ficaria clara no escuro. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ─────────────────────────────────────────────────────────────
    Sistema de design do CRM (OBS).
 
@@ -122,18 +128,60 @@
   --text-legenda--line-height: 16px;
   --text-legenda--font-weight: 500;
 
-  --text-rotulo: 11px;
-  --text-rotulo--line-height: 14px;
+  /* 12px, e não 11px: o piso da interface é 12px, e o token que define um dos
+     seis papéis não pode ser o primeiro a furar a própria regra. O que separa
+     `rotulo` de `legenda` no mesmo tamanho é a caixa alta, o espacejamento e o
+     peso, que é o que faz um rótulo de seção parecer rótulo. */
+  --text-rotulo: 12px;
+  --text-rotulo--line-height: 16px;
   --text-rotulo--letter-spacing: 0.08em;
   --text-rotulo--font-weight: 600;
 
-  /* Raio. Cinco degraus mais o balão, que é assinatura do produto. */
+  /* Raio. Cinco degraus mais o balão, que é assinatura do produto.
+     A escala é LITERAL de propósito: o padrão do shadcn deriva tudo de
+     --radius por calc(var(--radius) * 0.6), o que daria 7,2px e 9,6px onde a
+     casa tem 6px e 8px. Os componentes da base pedem rounded-sm/md/lg/xl e
+     caem aqui, que é o comportamento certo. */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  /* Alias legado: --radius-2xl era a superfície principal. */
+  /* LEGADO: --radius-2xl era a superfície principal e hoje é o MESMO valor de
+     --radius-xl. Ele sai quando a última das telas ainda não migradas parar de
+     usar `rounded-2xl` (hoje são 10 arquivos: /agente, /conhecimento, /equipe,
+     /painel, /perfil, /playground, /cadastro e os dois loading). Apagar antes
+     disso mudaria o raio delas de 16px para o padrão do Tailwind. */
   --radius-2xl: 16px;
+
+  /* ── Ponte para os nomes que o shadcn espera ──
+     A FRONTEIRA, e ela é permanente: token do shadcn é dono de SUPERFÍCIE,
+     BORDA, RAIO e ESTADO DE CONTROLE. Token nosso continua dono da TIPOGRAFIA
+     (os quatro níveis de tinta e os seis papéis) e das CORES DE ESTADO DO
+     PRODUTO (IA, humano, aviso, bloqueio). O shadcn tem UMA tinta por
+     superfície e nós temos QUATRO: `text-muted-foreground` NÃO substitui
+     `text-ink-2` nem `text-ink-3`, porque ele não sabe expressar hierarquia.
+
+     `accent` NÃO entra nesta lista. O nome já é nosso (linha 72) e está em uso
+     como TEXTO em 33 lugares das outras telas; no shadcn ele significa outra
+     coisa (a superfície de hover discreta de menu). Na camada base, `bg-accent`
+     vira `bg-[var(--active-bg)]`, que é o que os menus já usam hoje. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
 :root {
@@ -318,6 +366,34 @@
   --dur-slow: 240ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
+  /* ── Ponte para o shadcn: os apontamentos ──
+     Escrita UMA vez, só aqui, e NÃO existe cópia no bloco escuro de propósito.
+     `:root` e `[data-theme="dark"]` casam com o MESMO elemento (o <html>), com
+     a mesma especificidade, e o bloco escuro vem depois no arquivo. Então
+     var(--canvas) já resolve para o valor escuro, e `@theme inline` emite
+     var(--background) em vez de copiar o valor. Uma lista só, impossível de
+     sair de sincronia. */
+  --background: var(--canvas);
+  --foreground: var(--ink);
+  --card: var(--s-conteudo);
+  --card-foreground: var(--ink);
+  --popover: var(--s-conteudo);
+  --popover-foreground: var(--ink);
+  --primary: var(--brand-fill);
+  --primary-foreground: var(--brand-on);
+  --secondary: var(--s-bloco);
+  --secondary-foreground: var(--ink-2);
+  --muted: var(--s-bloco);
+  --muted-foreground: var(--ink-3);
+  --destructive: var(--danger-fill);
+  --destructive-foreground: var(--danger-on);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand-line);
+  /* Só para o componente que eventualmente leia var(--radius) direto: a escala
+     de verdade são os --radius-* literais lá em cima. */
+  --radius: 12px;
+
   color-scheme: light;
 }
 
@@ -474,7 +550,11 @@ h3 {
 }
 
 /* Superfície elevada: painel sólido com borda fina e sombra sobre o canvas.
-   `.glass` é alias legado (o nome mentia, nunca houve vidro nem blur). */
+   `.glass` é alias legado (o nome mentia, nunca houve vidro nem blur).
+
+   LEGADO: a geometria de cartão virou `components/ui/card.tsx`. Estas classes
+   seguem vivas porque as 13 telas ainda não migradas as usam, junto com os dois
+   loading.tsx. Somem quando a última tela migrar, não antes. */
 .surface-raised,
 .glass,
 .panel {
@@ -483,7 +563,9 @@ h3 {
   box-shadow: var(--panel-shadow);
 }
 
-/* Botão primário: fill da marca com a tinta que o acompanha. */
+/* Botão primário: fill da marca com a tinta que o acompanha.
+   LEGADO: virou a variante `brand` de `components/ui/button.tsx`. Segue viva
+   porque as telas ainda não migradas usam esta classe. */
 .btn-primary {
   background: var(--brand-fill);
   color: var(--brand-on);
@@ -492,16 +574,10 @@ h3 {
   filter: brightness(1.08);
 }
 
-/* Enviar mensagem: a única ação verde do produto. O par fill/tinta vem de
-   `--send-fill`/`--send-on`, que se invertem por tema para o contraste fechar
-   nos dois (branco no claro, tinta escura no escuro). */
-.btn-send {
-  background: var(--send-fill);
-  color: var(--send-on);
-}
-.btn-send:hover {
-  filter: brightness(1.08);
-}
+/* `.btn-send` morava aqui. Virou a variante `send` de
+   `components/ui/button.tsx` e não tem mais nenhum uso, então saiu. O par
+   `--send-fill`/`--send-on` continua nos tokens: são eles que se invertem por
+   tema para o contraste fechar nos dois. */
 
 /* Gradiente da marca. Único lugar autorizado a usar o azul. */
 .brand-grad {
@@ -579,14 +655,11 @@ select:focus-visible,
   border-color: var(--brand-line);
 }
 
-/* Cartão de seção. O atendimento tem TRÊS: o menu, a lista de conversas e a
-   conversa com os detalhes do contato. Dentro de um cartão a separação é linha
-   de 1px, nunca outro cartão. */
-.cartao {
-  background: var(--s-conteudo);
-  border: 1px solid var(--line);
-  box-shadow: var(--panel-shadow);
-}
+/* `.cartao` morava aqui. Virou `components/ui/card.tsx` e não tem mais nenhum
+   uso, então saiu. A regra que ela carregava continua valendo e agora mora no
+   componente: o atendimento tem TRÊS cartões (o menu, a lista de conversas e a
+   conversa com os detalhes do contato), e dentro de um cartão a separação é
+   linha de 1px, nunca outro cartão. */
 
 /* Sombra de rolagem: acende sob o cabeçalho quando a conversa passa por baixo
    dele, e acima da caixa de escrita enquanto sobra conversa embaixo. É o que

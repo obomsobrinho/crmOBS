@@ -1,9 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import * as React from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import BrandMark from "./BrandMark";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { BRAND } from "@/lib/brand";
 import {
   MessagesSquare,
@@ -64,7 +81,6 @@ export default function NavRail({
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [unreadConvos, setUnreadConvos] = useState(0);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
   // no estado inicial: o servidor não tem localStorage e o HTML sairia com um
@@ -105,24 +121,13 @@ export default function NavRail({
     };
   }, []);
 
-  // Fecha o menu do usuário ao clicar fora ou apertar Esc.
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
+  // O listener no `document` para fechar ao clicar fora saiu daqui: quem faz
+  // isso agora é o DropdownMenu, junto com Esc, devolução do foco e navegação
+  // por seta, que este menu nunca teve.
+
+  const estadoCanal = whatsappConnected
+    ? "WhatsApp conectado"
+    : "WhatsApp desconectado";
 
   function toggle() {
     setCollapsed((c) => {
@@ -147,25 +152,41 @@ export default function NavRail({
   const perfilActive = pathname.startsWith("/perfil");
 
   return (
-    <nav
-      className={`flex shrink-0 flex-col gap-1 rounded-xl border border-line bg-menu p-2 shadow-[var(--panel-shadow)] transition-[width] duration-200 ease-[var(--ease-out)] ${
-        collapsed ? "w-16 items-center" : "w-[212px]"
-      }`}
-    >
-      {/* A própria marca recolhe e expande o menu. Antes havia um botão de seta
-          só para isso, o que dava três alvos clicáveis num canto que trata de
-          um assunto só. */}
-      <button
-        onClick={toggle}
-        title={collapsed ? "Expandir menu" : "Recolher menu"}
-        aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-        aria-expanded={!collapsed}
-        className={`flex h-11 shrink-0 items-center rounded-lg text-left transition-colors hover:bg-[var(--rail-hover)] ${
-          collapsed ? "w-11 justify-center" : "px-2"
-        }`}
+    <Card asChild variant="menu">
+      <nav
+        className={cn(
+          "flex shrink-0 flex-col gap-1 p-2 transition-[width] duration-200 ease-[var(--ease-out)]",
+          collapsed ? "w-16 items-center" : "w-[212px]",
+        )}
       >
-        {collapsed ? <MarkOnly /> : <BrandMark size="sm" />}
-      </button>
+        {/* A própria marca recolhe e expande o menu. Antes havia um botão de
+            seta só para isso, o que dava três alvos clicáveis num canto que
+            trata de um assunto só. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="rail"
+              size="none"
+              onClick={toggle}
+              aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+              aria-expanded={!collapsed}
+              className={cn(
+                // `text-ink` porque este botão nunca teve cor própria: ele
+                // herdava a tinta principal, e a variante `rail` traria ink-2.
+                // `mb-2` porque a marca não é um item da lista: com o gap-1 de
+                // todos os outros ela encostava em "Conversas" e as duas coisas
+                // liam como uma pilha só.
+                "mb-2 h-11 rounded-lg text-left text-ink",
+                collapsed ? "w-11 justify-center" : "px-2",
+              )}
+            >
+              {collapsed ? <MarkOnly /> : <BrandMark size="sm" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {collapsed ? "Expandir menu" : "Recolher menu"}
+          </TooltipContent>
+        </Tooltip>
 
       {NAV.map(({ href, label, icon: Icon, donoOnly }) => {
         // Item só-do-dono some para atendente (role definido e diferente de dono).
@@ -174,86 +195,106 @@ export default function NavRail({
           ? activeHref === href
           : pathname === href || pathname.startsWith(href + "/");
         const unread = href === "/inbox" && unreadConvos > 0;
-        return (
-          <Link
-            key={href}
-            href={href}
-            title={collapsed ? label : undefined}
-            aria-current={active ? "page" : undefined}
-            className={`relative flex h-10 shrink-0 items-center gap-3 rounded-lg text-corpo transition-colors ${
-              collapsed ? "w-10 justify-center" : "px-3"
-            } ${
-              active
-                ? "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]"
-                : "text-ink-2 hover:bg-[var(--rail-hover)] hover:text-ink"
-            }`}
+        const item = (
+          <Button
+            asChild
+            variant="rail"
+            size="none"
+            className={cn(
+              "relative h-10 gap-3 rounded-lg text-corpo font-normal",
+              collapsed ? "w-10 justify-center" : "px-3",
+              active &&
+                "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
+            )}
           >
-            <Icon size={18} strokeWidth={1.8} className="shrink-0" />
-            {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-            {/* Expandido, pílula com o número; recolhido, só o ponto. A pílula
-                encolhida virava um círculo escuro sem nada legível dentro. */}
-            {unread && !collapsed && (
-              <span className="ml-auto min-w-5 shrink-0 rounded-full bg-ink px-2 py-0.5 text-center text-legenda font-semibold tabular-nums text-[var(--s-menu)]">
-                {unreadConvos > 99 ? "99+" : unreadConvos}
-              </span>
-            )}
-            {unread && collapsed && (
-              <span
-                title={`${unreadConvos} conversas não lidas`}
-                className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink"
-              />
-            )}
-          </Link>
+            <Link href={href} aria-current={active ? "page" : undefined}>
+              <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+              {!collapsed && (
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+              )}
+              {/* Expandido, pílula com o número; recolhido, só o ponto. A
+                  pílula encolhida virava um círculo escuro sem nada legível
+                  dentro. */}
+              {unread && !collapsed && (
+                <Badge variant="nao-lidas" className="ml-auto">
+                  {unreadConvos > 99 ? "99+" : unreadConvos}
+                </Badge>
+              )}
+              {unread && collapsed && (
+                <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
+              )}
+            </Link>
+          </Button>
+        );
+        // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
+        // ícone. Expandido, o rótulo está escrito ao lado e a dica seria eco.
+        return collapsed ? (
+          <Tooltip key={href}>
+            <TooltipTrigger asChild>{item}</TooltipTrigger>
+            <TooltipContent side="right">
+              {unread ? `${label} (${unreadConvos} não lidas)` : label}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <React.Fragment key={href}>{item}</React.Fragment>
         );
       })}
 
       {SOON.map(({ label, icon: Icon }) => (
-        <div
-          key={label}
-          title={`${label} (em breve)`}
-          className={`flex h-10 shrink-0 cursor-not-allowed items-center gap-3 rounded-full text-corpo text-ink-3 opacity-60 ${
-            collapsed ? "w-10 justify-center" : "px-3"
-          }`}
-        >
-          <Icon size={18} strokeWidth={1.8} className="shrink-0" />
-          {!collapsed && <span className="truncate">{label}</span>}
-        </div>
+        <Tooltip key={label}>
+          <TooltipTrigger asChild>
+            <div
+              tabIndex={0}
+              className={cn(
+                "flex h-10 shrink-0 cursor-not-allowed items-center gap-3 rounded-lg text-corpo text-ink-3 opacity-60",
+                collapsed ? "w-10 justify-center" : "px-3",
+              )}
+            >
+              <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+              {!collapsed && <span className="truncate">{label}</span>}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">{label} (em breve)</TooltipContent>
+        </Tooltip>
       ))}
 
-      <div
-        ref={menuRef}
-        className="relative mt-auto flex w-full flex-col gap-2 pt-2"
-      >
+      <div className="relative mt-auto flex w-full flex-col gap-2 pt-2">
         {/* Estado do canal e tema. É o que decide se vale a pena escrever
             qualquer coisa agora, então fica sempre à vista, em vez de escondido
             atrás do avatar. Sem moldura e sem fundo: é um indicador, não um
             botão, e a caixa em volta prometia um clique que não existe. */}
-        <div
-          className={`flex h-9 items-center ${
-            collapsed ? "w-full justify-center px-0" : "gap-2 px-1"
-          }`}
-          title={whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
-        >
-          <span
-            aria-hidden
-            className={`h-2 w-2 shrink-0 rounded-full ${
-              whatsappConnected ? "bg-human" : "bg-danger"
-            }`}
-          />
-          {collapsed ? (
-            <span className="sr-only">
-              {whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
-            </span>
-          ) : (
-            <span
-              className={`min-w-0 flex-1 truncate text-legenda ${
-                whatsappConnected ? "text-human-ink" : "text-danger-ink"
-              }`}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              tabIndex={0}
+              className={cn(
+                "flex h-9 items-center",
+                collapsed ? "w-full justify-center px-0" : "gap-2 px-1",
+              )}
             >
-              {whatsappConnected ? "WhatsApp conectado" : "WhatsApp desconectado"}
-            </span>
-          )}
-        </div>
+              <span
+                aria-hidden
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  whatsappConnected ? "bg-human" : "bg-danger",
+                )}
+              />
+              {collapsed ? (
+                <span className="sr-only">{estadoCanal}</span>
+              ) : (
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-legenda",
+                    whatsappConnected ? "text-human-ink" : "text-danger-ink",
+                  )}
+                >
+                  {estadoCanal}
+                </span>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right">{estadoCanal}</TooltipContent>
+        </Tooltip>
 
         {/* Tema entre o canal e o perfil. Recolhido, fica centralizado como os
             demais alvos da coluna; o perfil é sempre o último item. */}
@@ -261,59 +302,73 @@ export default function NavRail({
           <ThemeToggle collapsed={collapsed} />
         </div>
 
-        {menuOpen && (
-          <div
-            role="menu"
-            className={`absolute bottom-full z-20 mb-2 overflow-hidden rounded-xl border border-line bg-menu p-1 shadow-lg ${
-              collapsed ? "left-0 w-48" : "left-0 right-0"
-            }`}
-          >
-            <Link
-              href="/perfil"
-              role="menuitem"
-              onClick={() => setMenuOpen(false)}
-              className="flex h-9 items-center gap-2 rounded-lg px-3 text-apoio text-ink-2 transition-colors hover:bg-[var(--rail-hover)] hover:text-ink"
+        {/* O painel abre ACIMA DO BLOCO INTEIRO, não colado no avatar: ele
+            cobre o indicador do WhatsApp e o seletor de tema. Antes isso vinha
+            de graça, porque o `absolute bottom-full` era do contêiner; o Radix
+            ancora no gatilho, então os 104px repõem exatamente a diferença
+            (8 do pt-2, 36 do indicador, 8 do gap, 36 do tema, 8 do gap, mais os
+            8 do mb-2). São alturas fixas, então a conta não anda. */}
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="rail"
+              size="none"
+              className={cn(
+                // Idem: herdava a tinta principal, não é um item ghost.
+                "gap-2 rounded-lg p-1 text-ink",
+                collapsed && "justify-center",
+                (perfilActive || menuOpen) && "bg-[var(--rail-hover)]",
+              )}
             >
-              <User size={16} /> Perfil
-            </Link>
-            <button
-              onClick={logout}
-              role="menuitem"
-              className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-apoio text-ink-2 transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
+              <Avatar size="sm" className="bg-bloco text-ink-2 ring-1 ring-line">
+                {initials}
+              </Avatar>
+              {!collapsed && (
+                <>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block truncate text-corpo font-semibold">
+                      {clientName}
+                    </span>
+                    <span className="block text-legenda font-normal text-ink-3">
+                      Ver perfil
+                    </span>
+                  </span>
+                  <ChevronUp size={15} className="shrink-0 text-ink-3" />
+                </>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            sideOffset={104}
+            className={cn(
+              "overflow-hidden bg-menu",
+              collapsed
+                ? "w-48"
+                : "w-[var(--radix-dropdown-menu-trigger-width)]",
+            )}
+          >
+            <DropdownMenuItem
+              asChild
+              className="h-9 px-3 text-apoio hover:bg-[var(--rail-hover)] hover:text-ink focus:bg-[var(--rail-hover)] focus:text-ink"
+            >
+              <Link href="/perfil">
+                <User size={16} /> Perfil
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="perigo"
+              onSelect={logout}
+              className="h-9 px-3 text-apoio"
             >
               <LogOut size={16} /> Sair
-            </button>
-          </div>
-        )}
-
-        <button
-          onClick={() => setMenuOpen((v) => !v)}
-          title={collapsed ? clientName : undefined}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          className={`flex items-center gap-2 rounded-lg p-1 transition-colors hover:bg-[var(--rail-hover)] ${
-            collapsed ? "justify-center" : ""
-          } ${perfilActive || menuOpen ? "bg-[var(--rail-hover)]" : ""}`}
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-bloco text-legenda font-semibold text-ink-2 ring-1 ring-line">
-            {initials}
-          </span>
-          {!collapsed && (
-            <>
-              <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-corpo font-semibold">
-                  {clientName}
-                </span>
-                <span className="block text-legenda font-normal text-ink-3">
-                  Ver perfil
-                </span>
-              </span>
-              <ChevronUp size={15} className="shrink-0 text-ink-3" />
-            </>
-          )}
-        </button>
-      </div>
-    </nav>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        </div>
+      </nav>
+    </Card>
   );
 }
 

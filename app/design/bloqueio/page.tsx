@@ -29,7 +29,7 @@ export default function DesignBloqueioPage() {
             Aqui ficam as mensagens da conversa, que continuam chegando.
           </div>
           <MessageComposer
-            onSend={async () => {}}
+            onSend={async () => { }}
             iaAtiva={false}
             clientId="00000000-0000-0000-0000-000000000000"
             readOnly
