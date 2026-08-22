@@ -22,6 +22,45 @@ test.describe("Valor percebido (/design/valor)", () => {
     await expect(page.getByText(/pico de mensagens é domingo/).first()).toBeVisible();
   });
 
+  test("a frase mais forte é manchete, com o acumulado embaixo", async ({
+    page,
+  }) => {
+    await page.goto("/design/valor");
+
+    // Manchete: seis blocos iguais não têm hierarquia, e sem hierarquia a pessoa
+    // não lê nenhum. A frase mais forte fica em superfície da marca.
+    const manchete = page.locator(".bg-brand-surface").first();
+    await expect(manchete).toContainText("213");
+    await expect(manchete).toContainText(
+      /mensagens respondidas fora do horário de atendimento/
+    );
+    // O acumulado é o que trava a mão de quem ia cancelar: "213 no mês" convence,
+    // "1.876 desde o início" é outra conversa. Vai junto da manchete, não solto.
+    await expect(manchete).toContainText("1.876");
+    await expect(manchete).toContainText(/desde o início desta conta/);
+
+    // Contexto que já existe no resumo (mensagens recebidas), não métrica nova.
+    // Escopado à primeira seção: o mock sem horário herda o mesmo 486.
+    await expect(
+      page.locator("section").first().getByText(/486 mensagens recebidas/)
+    ).toBeVisible();
+  });
+
+  test("mês fechado vazio cai no acumulado em vez de mostrar tela vazia", async ({
+    page,
+  }) => {
+    await page.goto("/design/valor");
+    // Conta nova não tem mês fechado, e é justo quando o cliente mais duvida da
+    // ferramenta. A manchete vira o acumulado, e o rótulo do período vai junto:
+    // as frases dizem "desde o início", então o título não pode dizer julho.
+    const secao = page
+      .locator("section")
+      .filter({ hasText: /desde o início, sem ninguém do time/ });
+    await expect(secao.locator(".bg-brand-surface")).toContainText("1876");
+    // E o estado vazio não aparece junto do acumulado.
+    await expect(secao.getByText("Ainda sem movimento no período")).toHaveCount(0);
+  });
+
   test("sem horário configurado, omite o número em vez de estimar", async ({
     page,
   }) => {
@@ -31,8 +70,13 @@ test.describe("Valor percebido (/design/valor)", () => {
     // A regra que não se negocia: inventar número quebra a confiança, que é o
     // eixo de competição do produto. Só a seção com horário tem o 213.
     await expect(page.getByText("213", { exact: true })).toHaveCount(1);
-    // Os números que não dependem de horário continuam nas duas seções.
-    await expect(page.getByText("47", { exact: true })).toHaveCount(2);
+    // Sem horário a manchete é a próxima frase mais forte, e não um buraco.
+    const semHorario = page
+      .locator("section")
+      .filter({ hasText: "Falta o horário de atendimento" });
+    await expect(semHorario.locator(".bg-brand-surface")).toContainText(
+      /fim de semana ou feriado/
+    );
   });
 
   test("não usa travessão em texto visível", async ({ page }) => {

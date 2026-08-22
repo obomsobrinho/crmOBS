@@ -241,8 +241,16 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   e cancelamento. `?plano=` pré-seleciona a linha para o link vindo do site.
 - **Valor percebido (`lib/valor.ts`, módulo puro):** transforma operação em frase de dependência
   ("213 mensagens respondidas fora do horário em julho"). Ataca o churn: o valor do produto é
-  invisível porque a IA responde dentro do WhatsApp. Mora no `/painel` (mês **fechado**) e no passo
-  de cancelar do `BillingCheckout` (**acumulado desde o início**). Quatro regras que não se negociam:
+  invisível porque a IA responde dentro do WhatsApp. Mora no `/painel` (mês **fechado** com o
+  **acumulado desde o início** junto) e no passo de cancelar do `BillingCheckout` (acumulado).
+  **É a MANCHETE do painel:** a frase mais forte (`frasesDeValor` já devolve em ordem de força) ocupa
+  a largura inteira em superfície da marca, com o acumulado como segunda linha, e o resto vai para a
+  grade. Mês fechado vazio **cai no acumulado** em vez de mostrar tela vazia (conta nova é quando o
+  cliente mais duvida do produto), e nesse caso o rótulo do período vira "desde o início" junto,
+  senão o título mentiria. `ValorResumo` **não calcula nada**: duas opiniões sobre o mesmo número é o
+  começo de um número inventado. No `/painel` o mês é **recortado do acumulado em memória** (por
+  `Date.parse`, nunca comparando ISO como string: o banco devolve `+00:00` e `mesFechado` gera `Z`),
+  para não pedir as mesmas linhas duas vezes. Quatro regras que não se negociam:
   (1) **nunca inventar nem inflar**, porque o cliente confere no WhatsApp dele; sem horário
   configurado a frase é **omitida**, e frase com zero não entra;
   (2) **só resposta da IA conta** em "fora do horário" e "fim de semana" (`message_type='manual'` é

@@ -6,9 +6,11 @@ import { frasesDeValor, rotuloDoMes, type ValorResumo as Resumo } from "@/lib/va
 
 // Preview de design do resumo de valor percebido (dev-only, liberado pelo proxy).
 //
-// Mostra os DOIS estados que importam: com horário de atendimento configurado
-// (resumo cheio) e sem horário (o número mais forte é omitido, com aviso). O
-// segundo é o estado real da OBM hoje, então precisa ficar apresentável também.
+// Mostra os TRÊS estados que importam:
+// 1. com horário de atendimento configurado (manchete cheia mais acumulado);
+// 2. sem horário: o número mais forte é omitido, com aviso. É o estado real da
+//    OBM hoje, então precisa ficar apresentável também;
+// 3. mês fechado vazio e acumulado com dado, que é a conta nova no primeiro mês.
 export const dynamic = "force-dynamic";
 
 const PERIODO = rotuloDoMes(2026, 7);
@@ -32,6 +34,36 @@ const SEM_HORARIO: Resumo = {
   temHorario: false,
 };
 
+// Acumulado desde o início: os mesmos indicadores, sem janela de data.
+const ACUMULADO: Resumo = {
+  recebidas: 4312,
+  atendidasForaDoHorario: 1876,
+  atendidasEmFimDeSemanaOuFeriado: 402,
+  conversasSemHumano: 311,
+  leadsQualificados: 164,
+  pedidosDeAgendamento: 52,
+  respostasEmMenosDeUmMinuto: 1094,
+  primeiraRespostaMs: 39000,
+  pico: { diaSemana: 0, hora: 17, mensagens: 268 },
+  temHorario: true,
+};
+
+// Mês fechado sem nenhum movimento: conta que começou depois do mês virar.
+const MES_VAZIO: Resumo = {
+  recebidas: 0,
+  atendidasForaDoHorario: 0,
+  atendidasEmFimDeSemanaOuFeriado: 0,
+  conversasSemHumano: 0,
+  leadsQualificados: 0,
+  pedidosDeAgendamento: 0,
+  respostasEmMenosDeUmMinuto: 0,
+  primeiraRespostaMs: null,
+  pico: null,
+  temHorario: true,
+};
+
+const FRASES_ACUMULADAS = frasesDeValor(ACUMULADO, "desde o início");
+
 export default function DesignValorPage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
@@ -47,6 +79,8 @@ export default function DesignValorPage() {
             resumo={COM_HORARIO}
             frases={frasesDeValor(COM_HORARIO, PERIODO)}
             periodo={PERIODO}
+            acumulado={ACUMULADO}
+            frasesAcumuladas={FRASES_ACUMULADAS}
           />
 
           <div className="border-t border-line pt-6">
@@ -57,6 +91,19 @@ export default function DesignValorPage() {
               resumo={SEM_HORARIO}
               frases={frasesDeValor(SEM_HORARIO, PERIODO)}
               periodo={PERIODO}
+            />
+          </div>
+
+          <div className="border-t border-line pt-6">
+            <p className="mb-3 text-rotulo uppercase text-ink-3">
+              Mês fechado sem movimento, com acumulado
+            </p>
+            <ValorResumo
+              resumo={MES_VAZIO}
+              frases={frasesDeValor(MES_VAZIO, PERIODO)}
+              periodo={PERIODO}
+              acumulado={ACUMULADO}
+              frasesAcumuladas={FRASES_ACUMULADAS}
             />
           </div>
         </div>

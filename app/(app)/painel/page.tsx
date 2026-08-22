@@ -37,8 +37,8 @@ export default async function PainelPage() {
   const [
     { data: msgs },
     { data: quals },
-    { data: mesMsgs },
-    { data: mesQuals },
+    { data: todasMsgs },
+    { data: todasQuals },
     { data: cfg },
   ] = await Promise.all([
     supabase
@@ -51,17 +51,22 @@ export default async function PainelPage() {
       .select("phone, created_at")
       .gte("created_at", cutoff)
       .limit(2000),
+    // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e é
+    // ele que trava a mão de quem ia cancelar. O mês fechado é recortado deste
+    // conjunto em memória, mais abaixo, em vez de virar duas consultas próprias:
+    // o acumulado já contém o mês, e pedir as mesmas linhas duas vezes só
+    // dobraria o custo da página. Teto de linhas porque um tenant com um ano de
+    // operação tem dezenas de milhares; quando o teto doer, o caminho é uma
+    // tabela de agregado mensal (mesmo teto e mesmo motivo de /assinatura).
     supabase
       .from("chat_messages")
       .select("phone, user_message, bot_message, message_type, created_at")
-      .gte("created_at", mes.inicioISO)
-      .lt("created_at", mes.fimISO)
+      .order("created_at", { ascending: false })
       .limit(20000),
     supabase
       .from("conversation_qualifications")
       .select("phone, action, created_at")
-      .gte("created_at", mes.inicioISO)
-      .lt("created_at", mes.fimISO)
+      .order("created_at", { ascending: false })
       .limit(5000),
     // O horário de atendimento vive em agent_config (é configuração da empresa,
     // editada na tela do agente). Sem ele, o resumo omite o número de "fora do
@@ -96,13 +101,33 @@ export default async function PainelPage() {
   const hours =
     (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
 
+  const acumuladoMsgs = (todasMsgs ?? []) as ValorMsg[];
+  const acumuladoQuals = (todasQuals ?? []) as ValorQual[];
+
+  // Recorte do mês fechado a partir do acumulado. Comparação por instante
+  // (Date.parse) e não por string: o banco devolve "…+00:00" e mesFechado gera
+  // "…Z", e comparar esses dois como texto erra exatamente na linha da fronteira.
+  const inicioMs = Date.parse(mes.inicioISO);
+  const fimMs = Date.parse(mes.fimISO);
+  const noMes = (iso: string) => {
+    const t = Date.parse(iso);
+    return t >= inicioMs && t < fimMs;
+  };
+
   const resumo = resumoDeValor({
-    msgs: (mesMsgs ?? []) as ValorMsg[],
-    quals: (mesQuals ?? []) as ValorQual[],
+    msgs: acumuladoMsgs.filter((m) => noMes(m.created_at)),
+    quals: acumuladoQuals.filter((q) => noMes(q.created_at)),
     hours,
   });
   const periodo = rotuloDoMes(mes.ano, mes.mes);
   const frases = frasesDeValor(resumo, periodo);
+
+  const acumulado = resumoDeValor({
+    msgs: acumuladoMsgs,
+    quals: acumuladoQuals,
+    hours,
+  });
+  const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
 
   return (
     <div
@@ -121,7 +146,13 @@ export default async function PainelPage() {
         </p>
       </div>
 
-      <ValorResumo resumo={resumo} frases={frases} periodo={periodo} />
+      <ValorResumo
+        resumo={resumo}
+        frases={frases}
+        periodo={periodo}
+        acumulado={acumulado}
+        frasesAcumuladas={frasesAcumuladas}
+      />
 
       <section className="space-y-3">
         <h2 className="text-corpo font-semibold">

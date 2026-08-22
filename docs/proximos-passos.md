@@ -378,9 +378,24 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
       mês pela metade dá número que parece pequeno e vende contra a gente.
       **Antídoto do cancelamento** entregue: o acumulado desde o início aparece no passo de cancelar
       (`BillingCheckout`), antes do campo de motivo. Preview em `/design/valor` (com e sem horário) e
-      `/design/cancelamento`; 5 testes em `e2e/valor.design.spec.ts`, um deles falhando se aparecer
+      `/design/cancelamento`; testes em `e2e/valor.design.spec.ts`, um deles falhando se aparecer
       travessão. Conferido contra o banco: em julho de 2026 o painel mostrou os mesmos números que o
       SQL na mesma janela.
+- [x] **Valor percebido virou MANCHETE do painel** (22/08/2026). O cálculo não mudou uma linha; o que
+      mudou é hierarquia. Seis blocos do mesmo tamanho não têm manchete, e sem manchete a pessoa não
+      lê nenhum: agora a frase mais forte (a ordem já vinha de `frasesDeValor`) ocupa a largura
+      inteira em superfície da marca, com a frase em `text-titulo`, e o resto desce para a grade.
+      **O acumulado desde o início subiu para o painel**, como segunda linha da manchete: "213 no
+      mês" convence, mas "1.876 desde o início" é o que trava a mão de quem ia cancelar, e ele estava
+      só no passo de cancelamento, ou seja, chegava tarde. Duas decisões de apresentação:
+      (1) **mês fechado vazio cai no acumulado** em vez de mostrar "ainda sem movimento", porque
+      conta nova é exatamente quando o cliente mais duvida da ferramenta; nesse caso o rótulo do
+      período muda para "desde o início" junto, senão o título mentiria;
+      (2) `recebidas` aparece como contexto no cabeçalho (já vinha no resumo, não é métrica nova).
+      Custo de página inalterado: o mês fechado passou a ser **recortado do acumulado em memória**
+      em vez de virar duas consultas próprias, então continuam 4 consultas. O recorte compara por
+      `Date.parse` e não por string, porque o banco devolve `+00:00` e `mesFechado` gera `Z`, e
+      comparar isso como texto erra na linha da fronteira.
       **Decisões tomadas na implementação:**
       - Classificação em `America/Sao_Paulo` via `Intl`, não em UTC: em UTC a mensagem da noite
         cairia no dia seguinte e estragaria justamente o número mais forte.
