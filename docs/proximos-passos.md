@@ -469,10 +469,23 @@ entrada em cache**; `text-embedding-3-small` a US$ 0,02/M (irrelevante no total)
 com 3.000 conversas fica em 40% de margem, e ele é o único plano onde o teto é o caso provável.
 Boa notícia: `lib/agent.ts:124-134` já monta o system na ordem certa (persona, depois RAG, depois
 AGORA, depois orientação do operador), então a persona é prefixo estável e o cache funciona sem
-reordenar nada. Falta só **ler `usage.prompt_tokens_details.cached_tokens` e gravar em
-`agent_turns`**, e avisar no `/agente` quando a persona compilada ficar abaixo de ~1.100 tokens
-(abaixo disso a OpenAI não cacheia). Duas alavancas extras, se precisar: cair de 5 para 3 chunks de
+reordenar nada. Duas alavancas extras, se precisar: cair de 5 para 3 chunks de
 RAG quando a similaridade é baixa, e `HISTORY_ROWS` de 10 para 6.
+
+- [x] **Medir o cache de prompt** (22/08/2026). `agent_turns.cached_input_tokens` guarda
+      `usage.prompt_tokens_details.cached_tokens`; `null` = o modelo não informou, `0` = miss, e o
+      primeiro turno de uma conversa é sempre miss. **Primeira medição real** (Loja Teste, dois
+      turnos seguidos no cérebro real em `dryRun`): turno 1 com **0 de 3.787** tokens de entrada,
+      turno 2 com **2.304 de 3.870, ou 59,5%**. A hipótese da tabela acima se confirmou: o cache
+      pega, e pega em cima da persona, que é o único prefixo estável. A partir daqui a coluna "Com
+      cache" deixa de ser projeção e passa a ser conferível por consulta.
+      O `/agente` avisa quando a persona compilada fica abaixo de `CACHE_SAFE_TOKENS` (2.048, em
+      `lib/agent-prompt.ts`). **Por que 2.048 e não os ~1.100 anotados aqui antes:** a documentação
+      oficial diz 1.024 para GPT-5.6+ mas de 1.024 a 2.048 para modelos anteriores, e o nosso
+      (`gpt-5.4-mini`) é anterior; ela ainda avisa que o cache é inconsistente pouco acima de 1.024.
+      O aviso usa o teto da faixa porque prometer economia que não vem é pior que avisar de um risco
+      que não se concretizou. Na prática o modo guiado nunca dispara (o esqueleto vazio já dá ~2.146
+      tokens); quem dispara é modo avançado com prompt curto.
 
 **A base de conhecimento não escala custo.** O retrieval é fixo em 5 chunks, então 500 páginas
 custam por turno o mesmo que 5. Indexar um PDF de 50 páginas sai abaixo de R$ 0,01. Por isso a

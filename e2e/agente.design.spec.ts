@@ -97,6 +97,23 @@ test.describe("Modo avançado: rabo da base (/design/agente)", () => {
     expect(caixa).not.toContain("### PRECEDÊNCIA");
   });
 
+  test("prompt curto avisa que não vai ser cacheado; prompt cheio não avisa", async ({
+    page,
+  }) => {
+    await page.goto("/design/agente");
+    // O mock do guiado compila ~10 KB, bem acima do mínimo cacheável, então o
+    // aviso NÃO pode aparecer aqui: avisar sempre treina a pessoa a ignorar.
+    await expect(page.getByText(/O prompt tem cerca de/)).toHaveCount(0);
+
+    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.locator("textarea").last().fill("Atenda bem e seja simpática.");
+
+    // Agora avisa, e diz o número: é custo, não estética. Sem cache, a persona
+    // inteira paga preço cheio de entrada em TODA mensagem.
+    await expect(page.getByText(/O prompt tem cerca de/)).toBeVisible();
+    await expect(page.getByText(/2\.048 que a OpenAI pede/)).toBeVisible();
+  });
+
   test("o preview mostra o texto do cliente MAIS o rabo", async ({ page }) => {
     await page.goto("/design/agente");
     await page.getByRole("tab", { name: /Avançado/ }).click();

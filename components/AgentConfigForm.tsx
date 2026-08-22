@@ -17,7 +17,10 @@ import {
   buildAdvancedPersona,
   buildBaseTail,
   buildPersona,
+  estimarTokens,
+  foraDoCache,
   stripBaseTail,
+  CACHE_SAFE_TOKENS,
   DEFAULT_HANDOFF_NOTICE,
   EMPTY_CONFIG,
   TONES,
@@ -300,6 +303,11 @@ export default function AgentConfigForm({
   const agendarSemGrupo =
     cfg.goals.includes("agendar") && notifyJid.trim() === "";
 
+  // Persona curta demais para o cache de prompt da OpenAI pegar. Interessa ao
+  // dono porque é custo: a persona vai inteira em TODA mensagem, e sem cache cada
+  // turno paga o preço cheio de entrada. Só aparece quando o risco existe.
+  const semCache = foraDoCache(previewPersona);
+
   // Carrega uma versão antiga do drawer no formulário. NÃO salva: a pessoa
   // confere e aperta Salvar. O spread sobre EMPTY_CONFIG completa campos que não
   // existiam quando aquela versão foi gravada (handoffNotice, por exemplo).
@@ -391,6 +399,15 @@ export default function AgentConfigForm({
         <Banner>
           Este agente tem um prompt escrito à mão. Salvar pelo formulário guiado
           vai substituí-lo (o sistema pede confirmação).
+        </Banner>
+      )}
+      {semCache && (
+        <Banner>
+          O prompt tem cerca de {estimarTokens(previewPersona).toLocaleString("pt-BR")}{" "}
+          tokens, abaixo dos {CACHE_SAFE_TOKENS.toLocaleString("pt-BR")} que a
+          OpenAI pede para reaproveitar o prompt entre mensagens. Cada resposta vai
+          custar o preço cheio de entrada. Detalhar mais a empresa deixa o agente
+          melhor e mais barato ao mesmo tempo.
         </Banner>
       )}
 

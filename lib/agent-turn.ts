@@ -370,6 +370,11 @@ async function logTurn(
       model: t.model,
       input_tokens: t.usage?.inputTokens ?? null,
       output_tokens: t.usage?.outputTokens ?? null,
+      // Quanto da entrada veio do cache. É o que separa margem medida de margem
+      // chutada: sem ele, input_tokens cobra todo turno como entrada nova.
+      // `?? null` cobre os dois casos sem número: turno silencioso (não chama o
+      // modelo) e resposta que não trouxe o campo.
+      cached_input_tokens: t.usage?.cachedInputTokens ?? null,
     });
     if (error) console.error("falha ao registrar o turno:", error.message);
   } catch (e) {

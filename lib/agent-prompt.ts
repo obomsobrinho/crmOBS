@@ -63,6 +63,46 @@ export const LIMITS = {
 export const DEFAULT_HANDOFF_NOTICE =
   "Vou verificar isso e já te confirmo por aqui.";
 
+/**
+ * Tamanho mínimo para o cache de prompt da OpenAI valer.
+ *
+ * Fonte: https://developers.openai.com/api/docs/guides/prompt-caching ("o cache
+ * exige um prefixo mínimo que varia por modelo: GPT-5.6 e posteriores exigem ao
+ * menos 1.024 tokens; modelos anteriores vão de 1.024 a 2.048, com cache
+ * INCONSISTENTE para prompts pouco acima de 1.024").
+ *
+ * Por que dois números, e por que o aviso usa o de cima: o modelo que atende hoje
+ * é `gpt-5.4-mini`, que cai na faixa "anterior ao 5.6", então o mínimo real dele
+ * pode ser qualquer coisa entre 1.024 e 2.048 e a documentação não fecha o valor.
+ * Avisar só abaixo de 1.024 diria "está cacheado" para uma persona de 1.500
+ * tokens que talvez nunca seja. Entre errar prometendo economia e errar avisando
+ * de um risco que não se concretizou, o segundo é o barato.
+ *
+ * Só o que é ESTÁVEL entre turnos conta como prefixo cacheável, e isso é a
+ * persona: o bloco AGORA muda a cada minuto e os trechos do RAG mudam a cada
+ * mensagem (ver a ordem montada em `lib/agent.ts`).
+ */
+export const CACHE_MIN_TOKENS = 1024;
+export const CACHE_SAFE_TOKENS = 2048;
+
+/**
+ * Estimativa de tokens a partir do texto. 3,7 caracteres por token é a régua que
+ * o contador do prompt já usava para português; mora aqui para os dois lugares
+ * que precisam dela lerem o MESMO número.
+ */
+export function estimarTokens(texto: string): number {
+  return Math.round(texto.length / 3.7);
+}
+
+/**
+ * A persona é curta demais para o cache de prompt pegar? Turno sem cache paga o
+ * preço cheio de entrada, e como a persona vai inteira em TODA mensagem, é o
+ * item que mais pesa na conta do tenant.
+ */
+export function foraDoCache(persona: string): boolean {
+  return estimarTokens(persona) < CACHE_SAFE_TOKENS;
+}
+
 export const DAY_ORDER: DayKey[] = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"];
 
 export const DAY_LABEL: Record<DayKey, string> = {

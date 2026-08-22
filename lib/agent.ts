@@ -113,6 +113,15 @@ export class AgentError extends Error {}
 export interface TurnUsage {
   inputTokens: number | null;
   outputTokens: number | null;
+  /**
+   * Quantos dos tokens de entrada vieram do CACHE (leitura de um prefixo que a
+   * OpenAI já tinha visto). Sai de `usage.prompt_tokens_details.cached_tokens`.
+   *
+   * Sem este número a margem do plano é chute: o cache de prompt deixou de ser
+   * otimização e virou pré-requisito comercial. `null` = a resposta não informou;
+   * `0` = o prefixo não bateu, e o PRIMEIRO turno de uma conversa é sempre 0.
+   */
+  cachedInputTokens: number | null;
 }
 
 export interface AgentRun {
@@ -183,7 +192,11 @@ export async function runAgent(params: {
 
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    usage?: {
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      prompt_tokens_details?: { cached_tokens?: number };
+    };
   };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new AgentError("o modelo não retornou resposta");
@@ -196,7 +209,9 @@ export async function runAgent(params: {
   }
 
   // O consumo vem de graça na resposta. Registrar é o que permite saber o custo
-  // real por conversa em vez de estimar.
+  // real por conversa em vez de estimar. O campo de cache é opcional na API, e
+  // um modelo que não o informe não pode virar erro aqui: fica null.
+  const cached = data.usage?.prompt_tokens_details?.cached_tokens;
   const usage: TurnUsage | null = data.usage
     ? {
         inputTokens:
@@ -205,6 +220,7 @@ export async function runAgent(params: {
           typeof data.usage.completion_tokens === "number"
             ? data.usage.completion_tokens
             : null,
+        cachedInputTokens: typeof cached === "number" ? cached : null,
       }
     : null;
 

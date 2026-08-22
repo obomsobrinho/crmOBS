@@ -199,7 +199,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - **Fase 4 (medição do agente):** `agent_turns` guarda **uma linha por turno** que o `/api/agent`
   processou, com o diagnóstico que ele já calculava e descartava: `action`, `messages_sent`,
   `silenced` (`nao_publicado`/`assinatura`), RAG (`rag_searched`, `rag_matches`,
-  `rag_top_similarity`), guardrail, `latency_ms`, `model`, `input_tokens`, `output_tokens` e
+  `rag_top_similarity`), guardrail, `latency_ms`, `model`, `input_tokens`, `output_tokens`,
+  `cached_input_tokens` e
   `dry_run` (playground: o token foi gasto, mas métrica de operação deve filtrar fora). **Não guarda
   conteúdo de mensagem** (isso é `chat_messages`). `runAgent` passou a devolver
   `{output, usage, model}` para isso. A escrita é `logTurn` em `lib/agent-turn.ts`, **best-effort e
@@ -208,6 +209,19 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   base de conhecimento está sendo usada, e quantas vezes o guardrail conteve a IA.
   ⚠️ O **limite de conversas do plano NÃO sai daqui**: conversa é janela de 24h contada em
   `chat_messages` (inclui manual), `agent_turns` é só o que a IA processou.
+- **Fase 4 (cache de prompt medido):** `cached_input_tokens` responde a pergunta que decide a
+  margem do plano Avançado (40% sem cache, 55% com). Sai de
+  `usage.prompt_tokens_details.cached_tokens`; `null` = o modelo não informou, `0` = o prefixo não
+  bateu e **o primeiro turno de uma conversa é sempre 0**. Medição real na Loja Teste: turno 1 com
+  0 de 3.787, turno 2 com **2.304 de 3.870 (59,5%)**. O que faz o cache pegar é a ORDEM que
+  `lib/agent.ts` já monta (persona, RAG, AGORA, orientação do operador): só a persona é prefixo
+  estável, então **não reordenar isso** sem refazer a conta. O limiar mora em `lib/agent-prompt.ts`
+  como par de constantes: `CACHE_MIN_TOKENS` (1.024, o piso documentado para GPT-5.6+) e
+  `CACHE_SAFE_TOKENS` (2.048), e **o aviso do `/agente` usa o de cima de propósito**, porque
+  `gpt-5.4-mini` cai na faixa "anterior ao 5.6", onde a própria OpenAI diz que o mínimo vai de
+  1.024 a 2.048 e o cache é inconsistente pouco acima de 1.024. Prometer economia que não vem é
+  pior que avisar de um risco que não se concretizou. Na prática o guiado nunca dispara o aviso
+  (o esqueleto vazio já dá ~2.146 tokens); quem dispara é modo avançado com prompt curto.
 - **Fase 4 (cobrança, Asaas):** `lib/asaas.ts` (**server-only**) é o cliente da API; qualquer
   `ASAAS_ENV` diferente de `producao` cai no **sandbox** de propósito. ⚠️ **A chave começa com `$`,
   e o Next expande `$` como referência a outra variável:** no `.env.local` ela precisa de contrabarra

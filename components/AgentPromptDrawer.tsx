@@ -2,7 +2,12 @@
 
 import { useCallback, useState } from "react";
 import { Copy, Check, FileText, History, RotateCcw, X } from "lucide-react";
-import { LIMITS, type AgentConfig } from "@/lib/agent-prompt";
+import {
+  estimarTokens,
+  foraDoCache,
+  LIMITS,
+  type AgentConfig,
+} from "@/lib/agent-prompt";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { Button } from "@/components/ui/button";
@@ -69,8 +74,11 @@ export default function AgentPromptDrawer({
 
   const texto = vendo ? vendo.persona : persona;
   const chars = texto.length;
-  const tokens = Math.round(chars / 3.7);
+  const tokens = estimarTokens(texto);
   const warn = chars > LIMITS.personaWarn;
+  // Curto demais para o cache de prompt pegar. Fica na mesma linha do contador
+  // porque é a linha do CUSTO: ali já se diz que o prompt vai em toda mensagem.
+  const semCache = chars > 0 && foraDoCache(texto);
 
   // Busca só ao abrir: histórico é consulta que a maioria nunca vai pedir, e
   // fazer no carregamento seria custo em toda visita a /agente.
@@ -141,10 +149,15 @@ export default function AgentPromptDrawer({
             {texto || "Preencha os campos para gerar o prompt."}
           </pre>
 
-          <p className={`mt-2 text-legenda ${warn ? "text-warn-ink" : "text-ink-3"}`}>
+          <p
+            className={`mt-2 text-legenda ${
+              warn || semCache ? "text-warn-ink" : "text-ink-3"
+            }`}
+          >
             {chars.toLocaleString("pt-BR")} caracteres · ~
             {tokens.toLocaleString("pt-BR")} tokens · enviado em toda mensagem
             {warn && " · prompt longo, considere encurtar os detalhes"}
+            {semCache && " · curto demais para a OpenAI reaproveitar entre mensagens"}
           </p>
 
           {/* Histórico. Sem versão salva ainda, a seção inteira some. */}
