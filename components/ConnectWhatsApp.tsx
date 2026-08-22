@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import LogoutButton from "./LogoutButton";
 import ConnectionRiskNotice from "./ConnectionRiskNotice";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 type Phase = "idle" | "loading" | "waiting" | "importing" | "connected" | "error";
 
@@ -93,11 +96,11 @@ export default function ConnectWhatsApp({
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-4 lg:flex-row lg:items-start lg:justify-center lg:py-10">
-      <div className="glass w-full max-w-md space-y-5 rounded-2xl p-6 text-center">
+      <div className={cn(cardVariants(), "w-full max-w-md space-y-5 p-6 text-center")}>
         <div className="flex items-center justify-between">
           <div className="text-left">
-            <h1 className="font-display text-xl font-bold">Conectar WhatsApp</h1>
-            <p className="text-sm text-ink-muted">{clientName}</p>
+            <h1 className="text-titulo">Conectar WhatsApp</h1>
+            <p className="text-apoio text-ink-2">{clientName}</p>
           </div>
           <LogoutButton />
         </div>
@@ -105,12 +108,12 @@ export default function ConnectWhatsApp({
         {phase === "connected" || phase === "importing" ? (
           <div className="space-y-2 py-8">
             <div className="text-3xl">{phase === "importing" ? "⏳" : "✅"}</div>
-            <p className="font-medium text-ia">
+            <p className="font-medium text-human-ink">
               {phase === "importing"
                 ? "Conectado! Importando sua base…"
                 : "Tudo pronto!"}
             </p>
-            <p className="text-sm text-ink-muted">
+            <p className="text-apoio text-ink-2">
               {phase === "importing"
                 ? "Trazendo contatos e conversas do WhatsApp…"
                 : "Redirecionando…"}
@@ -118,12 +121,12 @@ export default function ConnectWhatsApp({
           </div>
         ) : (
           <>
-            <p className="text-sm text-ink-muted">
+            <p className="text-apoio text-ink-2">
               Abra o WhatsApp no celular do cliente, em Aparelhos conectados,
               e escaneie o QR code abaixo.
             </p>
 
-            <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-surface p-4">
+            <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-bloco p-4">
               {qr ? (
                 <Image
                   src={qr}
@@ -134,9 +137,9 @@ export default function ConnectWhatsApp({
                   className="h-64 w-64 rounded-lg"
                 />
               ) : phase === "loading" ? (
-                <span className="text-sm text-ink-dim">Gerando QR…</span>
+                <span className="text-apoio text-ink-3">Gerando QR…</span>
               ) : (
-                <span className="text-sm text-ink-dim">
+                <span className="text-apoio text-ink-3">
                   {hasInstance
                     ? "Aguardando conexão ou gere um novo QR."
                     : "Clique em Conectar para gerar o QR."}
@@ -145,24 +148,25 @@ export default function ConnectWhatsApp({
             </div>
 
             {phase === "waiting" && (
-              <p className="text-xs text-ink-dim">
+              <p className="text-legenda text-ink-3">
                 Aguardando você escanear… a tela avança sozinha ao conectar.
               </p>
             )}
 
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && <p className="text-apoio text-danger-ink">{error}</p>}
 
-            <button
+            <Button
+              size="field"
               onClick={connect}
               disabled={phase === "loading"}
-              className="btn-primary w-full rounded-lg px-3 py-2.5 text-sm font-medium transition disabled:opacity-60"
+              className="w-full justify-center"
             >
               {phase === "loading"
                 ? "Gerando…"
                 : qr
                 ? "Gerar novo QR"
                 : "Conectar WhatsApp"}
-            </button>
+            </Button>
           </>
         )}
       </div>

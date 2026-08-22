@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatBytes, type KnowledgeDoc } from "@/lib/crm";
+import { Button } from "@/components/ui/button";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.txt,.md";
 
@@ -144,17 +145,17 @@ export default function KnowledgeManager({
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div>
         <div className="flex items-center gap-2">
-          <BookOpen size={20} className="text-accent" />
-          <h1 className="font-display text-xl font-bold">Base de conhecimento</h1>
+          <BookOpen size={20} className="text-brand-ink" />
+          <h1 className="text-titulo">Base de conhecimento</h1>
         </div>
-        <p className="text-sm text-ink-muted">
+        <p className="text-apoio text-ink-2">
           Envie documentos (produtos, tabelas, perguntas frequentes) para o agente
           responder com base neles. PDF, Word, planilha, CSV ou texto.
         </p>
       </div>
 
       {!keyConfigured && (
-        <div className="flex items-start gap-2 rounded-lg border border-warn/30 bg-[var(--warn-bg)] px-3 py-2 text-sm text-warn">
+        <div className="flex items-start gap-2 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
           <CircleAlert size={15} className="mt-0.5 shrink-0" />
           <span>
             O processamento de documentos ainda não está ativo no servidor. O envio
@@ -164,13 +165,13 @@ export default function KnowledgeManager({
       )}
 
       {error && (
-        <div className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-sm text-danger">
+        <div className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
           {error}
         </div>
       )}
 
       <label
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface px-4 py-8 text-center transition-colors hover:bg-[var(--active-bg)] ${
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-bloco px-4 py-8 text-center transition-colors hover:bg-[var(--active-bg)] ${
           uploading ? "pointer-events-none opacity-60" : ""
         }`}
       >
@@ -184,19 +185,19 @@ export default function KnowledgeManager({
         />
         {uploading ? (
           <>
-            <Loader2 size={22} className="animate-spin text-accent" />
-            <span className="text-sm font-medium">Processando o documento…</span>
-            <span className="text-xs text-ink-dim">
+            <Loader2 size={22} className="animate-spin text-brand-ink" />
+            <span className="text-apoio font-medium">Processando o documento…</span>
+            <span className="text-legenda text-ink-3">
               Extraindo o texto e preparando para o agente.
             </span>
           </>
         ) : (
           <>
-            <Upload size={22} className="text-accent" />
-            <span className="text-sm font-medium">
+            <Upload size={22} className="text-brand-ink" />
+            <span className="text-apoio font-medium">
               Arraste um arquivo ou clique para enviar
             </span>
-            <span className="text-xs text-ink-dim">
+            <span className="text-legenda text-ink-3">
               PDF, DOCX, XLSX, CSV, TXT ou MD, até 8 MB.
             </span>
           </>
@@ -205,7 +206,7 @@ export default function KnowledgeManager({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {docs.length === 0 ? (
-          <div className="py-8 text-center text-sm text-ink-dim">
+          <div className="py-8 text-center text-apoio text-ink-3">
             Nenhum documento ainda.
           </div>
         ) : (
@@ -213,25 +214,25 @@ export default function KnowledgeManager({
             {docs.map((doc) => (
               <li
                 key={doc.id}
-                className="flex items-center gap-3 rounded-xl border border-line bg-surface p-3"
+                className="flex items-center gap-3 rounded-xl border border-line bg-bloco p-3"
               >
-                <FileText size={18} className="shrink-0 text-ink-dim" />
+                <FileText size={18} className="shrink-0 text-ink-faint" />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{doc.title}</div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-ink-dim">
+                  <div className="truncate text-apoio font-medium">{doc.title}</div>
+                  <div className="mt-0.5 flex items-center gap-2 text-legenda text-ink-3">
                     <StatusPill doc={doc} />
                     {doc.byteSize ? <span>{formatBytes(doc.byteSize)}</span> : null}
                   </div>
                 </div>
-                <button
-                  type="button"
+                <Button
+                  variant="danger-ghost"
+                  size="icon-control"
                   onClick={() => remove(doc.id)}
                   title="Remover"
                   aria-label={`Remover ${doc.title}`}
-                  className="shrink-0 rounded-lg p-2 text-ink-dim transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
                 >
                   <Trash2 size={16} />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -244,7 +245,7 @@ export default function KnowledgeManager({
 function StatusPill({ doc }: { doc: KnowledgeDoc }) {
   if (doc.status === "ready") {
     return (
-      <span className="flex items-center gap-1 text-ia">
+      <span className="flex items-center gap-1 text-human-ink">
         <CircleCheck size={12} />
         {doc.chunkCount} trecho{doc.chunkCount === 1 ? "" : "s"}
       </span>
@@ -253,7 +254,7 @@ function StatusPill({ doc }: { doc: KnowledgeDoc }) {
   if (doc.status === "error") {
     return (
       <span
-        className="flex items-center gap-1 text-danger"
+        className="flex items-center gap-1 text-danger-ink"
         title={doc.error ?? undefined}
       >
         <CircleAlert size={12} />
@@ -262,7 +263,7 @@ function StatusPill({ doc }: { doc: KnowledgeDoc }) {
     );
   }
   return (
-    <span className="flex items-center gap-1 text-ink-muted">
+    <span className="flex items-center gap-1 text-ink-2">
       <Loader2 size={12} className="animate-spin" />
       Processando
     </span>

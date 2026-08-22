@@ -134,10 +134,9 @@ promovidos de "Candidatos novos".
       direto) guarda a orientação do operador; `/api/agent` consome no próximo turno e limpa (a IA
       retoma sozinha). No inbox, orientar é a aba "Orientar" da caixa de escrita
       (`components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
-      consumida, ela aparece colada no topo da própria caixa, com a opção de cancelar. **Regra geral nova: handoff silencioso**, em `action=pausar` o
-      `/api/agent` devolve `messages` vazio (a IA não responde, só abre o handoff) e **pausa a IA
-      ele mesmo** (com messages vazio o n8n não alcança o nó que pausaria). Nós do n8n aguentam
-      array vazio; nenhuma mudança no n8n foi necessária.
+      consumida, ela aparece colada no topo da própria caixa, com a opção de cancelar.
+      ⚠️ O "handoff silencioso" que esta fase introduziu (em `action=pausar`, `messages` vazio mais
+      a IA se pausando) foi **revertido em 20/08/2026**: ver "Handoff sem pausa" abaixo.
 - [x] **Playground / bancada de teste** (`/playground`, dono-only). Dois painéis: Conversa (fala com
       a IA sem WhatsApp, sem pausar IA) + Diagnóstico (Classificação | Handoff lado a lado, Resumo
       full width embaixo). Bate no cérebro **real** via `POST /api/playground` (sessão do dono, força
@@ -147,6 +146,46 @@ promovidos de "Candidatos novos".
 - [x] **Resumo fiel + limpeza do turno de handoff** (`buildPersona`, regra geral do guiado): o
       summary descreve só o que a pessoa pediu, nunca o que a IA ofereceu. Loja Teste recompilada;
       OBM (avançado) intacta.
+- [x] **Handoff sem pausa** (20/08/2026, revisão da regra acima). Motivada por uma conversa real:
+      a pessoa pediu horário, a IA abriu o handoff **em silêncio**, ela perguntou "tem alguma vaga
+      pra hoje?" 26 segundos depois e, com a IA pausada, esse pedido novo foi **gravado mas nunca
+      classificado**. Ficou 6h36 sem resposta. Investigando, apareceu o defeito maior: a pausa é
+      porta de mão única, e **46 dos 47 contatos da OBM estavam com a IA desligada para sempre**.
+      Decisão do dono do produto: **handoff nunca pausa a IA**; pausa só quando um humano assume ou
+      alguém desliga na chave. O que foi feito:
+      - `conversations.handoff_at` (`timestamptz`, migration `mt_conversations_handoff_at`, sem
+        backfill): "a IA pediu ajuda e o time não respondeu". Guarda o **primeiro** handoff em
+        aberto, porque é ele que dá a espera real; o resumo do **último** pedido continua vindo de
+        `conversation_qualifications` (uma linha por turno). Escrita só service_role: abre no
+        `/api/agent`, fecha no `POST /api/send` (envio manual = alguém respondeu).
+      - `processTurn` parou de zerar `messages` e parou de gravar `atendimento_ia='pause'`.
+      - Filtro "Precisa de você" saiu de "IA pausada" para `handoff_at != null && !pausada`, com o
+        tempo de espera na linha ("6h · quer horário para hoje"). O âmbar da linha passou a seguir
+        o handoff, não a pausa, e virou `text-warn-ink` (era `text-warn`, fill como tinta).
+      - Aviso ao contato **configurável**: `agent_config.handoffNotice` é a **base** da frase, e o
+        prompt manda adaptar ao pedido ("vou verificar se tem horário pra hoje"). Base, e não frase
+        pronta, porque frase pronta se repetiria a cada handoff, que foi exatamente o que produção
+        mostrou (dois handoffs em 26s com a mesma promessa). Campo em `/agente`, seção Regras.
+      - `buildPersona` ganhou as regras "pausar não encerra a conversa", "não repita o aviso quando
+        já avisou" e "pausar não é desculpa pra não atender".
+      - **No n8n:** com `messages` não vazio, o `Loop envio` termina e o `Action` volta a ser
+        alcançado, então `Pausa IA (handoff)` dispararia de novo. Os dois nós de pausa da IA
+        (`Pausa IA (handoff)` e `Pausa IA (agendado)`) precisam ficar **desativados**;
+        `Pausar IA (Franck digitou)` continua ativo, porque é o "um humano assumiu".
+      - ⚠️ **Personas já compiladas não mudam sozinhas:** tenant em `guiado` só recebe as regras
+        novas ao salvar em `/agente`. As duas foram atualizadas em 20/08/2026: Loja Teste
+        recompilada pelo formulário (8532 para 9326 chars) e a OBM, que está em `avancado`, recebeu
+        uma seção nova `### QUANDO PASSAR PRO TIME` inserida logo antes do `### OUTPUT`, para o
+        contrato continuar sendo o último bloco (9721 para 10494 chars, autorizado pelo dono do
+        produto). Prova de não-regressão: removendo exatamente o bloco novo, o md5 da OBM volta a
+        ser o original `a17c50af…`. Backup em `public._persona_backup_20260820` (tabela descartável,
+        `drop` quando o comportamento estiver conferido em produção).
+      - **Teste local no cérebro real** (bancada em `dryRun`, tenant Loja Teste): "quero falar com
+        uma pessoa do time" devolveu mensagem mais `action=pausar` (antes vinha `messages: []`); e o
+        caso que originou o item, histórico com "horário pra sexta de manhã" mais a IA já tendo
+        avisado que ia verificar, seguido de "tem alguma vaga pra hoje?", devolveu **"Vou verificar
+        se tem horário pra hoje e já te confirmo por aqui."** com `action=pausar` e summary "Pessoa
+        quer saber se tem horário disponível hoje": segundo handoff, refletindo o último pedido.
 
 **Fase 4 — Comercializável**
 
@@ -255,6 +294,67 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
       Manrope, verde/âmbar/vermelho só para estado): a troca de marca é paleta de acento, logo e
       nome, não redesenho.
 
+- [x] **Estrutura base do agente e consolidação da tela** (22/08/2026). Nasceu de uma pergunta do
+      dono: se o handoff é regra geral, por que ela foi aplicada num prompt em vez do gerador?
+      **Pesquisa que embasou a decisão** (documentação oficial, verificada em 21/08/2026): a
+      HelenaCRM, a mais avançada do conjunto de pares, expõe **campo de texto livre**
+      ("Personalidade do Agente", exemplo oficial dela: `"Você é um agente de atendimento da
+      empresa Teste. Seu nome é John. Seja sempre cordial e prestativo."`) mais 8 habilidades
+      tipadas; o Octadesk (R$ 2.499) **não tem prompt livre**, só campos fechados (tom em 6 opções,
+      estilo em 3, palavras a evitar, máximo de mensagens por resposta); a SleekFlow tem "Your
+      playbook" (livre) e **"Optimized playbook"**, que a plataforma compila em seções fixas; e o
+      Intercom Fin não dá prompt, dá **até 100 regras de 2.500 caracteres** com o núcleo travado. A
+      Decagon vende a categoria: "o time escreve em linguagem simples e a plataforma **compila** em
+      lógica estruturada". Conclusão: **quanto mais maduro o produto, menos prompt livre**, e o
+      `buildPersona` já estava à frente do conjunto de pares nesse eixo.
+      Decisões travadas:
+      - **Três camadas, não duas.** Base que abre (identidade, contexto, tom, fontes), depois o
+        conteúdo do cliente cercado por `--- início/fim ---`, depois **base que fecha**
+        (precedência, quando chamar humano, anti-manipulação, OUTPUT). O contrato é o ÚLTIMO bloco,
+        porque recência protege ele do que o cliente escrever sem querer.
+      - **Base é molde e regra; cliente é valor.** Nome e horário são dado do cliente, não texto da
+        base. Base com horário escrito dentro seria uma base por cliente.
+      - **Precedência declarada:** o cliente manda no jeito de atender (tratamento, apelido, tom, o
+        que pode falar); a base manda no contrato. Sem declarar, o modelo decide na hora.
+      - **Modo avançado = liberdade com rabo colado** (opção C): edita o que quiser, e a base sempre
+        reanexa as seções finais. Sem isso, tenant em avançado nunca mais recebe melhoria da base,
+        que foi exatamente o que aconteceu com a OBM no handoff. Implementado com `buildBaseTail`,
+        `stripBaseTail` e `buildAdvancedPersona` (`lib/agent-prompt.ts`): a textarea guarda só a
+        parte editável, o rabo aparece num bloco somente leitura abaixo, e a tela **avisa** quando o
+        texto guardado tinha seções que agora são fixas, em vez de apagar em silêncio.
+        ⚠️ **A persona da OBM não foi recompilada, e a decisão de quando migrar é do dono.** Ela
+        perde três coisas ao salvar por lá: o nome no `ANTI-MANIPULAÇÃO` ("como Tony, da OBS", porque
+        ela não tem `agent_config`), a calibragem do summary ("segmento, dor identificada e contexto
+        relevante") e o parágrafo final "IMPORTANTE: os exemplos acima mostram apenas o conteúdo e o
+        tom... deve ser entregue SEMPRE pela ferramenta de formato estruturado", que mora DENTRO do
+        `### OUTPUT` dela. **Esse último é o mais sério**, porque é o que impede o modelo de
+        responder em texto solto imitando os exemplos: mover para a seção EXEMPLOS antes de salvar.
+      - **Sem rascunho.** Salvar JÁ É publicar (o n8n lê `clients.persona` ao vivo), então não
+        existe botão Publicar separado: cada Salvar é uma versão. Rascunho só faria sentido se
+        `/agente` e `/playground` compartilhassem estado, e aí a resposta é fundir as telas.
+      - **Versões em log append-only** (`agent_publications`: config, **persona compilada**,
+        `prompt_mode`, quem e quando). Não é fonte de verdade: quem está no ar segue em `clients`.
+        Escolhido em vez de tabela autoritativa porque dá o benefício (voltar atrás, e saber o que o
+        agente dizia numa data) sem o custo (resolver "qual linha está ativa", RLS nova no caminho
+        de produção). **Restaurar não grava:** carrega a versão no formulário e a pessoa salva.
+      - **`agent_enabled` separado de `agent_published_at`.** A primeira ativação nunca é limpa,
+        senão desligar a IA por uma hora faria a barra de onboarding voltar em toda página pedindo
+        para publicar. Vocabulário: **"Agente ativo" e "Desativado"**, nunca "pausado" (pausada é a
+        IA de UMA conversa quando um humano assume).
+      - **Tela: 4 cartões viraram 1.** Publicar virou chave no cabeçalho, notificação do grupo virou
+        campo dentro de Objetivos (só com "Agendar" marcado), horário virou seção nos dois modos,
+        Salvar desceu para o rodapé, e o prompt gerado saiu da coluna fixa para um **drawer**
+        (`components/ui/sheet.tsx`, 16º da camada base). Uma rolagem só na tela. Apagados:
+        `AgentPublishCard`, `NotifyTargetCard`, `AgentBusinessHours`, `AgentPromptPreview`.
+- [ ] **Fundir `/agente` e `/playground`.** ⚠️ **PENDÊNCIA ABERTA, levantada pelo dono do produto:**
+      configurar e testar são a mesma atividade e estão em duas telas. O fluxo real é editar,
+      testar, voltar, editar, testar. Hoje isso exige salvar entre cada volta, e salvar mexe no
+      agente que está atendendo cliente de verdade. Fundir (configuração de um lado, conversa do
+      outro, como o playground da OpenAI) elimina a necessidade de rascunho: você edita, o teste
+      seguinte já usa a edição, e Salvar serve só para levar ao ar. **Consequência aceita:** parte
+      do layout de `/agente` feito em 22/08 será refeito, porque o formulário passa a dividir a
+      tela com a conversa.
+
 **Fase 5 — Expansão (só depois de ter cliente)**
 - [ ] **Controle de consumo de IA por tenant (instrumentação para decidir o pricing).** Não é
       feature de cliente, é medição nossa para responder uma pergunta de negócio: **cobrar com a IA
@@ -271,6 +371,59 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
       **Nota de sequência:** a *medição* é barata (registrar o uso que a chamada já devolve) e só
       gera valor com histórico acumulado; a *análise e a decisão* é que são desta fase. Se quiser
       dado pronto quando for decidir o pricing na Fase 4, vale ligar só o registro antes.
+- [x] **Dados de valor percebido (retenção e venda): "não posso ficar sem isso".** FEITO em
+      19/08/2026. Motor em `lib/valor.ts` (módulo puro: os 7 números mais as frases prontas em
+      pt-BR), superfície em `components/ValorResumo.tsx`, ligado no `/painel` acima dos 4 números de
+      operação (que ganharam a seção "Operação, últimos 7 dias"). Janela do resumo é **mês fechado**:
+      mês pela metade dá número que parece pequeno e vende contra a gente.
+      **Antídoto do cancelamento** entregue: o acumulado desde o início aparece no passo de cancelar
+      (`BillingCheckout`), antes do campo de motivo. Preview em `/design/valor` (com e sem horário) e
+      `/design/cancelamento`; 5 testes em `e2e/valor.design.spec.ts`, um deles falhando se aparecer
+      travessão. Conferido contra o banco: em julho de 2026 o painel mostrou os mesmos números que o
+      SQL na mesma janela.
+      **Decisões tomadas na implementação:**
+      - Classificação em `America/Sao_Paulo` via `Intl`, não em UTC: em UTC a mensagem da noite
+        cairia no dia seguinte e estragaria justamente o número mais forte.
+      - **Só resposta da IA conta** em "fora do horário" e "fim de semana". Resposta manual fica de
+        fora porque foi alguém do time trabalhando de madrugada, e somar as duas inflaria a frase.
+        No dado real de 90 dias isso era 31 da IA contra 7 de humano.
+      - **Feriados nacionais calculados no módulo** (fixos mais os móveis derivados da Páscoa). Sem
+        serviço externo e sem tabela. Municipal e estadual ficaram fora: exigiria cadastro por
+        tenant, e chutar o município transformaria dia útil em feriado dentro da frase.
+      - **Sem horário configurado, a frase é OMITIDA**, com aviso na tela e link para configurar.
+        Frase com número zero também não entra: não convence e ocupa espaço.
+      - **Horário de atendimento salvável sozinho** (`mode: "horario"` no `PUT` de `agent-config`
+        mais `components/AgentBusinessHours.tsx`, que aparece só no modo avançado). Sem isso a OBM
+        nunca teria horário, porque a persona dela é escrita à mão e passar pelo formulário guiado a
+        substituiria. Faz merge no `agent_config` e não toca `persona` nem `prompt_mode` (provado: o
+        md5 da persona ficou inalterado depois de salvar).
+      **Pendente deste item:** a entrega recorrente do resumo (mensal, no WhatsApp ou no e-mail do
+      dono), que exige escolher canal e um agendador. E o acumulado do cancelamento é calculado na
+      hora com teto de 20 mil linhas; quando o teto doer, o caminho é tabela de agregado mensal.
+      Descrição original do item, preservada: o mesmo motor de
+      medição do item acima, virado para fora, para o cliente. Ataca o maior risco de churn deste
+      produto: **o valor dele é invisível**, porque a IA responde dentro do WhatsApp e o dono vê tudo
+      no celular dele de qualquer jeito; um painel que ele não abre não sustenta mensalidade.
+      A ideia é transformar operação em evidência de dependência, no formato de frase pronta:
+      > "A clínica atendeu **213 mensagens fora do horário comercial** em outubro."
+
+      Números candidatos, todos deriváveis do que já gravamos (`chat_messages`, `conversations`,
+      `conversation_qualifications`, `agent_turns`):
+      - mensagens respondidas **fora do horário comercial** e **em fim de semana e feriado** (o mais
+        forte: é o trabalho que humano nenhum teria feito);
+      - conversas atendidas **sem nenhuma intervenção humana** (quanto a IA carregou sozinha);
+      - **leads qualificados** e pedidos de agendamento captados no período;
+      - **tempo de primeira resposta** hoje contra o começo (antes e depois);
+      - **primeira resposta em menos de 1 minuto**, quantas vezes;
+      - horário e dia de pico (mostra quando ele estaria perdendo cliente sem a ferramenta).
+
+      Usos: (a) **retenção**, entrega recorrente do resumo (mensal, no WhatsApp ou no e-mail do dono,
+      já que ele não abre o painel); (b) **venda**, o mesmo número vira prova social e material de
+      caso, com autorização; (c) **antídoto do cancelamento**, mostrar o acumulado na hora em que ele
+      pensa em sair.
+      **Cuidados:** nunca inventar nem inflar número (o cliente confere no WhatsApp dele, e a régua de
+      confiança é o nosso eixo); precisa do horário comercial configurado por tenant para "fora do
+      horário" significar algo; e no primeiro mês o número é fraco, então o valor cresce com histórico.
 - [ ] Multicanal (Instagram, Messenger).
 - [ ] API Oficial como opção.
 
@@ -292,6 +445,149 @@ arquitetura quase gêmea da nossa. Nenhuma reabre decisão travada.
 > retornou trechos e a pergunta é complexa, conversa longa/quente, ou baixa confiança). O
 > `OPENAI_AGENT_MODEL` já permite trocar o modelo global; a evolução é override por tenant (vira
 > alavanca de plano, já que cobramos por assento) + heurística de escalonamento.
+
+## Economia unitária e canal de venda (21/08/2026)
+
+Decidido em conversa. A tabela de preços em si está na Fase 4 e não muda.
+
+### Custo real por conversa
+
+Medido no código (`HISTORY_ROWS` 10, `p_match_count` 5, `CHUNK_SIZE` 1000) e confirmado pela
+primeira leitura de `agent_turns` (3.499 tokens de entrada, 93 de saída num turno real).
+
+| | Sem cache | Com cache de prompt |
+|---|---|---|
+| Turno | R$ 0,019 | R$ 0,013 (o 1º turno da conversa é sempre miss) |
+| Conversa de 6 turnos | **R$ 0,114** | **R$ 0,084** |
+| Custo de IA no Essencial (400) | R$ 46 | R$ 34 |
+| Custo de IA no Avançado (3.000) | R$ 342 (margem 40%) | R$ 252 (margem 55%) |
+
+Preços usados: `gpt-5.4-mini` a US$ 0,75/M de entrada, US$ 4,50/M de saída e **US$ 0,075/M de
+entrada em cache**; `text-embedding-3-small` a US$ 0,02/M (irrelevante no total). Dólar a R$ 5,16.
+
+**O cache de prompt deixou de ser otimização e virou pré-requisito comercial:** sem ele o Avançado
+com 3.000 conversas fica em 40% de margem, e ele é o único plano onde o teto é o caso provável.
+Boa notícia: `lib/agent.ts:124-134` já monta o system na ordem certa (persona, depois RAG, depois
+AGORA, depois orientação do operador), então a persona é prefixo estável e o cache funciona sem
+reordenar nada. Falta só **ler `usage.prompt_tokens_details.cached_tokens` e gravar em
+`agent_turns`**, e avisar no `/agente` quando a persona compilada ficar abaixo de ~1.100 tokens
+(abaixo disso a OpenAI não cacheia). Duas alavancas extras, se precisar: cair de 5 para 3 chunks de
+RAG quando a similaridade é baixa, e `HISTORY_ROWS` de 10 para 6.
+
+**A base de conhecimento não escala custo.** O retrieval é fixo em 5 chunks, então 500 páginas
+custam por turno o mesmo que 5. Indexar um PDF de 50 páginas sai abaixo de R$ 0,01. Por isso a
+lista de planos oferece base ilimitada em todos: é generosidade de graça.
+
+**Teto duro por turno:** no pior caso (persona de 12.000 chars e histórico cheio) o turno custa
+R$ 0,065. Nenhum tenant consegue explodir a conta além disso.
+
+### Custo fixo e break-even
+
+| Item | Mensal |
+|---|---|
+| VPS KVM 2 (US$ 24,49, Easypanel + Evolution + n8n) | R$ 126 |
+| Supabase Pro (US$ 25) | R$ 129 |
+| Vercel Pro (US$ 20) | R$ 103 |
+| Domínio (R$ 49/ano) | R$ 4 |
+| **Total** | **R$ 362** |
+
+Margem do Essencial no cartão: R$ 197 menos R$ 6,38 de Asaas e R$ 34 de IA = **R$ 157 (80%)**.
+**Break-even em 3 clientes** (4 com comissão de canal ligada).
+
+**Três decisões de infra:**
+- **Supabase Pro é gatilho, não cronograma: sobe no dia em que o primeiro cliente pagar.** O plano
+  Free **não tem backup automático** e pausa o projeto após 1 semana de inatividade. Guardar
+  conversa de cliente pagante sem backup é o risco real, não o limite de 500 MB (que os embeddings
+  do RAG, 6 KB por chunk, comem rápido de qualquer jeito).
+- **Não self-hospedar o Supabase na VPS.** Concentraria banco, auth e conexão do WhatsApp no mesmo
+  ponto de falha, disputaria RAM com as instâncias Baileys, e transformaria o dono em DBA. A
+  economia seria R$ 129/mês, menos que a margem de um cliente.
+- ⚠️ **O plano Hobby da Vercel proíbe uso comercial.** Rodar SaaS pago nele é violação de termos.
+  Vercel Pro no mesmo gatilho do Supabase.
+
+### Taxas do Asaas (verificadas 12/08/2026)
+
+Pix e boleto R$ 0,99 nos 3 primeiros meses e **R$ 1,99** depois. Cartão 1,99% + R$ 0,49, virando
+**2,99% + R$ 0,49** após 3 meses. Sem mensalidade. Há uma linha de "1,99% em assinaturas" que
+**precisa ser confirmada no contrato** antes de fechar o número.
+
+**Não dar desconto para Pix.** Sobre R$ 197 a diferença entre Pix e cartão é de R$ 4,39, e 5% de
+desconto custaria R$ 9,85. Se for incentivar, o teto é 2%.
+
+### Estratégia de venda
+
+**Sem taxa de implantação e sem fidelidade, por decisão do dono.** O produto foi construído para
+autonomia (cadastro, conexão, configuração e uso sem alguém pegando na mão) e a venda acompanha:
+prático, direto, cancelamento tranquilo. Consequência aceita: **tudo passa a depender de retenção.**
+
+**Anual sem parecer contrato.** Nunca usar "contrato" nem "fidelidade": chamar de plano anual.
+Oferecer **no fim do teste de 7 dias**, não na entrada, porque é o momento de maior valor
+percebido. Duas opções apenas (mensal e anual), desconto sempre em meses ("2 meses grátis"), nunca
+em porcentagem. **Anual parcelado no cartão com antecipação no Asaas** resolve o conflito de caixa:
+o cliente paga mensal, o dono recebe quase tudo agora (conferir a taxa de antecipação).
+
+**Canal por filiado, com cupom.** Pessoas com autoridade sobre a decisão (contador, representante
+que visita o comércio, agência de tráfego local), não com audiência. Regras:
+- **Desconto é de aquisição, comissão é de canal.** Desconto vale UMA vez (1º mês); comissão é
+  recorrente. Dar os dois de forma recorrente derruba a margem de 80% para 44%.
+- **Comissão recorrente enquanto o cliente ficar.** 20% deixa R$ 118 por cliente (60%), 25% deixa
+  R$ 108 (55%), 30% deixa R$ 98 (50%). Referência de mercado já registrada neste repo: RD Station
+  paga 20% por 12 meses e ChatGuru até 20% de MRR, então 25% é prêmio consciente.
+- **Pagar a partir do 2º mês pago**, não do cadastro.
+- **O filiado vende, nós atendemos.** Programa de afiliado morre quando o parceiro vira suporte.
+- **Não construir painel de afiliado.** Recrutar 5 pessoas e tocar em planilha e Pix. Painel só
+  quando houver 15 parceiros ativos.
+- Falta no produto: **campo de cupom no `/cadastro`** e **coluna de origem em `clients`**
+  (`referral_code`), senão não há como resolver disputa de atribuição.
+
+**Revenda (empresa de TI que põe margem por cima) é OUTRO negócio, e fica para depois.** No filiado
+o cliente é nosso; na revenda o cliente é do parceiro e sai junto com ele. Revenda exige decidir
+dono da conta, suporte de primeiro nível e preço mínimo, e hoje não existe marca branca nem gestão
+de subconta. Decidir de propósito, não por acidente.
+
+**Isca de prospecção: auditoria de atendimento.** Mandar 3 mensagens (manhã, tarde, noite) no
+WhatsApp de 20 comércios da cidade, anotar se respondeu e em quanto tempo, e entregar a folha sem
+vender nada. Derruba a objeção "eu já atendo bem" com o dado do próprio dono, não exige aparecer em
+vídeo e não exige time comercial. ⚠️ **Contato manual e individual. Nunca virar disparo em massa: a
+conexão é QR e volume automatizado ali é o cenário de banimento.**
+
+**Prova social sem o dono aparecer:** número público onde qualquer um conversa com um agente (o
+produto é a demo), print de conversa real com o horário visível, número extraído do painel,
+depoimento em **áudio** de WhatsApp (o ICP não grava vídeo mas manda áudio o dia inteiro), e estudo
+de caso de uma página que o parceiro possa encaminhar.
+
+**Comunicação vertical, produto horizontal.** Uma página por segmento (clínica, salão, ótica), com
+o mesmo produto, mesmo preço e mesmo agente atrás. Custa horas e é a maior alavanca de conversão
+disponível. Não divide o roadmap.
+
+**Não fazer agora:** anúncio pago (ticket de R$ 197 sem funil nem time para converter), SEO
+nacional (12 meses e concorrente com time de conteúdo), plano gratuito (custo variável de IA sem
+receita), licença vitalícia ou AppSumo (mata a recorrência e o custo de IA fica para sempre),
+mercado internacional (produto amarrado a WhatsApp BR e Asaas).
+
+### Retenção: o resumo mensal é estrutural, não enfeite
+
+Sem taxa de entrada e sem fidelidade, a única coisa que segura o cliente é ele **ver** o valor. E o
+valor deste produto é invisível por natureza: o dono vê a IA respondendo no celular dele e acha
+normal, porque ninguém conta o que não deu trabalho.
+
+O cálculo já existe em `lib/valor.ts` e aparece no `/painel` e no passo de cancelar. **Falta o
+canal:** uma mensagem no WhatsApp do dono, uma vez por mês, com a frase pronta ("em outubro seu
+atendimento respondeu 213 mensagens fora do horário, 47 delas depois das 22h").
+
+⚠️ Isso **não é** o B-6 removido do roadmap. Aquele era notificação por lead, que vira ruído. Este
+é um resumo por mês, que vira fatura justificada. O mesmo número é a melhor peça de prova social
+que existe para vender.
+
+### ⚠️ Correções de rumo desta conversa
+
+Recomendações dadas em 21/08 que colidem com decisões já fechadas em 13/08 e que **não valem**:
+funil múltiplo (descartado), relatório por atendente (descartado), atribuição travada por plano
+(não é travada) e cobrar taxa de implantação (o dono decidiu não cobrar).
+
+E uma correção de produto para material de venda: **não existe agenda.** O `action: "agendar"`
+captura dia e período, avisa um grupo e passa para humano. Sem calendário, sem slot, sem
+confirmação. Prometer "agenda" para clínica e salão é a promessa mais perigosa possível aqui.
 
 ## Não construir (nenhuma fase por ora)
 

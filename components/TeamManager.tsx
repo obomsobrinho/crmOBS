@@ -18,6 +18,23 @@ import {
   type Member,
 } from "@/lib/team";
 import { avatarPair } from "@/lib/inbox";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Gestão de equipe: dono convida por e-mail, define papel e remove membros.
 // Atendente vê a lista mas não age. Writes vão por /api/team/* (service_role);
@@ -104,49 +121,57 @@ export default function TeamManager({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto">
       {isOwner && (
+        // `bg-bloco` e não `bg-surface`: este formulário mora DENTRO do cartão
+        // da página, e bloco é a superfície de quem mora dentro. Com a antiga,
+        // no tema escuro ele tinha exatamente a cor do pai e só a borda o
+        // separava do fundo.
         <form
           onSubmit={invite}
-          className="rounded-xl border border-line bg-surface p-4"
+          className="rounded-xl border border-line bg-bloco p-4"
         >
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-            <UserPlus size={16} className="text-accent" />
+          <div className="mb-3 flex items-center gap-2 text-apoio font-semibold">
+            <UserPlus size={16} className="text-brand-ink" />
             Convidar por e-mail
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input
+            <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="pessoa@empresa.com"
               aria-label="E-mail do convidado"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+              className="flex-1"
             />
-            <select
+            <Select
               value={role}
-              onChange={(e) => setRole(e.target.value as "atendente" | "dono")}
-              aria-label="Papel do convidado"
-              className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+              onValueChange={(v) => setRole(v as "atendente" | "dono")}
             >
-              <option value="atendente">Atendente</option>
-              <option value="dono">Dono</option>
-            </select>
-            <button
+              <SelectTrigger size="field" aria-label="Papel do convidado">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="atendente">Atendente</SelectItem>
+                <SelectItem value="dono">Dono</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
               type="submit"
+              size="field"
               disabled={inviting || !email.trim()}
-              className="btn-primary shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-60"
+              className="px-4"
             >
               {inviting ? "Enviando…" : "Convidar"}
-            </button>
+            </Button>
           </div>
-          <p className="mt-2 text-xs text-ink-dim">
+          <p className="mt-2 text-legenda text-ink-3">
             A pessoa recebe um link por e-mail para definir a própria senha e entrar.
           </p>
           {msg && (
             <p
-              className={`mt-2 text-sm ${
-                msg.kind === "ok" ? "text-ia" : "text-danger"
+              className={`mt-2 text-apoio ${
+                msg.kind === "ok" ? "text-human-ink" : "text-danger-ink"
               }`}
             >
               {msg.text}
@@ -157,12 +182,12 @@ export default function TeamManager({
 
       <div>
         <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
-            Membros
+          <span className="text-rotulo uppercase text-ink-3">Membros</span>
+          <span className="text-legenda tabular-nums text-ink-3">
+            {members.length}
           </span>
-          <span className="text-[11px] text-ink-dim">{members.length}</span>
         </div>
-        <ul className="overflow-hidden rounded-xl border border-line bg-surface">
+        <ul className="overflow-hidden rounded-xl border border-line bg-bloco">
           {members.map((m, i) => {
             const isSelf = m.userId === myUserId;
             const owner = m.role === "dono";
@@ -173,114 +198,93 @@ export default function TeamManager({
                   i > 0 ? "border-t border-line" : ""
                 }`}
               >
-                <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  style={avatarPair(m.email)}
-                >
+                <Avatar size="md" style={avatarPair(m.email)}>
                   {memberInitials(m.email)}
-                </div>
+                </Avatar>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium capitalize">
+                    <span className="truncate text-apoio font-medium capitalize">
                       {memberName(m.email)}
                     </span>
                     {isSelf && (
-                      <span className="shrink-0 rounded-full bg-[var(--active-bg)] px-1.5 py-0.5 text-[10px] font-medium text-ink-muted">
+                      <span className="shrink-0 rounded-full bg-[var(--active-bg)] px-1.5 py-0.5 text-legenda text-ink-2">
                         você
                       </span>
                     )}
                   </div>
-                  <div className="truncate text-xs text-ink-dim">{m.email}</div>
+                  <div className="truncate text-legenda text-ink-3">{m.email}</div>
                 </div>
+                {/* Dono: par `surface`/`ink` da marca. Antes era um cinza neutro
+                    de fundo com o `fill` roxo de tinta, que é exatamente o que a
+                    regra dos quatro papéis proíbe. */}
                 <span
-                  className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  className={`flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-legenda ${
                     owner
-                      ? "bg-[var(--selected-bg)] text-accent"
-                      : "bg-[var(--active-bg)] text-ink-muted"
+                      ? "bg-brand-surface text-brand-ink"
+                      : "bg-[var(--active-bg)] text-ink-2"
                   }`}
                 >
                   {owner && <ShieldCheck size={12} />}
                   {roleLabel(m.role)}
                 </span>
                 {isOwner && !isSelf && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger-ghost"
+                    size="icon-chrome"
                     onClick={() => setToRemove(m)}
                     aria-label={`Remover ${memberName(m.email)}`}
                     title="Remover do time"
-                    className="shrink-0 rounded-lg p-1.5 text-ink-dim transition-colors hover:bg-[var(--danger-bg)] hover:text-danger"
                   >
                     <Trash2 size={15} />
-                  </button>
+                  </Button>
                 )}
               </li>
             );
           })}
         </ul>
         {!isOwner && (
-          <p className="mt-2 text-xs text-ink-dim">
+          <p className="mt-2 text-legenda text-ink-3">
             <User size={12} className="mr-1 inline" />
             Só o dono da conta pode convidar ou remover membros.
           </p>
         )}
       </div>
 
-      {toRemove && (
-        <ConfirmRemove
-          member={toRemove}
-          onCancel={() => setToRemove(null)}
-          onConfirm={() => remove(toRemove)}
-        />
-      )}
-    </div>
-  );
-}
-
-function ConfirmRemove({
-  member,
-  onCancel,
-  onConfirm,
-}: {
-  member: Member;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onCancel}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-2xl border border-line bg-surface p-5 shadow-[var(--panel-shadow)]"
+      <Dialog
+        open={toRemove !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) setToRemove(null);
+        }}
       >
-        <div className="mb-2 flex items-center gap-2">
-          <AlertTriangle size={18} className="text-warn" />
-          <h3 className="font-display text-base font-bold">Remover do time?</h3>
-        </div>
-        <p className="mb-5 text-sm text-ink-muted">
-          {memberName(member.email)} ({member.email}) perde o acesso a esta conta.
-          O login continua existindo, mas sem ver as conversas deste tenant.
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className="rounded-lg bg-danger px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-          >
-            Remover
-          </button>
-        </div>
-      </div>
+        {toRemove && (
+          <DialogContent tamanho="confirmacao">
+            <div className="mb-2 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-warn-ink" />
+              <DialogTitle>Remover do time?</DialogTitle>
+            </div>
+            <DialogDescription className="mb-5">
+              {memberName(toRemove.email)} ({toRemove.email}) perde o acesso a esta
+              conta. O login continua existindo, mas sem ver as conversas deste
+              tenant.
+            </DialogDescription>
+            <div className="flex justify-end gap-2">
+              <DialogClose asChild>
+                <Button variant="outline" size="field" className="px-4">
+                  Cancelar
+                </Button>
+              </DialogClose>
+              <Button
+                variant="danger"
+                size="field"
+                className="px-4"
+                onClick={() => remove(toRemove)}
+              >
+                Remover
+              </Button>
+            </div>
+          </DialogContent>
+        )}
+      </Dialog>
     </div>
   );
 }

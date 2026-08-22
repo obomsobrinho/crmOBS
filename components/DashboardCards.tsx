@@ -16,15 +16,15 @@ function Card({
   helper: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
-      <div className="flex items-center gap-2 text-ink-muted">
-        <Icon size={16} className="text-accent" />
-        <span className="text-sm font-medium">{label}</span>
+    <div className="rounded-xl border border-line bg-bloco p-5">
+      <div className="flex items-center gap-2 text-ink-2">
+        <Icon size={16} className="text-brand-ink" />
+        <span className="text-apoio font-medium">{label}</span>
       </div>
-      <div className="mt-3 font-display text-3xl font-bold tabular-nums">
+      <div className="mt-3 font-display text-display tabular-nums">
         {value}
       </div>
-      <div className="mt-1 text-xs text-ink-dim">{helper}</div>
+      <div className="mt-1 text-legenda text-ink-3">{helper}</div>
     </div>
   );
 }

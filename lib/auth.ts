@@ -24,8 +24,18 @@ export interface MyClient {
    * usa `access.blocked`; a UI usa `access.warn` para avisar sem bloquear.
    */
   access: AccessState;
-  /** Onboarding: quando o agente foi publicado (null = não publicado). */
+  /**
+   * PRIMEIRA ativação do agente (null = nunca foi ao ar). NUNCA é limpo: é o que
+   * diz ao onboarding que o trilho acabou. Não confundir com `agentEnabled`.
+   */
   agentPublishedAt: string | null;
+  /**
+   * Liga-desliga do agente (switch "Agente ativo"). A IA só responde com
+   * `agentPublishedAt` preenchido E isto verdadeiro. Existe separado porque
+   * desligar zerando `agentPublishedAt` faria a barra de onboarding reaparecer
+   * em toda página pedindo para publicar de novo, só porque alguém desligou a IA.
+   */
+  agentEnabled: boolean;
   /** Progresso derivado por lib/onboarding.onboardingState. */
   onboarding: OnboardingState;
 }
@@ -47,7 +57,7 @@ export async function getMyClient(): Promise<MyClient | null> {
   const { data } = await supabase
     .from("clients")
     .select(
-      "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, onboarding_tested_at"
+      "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at"
     )
     .limit(1)
     .maybeSingle();
@@ -64,6 +74,7 @@ export async function getMyClient(): Promise<MyClient | null> {
     billing_plan: string | null;
     agent_config_updated_at: string | null;
     agent_published_at: string | null;
+    agent_enabled: boolean | null;
     onboarding_tested_at: string | null;
   };
 
@@ -91,6 +102,10 @@ export async function getMyClient(): Promise<MyClient | null> {
       grace_until: client.grace_until,
     }),
     agentPublishedAt: client.agent_published_at,
+    // `!== false` e não `?? true`: a coluna é NOT NULL com default true, mas um
+    // tenant lido antes da migration chegaria com undefined, e nesse caso ligado
+    // é o comportamento que não derruba quem já estava atendendo.
+    agentEnabled: client.agent_enabled !== false,
     onboarding: onboardingState({
       hasInstance: !!client.evolution_instance,
       agentConfigured: !!client.agent_config_updated_at,

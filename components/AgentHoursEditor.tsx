@@ -2,6 +2,9 @@
 
 import type { BusinessHours, DayKey } from "@/lib/agent-prompt";
 import { DAY_ORDER, DAY_LABEL } from "@/lib/agent-prompt";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 // Editor de horário de atendimento: 7 linhas (checkbox + dois horários).
 export default function AgentHoursEditor({
@@ -39,35 +42,35 @@ export default function AgentHoursEditor({
           const day = value[d];
           return (
             <div key={d} className="flex items-center gap-3">
-              <label className="flex w-32 shrink-0 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+              <label className="flex w-32 shrink-0 items-center gap-2 text-apoio">
+                <Checkbox
                   checked={day.open}
-                  onChange={(e) => setDay(d, { open: e.target.checked })}
-                  className="h-4 w-4 accent-[var(--accent)]"
+                  onCheckedChange={(v) => setDay(d, { open: v === true })}
                 />
-                <span className={day.open ? "" : "text-ink-dim"}>
+                <span className={day.open ? "" : "text-ink-3"}>
                   {cap(DAY_LABEL[d])}
                 </span>
               </label>
               {day.open ? (
-                <div className="flex items-center gap-2 text-sm">
-                  <input
+                <div className="flex items-center gap-2">
+                  {/* Degrau de controle (32px) e não o de campo (40px): sete
+                      destas linhas empilhadas com 40px viram uma parede. */}
+                  <Input
                     type="time"
                     value={day.from}
                     onChange={(e) => setDay(d, { from: e.target.value })}
-                    className="rounded-lg border border-line bg-surface px-2 py-1 outline-none transition-colors focus:border-line-strong"
+                    className="h-[var(--h-control)] w-auto px-2"
                   />
-                  <span className="text-ink-dim">às</span>
-                  <input
+                  <span className="text-apoio text-ink-3">às</span>
+                  <Input
                     type="time"
                     value={day.to}
                     onChange={(e) => setDay(d, { to: e.target.value })}
-                    className="rounded-lg border border-line bg-surface px-2 py-1 outline-none transition-colors focus:border-line-strong"
+                    className="h-[var(--h-control)] w-auto px-2"
                   />
                 </div>
               ) : (
-                <span className="text-sm text-ink-dim">Fechado</span>
+                <span className="text-apoio text-ink-3">Fechado</span>
               )}
             </div>
           );
@@ -75,20 +78,12 @@ export default function AgentHoursEditor({
       </div>
 
       <div className="flex flex-wrap gap-2 pt-1">
-        <button
-          type="button"
-          onClick={copyWeekdays}
-          className="rounded-lg border border-line px-3 py-1.5 text-[13px] text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-        >
+        <Button variant="outline" onClick={copyWeekdays}>
           Copiar seg. para os dias úteis
-        </button>
-        <button
-          type="button"
-          onClick={allDay}
-          className="rounded-lg border border-line px-3 py-1.5 text-[13px] text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-        >
+        </Button>
+        <Button variant="outline" onClick={allDay}>
           24h todos os dias
-        </button>
+        </Button>
       </div>
     </div>
   );

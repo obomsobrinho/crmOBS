@@ -8,7 +8,8 @@ test.describe("Acesso do dono", () => {
     await page.goto("/inbox");
     await expect(page.getByRole("link", { name: "Agente" })).toBeVisible();
     await page.goto("/agente");
-    await expect(page.getByRole("button", { name: "Guiado" })).toBeVisible();
+    // Papel ARIA `tab`: o seletor de modo virou Tabs do Radix na migração de UI.
+    await expect(page.getByRole("tab", { name: "Guiado" })).toBeVisible();
   });
 
   test("Equipe lista o próprio usuário", async ({ page }) => {

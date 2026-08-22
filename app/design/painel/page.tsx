@@ -1,6 +1,8 @@
 import { LayoutDashboard } from "lucide-react";
 import NavRail from "@/components/NavRail";
 import DashboardCards from "@/components/DashboardCards";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { DashboardMetrics } from "@/lib/metrics";
 
 // Preview de design do Painel (dev-only, liberado pelo proxy). Métricas mock.
@@ -18,12 +20,12 @@ export default function DesignPainelPage() {
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/painel" role="dono" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+        <div className={cn(cardVariants(), "flex min-h-0 flex-1 flex-col overflow-hidden p-6")}>
           <div className="mb-1 flex items-center gap-2">
-            <LayoutDashboard size={20} className="text-accent" />
-            <h1 className="font-display text-xl font-bold">Painel</h1>
+            <LayoutDashboard size={20} className="text-brand-ink" />
+            <h1 className="text-titulo">Painel</h1>
           </div>
-          <p className="mb-5 text-sm text-ink-muted">
+          <p className="mb-5 text-apoio text-ink-2">
             Um resumo da conta Ótica Vision nos últimos 7 dias.
           </p>
           <DashboardCards metrics={MOCK} />

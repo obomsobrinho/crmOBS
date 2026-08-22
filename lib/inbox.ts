@@ -19,6 +19,8 @@ export interface ConvRow {
   unread_count: number | null;
   assigned_user_id: string | null;
   stage?: string | null; // pipeline (só o board seleciona esta coluna)
+  /** Handoff aberto pela IA e ainda não atendido. Opcional: o board não lê. */
+  handoff_at?: string | null;
 }
 
 // Linha crua de `dados_cliente` usada para resolver nome e estado da IA.
@@ -53,6 +55,7 @@ export function buildInbox(
     unread: c.unread_count ?? 0,
     assignedUserId: c.assigned_user_id ?? null,
     stage: c.stage ?? null,
+    handoffAt: c.handoff_at ?? null,
   }));
   return { items, ia };
 }

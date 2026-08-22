@@ -87,7 +87,7 @@ export default function ContactFields({
         {status !== "idle" && (
           <span
             className={`ml-auto text-legenda ${
-              status === "erro" ? "text-danger" : "text-ink-3"
+              status === "erro" ? "text-danger-ink" : "text-ink-3"
             }`}
           >
             {status === "salvando"
@@ -193,7 +193,7 @@ function Linha({
           size="none"
           onClick={onRemover}
           aria-label="Remover campo"
-          className="text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger group-hover:opacity-100"
+          className="text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger-ink group-hover:opacity-100"
         >
           <X size={13} />
         </Button>

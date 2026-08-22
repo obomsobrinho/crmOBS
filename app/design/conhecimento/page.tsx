@@ -1,5 +1,6 @@
 import NavRail from "@/components/NavRail";
 import KnowledgeManager from "@/components/KnowledgeManager";
+import { Card } from "@/components/ui/card";
 import type { KnowledgeDoc } from "@/lib/crm";
 
 // Preview de design da base de conhecimento (dev-only, liberado pelo proxy).
@@ -40,14 +41,14 @@ export default function DesignConhecimentoPage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/conhecimento" role="dono" />
-      <div className="glass flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+      <Card className="flex min-w-0 flex-1 flex-col overflow-hidden p-6">
         <KnowledgeManager
           clientId="preview"
           initialDocs={MOCK}
           keyConfigured
           preview
         />
-      </div>
+      </Card>
     </div>
   );
 }

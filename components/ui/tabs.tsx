@@ -2,11 +2,21 @@
 
 import * as React from "react";
 import { Tabs as TabsPrimitive } from "radix-ui";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Abas com sublinhado.
+ * Abas, em duas formas.
+ *
+ * `sublinhado` (padrão) é a do composer, descrita abaixo. `segmentado` é o
+ * alternador de modo do /agente: dois botões numa bandeja com moldura, e o
+ * ativo ganha o fill da marca. Ele era um par de `<button>` solto, sem `role`
+ * nenhum, e o ativo usava `brand-grad`, cujo escopo o próprio sistema fecha em
+ * "superfície decorativa a partir de 28px". Trazê-lo para cá dá
+ * `role="tablist"`, navegação por seta e foco itinerante de graça.
+ *
+ * ── sublinhado ──
  *
  * A ativa é rótulo em negrito com uma barra sólida de 3px embaixo, sem fundo
  * nenhum; a barra é quem carrega a cor do modo. Pílula e bloco cheio de cor já
@@ -40,47 +50,79 @@ function Tabs({
   );
 }
 
+const listaVariants = cva("flex items-center gap-1", {
+  variants: {
+    variant: {
+      sublinhado: "",
+      /** Bandeja com moldura, no mesmo fundo de campo do resto da casa. */
+      segmentado: "w-fit rounded-lg border border-line bg-[var(--input-bg)] p-1",
+    },
+  },
+  defaultVariants: { variant: "sublinhado" },
+});
+
 function TabsList({
   className,
+  variant,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List>) {
+}: React.ComponentProps<typeof TabsPrimitive.List> &
+  VariantProps<typeof listaVariants>) {
   return (
     <TabsPrimitive.List
       data-slot="tabs-list"
-      className={cn("flex items-center gap-1", className)}
+      className={cn(listaVariants({ variant, className }))}
       {...props}
     />
   );
 }
 
+const gatilhoVariants = cva(
+  "group/aba flex transition-colors [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        sublinhado: [
+          "flex-col items-center gap-1.5 px-2.5 pt-1 text-legenda",
+          "text-ink-3 hover:text-ink-2",
+          "data-[state=active]:font-semibold data-[state=active]:text-ink",
+        ],
+        segmentado: [
+          "items-center gap-1.5 rounded-md px-3 text-apoio font-medium",
+          "h-[var(--h-control)] text-ink-2 hover:text-ink",
+          "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+        ],
+      },
+    },
+    defaultVariants: { variant: "sublinhado" },
+  },
+);
+
 function TabsTrigger({
   className,
+  variant = "sublinhado",
   barra,
   children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Trigger> & {
-  /** Cor da barra quando a aba está ativa. Ex.: "var(--human-fill)". */
-  barra?: string;
-}) {
+}: React.ComponentProps<typeof TabsPrimitive.Trigger> &
+  VariantProps<typeof gatilhoVariants> & {
+    /** Cor da barra quando a aba está ativa. Só em `sublinhado`. */
+    barra?: string;
+  }) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       style={barra ? ({ "--aba-cor": barra } as React.CSSProperties) : undefined}
-      className={cn(
-        "group/aba flex flex-col items-center gap-1.5 px-2.5 pt-1 text-legenda transition-colors",
-        "text-ink-3 hover:text-ink-2",
-        "data-[state=active]:font-semibold data-[state=active]:text-ink",
-        "[&_svg]:pointer-events-none [&_svg]:shrink-0",
-        className,
-      )}
+      className={cn(gatilhoVariants({ variant, className }))}
       {...props}
     >
       {children}
-      <span
-        aria-hidden
-        data-slot="tabs-trigger-bar"
-        className="h-[3px] w-full rounded-t-[3px] bg-transparent transition-colors group-data-[state=active]/aba:bg-[var(--aba-cor)]"
-      />
+      {variant === "sublinhado" && (
+        <span
+          aria-hidden
+          data-slot="tabs-trigger-bar"
+          className="h-[3px] w-full rounded-t-[3px] bg-transparent transition-colors group-data-[state=active]/aba:bg-[var(--aba-cor)]"
+        />
+      )}
     </TabsPrimitive.Trigger>
   );
 }

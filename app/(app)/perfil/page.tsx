@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
 import ChangePassword from "@/components/ChangePassword";
 import { statusLabel } from "@/lib/billing";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +36,15 @@ export default async function PerfilPage() {
   ];
 
   return (
-    <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+    <div className={cn(cardVariants(), "flex min-h-0 flex-1 flex-col overflow-hidden p-6")}>
       <div className="mb-1 flex items-center gap-2">
-        <User size={20} className="text-accent" />
-        <h1 className="font-display text-xl font-bold">Perfil</h1>
+        <User size={20} className="text-brand-ink" />
+        <h1 className="text-titulo">Perfil</h1>
       </div>
-      <p className="mb-5 text-sm text-ink-muted">Dados da sua conta.</p>
+      <p className="mb-5 text-apoio text-ink-2">Dados da sua conta.</p>
 
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
-        <div className="max-w-xl rounded-xl border border-line bg-surface">
+        <div className="max-w-xl rounded-xl border border-line bg-bloco">
           {rows.map((r, i) => (
             <div
               key={r.label}
@@ -50,8 +52,8 @@ export default async function PerfilPage() {
                 i > 0 ? "border-t border-line" : ""
               }`}
             >
-              <span className="text-sm text-ink-muted">{r.label}</span>
-              <span className="text-sm font-medium">{r.value}</span>
+              <span className="text-apoio text-ink-2">{r.label}</span>
+              <span className="text-apoio font-medium">{r.value}</span>
             </div>
           ))}
         </div>

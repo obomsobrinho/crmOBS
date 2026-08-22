@@ -3,6 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PLANS, PLAN_ORDER, type PlanKey } from "@/lib/billing";
+import type { FraseValor } from "@/lib/valor";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 // Caixa, não vitrine.
 //
@@ -21,6 +25,7 @@ export default function BillingCheckout({
   nomePadrao,
   emailPadrao,
   planoSugerido,
+  frasesAcumuladas = [],
 }: {
   /** Plano já contratado, ou null se nunca assinou. */
   planoAtual: PlanKey | null;
@@ -30,6 +35,11 @@ export default function BillingCheckout({
   emailPadrao: string;
   /** Veio de `/assinatura?plano=...`, o link do site. */
   planoSugerido: PlanKey | null;
+  /**
+   * Acumulado de valor desde o início, mostrado só no passo de cancelar.
+   * Vazio quando não há histórico: frase com zero não segura ninguém.
+   */
+  frasesAcumuladas?: FraseValor[];
 }) {
   const router = useRouter();
   const [escolhido, setEscolhido] = useState<PlanKey>(
@@ -108,44 +118,69 @@ export default function BillingCheckout({
 
   if (cancelando) {
     return (
-      <div className="space-y-3 rounded-xl border border-line bg-surface p-4">
-        <p className="text-sm font-medium">Cancelar assinatura</p>
-        <p className="text-sm text-ink-muted">
+      <div className="space-y-3 rounded-xl border border-line bg-bloco p-4">
+        <p className="text-apoio font-medium">Cancelar assinatura</p>
+
+        {/* Antídoto do cancelamento: o acumulado desde o início, na hora exata
+            em que a pessoa pensa em sair. O valor deste produto é invisível (a
+            IA responde dentro do WhatsApp), e este é o único momento em que ela
+            para para olhar. Números reais, nunca inflados. */}
+        {frasesAcumuladas.length > 0 && (
+          <div className="space-y-2 rounded-lg border border-line bg-conteudo p-3">
+            <p className="text-legenda uppercase text-ink-3">
+              O que a IA já fez nesta conta
+            </p>
+            <ul className="space-y-1.5">
+              {frasesAcumuladas.map((f) => (
+                <li key={f.key} className="flex gap-2 text-apoio">
+                  <span className="shrink-0 font-semibold tabular-nums">
+                    {f.numero}
+                  </span>
+                  <span className="text-ink-2">{f.texto}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p className="text-apoio text-ink-2">
           A cobrança para. Suas conversas e configurações continuam salvas, e a
           conta fica em modo leitura.
         </p>
         <div className="space-y-1.5">
-          <label htmlFor="motivo" className="text-sm font-medium">
+          <label htmlFor="motivo" className="text-apoio font-medium">
             O que motivou? (opcional)
           </label>
-          <textarea
+          <Textarea
             id="motivo"
             rows={3}
             maxLength={500}
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
             placeholder="Ajuda a gente a melhorar."
-            className="w-full resize-none rounded-lg border border-line bg-panel px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+            className="resize-none"
           />
         </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error && <p className="text-apoio text-danger-ink">{error}</p>}
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="outline"
+            size="field"
             onClick={cancelar}
             disabled={loading}
-            className="rounded-lg border border-danger/40 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-[var(--danger-bg)] disabled:opacity-60"
+            className="border-danger-line text-danger-ink hover:bg-danger-surface"
           >
             {loading ? "Cancelando…" : "Confirmar cancelamento"}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
+            size="field"
             onClick={() => {
               setCancelando(false);
               setError(null);
             }}
-            className="rounded-lg border border-line px-3 py-2 text-sm transition-colors hover:border-line-strong"
           >
             Voltar
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -154,7 +189,7 @@ export default function BillingCheckout({
   return (
     <div className="space-y-4">
       <div>
-        <p className="mb-2 text-sm font-medium">
+        <p className="mb-2 text-apoio font-medium">
           {temAssinatura ? "Trocar de plano" : "Escolher plano"}
         </p>
         <div className="overflow-hidden rounded-xl border border-line">
@@ -162,37 +197,42 @@ export default function BillingCheckout({
             const p = PLANS[k];
             const ativo = escolhido === k;
             return (
+              // Seleção única desenhada com <button>, e não com RadioGroup: a
+              // troca seria de composição, não de vocabulário, e a decisão desta
+              // rodada é não redesenhar. `aria-pressed` é o que faltava.
               <button
                 key={k}
+                type="button"
+                aria-pressed={ativo}
                 onClick={() => setEscolhido(k)}
                 className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
                   i > 0 ? "border-t border-line" : ""
                 } ${
                   ativo
                     ? "bg-[var(--active-bg)]"
-                    : "bg-surface hover:bg-[var(--active-bg)]"
+                    : "bg-bloco hover:bg-[var(--active-bg)]"
                 }`}
               >
                 <span
                   className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
-                    ativo ? "border-accent" : "border-line-strong"
+                    ativo ? "border-primary" : "border-line-strong"
                   }`}
                 >
-                  {ativo && <span className="h-2 w-2 rounded-full bg-accent" />}
+                  {ativo && <span className="h-2 w-2 rounded-full bg-primary" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="text-sm font-medium">{p.name}</span>
-                  <span className="ml-2 text-xs text-ink-muted">
+                  <span className="text-apoio font-medium">{p.name}</span>
+                  <span className="ml-2 text-legenda text-ink-2">
                     {p.seats} {p.seats === 1 ? "atendente" : "atendentes"} além do
                     dono
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-medium tabular-nums">
+                <span className="shrink-0 text-apoio font-medium tabular-nums">
                   R$ {p.priceBRL}
-                  <span className="text-xs font-normal text-ink-muted">/mês</span>
+                  <span className="text-legenda font-normal text-ink-2">/mês</span>
                 </span>
                 {planoAtual === k && (
-                  <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[11px] text-ink-muted">
+                  <span className="shrink-0 rounded-full bg-[var(--chip-bg)] px-2 py-0.5 text-legenda text-[var(--chip-fg)]">
                     atual
                   </span>
                 )}
@@ -206,64 +246,65 @@ export default function BillingCheckout({
       {!temAssinatura && (
         <>
           <div className="space-y-1.5">
-            <label htmlFor="doc" className="text-sm font-medium">
+            <label htmlFor="doc" className="text-apoio font-medium">
               CPF ou CNPJ de quem paga
             </label>
-            <input
+            <Input
               id="doc"
               inputMode="numeric"
               autoComplete="off"
               value={cpfCnpj}
               onChange={(e) => setCpfCnpj(e.target.value)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
             />
-            <p className="text-xs text-ink-muted">
+            <p className="text-legenda text-ink-2">
               Exigido para emitir Pix e boleto. Fica só com o meio de pagamento.
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="email-cobranca" className="text-sm font-medium">
+            <label htmlFor="email-cobranca" className="text-apoio font-medium">
               E-mail de cobrança
             </label>
-            <input
+            <Input
               id="email-cobranca"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
             />
           </div>
         </>
       )}
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="text-apoio text-danger-ink">{error}</p>}
 
-      <button
+      <Button
+        size="field"
         onClick={assinar}
         disabled={loading || !podeEnviar}
-        className="btn-primary w-full rounded-lg px-3 py-2.5 text-sm font-medium transition disabled:opacity-60"
+        className="w-full justify-center"
       >
         {loading
           ? "Aguarde…"
           : temAssinatura
             ? "Trocar para este plano"
             : "Ir para o pagamento"}
-      </button>
+      </Button>
 
-      <p className="text-center text-xs text-ink-muted">
+      <p className="text-center text-legenda text-ink-2">
         Pix, boleto ou cartão. Você escolhe na próxima tela.
       </p>
 
       {temAssinatura && (
-        <div className="border-t border-line pt-3 text-center">
-          <button
+        <div className="flex justify-center border-t border-line pt-3">
+          <Button
+            variant="danger-ghost"
+            size="none"
             onClick={() => setCancelando(true)}
-            className="text-xs text-ink-muted transition-colors hover:text-danger"
+            className="text-legenda"
           >
             Cancelar assinatura
-          </button>
+          </Button>
         </div>
       )}
     </div>

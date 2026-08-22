@@ -1,5 +1,6 @@
 import NavRail from "@/components/NavRail";
 import Playground, { type PlaygroundTurn } from "@/components/Playground";
+import { Card } from "@/components/ui/card";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 
 // Preview de design do Playground (dev-only, liberado pelo proxy). Começa com uma
@@ -61,9 +62,9 @@ export default function DesignPlaygroundPage() {
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/playground" role="dono" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
           <Playground stageNames={STAGE_NAMES} initialTurns={TURNS} />
-        </div>
+        </Card>
       </div>
     </div>
   );

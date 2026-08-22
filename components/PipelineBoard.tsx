@@ -37,6 +37,25 @@ import {
   type Stage,
   type StageRow,
 } from "@/lib/pipeline";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const STAGE_SELECT =
   "id, key, name, position, is_canonical, is_default, archived, color";
@@ -324,90 +343,98 @@ export default function PipelineBoard({
   );
 
   return (
-    <div className="panel flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Cabeçalho + filtros */}
       <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
         <div className="mr-1 flex items-center gap-2">
-          <KanbanSquare size={20} className="text-accent" />
-          <h1 className="font-display text-lg font-bold">Pipeline</h1>
-          <span className="text-xs text-ink-dim">{shownCount}</span>
+          <KanbanSquare size={20} className="text-brand-ink" />
+          <h1 className="text-titulo">Pipeline</h1>
+          <span className="text-legenda tabular-nums text-ink-3">{shownCount}</span>
         </div>
 
-        <div className="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5">
-          <Search size={15} className="shrink-0 text-ink-dim" />
-          <input
+        {/* Mesmo campo com lupa da lista de conversas: moldura no degrau de
+            controle, ícone em tinta fraca e o Input sem moldura própria. */}
+        <div className="flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line">
+          <Search size={15} className="shrink-0 text-ink-faint" />
+          <Input
+            variant="limpo"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar nome ou telefone"
             aria-label="Buscar cards"
-            className="w-44 bg-transparent text-sm outline-none placeholder:text-ink-dim"
+            className="w-44 text-apoio"
           />
         </div>
 
-        <select
-          value={attFilter}
-          onChange={(e) => setAttFilter(e.target.value)}
-          aria-label="Filtrar por atendente"
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-line-strong"
-        >
-          <option value="all">Todos os atendentes</option>
-          <option value="none">Sem atendente</option>
-          {members.map((m) => (
-            <option key={m.userId} value={m.userId}>
-              {memberName(m.email)}
-            </option>
-          ))}
-        </select>
+        <Select value={attFilter} onValueChange={setAttFilter}>
+          <SelectTrigger aria-label="Filtrar por atendente">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os atendentes</SelectItem>
+            <SelectItem value="none">Sem atendente</SelectItem>
+            {members.map((m) => (
+              <SelectItem key={m.userId} value={m.userId}>
+                {memberName(m.email)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-        <select
-          value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value)}
-          aria-label="Filtrar por estágio"
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm outline-none transition-colors focus:border-line-strong"
-        >
-          <option value="all">Todos os estágios</option>
-          {activeStages.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        <Select value={stageFilter} onValueChange={setStageFilter}>
+          <SelectTrigger aria-label="Filtrar por estágio">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os estágios</SelectItem>
+            {activeStages.map((s) => (
+              <SelectItem key={s.key} value={s.key}>
+                {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {isOwner && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
             onClick={() => setManaging(true)}
-            className="ml-auto flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
+            className="ml-auto"
           >
             <Settings2 size={15} /> Gerenciar estágios
-          </button>
+          </Button>
         )}
       </div>
 
       {error && (
-        <div className="flex items-center justify-between gap-2 border-b border-line bg-[var(--danger-bg)] px-4 py-2 text-sm text-danger">
+        <div className="flex items-center justify-between gap-2 border-b border-line bg-danger-surface px-4 py-2 text-apoio text-danger-ink">
           <span>{error}</span>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon-chrome"
             onClick={() => setError(null)}
             aria-label="Fechar aviso"
-            className="rounded p-0.5 hover:opacity-70"
+            className="text-danger-ink"
           >
             <X size={14} />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Colunas */}
       <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
         {columns.length === 0 && (
-          <div className="m-auto text-sm text-ink-dim">
+          <div className="m-auto text-apoio text-ink-3">
             Nenhum estágio ativo. {isOwner ? "Crie um em Gerenciar estágios." : ""}
           </div>
         )}
         {columns.map(({ stage, cards: colCards }) => {
           const over = dragOverKey === stage.key;
           return (
+            // `bg-msg`: a coluna é a bandeja recuada e o card é o que sobe
+            // dentro dela. Antes coluna e página dividiam `--surface`, então no
+            // escuro a coluna sumia no fundo e o card é que era o poço escuro,
+            // que é a hierarquia ao contrário.
             <div
               key={stage.key}
               onDragOver={(e) => {
@@ -425,8 +452,10 @@ export default function PipelineBoard({
                 setDragOverKey(null);
                 if (phone) void moveCard(phone, stage.key);
               }}
-              className={`flex w-72 shrink-0 flex-col rounded-xl border bg-surface transition-colors ${
-                over ? "border-accent ring-1 ring-[var(--accent)]" : "border-line"
+              className={`flex w-72 shrink-0 flex-col rounded-xl border bg-msg transition-colors ${
+                over
+                  ? "border-brand-ink ring-1 ring-[var(--brand-ink)]"
+                  : "border-line"
               }`}
             >
               <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
@@ -435,14 +464,16 @@ export default function PipelineBoard({
                   style={{ background: stageColor(stage.color) }}
                   aria-hidden
                 />
-                <span className="truncate text-sm font-semibold">{stage.name}</span>
-                <span className="ml-auto text-xs tabular-nums text-ink-dim">
+                <span className="truncate text-apoio font-semibold">
+                  {stage.name}
+                </span>
+                <span className="ml-auto text-legenda tabular-nums text-ink-3">
                   {colCards.length}
                 </span>
               </div>
               <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
                 {colCards.length === 0 && (
-                  <div className="px-2 py-6 text-center text-xs text-ink-dim">
+                  <div className="px-2 py-6 text-center text-legenda text-ink-3">
                     Vazio
                   </div>
                 )}
@@ -462,16 +493,15 @@ export default function PipelineBoard({
         })}
       </div>
 
-      {managing && (
-        <StageManager
-          stages={stages}
-          onClose={() => setManaging(false)}
-          onAdd={addStage}
-          onPatch={patchStage}
-          onMove={moveStage}
-        />
-      )}
-    </div>
+      <StageManager
+        aberto={managing}
+        stages={stages}
+        onClose={() => setManaging(false)}
+        onAdd={addStage}
+        onPatch={patchStage}
+        onMove={moveStage}
+      />
+    </Card>
   );
 }
 
@@ -503,59 +533,56 @@ function CardItem({
           onOpen();
         }
       }}
-      className="cursor-pointer rounded-lg border border-line bg-canvas p-2.5 transition-colors hover:border-line-strong"
+      className="cursor-pointer rounded-lg border border-line bg-conteudo p-2.5 transition-colors hover:border-line-strong"
     >
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold"
-            style={avatarPair(card.phone)}
-          >
+          <Avatar size="xs" style={avatarPair(card.phone)}>
             {ini ?? <User size={14} />}
-          </div>
+          </Avatar>
           {card.paused && (
             <span
               title="Você está atendendo (IA pausada)"
-              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-warn ring-2 ring-canvas"
+              className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-warn ring-2 ring-conteudo"
             />
           )}
         </div>
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">
+        <span className="min-w-0 flex-1 truncate text-apoio font-medium">
           {label}
         </span>
         {card.unread > 0 && (
-          <span className="brand-grad flex h-[17px] min-w-[17px] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums">
+          <Badge variant="nao-lidas">
             {card.unread > 99 ? "99+" : card.unread}
-          </span>
+          </Badge>
         )}
       </div>
 
       {card.summary ? (
-        <div className="mt-1.5 flex items-start gap-1 text-[12px] text-warn">
+        <div className="mt-1.5 flex items-start gap-1 text-legenda text-warn-ink">
           <Bot size={12} className="mt-0.5 shrink-0 opacity-80" />
           <span className="line-clamp-2">{card.summary}</span>
         </div>
       ) : (
-        <div className="mt-1.5 truncate text-[12px] text-ink-muted">
+        <div className="mt-1.5 truncate text-legenda text-ink-2">
           {card.lastFrom === "out" ? `Você: ${preview}` : preview}
         </div>
       )}
 
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span className="text-[11px] tabular-nums text-ink-dim" suppressHydrationWarning>
+        <span
+          className="text-legenda tabular-nums text-ink-3"
+          suppressHydrationWarning
+        >
           {formatTime(card.lastMessageAt)}
         </span>
         {member && (
           <span
             title={`Atendente: ${memberName(member.email)}`}
-            className="flex items-center gap-1 text-[11px] text-ink-dim"
+            className="flex items-center gap-1 text-legenda text-ink-3"
           >
-            <span
-              className="flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold"
-              style={avatarPair(member.email)}
-            >
+            <Avatar size="3xs" style={avatarPair(member.email)}>
               {memberInitials(member.email).slice(0, 1)}
-            </span>
+            </Avatar>
             {memberName(member.email)}
           </span>
         )}
@@ -565,12 +592,14 @@ function CardItem({
 }
 
 function StageManager({
+  aberto,
   stages,
   onClose,
   onAdd,
   onPatch,
   onMove,
 }: {
+  aberto: boolean;
   stages: Stage[];
   onClose: () => void;
   onAdd: (name: string) => void;
@@ -584,29 +613,23 @@ function StageManager({
   const archived = stages.filter((s) => s.archived);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      onClick={onClose}
+    <Dialog
+      open={aberto}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-[var(--panel-shadow)]"
-      >
+      <DialogContent tamanho="gestao">
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="flex items-center gap-2">
-            <Settings2 size={18} className="text-accent" />
-            <h3 className="font-display text-base font-bold">Estágios do pipeline</h3>
+            <Settings2 size={18} className="text-brand-ink" />
+            <DialogTitle>Estágios do pipeline</DialogTitle>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fechar"
-            className="rounded-lg p-1.5 text-ink-dim transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
-          >
-            <X size={18} />
-          </button>
+          <DialogClose asChild>
+            <Button variant="ghost" size="icon-chrome" aria-label="Fechar">
+              <X size={18} />
+            </Button>
+          </DialogClose>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
@@ -618,21 +641,17 @@ function StageManager({
             }}
             className="flex gap-2"
           >
-            <input
+            <Input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Novo estágio (ex.: Proposta enviada)"
               aria-label="Nome do novo estágio"
               maxLength={40}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+              className="flex-1"
             />
-            <button
-              type="submit"
-              disabled={!newName.trim()}
-              className="btn-primary flex shrink-0 items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-60"
-            >
+            <Button type="submit" size="field" disabled={!newName.trim()}>
               <Plus size={15} /> Criar
-            </button>
+            </Button>
           </form>
 
           <ul className="flex flex-col gap-2">
@@ -650,42 +669,42 @@ function StageManager({
 
           {archived.length > 0 && (
             <div>
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-ink-dim">
+              <div className="mb-2 text-rotulo uppercase text-ink-3">
                 Arquivados
               </div>
               <ul className="flex flex-col gap-2">
                 {archived.map((s) => (
                   <li
                     key={s.id}
-                    className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2"
+                    className="flex items-center gap-2 rounded-lg border border-line bg-bloco px-3 py-2"
                   >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full opacity-60"
                       style={{ background: stageColor(s.color) }}
                     />
-                    <span className="flex-1 truncate text-sm text-ink-muted">
+                    <span className="flex-1 truncate text-apoio text-ink-2">
                       {s.name}
                     </span>
-                    <button
-                      type="button"
+                    <Button
+                      variant="ghost"
+                      size="chrome"
                       onClick={() => onPatch(s.id, { archived: false })}
-                      className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
                     >
                       <ArchiveRestore size={13} /> Restaurar
-                    </button>
+                    </Button>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          <p className="text-xs text-ink-dim">
+          <DialogDescription className="text-legenda text-ink-3">
             Os estágios Novo, Qualificado e Aguardando atendimento são usados pela
             IA para mover o card sozinha. Você pode renomeá-los e reordená-los.
-          </p>
+          </DialogDescription>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -711,28 +730,32 @@ function StageRowItem({
   }
 
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-2 py-2">
+    <li className="flex items-center gap-2 rounded-lg border border-line bg-bloco px-2 py-2">
       <div className="flex flex-col">
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="none"
           disabled={!canUp}
           onClick={() => onMove(stage.id, -1)}
           aria-label="Subir"
-          className="rounded p-0.5 text-ink-dim transition-colors hover:text-ink disabled:opacity-30"
+          className="rounded p-0.5"
         >
           <ChevronUp size={14} />
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="ghost"
+          size="none"
           disabled={!canDown}
           onClick={() => onMove(stage.id, 1)}
           aria-label="Descer"
-          className="rounded p-0.5 text-ink-dim transition-colors hover:text-ink disabled:opacity-30"
+          className="rounded p-0.5"
         >
           <ChevronDown size={14} />
-        </button>
+        </Button>
       </div>
 
+      {/* Amostra de cor, não botão do sistema: aqui a cor É o conteúdo, então
+          nenhuma variante do Button se aplica (todas pintariam por cima). */}
       <button
         type="button"
         aria-label="Trocar cor"
@@ -742,11 +765,12 @@ function StageRowItem({
           const next = STAGE_COLOR_KEYS[(i + 1) % STAGE_COLOR_KEYS.length];
           onPatch(stage.id, { color: next });
         }}
-        className="h-4 w-4 shrink-0 cursor-pointer rounded-full ring-1 ring-line"
+        className="h-4 w-4 shrink-0 rounded-full ring-1 ring-line"
         style={{ background: stageColor(stage.color) }}
       />
 
-      <input
+      <Input
+        variant="limpo"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={commitName}
@@ -754,23 +778,23 @@ function StageRowItem({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
         }}
         maxLength={40}
-        className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm outline-none transition-colors hover:border-line focus:border-line-strong"
+        className="min-w-0 flex-1 rounded-md border border-transparent px-2 py-1 text-apoio transition-colors hover:border-line"
       />
 
       {stage.isDefault ? (
-        <span className="shrink-0 rounded-full bg-[var(--active-bg)] px-2 py-0.5 text-[10px] font-medium text-ink-muted">
+        <span className="shrink-0 rounded-full bg-[var(--active-bg)] px-2 py-0.5 text-legenda text-ink-2">
           default
         </span>
       ) : (
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon-chrome"
           onClick={() => onPatch(stage.id, { archived: true })}
           aria-label="Arquivar estágio"
           title="Arquivar"
-          className="shrink-0 rounded-md p-1.5 text-ink-dim transition-colors hover:bg-[var(--active-bg)] hover:text-ink"
         >
           <Archive size={14} />
-        </button>
+        </Button>
       )}
     </li>
   );

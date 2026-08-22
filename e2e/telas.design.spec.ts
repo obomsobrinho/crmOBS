@@ -23,11 +23,24 @@ test.describe("Equipe (/design/equipe)", () => {
 test.describe("Inbox (/design)", () => {
   test("mostra atribuição, tags, notas e filtros", async ({ page }) => {
     await page.goto("/design");
-    await expect(page.getByText("Atendimento", { exact: true })).toBeVisible();
+    // A seção "Atendimento" saiu do painel de contexto na migração de UI: quem
+    // atende virou um chip no cabeçalho da conversa, e ter os dois era a mesma
+    // decisão em dois lugares. O que ficou é o chip, que abre o seletor.
+    await expect(
+      page.getByRole("button", { name: /Você|Ninguém assumiu ainda/ }).first()
+    ).toBeVisible();
     await expect(page.getByText("Tags", { exact: true })).toBeVisible();
-    await expect(page.getByText("Notas internas")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Não lidas/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Precisa de você/ })).toBeVisible();
+    // "Notas internas" virou só "Notas" no painel, e escrever nota passou a ser
+    // uma aba do campo de escrita, em vez de um formulário próprio.
+    await expect(page.getByText("Notas", { exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
+    // Os filtros viraram um seletor só: três moram no menu e "Precisa de você"
+    // ganhou botão próprio, porque é o corte que faz alguém largar o que está
+    // fazendo. "Não lidas" deixou de existir e virou "Sem resposta", no menu.
+    await expect(page.getByRole("button", { name: /Todas/ })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Precisa de você" })
+    ).toBeVisible();
   });
 
   test("busca por nome filtra a lista", async ({ page }) => {
@@ -39,19 +52,29 @@ test.describe("Inbox (/design)", () => {
     await expect(page.getByText("Olá, vim pelo qr code!")).toHaveCount(0);
   });
 
-  test("editar contato abre o formulário", async ({ page }) => {
+  test("contato é editado no lugar, sem passo de abrir formulário", async ({
+    page,
+  }) => {
     await page.goto("/design");
-    await page.getByRole("button", { name: "Editar" }).click();
-    await expect(page.getByText("Nome de exibição")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Salvar" })).toBeVisible();
+    // A migração tirou o botão "Editar" que trocava a lista por um formulário
+    // com Cancelar e Salvar: eram três cliques para corrigir uma letra. Agora
+    // cada linha é o próprio campo e grava ao perder o foco.
+    await expect(page.getByRole("button", { name: "Editar" })).toHaveCount(0);
+    await expect(
+      page.getByPlaceholder("Como você chama este contato")
+    ).toBeVisible();
+    // Sem Cancelar e Salvar: gravar ao perder o foco é o que tirou os cliques.
+    await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
   });
 });
 
 test.describe("Agente (/design/agente)", () => {
   test("renderiza o construtor guiado/avançado", async ({ page }) => {
     await page.goto("/design/agente");
-    await expect(page.getByRole("button", { name: "Guiado" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Avançado" })).toBeVisible();
+    // O seletor de modo virou Tabs do Radix na migração, então o papel ARIA é
+    // `tab` dentro de um `tablist`, e não `button` como era antes.
+    await expect(page.getByRole("tab", { name: "Guiado" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Avançado" })).toBeVisible();
   });
 });
 

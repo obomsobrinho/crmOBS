@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, prettyPhone } from "@/lib/format";
+import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
   buildInbox,
   initials,
@@ -44,6 +44,17 @@ import type { InboxItem } from "@/lib/types";
 
 function isPaused(state: string | null | undefined): boolean {
   return state === "pause";
+}
+
+// "Precisa de você" = a IA abriu um handoff e ninguém do time respondeu ainda.
+//
+// Antes este corte era simplesmente "IA pausada", porque o handoff pausava a IA.
+// Isso misturava duas coisas diferentes: "a IA pediu ajuda" e "alguém já
+// assumiu". Como a pausa é porta de mão única, a lista virava depósito (46 dos
+// 47 contatos da OBM estavam nela). Agora o handoff tem data própria, e a pausa
+// só exclui da fila: se um humano assumiu, a conversa não espera por ninguém.
+function needsYou(it: InboxItem, ia: Record<string, string | null>): boolean {
+  return it.handoffAt != null && !isPaused(ia[it.phone]);
 }
 
 // Os quatro cortes da lista. Viraram UM seletor com menu, e não quatro chips
@@ -104,7 +115,7 @@ export default function ContactSidebar({
         supabase
           .from("conversations")
           .select(
-            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id"
+            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, handoff_at"
           )
           .order("last_message_at", { ascending: false })
           .limit(500),
@@ -218,7 +229,7 @@ export default function ContactSidebar({
   }, [query, supabase]);
 
   const needsCount = useMemo(
-    () => items.filter((it) => isPaused(iaByPhone[it.phone])).length,
+    () => items.filter((it) => needsYou(it, iaByPhone)).length,
     [items, iaByPhone]
   );
   const unansweredCount = useMemo(
@@ -241,7 +252,7 @@ export default function ContactSidebar({
     const q = query.trim().toLowerCase();
     return items
       .filter((it) => {
-        if (filter === "needs" && !isPaused(iaByPhone[it.phone])) return false;
+        if (filter === "needs" && !needsYou(it, iaByPhone)) return false;
         if (filter === "unanswered" && it.lastFrom !== "in") return false;
         if (filter === "mine" && it.assignedUserId !== myUserId) return false;
         if (!q) return true;
@@ -335,6 +346,10 @@ export default function ContactSidebar({
                     setFilter((f) => (f === "needs" ? "all" : "needs"))
                   }
                   aria-pressed={filter === "needs"}
+                  // O conteúdo visível é ícone mais número, então sem isto o
+                  // botão não tem nome acessível: leitor de tela anunciaria só
+                  // "3". Tooltip não serve como nome (só existe no hover).
+                  aria-label="Precisa de você"
                   className={cn(
                     "gap-1.5 text-warn-ink",
                     filter === "needs"
@@ -368,7 +383,7 @@ export default function ContactSidebar({
 
       <ScrollArea fade className="min-h-0 flex-1">
         {results.length === 0 && (
-          <div className="p-4 text-apoio text-ink-dim">
+          <div className="p-4 text-apoio text-ink-3">
             {query.trim()
               ? "Nada encontrado."
               : filter === "needs"
@@ -386,8 +401,13 @@ export default function ContactSidebar({
             const href = `/inbox/${encodeURIComponent(phone)}`;
             const active = activePhone ? activePhone === phone : pathname === href;
             const paused = isPaused(iaByPhone[phone]);
-            // Motivo da IA (resumo) quando a conversa está com a IA pausada.
-            const reason = paused && qualByPhone[phone] ? qualByPhone[phone] : null;
+            // Handoff em aberto: o que a IA pediu (resumo da ÚLTIMA
+            // qualificação, então reflete o último pedido da pessoa) e há quanto
+            // tempo isso está esperando. O tempo sai do PRIMEIRO handoff em
+            // aberto, que é a espera de verdade.
+            const needs = needsYou(it, iaByPhone);
+            const reason = needs && qualByPhone[phone] ? qualByPhone[phone] : null;
+            const espera = needs && it.handoffAt ? formatEspera(it.handoffAt) : null;
             const att = it.assignedUserId ? membersById[it.assignedUserId] : null;
             // Ao abrir a conversa você a está lendo, então não mostra badge.
             const unread = active ? 0 : it.unread;
@@ -452,8 +472,12 @@ export default function ContactSidebar({
                         {label}
                       </span>
                       <span
+                        // Âmbar agora segue o handoff, não a pausa: pausa passou
+                        // a significar "alguém assumiu", que não é urgência.
+                        // `text-warn-ink` e não `text-warn`: o fill do matiz não
+                        // serve como tinta (regra do design system).
                         className={`shrink-0 text-legenda tabular-nums ${
-                          paused ? "font-medium text-warn" : "text-ink-dim"
+                          needs ? "font-medium text-warn-ink" : "text-ink-3"
                         }`}
                         suppressHydrationWarning
                       >
@@ -462,19 +486,26 @@ export default function ContactSidebar({
                     </div>
                     <div className="mt-0.5 flex items-center justify-between gap-2">
                       {snippet ? (
-                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-ink-muted">
+                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-ink-2">
                           <Search size={11} className="shrink-0 opacity-70" />
                           <span className="truncate italic">{snippet}</span>
                         </span>
-                      ) : reason ? (
-                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-warn">
+                      ) : espera ? (
+                        // Espera primeiro, motivo depois: a decisão de abrir a
+                        // conversa é pela espera, o motivo só diz o que é.
+                        <span className="flex min-w-0 flex-1 items-center gap-1 text-apoio text-warn-ink">
                           <Bot size={11} className="shrink-0 opacity-80" />
-                          <span className="truncate">{reason}</span>
+                          <span className="shrink-0 font-medium tabular-nums">
+                            {espera}
+                          </span>
+                          <span className="min-w-0 truncate">
+                            {reason ? `· ${reason}` : "· esperando você"}
+                          </span>
                         </span>
                       ) : (
                         <span
                           className={`block truncate text-apoio ${
-                            unread > 0 ? "text-ink" : "text-ink-muted"
+                            unread > 0 ? "text-ink" : "text-ink-2"
                           }`}
                         >
                           {preview}

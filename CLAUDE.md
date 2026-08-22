@@ -18,7 +18,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 ## Glossário do schema (IMPORTANTE — "cliente" é ambíguo)
 - **`clients`** = o **TENANT**: a empresa que USA o CRM (ex.: OBM, Loja Teste). É "o cliente do
   CRM". PK `uuid`. Tem `evolution_instance` (única), `persona` (prompt do agente),
-  `notify_group_jid`, `imported_at`, `agent_config` (jsonb do construtor guiado),
+  `notify_group_jid`, `imported_at`, `agent_config` (jsonb do construtor guiado; dentro dele,
+  `hours` é lido também por `lib/valor.ts` e `handoffNotice` é a base do aviso de handoff),
   `prompt_mode` (`guiado`/`avancado`), `agent_config_updated_at`. **Fase 4 (assinatura):**
   `subscription_status` (`trialing`/`active`/`past_due`/`canceled`, CHECK no banco),
   `trial_ends_at`, `grace_until` (carência em atraso), `billing_provider` (`asaas`/`stripe`),
@@ -26,7 +27,46 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   por eles), `billing_seats`, `billing_updated_at`.
   - **REGRA:** o n8n lê SÓ `persona` (ao vivo, a cada msg). No modo `guiado`, `persona` é a
     **saída compilada** de `agent_config` por `buildPersona` (`lib/agent-prompt.ts`); no
-    `avancado`, é texto escrito à mão. Config do agente é editada em `/agente` (**só dono**: a
+    `avancado`, é texto escrito à mão.
+  - **ESTRUTURA BASE DO PROMPT (decisão de 22/08/2026, contexto em `docs/proximos-passos.md`):
+    TRÊS CAMADAS, e a ordem é a defesa.** (1) base que abre (identidade, contexto, tom, fontes e
+    honestidade), (2) conteúdo do cliente cercado por `--- início/fim ---`, (3) **base que fecha**
+    (precedência, quando chamar humano, anti-manipulação, `### OUTPUT`). O contrato é o ÚLTIMO bloco
+    porque recência o protege do que o cliente escrever sem querer. Duas regras saem disso:
+    **base é molde e regra, cliente é valor** (nome e horário são dado do cliente, nunca texto da
+    base, senão existe uma base por cliente), e **precedência declarada** (o cliente manda no jeito
+    de atender: tratamento, apelido, tom; a base manda no contrato).
+  - **O rabo da base é UMA função, usada pelos DOIS modos:** `buildBaseTail()` em
+    `lib/agent-prompt.ts` produz `PRECEDÊNCIA` + `QUANDO CHAMAR UM HUMANO` + `ANTI-MANIPULAÇÃO` +
+    `### OUTPUT`, e `buildPersona` termina chamando ela. **`agentName`/`companyName` são OPCIONAIS
+    ali de propósito:** tenant em modo avançado pode não ter `agent_config` (a OBM não tem), e um
+    rabo que dependesse de dado do tenant não seria invariante; sem os nomes o texto fica genérico.
+  - **Modo avançado = liberdade com rabo colado.** O tenant escreve o que quiser e o servidor
+    **sempre recola** o rabo: `buildAdvancedPersona` roda `stripBaseTail` (que remove do texto dele
+    qualquer seção da base, para não duplicar) e concatena `buildBaseTail`. A rota devolve `removed`
+    e a tela **AVISA** o que vai sair, em vez de apagar em silêncio. Sem isso, quem está no avançado
+    nunca mais recebe melhoria da base, que foi exatamente o que aconteceu na regra de handoff e
+    obrigou a colar as regras à mão na persona da OBM.
+    ⚠️ **A persona da OBM NÃO foi recompilada** (22/08/2026): ela perde três coisas quando for, e é
+    decisão do dono do produto quando migrar. O que ela perde: o nome no `ANTI-MANIPULAÇÃO` ("como
+    Tony, da OBS", porque ela não tem `agent_config`), a calibragem do summary ("segmento, dor
+    identificada e contexto relevante") e o parágrafo final "IMPORTANTE: os exemplos acima..." que
+    mora DENTRO do `### OUTPUT` dela e impede o modelo de responder em texto solto imitando os
+    exemplos. Esse último é o mais sério: antes de salvar por lá, mover ele para a seção EXEMPLOS.
+  - **SALVAR JÁ É PUBLICAR**, porque o n8n lê `persona` ao vivo. Logo **não existe rascunho nem
+    botão Publicar**: cada save do `PUT /agent-config` grava uma linha em **`agent_publications`**
+    (log append-only: `config`, **`persona` compilada**, `prompt_mode`, `published_by`,
+    `published_at`). Esse log **não é fonte de verdade** (quem atende segue em `clients`), é
+    registro: serve para restaurar uma versão e para responder "o que o agente estava dizendo na
+    terça?", cruzando com `agent_turns`. **Restaurar não grava:** carrega a versão no formulário e a
+    pessoa salva. Leitura por membro do tenant (RLS), escrita só service_role.
+  - **`agent_enabled` (boolean) é o liga-desliga; `agent_published_at` é a PRIMEIRA ativação e
+    NUNCA é limpo.** São separados porque zerar `agent_published_at` ao desligar fazia
+    `onboardingState().complete` virar false e a barra de onboarding reaparecer em toda página
+    pedindo "Publicar o agente", só porque alguém desligou a IA por uma hora. O `processTurn`
+    emudece se qualquer um dos dois barrar. **Vocabulário: "Agente ativo" e "Desativado", nunca
+    "pausado"** (pausada é a IA de UMA conversa quando um humano assume; usar a mesma palavra nos
+    dois lugares faz a pessoa olhar o inbox sem saber qual dos dois parou). Config do agente é editada em `/agente` (**só dono**: a
     página redireciona atendente e o `PUT` responde 403); write só por service_role (RLS de
     `clients` não dá UPDATE a `authenticated`).
 - **`dados_cliente`** = os **CONTATOS/LEADS**: quem manda mensagem no WhatsApp *daquele* tenant
@@ -57,7 +97,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Writes diretos do CRM (browser, RLS aplicada): `dados_cliente.atendimento_ia` (pausar/religar
   a IA) e `conversations` nas colunas liberadas (`unread_count` no mark-as-read,
   `assigned_user_id` na atribuição, `status`, `stage`/`stage_source` no pipeline,
-  `pending_instruction` do handoff coach). Convite/remoção
+  `pending_instruction` do handoff coach). ⚠️ **"colunas liberadas" em `conversations` é
+  CONVENÇÃO, não banco:** a tabela tem grant de UPDATE em **nível de tabela** para `authenticated`
+  e uma policy `UPDATE` que só checa o tenant, então qualquer membro pode escrever qualquer coluna
+  dela pelo browser. `conversations.handoff_at` segue a mesma convenção (abre no `/api/agent`,
+  fecha no `/api/send`, os dois service_role). Apertar isso de verdade exigiria revogar o UPDATE
+  de tabela e regrantear coluna por coluna, o que mexe em todos os writes existentes: **decisão
+  pendente do dono do produto**, não fazer de passagem. Convite/remoção
   de membro NÃO é write direto: vai por route handler `service_role`. Gestão de `pipeline_stages`
   (criar/renomear/reordenar/arquivar) é write direto do browser MAS **só dono** (RLS checa
   `role='dono'`); mover card (update de `conversations.stage`) é liberado a qualquer membro.
@@ -95,12 +141,21 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   puro): RAG usado + similaridade, estágio que moveria, latência, guardrail. **Guardrail**
   (`lib/guardrail.ts`, puro): checa a resposta pronta antes de sair e bloqueia preço/link/telefone
   fora das fontes (persona + RAG + orientação do operador) e promessa forte; se reprova, degrada
-  para `pausar`. **Handoff coach:** `conversations.pending_instruction` (grant de coluna, browser
+  para `pausar`. **Handoff coach:** `conversations.pending_instruction` (browser
   direto) guarda a orientação do operador; `/api/agent` consome no próximo turno e limpa (a IA
-  retoma sozinha). **Handoff silencioso (regra geral):** em `action=pausar` o `/api/agent` devolve
-  `messages` vazio (a IA não responde, só abre o handoff) e **pausa a IA ele mesmo**
-  (`dados_cliente.atendimento_ia='pause'`), porque com messages vazio o n8n não chega no nó que
-  pausaria. **Playground** (`/playground`, dono-only)
+  retoma sozinha). **Handoff (regra geral, revista em 20/08/2026): HANDOFF NÃO PAUSA E NÃO
+  EMUDECE A IA.** A versão anterior fazia as duas coisas (em `action=pausar` zerava `messages` e
+  gravava `atendimento_ia='pause'`) e produção mostrou os dois defeitos juntos: a IA abria o
+  handoff em silêncio, a pessoa mandava outro pedido 26s depois e, com a IA pausada, esse pedido
+  era gravado mas **nunca classificado**; e como a pausa é porta de mão única, **46 dos 47
+  contatos da OBM estavam com a IA desligada para sempre**. Agora: a IA responde uma frase
+  dizendo **o que** vai verificar (texto base em `agent_config.handoffNotice`, regra no prompt),
+  marca `conversations.handoff_at` e **segue atendendo**; cada mensagem nova gera handoff novo com
+  o resumo do **último** pedido (`conversation_qualifications` já grava uma linha por turno).
+  `handoff_at` guarda o **primeiro** handoff em aberto (é ele que dá a espera real, "esperando há
+  6h"), é limpo pelo envio manual (`POST /api/send`, service_role) e é o que alimenta o filtro
+  "Precisa de você". **Pausa volta a significar só o que deveria:** um humano assumiu (nó
+  `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave. **Playground** (`/playground`, dono-only)
   fala com o cérebro REAL via `POST /api/playground` (sessão do dono, força `dryRun`), sem WhatsApp.
 - **Fase 4 (assinatura e gate):** a regra de acesso mora em `lib/billing.ts` (**módulo puro**, zero
   imports, igual `lib/agent-prompt.ts`, então servidor e browser usam a MESMA função):
@@ -170,6 +225,21 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   A tela `/assinatura` é **caixa, não vitrine**: a página de vendas mora no site; aqui só três linhas
   de plano, CPF/CNPJ (exigência do gateway, o documento **não** é gravado no nosso banco), pagamento
   e cancelamento. `?plano=` pré-seleciona a linha para o link vindo do site.
+- **Valor percebido (`lib/valor.ts`, módulo puro):** transforma operação em frase de dependência
+  ("213 mensagens respondidas fora do horário em julho"). Ataca o churn: o valor do produto é
+  invisível porque a IA responde dentro do WhatsApp. Mora no `/painel` (mês **fechado**) e no passo
+  de cancelar do `BillingCheckout` (**acumulado desde o início**). Quatro regras que não se negociam:
+  (1) **nunca inventar nem inflar**, porque o cliente confere no WhatsApp dele; sem horário
+  configurado a frase é **omitida**, e frase com zero não entra;
+  (2) **só resposta da IA conta** em "fora do horário" e "fim de semana" (`message_type='manual'` é
+  humano trabalhando de madrugada, e somar inflaria a frase);
+  (3) classificação em **America/Sao_Paulo** via `Intl`, nunca em UTC (em UTC a mensagem da noite
+  vira do dia seguinte);
+  (4) **feriado só nacional**, calculado no módulo (fixos + móveis da Páscoa); municipal exigiria
+  cadastro por tenant, e chutar transformaria dia útil em feriado dentro da frase.
+  O horário sai de `agent_config -> hours`, e o `PUT` de `agent-config` aceita `mode: "horario"` para
+  salvá-lo **sozinho** (merge, sem tocar `persona` nem `prompt_mode`): tenant em modo avançado tem
+  persona escrita à mão e o formulário guiado a substituiria.
 - **Marca:** nome, inicial e tagline ficam em `lib/brand.ts`, e o selo em `components/BrandMark.tsx`
   (usado em login, cadastro, recuperar senha, definir senha, assinatura e nav rail). Trocar de marca
   é editar esse arquivo mais `--accent` e `.brand-grad` no `globals.css`. **Verde, âmbar e vermelho
@@ -184,16 +254,51 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
      (é o que produzia as 18 reprovações WCAG AA) e nunca usar `ink` como fundo. Ou seja:
      `text-brand-ink`, não `text-accent`; `text-warn-ink`, não `text-warn`.
   2. **Tinta em 4 níveis:** `ink` > `ink-2` > `ink-3` (piso de texto, mínimo 12px) > `ink-faint`
-     (**nunca** texto, só ícone e divisor). `--ink-muted` e `--ink-dim` são aliases de `ink-2`/`ink-3`.
+     (**nunca** texto, só ícone e divisor). Os nomes `text-ink-muted` e `text-ink-dim` **não existem mais**: eram aliases e foram removidos em 17/08/2026.
   3. **Seis papéis tipográficos** com entrelinha travada: `text-display`, `text-titulo`,
      `text-corpo`, `text-apoio`, `text-legenda`, `text-rotulo`. Nada abaixo de 12px na interface.
   4. **O azul `--brand-grad-end` (#4464d4)** existe só porque a logo termina nele. Escopo fechado:
      gradiente de marca, símbolo e superfície decorativa a partir de 28px. Não pinta texto, ícone
      nem estado.
-  ⚠️ Os aliases legados (`--accent`, `--ia`, `--danger`, `--canvas`) seguem nos **valores antigos de
-  propósito**: componentes ainda os usam como cor de texto, e trocá-los pelos `fill` novos pioraria
-  o contraste. Migram junto com o redesenho das telas. Avatar usa `avatarPair()` (`lib/inbox.ts`),
+  ⚠️ Os aliases de @theme (`--color-accent`, `--color-ia`, `--color-ink-muted`, `--color-ink-dim`)
+  e as classes `.btn-primary`, `.glass`, `.panel` e `--radius-2xl` **FORAM REMOVIDOS** em
+  17/08/2026, quando o último consumidor migrou. Sobram só `--surface` (4 usos) e `--panel`
+  (1 uso), os dois na tela de atendimento: a migração deles está escrita e **aguardando decisão do
+  dono do produto**, porque mexe em 4 pixels de uma tela já aprovada. Avatar usa `avatarPair()` (`lib/inbox.ts`),
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
+- **Camada base shadcn/ui (`components/ui/`, 16 arquivos):** `button`, `input`, `textarea`,
+  `badge`, `avatar`, `separator`, `card`, `scroll-area`, `dropdown-menu`, `switch`, `tabs`,
+  `tooltip`, `dialog`, `sheet`, `select`, `checkbox`. O `sheet` (painel lateral, drawer) entrou em
+  22/08/2026 e é arquivo separado do `dialog` de propósito: o `conteudoVariants` do dialog embute
+  `top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2`, e sobrescrever isso por className brigaria
+  com o `translate` do centramento (a armadilha do Tailwind v4 documentada abaixo). Animação
+  própria: `.anim-lateral` no `globals.css`, que PODE mexer em `translate` porque o painel encosta
+  em `right-0` e não usa translate para se posicionar. Sobre **Radix** (pacote unificado `radix-ui`), com
+  `cva` e `cn` (`lib/utils.ts`). **São DUAS camadas:** `components/ui/` é a BASE, ajustada UMA vez
+  para encarnar o sistema; `components/` é PRODUTO e consome a base. **Toda a UI já passou por ela**
+  (concluído em 17/08/2026). Antes de escrever `className` numa tela, procurar a variante na base:
+  se a mesma sopa de classe aparecer duas vezes, ela virou variante.
+  Sete regras da base, cada uma paga com bug:
+  1. **Geometria mora no `size`** do cva, não na base: raio, `gap` e peso da fonte. Assim
+     `size="none"` significa mesmo "sem geometria".
+  2. **Nunca `[&_svg]:size-4`**: `size-4` é CSS e vence o atributo `width` do lucide, engordando
+     todo ícone de 13, 14 e 15px.
+  3. **Nunca anel de foco no componente**: o foco é global no `globals.css`.
+  4. **`data-slot` DEPOIS do spread**, senão um gatilho de fora (ex.: `TooltipTrigger`) sobrescreve.
+  5. **Não depender do `data-state` de um ancestral** (`TooltipTrigger` sobrescreve o do filho):
+     passar estado por prop, como `SwitchTrack`/`SwitchThumb` fazem.
+  6. **`tailwind-merge` conhece a escala tipográfica** via `extendTailwindMerge` em
+     `lib/utils.ts`. Sem isso ele trata `text-corpo` como COR e descarta `text-ink-2` em silêncio.
+  7. **Root do Radix não renderiza elemento:** `DropdownMenuTrigger asChild` em volta de
+     `<Tooltip>` clona props no nada. Os dois gatilhos precisam se encadear ao MESMO elemento.
+  ⚠️ **Animação é CSS da casa**, não `tw-animate-css` nem Motion: `.anim-flutuante`, `.anim-fundo`
+  e `.msg-in` no `globals.css`, com `prefers-reduced-motion`. O Radix espera o `animationend` para
+  desmontar, então a saída funciona sem `forceMount`. **O Tailwind v4 emite `-translate-x-1/2` como
+  a propriedade `translate`, separada do `transform`:** keyframe que repita o translate SOMA em vez
+  de substituir (o modal andou 256px na primeira tentativa).
+  ⚠️ Para `<form>` ou `<section>` que É o cartão, usar `cn(cardVariants(), ...)` em vez de
+  `Card asChild`: evita um nó extra na árvore só para envolver.
+
 - **Fase 4 (cadastro self-service):** `/cadastro` (público) manda `{companyName, email}` para
   `POST /api/signup`. **O formulário NÃO pede senha de propósito:** a senha nunca passa pelo nosso
   servidor. A rota usa `auth.admin.inviteUserByEmail` (mesmo caminho provado do convite de equipe),
@@ -214,11 +319,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `onboarding_tested_at` (marcado por `/api/playground` no primeiro teste) e `agent_published_at`.
   `getMyClient()` traz `onboarding` pronto (só escalares, **nunca** `persona`/`agent_config`).
   `components/OnboardingBar.tsx` aparece em toda página do app enquanto não publicado.
-  **`agent_published_at` é o interruptor do agente:** com ele nulo, `processTurn` devolve **200 com
+  **O interruptor do agente são DUAS colunas** (ver a regra no glossário de `clients`):
+  `agent_published_at` nulo **ou** `agent_enabled` false e o `processTurn` devolve **200 com
   `messages` vazio** (e NÃO erro) antes de chamar o modelo, então a IA fica muda, não gasta token e
   **a mensagem do cliente continua sendo gravada** pelo n8n para um humano responder. Vale só fora
-  do `dryRun` (senão o passo "testar" seria impossível). Publicar exige os 3 passos anteriores
-  (`PUT /api/clients/[id]/publish`, dono-only, 409 com o que falta). Aviso de risco do QR em
+  do `dryRun` (senão o passo "testar" seria impossível). `PUT /api/clients/[id]/publish` recebe
+  `{ enabled: boolean }`, é dono-only, e os 3 passos anteriores são exigidos **só na primeira
+  ativação** (409 com o que falta): quem já testou não testa de novo para religar. Aviso de risco do QR em
   `/connect` (`components/ConnectionRiskNotice.tsx`): **nunca** prometer proteção contra bloqueio
   nem usar "não pague a API da Meta" (e2e trava isso).
 - **Decisões mantidas de propósito:** `dados_cliente.atendimento_ia` é `text`
@@ -240,13 +347,15 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   com a data/hora atual (America/Sao_Paulo, pt-BR) via `$now`. Logo o agente **sabe** a data/hora;
   `buildPersona` referencia essa "seção AGORA" (não dizer mais que o agente não sabe a data).
 - **"CRM Envio Manual"**: envio manual do CRM, roteado por `instance`/`client_id`.
-- **Handoff silencioso (Fase 3.5):** em `action=pausar` o `/api/agent` devolve `messages: []` (a IA
-  não responde, só abre o handoff). Os nós do n8n aguentam array vazio (`Salva chat_messages` usa
-  `messages.join(' | ')` que vira `''`; `Split messages` gera 0 itens; nada é enviado). PORÉM o
-  ramo que pausa a IA (`Action` -> `Pausa IA (handoff)`) fica no fim do `Loop envio`, que não roda
-  com 0 itens. Por isso **o próprio `/api/agent` pausa a IA** (`dados_cliente.atendimento_ia='pause'`)
-  no handoff, sem depender do n8n. O `agendar` continua não vazio: o n8n manda o recap, notifica o
-  grupo e pausa (`Pausa IA (agendado)`). **Nenhuma mudança no n8n foi necessária.**
+- **Handoff sem pausa (20/08/2026):** agora `action=pausar` devolve mensagem (a IA avisa o que vai
+  verificar e segue atendendo). Isso tem uma consequência no n8n que é fácil de esquecer: **com
+  `messages` não vazio, o `Loop envio` termina e o `Action` passa a ser alcançado**, então o nó
+  `Pausa IA (handoff)` volta a disparar. Ou seja, tirar a pausa do lado do app **não basta**: os
+  dois nós `Pausa IA (handoff)` e `Pausa IA (agendado)` estão **desativados desde 20/08/2026**
+  (`disableNode`, que no n8n é pass-through, então `Notifica grupo` -> `Pausa IA (agendado)`
+  continua notificando o grupo). O nó que PERMANECE ativo é `Pausar IA (Franck digitou)`: é ele
+  que representa "um humano assumiu", o único caso em que a IA deve calar. Reverter é `enableNode`
+  nos dois.
 - **REGRA:** nunca modificar/ativar workflows n8n ao vivo sem confirmação explícita do usuário.
   Usar `validateOnly` antes de aplicar.
 
@@ -264,7 +373,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `/auth/confirm` (verifica o link do e-mail).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
   whatsapp-status, import, **agent-config** `PUT`, **notify-target** `PUT` dono-only,
-  **publish** `PUT` dono-only (interruptor do agente),
+  **publish** `PUT` dono-only (`{ enabled }`, liga e desliga o agente),
   **knowledge** `DELETE` + **knowledge/upload-url** + **knowledge/process** dono-only, upload
   direto ao Storage por URL assinada + processamento à parte, compatível com o limite de corpo da
   Vercel), `app/api/agent` (cérebro, `processTurn`, protegido por `x-lookup-secret`),
@@ -289,7 +398,11 @@ posicionamento sem ler a que se aplica:
   **superadas**; o banner no topo do arquivo lista o que vale. Em conflito, `proximos-passos.md` manda.
 
 Regras que saem desses documentos e valem para qualquer sugestão minha:
-- Concorrentes de referência são **ZapResponder** e **HelenaCRM**, não Kommo/RD Station/Blip/Zenvia.
+- **Âncoras de posicionamento** são **ZapResponder** (piso de preço) e **HelenaCRM** (teto), não
+  Kommo/RD Station/Blip/Zenvia. ⚠️ Isso NÃO quer dizer que o campo tenha dois concorrentes: a lista
+  completa de pares está em `estrategia-2026-07.md` (faixa de R$ 87 a R$ 1.000, com Nexloo, Zappy,
+  SocialHub, AtendeNex, Convecta AI, Umbler Talk, WiiChat, Sellflux, GPT Maker, BotConversa e
+  outros). Nunca responder "os concorrentes são ZapResponder e Helena" sem abrir essa lista.
 - **Nunca** construir agenda própria completa (usar Google Calendar) nem construtor visual de
   automações (vira produto que exige consultoria).
 - **Nunca** construir disparo em massa ou follow-up ativo em cima da conexão QR (Baileys): é o
@@ -314,8 +427,15 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
   (fluxo quente; ver `docs/proximos-passos.md`).
 - **Fase 3.5** (fechamento da IA): guardrail de validação antes de enviar (`lib/guardrail.ts`),
   handoff coach (`conversations.pending_instruction`, a IA retoma sozinha no próximo turno),
-  handoff silencioso (`pausar` -> `messages` vazio + o `/api/agent` pausa a IA sozinho, sem mudar o
-  n8n), e a bancada de teste `/playground` (dono-only, `dryRun` no cérebro real via
-  `lib/agent-turn.ts`).
+  e a bancada de teste `/playground` (dono-only, `dryRun` no cérebro real via `lib/agent-turn.ts`).
+  ⚠️ O "handoff silencioso" desta fase foi **revertido em 20/08/2026** (ver a regra de handoff
+  acima): ele emudecia e pausava a IA, e os dois efeitos se mostraram errados em produção.
+- **Migração de UI para a camada base (17/08/2026):** as 15 telas do sistema saíram de classe
+  solta para `components/ui/`. 51 arquivos tocados. Verificação: `npm run build` limpo, eslint em
+  **0 erros** (os 2 de `set-state-in-effect` foram resolvidos com ajuste em tempo de render), e a
+  tela de atendimento provada **idêntica** por retrato numérico (425 elementos no escuro, 417 no
+  claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
+  `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
+  `danger-ink` (9,0:1).
 - Testes e2e (Playwright, `e2e/`) cobrem as telas `/design` (inclui `/design/playground`) e o login
   do dono; ainda **sem** cenário e2e para `/pipeline` e `/painel` (só `/design` + tsc/eslint).

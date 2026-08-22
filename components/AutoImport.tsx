@@ -30,7 +30,7 @@ export default function AutoImport({ clientId }: { clientId: string }) {
   if (!importing) return null;
 
   return (
-    <div className="glass rounded-xl border-[var(--warn-border)] bg-[var(--warn-bg)] px-4 py-2 text-xs font-medium text-warn">
+    <div className="rounded-xl border border-warn-line bg-warn-surface px-4 py-2 text-legenda font-medium text-warn-ink">
       Importando contatos e conversas do WhatsApp…
     </div>
   );

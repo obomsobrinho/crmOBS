@@ -67,6 +67,14 @@ const buttonVariants = cva(
         rail: "text-ink-2 hover:bg-[var(--rail-hover)] hover:text-ink",
         /** Ação de texto na cor da marca (`ink`, nunca `fill`, que é fundo). */
         "brand-ghost": "text-brand-ink hover:bg-[var(--active-bg)]",
+        /**
+         * Ação destrutiva discreta: nasce apagada e só se assume no hover.
+         * O realce usa o par `surface`/`ink` do vermelho, nunca `fill`: no tema
+         * escuro `--danger-fill` como TEXTO dá 3,2:1 sobre a superfície de
+         * conteúdo, enquanto `--danger-ink` dá 9,0:1.
+         */
+        "danger-ghost":
+          "text-ink-3 hover:bg-danger-surface hover:text-danger-ink",
       },
       size: {
         /** 40px. Mesmo degrau do campo de digitar. */

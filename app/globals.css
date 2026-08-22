@@ -65,25 +65,18 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-ink-faint: var(--ink-faint);
-  /* Aliases legados: ink-muted = ink-2, ink-dim = ink-3. */
-  --color-ink-muted: var(--ink-2);
-  --color-ink-dim: var(--ink-3);
 
   /* Marca e IA. */
   --color-brand: var(--brand-fill);
   --color-brand-ink: var(--brand-ink);
   --color-brand-surface: var(--brand-surface);
   --color-brand-line: var(--brand-line);
-  /* Alias legado: --accent era o fill da marca. */
-  --color-accent: var(--accent);
 
   /* Humano e enviar. */
   --color-human: var(--human-fill);
   --color-human-ink: var(--human-ink);
   --color-human-surface: var(--human-surface);
   --color-human-line: var(--human-line);
-  /* Alias legado: --ia era usado como fill e como texto. */
-  --color-ia: var(--ia);
 
   /* Precisa de você. */
   --color-warn: var(--warn-fill);
@@ -146,12 +139,6 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-  /* LEGADO: --radius-2xl era a superfície principal e hoje é o MESMO valor de
-     --radius-xl. Ele sai quando a última das telas ainda não migradas parar de
-     usar `rounded-2xl` (hoje são 10 arquivos: /agente, /conhecimento, /equipe,
-     /painel, /perfil, /playground, /cadastro e os dois loading). Apagar antes
-     disso mudaria o raio delas de 16px para o padrão do Tailwind. */
-  --radius-2xl: 16px;
 
   /* ── Ponte para os nomes que o shadcn espera ──
      A FRONTEIRA, e ela é permanente: token do shadcn é dono de SUPERFÍCIE,
@@ -549,31 +536,6 @@ h3 {
   letter-spacing: -0.01em;
 }
 
-/* Superfície elevada: painel sólido com borda fina e sombra sobre o canvas.
-   `.glass` é alias legado (o nome mentia, nunca houve vidro nem blur).
-
-   LEGADO: a geometria de cartão virou `components/ui/card.tsx`. Estas classes
-   seguem vivas porque as 13 telas ainda não migradas as usam, junto com os dois
-   loading.tsx. Somem quando a última tela migrar, não antes. */
-.surface-raised,
-.glass,
-.panel {
-  background: var(--raised);
-  border: 1px solid var(--line);
-  box-shadow: var(--panel-shadow);
-}
-
-/* Botão primário: fill da marca com a tinta que o acompanha.
-   LEGADO: virou a variante `brand` de `components/ui/button.tsx`. Segue viva
-   porque as telas ainda não migradas usam esta classe. */
-.btn-primary {
-  background: var(--brand-fill);
-  color: var(--brand-on);
-}
-.btn-primary:hover {
-  filter: brightness(1.08);
-}
-
 /* `.btn-send` morava aqui. Virou a variante `send` de
    `components/ui/button.tsx` e não tem mais nenhum uso, então saiu. O par
    `--send-fill`/`--send-on` continua nos tokens: são eles que se invertem por
@@ -694,4 +656,115 @@ select:focus-visible,
 }
 .msg-in {
   animation: msg-in var(--dur-slow) var(--ease-out) both;
+}
+
+/* ── Item 12: entrada e saída de camada flutuante ──
+   Escrito à mão, e NÃO com `tw-animate-css`: aquele pacote é exatamente este
+   punhado de keyframes, a casa já tinha `msg-in` no mesmo padrão, e o combinado
+   era não empilhar duas bibliotecas de animação. Fica também compatível com
+   Motion depois, porque Motion serviria para gesto e layout, não para
+   aparecer/desaparecer de popover.
+
+   O Radix marca `data-state` no elemento e ESPERA o `animationend` antes de
+   desmontar, então a saída funciona em CSS puro, sem `forceMount` e sem
+   `AnimatePresence`.
+
+   ⚠️ ARMADILHA, medida na tela e nao suposta: o Tailwind v4 emite
+   `-translate-x-1/2` como a propriedade `translate`, e NAO como o atalho
+   `transform`. As duas sao independentes e se SOMAM. Um keyframe que repetisse
+   `translate(-50%, -50%)` no `transform` deslocaria o modal 256px para a
+   esquerda durante os 120ms; foi exatamente o que aconteceu na primeira
+   tentativa, e a checagem pegou. Por isso o keyframe mexe SO em `opacity` e
+   `scale`: o centramento vem da propriedade `translate` e segue valendo. */
+@keyframes flutuante-entra {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes flutuante-sai {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes fundo-entra {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fundo-sai {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Painel lateral (drawer). Entra deslizando da direita, então aqui o keyframe
+   PODE mexer em `translate`: diferente do modal centrado, este painel não usa
+   `-translate-x-1/2` do Tailwind para se posicionar (ele encosta em `right-0`),
+   logo não existe propriedade `translate` para somar e deslocar. */
+@keyframes lateral-entra {
+  from {
+    opacity: 0;
+    translate: 100% 0;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes lateral-sai {
+  from {
+    opacity: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    translate: 100% 0;
+  }
+}
+
+.anim-lateral[data-state="open"] {
+  animation: lateral-entra var(--dur-fast) var(--ease-out);
+}
+.anim-lateral[data-state="closed"] {
+  animation: lateral-sai var(--dur-fast) var(--ease-out);
+}
+
+.anim-flutuante[data-state="open"] {
+  animation: flutuante-entra var(--dur-fast) var(--ease-out);
+}
+.anim-flutuante[data-state="closed"] {
+  animation: flutuante-sai var(--dur-fast) var(--ease-out);
+}
+.anim-fundo[data-state="open"] {
+  animation: fundo-entra var(--dur-fast) var(--ease-out);
+}
+.anim-fundo[data-state="closed"] {
+  animation: fundo-sai var(--dur-fast) var(--ease-out);
+}
+
+/* Quem pediu menos movimento no sistema recebe menos movimento. Vale para a
+   mensagem que entra na conversa também, que já existia sem essa guarda. */
+@media (prefers-reduced-motion: reduce) {
+  .msg-in,
+  .anim-flutuante,
+  .anim-lateral,
+  .anim-fundo {
+    animation: none;
+  }
 }

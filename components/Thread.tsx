@@ -170,6 +170,7 @@ export default function Thread({
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
+  const [rowsProp, setRowsProp] = useState<ChatRow[]>(initialRows);
   const [pending, setPending] = useState<Pending[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   // Rolagem: `rolou` = há conversa passando por baixo do cabeçalho; `temMais` =
@@ -196,10 +197,16 @@ export default function Thread({
   const phoneRef = useRef(phone);
 
   // Ressincroniza ao navegar entre conversas (o componente é reaproveitado).
-  useEffect(() => {
+  //
+  // Ajuste em tempo de render, e não `useEffect` com `setState` dentro: com o
+  // efeito, o React pintava a conversa NOVA com as mensagens da ANTIGA e só
+  // então corrigia, o que é uma renderização em cascata e um piscar visível em
+  // lista longa. Ver react.dev "adjusting state when a prop changes".
+  if (rowsProp !== initialRows) {
+    setRowsProp(initialRows);
     setRows(initialRows);
     setPending([]);
-  }, [initialRows]);
+  }
 
   const refetch = useCallback(async () => {
     const { data } = await supabase
@@ -706,7 +713,7 @@ function MediaView({ url, type }: { url: string; type: string | null }) {
 
   if (!resolved) {
     return (
-      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio text-ink-muted">
+      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio text-ink-2">
         <FileText size={15} /> carregando mídia…
       </div>
     );
@@ -762,7 +769,7 @@ function BubbleView({
   // Sem borda; relevo leve via --bubble-shadow (só no light).
   let bubbleClass: string;
   if (failed) {
-    bubbleClass = "bg-[var(--danger-bg)] text-danger";
+    bubbleClass = "bg-danger-surface text-danger-ink";
   } else if (b.author === "voce") {
     bubbleClass = "bg-[var(--bubble-you-bg)] text-[var(--bubble-you-fg)]";
   } else if (b.author === "ia") {

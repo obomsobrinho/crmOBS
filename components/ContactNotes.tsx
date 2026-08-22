@@ -147,7 +147,7 @@ export default function ContactNotes({
                 size="none"
                 onClick={() => remove(n.id)}
                 aria-label="Remover nota"
-                className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger group-hover:opacity-100"
+                className="rounded p-0.5 text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger-ink group-hover:opacity-100"
               >
                 <Trash2 size={12} />
               </Button>

@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
+// Fecha o handoff aberto pela IA (conversations.handoff_at). Best-effort e
+// NUNCA lança: a mensagem já saiu, e falhar aqui não pode virar erro para quem
+// só quis responder. Vai por service_role porque handoff_at não tem grant de
+// UPDATE para o browser (quem abre é o /api/agent, quem fecha é esta rota).
+async function clearHandoff(clientId: string, phone: string): Promise<void> {
+  try {
+    const svc = createServiceClient();
+    const { error } = await svc
+      .from("conversations")
+      .update({ handoff_at: null })
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .not("handoff_at", "is", null);
+    if (error) console.error("falha ao fechar o handoff:", error.message);
+  } catch (e) {
+    console.error("falha ao fechar o handoff:", e);
+  }
+}
+
 // Recebe { phone, text } do composer e repassa para o webhook do n8n.
 // NÃO grava nada no banco — quem grava a mensagem 'out' é o n8n, depois de
 // confirmar o envio pela Evolution. A URL do webhook fica só no server.
@@ -106,6 +125,11 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
+    // Um humano respondeu, então o handoff que a IA abriu está atendido: limpa
+    // conversations.handoff_at para a conversa sair de "Precisa de você". É este
+    // o gesto que fecha o handoff, e não a chave da IA: responder pelo CRM não
+    // quer dizer que o dono queira a IA desligada dali pra frente.
+    await clearHandoff(client.id, phone);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

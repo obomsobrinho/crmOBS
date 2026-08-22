@@ -62,7 +62,7 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-fit max-w-64 rounded-md bg-ink px-2.5 py-1.5 text-legenda text-balance text-[var(--canvas)]",
+          "anim-flutuante z-50 w-fit max-w-64 rounded-md bg-ink px-2.5 py-1.5 text-legenda text-balance text-[var(--canvas)]",
           className,
         )}
         {...props}

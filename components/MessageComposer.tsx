@@ -155,8 +155,8 @@ export default function MessageComposer({
   if (readOnly) {
     return (
       <div className="shrink-0 bg-msg px-3 pb-3 pt-2">
-        <div className="flex items-center gap-2 rounded-lg border-l-[3px] border-l-[var(--danger)] bg-[var(--danger-bg)] px-3 py-2.5 text-apoio text-ink">
-          <Lock size={14} className="shrink-0 text-danger" />
+        <div className="flex items-center gap-2 rounded-lg border-l-[3px] border-l-danger bg-danger-surface px-3 py-2.5 text-apoio text-ink">
+          <Lock size={14} className="shrink-0 text-danger-ink" />
           <span>
             Envio pausado enquanto a conta não está em dia. Você continua vendo
             as mensagens que chegam.
@@ -192,7 +192,7 @@ export default function MessageComposer({
   return (
     <div className="shrink-0 bg-msg px-3 pb-3 pt-0">
       {attachError && (
-        <div className="mb-2 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-apoio text-danger">
+        <div className="mb-2 rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
           {attachError}
         </div>
       )}

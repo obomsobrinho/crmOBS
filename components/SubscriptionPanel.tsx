@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CreditCard, ShieldAlert } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
 import BrandMark from "@/components/BrandMark";
+import { Card } from "@/components/ui/card";
 import {
   billableSeats,
   planFor,
@@ -91,25 +92,25 @@ export default function SubscriptionPanel({
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="glass w-full max-w-lg space-y-5 rounded-2xl p-7">
+      <Card className="w-full max-w-lg space-y-5 p-7">
         <BrandMark />
 
         <div className="flex items-start gap-2">
           {access.blocked ? (
-            <ShieldAlert size={20} className="mt-0.5 shrink-0 text-danger" />
+            <ShieldAlert size={20} className="mt-0.5 shrink-0 text-danger-ink" />
           ) : (
-            <CreditCard size={20} className="mt-0.5 shrink-0 text-accent" />
+            <CreditCard size={20} className="mt-0.5 shrink-0 text-brand-ink" />
           )}
           <div>
-            <h1 className="font-display text-xl font-bold">
+            <h1 className="text-titulo">
               {access.blocked ? "Acesso pausado" : "Assinatura"}
             </h1>
-            <p className="text-sm text-ink-muted">{access.message}</p>
+            <p className="text-apoio text-ink-2">{access.message}</p>
           </div>
         </div>
 
         {access.blocked && (
-          <p className="rounded-lg bg-[var(--danger-bg)] px-3 py-2 text-sm text-danger">
+          <p className="rounded-lg bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
             O atendimento automático e o envio de mensagens estão parados
             enquanto a conta não estiver em dia. Suas conversas e configurações
             continuam salvas.
@@ -117,7 +118,7 @@ export default function SubscriptionPanel({
         )}
 
         {!access.blocked && access.warn && (
-          <p className="rounded-lg bg-[var(--warn-bg)] px-3 py-2 text-sm text-warn">
+          <p className="rounded-lg bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
             {access.warn}
           </p>
         )}
@@ -125,12 +126,12 @@ export default function SubscriptionPanel({
         {/* Atendente além do incluído: virou adicional pago. Ninguém é removido
             automaticamente, então o aviso é o que resolve. */}
         {assentos.extra > 0 && (
-          <p className="rounded-lg bg-[var(--warn-bg)] px-3 py-2 text-sm text-warn">
+          <p className="rounded-lg bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
             {assentos.message}
           </p>
         )}
 
-        <div className="overflow-hidden rounded-xl border border-line bg-surface">
+        <div className="overflow-hidden rounded-xl border border-line bg-bloco">
           {rows.map((r, i) => (
             <div
               key={r.label}
@@ -138,8 +139,8 @@ export default function SubscriptionPanel({
                 i > 0 ? "border-t border-line" : ""
               }`}
             >
-              <span className="text-sm text-ink-muted">{r.label}</span>
-              <span className="text-sm font-medium">{r.value}</span>
+              <span className="text-apoio text-ink-2">{r.label}</span>
+              <span className="text-apoio font-medium">{r.value}</span>
             </div>
           ))}
         </div>
@@ -148,7 +149,7 @@ export default function SubscriptionPanel({
         {isOwner ? (
           children
         ) : (
-          <p className="text-sm text-ink-muted">
+          <p className="text-apoio text-ink-2">
             Quem resolve a assinatura é a pessoa responsável pela conta da sua
             empresa. Avise essa pessoa para liberar o acesso do time.
           </p>
@@ -156,20 +157,20 @@ export default function SubscriptionPanel({
 
         <div className="flex items-center justify-between border-t border-line pt-4">
           {access.blocked ? (
-            <span className="text-xs text-ink-muted">
+            <span className="text-legenda text-ink-2">
               Assim que o pagamento entrar, o acesso volta sozinho.
             </span>
           ) : (
             <Link
               href="/inbox"
-              className="text-xs text-ink-muted transition-colors hover:text-ink"
+              className="text-legenda text-ink-2 transition-colors hover:text-ink"
             >
               Voltar para as conversas
             </Link>
           )}
           <LogoutButton />
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

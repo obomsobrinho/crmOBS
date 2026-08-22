@@ -5,6 +5,10 @@ import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { TRIAL_DAYS } from "@/lib/billing";
 import BrandMark from "@/components/BrandMark";
+import { Button } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 // Cadastro público. O formulário NÃO pede senha de propósito: a senha nunca
 // passa pelo nosso servidor. A pessoa recebe um link por e-mail e escolhe a
@@ -43,21 +47,21 @@ export default function CadastroPage() {
   if (enviado) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
-        <div className="glass w-full max-w-sm space-y-5 rounded-2xl p-7">
+        <div className={cn(cardVariants(), "w-full max-w-sm space-y-5 p-7")}>
           <BrandMark />
 
           <div className="flex items-start gap-2">
-            <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-ia" />
+            <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-human-ink" />
             <div>
-              <h1 className="font-display text-xl font-bold">Confira seu e-mail</h1>
-              <p className="text-sm text-ink-muted">
+              <h1 className="text-titulo">Confira seu e-mail</h1>
+              <p className="text-apoio text-ink-2">
                 Mandamos um link para <span className="font-medium">{email}</span>.
                 Abra o link para escolher sua senha e começar.
               </p>
             </div>
           </div>
 
-          <p className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted">
+          <p className="rounded-lg border border-line bg-bloco px-3 py-2 text-apoio text-ink-2">
             Não chegou em alguns minutos? Confira a caixa de spam. O link vale
             por tempo limitado.
           </p>
@@ -65,7 +69,7 @@ export default function CadastroPage() {
           <div className="border-t border-line pt-4 text-center">
             <Link
               href="/login"
-              className="text-xs text-ink-muted transition-colors hover:text-ink"
+              className="text-legenda text-ink-2 transition-colors hover:text-ink"
             >
               Voltar para o login
             </Link>
@@ -79,22 +83,22 @@ export default function CadastroPage() {
     <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <form
         onSubmit={handleSubmit}
-        className="glass w-full max-w-sm space-y-5 rounded-2xl p-7"
+        className={cn(cardVariants(), "w-full max-w-sm space-y-5 p-7")}
       >
         <BrandMark />
 
         <div>
-          <h1 className="font-display text-xl font-bold">Criar conta</h1>
-          <p className="text-sm text-ink-muted">
+          <h1 className="text-titulo">Criar conta</h1>
+          <p className="text-apoio text-ink-2">
             {TRIAL_DAYS} dias para testar, sem cartão.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="company" className="text-sm font-medium">
+          <label htmlFor="company" className="text-apoio font-medium">
             Nome da empresa
           </label>
-          <input
+          <Input
             id="company"
             type="text"
             autoComplete="organization"
@@ -102,46 +106,45 @@ export default function CadastroPage() {
             maxLength={80}
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
           />
-          <p className="text-xs text-ink-muted">
+          <p className="text-legenda text-ink-2">
             É o nome que aparece pra sua equipe dentro do sistema.
           </p>
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm font-medium">
+          <label htmlFor="email" className="text-apoio font-medium">
             Seu e-mail
           </label>
-          <input
+          <Input
             id="email"
             type="email"
             autoComplete="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
           />
-          <p className="text-xs text-ink-muted">
+          <p className="text-legenda text-ink-2">
             Você escolhe sua senha pelo link que vamos mandar nesse e-mail.
           </p>
         </div>
 
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error && <p className="text-apoio text-danger-ink">{error}</p>}
 
-        <button
+        <Button
           type="submit"
+          size="field"
           disabled={loading}
-          className="btn-primary w-full rounded-lg px-3 py-2.5 text-sm font-medium transition disabled:opacity-60"
+          className="w-full justify-center"
         >
           {loading ? "Criando conta…" : "Criar conta"}
-        </button>
+        </Button>
 
         <div className="border-t border-line pt-4 text-center">
-          <span className="text-xs text-ink-muted">Já tem conta? </span>
+          <span className="text-legenda text-ink-2">Já tem conta? </span>
           <Link
             href="/login"
-            className="text-xs font-medium text-accent transition-colors hover:underline"
+            className="text-legenda font-medium text-brand-ink transition-colors hover:underline"
           >
             Entrar
           </Link>

@@ -6,6 +6,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 import SubscriptionPanel from "@/components/SubscriptionPanel";
 import BillingCheckout from "@/components/BillingCheckout";
 import { type PlanKey } from "@/lib/billing";
+import {
+  frasesDeValor,
+  resumoDeValor,
+  type ValorMsg,
+  type ValorQual,
+} from "@/lib/valor";
+import type { BusinessHours } from "@/lib/agent-prompt";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +61,36 @@ export default async function AssinaturaPage({
 
   const planoSugerido = planoDaUrl((await searchParams).plano);
 
+  // Acumulado de valor desde o início, para o passo de cancelar. Sem janela de
+  // data de propósito: é o "tudo que a IA já fez aqui". Teto de linhas porque um
+  // tenant com um ano de operação tem dezenas de milhares, e esta tela precisa
+  // abrir rápido. Quando o teto doer, o caminho é uma tabela de agregado mensal.
+  const [{ data: todasMsgs }, { data: todasQuals }, { data: cfg }] =
+    await Promise.all([
+      supabase
+        .from("chat_messages")
+        .select("phone, user_message, bot_message, message_type, created_at")
+        .order("created_at", { ascending: false })
+        .limit(20000),
+      supabase
+        .from("conversation_qualifications")
+        .select("phone, action, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      supabase
+        .from("clients")
+        .select("agent_config")
+        .eq("id", client.id)
+        .maybeSingle(),
+    ]);
+
+  const acumulado = resumoDeValor({
+    msgs: (todasMsgs ?? []) as ValorMsg[],
+    quals: (todasQuals ?? []) as ValorQual[],
+    hours: (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null,
+  });
+  const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
+
   return (
     <SubscriptionPanel
       companyName={client.name}
@@ -72,6 +109,7 @@ export default async function AssinaturaPage({
         nomePadrao={client.name}
         emailPadrao={user?.email ?? ""}
         planoSugerido={planoSugerido}
+        frasesAcumuladas={frasesAcumuladas}
       />
     </SubscriptionPanel>
   );

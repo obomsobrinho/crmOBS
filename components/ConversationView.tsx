@@ -50,6 +50,7 @@ export default function ConversationView({
   const supabase = createClient();
   const [showContext, setShowContext] = useState(true);
   const [iaState, setIaState] = useState<string | null>(atendimentoIa);
+  const [iaProp, setIaProp] = useState<string | null>(atendimentoIa);
   const [assigned, setAssigned] = useState<string | null>(assignedUserId);
   const [assignedProp, setAssignedProp] = useState<string | null>(assignedUserId);
   const [instruction, setInstruction] = useState<string | null>(pendingInstruction);
@@ -57,13 +58,18 @@ export default function ConversationView({
     pendingInstruction
   );
 
-  // Ressincroniza ao navegar entre conversas.
-  useEffect(() => {
+  // Ajuste em tempo de render (sem efeito) quando o estado da IA, a atribuição
+  // ou a orientação vindas do servidor mudam ao trocar de conversa. Ver
+  // react.dev "adjusting state when a prop changes".
+  //
+  // O da IA era um `useEffect` com `setState` dentro, o que gera renderização em
+  // cascata: React pinta com o valor antigo, o efeito roda, e ele pinta de novo.
+  // Aqui o ajuste acontece ANTES da primeira pintura, então a chave nunca
+  // aparece na posição da conversa anterior.
+  if (iaProp !== atendimentoIa) {
+    setIaProp(atendimentoIa);
     setIaState(atendimentoIa);
-  }, [atendimentoIa]);
-  // Ajuste em tempo de render (sem efeito) quando a atribuição ou a orientação
-  // vindas do servidor mudam ao trocar de conversa. Ver react.dev "adjusting
-  // state when a prop changes".
+  }
   if (assignedProp !== assignedUserId) {
     setAssignedProp(assignedUserId);
     setAssigned(assignedUserId);

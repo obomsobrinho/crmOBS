@@ -37,6 +37,13 @@ export interface InboxItem {
   assignedUserId: string | null;
   /** Estágio do pipeline (conversations.stage) ou null (= coluna default). */
   stage: string | null;
+  /**
+   * Quando a IA abriu o handoff e ninguém do time respondeu ainda
+   * (conversations.handoff_at), ou null. É o sinal de "Precisa de você": antes
+   * esse corte era "IA pausada", o que confundia "a IA pediu ajuda" com
+   * "alguém assumiu" e deixava a IA desligada para sempre.
+   */
+  handoffAt: string | null;
 }
 
 // Balão renderizado na thread (uma linha vira 1–2 balões).

@@ -1,6 +1,6 @@
 import NavRail from "@/components/NavRail";
 import AgentConfigForm from "@/components/AgentConfigForm";
-import NotifyTargetCard from "@/components/NotifyTargetCard";
+import { Card } from "@/components/ui/card";
 import { EMPTY_CONFIG, type AgentConfig } from "@/lib/agent-prompt";
 
 // Preview de design do construtor do agente (dev-only, liberado pelo proxy).
@@ -21,6 +21,7 @@ const MOCK: AgentConfig = {
   goals: ["duvidas", "qualificar", "agendar"],
   dontDo: ["Nunca prometer prazo de entrega", "Não dar desconto por conta própria"],
   escalateWhen: ["Quando pedirem receita médica"],
+  handoffNotice: "Vou verificar isso com a equipe e já te confirmo por aqui.",
   details:
     "Fazemos exame de vista gratuito com hora marcada. Trabalhamos com as marcas Ray-Ban, Oakley e Chilli Beans. Lentes multifocais têm garantia de 1 ano. Promoção do mês: 2ª armação com 40% de desconto.",
 };
@@ -29,8 +30,8 @@ export default function DesignAgentePage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/agente" />
-      <div className="glass flex min-w-0 flex-1 flex-col gap-4 overflow-hidden rounded-2xl p-6">
-        <NotifyTargetCard clientId="preview" initialJid={null} preview />
+      {/* overflow-y-auto como na tela real: a rolagem é do cartão, uma só. */}
+      <Card className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
         <AgentConfigForm
           clientId="preview"
           instance="crm_preview01"
@@ -38,10 +39,12 @@ export default function DesignAgentePage() {
           initialConfig={MOCK}
           initialPersona={null}
           hasManualPersona={false}
-          notifyGroupConfigured={false}
+          initialNotifyJid="120363000000000000@g.us"
+          agentEnabled
+          blockers={[]}
           preview
         />
-      </div>
+      </Card>
     </div>
   );
 }

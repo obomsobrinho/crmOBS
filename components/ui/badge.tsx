@@ -36,7 +36,7 @@ const badgeVariants = cva(
         "nao-lidas":
           "flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-legenda font-semibold tabular-nums text-primary-foreground",
         /** Separador de dia no meio da conversa. */
-        dia: "rounded-full bg-panel px-3 py-1 text-legenda font-semibold tracking-wide uppercase text-ink-muted",
+        dia: "rounded-full bg-panel px-3 py-1 text-legenda font-semibold tracking-wide uppercase text-ink-2",
         /** Tag do contato. */
         tag: "flex items-center gap-1.5 rounded-full border border-line py-0.5 text-legenda",
       },

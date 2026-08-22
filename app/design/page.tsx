@@ -43,18 +43,27 @@ const MEMBERS: Member[] = [
   { userId: "u2", email: "carlos@obm.com", role: "atendente" },
 ];
 
+// Handoff em aberto. Relativo a agora, e não uma data fixa como o resto do mock,
+// porque o que a lista mostra é o TEMPO DE ESPERA: com data fixa o preview diria
+// "23 d" e cresceria todo dia.
+const ESPERANDO_6H = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+
 const LIST: InboxItem[] = [
-  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: T(11, 55), unread: 0, assignedUserId: ME, stage: null },
-  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: T(11, 58), unread: 2, assignedUserId: null, stage: null },
-  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: T(21, 28, 27), unread: 0, assignedUserId: "u2", stage: null },
-  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: T(17, 18, 27), unread: 1, assignedUserId: null, stage: null },
-  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: T(9, 20, 27), unread: 0, assignedUserId: null, stage: null },
+  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: T(11, 55), unread: 0, assignedUserId: ME, stage: null, handoffAt: null },
+  // Handoff aberto e ninguém respondeu ainda: é o caso de "Precisa de você".
+  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: T(11, 58), unread: 2, assignedUserId: null, stage: null, handoffAt: ESPERANDO_6H },
+  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: T(21, 28, 27), unread: 0, assignedUserId: "u2", stage: null, handoffAt: null },
+  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: T(17, 18, 27), unread: 1, assignedUserId: null, stage: null, handoffAt: null },
+  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: T(9, 20, 27), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
 ];
 
 export default function DesignPreview() {
   const items = LIST;
+  // IA pausada = um humano assumiu, que não é mais a mesma coisa que handoff
+  // aberto. Aqui é a conversa atribuída à própria pessoa logada, que é como isso
+  // aparece na prática: você assumiu, então a IA saiu da frente.
   const initialIa: Record<string, string | null> = {
-    "553384266039@s.whatsapp.net": "pause",
+    "553584774753@s.whatsapp.net": "pause",
   };
 
   return (

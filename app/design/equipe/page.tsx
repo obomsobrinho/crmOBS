@@ -1,6 +1,7 @@
 import { Users } from "lucide-react";
 import NavRail from "@/components/NavRail";
 import TeamManager from "@/components/TeamManager";
+import { Card } from "@/components/ui/card";
 import type { Member } from "@/lib/team";
 
 // Preview de design da tela de Equipe (dev-only, liberado pelo proxy). Sem banco
@@ -18,16 +19,16 @@ export default function DesignEquipePage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/equipe" />
-      <div className="glass flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+      <Card className="flex min-w-0 flex-1 flex-col overflow-hidden p-6">
         <div className="mb-1 flex items-center gap-2">
-          <Users size={20} className="text-accent" />
-          <h1 className="font-display text-xl font-bold">Equipe</h1>
+          <Users size={20} className="text-brand-ink" />
+          <h1 className="text-titulo">Equipe</h1>
         </div>
-        <p className="mb-5 text-sm text-ink-muted">
+        <p className="mb-5 text-apoio text-ink-2">
           Quem pode atender pela conta Ótica Vision.
         </p>
         <TeamManager initialMembers={MOCK} myRole="dono" myUserId={ME} preview />
-      </div>
+      </Card>
     </div>
   );
 }

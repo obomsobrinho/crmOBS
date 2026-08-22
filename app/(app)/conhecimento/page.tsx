@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
 import KnowledgeManager from "@/components/KnowledgeManager";
+import { Card } from "@/components/ui/card";
 import type { KnowledgeDoc } from "@/lib/crm";
 
 export const dynamic = "force-dynamic";
@@ -39,12 +40,12 @@ export default async function ConhecimentoPage() {
   }));
 
   return (
-    <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
       <KnowledgeManager
         clientId={client.id}
         initialDocs={docs}
         keyConfigured={!!process.env.OPENAI_API_KEY}
       />
-    </div>
+    </Card>
   );
 }

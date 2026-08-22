@@ -67,7 +67,7 @@ export async function processTurn(
   const { data: client, error: clientErr } = await svc
     .from("clients")
     .select(
-      "persona, name, subscription_status, trial_ends_at, grace_until, agent_published_at"
+      "persona, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled"
     )
     .eq("id", clientId)
     .maybeSingle();
@@ -110,7 +110,13 @@ export async function processTurn(
     });
     return t;
   }
-  if (!dryRun && !client.agent_published_at) {
+  // Duas condições, um silêncio: nunca foi ao ar (`agent_published_at` nulo) ou
+  // está desligado na chave (`agent_enabled` false). São colunas separadas de
+  // propósito: a primeira é o marco do onboarding e nunca é limpa, a segunda é o
+  // switch da tela. `!== false` porque a coluna é NOT NULL default true, e na
+  // dúvida atender é melhor que emudecer quem já estava no ar.
+  const desligado = !client.agent_published_at || client.agent_enabled === false;
+  if (!dryRun && desligado) {
     const t = silentTurn(t0, { notPublished: true });
     await logTurn(svc, {
       clientId,
@@ -137,6 +143,10 @@ export async function processTurn(
   // produção sai de conversations.pending_instruction e é consumida uma vez.
   let history: ChatTurn[];
   let instruction: string | null;
+  // Handoff já aberto nesta conversa (conversations.handoff_at). Serve para NÃO
+  // sobrescrever o primeiro handoff em aberto: é o primeiro que dá a espera real
+  // ("esperando há 6h"); o último só troca o resumo.
+  let handoffAt: string | null = null;
   if (dryRun) {
     history = sanitizeHistory(params.history);
     instruction =
@@ -154,7 +164,7 @@ export async function processTurn(
         .limit(HISTORY_ROWS),
       svc
         .from("conversations")
-        .select("pending_instruction")
+        .select("pending_instruction, handoff_at")
         .eq("client_id", clientId)
         .eq("phone", phone)
         .maybeSingle(),
@@ -163,6 +173,7 @@ export async function processTurn(
     history = buildHistory(rows);
     const pend = (conv?.pending_instruction as string | null) ?? null;
     instruction = pend && pend.trim() ? pend.trim() : null;
+    handoffAt = (conv?.handoff_at as string | null) ?? null;
   }
 
   // Retrieval da base de conhecimento (RAG). Best-effort e só leitura, então
@@ -213,19 +224,28 @@ export async function processTurn(
   const guarded = applyGuardrail(raw, { persona, knowledge, instruction });
   const guardrail = guarded.guardrail;
 
-  // Política de handoff (decisão de produto, vale para todos os tenants): quando
-  // a IA passa a conversa para um humano (action=pausar), ela NÃO envia nada ao
-  // cliente. Só abre o handoff e espera o operador orientar (coach) ou assumir.
-  // Evita o turno contraditório (responder a dúvida E passar pro time). O
-  // `agendar` segue mandando o recap (a pessoa combinou dia e período).
+  // Política de handoff (decisão de produto, vale para todos os tenants):
+  // HANDOFF NÃO PAUSA A IA E NÃO EMUDECE A IA.
   //
-  // Com messages vazio, o n8n não chega no ramo que pausa a IA (o "Split
-  // messages" gera 0 itens e o "Action" fica no branch de fim do loop). Por isso
-  // o próprio /api/agent pausa a IA no handoff (ver mais abaixo, fora do dryRun).
-  const output =
-    guarded.output.action === "pausar"
-      ? { ...guarded.output, messages: [] }
-      : guarded.output;
+  // A versão anterior fazia as duas coisas: em action=pausar ela zerava
+  // `messages` e pausava `dados_cliente.atendimento_ia`. Produção mostrou os dois
+  // defeitos juntos numa conversa real: a pessoa perguntou de horário, a IA abriu
+  // o handoff em silêncio, a pessoa perguntou "tem alguma vaga pra hoje?" 26
+  // segundos depois e, com a IA pausada, esse pedido novo foi gravado mas nunca
+  // classificado. Ficou 6h36 sem resposta. E a pausa é porta de mão única (alguém
+  // precisa reativar na mão), então 46 dos 47 contatos da OBM estavam com a IA
+  // desligada para sempre.
+  //
+  // Agora: a IA responde uma frase dizendo o que vai verificar (regra e texto
+  // base no prompt, ver `handoffNotice` em lib/agent-prompt.ts), marca
+  // `handoff_at` e SEGUE ATENDENDO. Cada mensagem nova gera um handoff novo, com
+  // o resumo do último pedido. Pausa passa a significar só o que deveria: um
+  // humano assumiu (nó "Pausar IA (Franck digitou)" do n8n) ou alguém desligou a
+  // IA na chave.
+  //
+  // O guardrail continua protegido: quando ele reprova, ele mesmo já troca as
+  // mensagens pela frase neutra antes de chegar aqui, então nada inventado sai.
+  const output = guarded.output;
 
   // Consumo único: em produção, limpa a orientação depois de usada (best-effort;
   // um erro aqui não pode derrubar a resposta).
@@ -266,17 +286,19 @@ export async function processTurn(
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
       stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
 
-      // Handoff (pausar): pausa a IA aqui, porque com messages vazio o n8n não
-      // alcança o nó "Pausa IA (handoff)". O `agendar` NÃO pausa aqui: ali o n8n
-      // ainda manda o recap, notifica o grupo e pausa (nó "Pausa IA (agendado)").
-      // Best-effort: um erro aqui não pode derrubar a resposta.
-      if (output.action === "pausar") {
-        const { error: pErr } = await svc
-          .from("dados_cliente")
-          .update({ atendimento_ia: "pause" })
+      // Abre o handoff: marca que a IA pediu ajuda e o time ainda não respondeu.
+      // Só grava quando está nulo, porque o valor que interessa é o PRIMEIRO
+      // handoff em aberto (é ele que mede a espera). O resumo do último pedido
+      // vem de conversation_qualifications, que ganha uma linha por turno.
+      // Quem limpa é o envio manual (/api/send). Best-effort: um erro aqui não
+      // pode derrubar a resposta ao cliente.
+      if (!handoffAt) {
+        const { error: hErr } = await svc
+          .from("conversations")
+          .update({ handoff_at: new Date().toISOString() })
           .eq("client_id", clientId)
-          .eq("telefone", phone);
-        if (pErr) console.error("falha ao pausar a IA no handoff:", pErr.message);
+          .eq("phone", phone);
+        if (hErr) console.error("falha ao abrir o handoff:", hErr.message);
       }
     }
   }

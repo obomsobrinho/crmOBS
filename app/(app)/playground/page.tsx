@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
 import Playground from "@/components/Playground";
+import { Card } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,8 @@ export default async function PlaygroundPage() {
   }
 
   return (
-    <div className="glass flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl p-6">
+    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
       <Playground stageNames={stageNames} />
-    </div>
+    </Card>
   );
 }

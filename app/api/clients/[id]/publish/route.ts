@@ -3,9 +3,20 @@ import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { publishBlockers } from "@/lib/onboarding";
 
-// Publica (ou despublica) o agente do tenant logado. Publicar é o interruptor
-// real: com `agent_published_at` nulo, o /api/agent responde em silêncio e nenhum
-// cliente recebe mensagem da IA.
+// Liga e desliga o agente do tenant logado. É o interruptor real: desligado, o
+// /api/agent responde em silêncio e nenhum cliente recebe mensagem da IA (as
+// mensagens continuam sendo gravadas para a equipe responder na mão).
+//
+// DUAS COLUNAS, DOIS PAPÉIS:
+//   agent_published_at  primeira ativação. Gravada uma vez e NUNCA limpa, porque
+//                       é ela que diz ao onboarding que o trilho acabou. Zerar
+//                       no desligar fazia a barra de onboarding voltar em toda
+//                       página pedindo "Publicar o agente".
+//   agent_enabled       o liga-desliga de verdade, o que o switch da tela move.
+//
+// Os pré-requisitos (conectar, configurar, testar) valem só na PRIMEIRA
+// ativação. Depois disso ligar e desligar é livre: quem já testou não precisa
+// testar de novo para religar.
 //
 // Write via service_role: a RLS de `clients` não dá UPDATE a `authenticated`
 // (update do browser afetaria 0 linhas em silêncio). Por isso a checagem de
@@ -26,19 +37,22 @@ export async function PUT(
       { status: 403 }
     );
 
-  let body: { published?: boolean };
+  let body: { enabled?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  if (typeof body.published !== "boolean") {
-    return NextResponse.json({ error: "informe published" }, { status: 400 });
+  if (typeof body.enabled !== "boolean") {
+    return NextResponse.json({ error: "informe enabled" }, { status: 400 });
   }
 
+  const primeiraVez = !mine.agentPublishedAt;
+
   // Gate de pré-requisitos: mesma regra que a UI mostra (lib/onboarding), para
-  // não existirem duas opiniões sobre quando dá para publicar.
-  if (body.published) {
+  // não existirem duas opiniões sobre quando dá para ativar. Vale só na primeira
+  // ativação: religar depois não exige testar de novo.
+  if (body.enabled && primeiraVez) {
     const faltas = publishBlockers({
       hasInstance: !!mine.evolution_instance,
       agentConfigured: !!mine.onboarding.steps.find((s) => s.key === "configurar")
@@ -48,31 +62,35 @@ export async function PUT(
     });
     if (faltas.length > 0) {
       return NextResponse.json(
-        { error: `antes de publicar, falta: ${faltas.join(", ")}.`, faltas },
+        { error: `antes de ativar, falta: ${faltas.join(", ")}.`, faltas },
         { status: 409 }
       );
     }
   }
 
+  // Desligar NÃO limpa agent_published_at (ver o comentário no topo).
+  const update: Record<string, unknown> = { agent_enabled: body.enabled };
+  if (body.enabled && primeiraVez) {
+    update.agent_published_at = new Date().toISOString();
+  }
+
   const svc = createServiceClient();
   const { data, error } = await svc
     .from("clients")
-    .update({
-      agent_published_at: body.published ? new Date().toISOString() : null,
-    })
+    .update(update)
     .eq("id", id)
-    .select("id, agent_published_at");
+    .select("id, agent_published_at, agent_enabled");
 
   if (error || !data?.length) {
     return NextResponse.json(
-      { error: "falha ao salvar a publicação", detail: error?.message },
+      { error: "falha ao salvar", detail: error?.message },
       { status: 500 }
     );
   }
 
   return NextResponse.json({
     ok: true,
-    published: !!data[0].agent_published_at,
+    enabled: data[0].agent_enabled !== false,
     publishedAt: data[0].agent_published_at,
   });
 }

@@ -25,18 +25,23 @@ test.describe("Trilho de onboarding (/design/onboarding)", () => {
     }
   });
 
-  test("publicar fica travado enquanto falta passo, e diz o que falta", async ({
+  test("ativar fica travado enquanto falta passo, e diz o que falta", async ({
     page,
   }) => {
     await page.goto("/design/onboarding");
-    await expect(page.getByText("Agente pausado")).toBeVisible();
-    // A IA não responde ninguém, mas a mensagem do cliente não se perde.
-    await expect(page.getByText(/ficam no inbox/)).toBeVisible();
+    // O cartão inteiro de publicação virou uma chave mais uma linha. E o rótulo
+    // deixou de ser "pausado": pausada é a IA de UMA conversa quando um humano
+    // assume, e repetir a palavra nos dois lugares confundia os dois estados.
+    await expect(page.getByText("Desativado")).toBeVisible();
     await expect(
-      page.getByText(/Antes de publicar, falta: testar a conversa na bancada/)
+      page.getByText(
+        /Antes de ativar o agente, falta: testar a conversa na bancada/
+      )
     ).toBeVisible();
+    // A chave não é o gate (o gate é a rota, que devolve 409), mas ela não deve
+    // convidar ao clique enquanto falta passo.
     await expect(
-      page.getByRole("button", { name: "Publicar agente" })
+      page.getByRole("switch", { name: "Ativar agente" })
     ).toBeDisabled();
   });
 });

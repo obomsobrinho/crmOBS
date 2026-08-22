@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Send, RotateCcw, Sparkles, FlaskConical } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
 // /api/playground (dryRun): nada é enviado no WhatsApp, nada é gravado, o card
@@ -157,30 +159,32 @@ export default function Playground({
       <div className="mb-4 flex items-center justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
-            <FlaskConical size={20} className="text-accent" />
-            <h1 className="font-display text-xl font-bold">Playground</h1>
+            <FlaskConical size={20} className="text-brand-ink" />
+            <h1 className="text-titulo">Playground</h1>
           </div>
-          <p className="mt-1 text-sm text-ink-muted">
+          <p className="mt-1 text-apoio text-ink-2">
             Converse com a IA como se fosse um cliente. Nada é enviado no WhatsApp
             e nada é gravado.
           </p>
         </div>
-        <button
+        <Button
+          variant="outline"
+          size="field"
           onClick={reset}
           disabled={turns.length === 0 && !simStage}
-          className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink disabled:opacity-50"
         >
           <RotateCcw size={14} />
           Resetar
-        </button>
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1 gap-4">
-        {/* ESQUERDA: Conversa */}
-        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-surface">
+        {/* ESQUERDA: Conversa. `bg-msg` é a superfície de área de mensagens, a
+            mesma da tela de atendimento: aqui também é onde os balões moram. */}
+        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-msg">
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
             {turns.length === 0 ? (
-              <div className="flex h-full items-center justify-center px-6 text-center text-sm text-ink-dim">
+              <div className="flex h-full items-center justify-center px-6 text-center text-apoio text-ink-3">
                 Mande a primeira mensagem para testar o atendimento da IA.
               </div>
             ) : (
@@ -189,7 +193,7 @@ export default function Playground({
                 if (t.role === "assistant" && !t.content.trim()) {
                   return (
                     <div key={i} className="flex justify-center">
-                      <div className="rounded-full bg-[var(--warn-bg)] px-3 py-1 text-[12px] text-warn">
+                      <div className="rounded-full bg-warn-surface px-3 py-1 text-legenda text-warn-ink">
                         A IA abriu handoff e não respondeu. Oriente ao lado ou
                         assuma a conversa.
                       </div>
@@ -201,11 +205,14 @@ export default function Playground({
                     key={i}
                     className={`flex ${t.role === "user" ? "justify-end" : "justify-start"}`}
                   >
+                    {/* Par fill/on da marca, e não `bg-accent text-white`: o
+                        branco fixo era o único balão do produto que não se
+                        adaptava por tema. */}
                     <div
-                      className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-snug ${
+                      className={`max-w-[80%] rounded-xl px-3.5 py-2 text-apoio leading-snug whitespace-pre-wrap ${
                         t.role === "user"
-                          ? "bg-accent text-white"
-                          : "bg-panel text-ink"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-conteudo text-ink"
                       }`}
                     >
                       {t.content}
@@ -217,7 +224,7 @@ export default function Playground({
           </div>
           <div className="border-t border-line p-3">
             <div className="flex items-end gap-2">
-              <textarea
+              <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -228,18 +235,21 @@ export default function Playground({
                 }}
                 rows={2}
                 placeholder="Escreva como um cliente escreveria..."
-                className="min-h-0 flex-1 resize-none rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
+                className="min-h-0 flex-1 resize-none"
               />
-              <button
+              <Button
+                size="none"
                 onClick={sendMessage}
                 disabled={!input.trim() || sending}
-                className="btn-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition disabled:opacity-50"
+                className="h-10 w-10 justify-center rounded-lg"
                 aria-label="Enviar"
               >
                 <Send size={16} />
-              </button>
+              </Button>
             </div>
-            {error && <p className="mt-1.5 text-[12px] text-danger">{error}</p>}
+            {error && (
+              <p className="mt-1.5 text-legenda text-danger-ink">{error}</p>
+            )}
           </div>
         </div>
 
@@ -270,10 +280,8 @@ export default function Playground({
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      <div className="mb-2.5 text-[11px] font-medium uppercase tracking-wide text-ink-dim">
-        {title}
-      </div>
+    <div className="rounded-xl border border-line bg-bloco p-4">
+      <div className="mb-2.5 text-rotulo uppercase text-ink-3">{title}</div>
       {children}
     </div>
   );
@@ -305,36 +313,36 @@ function HandoffPanel({
     <Panel title="Handoff">
       <div className="space-y-2.5">
         {open ? (
-          <div className="rounded-lg bg-[var(--warn-bg)] px-3 py-2.5">
-            <div className="text-[12.5px] font-medium text-warn">
+          <div className="rounded-lg bg-warn-surface px-3 py-2.5">
+            <div className="text-legenda font-semibold text-warn-ink">
               {diag!.guardrail.blocked
                 ? "O guardrail segurou a resposta"
                 : "A IA abriu handoff"}
             </div>
-            <p className="mt-1 text-[13px] leading-snug text-ink">
+            <p className="mt-1 text-apoio leading-snug text-ink">
               {diag!.guardrail.blocked
                 ? diag!.guardrail.reason
                 : diag!.summary || actionLabel(diag!.action)}
             </p>
             {diag!.guardrail.blocked && diag!.guardrail.draft && (
-              <p className="mt-1.5 text-[12px] italic leading-snug text-ink-muted">
+              <p className="mt-1.5 text-legenda leading-snug italic text-ink-2">
                 Ia dizer: {diag!.guardrail.draft}
               </p>
             )}
           </div>
         ) : (
-          <div className="rounded-lg bg-panel px-3 py-2.5 text-[13px] text-ink-muted">
+          <div className="rounded-lg bg-conteudo px-3 py-2.5 text-apoio text-ink-2">
             {diag
               ? "Nenhum handoff neste turno. A IA seguiu sozinha."
               : "Nenhum handoff aberto. Quando a IA precisar de um humano, aparece aqui pra você orientar ou assumir."}
           </div>
         )}
         <div>
-          <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-medium text-ink-muted">
-            <Sparkles size={12} className="text-ia" />
+          <div className="mb-1.5 flex items-center gap-1.5 text-legenda text-ink-2">
+            <Sparkles size={12} className="text-human-ink" />
             Orientar a IA
           </div>
-          <textarea
+          <Textarea
             value={coachDraft}
             onChange={(e) => setCoachDraft(e.target.value)}
             rows={3}
@@ -345,15 +353,16 @@ function HandoffPanel({
                 ? "Ex.: diga que sim, pode vir agora, e peça o nome."
                 : "Fica disponível quando a IA abrir um handoff."
             }
-            className="w-full resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[13px] outline-none transition-colors focus:border-line-strong disabled:opacity-50"
+            className="resize-none"
           />
-          <button
+          <Button
+            size="primary"
             onClick={onCoach}
             disabled={!open || !coachDraft.trim() || sending || !canCoach}
-            className="btn-primary mt-2 w-full rounded-lg px-3 py-2 text-[13px] font-medium transition disabled:opacity-50"
+            className="mt-2 w-full justify-center"
           >
             {sending ? "..." : "Orientar e responder"}
-          </button>
+          </Button>
         </div>
       </div>
     </Panel>
@@ -374,7 +383,7 @@ function ClassificationPanel({
     key ? stageNames[key] ?? key : null;
   return (
     <Panel title="Classificação">
-      <div className="space-y-3 text-[13px]">
+      <div className="space-y-3 text-apoio">
         <Field label="Ação" value={diag ? actionLabel(diag.action) : P} />
         <Field
           label="Guardrail"
@@ -395,17 +404,17 @@ function ClassificationPanel({
           value={stageLabel(simStage) ?? "inicial"}
         />
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-ink-dim">
+          <div className="text-rotulo uppercase text-ink-3">
             Base de conhecimento
           </div>
           {!diag ? (
-            <div className="text-[13px] text-ink-muted">aguardando o 1º turno</div>
+            <div className="text-apoio text-ink-2">aguardando o 1º turno</div>
           ) : !diag.ragSearched ? (
-            <div className="text-[13px] text-ink-muted">
+            <div className="text-apoio text-ink-2">
               Sem base cadastrada neste tenant.
             </div>
           ) : diag.ragMatches.length === 0 ? (
-            <div className="text-[13px] text-ink-muted">
+            <div className="text-apoio text-ink-2">
               Buscou, nada relevante voltou.
             </div>
           ) : (
@@ -413,13 +422,13 @@ function ClassificationPanel({
               {diag.ragMatches.map((m, i) => (
                 <li
                   key={i}
-                  className="flex items-baseline gap-2 rounded-lg bg-panel px-2.5 py-1.5"
+                  className="flex items-baseline gap-2 rounded-lg bg-conteudo px-2.5 py-1.5"
                   title={m.preview}
                 >
-                  <span className="shrink-0 text-[11px] font-medium tabular-nums text-ia">
+                  <span className="shrink-0 text-legenda font-semibold tabular-nums text-human-ink">
                     {(m.similarity * 100).toFixed(0)}%
                   </span>
-                  <span className="line-clamp-1 text-[12px] leading-snug text-ink-muted">
+                  <span className="line-clamp-1 text-legenda leading-snug text-ink-2">
                     {m.preview}
                   </span>
                 </li>
@@ -435,7 +444,7 @@ function ClassificationPanel({
 function SummaryPanel({ diag }: { diag: TurnDiagnostics | null }) {
   return (
     <Panel title="Resumo">
-      <div className="space-y-3 text-[13px]">
+      <div className="space-y-3 text-apoio">
         <Field
           label="Resumo do caso"
           value={diag ? diag.summary || "sem resumo" : "aguardando"}
@@ -466,8 +475,8 @@ function SummaryPanel({ diag }: { diag: TurnDiagnostics | null }) {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-wide text-ink-dim">{label}</div>
-      <div className="text-[13px] font-medium text-ink">{value}</div>
+      <div className="text-rotulo uppercase text-ink-3">{label}</div>
+      <div className="text-apoio font-medium text-ink">{value}</div>
     </div>
   );
 }

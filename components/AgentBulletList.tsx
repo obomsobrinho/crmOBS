@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 // Lista editável de frases curtas (ex.: o que NÃO fazer, quando chamar humano).
 export default function AgentBulletList({
@@ -42,25 +44,29 @@ export default function AgentBulletList({
           {value.map((item, i) => (
             <li
               key={i}
-              className="flex items-start gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+              className="flex items-start gap-2 rounded-lg border border-line bg-bloco px-3 py-2 text-apoio"
             >
-              <span className="mt-0.5 shrink-0 text-ink-dim">•</span>
+              {/* `ink-faint` e não `ink-3`: o marcador é ornamento de lista, e
+                  a regra dos quatro níveis reserva o faint para ícone e
+                  divisor, que é exatamente o papel dele aqui. */}
+              <span className="mt-0.5 shrink-0 text-ink-faint">•</span>
               <span className="min-w-0 flex-1 break-words">{item}</span>
-              <button
-                type="button"
+              <Button
+                variant="danger-ghost"
+                size="none"
                 onClick={() => remove(i)}
                 aria-label={`Remover: ${item}`}
-                className="shrink-0 text-ink-dim transition-colors hover:text-danger"
+                className="rounded"
               >
                 <X size={15} />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>
       )}
 
       <div className="flex gap-2">
-        <input
+        <Input
           value={draft}
           maxLength={maxLen}
           onChange={(e) => setDraftBoth(e.target.value)}
@@ -71,16 +77,15 @@ export default function AgentBulletList({
             }
           }}
           placeholder={placeholder}
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-colors focus:border-line-strong"
         />
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="field"
           onClick={add}
           disabled={!draft.trim()}
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-line px-3 py-2 text-sm text-ink-muted transition-colors hover:bg-[var(--active-bg)] hover:text-ink disabled:opacity-50"
         >
           <Plus size={14} /> Adicionar
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp, Info, ShieldAlert, Smartphone } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { cardVariants } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // Transparência sobre a conexão por QR code, na tela onde a decisão é tomada.
 //
@@ -14,32 +17,32 @@ export default function ConnectionRiskNotice() {
   const [aberto, setAberto] = useState(false);
 
   return (
-    <div className="glass w-full max-w-md space-y-4 rounded-2xl p-6">
+    <div className={cn(cardVariants(), "w-full max-w-md space-y-4 p-6")}>
       <div className="flex items-start gap-2">
-        <ShieldAlert size={18} className="mt-0.5 shrink-0 text-warn" />
+        <ShieldAlert size={18} className="mt-0.5 shrink-0 text-warn-ink" />
         <div>
-          <h2 className="font-display text-base font-bold">
+          <h2 className="text-corpo font-semibold">
             Antes de conectar, leia
           </h2>
-          <p className="text-sm text-ink-muted">
+          <p className="text-apoio text-ink-2">
             A conexão é feita lendo o QR code em Aparelhos conectados, o mesmo
             recurso que o WhatsApp Web usa. Não é a API Oficial da Meta.
           </p>
         </div>
       </div>
 
-      <div className="space-y-2 rounded-xl border border-line bg-surface p-3">
+      <div className="space-y-2 rounded-xl border border-line bg-bloco p-3">
         <div className="flex items-start gap-2">
-          <Smartphone size={15} className="mt-0.5 shrink-0 text-accent" />
-          <p className="text-sm">
+          <Smartphone size={15} className="mt-0.5 shrink-0 text-brand-ink" />
+          <p className="text-apoio">
             <span className="font-medium">Use um número dedicado ao atendimento.</span>{" "}
             Um chip só para a empresa, nunca o celular pessoal do dono. Se algo
             acontecer com esse número, sua vida pessoal continua funcionando.
           </p>
         </div>
         <div className="flex items-start gap-2">
-          <Info size={15} className="mt-0.5 shrink-0 text-accent" />
-          <p className="text-sm">
+          <Info size={15} className="mt-0.5 shrink-0 text-brand-ink" />
+          <p className="text-apoio">
             <span className="font-medium">Existe risco de bloqueio.</span> O
             WhatsApp pode restringir um número que ele considere fora das regras
             dele. Isso não depende de nós: não temos como impedir o bloqueio nem
@@ -49,16 +52,16 @@ export default function ConnectionRiskNotice() {
       </div>
 
       <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-muted">
+        <p className="mb-1.5 text-rotulo uppercase text-ink-3">
           O que aumenta o risco
         </p>
-        <ul className="space-y-1 text-sm text-ink-muted">
+        <ul className="space-y-1 text-apoio text-ink-2">
           <li>Mandar mensagem para muita gente que não procurou você antes.</li>
           <li>Disparo em massa e campanhas de divulgação.</li>
           <li>Chip novo já começando com volume alto de conversas.</li>
           <li>Muita gente marcando suas mensagens como spam ou bloqueando.</li>
         </ul>
-        <p className="mt-2 text-sm text-ink-muted">
+        <p className="mt-2 text-apoio text-ink-2">
           O uso que o sistema foi feito para atender é o contrário disso:
           responder quem chamou você.
         </p>
@@ -66,7 +69,7 @@ export default function ConnectionRiskNotice() {
 
       <button
         onClick={() => setAberto((v) => !v)}
-        className="flex w-full items-center justify-between rounded-lg border border-line px-3 py-2 text-sm font-medium transition-colors hover:border-line-strong"
+        className={cn(buttonVariants({ variant: "outline", size: "field" }), "w-full justify-between")}
         aria-expanded={aberto}
       >
         Se o número cair, o que acontece
@@ -74,7 +77,7 @@ export default function ConnectionRiskNotice() {
       </button>
 
       {aberto && (
-        <ol className="space-y-2 text-sm text-ink-muted">
+        <ol className="space-y-2 text-apoio text-ink-2">
           <li>
             <span className="font-medium text-ink">1. Nada se perde aqui.</span>{" "}
             Contatos, conversas, notas e a configuração do agente ficam no

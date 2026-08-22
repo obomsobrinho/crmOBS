@@ -19,7 +19,7 @@ async function getInbox(): Promise<{
     supabase
       .from("conversations")
       .select(
-        "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id"
+        "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, handoff_at"
       )
       .order("last_message_at", { ascending: false })
       .limit(500),

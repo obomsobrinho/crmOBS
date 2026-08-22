@@ -96,13 +96,13 @@ export default function ContactTags({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 text-rotulo uppercase text-ink-dim">Tags</span>
+        <span className="shrink-0 text-rotulo uppercase text-ink-3">Tags</span>
         <Button
           variant="ghost"
           size="none"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="shrink-0 gap-1 text-legenda font-medium text-ink-muted hover:bg-transparent"
+          className="shrink-0 gap-1 text-legenda font-medium text-ink-2 hover:bg-transparent"
         >
           <Plus size={13} /> Adicionar
         </Button>
@@ -126,7 +126,7 @@ export default function ContactTags({
                 size="none"
                 onClick={() => unapply(t.id)}
                 aria-label={`Remover tag ${t.name}`}
-                className="rounded-full p-0.5 text-ink-dim hover:bg-[var(--danger-bg)] hover:text-danger"
+                className="rounded-full p-0.5 text-ink-3 hover:bg-danger-surface hover:text-danger-ink"
               >
                   <X size={12} />
                 </Button>
@@ -135,7 +135,7 @@ export default function ContactTags({
           </div>
         ) : (
           !open && (
-            <p className="flex min-w-0 items-center gap-1.5 text-apoio text-ink-dim">
+            <p className="flex min-w-0 items-center gap-1.5 text-apoio text-ink-3">
               <TagIcon size={13} className="shrink-0" /> Nenhuma tag ainda.
             </p>
           )

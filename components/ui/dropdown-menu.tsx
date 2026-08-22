@@ -28,7 +28,8 @@ import { cn } from "@/lib/utils";
  *   passar o mouse, então `focus:` já cobriria os dois casos, mas declarar os
  *   dois deixa a cor idêntica em qualquer ordem de evento.
  * - Saíram `[&_svg:not([class*='size-'])]:size-4` (engordaria nossos ícones de
- *   13 e 14px) e as classes de animação (sem tw-animate-css nesta rodada).
+ *   13 e 14px) e as classes de animação do pacote:
+ *   a entrada e a saída são `.anim-flutuante`, CSS escrito na casa.
  */
 function DropdownMenu({
   ...props
@@ -66,7 +67,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border border-line bg-conteudo p-1 shadow-[var(--panel-shadow)]",
+          "anim-flutuante z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border border-line bg-conteudo p-1 shadow-[var(--panel-shadow)]",
           className,
         )}
         {...props}
@@ -90,8 +91,11 @@ function DropdownMenuItem({
         "relative flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2 text-left text-legenda text-ink-2 transition-colors outline-hidden select-none",
         "hover:bg-[var(--active-bg)] focus:bg-[var(--active-bg)]",
         "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        "data-[variant=perigo]:hover:bg-[var(--danger-bg)] data-[variant=perigo]:hover:text-danger",
-        "data-[variant=perigo]:focus:bg-[var(--danger-bg)] data-[variant=perigo]:focus:text-danger",
+        // `danger-ink`, e não `danger`: `--danger-fill` como TEXTO dá 3,2:1
+        // sobre a superfície de conteúdo no tema escuro, e o par certo da
+        // regra 1 é `surface` de fundo com `ink` de tinta (9,0:1).
+        "data-[variant=perigo]:hover:bg-danger-surface data-[variant=perigo]:hover:text-danger-ink",
+        "data-[variant=perigo]:focus:bg-danger-surface data-[variant=perigo]:focus:text-danger-ink",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0",
         className,
       )}

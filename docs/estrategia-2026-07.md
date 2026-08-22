@@ -150,6 +150,37 @@ Kommo cobra em dólar com mínimo de 6 meses. Nenhum deles disputa o mesmo clien
 **Seu conjunto real de concorrentes é este, e são os dois abaixo mais os players de R$ 87 a 199 já
 mapeados (GPT Maker, SocialHub, Atendente.AI, Nexloo, Sellflux, Simple Chat, BotConversa).**
 
+#### Atualização 21/08/2026 (nova rodada de verificação de preço)
+
+Quatro nomes que não estavam mapeados, todos verificados em página oficial em 21/08/2026:
+
+| Fornecedor | Planos | O que importa |
+|---|---|---|
+| **AtendeNex** (atendenex.com.br) | R$ 349 (1 número, 5 usuários) / R$ 459 (2, 10) / R$ 659 (3, 15) | Pacote fechado com IA, Kanban e disparo. É contra ele que a gente perde a comparação em time de 5. |
+| **Convecta AI** (convectaai.com.br/planos) | R$ 87 Start / R$ 147 Pro (4.000 créditos) | **Assume conexão por QR Code.** IA por crédito. Não tem inbox de equipe: é produto de dono sozinho. |
+| **Tunico CRM** (tunicocrm.com.br) | "a partir de R$ 29,90", 14 dias sem cartão | Não publica tabela: o sitemap não tem página de planos. Preço só atrás do cadastro. |
+| **Tomik** (chat.tomik.ai) | não publica | Hub para agência gerenciar agentes de vários clientes. Não é concorrente: é concorrente de quem revende. |
+
+**Duas correções em dados desta seção:**
+
+1. **O ZapResponder é API Oficial da Meta, não QR.** A página dele afirma ser "aprovada e
+   certificada pela Meta" e usar WhatsApp Business API. Ou seja, R$ 132 já compra conexão oficial,
+   e isso limita quanto dá para cobrar em cima de uma conexão QR.
+2. **O Nexloo de R$ 149 NÃO tem agente de IA** (o item aparece riscado na página de planos). O
+   plano com IA deles começa no Plantonista, **R$ 349 com 2.000 conversas**. Portanto a frase mais
+   abaixo nesta página ("atendido pela Nexloo por R$ 149/mês sem setup") está incompleta: por
+   R$ 149 o cliente leva inbox e Kanban, sem IA. A entrada real do mercado COM IA é R$ 349.
+
+**Modelos de cobrança, o padrão que apareceu:** quem cobra por assento (Zappy, SocialHub,
+HelenaCRM, AtendeNex, WiiChat, SleekFlow) **não publica limite de conversa**; quem limita conversa
+(Nexloo, Octadesk, RD, ZapResponder, Kommo, respond.io, WATI) **dá usuário ilimitado**. Não houve
+uma exceção nas ~30 linhas de plano levantadas. Misturar os dois na vitrine faz o cliente sentir
+cobrança dupla.
+
+**Referência internacional de assento adicional:** respond.io US$ 12 a 24 por usuário extra sobre
+planos de US$ 79 a 279, ou seja **15% a 30% do plano base**. Kommo US$ 15/25/45 por usuário.
+SleekFlow R$ 589 (3 usuários) e R$ 1.759 (10).
+
 #### ZapResponder (https://ia.zapresponder.com.br/) — o concorrente mais próximo
 [DADO] verificado 30/07/2026. Headline: "Automatize o atendimento no WhatsApp com IA".
 
@@ -229,8 +260,8 @@ pesquisa; principais links no fim desta seção.
 | Faixa | Players |
 |---|---|
 | **R$ 0** | **Meta Business Agent** (nativo no app), atende.aí Grátis (inclui 1 número de WhatsApp real), Huggy Starter (WhatsApp restrito), WiiChat Gratuito (sem WhatsApp e sem IA), Blip Free (sem WhatsApp) |
-| **R$ 87 a 199** | GPT Maker 87, SocialHub 99, Atendente.AI 99, Umbler Talk 109 a 129 (mín. 2 agentes), Nexloo 149, Sellflux 149, Zappy 149/usuário, Simple Chat 159, BotConversa 189 a 199 |
-| **R$ 239 a 499** | Simple Chat 239, atende.aí 249, Suri 270 a 290, Nexloo 349, SocialHub 399, Sellflux 440, ChatPro 499, Atendente.AI 499, WiiChat 379+ |
+| **R$ 87 a 199** | GPT Maker 87, SocialHub 99 (**sem IA nesse plano**), Atendente.AI 99, Convecta AI 87 e 147 (QR), Umbler Talk 109 a 129 (mín. 2 agentes), Nexloo 149 (**sem IA nesse plano**), Sellflux 149, Zappy 149/usuário, Simple Chat 159, BotConversa 189 a 199 |
+| **R$ 239 a 499** | Simple Chat 239, atende.aí 249, Suri 270 a 290, **AtendeNex 349 a 459**, Nexloo 349 (1º plano com IA), SocialHub 399, Sellflux 440, ChatPro 499, Atendente.AI 499, WiiChat 379+ (setup R$ 2.999) |
 | **R$ 500 a 1.000** | Clint 523+ (mais R$ 299 do módulo de IA), Huggy 579, Nexloo 599, Sellflux 690, Poli 829,90, RD Station Conversas 989, Chat Inteligente 990, GPT Maker 997 |
 | **R$ 1.000+** | Poli 1.319,90 e 1.859,90, Chat Inteligente 1.990 e 2.990, RD Station 2.699, Blip Super 7.292 |
 
