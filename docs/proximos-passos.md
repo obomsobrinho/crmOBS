@@ -42,7 +42,30 @@ estabilidade e suporte.
 - [x] Tabela `conversations` (não-lidas, atribuição, ordenação, base do pipeline) + trigger.
 - [x] Colunas `sender_user_id`, `media_url`, `media_type` em `chat_messages`.
 - [x] `user_clients.role`.
+- [x] **Grants de `conversations`, nível 1** (22/08/2026, `mt_conversations_column_grants`). A
+      pendência era: `authenticated` tinha UPDATE em nível de TABELA e a policy só checava o tenant,
+      então qualquer membro, inclusive atendente, escrevia qualquer coluna pelo browser. **Não era
+      vazamento entre tenants** (a RLS segura, e `chat_messages` está de fato protegida porque tem o
+      grant mas **não tem policy de UPDATE**): era falta de separação DENTRO do tenant.
+      Agora o UPDATE é por coluna, só nas 8 que o browser escreve (`unread_count`,
+      `assigned_user_id`, `stage`, `stage_source`, `stage_changed_at`, `pending_instruction*`).
+      **`handoff_at` saiu da lista**, e era o que mais importava: limpar ele escondia a conversa do
+      filtro "Precisa de você", e ele já era escrito só por rota service_role. `status` saiu porque
+      ninguém escreve. Provado por impersonação de `authenticated`: `unread_count` passa,
+      `handoff_at` responde `42501 permission denied`, e arrastar card, atribuir e coach seguem
+      funcionando.
+      ⚠️ **Nível 2 segue pendente e NÃO sai com grant:** separar dono de atendente por coluna é
+      impossível assim, porque os dois são o mesmo papel de banco (`authenticated`). `stage_source` e
+      `pending_instruction` continuam abertos a qualquer membro, e o segundo entra no system prompt
+      como orientação confiável do time. Resolver exige trigger ou mover o write para rota
+      service_role.
 - [ ] Parar de gravar resposta da IA como `"msg1 | msg2"` numa linha só. ⚠️ toca o n8n.
+      **Reavaliado em 22/08/2026 e MANTIDO adiado**, com número: são **14 de 116 respostas (12%)**
+      guardadas com `" | "`. Nada quebrado, porque Thread, sidebar, card do pipeline e a
+      reconstrução de histórico já desfazem. O dono autorizou "aplicar tudo" na mesma conversa, mas
+      este item foi deixado de fora de propósito: mexer nele exige o nó de gravação do n8n em
+      produção, e a regra da casa é nunca tocar workflow ao vivo sem autorização explícita e
+      separada. Revisitar junto com trazer a gravação de mensagens para dentro do app.
       NOTA (06/08): baixa prioridade. O envio usa o array (`Prep messages`/`Split messages`),
       então o `" | "` só existe no armazenamento; a exibição só quebraria se uma mensagem
       contivesse literalmente " | ". Fix correto (uma linha por mensagem) é invasivo no fluxo
@@ -322,13 +345,27 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
         `stripBaseTail` e `buildAdvancedPersona` (`lib/agent-prompt.ts`): a textarea guarda só a
         parte editável, o rabo aparece num bloco somente leitura abaixo, e a tela **avisa** quando o
         texto guardado tinha seções que agora são fixas, em vez de apagar em silêncio.
-        ⚠️ **A persona da OBM não foi recompilada, e a decisão de quando migrar é do dono.** Ela
-        perde três coisas ao salvar por lá: o nome no `ANTI-MANIPULAÇÃO` ("como Tony, da OBS", porque
-        ela não tem `agent_config`), a calibragem do summary ("segmento, dor identificada e contexto
-        relevante") e o parágrafo final "IMPORTANTE: os exemplos acima mostram apenas o conteúdo e o
-        tom... deve ser entregue SEMPRE pela ferramenta de formato estruturado", que mora DENTRO do
-        `### OUTPUT` dela. **Esse último é o mais sério**, porque é o que impede o modelo de
-        responder em texto solto imitando os exemplos: mover para a seção EXEMPLOS antes de salvar.
+        ✅ **A persona da OBM foi recompilada em 22/08/2026**, autorizada pelo dono. 10.494 para
+        11.452 chars, `md5 0efa85000852f92b75140562127b3544`, versão registrada em
+        `agent_publications` com `published_by` nulo (foi migração, não alguém clicando em Salvar), e
+        backup em `public._persona_backup_20260822`.
+        **O que foi movido ANTES de recompilar**, porque o strip levaria embora: o parágrafo
+        "IMPORTANTE: os exemplos acima..." (morava dentro do `### OUTPUT` dela e é o que impede o
+        modelo de responder em texto solto imitando os exemplos) e a calibragem do summary
+        ("segmento, dor identificada e contexto relevante"). Os dois foram para o fim do
+        `### EXEMPLOS`, posição em que o "acima" do parágrafo continua verdadeiro. O parágrafo foi
+        **extraído do texto dela por índice, nunca redigitado**: retipar 300 caracteres com acento é
+        convite a estragar justamente o que se quer preservar.
+        **O que ela perdeu de propósito:** o nome no `ANTI-MANIPULAÇÃO` (o rabo da base fica genérico
+        sem `agent_config`) e o "com o time" no aviso de handoff. Injetar os nomes à mão produziria
+        uma persona que a rota não sabe reproduzir, e no próximo save pela UI eles sumiriam sozinhos;
+        consistência com a rota vale mais que a frase. O `### IDENTIDADE` dela já estabelece quem é o
+        Tony, então o modelo não perdeu o nome. **Ganhou** os 3 gatilhos fixos de escalada que não
+        tinha (pediu humano, falta informação, reclamação séria).
+        **Fumaça com o cérebro real**, rodando o texto dela por `personaOverride` na Loja Teste para
+        não escrever no tenant do cliente: apresenta como "Tony, da OBS", devolve 2 mensagens no
+        array (o parágrafo IMPORTANTE fazendo o trabalho), recusa dar preço e oferece a call, e o
+        guardrail passou nos dois turnos.
       - **Sem rascunho.** Salvar JÁ É publicar (o n8n lê `clients.persona` ao vivo), então não
         existe botão Publicar separado: cada Salvar é uma versão. Rascunho só faria sentido se
         `/agente` e `/playground` compartilhassem estado, e aí a resposta é fundir as telas.

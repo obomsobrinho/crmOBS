@@ -47,12 +47,21 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     e a tela **AVISA** o que vai sair, em vez de apagar em silêncio. Sem isso, quem está no avançado
     nunca mais recebe melhoria da base, que foi exatamente o que aconteceu na regra de handoff e
     obrigou a colar as regras à mão na persona da OBM.
-    ⚠️ **A persona da OBM NÃO foi recompilada** (22/08/2026): ela perde três coisas quando for, e é
-    decisão do dono do produto quando migrar. O que ela perde: o nome no `ANTI-MANIPULAÇÃO` ("como
-    Tony, da OBS", porque ela não tem `agent_config`), a calibragem do summary ("segmento, dor
-    identificada e contexto relevante") e o parágrafo final "IMPORTANTE: os exemplos acima..." que
-    mora DENTRO do `### OUTPUT` dela e impede o modelo de responder em texto solto imitando os
-    exemplos. Esse último é o mais sério: antes de salvar por lá, mover ele para a seção EXEMPLOS.
+    ✅ **A persona da OBM FOI recompilada** (22/08/2026, autorizada pelo dono): 10.494 -> 11.452
+    chars, `md5 0efa85000852f92b75140562127b3544`, com a versão registrada em `agent_publications`
+    (`published_by` nulo, porque foi migração e não alguém clicando em Salvar). Backup em
+    `public._persona_backup_20260822`.
+    **Duas coisas dela foram MOVIDAS antes de recompilar, senão morreriam no strip:** o parágrafo
+    "IMPORTANTE: os exemplos acima..." (morava dentro do `### OUTPUT` dela e é o que impede o modelo
+    de responder em texto solto imitando os exemplos) e a calibragem do summary ("segmento, dor
+    identificada e contexto relevante"). Os dois foram para o fim do `### EXEMPLOS`, onde o "acima"
+    do parágrafo continua verdadeiro. Ela **perdeu de propósito** o nome no `ANTI-MANIPULAÇÃO`
+    (o rabo da base fica genérico sem `agent_config`) e o "com o time" no aviso de handoff: injetar
+    os nomes à mão produziria uma persona que a rota não sabe reproduzir, e no próximo save pela UI
+    eles sumiriam. O `### IDENTIDADE` dela já diz quem é o Tony, então o modelo não perdeu o nome.
+    Ganhou os 3 gatilhos fixos de escalada que não tinha. Fumaça com o cérebro real (rodando o texto
+    dela por `personaOverride` na Loja Teste, para não escrever na OBM): apresenta como "Tony, da
+    OBS", devolve 2 mensagens no array, recusa dar preço e oferece a call, guardrail passou.
   - **SALVAR JÁ É PUBLICAR**, porque o n8n lê `persona` ao vivo. Logo **não existe rascunho nem
     botão Publicar**: cada save do `PUT /agent-config` grava uma linha em **`agent_publications`**
     (log append-only: `config`, **`persona` compilada**, `prompt_mode`, `published_by`,
@@ -97,13 +106,20 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Writes diretos do CRM (browser, RLS aplicada): `dados_cliente.atendimento_ia` (pausar/religar
   a IA) e `conversations` nas colunas liberadas (`unread_count` no mark-as-read,
   `assigned_user_id` na atribuição, `status`, `stage`/`stage_source` no pipeline,
-  `pending_instruction` do handoff coach). ⚠️ **"colunas liberadas" em `conversations` é
-  CONVENÇÃO, não banco:** a tabela tem grant de UPDATE em **nível de tabela** para `authenticated`
-  e uma policy `UPDATE` que só checa o tenant, então qualquer membro pode escrever qualquer coluna
-  dela pelo browser. `conversations.handoff_at` segue a mesma convenção (abre no `/api/agent`,
-  fecha no `/api/send`, os dois service_role). Apertar isso de verdade exigiria revogar o UPDATE
-  de tabela e regrantear coluna por coluna, o que mexe em todos os writes existentes: **decisão
-  pendente do dono do produto**, não fazer de passagem. Convite/remoção
+  `pending_instruction` do handoff coach). ✅ **"colunas liberadas" agora é BANCO, não convenção**
+  (22/08/2026, `mt_conversations_column_grants`): o grant de UPDATE saiu do nível de tabela e virou
+  grant por COLUNA, só nas 8 que o browser escreve (`unread_count`, `assigned_user_id`, `stage`,
+  `stage_source`, `stage_changed_at` e os três `pending_instruction*`). Antes a policy só checava o
+  tenant, e qualquer membro podia escrever qualquer coluna pelo browser. **`handoff_at` ficou de fora
+  de propósito** (abre no `/api/agent`, fecha no `/api/send`, os dois service_role): limpar ele pelo
+  browser escondia a conversa do filtro "Precisa de você". `status` também ficou fora, porque ninguém
+  escreve. Provado por impersonação: `update unread_count` como `authenticated` passa, `update
+  handoff_at` responde `42501 permission denied`.
+  ⚠️ **O que grant NÃO resolve:** separar dono de atendente por coluna, porque os dois são o MESMO
+  papel de banco (`authenticated`). Então `stage_source` e `pending_instruction` seguem abertos a
+  qualquer membro do tenant, e `pending_instruction` entra no system prompt como orientação confiável
+  do time. Apertar isso exige trigger ou mover o write para rota service_role: **decisão pendente do
+  dono do produto**. Convite/remoção
   de membro NÃO é write direto: vai por route handler `service_role`. Gestão de `pipeline_stages`
   (criar/renomear/reordenar/arquivar) é write direto do browser MAS **só dono** (RLS checa
   `role='dono'`); mover card (update de `conversations.stage`) é liberado a qualquer membro.
