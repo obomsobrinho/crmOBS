@@ -28,7 +28,6 @@ import {
   LayoutDashboard,
   Bot,
   BookOpen,
-  FlaskConical,
   Users,
   User,
   Calendar,
@@ -51,7 +50,9 @@ const NAV: {
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, donoOnly: true },
-  { href: "/playground", label: "Playground", icon: FlaskConical, donoOnly: true },
+  // "Playground" saiu do menu: a bancada de teste virou painel lateral dentro do
+  // /agente, porque configurar e testar são a mesma atividade e ter duas telas
+  // obrigava a SALVAR (ou seja, publicar) só para testar.
   { href: "/equipe", label: "Equipe", icon: Users },
 ];
 

@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, RotateCcw, Sparkles, FlaskConical } from "lucide-react";
+import { Send, RotateCcw, Sparkles } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
+import type { AgentConfig } from "@/lib/agent-prompt";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -11,12 +12,29 @@ import { Textarea } from "@/components/ui/textarea";
 // NÃO é movido de verdade (só mostra o estágio que moveria). Painel esquerdo =
 // Conversa; painel direito = Diagnóstico do turno (handoff / classificação /
 // resumo). Botão resetar limpa tudo e começa do zero.
+//
+// Mora dentro do painel lateral do `/agente` (`AgentTestDrawer`), e não em tela
+// própria: configurar e testar são a mesma atividade, e o ciclo real é editar,
+// testar, voltar, editar. Por isso este componente não desenha título nem
+// descrição: quem faz isso é o cabeçalho do painel.
 
 export interface PlaygroundTurn {
   role: "user" | "assistant";
   content: string;
   diag?: TurnDiagnostics;
 }
+
+/**
+ * Configuração que a pessoa está EDITANDO no formulário, enviada em cada turno.
+ * Sem ela a bancada testa a configuração salva (comportamento antigo).
+ *
+ * Vai CRUA, e não compilada: quem monta a persona é o servidor, que recola o
+ * rabo invariante da base. Persona final vinda do browser poderia chegar sem o
+ * contrato de saída, e aí o teste mentiria sobre o agente real.
+ */
+export type ConfiguracaoEmEdicao =
+  | { mode: "guiado"; config: AgentConfig }
+  | { mode: "avancado"; persona: string; handoffNotice: string };
 
 interface ApiResult {
   output: { messages: string[]; action: string; summary: string; preferencia_horario: string };
@@ -27,12 +45,19 @@ export default function Playground({
   stageNames,
   initialTurns = [],
   initialStage = null,
+  configuracao = null,
 }: {
   // key -> nome do estágio, para rotular o "estágio que moveria".
   stageNames: Record<string, string>;
   // Só para o /design: começa com uma conversa de exemplo.
   initialTurns?: PlaygroundTurn[];
   initialStage?: string | null;
+  /**
+   * Configuração em edição. Lida na hora de cada turno (e não copiada para o
+   * estado), então uma alteração no formulário vale no turno seguinte sem
+   * precisar fechar e reabrir o painel.
+   */
+  configuracao?: ConfiguracaoEmEdicao | null;
 }) {
   const [turns, setTurns] = useState<PlaygroundTurn[]>(initialTurns);
   const [input, setInput] = useState("");
@@ -73,10 +98,25 @@ export default function Playground({
         ...payload,
         currentStage: simStage,
         stageSource: simStageSource,
+        // Espalhado por último e só quando existe: sem configuração em edição o
+        // corpo fica idêntico ao de antes e o servidor usa a persona salva.
+        ...(configuracao ?? {}),
       }),
     });
-    const data = (await res.json()) as ApiResult & { error?: string };
-    if (!res.ok) throw new Error(data.error || "falha ao falar com o agente");
+    const data = (await res.json()) as ApiResult & {
+      error?: string;
+      fields?: Record<string, string>;
+    };
+    if (!res.ok) {
+      // Config incompleta volta com os campos que faltam. Dizer "configuração
+      // incompleta" e parar aí obrigaria a pessoa a caçar o campo na mão.
+      const faltando = data.fields ? Object.values(data.fields).join(", ") : "";
+      throw new Error(
+        faltando
+          ? `${data.error || "configuração incompleta"}: ${faltando}`
+          : data.error || "falha ao falar com o agente"
+      );
+    }
     return data;
   }
 
@@ -156,17 +196,7 @@ export default function Playground({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <FlaskConical size={20} className="text-brand-ink" />
-            <h1 className="text-titulo">Playground</h1>
-          </div>
-          <p className="mt-1 text-apoio text-ink-2">
-            Converse com a IA como se fosse um cliente. Nada é enviado no WhatsApp
-            e nada é gravado.
-          </p>
-        </div>
+      <div className="mb-3 flex items-center justify-end">
         <Button
           variant="outline"
           size="field"
@@ -178,7 +208,7 @@ export default function Playground({
         </Button>
       </div>
 
-      <div className="flex min-h-0 flex-1 gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         {/* ESQUERDA: Conversa. `bg-msg` é a superfície de área de mensagens, a
             mesma da tela de atendimento: aqui também é onde os balões moram. */}
         <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-msg">
@@ -253,24 +283,23 @@ export default function Playground({
           </div>
         </div>
 
-        {/* DIREITA: Diagnóstico do turno. Handoff + Classificação lado a lado
-            (mesma altura), Resumo full width embaixo. */}
-        <div className="flex w-[620px] shrink-0 flex-col gap-3 overflow-y-auto xl:w-[720px]">
-          <div className="grid grid-cols-2 items-stretch gap-3">
-            <ClassificationPanel
-              diag={lastDiag}
-              simStage={simStage}
-              stageNames={stageNames}
-            />
-            <HandoffPanel
-              diag={lastDiag}
-              canCoach={lastUserIndex >= 0}
-              coachDraft={coachDraft}
-              setCoachDraft={setCoachDraft}
-              onCoach={coach}
-              sending={sending}
-            />
-          </div>
+        {/* DIREITA: Diagnóstico do turno, em coluna única. Eram duas colunas
+            quando isto era tela cheia; dentro do painel lateral a largura é
+            menor, e dois painéis lado a lado viravam duas colunas estreitas. */}
+        <div className="flex shrink-0 flex-col gap-3 overflow-y-auto lg:w-[380px]">
+          <ClassificationPanel
+            diag={lastDiag}
+            simStage={simStage}
+            stageNames={stageNames}
+          />
+          <HandoffPanel
+            diag={lastDiag}
+            canCoach={lastUserIndex >= 0}
+            coachDraft={coachDraft}
+            setCoachDraft={setCoachDraft}
+            onCoach={coach}
+            sending={sending}
+          />
           <SummaryPanel diag={lastDiag} />
         </div>
       </div>

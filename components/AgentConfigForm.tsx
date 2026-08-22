@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Save,
@@ -35,6 +34,8 @@ import AgentHoursEditor from "./AgentHoursEditor";
 import AgentBulletList from "./AgentBulletList";
 import AgentPromptDrawer from "./AgentPromptDrawer";
 import AgentPowerToggle from "./AgentPowerToggle";
+import AgentTestDrawer from "./AgentTestDrawer";
+import type { ConfiguracaoEmEdicao } from "./Playground";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -59,6 +60,7 @@ export default function AgentConfigForm({
   prefillCompanyName,
   hasManualPersona,
   initialNotifyJid,
+  stageNames,
   agentEnabled,
   blockers,
   preview = false,
@@ -78,6 +80,8 @@ export default function AgentConfigForm({
    * objetivo que o exige.
    */
   initialNotifyJid: string | null;
+  /** key -> nome do estágio do funil, para a bancada rotular o card que moveria. */
+  stageNames: Record<string, string>;
   /** Agente atendendo agora (já foi ao ar E está ligado). */
   agentEnabled: boolean;
   /** O que falta para a primeira ativação (lib/onboarding.publishBlockers). */
@@ -308,6 +312,14 @@ export default function AgentConfigForm({
   // turno paga o preço cheio de entrada. Só aparece quando o risco existe.
   const semCache = foraDoCache(previewPersona);
 
+  // O que a bancada vai testar: o estado do formulário, CRU. Compilar aqui e
+  // mandar a persona pronta deixaria o browser decidir o prompt final, e o rabo
+  // invariante da base é justamente o que não pode depender do browser.
+  const configuracao: ConfiguracaoEmEdicao =
+    mode === "guiado"
+      ? { mode: "guiado", config: cfg }
+      : { mode: "avancado", persona: rawPersona, handoffNotice: cfg.handoffNotice };
+
   // Carrega uma versão antiga do drawer no formulário. NÃO salva: a pessoa
   // confere e aperta Salvar. O spread sobre EMPTY_CONFIG completa campos que não
   // existiam quando aquela versão foi gravada (handoffNotice, por exemplo).
@@ -346,6 +358,9 @@ export default function AgentConfigForm({
         {/* O cabeçalho fala só do que está no ar. Salvar desceu para o rodapé,
             junto do fim do formulário, que é onde a pessoa termina de mexer. */}
         <div className="flex items-center gap-2">
+          {/* Testar vem antes de ver o prompt: é o que a pessoa quer fazer
+              depois de mexer nos campos. O prompt é conferência. */}
+          <AgentTestDrawer configuracao={configuracao} stageNames={stageNames} />
           <AgentPromptDrawer persona={previewPersona} onRestore={restaurar} />
           <AgentPowerToggle
             clientId={clientId}
@@ -361,11 +376,9 @@ export default function AgentConfigForm({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
           <TriangleAlert size={15} className="shrink-0" />
           <span>Antes de ativar o agente, falta: {blockers.join(", ")}.</span>
-          {!blockers.includes("testar a conversa na bancada") ? null : (
-            <Link href="/playground" className="font-medium underline">
-              Testar agora
-            </Link>
-          )}
+          {/* Sem link para "testar": a bancada é o botão logo acima, nesta
+              mesma tela. Mandar a pessoa para outra rota era o que existia
+              quando o playground era tela própria. */}
         </div>
       )}
 

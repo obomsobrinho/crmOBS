@@ -40,6 +40,7 @@ export default function DesignAgentePage() {
           initialPersona={null}
           hasManualPersona={false}
           initialNotifyJid="120363000000000000@g.us"
+          stageNames={{ aguardando_humano: "Aguardando atendimento" }}
           agentEnabled
           blockers={[]}
           preview

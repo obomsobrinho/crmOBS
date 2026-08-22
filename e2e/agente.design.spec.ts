@@ -66,6 +66,30 @@ test.describe("Tela do agente (/design/agente)", () => {
     await expect(page.getByText("Agente pausado")).toHaveCount(0);
   });
 
+  test("a bancada de teste abre nesta tela, sem sair dela", async ({ page }) => {
+    await page.goto("/design/agente");
+
+    // Configurar e testar são a mesma atividade. Estavam em duas telas, e testar
+    // exigia SALVAR antes, que é publicar: o dono mexia no agente que está
+    // atendendo cliente de verdade só para experimentar.
+    await page.getByRole("button", { name: "Testar o agente" }).click();
+    const painel = page.locator('[data-slot="sheet-content"]');
+    await expect(painel).toBeVisible();
+    await expect(painel.getByText(/mesmo sem salvar/)).toBeVisible();
+    // Conversa de um lado, diagnóstico do outro.
+    await expect(
+      painel.getByPlaceholder("Escreva como um cliente escreveria...")
+    ).toBeVisible();
+    await expect(painel.getByText("Classificação", { exact: true })).toBeVisible();
+    await expect(painel.getByText("Handoff", { exact: true })).toBeVisible();
+
+    // E o formulário continua atrás, na mesma rota: o ciclo é editar, testar,
+    // voltar, editar, sem navegação no meio.
+    await painel.getByRole("button", { name: "Fechar" }).click();
+    await expect(painel).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Salvar" })).toBeVisible();
+  });
+
   test("não usa travessão em texto visível", async ({ page }) => {
     await page.goto("/design/agente");
     const texto = await page.locator("body").innerText();

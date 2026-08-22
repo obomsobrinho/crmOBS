@@ -70,7 +70,9 @@ const DEFS: StepDef[] = [
     key: "testar",
     label: "Testar a conversa",
     hint: "Fale com o agente na bancada de teste antes de soltar para clientes.",
-    href: "/playground",
+    // /agente, e não /playground: a bancada virou painel lateral dentro da tela
+    // de configuração, e a tela própria deixou de existir.
+    href: "/agente",
     cta: "Testar",
   },
   {

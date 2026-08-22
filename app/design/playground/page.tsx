@@ -1,10 +1,16 @@
 import NavRail from "@/components/NavRail";
-import Playground, { type PlaygroundTurn } from "@/components/Playground";
+import AgentTestDrawer from "@/components/AgentTestDrawer";
+import { type PlaygroundTurn } from "@/components/Playground";
 import { Card } from "@/components/ui/card";
+import { EMPTY_CONFIG } from "@/lib/agent-prompt";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 
-// Preview de design do Playground (dev-only, liberado pelo proxy). Começa com uma
-// conversa de exemplo já com handoff aberto, para exercitar os 3 painéis.
+// Preview de design da bancada de teste (dev-only, liberado pelo proxy).
+//
+// A bancada não é mais tela própria: virou painel lateral dentro do `/agente`.
+// Este preview abre o painel já aberto, com uma conversa de exemplo que termina
+// em handoff, para exercitar os 3 painéis de diagnóstico sem login e sem chamada
+// ao modelo.
 export const dynamic = "force-dynamic";
 
 const STAGE_NAMES: Record<string, string> = {
@@ -42,7 +48,7 @@ const TURNS: PlaygroundTurn[] = [
   },
   { role: "user", content: "Vocês têm atendimento de emergência pra daqui meia hora?" },
   {
-    // Handoff silencioso: a IA não envia nada, só abre o handoff.
+    // Turno sem mensagem: exercita o aviso central de handoff na conversa.
     role: "assistant",
     content: "",
     diag: diag({
@@ -60,10 +66,15 @@ const TURNS: PlaygroundTurn[] = [
 export default function DesignPlaygroundPage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
-      <NavRail clientName="Ótica Vision" activeHref="/playground" role="dono" />
+      <NavRail clientName="Ótica Vision" activeHref="/agente" role="dono" />
       <div className="flex min-w-0 flex-1 flex-col">
         <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
-          <Playground stageNames={STAGE_NAMES} initialTurns={TURNS} />
+          <AgentTestDrawer
+            configuracao={{ mode: "guiado", config: EMPTY_CONFIG }}
+            stageNames={STAGE_NAMES}
+            defaultOpen
+            initialTurns={TURNS}
+          />
         </Card>
       </div>
     </div>

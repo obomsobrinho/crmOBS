@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { cn } from "@/lib/utils";
@@ -40,10 +41,36 @@ function SheetTrigger({
   return <DialogPrimitive.Trigger {...props} data-slot="sheet-trigger" />;
 }
 
+/**
+ * A largura é a única geometria que varia entre os painéis, então ela é
+ * VARIANTE e não className na tela: o painel do prompt e o da bancada usariam a
+ * mesma sopa de classe com um número trocado, e sopa repetida é variante.
+ */
+const conteudoVariants = cva(
+  "anim-lateral fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-conteudo shadow-[var(--panel-shadow)]",
+  {
+    variants: {
+      tamanho: {
+        /** Leitura: 520px é onde um prompt de ~9 KB não vira coluna de 40 caracteres. */
+        padrao: "sm:max-w-[520px]",
+        /**
+         * Trabalho: a bancada de teste tem conversa E diagnóstico lado a lado, e
+         * em 520px as duas colunas ficariam estreitas demais para as duas
+         * servirem. Em tela pequena os dois valores caem para a largura toda.
+         */
+        largo: "sm:max-w-[1040px]",
+      },
+    },
+    defaultVariants: { tamanho: "padrao" },
+  },
+);
+
 function SheetContent({
   className,
+  tamanho,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> &
+  VariantProps<typeof conteudoVariants>) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -52,12 +79,7 @@ function SheetContent({
       />
       <DialogPrimitive.Content
         data-slot="sheet-content"
-        className={cn(
-          // 520px é a largura em que um prompt de ~9 KB fica legível sem virar
-          // uma coluna de 40 caracteres. Em tela pequena ocupa a largura toda.
-          "anim-lateral fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-conteudo shadow-[var(--panel-shadow)] sm:max-w-[520px]",
-          className,
-        )}
+        className={cn(conteudoVariants({ tamanho, className }))}
         {...props}
       />
     </DialogPrimitive.Portal>

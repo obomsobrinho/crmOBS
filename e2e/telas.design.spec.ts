@@ -78,12 +78,20 @@ test.describe("Agente (/design/agente)", () => {
   });
 });
 
-test.describe("Playground (/design/playground)", () => {
+test.describe("Bancada de teste (/design/playground)", () => {
+  // A bancada deixou de ser tela e virou painel lateral dentro do /agente. O
+  // preview abre o painel já aberto, então o que se testa aqui é o painel.
   test("mostra conversa, os 3 painéis e o diagnóstico do turno", async ({
     page,
   }) => {
     await page.goto("/design/playground");
-    await expect(page.getByRole("heading", { name: "Playground" })).toBeVisible();
+    const painel = page.locator('[data-slot="sheet-content"]');
+    await expect(painel).toBeVisible();
+    await expect(
+      painel.getByRole("heading", { name: "Testar o agente" })
+    ).toBeVisible();
+    // A promessa que faz o painel existir: testa o que está na tela, sem salvar.
+    await expect(painel.getByText(/mesmo sem salvar/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Resetar" })).toBeVisible();
     // Painéis do diagnóstico.
     await expect(page.getByText("Handoff", { exact: true })).toBeVisible();

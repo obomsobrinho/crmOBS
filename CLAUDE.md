@@ -155,8 +155,21 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `handoff_at` guarda o **primeiro** handoff em aberto (é ele que dá a espera real, "esperando há
   6h"), é limpo pelo envio manual (`POST /api/send`, service_role) e é o que alimenta o filtro
   "Precisa de você". **Pausa volta a significar só o que deveria:** um humano assumiu (nó
-  `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave. **Playground** (`/playground`, dono-only)
-  fala com o cérebro REAL via `POST /api/playground` (sessão do dono, força `dryRun`), sem WhatsApp.
+  `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave. **Bancada de teste** (painel
+  lateral dentro de `/agente`, dono-only) fala com o cérebro REAL via `POST /api/playground`
+  (sessão do dono, força `dryRun`), sem WhatsApp.
+- **Bancada de teste dentro do `/agente` (22/08/2026):** `components/AgentTestDrawer.tsx` abre o
+  `Playground` num `sheet` (`tamanho="largo"`). **Ela testa a configuração EM EDIÇÃO, não a salva**,
+  e é isso que resolve o problema: salvar já é publicar, então antes disso testar significava mexer
+  no agente que está atendendo cliente de verdade. O corpo do `POST /api/playground` leva a
+  configuração **crua** (`mode` mais `config` ou `persona`) e **quem compila é o servidor**
+  (`validateConfig` + `buildPersona`, ou `buildAdvancedPersona` no avançado), então o rabo invariante
+  da base é sempre recolado: persona final vinda do browser poderia chegar sem `### OUTPUT` e o teste
+  mentiria. `processTurn` recebe `personaOverride` e **só honra em `dryRun`** (a guarda mora no
+  módulo, e não na rota, porque persona vinda de fora nunca pode atender no WhatsApp). Config
+  incompleta volta **400** com os campos que faltam. **Foi painel e não duas colunas** de propósito:
+  duas colunas refariam o layout de `/agente` aprovado em 22/08. ⚠️ A tela `/playground` **não existe
+  mais** (responde 404) e saiu do menu; ficaram o endpoint e o preview `/design/playground`.
 - **Fase 4 (assinatura e gate):** a regra de acesso mora em `lib/billing.ts` (**módulo puro**, zero
   imports, igual `lib/agent-prompt.ts`, então servidor e browser usam a MESMA função):
   `accessState({subscription_status, trial_ends_at, grace_until})` devolve `{blocked, reason,
@@ -165,7 +178,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   mensagens seguem chegando e ela acompanha as conversas, como um WhatsApp Web aberto, mas não
   trabalha. **Gate server-side em 4 pontos**, nunca esconder botão no client:
   (1) `requireActiveTenant()` (`lib/auth.ts`) manda para `/assinatura` nas páginas pagas
-  (`/pipeline`, `/painel`, `/agente`, `/conhecimento`, `/playground`, `/equipe`); fica em CADA
+  (`/pipeline`, `/painel`, `/agente`, `/conhecimento`, `/equipe`); fica em CADA
   página, e não no layout, porque layout de Server Component não conhece a rota atual. `/inbox`,
   `/perfil` e `/assinatura` seguem abertos (`/assinatura` fora do route group `(app)`);
   (2) `processTurn` devolve **turno silencioso** (`silentTurn`: 200, `messages` vazio,
@@ -295,7 +308,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2`, e sobrescrever isso por className brigaria
   com o `translate` do centramento (a armadilha do Tailwind v4 documentada abaixo). Animação
   própria: `.anim-lateral` no `globals.css`, que PODE mexer em `translate` porque o painel encosta
-  em `right-0` e não usa translate para se posicionar. Sobre **Radix** (pacote unificado `radix-ui`), com
+  em `right-0` e não usa translate para se posicionar. A largura do `sheet` é **variante**
+  (`tamanho: padrao` 520px para leitura, `largo` 1040px para a bancada de teste), e não className na
+  tela: eram dois usos da mesma sopa de classe com um número trocado. Sobre **Radix** (pacote unificado `radix-ui`), com
   `cva` e `cn` (`lib/utils.ts`). **São DUAS camadas:** `components/ui/` é a BASE, ajustada UMA vez
   para encarnar o sistema; `components/` é PRODUTO e consome a base. **Toda a UI já passou por ela**
   (concluído em 17/08/2026). Antes de escrever `className` numa tela, procurar a variante na base:
@@ -389,8 +404,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Rotas: `/login`, `/cadastro` (público, cria conta), `/recuperar-senha` (público),
   `/connect` (QR + aviso de risco + import automático), `/inbox`, `/inbox/[id]`, `/pipeline`
   (board Kanban do funil), `/painel` (dashboard, 4 números), `/agente` (construtor do prompt),
-  `/conhecimento` (base de conhecimento/RAG, dono-only), `/playground` (bancada de teste do agente,
-  dono-only), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
+  `/conhecimento` (base de conhecimento/RAG, dono-only), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
   gate de assinatura; fora do route group `(app)`), `/definir-senha` (convidado escolhe a senha),
   `/auth/confirm` (verifica o link do e-mail).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
@@ -399,7 +413,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   **knowledge** `DELETE` + **knowledge/upload-url** + **knowledge/process** dono-only, upload
   direto ao Storage por URL assinada + processamento à parte, compatível com o limite de corpo da
   Vercel), `app/api/agent` (cérebro, `processTurn`, protegido por `x-lookup-secret`),
-  `app/api/playground` (bancada, dono-only por sessão, reusa `processTurn` em `dryRun`),
+  `app/api/playground` (bancada, dono-only por sessão, reusa `processTurn` em `dryRun`; aceita a
+  configuração CRUA em edição e COMPILA no servidor),
   `app/api/team/{invite,remove}` (dono-only, service_role), `app/api/signup` (**público**, freio de
   abuso por IP + `provision_tenant`) e `by-instance`.
 
@@ -449,7 +464,8 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
   (fluxo quente; ver `docs/proximos-passos.md`).
 - **Fase 3.5** (fechamento da IA): guardrail de validação antes de enviar (`lib/guardrail.ts`),
   handoff coach (`conversations.pending_instruction`, a IA retoma sozinha no próximo turno),
-  e a bancada de teste `/playground` (dono-only, `dryRun` no cérebro real via `lib/agent-turn.ts`).
+  e a bancada de teste (dono-only, `dryRun` no cérebro real via `lib/agent-turn.ts`; virou painel
+  lateral dentro do `/agente` em 22/08/2026).
   ⚠️ O "handoff silencioso" desta fase foi **revertido em 20/08/2026** (ver a regra de handoff
   acima): ele emudecia e pausava a IA, e os dois efeitos se mostraram errados em produção.
 - **Migração de UI para a camada base (17/08/2026):** as 15 telas do sistema saíram de classe
@@ -459,5 +475,6 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
   claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
   `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
   `danger-ink` (9,0:1).
-- Testes e2e (Playwright, `e2e/`) cobrem as telas `/design` (inclui `/design/playground`) e o login
-  do dono; ainda **sem** cenário e2e para `/pipeline` e `/painel` (só `/design` + tsc/eslint).
+- Testes e2e (Playwright, `e2e/`): **40 sem login** nas telas `/design` (inclui
+  `/design/playground`, que agora abre o painel de teste) e **7 com login** (`e2e/*.auth.spec.ts`),
+  estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem** cenário e2e para `/pipeline`.

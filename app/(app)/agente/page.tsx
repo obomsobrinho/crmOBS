@@ -15,13 +15,23 @@ export default async function AgentePage() {
   // Configurar o agente é só do dono. Atendente não vê nem acessa.
   if (!client || client.role !== "dono") redirect("/inbox");
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("clients")
-    .select(
-      "persona, agent_config, prompt_mode, evolution_instance, notify_group_jid"
-    )
-    .eq("id", client!.id)
-    .maybeSingle();
+  // Os estágios vêm junto porque a bancada de teste mora nesta tela agora (era o
+  // /playground): eles só rotulam o "estágio que moveria" no diagnóstico.
+  const [{ data }, { data: stages }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select(
+        "persona, agent_config, prompt_mode, evolution_instance, notify_group_jid"
+      )
+      .eq("id", client!.id)
+      .maybeSingle(),
+    supabase.from("pipeline_stages").select("key, name").eq("client_id", client!.id),
+  ]);
+
+  const stageNames: Record<string, string> = {};
+  for (const s of (stages ?? []) as { key: string; name: string }[]) {
+    stageNames[s.key] = s.name;
+  }
 
   const persona = (data?.persona as string | null) ?? null;
   const promptMode = (data?.prompt_mode as Mode | null) ?? "guiado";
@@ -53,6 +63,7 @@ export default async function AgentePage() {
         prefillCompanyName={initialConfig ? null : client?.name}
         hasManualPersona={hasManualPersona}
         initialNotifyJid={notifyGroup}
+        stageNames={stageNames}
         // Atendendo agora = já foi ao ar alguma vez E está ligado na chave.
         agentEnabled={!!client!.agentPublishedAt && client!.agentEnabled}
         blockers={publishBlockers({

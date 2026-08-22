@@ -346,14 +346,33 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
         Salvar desceu para o rodapé, e o prompt gerado saiu da coluna fixa para um **drawer**
         (`components/ui/sheet.tsx`, 16º da camada base). Uma rolagem só na tela. Apagados:
         `AgentPublishCard`, `NotifyTargetCard`, `AgentBusinessHours`, `AgentPromptPreview`.
-- [ ] **Fundir `/agente` e `/playground`.** ⚠️ **PENDÊNCIA ABERTA, levantada pelo dono do produto:**
-      configurar e testar são a mesma atividade e estão em duas telas. O fluxo real é editar,
-      testar, voltar, editar, testar. Hoje isso exige salvar entre cada volta, e salvar mexe no
-      agente que está atendendo cliente de verdade. Fundir (configuração de um lado, conversa do
-      outro, como o playground da OpenAI) elimina a necessidade de rascunho: você edita, o teste
-      seguinte já usa a edição, e Salvar serve só para levar ao ar. **Consequência aceita:** parte
-      do layout de `/agente` feito em 22/08 será refeito, porque o formulário passa a dividir a
-      tela com a conversa.
+- [x] **Fundir `/agente` e `/playground`** (22/08/2026). A pendência era: configurar e testar são a
+      mesma atividade e estavam em duas telas, o fluxo real é editar, testar, voltar, editar, e isso
+      exigia SALVAR entre cada volta. Como salvar já é publicar (o n8n lê `clients.persona` ao vivo),
+      testar significava mexer no agente que está atendendo cliente de verdade.
+      **Decisão: painel lateral dentro do `/agente`** (`components/AgentTestDrawer.tsx`, sobre o
+      `sheet` da camada base), e **não** as duas colunas que estavam previstas aqui. O motivo é que
+      as duas colunas refariam o layout aprovado em 22/08, e o painel entrega o mesmo ciclo curto
+      sem tocar em nada dele: a consequência que estava "aceita" acabou não sendo necessária.
+      O `sheet` ganhou variante de largura (`tamanho: padrao | largo`, 520 e 1040px) em vez de
+      className na tela, porque era a mesma sopa de classe com um número trocado.
+      **O que faz o teste valer:** o corpo do `POST /api/playground` passou a levar a configuração
+      CRUA em edição (`mode` mais `config` ou `persona`), e `processTurn` ganhou `personaOverride`,
+      honrado **só em `dryRun`** (a guarda mora no módulo, não na rota: persona vinda de fora nunca
+      pode atender no WhatsApp, mesmo que alguém erre a rota depois). Quem compila é o servidor,
+      sempre, então o rabo invariante da base é recolado e o teste não pode rodar sem contrato de
+      saída. Config incompleta volta 400 com os campos que faltam, o que também atende à preocupação
+      levantada na época ("não quero testar algo que não está completo").
+      **A tela própria `/playground` foi removida**, junto do item do menu; ficaram o endpoint
+      `/api/playground` e o preview `/design/playground` (que agora abre o painel). A rota antiga
+      responde **404**: ela era dono-only e só existia no menu, então não há link externo para
+      quebrar, e um redirect seria um arquivo cujo único trabalho é pedir desculpa. Se incomodar,
+      é uma linha.
+      **Provado com login** (`e2e/agente.auth.spec.ts`, cérebro real): trocar o nome do agente no
+      campo e mandar mensagem faz a IA responder com o nome NOVO, e a vigilância de rede confirma
+      zero `PUT` de `agent-config`. Depois disso, no banco: `md5(persona)` da Loja Teste igual,
+      `chat_messages` igual (25), `agent_publications` igual (2), `conversation_qualifications` igual
+      (2), e a única linha nova em `agent_turns` marcada `dry_run`.
 
 **Fase 5 — Expansão (só depois de ter cliente)**
 - [ ] **Controle de consumo de IA por tenant (instrumentação para decidir o pricing).** Não é

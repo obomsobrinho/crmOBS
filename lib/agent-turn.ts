@@ -51,6 +51,20 @@ export interface ProcessTurnParams {
   currentStage?: string | null;
   stageSource?: string | null;
   instruction?: string | null;
+  /**
+   * Persona a usar NO LUGAR da que está salva em `clients.persona`.
+   *
+   * Existe para a bancada de teste dentro do `/agente` poder provar a
+   * configuração que a pessoa está EDITANDO, sem salvar. Salvar já é publicar
+   * (o n8n lê `clients.persona` ao vivo), então testar salvando significa mexer
+   * no agente que está atendendo cliente de verdade.
+   *
+   * **Honrado SÓ no dryRun**, e a guarda é aqui e não na rota: uma persona que
+   * chega de fora nunca pode atender no WhatsApp, mesmo que alguém erre a rota
+   * um dia. Quem monta a persona é o servidor (o rabo da base é recolado lá),
+   * então isto já chega compilado.
+   */
+  personaOverride?: string | null;
 }
 
 export async function processTurn(
@@ -131,10 +145,19 @@ export async function processTurn(
     return t;
   }
 
+  // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
+  // dryRun: fora dele a única fonte é o banco.
+  const emEdicao =
+    dryRun &&
+    typeof params.personaOverride === "string" &&
+    params.personaOverride.trim()
+      ? params.personaOverride
+      : null;
   const persona =
-    typeof client.persona === "string" && client.persona.trim()
+    emEdicao ??
+    (typeof client.persona === "string" && client.persona.trim()
       ? client.persona
-      : buildFallbackPersona((client.name as string) ?? "a empresa");
+      : buildFallbackPersona((client.name as string) ?? "a empresa"));
 
   // Histórico: no dryRun vem do chamador (playground); em produção sai de
   // chat_messages (escopo client_id + phone). A mensagem atual ainda não está
