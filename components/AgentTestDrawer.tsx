@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { FlaskConical, X } from "lucide-react";
+import { FlaskConical, RotateCcw, X } from "lucide-react";
 import Playground, {
   type ConfiguracaoEmEdicao,
   type PlaygroundTurn,
@@ -39,6 +39,8 @@ export default function AgentTestDrawer({
   stageNames,
   defaultOpen = false,
   initialTurns,
+  aberto: abertoExterno,
+  onAbertoChange,
 }: {
   /**
    * O que está no formulário AGORA. Passado direto para a bancada, que lê no
@@ -51,8 +53,24 @@ export default function AgentTestDrawer({
   /** Só para o /design: abre o painel já aberto, com conversa de exemplo. */
   defaultOpen?: boolean;
   initialTurns?: PlaygroundTurn[];
+  /** Abertura controlada de fora. Sem ela, o painel gerencia o próprio estado. */
+  aberto?: boolean;
+  onAbertoChange?: (aberto: boolean) => void;
 }) {
-  const [aberto, setAberto] = useState(defaultOpen);
+  // Estado interno com escape para CONTROLE externo. Existe porque o modo
+  // montagem oferece a bancada uma segunda vez, no rodapé, depois do primeiro
+  // save. Renderizar um segundo `AgentTestDrawer` ali daria DOIS `Playground` com
+  // conversas diferentes; controlar a abertura de fora mantém uma bancada só.
+  const [abertoLocal, setAbertoLocal] = useState(defaultOpen);
+  const aberto = abertoExterno ?? abertoLocal;
+  const setAberto = (v: boolean) => {
+    setAbertoLocal(v);
+    onAbertoChange?.(v);
+  };
+  // Resetar = remontar a bancada. Trocar a `key` devolve turnos, entrada,
+  // orientação e estágio simulado ao estado inicial de uma vez, o que evita
+  // expor a função de reset do Playground para cá só por causa de um botão.
+  const [sessao, setSessao] = useState(0);
 
   return (
     <Sheet open={aberto} onOpenChange={setAberto}>
@@ -72,17 +90,31 @@ export default function AgentTestDrawer({
               mesmo sem salvar, e nada é enviado no WhatsApp.
             </SheetDescription>
           </div>
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon-control" aria-label="Fechar">
-              <X size={16} />
+          {/* Resetar mora no cabeçalho, junto do fechar: era uma linha própria
+              acima da conversa, e aquela linha é que abria um vão grande logo
+              embaixo do título. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              variant="outline"
+              size="field"
+              onClick={() => setSessao((n) => n + 1)}
+            >
+              <RotateCcw size={14} />
+              Resetar
             </Button>
-          </SheetClose>
+            <SheetClose asChild>
+              <Button variant="ghost" size="icon-control" aria-label="Fechar">
+                <X size={16} />
+              </Button>
+            </SheetClose>
+          </div>
         </div>
 
         {/* min-h-0 é o que deixa a conversa rolar dentro do painel em vez de
             esticar o painel inteiro. */}
         <div className="flex min-h-0 flex-1 flex-col p-5">
           <Playground
+            key={sessao}
             stageNames={stageNames}
             configuracao={configuracao}
             initialTurns={initialTurns}

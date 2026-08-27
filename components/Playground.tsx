@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, RotateCcw, Sparkles } from "lucide-react";
+import { Send, Sparkles } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import { Button } from "@/components/ui/button";
@@ -185,29 +185,13 @@ export default function Playground({
     }
   }
 
-  function reset() {
-    setTurns([]);
-    setInput("");
-    setCoachDraft("");
-    setError(null);
-    setSimStage(null);
-    setSimStageSource(null);
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3 flex items-center justify-end">
-        <Button
-          variant="outline"
-          size="field"
-          onClick={reset}
-          disabled={turns.length === 0 && !simStage}
-        >
-          <RotateCcw size={14} />
-          Resetar
-        </Button>
-      </div>
-
+      {/* O botão Resetar ficava aqui, numa linha própria acima da conversa, e era
+          ele que abria o vão grande embaixo do cabeçalho do painel. Subiu para o
+          cabeçalho do `AgentTestDrawer`, que reseta remontando este componente
+          por `key`: remontar já devolve turnos, entrada, orientação e estágio
+          simulado ao estado inicial, o que dispensa expor a função para fora. */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         {/* ESQUERDA: Conversa. `bg-msg` é a superfície de área de mensagens, a
             mesma da tela de atendimento: aqui também é onde os balões moram. */}

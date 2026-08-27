@@ -9,33 +9,60 @@ import {
   CircleCheck,
   CircleAlert,
   BookOpen,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatBytes, type KnowledgeDoc } from "@/lib/crm";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+  SheetClose,
+} from "@/components/ui/sheet";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.txt,.md";
+
+/** Quantos documentos a apresentação compacta mostra antes de "ver todos". */
+const RESUMO = 3;
 
 export default function KnowledgeManager({
   clientId,
   initialDocs,
   keyConfigured,
+  apresentacao = "pagina",
   preview = false,
 }: {
   clientId: string;
   initialDocs: KnowledgeDoc[];
   /** OPENAI_API_KEY presente no servidor. Sem ela, o upload responde 501. */
   keyConfigured: boolean;
+  /**
+   * `pagina` = a tela `/conhecimento` (título, área de arraste grande, lista
+   * inteira). `bloco` = dentro do grupo "O que ele sabe" do `/agente`:
+   * inventário curto, com o envio e a lista completa no painel lateral.
+   *
+   * É a MESMA instância nos dois casos, e isso não é detalhe: `docs` é estado
+   * local, então renderizar duas instâncias (uma embutida e uma no painel) faria
+   * as duas divergirem no primeiro upload.
+   */
+  apresentacao?: "pagina" | "bloco";
   preview?: boolean;
 }) {
   const supabase = createClient();
   const [docs, setDocs] = useState<KnowledgeDoc[]>(initialDocs);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [painelAberto, setPainelAberto] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function updateDoc(id: string, patch: Partial<KnowledgeDoc>) {
     setDocs((d) => d.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  }
+
+  function escolherArquivo() {
+    inputRef.current?.click();
   }
 
   // Upload em 3 passos (padrão gatekeeper, compatível com a Vercel):
@@ -141,8 +168,185 @@ export default function KnowledgeManager({
     }
   }
 
+  // Um input só, na raiz, acionado pelo botão embutido E pela área de arraste do
+  // painel. Dois inputs seriam dois caminhos para o mesmo handler.
+  const campoArquivo = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept={ACCEPT}
+      onChange={onPick}
+      disabled={uploading}
+      className="hidden"
+    />
+  );
+
+  const avisoChave = !keyConfigured && (
+    <div className="flex items-start gap-2 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
+      <CircleAlert size={15} className="mt-0.5 shrink-0" />
+      <span>
+        O processamento de documentos ainda não está ativo no servidor. O envio
+        fica disponível quando a chave do modelo estiver configurada.
+      </span>
+    </div>
+  );
+
+  const avisoErro = error && (
+    <div className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
+      {error}
+    </div>
+  );
+
+  // Era um <label> envolvendo o input; virou <button> porque agora existe um
+  // input só, na raiz, e dois gatilhos apontando para ele.
+  const areaArraste = (
+    <button
+      type="button"
+      onClick={escolherArquivo}
+      disabled={uploading}
+      className="flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-bloco px-4 py-8 text-center transition-colors hover:bg-[var(--active-bg)] disabled:pointer-events-none disabled:opacity-60"
+    >
+      {uploading ? (
+        <>
+          <Loader2 size={22} className="animate-spin text-brand-ink" />
+          <span className="text-apoio font-medium">Processando o documento…</span>
+          <span className="text-legenda text-ink-3">
+            Extraindo o texto e preparando para o agente.
+          </span>
+        </>
+      ) : (
+        <>
+          <Upload size={22} className="text-brand-ink" />
+          <span className="text-apoio font-medium">
+            Arraste um arquivo ou clique para enviar
+          </span>
+          <span className="text-legenda text-ink-3">
+            PDF, DOCX, XLSX, CSV, TXT ou MD, até 8 MB.
+          </span>
+        </>
+      )}
+    </button>
+  );
+
+  function lista(limite?: number) {
+    if (docs.length === 0) {
+      return (
+        <p className="py-4 text-center text-apoio text-ink-3">
+          Nenhum documento ainda.
+        </p>
+      );
+    }
+    const mostrar = limite ? docs.slice(0, limite) : docs;
+    return (
+      <ul className="space-y-2">
+        {mostrar.map((doc) => (
+          <li
+            key={doc.id}
+            className="flex items-center gap-3 rounded-xl border border-line bg-bloco p-3"
+          >
+            <FileText size={18} className="shrink-0 text-ink-faint" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-apoio font-medium">{doc.title}</div>
+              <div className="mt-0.5 flex items-center gap-2 text-legenda text-ink-3">
+                <StatusPill doc={doc} />
+                {doc.byteSize ? <span>{formatBytes(doc.byteSize)}</span> : null}
+              </div>
+            </div>
+            <Button
+              variant="danger-ghost"
+              size="icon-control"
+              onClick={() => remove(doc.id)}
+              title="Remover"
+              aria-label={`Remover ${doc.title}`}
+            >
+              <Trash2 size={16} />
+            </Button>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  const painel = (
+    <Sheet open={painelAberto} onOpenChange={setPainelAberto}>
+      <SheetContent>
+        <div className="flex items-start justify-between gap-2 border-b border-line px-5 py-3">
+          <div>
+            <SheetTitle>Documentos</SheetTitle>
+            <SheetDescription>
+              Produtos, tabelas de preço, perguntas frequentes, contratos.
+            </SheetDescription>
+          </div>
+          <SheetClose asChild>
+            <Button variant="ghost" size="icon-control" aria-label="Fechar">
+              <X size={16} />
+            </Button>
+          </SheetClose>
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+          {avisoChave}
+          {avisoErro}
+          {areaArraste}
+          {lista()}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+
+  // ——— Dentro do /agente: inventário, não entrada de formulário ———
+  //
+  // A diferença precisa estar ESCRITA: nesta tela o Salvar publica, e o
+  // documento NÃO passa por ele (as 3 chamadas do upload gravam na hora). Sem a
+  // frase, a pessoa envia um arquivo, não clica em Salvar, e fica sem saber se
+  // valeu. É a mesma honestidade do "Salvar já publica no WhatsApp" do rodapé.
+  if (apresentacao === "bloco") {
+    return (
+      <div className="space-y-2">
+        {campoArquivo}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-rotulo uppercase text-ink-3">Documentos</h3>
+          <Button variant="outline" onClick={escolherArquivo} disabled={uploading}>
+            {uploading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Upload size={14} />
+            )}
+            {uploading ? "Processando…" : "Enviar documento"}
+          </Button>
+        </div>
+        {/* NÃO promete "custa menos token": `match_knowledge_chunks` não tem
+            limiar de similaridade, então com um documento no tenant os 5 melhores
+            trechos entram no prompt em TODO turno, relevantes ou não. O que é
+            verdade e importa para a escolha é outra coisa: aqui não tem teto de
+            tamanho, e não gasta o orçamento de 2.000 caracteres do campo acima. */}
+        <p className="text-legenda text-ink-3">
+          O agente consulta estes arquivos para responder. Use aqui o que é longo
+          ou muda sozinho: tabela de preço, catálogo, contrato.
+        </p>
+        {avisoChave}
+        {avisoErro}
+        {lista(RESUMO)}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-legenda text-ink-3">
+            Documento entra no ar quando termina de processar, sem precisar salvar.
+          </p>
+          {docs.length > 0 && (
+            <Button variant="ghost" onClick={() => setPainelAberto(true)}>
+              {docs.length > RESUMO
+                ? `Ver todos (${docs.length})`
+                : "Gerenciar documentos"}
+            </Button>
+          )}
+        </div>
+        {painel}
+      </div>
+    );
+  }
+
+  // ——— Tela /conhecimento: segue existindo como rota, fora do menu ———
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
+      {campoArquivo}
       <div>
         <div className="flex items-center gap-2">
           <BookOpen size={20} className="text-brand-ink" />
@@ -154,90 +358,11 @@ export default function KnowledgeManager({
         </p>
       </div>
 
-      {!keyConfigured && (
-        <div className="flex items-start gap-2 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
-          <CircleAlert size={15} className="mt-0.5 shrink-0" />
-          <span>
-            O processamento de documentos ainda não está ativo no servidor. O envio
-            fica disponível quando a chave do modelo estiver configurada.
-          </span>
-        </div>
-      )}
+      {avisoChave}
+      {avisoErro}
+      {areaArraste}
 
-      {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
-          {error}
-        </div>
-      )}
-
-      <label
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-bloco px-4 py-8 text-center transition-colors hover:bg-[var(--active-bg)] ${
-          uploading ? "pointer-events-none opacity-60" : ""
-        }`}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPT}
-          onChange={onPick}
-          disabled={uploading}
-          className="hidden"
-        />
-        {uploading ? (
-          <>
-            <Loader2 size={22} className="animate-spin text-brand-ink" />
-            <span className="text-apoio font-medium">Processando o documento…</span>
-            <span className="text-legenda text-ink-3">
-              Extraindo o texto e preparando para o agente.
-            </span>
-          </>
-        ) : (
-          <>
-            <Upload size={22} className="text-brand-ink" />
-            <span className="text-apoio font-medium">
-              Arraste um arquivo ou clique para enviar
-            </span>
-            <span className="text-legenda text-ink-3">
-              PDF, DOCX, XLSX, CSV, TXT ou MD, até 8 MB.
-            </span>
-          </>
-        )}
-      </label>
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {docs.length === 0 ? (
-          <div className="py-8 text-center text-apoio text-ink-3">
-            Nenhum documento ainda.
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {docs.map((doc) => (
-              <li
-                key={doc.id}
-                className="flex items-center gap-3 rounded-xl border border-line bg-bloco p-3"
-              >
-                <FileText size={18} className="shrink-0 text-ink-faint" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-apoio font-medium">{doc.title}</div>
-                  <div className="mt-0.5 flex items-center gap-2 text-legenda text-ink-3">
-                    <StatusPill doc={doc} />
-                    {doc.byteSize ? <span>{formatBytes(doc.byteSize)}</span> : null}
-                  </div>
-                </div>
-                <Button
-                  variant="danger-ghost"
-                  size="icon-control"
-                  onClick={() => remove(doc.id)}
-                  title="Remover"
-                  aria-label={`Remover ${doc.title}`}
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{lista()}</div>
     </div>
   );
 }

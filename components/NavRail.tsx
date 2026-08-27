@@ -27,7 +27,6 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Bot,
-  BookOpen,
   Users,
   User,
   Calendar,
@@ -49,7 +48,13 @@ const NAV: {
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
-  { href: "/conhecimento", label: "Conhecimento", icon: BookOpen, donoOnly: true },
+  // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
+  // a base de conhecimento virou um bloco dentro do grupo "O que ele sabe" do
+  // /agente. O prompt já tratava "detalhes do negócio" e os trechos da base como
+  // a MESMA fonte autorizada (seção FONTES E HONESTIDADE), e dois itens irmãos no
+  // menu obrigavam o dono a adivinhar em qual tela dizer o que o agente sabe.
+  // A rota `/conhecimento` CONTINUA existindo: são 50 linhas que só embrulham o
+  // componente, apagar não economiza nada e quebraria link salvo.
   // "Playground" saiu do menu: a bancada de teste virou painel lateral dentro do
   // /agente, porque configurar e testar são a mesma atividade e ter duas telas
   // obrigava a SALVAR (ou seja, publicar) só para testar.
@@ -342,7 +347,13 @@ export default function NavRail({
           <DropdownMenuContent
             side="top"
             align="start"
-            sideOffset={104}
+            // Sem sideOffset: fica o padrão (4) da camada base. Era 104, um
+            // número mágico posto para o menu não cobrir a faixa "WhatsApp
+            // conectado" e o "Tema claro", que ficam logo acima do gatilho. O
+            // efeito foi pior que o problema: o painel flutuava solto, a 104px do
+            // botão, parecendo estar POR CIMA daqueles itens em vez de ancorado
+            // nele. Menu cobrir o que está imediatamente acima é o comportamento
+            // normal de um dropdown, e é o que a pessoa espera.
             className={cn(
               "overflow-hidden bg-menu",
               collapsed

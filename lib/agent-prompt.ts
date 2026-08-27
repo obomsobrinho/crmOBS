@@ -53,9 +53,20 @@ export const LIMITS = {
   bullet: 200,
   handoffNotice: 200,
   persona: 12000,
-  // O esqueleto fixo já tem ~5 KB; só alertamos quando o conteúdo do cliente
-  // empurra bem acima disso.
-  personaWarn: 9500,
+  /**
+   * Aviso de tamanho: 85% do teto de `persona`.
+   *
+   * Era 9.500, calibrado quando o esqueleto fixo tinha ~5 KB. O esqueleto passou
+   * de 7.900 (o rabo da base cresceu) e o aviso começou a disparar com o
+   * formulário praticamente vazio: um tenant recém-configurado dava 9.675 e já
+   * lia "prompt longo, considere encurtar os detalhes". Aviso que mente ensina a
+   * pessoa a ignorar aviso.
+   *
+   * Amarrado ao TETO de propósito, e não ao tamanho do esqueleto: a pergunta que
+   * ele responde é "estou perto do limite?", que continua valendo nos dois modos
+   * (no avançado não existe esqueleto guiado para descontar).
+   */
+  personaWarn: 10200,
 } as const;
 
 // Base do aviso de handoff quando o tenant não cadastrou o dele. Genérica de

@@ -156,7 +156,8 @@ export default function AgentPromptDrawer({
           >
             {chars.toLocaleString("pt-BR")} caracteres · ~
             {tokens.toLocaleString("pt-BR")} tokens · enviado em toda mensagem
-            {warn && " · prompt longo, considere encurtar os detalhes"}
+            {warn &&
+              ` · perto do teto de ${LIMITS.persona.toLocaleString("pt-BR")} caracteres`}
             {semCache && " · curto demais para a OpenAI reaproveitar entre mensagens"}
           </p>
 

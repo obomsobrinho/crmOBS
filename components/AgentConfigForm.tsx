@@ -11,6 +11,9 @@ import {
   LayoutTemplate,
   Bell,
   Lock,
+  ChevronRight,
+  ChevronDown,
+  FlaskConical,
 } from "lucide-react";
 import {
   buildAdvancedPersona,
@@ -18,6 +21,7 @@ import {
   buildPersona,
   estimarTokens,
   foraDoCache,
+  renderHours,
   stripBaseTail,
   CACHE_SAFE_TOKENS,
   DEFAULT_HANDOFF_NOTICE,
@@ -32,6 +36,8 @@ import {
 import { AGENT_PRESETS, type AgentPreset } from "@/lib/agent-presets";
 import AgentHoursEditor from "./AgentHoursEditor";
 import AgentBulletList from "./AgentBulletList";
+import KnowledgeManager from "./KnowledgeManager";
+import { type KnowledgeDoc } from "@/lib/crm";
 import AgentPromptDrawer from "./AgentPromptDrawer";
 import AgentPowerToggle from "./AgentPowerToggle";
 import AgentTestDrawer from "./AgentTestDrawer";
@@ -61,7 +67,10 @@ export default function AgentConfigForm({
   hasManualPersona,
   initialNotifyJid,
   stageNames,
+  knowledgeDocs,
+  knowledgeKeyConfigured,
   agentEnabled,
+  jaPublicou,
   blockers,
   preview = false,
 }: {
@@ -82,8 +91,28 @@ export default function AgentConfigForm({
   initialNotifyJid: string | null;
   /** key -> nome do estágio do funil, para a bancada rotular o card que moveria. */
   stageNames: Record<string, string>;
+  /**
+   * Base de conhecimento do tenant. Mora aqui desde 26/08/2026: o prompt já
+   * tratava "detalhes do negócio" e os trechos da base como a MESMA fonte
+   * autorizada, e só o menu separava as duas.
+   */
+  knowledgeDocs: KnowledgeDoc[];
+  /** OPENAI_API_KEY no servidor. Sem ela o upload responde 501. */
+  knowledgeKeyConfigured: boolean;
   /** Agente atendendo agora (já foi ao ar E está ligado). */
   agentEnabled: boolean;
+  /**
+   * `agent_published_at` preenchido, ou seja, o agente JÁ FOI AO AR alguma vez.
+   *
+   * É o sinal que separa MONTAGEM de EDIÇÃO nesta tela, e foi escolhido por
+   * eliminação: `agent_config_updated_at` é preenchido no PRIMEIRO save, e como a
+   * pessoa salva várias vezes enquanto monta, o guia sumiria no meio da
+   * montagem. `agent_published_at` é a primeira ativação e nunca é limpo, então
+   * significa literalmente "esta pessoa já conectou, configurou, testou e ligou".
+   * É o MESMO sinal que faz a barra de onboarding sumir, e é essa coincidência
+   * que evita dois contadores de progresso na mesma página.
+   */
+  jaPublicou: boolean;
   /** O que falta para a primeira ativação (lib/onboarding.publishBlockers). */
   blockers: string[];
   /** /design: desativa o fetch de salvar. */
@@ -111,11 +140,6 @@ export default function AgentConfigForm({
   // único Salvar na tela; o save dispara os dois PUT.
   const [notifyJid, setNotifyJid] = useState<string>(initialNotifyJid ?? "");
   const [savedJid, setSavedJid] = useState<string>(initialNotifyJid ?? "");
-  // No modo avançado o horário é salvo à parte (mode "horario"), e só se a pessoa
-  // encostou nele. Sem essa guarda, um save qualquer gravaria o DEFAULT_HOURS
-  // como se fosse horário configurado, e o /painel passaria a contar
-  // "atendimento fora do horário" em cima de um horário que ninguém escolheu.
-  const [hoursTouched, setHoursTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -127,12 +151,51 @@ export default function AgentConfigForm({
   // Modelo por segmento escolhido, aguardando confirmação (substitui os campos).
   const [pendingPreset, setPendingPreset] = useState<AgentPreset | null>(null);
 
+  // Dois sub-blocos recolhem: são os mais altos da tela E são "configura uma vez
+  // e esquece". Recolhidos, mostram o VALOR na própria linha do cabeçalho, então
+  // quem volta para conferir o horário lê sem abrir, o que é melhor que antes,
+  // quando precisava rolar até o bloco.
+  //
+  // Regra que os torna seguros: **vazio começa aberto**, senão a primeira
+  // configuração nunca acharia o campo.
+  //
+  // Não existe regra de "abre com erro de validação" porque não existe erro que
+  // caia neles: `validateConfig` só reprova companyName, companyWhat, agentName e
+  // goals, e os quatro estão em bloco sempre aberto. Escrever a regra aqui seria
+  // código morto fingindo proteção.
+  // Guia da primeira montagem. Ele muda a VOZ da tela, nunca a estrutura: nada é
+  // escondido, nada trava, nada desmonta, a rolagem continua sendo uma só.
+  //
+  // Por que não virou wizard nem abas, com número: os três grupos medem 517, 1008
+  // e 733px numa área visível de 874px. Um wizard de três passos entregaria um
+  // passo de 0,6 tela, um de 1,2 e um de 0,85, então o passo do meio continuaria
+  // rolando: cobraria o preço sem resolver o problema. E trocar de grupo hoje
+  // custa ZERO, porque tudo vive em dois `useState` e ninguém desmonta; passo de
+  // verdade torna isso maior que zero e reintroduz o bug do rascunho de lista.
+  const [guiaDispensado, setGuiaDispensado] = useState(false);
+  const montando = mode === "guiado" && !jaPublicou && !guiaDispensado;
+  // A bancada de teste é oferecida duas vezes na montagem: no cabeçalho e no
+  // rodapé, depois do primeiro save. Uma instância só, controlada daqui.
+  const [bancadaAberta, setBancadaAberta] = useState(false);
+
+  const [horarioAberto, setHorarioAberto] = useState(
+    () => renderHours(cfg.hours) === ""
+  );
+  const [limitesAberto, setLimitesAberto] = useState(
+    () => cfg.dontDo.length === 0 && cfg.escalateWhen.length === 0
+  );
+
   // Rascunhos ainda não adicionados nas listas (regras). Ficam num ref para
   // serem incorporados ao salvar, mesmo que o cliente esqueça de clicar "Adicionar".
   const draftsRef = useRef<{ dontDo: string; escalateWhen: string }>({
     dontDo: "",
     escalateWhen: "",
   });
+
+  // O Salvar virou rodapé grudado, então quem aperta ele pode estar a duas telas
+  // do topo, onde o erro aparece. Sem trazer o aviso para a vista, a pessoa
+  // clicaria em Salvar e nada pareceria acontecer.
+  const errorRef = useRef<HTMLDivElement>(null);
 
   const guidedPersona = useMemo(() => buildPersona(cfg), [cfg]);
   // No avançado o preview mostra o resultado REAL (texto dele mais o rabo da
@@ -179,22 +242,42 @@ export default function AgentConfigForm({
 
   // O formulário já tem conteúdo relevante? (para confirmar antes de aplicar um
   // modelo, que substitui os campos).
+  //
+  // Inclui endereço, site e observação de horário de propósito: quem ajustava
+  // esses campos antes de escrever "o que a empresa faz" recebia o modelo SEM
+  // confirmação nenhuma, e perdia aquilo em silêncio.
   function formHasContent(): boolean {
     return (
       cfg.companyWhat.trim() !== "" ||
       cfg.details.trim() !== "" ||
       cfg.dontDo.length > 0 ||
-      cfg.escalateWhen.length > 0
+      cfg.escalateWhen.length > 0 ||
+      cfg.companyAddress.trim() !== "" ||
+      cfg.companySite.trim() !== "" ||
+      cfg.hoursNote.trim() !== ""
     );
   }
 
-  // Aplica um modelo por segmento. Preserva a identidade já digitada (nome da
-  // empresa e do agente); substitui o resto pelo esqueleto do segmento.
+  // Aplica um modelo por segmento: substitui o COMPORTAMENTO (tom, objetivos,
+  // regras, detalhes) pelo esqueleto do segmento.
+  //
+  // Dado do cliente NÃO entra nisso: nome, endereço, site e horário são dele, e
+  // não do segmento. Antes o spread de `p.config` (que é EMPTY_CONFIG mais seis
+  // campos) zerava horário, endereço, site e o aviso de handoff, e devolvia
+  // `neverAdmitAi` ao default. Um preset não tem opinião sobre o horário de
+  // ninguém.
   function applyPreset(p: AgentPreset) {
     setCfg((c) => ({
       ...p.config,
-      companyName: c.companyName || p.config.companyName,
-      agentName: c.agentName || p.config.agentName,
+      companyName: c.companyName,
+      agentName: c.agentName,
+      agentRole: c.agentRole,
+      companyAddress: c.companyAddress,
+      companySite: c.companySite,
+      hours: c.hours,
+      hoursNote: c.hoursNote,
+      handoffNotice: c.handoffNotice,
+      neverAdmitAi: c.neverAdmitAi,
     }));
     draftsRef.current = { dontDo: "", escalateWhen: "" };
     setFields({});
@@ -204,6 +287,19 @@ export default function AgentConfigForm({
   function choosePreset(p: AgentPreset) {
     if (formHasContent()) setPendingPreset(p);
     else applyPreset(p);
+  }
+
+  // Mostra o erro E leva ele para a vista. O `setTimeout(0)` espera o React
+  // pintar o banner: no momento da chamada `errorRef` ainda é nulo, porque o
+  // banner só existe quando `error` deixa de ser nulo.
+  function falhar(msg: string, campos?: Record<string, string>) {
+    setError(msg);
+    if (campos) setFields(campos);
+    setSaving(false);
+    setTimeout(
+      () => errorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }),
+      0
+    );
   }
 
   async function save(confirmOverwrite = false) {
@@ -241,26 +337,12 @@ export default function AgentConfigForm({
         return;
       }
       if (!res.ok) {
-        setError(data.error ?? "Falha ao salvar.");
-        if (data.fields) setFields(data.fields);
-        setSaving(false);
+        falhar(data.error ?? "Falha ao salvar.", data.fields);
         return;
       }
-      // Horário no modo avançado: salvo à parte, porque o mode "avancado" só
-      // grava a persona. Só quando a pessoa encostou no editor.
-      if (mode === "avancado" && hoursTouched) {
-        const resH = await fetch(`/api/clients/${clientId}/agent-config`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "horario", hours: cfg.hours }),
-        });
-        if (!resH.ok) {
-          setError("O prompt foi salvo, mas o horário não.");
-          setSaving(false);
-          return;
-        }
-        setHoursTouched(false);
-      }
+      // O save do horário à parte (mode "horario") saiu junto com a seção de
+      // Horário do modo avançado. O endpoint continua existindo e funcionando,
+      // só não tem mais chamador na interface.
 
       // Grupo de notificação, só quando mudou. Vai DEPOIS do prompt porque é o
       // menos importante dos dois: se falhar, a configuração do agente já está
@@ -277,10 +359,7 @@ export default function AgentConfigForm({
           jid?: string | null;
         };
         if (!resJid.ok) {
-          setError(
-            dataJid.error ?? "O agente foi salvo, mas o grupo de avisos não."
-          );
-          setSaving(false);
+          falhar(dataJid.error ?? "O agente foi salvo, mas o grupo de avisos não.");
           return;
         }
         const proximo = dataJid.jid ?? "";
@@ -299,18 +378,68 @@ export default function AgentConfigForm({
       // Sem router.refresh(): a persona já vale no n8n na hora, e a tela mantém
       // o que o cliente preencheu (recarregar poderia dar impressão de perda).
     } catch {
-      setError("Não foi possível contatar o servidor.");
-      setSaving(false);
+      falhar("Não foi possível contatar o servidor.");
     }
   }
 
   const agendarSemGrupo =
     cfg.goals.includes("agendar") && notifyJid.trim() === "";
 
+  // Estado de cada grupo na montagem. Só existe onde há campo OBRIGATÓRIO, e
+  // `validateConfig` reprova exatamente quatro: companyName, companyWhat e
+  // agentName (grupo 1) e goals (grupo 3).
+  //
+  // ⚠️ O grupo 2 NÃO tem estado, e essa assimetria é o motivo de isto não ser um
+  // stepper com bolinha de completude: ele não tem um único campo obrigatório,
+  // então a bolinha dele nunca ficaria verde e o desenho quebraria. O rótulo dele
+  // diz a verdade em vez de fingir progresso: "opcional, e é o que mais melhora
+  // as respostas".
+  const faltamNoQuem = [cfg.companyName, cfg.companyWhat, cfg.agentName].filter(
+    (v) => v.trim() === ""
+  ).length;
+  const estadoQuem = !montando
+    ? undefined
+    : faltamNoQuem === 0
+      ? "pronto"
+      : faltamNoQuem === 1
+        ? "falta 1"
+        : `faltam ${faltamNoQuem}`;
+  const estadoPode = !montando
+    ? undefined
+    : cfg.goals.length === 0
+      ? "falta escolher um objetivo"
+      : "pronto";
+
   // Persona curta demais para o cache de prompt da OpenAI pegar. Interessa ao
   // dono porque é custo: a persona vai inteira em TODA mensagem, e sem cache cada
   // turno paga o preço cheio de entrada. Só aparece quando o risco existe.
+  //
+  // Saiu do topo da tela e virou aviso DEBAIXO de "Detalhes do negócio", que é o
+  // único campo que o resolve. Como banner de topo, ele passou a ficar a 200px da
+  // caixa de enviar documento, e a inferência natural (errada) era que mandar um
+  // arquivo consertaria: documento entra por retrieval, DEPOIS da persona, então
+  // não faz parte do prefixo que o cache reaproveita.
   const semCache = foraDoCache(previewPersona);
+
+  // Valor resumido dos blocos recolhidos. Só a primeira parte do horário: a linha
+  // "Não atende" é ruído numa linha de cabeçalho.
+  const resumoHorario = useMemo(() => {
+    const linhas = renderHours(cfg.hours)
+      .split("\n")
+      .filter((l) => l !== "" && !l.startsWith("- Não atende"));
+    if (linhas.length === 0) return "Nenhum horário definido";
+    return linhas.map((l) => l.replace(/^- /, "")).join("; ");
+  }, [cfg.hours]);
+
+  const resumoLimites = useMemo(() => {
+    const a = cfg.dontDo.length;
+    const b = cfg.escalateWhen.length;
+    if (a === 0 && b === 0) return "Nada definido";
+    const partes: string[] = [];
+    if (a > 0) partes.push(`${a} limite${a === 1 ? "" : "s"}`);
+    if (b > 0) partes.push(`${b} caso${b === 1 ? "" : "s"} de chamar o time`);
+    return partes.join(", ");
+  }, [cfg.dontDo.length, cfg.escalateWhen.length]);
 
   // O que a bancada vai testar: o estado do formulário, CRU. Compilar aqui e
   // mandar a persona pronta deixaria o browser decidir o prompt final, e o rabo
@@ -360,7 +489,12 @@ export default function AgentConfigForm({
         <div className="flex items-center gap-2">
           {/* Testar vem antes de ver o prompt: é o que a pessoa quer fazer
               depois de mexer nos campos. O prompt é conferência. */}
-          <AgentTestDrawer configuracao={configuracao} stageNames={stageNames} />
+          <AgentTestDrawer
+            configuracao={configuracao}
+            stageNames={stageNames}
+            aberto={bancadaAberta}
+            onAbertoChange={setBancadaAberta}
+          />
           <AgentPromptDrawer persona={previewPersona} onRestore={restaurar} />
           <AgentPowerToggle
             clientId={clientId}
@@ -395,18 +529,18 @@ export default function AgentConfigForm({
         </TabsList>
       </Tabs>
 
-      {/* Banners */}
+      {/* Banners. O aviso do grupo de avisos NÃO mora mais aqui: ele descreve um
+          problema cuja solução é um campo desta mesma tela, e no topo ficava a
+          600px do campo, sem apontar para ele. Agora é uma linha embaixo do
+          próprio campo. */}
       {error && (
-        <div className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
+        <div
+          ref={errorRef}
+          role="alert"
+          className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink"
+        >
           {error}
         </div>
-      )}
-      {agendarSemGrupo && (
-        <Banner>
-          Para o agente marcar conversas com o time é preciso um grupo de WhatsApp
-          para notificar. Enquanto ele não estiver configurado, esse encaminhamento
-          não vai funcionar.
-        </Banner>
       )}
       {hadManual && mode === "guiado" && (
         <Banner>
@@ -414,53 +548,87 @@ export default function AgentConfigForm({
           vai substituí-lo (o sistema pede confirmação).
         </Banner>
       )}
-      {semCache && (
-        <Banner>
-          O prompt tem cerca de {estimarTokens(previewPersona).toLocaleString("pt-BR")}{" "}
-          tokens, abaixo dos {CACHE_SAFE_TOKENS.toLocaleString("pt-BR")} que a
-          OpenAI pede para reaproveitar o prompt entre mensagens. Cada resposta vai
-          custar o preço cheio de entrada. Detalhar mais a empresa deixa o agente
-          melhor e mais barato ao mesmo tempo.
-        </Banner>
-      )}
+      {/* O aviso de cache saiu daqui: ver o comentário em `semCache`. Ele agora
+          mora embaixo de "Detalhes do negócio", o campo que o resolve. */}
 
-      {/* Colunas: form + preview */}
-      {/* Uma coluna. O prompt gerado saiu daqui para o drawer, e o formulário
-          ficou com a largura toda: campo curto em duas colunas, campo longo
-          inteiro. Antes ele vivia numa faixa de ~400px ao lado do preview. */}
+      {/* UMA coluna de seções, com colunas DENTRO delas.
+          As duas colunas anteriores eram no nível da SEÇÃO, e isso quebrava em
+          1024px: `Par` usa `sm:`, que é breakpoint de viewport e não de
+          container, então dentro de uma coluna de 348px o campo de regra caía
+          para 34px de largura e as 7 linhas de horário perdiam 26px. O vazio à
+          direita que motivou aquela mudança não vinha de "uma coluna": vinha de
+          campo de 40px esticado em 972px, e o remédio para isso é três campos
+          por linha, não partir a página no meio. */}
       <div className="flex">
         {mode === "guiado" ? (
-          <div className="min-w-0 flex-1 space-y-5">
-            <section className="rounded-xl border border-line bg-bloco p-4">
-              <div className="mb-1 flex items-center gap-2">
-                <LayoutTemplate size={15} className="text-brand-ink" />
-                <h2 className="text-corpo font-semibold">Começar de um modelo</h2>
-              </div>
-              <p className="mb-3 text-legenda text-ink-3">
-                Escolha o segmento mais próximo do seu negócio para preencher tom,
-                objetivos e regras. Depois é só ajustar. O nome da empresa e do
-                agente que você já digitou são mantidos.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {AGENT_PRESETS.map((p) => (
+          <div className="min-w-0 flex-1 space-y-6">
+            {/* Três grupos com NOME, na ordem em que se pensa sobre um
+                funcionário novo (quem é você, o que você sabe, o que você pode
+                fazer). É o nível de hierarquia que faltava: as seis seções
+                antigas tinham peso tipográfico idêntico, então nada mandava em
+                nada.
+                Teve um índice de âncoras aqui, e SAIU (decisão do dono, 26/08):
+                com três grupos de nome curto, ele repetia na horizontal o que os
+                títulos já dizem 40px abaixo. Os `id` das seções ficam, porque
+                custam nada e servem para link direto. */}
+            {/* ACOMPANHANTE: só na primeira montagem, e só no modo guiado.
+                Aparece por cima da tela e some para sempre quando o agente vai ao
+                ar (`jaPublicou`). NÃO tem contador: "2 de 3" aqui viveria dentro
+                do passo "2 de 4" da barra de onboarding, que é a mesma página.
+                Os dois nascem e morrem pelo MESMO sinal, então existe um contador
+                só na conta inteira. */}
+            {montando && (
+              <div className="rounded-xl border border-brand-line bg-brand-surface p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="text-titulo">Vamos montar seu atendente</h2>
+                    <p className="mt-1 text-apoio text-ink-2">
+                      São três partes, uns cinco minutos. Nada vai ao ar até você
+                      ativar o agente lá em cima.
+                    </p>
+                  </div>
                   <Button
-                    key={p.id}
-                    variant="outline"
-                    title={p.description}
-                    onClick={() => choosePreset(p)}
-                    className="rounded-full"
+                    variant="ghost"
+                    onClick={() => setGuiaDispensado(true)}
+                    className="shrink-0"
                   >
-                    {p.label}
+                    Já sei o que estou fazendo
                   </Button>
-                ))}
+                </div>
+                {/* Os presets sobem para CÁ na montagem: é o único momento em que
+                    "comece de um modelo" é a primeira coisa a fazer. No modo
+                    edição eles seguem no pé do grupo 1, onde foram parar em
+                    26/08, porque lá são ação destrutiva e não convite. */}
+                <div className="mt-4 border-t border-brand-line pt-4">
+                  <p className="mb-2 flex items-center gap-2 text-apoio font-medium">
+                    <LayoutTemplate size={15} className="shrink-0 text-brand-ink" />
+                    Comece de um modelo do seu segmento
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {AGENT_PRESETS.map((p) => (
+                      <Button
+                        key={p.id}
+                        variant="outline"
+                        title={p.description}
+                        onClick={() => choosePreset(p)}
+                        className="rounded-full"
+                      >
+                        {p.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </section>
+            )}
 
-            <Secao title="Empresa">
-              {/* Campo curto em duas colunas, campo longo inteiro. Antes era tudo
-                  empilhado porque o formulário vivia numa faixa de ~400px ao
-                  lado do preview; agora tem a largura da tela. */}
-              <Par>
+            <Secao
+              id="grupo-quem"
+              title="Quem atende"
+              numero={montando ? 1 : undefined}
+              estado={estadoQuem}
+              continuarPara={montando ? "grupo-sabe" : undefined}
+            >
+              <Trio>
                 <Field label="Nome da empresa" error={fields.companyName} required>
                   <Input
                     value={cfg.companyName}
@@ -478,7 +646,13 @@ export default function AgentConfigForm({
                     placeholder="https://…"
                   />
                 </Field>
-              </Par>
+                <Field label="Endereço">
+                  <Input
+                    value={cfg.companyAddress}
+                    onChange={(e) => patch({ companyAddress: e.target.value })}
+                  />
+                </Field>
+              </Trio>
               <Field label="O que a empresa faz" error={fields.companyWhat} required>
                 <Textarea
                   value={cfg.companyWhat}
@@ -488,35 +662,6 @@ export default function AgentConfigForm({
                   className="resize-none"
                 />
               </Field>
-              <Field label="Endereço">
-                <Input
-                  value={cfg.companyAddress}
-                  onChange={(e) => patch({ companyAddress: e.target.value })}
-                />
-              </Field>
-            </Secao>
-
-            <Secao title="Horário de atendimento">
-              <p className="-mt-1 mb-3 text-legenda text-ink-3">
-                O agente informa esse horário, mas não sabe a data e a hora atual,
-                então ele nunca diz se está aberto ou fechado agora.
-              </p>
-              <AgentHoursEditor
-                value={cfg.hours}
-                onChange={(v) => patch({ hours: v })}
-              />
-              <div className="mt-3">
-                <Field label="Observação de horário">
-                  <Input
-                    value={cfg.hoursNote}
-                    onChange={(e) => patch({ hoursNote: e.target.value })}
-                    placeholder="Ex.: fechado em feriados"
-                  />
-                </Field>
-              </div>
-            </Secao>
-
-            <Secao title="Agente">
               <Par>
                 <Field label="Nome do agente" error={fields.agentName} required>
                   <Input
@@ -552,8 +697,142 @@ export default function AgentConfigForm({
                   ))}
                 </div>
               </Field>
+
+              {/* O modelo desceu do topo para o pé deste grupo. Ele importa por
+                  30 segundos na vida da conta, e como faixa permanente de
+                  largura cheia ocupava o lugar mais clicável da tela oferecendo
+                  uma ação que SUBSTITUI campos. Continua sendo pílula, mas agora
+                  depois de uma linha, e não antes de tudo.
+                  Na MONTAGEM ele não aparece aqui: subiu para o bloco de
+                  abertura, onde é convite em vez de risco. */}
+              <div
+                className={`flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-3 ${
+                  montando ? "hidden" : "flex"
+                }`}
+              >
+                <div className="flex items-center gap-2 text-legenda text-ink-3">
+                  <LayoutTemplate size={15} className="shrink-0 text-brand-ink" />
+                  <span>
+                    Não sabe o que escrever? Comece de um modelo do seu segmento e
+                    ajuste depois.
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {AGENT_PRESETS.map((p) => (
+                    <Button
+                      key={p.id}
+                      variant="outline"
+                      title={p.description}
+                      onClick={() => choosePreset(p)}
+                      className="rounded-full"
+                    >
+                      {p.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </Secao>
+
+            <Secao
+              id="grupo-sabe"
+              title="O que ele sabe"
+              numero={montando ? 2 : undefined}
+              estado={
+                montando ? "opcional, e é o que mais melhora as respostas" : undefined
+              }
+              continuarPara={montando ? "grupo-pode" : undefined}
+            >
+              {/* Subiu para o começo do grupo, e é o bloco mais alto da tela:
+                  é o campo que mais muda a qualidade da resposta e o único que
+                  resolve o aviso de cache de prompt. Antes era o ÚLTIMO bloco da
+                  página, e nunca aparecia na primeira tela. */}
+              <Field label="Detalhes do negócio">
+                <Hint>
+                  O agente sabe isto de cor, e vale em toda conversa. Produtos,
+                  serviços, perguntas frequentes, promoções: escreva livremente.
+                </Hint>
+                <Textarea
+                  value={cfg.details}
+                  onChange={(e) =>
+                    patch({ details: e.target.value.slice(0, LIMITS.details) })
+                  }
+                  rows={8}
+                  className="resize-none"
+                />
+                <div className="text-right text-legenda tabular-nums text-ink-3">
+                  {cfg.details.length}/{LIMITS.details}
+                </div>
+                {semCache && (
+                  <AvisoCache tokens={estimarTokens(previewPersona)}>
+                    Detalhar mais aqui deixa o agente melhor e mais barato ao mesmo
+                    tempo. Documento enviado abaixo não resolve isto: ele entra por
+                    consulta, depois do prompt.
+                  </AvisoCache>
+                )}
+              </Field>
+
+              {/* A base de conhecimento passou a morar AQUI (26/08/2026), e o
+                  argumento é o código, não navegação: a seção FONTES E HONESTIDADE
+                  do prompt lista "detalhes do negócio" e os trechos da base na
+                  MESMA frase, como o que o agente pode afirmar. O dono tinha que
+                  descobrir sozinho que metade dessa lista se configura aqui e a
+                  outra metade em outra tela do menu.
+                  Versão compacta de propósito: a área de arraste do
+                  KnowledgeManager tem `py-8` e sozinha somaria uns 400px a uma
+                  tela que já é longa. Ela vive no painel lateral. */}
+              <div className="border-t border-line pt-4">
+                <KnowledgeManager
+                  clientId={clientId}
+                  initialDocs={knowledgeDocs}
+                  keyConfigured={knowledgeKeyConfigured}
+                  apresentacao="bloco"
+                  preview={preview}
+                />
+              </div>
+
+              {/* Horário em largura cheia: as 7 linhas cabem, e a observação vai
+                  ao lado em vez de embaixo. Em meia coluna o rótulo do dia
+                  (`w-32`) mais os dois campos de hora somavam 347px num espaço
+                  de 314, e a linha era cortada. */}
+              <Recolhivel
+                titulo="Horário de atendimento"
+                resumo={resumoHorario}
+                aberto={horarioAberto}
+                onToggle={() => setHorarioAberto((v) => !v)}
+              >
+                <p className="mb-3 text-legenda text-ink-3">
+                  O agente informa esse horário, mas não sabe a data e a hora
+                  atual, então ele nunca diz se está aberto ou fechado agora.
+                </p>
+                <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+                  <AgentHoursEditor
+                    value={cfg.hours}
+                    onChange={(v) => patch({ hours: v })}
+                  />
+                  <Field label="Observação de horário">
+                    <Input
+                      value={cfg.hoursNote}
+                      onChange={(e) => patch({ hoursNote: e.target.value })}
+                      placeholder="Ex.: fechado em feriados"
+                    />
+                  </Field>
+                </div>
+              </Recolhivel>
+            </Secao>
+
+            <Secao
+              id="grupo-pode"
+              title="O que ele pode fazer"
+              numero={montando ? 3 : undefined}
+              estado={estadoPode}
+            >
+              {/* Objetivos SEM pintura. Eram três cartões em `bg-brand-surface`,
+                  cerca de 204px do elemento de maior contraste do corpo da tela,
+                  para a escolha menos disputada do formulário: ela já vem com
+                  default e quase ninguém mexe. Linha quieta de caixa de marcar
+                  diz a mesma coisa sem roubar a atenção do que importa. */}
               <Field label="Objetivos" error={fields.goals} required>
-                <div className="space-y-1.5">
+                <div className="grid gap-1 sm:grid-cols-3">
                   {GOALS.map((g) => {
                     const active = cfg.goals.includes(g.value as Goal);
                     return (
@@ -562,11 +841,7 @@ export default function AgentConfigForm({
                       // marcar, e o leitor de tela precisa saber disso.
                       <label
                         key={g.value}
-                        className={`flex w-full cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-                          active
-                            ? "border-brand-line bg-brand-surface"
-                            : "border-line hover:bg-[var(--active-bg)]"
-                        }`}
+                        className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-[var(--active-bg)]"
                       >
                         <Checkbox
                           checked={active}
@@ -596,7 +871,9 @@ export default function AgentConfigForm({
 
               {/* O grupo de avisos aparece só com "Agendar" marcado: é o único
                   objetivo que depende dele. Fora daí seria um campo técnico
-                  (um JID) pedido sem motivo na primeira configuração. */}
+                  (um JID) pedido sem motivo na primeira configuração. E o aviso
+                  de que ele está vazio mora AQUI, embaixo do campo que resolve,
+                  em vez de no topo da tela. */}
               {cfg.goals.includes("agendar") && (
                 <Field label="Grupo de WhatsApp para avisar">
                   <div className="flex items-center gap-2">
@@ -608,100 +885,96 @@ export default function AgentConfigForm({
                       className="flex-1 font-mono"
                     />
                   </div>
-                  <Hint>
-                    Quando o agente marca uma conversa com o time, ele avisa neste
-                    grupo. Peça o JID do grupo a quem cuida da automação.
-                  </Hint>
+                  {agendarSemGrupo ? (
+                    <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
+                      <AlertTriangle size={14} className="mt-px shrink-0" />
+                      <span>
+                        Sem este grupo o agente não consegue avisar o time, e
+                        marcar uma conversa não vai funcionar. Peça o JID do grupo
+                        a quem cuida da automação.
+                      </span>
+                    </p>
+                  ) : (
+                    <Hint>
+                      Quando o agente marca uma conversa com o time, ele avisa
+                      neste grupo.
+                    </Hint>
+                  )}
                 </Field>
               )}
 
-              <label className="flex cursor-pointer items-center gap-2 text-apoio">
-                <Checkbox
-                  checked={cfg.neverAdmitAi}
-                  onCheckedChange={(v) => patch({ neverAdmitAi: v === true })}
-                />
-                Nunca admitir que é uma IA
-              </label>
-            </Secao>
-
-            <Secao title="Regras">
-              <Par>
-              <Field label="O que o agente NÃO deve fazer">
-                <AgentBulletList
-                  value={cfg.dontDo}
-                  onChange={(v) => patch({ dontDo: v })}
-                  onDraftChange={(v) => (draftsRef.current.dontDo = v)}
-                  placeholder="Ex.: nunca dar desconto por conta própria"
-                  maxLen={LIMITS.bullet}
-                />
-              </Field>
-              <Field label="Quando chamar um humano">
-                <AgentBulletList
-                  value={cfg.escalateWhen}
-                  onChange={(v) => patch({ escalateWhen: v })}
-                  onDraftChange={(v) => (draftsRef.current.escalateWhen = v)}
-                  placeholder="Ex.: quando pedirem orçamento fechado"
-                  maxLen={LIMITS.bullet}
-                />
-              </Field>
-              </Par>
-              <Field label="O que avisar ao passar para o time">
-                <Input
-                  value={cfg.handoffNotice}
-                  onChange={(e) =>
-                    patch({
-                      handoffNotice: e.target.value.slice(0, LIMITS.handoffNotice),
-                    })
-                  }
-                  placeholder={DEFAULT_HANDOFF_NOTICE}
-                />
-                <p className="text-legenda text-ink-3">
-                  É a base da frase, não a frase pronta: o agente adapta ao que a
-                  pessoa acabou de pedir (por exemplo &quot;vou verificar se tem
-                  horário pra hoje&quot;). Em branco, ele usa a frase acima.
-                </p>
-              </Field>
-            </Secao>
-
-            <Secao title="Detalhes do negócio">
-              <p className="-mt-1 mb-2 text-legenda text-ink-3">
-                Produtos, serviços, perguntas frequentes, promoções: tudo que o
-                agente precisa saber para responder. Escreva livremente.
-              </p>
-              <Textarea
-                value={cfg.details}
-                onChange={(e) =>
-                  patch({ details: e.target.value.slice(0, LIMITS.details) })
-                }
-                rows={8}
-                className="resize-none"
-              />
-              <div className="mt-1 text-right text-legenda tabular-nums text-ink-3">
-                {cfg.details.length}/{LIMITS.details}
-              </div>
+              {/* Listas em largura cheia. Estavam num `Par` dentro de uma coluna
+                  de 348px, e o campo ficava com 34px para um placeholder de 41
+                  caracteres. O próprio comentário do `Par` já dizia a regra: só
+                  para campo CURTO.
+                  ⚠️ `manterMontado` NÃO é preferência: `AgentBulletList` guarda o
+                  rascunho não adicionado num ref do pai (`onDraftChange`), e
+                  `withPendingDrafts` o incorpora no Salvar. Se o bloco
+                  desmontasse ao recolher, o texto visível sumiria da tela mas
+                  continuaria sendo salvo, que é pior que perder. */}
+              <Recolhivel
+                titulo="Limites e quando chamar o time"
+                resumo={resumoLimites}
+                aberto={limitesAberto}
+                onToggle={() => setLimitesAberto((v) => !v)}
+                manterMontado
+              >
+                <div className="space-y-4">
+                <Field label="O que o agente NÃO deve fazer">
+                  <AgentBulletList
+                    value={cfg.dontDo}
+                    onChange={(v) => patch({ dontDo: v })}
+                    onDraftChange={(v) => (draftsRef.current.dontDo = v)}
+                    placeholder="Ex.: nunca dar desconto por conta própria"
+                    maxLen={LIMITS.bullet}
+                  />
+                </Field>
+                <Field label="Quando chamar um humano">
+                  <AgentBulletList
+                    value={cfg.escalateWhen}
+                    onChange={(v) => patch({ escalateWhen: v })}
+                    onDraftChange={(v) => (draftsRef.current.escalateWhen = v)}
+                    placeholder="Ex.: quando pedirem orçamento fechado"
+                    maxLen={LIMITS.bullet}
+                  />
+                </Field>
+                <Field label="O que avisar ao passar para o time">
+                  <Input
+                    value={cfg.handoffNotice}
+                    onChange={(e) =>
+                      patch({
+                        handoffNotice: e.target.value.slice(0, LIMITS.handoffNotice),
+                      })
+                    }
+                    placeholder={DEFAULT_HANDOFF_NOTICE}
+                  />
+                  <Hint>
+                    É a base da frase, não a frase pronta: o agente adapta ao que
+                    a pessoa acabou de pedir (por exemplo &quot;vou verificar se
+                    tem horário pra hoje&quot;). Em branco, ele usa a frase acima.
+                  </Hint>
+                </Field>
+                  <label className="flex cursor-pointer items-center gap-2 text-apoio">
+                    <Checkbox
+                      checked={cfg.neverAdmitAi}
+                      onCheckedChange={(v) => patch({ neverAdmitAi: v === true })}
+                    />
+                    Nunca admitir que é uma IA
+                  </label>
+                </div>
+              </Recolhivel>
             </Secao>
           </div>
         ) : (
           <div className="min-w-0 flex-1 space-y-5">
-            {/* Horário também no avançado. Antes era um cartão separado
-                (AgentBusinessHours) que existia só porque a persona à mão não
-                tem onde guardar horário, e sem horário o /painel não consegue
-                contar atendimento fora do expediente. Aqui ele é seção como
-                qualquer outra, e o save manda junto. */}
-            <Secao title="Horário de atendimento">
-              <p className="-mt-1 mb-3 text-legenda text-ink-3">
-                É dado da empresa, não do prompt: fica salvo mesmo com o prompt
-                escrito à mão, e alimenta os números do painel.
-              </p>
-              <AgentHoursEditor
-                value={cfg.hours}
-                onChange={(v) => {
-                  setHoursTouched(true);
-                  patch({ hours: v });
-                }}
-              />
-            </Secao>
-
+            {/* Horário SAIU do avançado (22/08/2026, decisão do dono). O motivo é
+                coerência: nome da empresa também é dado da empresa e nunca esteve
+                aqui, então ter só o horário confundia mais do que ajudava. No
+                avançado o tenant escreve o horário no próprio prompt se quiser, e
+                deixar sem nada é aceitável.
+                Consequência assumida: tenant avançado não alimenta o número de
+                "fora do horário" do /painel. O custo hoje é zero, porque o único
+                tenant avançado (OBM) tem agent_config nulo e nunca teve horário. */}
             <Secao title="Prompt (modo avançado)">
               <p className="-mt-1 mb-2 text-legenda text-ink-3">
                 Escreva o prompt do jeito que quiser. As quatro seções do fim são
@@ -735,6 +1008,21 @@ export default function AgentConfigForm({
                 {rawPersona.length.toLocaleString("pt-BR")} caracteres
               </div>
 
+              {/* O aviso de cache também vive AQUI, e não só no guiado. Ele saiu
+                  do topo da tela para ficar junto do campo que o resolve, e no
+                  avançado esse campo é a própria textarea. Na prática é o único
+                  modo em que o aviso dispara: o esqueleto vazio do guiado já dá
+                  cerca de 2.146 tokens. Deixar só no guiado teria matado o aviso
+                  exatamente onde ele serve. */}
+              {semCache && (
+                <div className="mt-2">
+                  <AvisoCache tokens={estimarTokens(previewPersona)}>
+                    Escrever mais contexto no prompt deixa o agente melhor e mais
+                    barato ao mesmo tempo.
+                  </AvisoCache>
+                </div>
+              )}
+
               <div className="mt-4">
                 <div className="mb-1.5 flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
                   <Lock size={13} />
@@ -750,13 +1038,43 @@ export default function AgentConfigForm({
 
       </div>
 
-      {/* Rodapé. Salvar mora aqui, no fim do formulário, e não no cabeçalho:
-          é onde a pessoa termina de mexer. Salvar JÁ É publicar (o n8n lê
-          clients.persona ao vivo), então cada save vira uma versão no histórico
-          do drawer, que é de onde se volta atrás. */}
-      <div className="flex flex-wrap items-center justify-end gap-3 border-t border-line pt-4">
+      {/* Rodapé GRUDADO no fim do cartão. Salvar mora aqui, e não no cabeçalho,
+          porque é onde a pessoa termina de mexer; mas o formulário tem 2,6 telas
+          de altura, e um Salvar estático ficava a 1.862px de rolagem: voltar para
+          trocar um campo custava rolar até o fim para confirmar.
+          Salvar JÁ É publicar (o n8n lê clients.persona ao vivo), e a frase ao
+          lado existe para isso não ser surpresa; cada save vira uma versão no
+          histórico do drawer, que é de onde se volta atrás.
+          ⚠️ O `-mx-6` sangra até a borda do cartão, mas o padding de BAIXO do
+          cartão foi removido (`px-6 pt-6` nas duas páginas que montam esta tela)
+          em vez de cancelado com `-mb-6`. O motivo é medido: `bottom: 0` cola no
+          fim da CONTENT BOX do container de rolagem, então com `pb-6` no cartão a
+          faixa parava 24px acima do fim e dava para ver conteúdo passando por
+          baixo dela. Quem dá o respiro de baixo agora é o `py-3` daqui. */}
+      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-line bg-conteudo px-6 py-3">
+        {/* ⚠️ A frase depende de `jaPublicou`, e isso é CORREÇÃO, não estilo.
+            "Salvar já publica no WhatsApp" era dito a todo mundo, mas
+            `lib/agent-turn.ts` devolve turno silencioso quando
+            `agent_published_at` é nulo: antes da primeira ativação, salvar NÃO
+            publica nada. A tela assustava o cliente final exatamente no momento
+            em que ele está mais inseguro, escrevendo o nome da empresa. */}
+        <span className="mr-auto text-legenda text-ink-3">
+          {jaPublicou
+            ? "Salvar já publica no WhatsApp."
+            : "Ainda não vai ao ar: o agente só começa a responder quando você ativar."}
+        </span>
         {savedAt && (
           <span className="text-legenda text-ink-3">Salvo às {savedAt}</span>
+        )}
+        {/* Depois do primeiro save da montagem, o rodapé entrega a pessoa ao
+            passo seguinte do onboarding (testar), que é um botão desta mesma
+            tela. É a barra de onboarding continuando aqui dentro, em vez de
+            largar a pessoa em quase três telas de formulário. */}
+        {!jaPublicou && savedAt && (
+          <Button variant="outline" size="field" onClick={() => setBancadaAberta(true)}>
+            <FlaskConical size={15} />
+            Agora teste a conversa
+          </Button>
         )}
         <Button size="field" onClick={() => save()} disabled={saving}>
           <Save size={15} />
@@ -779,7 +1097,7 @@ export default function AgentConfigForm({
       <ConfirmModal
         aberto={pendingPreset !== null}
         title={`Aplicar o modelo ${pendingPreset?.label ?? ""}?`}
-        body="Isso substitui tom, objetivos, regras e detalhes pelo esqueleto do segmento. O nome da empresa e do agente são mantidos."
+        body="Isso substitui tom, objetivos, regras e detalhes pelo esqueleto do segmento. Nome, endereço, site e horário são mantidos."
         confirmLabel="Aplicar modelo"
         onCancel={() => setPendingPreset(null)}
         onConfirm={() => {
@@ -847,25 +1165,155 @@ function ConfirmModal({
  * bloco DENTRO dela, e por isso usa `bg-bloco`, a superfície de quem mora
  * dentro. Com `bg-surface` ele tinha a mesma cor do pai no tema escuro.
  */
-function Secao({ title, children }: { title: string; children: React.ReactNode }) {
+function Secao({
+  id,
+  title,
+  numero,
+  estado,
+  continuarPara,
+  children,
+}: {
+  id?: string;
+  title: string;
+  /**
+   * Ordem de leitura na primeira montagem. É NUMERAL de ordem, não de progresso:
+   * a palavra "passo" não aparece de propósito, porque neste produto "passo" já
+   * significa "travado até o anterior terminar" (é assim que a barra de
+   * onboarding funciona), e estes grupos não travam nem devem.
+   * Fica dentro do próprio `h2`, e não numa trilha à esquerda: trilha repetiria
+   * na horizontal o que o título diz.
+   */
+  numero?: number;
+  /** "faltam 2", "pronto", "opcional". Ausente = não diz nada. */
+  estado?: string;
+  /** `id` do próximo grupo. Só rola até lá; não avança nada, não trava nada. */
+  continuarPara?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="rounded-xl border border-line bg-bloco p-4">
-      <h2 className="mb-3 text-corpo font-semibold">{title}</h2>
+    // `scroll-mt-2` para o título não encostar na borda de cima do cartão, que é
+    // o container de rolagem.
+    <section
+      id={id}
+      className="scroll-mt-2 rounded-xl border border-line bg-bloco p-4"
+    >
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h2 className="flex items-baseline gap-2 text-corpo font-semibold">
+          {numero != null && (
+            <span className="text-legenda tabular-nums text-ink-3">{numero}</span>
+          )}
+          {title}
+        </h2>
+        {estado && <span className="text-legenda text-ink-3">{estado}</span>}
+      </div>
       <div className="space-y-4">{children}</div>
+      {continuarPara && (
+        <div className="mt-4 flex justify-end border-t border-line pt-3">
+          <Button
+            variant="outline"
+            onClick={() =>
+              document
+                .getElementById(continuarPara)
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }
+          >
+            Continuar
+            <ChevronDown size={14} />
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
 
+// O helper `SubTitulo` existiu por uma versão e saiu quando os dois sub-blocos
+// que ele rotulava passaram a recolher: o `Recolhivel` abaixo já desenha o
+// próprio `<h3>`. Ele usava `text-rotulo`, que é o degrau que dá os três níveis
+// da tela (título da página, título do grupo, rótulo do sub-bloco) sem inventar
+// um sétimo papel tipográfico.
+
 /**
- * Dois campos lado a lado, empilhando em tela estreita.
+ * Sub-bloco que recolhe, mostrando o VALOR na linha do cabeçalho quando fechado.
+ * É a regra que torna o recolhimento um ganho e não uma escondida: quem volta
+ * para conferir o horário lê "Segunda a sexta: 08:00 às 18:00" sem abrir nada.
  *
- * Existe porque o prompt gerado saiu da coluna lateral e o formulário herdou a
- * largura toda. Antes, com ~400px, campo em duas colunas não caberia; agora
- * empilhar "Nome da empresa" e "Site" um debaixo do outro só faz a pessoa rolar
- * mais. Só para campo CURTO: textarea e lista continuam inteiros.
+ * Sem `<details>` e sem accordion novo na base: `<button aria-expanded>` mais
+ * render condicional é o padrão que a casa já usa no `OnboardingBar`. Sem
+ * transição no ícone, porque animação aqui é CSS da casa e um `rotate` em
+ * transição é exatamente a armadilha do Tailwind v4 documentada no CLAUDE.md.
+ */
+function Recolhivel({
+  titulo,
+  resumo,
+  aberto,
+  onToggle,
+  manterMontado = false,
+  children,
+}: {
+  titulo: string;
+  resumo: string;
+  aberto: boolean;
+  onToggle: () => void;
+  /**
+   * Esconde por CSS em vez de desmontar. Existe para bloco que tem estado
+   * interno não salvo (ver o aviso no bloco de limites).
+   */
+  manterMontado?: boolean;
+  children: React.ReactNode;
+}) {
+  const Icone = aberto ? ChevronDown : ChevronRight;
+  return (
+    <div className="border-t border-line pt-4">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={aberto}
+        className="flex w-full items-center gap-2 text-left"
+      >
+        <Icone size={14} className="shrink-0 text-ink-faint" />
+        <h3 className="shrink-0 text-rotulo uppercase text-ink-3">{titulo}</h3>
+        {!aberto && (
+          <span className="min-w-0 truncate text-legenda text-ink-2">{resumo}</span>
+        )}
+        <span className="ml-auto shrink-0 text-legenda text-ink-3">
+          {aberto ? "fechar" : "abrir"}
+        </span>
+      </button>
+      {manterMontado ? (
+        <div className={aberto ? "mt-3" : "hidden"}>{children}</div>
+      ) : (
+        aberto && <div className="mt-3">{children}</div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Dois campos lado a lado, empilhando em tela estreita. Só para campo CURTO:
+ * textarea e lista continuam inteiros.
+ *
+ * ⚠️ O prefixo é breakpoint de VIEWPORT, não de container. Este helper só é
+ * seguro dentro de uma seção de largura cheia; foi por estar dentro de uma
+ * coluna de 348px que o campo das regras colapsou para 34px em 1024px.
+ *
+ * Divide a partir de `lg` (1024px), e não de `sm`: medido em 768px, duas colunas
+ * dão 210px por campo, que é estreito demais para um nome de empresa.
  */
 function Par({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
+  return <div className="grid items-start gap-4 lg:grid-cols-2">{children}</div>;
+}
+
+/**
+ * Três campos curtos por linha, mas só a partir de `xl` (1280px). Em 1024px três
+ * colunas dão 217px cada, então ali ele vira duas de 336px. Mesma ressalva do
+ * `Par` sobre o prefixo ser de viewport.
+ */
+function Trio({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      {children}
+    </div>
+  );
 }
 
 function Field({
@@ -893,6 +1341,36 @@ function Field({
 
 function Hint({ children }: { children: React.ReactNode }) {
   return <p className="text-legenda text-ink-3">{children}</p>;
+}
+
+/**
+ * Aviso de que a persona é curta demais para o cache de prompt pegar. Fica
+ * colado no campo que o resolve, e por isso existe nos dois modos: no guiado é
+ * "Detalhes do negócio", no avançado é a própria textarea.
+ *
+ * O limiar é `CACHE_SAFE_TOKENS` (2.048) e não o piso de 1.024 de propósito:
+ * `gpt-5.4-mini` cai na faixa em que a OpenAI diz que o mínimo varia de 1.024 a
+ * 2.048 e o cache é inconsistente pouco acima do piso. Prometer economia que não
+ * vem é pior que avisar de um risco que não se concretizou.
+ */
+function AvisoCache({
+  tokens,
+  children,
+}: {
+  tokens: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
+      <AlertTriangle size={14} className="mt-px shrink-0" />
+      <span>
+        O prompt tem cerca de {tokens.toLocaleString("pt-BR")} tokens, abaixo dos{" "}
+        {CACHE_SAFE_TOKENS.toLocaleString("pt-BR")} que a OpenAI pede para
+        reaproveitar o prompt entre mensagens, então cada resposta paga o preço
+        cheio de entrada. {children}
+      </span>
+    </p>
+  );
 }
 
 function Banner({ children }: { children: React.ReactNode }) {

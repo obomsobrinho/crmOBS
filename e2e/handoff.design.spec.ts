@@ -31,6 +31,12 @@ test.describe("Handoff na lista de conversas (/design)", () => {
 
   test("aviso de handoff é um campo do construtor", async ({ page }) => {
     await page.goto("/design/agente");
+    // O campo passou a morar no bloco recolhível "Limites e quando chamar o
+    // time" (26/08/2026), então tem que abrir. Fica a um clique, e não escondido:
+    // a linha do bloco fechado já mostra quantos limites existem.
+    await page
+      .getByRole("button", { name: /Limites e quando chamar o time/ })
+      .click();
     await expect(
       page.getByText("O que avisar ao passar para o time")
     ).toBeVisible();
