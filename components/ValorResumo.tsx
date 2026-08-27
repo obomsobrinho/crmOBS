@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { Clock, CalendarClock, Settings2 } from "lucide-react";
 import type { FraseValor, ValorResumo as Resumo } from "@/lib/valor";
+import {
+  Stat,
+  StatTopo,
+  StatRotulo,
+  StatValor,
+  StatFrase,
+  StatLegenda,
+} from "@/components/ui/stat";
 
 // Valor percebido, em frase pronta.
 //
@@ -20,13 +28,29 @@ import type { FraseValor, ValorResumo as Resumo } from "@/lib/valor";
 // entra como segunda linha da manchete, porque "213 no mês" convence, mas "1.876
 // desde o início" é o que trava a mão de quem ia cancelar.
 
-/** Bloco secundário: número em cima, frase embaixo. */
-function Bloco({ numero, texto }: { numero: string; texto: string }) {
+/**
+ * Bloco secundário: número em cima, frase embaixo.
+ *
+ * `compacto` (numeral de 18px) e não `padrao` (24px), e isso é o ponto da rodada
+ * de 26/08: antes os DEZ números do painel usavam o mesmo `text-display`, e a
+ * manchete só se distinguia por cor de fundo. Com 32 / 24 / 18 a tela passa a ter
+ * ordem de leitura antes de qualquer palavra ser lida.
+ */
+function Bloco({
+  numero,
+  texto,
+  periodo,
+}: {
+  numero: string;
+  texto: string;
+  periodo: string;
+}) {
   return (
-    <div className="rounded-xl border border-line bg-bloco p-5">
-      <div className="font-display text-display tabular-nums">{numero}</div>
-      <p className="mt-1 text-apoio text-ink-2">{texto}</p>
-    </div>
+    <Stat variant="elevado" tamanho="compacto">
+      <StatValor tamanho="compacto">{numero}</StatValor>
+      <StatFrase tamanho="compacto">{texto}</StatFrase>
+      <StatLegenda>{periodo}</StatLegenda>
+    </Stat>
   );
 }
 
@@ -79,21 +103,17 @@ export default function ValorResumo({
       ? numeroOuNull(doAcumulado.find((f) => f.key === manchete.key)?.numero ?? "")
       : null;
 
+  // Escopo da manchete, numa linha só. Era um `h2` de seção mais dois spans
+  // acima do cartão; virou a legenda DO cartão, porque o período é do número e
+  // não da seção. Foi assim que a tela mostrava "9 leads" (7 dias) e "19 leads"
+  // (mês) sem nenhum dos dois dizer de quando era.
+  const escopo =
+    resumoMostrado.recebidas > 0
+      ? `${rotuloPeriodo} · ${resumoMostrado.recebidas.toLocaleString("pt-BR")} mensagens recebidas`
+      : rotuloPeriodo;
+
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <CalendarClock size={16} className="text-brand-ink" />
-        <h2 className="text-corpo font-semibold">O que a IA fez por você</h2>
-        <span className="text-legenda text-ink-3">{rotuloPeriodo}</span>
-        {/* Contexto, não métrica nova: `recebidas` já vem no resumo. Fora quando
-            é zero, pela mesma regra das frases. */}
-        {resumoMostrado.recebidas > 0 && (
-          <span className="text-legenda text-ink-3">
-            · {resumoMostrado.recebidas.toLocaleString("pt-BR")} mensagens recebidas
-          </span>
-        )}
-      </div>
-
       {/* Sem horário configurado, o número mais forte do resumo (fora do
           horário) não existe. Dizer isso é melhor que estimar: o cliente
           confere no WhatsApp dele. */}
@@ -120,40 +140,62 @@ export default function ValorResumo({
       )}
 
       {!manchete ? (
-        <div className="rounded-xl border border-line bg-bloco p-5">
+        <Stat variant="vazio">
+          <StatTopo>
+            <StatRotulo asChild>
+              <h2>O que a IA fez por você</h2>
+            </StatRotulo>
+          </StatTopo>
           <div className="flex items-center gap-2 text-ink-2">
             <Clock size={16} className="text-ink-3" />
             <span className="text-apoio font-medium">
               Ainda sem movimento no período
             </span>
           </div>
-          <p className="mt-1 text-legenda text-ink-3">
+          <StatLegenda>
             Este resumo fica mais forte a cada mês de atendimento acumulado.
-          </p>
-        </div>
+          </StatLegenda>
+        </Stat>
       ) : (
         <>
-          {/* Manchete. Superfície da marca e largura inteira: é a frase que a
-              pessoa precisa ler mesmo se não ler mais nada nesta tela. */}
-          <div className="rounded-xl border border-brand-line bg-brand-surface p-6">
-            <div className="font-display text-display tabular-nums text-brand-ink">
+          {/* Manchete. Superfície da marca, largura inteira e o ÚNICO numeral de
+              32px da tela: é a frase que a pessoa precisa ler mesmo se não ler
+              mais nada aqui. Antes ela tinha o mesmo tamanho de número dos outros
+              nove blocos e se distinguia só pela cor de fundo. */}
+          <Stat variant="marca" tamanho="manchete">
+            <StatTopo>
+              {/* `h2` de verdade: o cartão É a seção, e o rótulo é o título dela.
+                  Sem isso a página ficaria com um `h1` e nenhum `h2`. */}
+              <StatRotulo asChild>
+                <h2 className="flex items-center gap-1.5">
+                  <CalendarClock size={13} aria-hidden />O que a IA fez por você
+                </h2>
+              </StatRotulo>
+            </StatTopo>
+            <StatValor tamanho="manchete" className="text-brand-ink">
               {manchete.numero}
-            </div>
-            <p className="mt-1.5 text-titulo">{manchete.texto}</p>
+            </StatValor>
+            <StatFrase tamanho="manchete">{manchete.texto}</StatFrase>
             {totalDaManchete && (
-              <p className="mt-2.5 text-apoio text-ink-2">
+              <p className="text-apoio text-ink-2">
                 <span className="font-semibold tabular-nums text-ink">
                   {totalDaManchete}
                 </span>{" "}
                 desde o início desta conta.
               </p>
             )}
-          </div>
+            <StatLegenda>{escopo}</StatLegenda>
+          </Stat>
 
           {resto.length > 0 && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {resto.map((f) => (
-                <Bloco key={f.key} numero={f.numero} texto={f.texto} />
+                <Bloco
+                  key={f.key}
+                  numero={f.numero}
+                  texto={f.texto}
+                  periodo={rotuloPeriodo}
+                />
               ))}
             </div>
           )}

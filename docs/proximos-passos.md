@@ -24,6 +24,184 @@ Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estr
   dinâmico, mitigada com `loading.tsx`; não é motivo de troca de stack. Reavaliar só se o produto
   virar uma SPA pura com backend próprio à parte (não é o caso).
 
+## Próxima rodada (decidido em 26/08/2026)
+
+Ordem travada. **Cobrança e checkout saem do caminho crítico**: o lançamento será um **beta
+gratuito** com conhecidos do dono (empresários, clínicas), custeado por ele, para validar uso e
+achar bug antes de vender. Consequência: Asaas e Vercel Pro voltam a ser gatilho do primeiro
+pagante, não pré-requisito.
+
+1. **Fechar o MVP do beta.** Bloqueador real e pequeno: o gate de assinatura expulsa o testador
+   quando o trial vence. A saída já existe no código, porque **`trialing` com `trial_ends_at` nulo
+   não bloqueia** de propósito; falta só uma forma de marcar um tenant como beta. Junto: um canal de
+   feedback, e deixar explícito ao testador que publicar é o que solta a IA no cliente real dele.
+   ⚠️ São negócios reais com clientes reais: se a IA errar, o prejuízo de imagem é do testador.
+2. **Agenda** (ver abaixo). É o próximo desenvolvimento.
+3. **Redesenho geral no Claude Design** (seção própria mais abaixo): tapa no visual como um todo,
+   conferir aderência ao padrão e **acertar o tema claro**, que é o que mais destoa hoje. Primeira
+   impressão importa porque o beta é com conhecidos, e o painel já foi aprovado como "ainda não
+   está bom".
+4. **Bateria de testes de segurança da IA** (novo, ver abaixo).
+
+### Agenda (promovida a próximo passo, saiu do "não construir")
+
+Decisão do dono em 26/08: agenda é importante e vale para clínica, que é o perfil dos testadores.
+
+**Regra que continua valendo: NÃO construir agenda própria completa. Integrar Google Calendar.**
+Disponibilidade, bloqueio, duração, reagendamento e fuso são o item de maior custo operacional do
+roadmap inteiro, e o Calendar já resolve.
+
+Base que já existe e deve ser aproveitada: o `action: "agendar"` captura dia e período, avisa o
+grupo e passa para humano. A agenda transforma isso em marcação real.
+
+O trabalho de verdade tem três partes, em ordem de risco:
+- **Conexão** por tenant (OAuth do Google, um calendário por conta).
+- **A IA consultar horário livre e marcar.** Isso exige dar ferramenta ao agente (function calling
+  em `/api/agent`), que hoje não tem. É a mudança arquitetural da fase, não a tela.
+- **Confirmação e lembrete.** ⚠️ **Ponto que precisa de decisão antes de codar:** lembrete de
+  consulta é mensagem ATIVA, normalmente fora da janela de 24h. Sobre conexão QR isso é exatamente o
+  cenário de banimento que o projeto decidiu não correr. Ou o lembrete fica de fora, ou fica preso à
+  API Oficial, ou é disparado pelo humano. Não decidir isso é escolher por acidente.
+
+### Ordem confirmada do MVP do beta (26/08, revisada para 6 passos)
+
+1. **Dashboard.** Não é só implementar: envolve **pesquisa de métricas** (quais dados de fato
+   importam), **desenho** (como mostrar) e **gráfico**. É a manchete do beta e a tela onde o
+   empresário julga o produto, então tem que ser a melhor tela do sistema.
+2. **Steps do agente.** Mesmo tratamento: pesquisa e desenho antes de implementar.
+3. **Os 4 furos**: marcar tenant de beta, canal de feedback, instrumentação do beta, testes mínimos
+   de segurança da IA.
+4. **Design e mobile no Claude Design** (redesenho geral, tema claro, celular).
+5. **Aplicar o design escolhido.**
+6. **Testes** (incluindo a bateria completa de segurança da IA).
+
+Estrutura antes de estética, de propósito: os passos 1 e 2 definem a estrutura das telas, os passos
+4 e 5 são o polimento. Inverter significaria redesenhar duas vezes.
+
+⚠️ **Pesquisa e desenho separados da implementação nos passos 1 e 2.** Foi decisão explícita do dono:
+essas duas telas não devem ser "corretas e sem graça". Cada uma tem um ponto de parada para
+aprovação do desenho antes de virar código.
+
+**Acesso do testador: decidido o caminho simples, sem cupom.** A marcação já existe de graça, porque
+`trialing` com `trial_ends_at` **nulo** não bloqueia (comportamento intencional do gate) e o cadastro
+normal sempre grava uma data. Logo **`trial_ends_at IS NULL` já identifica o testador beta**, sem
+migração, sem campo e sem UI. Com 5 a 10 testadores, marcar à mão é trivial. O campo de cupom
+(`referral_code`) continua no roadmap, mas o propósito real dele é atribuição para pagar comissão de
+filiado, e no beta gratuito não há comissão a pagar.
+
+### Steps do agente: desenho de referência (26/08)
+
+Padrão aprovado pelo dono (referência visual: assistente de onboarding tipo Plain/Kastamer).
+Coluna esquerda com a trilha vertical (ícone, título, descrição; concluído com check e linha cheia,
+futuro apagado com linha tracejada). Coluna direita com "PASSO N DE 4", título grande, um parágrafo
+que explica **por que** o passo importa, os campos, e rodapé com Voltar e Salvar e continuar.
+
+**Os 4 passos** (a mesma ordem em que o dono pensa o problema):
+1. **Quem atende** (nome do agente, empresa, tom)
+2. **O que ele sabe** (o que a empresa faz, horário, detalhes, base de conhecimento)
+3. **O que ele pode fazer** (objetivos, regras, quando chamar humano)
+4. **Testar e publicar** (bancada de teste e a chave)
+
+> Estes títulos já tinham sido recusados como **âncora no topo** da tela antiga. Como **passo** eles
+> funcionam, porque descrevem a sequência natural de configurar um atendente.
+
+**O bloco "Guidance"** da referência (3 cartões pequenos com ícone, uma linha e "saiba como") é o que
+entrega "simples mas com opções para explorar": caminho principal curto, aprofundamento opcional.
+
+**Três decisões de desenho que precisam ser respeitadas:**
+- **Assistente na primeira vez, edição livre depois.** Wizard é ótimo na primeira configuração e
+  insuportável na quinta. A trilha da esquerda tem que ser navegável (clicar direto no passo).
+- ⚠️ **"Salvar e continuar" colide com "salvar já é publicar".** O n8n lê `clients.persona` ao vivo,
+  então gravar a cada passo empurraria persona meio configurada para um agente que já atende. Para
+  tenant novo é inofensivo (a IA só fala depois de publicar, via `agent_published_at`). Para quem
+  edita agente ATIVO, é perigoso. Ou o wizard acumula e grava só no fim, ou o botão muda de
+  comportamento quando o agente já está publicado.
+- **No celular a coluna dupla não cabe:** a trilha vira um "Passo N de 4" compacto no topo com o
+  título do passo. Decidir no desenho, não na implementação.
+
+### Dashboard: promovido a primeira tela (26/08)
+
+Decisão do dono: **o painel passa a ser o primeiro item do menu**, antes de Conversas. Razão: é a
+tela que prova valor, é o que ele mostra ao cliente, e é onde o empresário julga o produto depois que
+a novidade passa.
+
+> Refinamento sugerido, a confirmar: a primeira tela pode depender do **papel**. Quem trabalha na
+> operação (atendente) abre em Conversas; o dono abre no Painel. Os papéis já existem em
+> `user_clients.role`, então o custo é baixo.
+
+**As quatro perguntas que o painel tem que responder** (é assim que ele deve ser organizado, não por
+tipo de gráfico):
+1. **A IA está dando conta?** Conversas resolvidas 100% pela IA sem humano, quantas precisaram de
+   você e por quê, tempo de primeira resposta.
+2. **O que isso me deu?** (o que retém) Mensagens respondidas fora do horário, em fim de semana e
+   feriado; primeira resposta abaixo de 1 minuto; acumulado desde o início. Já calculado em
+   `lib/valor.ts`.
+3. **O que preciso fazer agora?** Fila do "precisa de você", leads qualificados aguardando,
+   oportunidades paradas.
+4. **Está crescendo?** Série de 30 dias, horário e dia de pico.
+
+**Sacadas do painel, em ordem de impacto:**
+- **A manchete tem que ser métrica de DEPENDÊNCIA, não de volume.** "347 conversas" o dono acha
+  normal, porque acha que também faria. "213 respondidas fora do horário" ele não consegue replicar
+  sem a ferramenta. A manchete é sempre o que ele não consegue fazer sozinho.
+- **Antes e depois, usando o histórico importado.** ⚠️ **Esta é a melhor sacada da lista e é
+  exclusiva nossa:** no onboarding importamos o histórico do WhatsApp do cliente, então temos como
+  ele atendia ANTES da IA. Tempo de primeira resposta antes contra depois é um número devastador, e
+  **nenhum concorrente consegue mostrar isso**, porque nenhum importa histórico.
+- **O que a IA não soube responder.** Lista das perguntas que viraram handoff por falta de
+  informação, virando sugestão do que adicionar na base de conhecimento. Transforma o painel de
+  espelho em ferramenta de melhoria, e aumenta o uso da base, que é o que trava o cliente no produto.
+- **Traduzir para horas ou dinheiro.** "213 mensagens fora do horário" vira "equivalente a X horas de
+  secretária". É o que faz o preço parecer barato. Com conta transparente e conservadora: número
+  inventado aqui destrói a régua de confiança, que é o nosso eixo.
+- **Todo número precisa de comparação e de período.** Já resolvido no componente (`Stat` com rótulo,
+  número, frase que interpreta e legenda de período) e em `lib/delta.ts`. Aplicar em tudo, sem
+  exceção: cartão sem período mente sobre o próprio número.
+
+### Cadastro do contato, além do WhatsApp (novo, 26/08, não perder)
+
+Hoje `dados_cliente` guarda o que o WhatsApp entrega (telefone, nome) mais `display_name` e
+`custom_fields`. Falta o cadastro de verdade: **CPF, data de nascimento, e-mail** e afins, que são o
+que permite o resto depois (aniversário, documento, histórico do paciente, integração).
+
+Decisões do dono já dadas:
+- **Não forçar.** Nada de bloquear atendimento por falta de cadastro.
+- **Sinalizar:** um aviso discreto ao lado do atendimento quando o contato está incompleto.
+- **Futuro:** o próprio agente pode coletar esses dados na conversa, naturalmente. É o caminho, mas
+  não é o primeiro passo.
+
+⚠️ Dado pessoal sensível (CPF, data de nascimento) muda o peso da LGPD sobre o produto: passa a
+exigir base legal, finalidade declarada e cuidado com retenção. Decidir de propósito antes de
+coletar, não depois.
+
+### Lembrete e mensagem ativa: decisão do dono (26/08)
+
+**Decisão: MANTER lembrete de consulta e mensagens do tipo aniversário.** O dono pesou o risco de
+banimento contra o custo de ficar abaixo dos CRMs de clínica, que fazem isso, e escolheu construir.
+Registrado como decisão consciente, não como descuido: o risco documentado no projeto continua real.
+
+**Mitigações que tornam isso sustentável, e que devem entrar junto com a feature:**
+- **Separar os dois casos, porque o risco é MUITO diferente.** Lembrete para quem marcou e conversou
+  ontem é o caso de menor risco possível de mensagem ativa: baixo volume, mensagem esperada, alta
+  taxa de resposta, conteúdo personalizado. Disparo de aniversário para a base inteira é o de maior
+  risco. Tratar os dois como "mensagem ativa" e aplicar limites diferentes.
+- **Só para contato com conversa recente.** Nunca para número frio ou lista importada.
+- **Ritmo humano:** teto por dia, intervalo aleatório entre envios, nunca rajada.
+- **Saída fácil** ("responda SAIR"), que derruba denúncia, o gatilho de banimento que mais pesa.
+- **Construir agnóstico de canal.** O lembrete é o argumento mais forte para migrar para a API
+  Oficial (template de utilidade é legal e custa cerca de R$ 0,035). Se nascer amarrado ao QR, a
+  migração depois custa o dobro.
+
+### Bateria de testes de segurança da IA (novo, 26/08)
+
+O dono pediu teste a fundo do risco de a IA falar besteira com o cliente final do testador. Hoje a
+defesa existe em três camadas (seção FONTES E HONESTIDADE no `buildPersona`, `lib/guardrail.ts` antes
+de enviar, e o handoff), mas **não existe teste que prove que elas seguram**. O que falta é um
+conjunto de conversas-armadilha rodando contra o cérebro real em `dryRun`: preço que não está na
+base, promessa de prazo, pedido de conselho médico ou jurídico, tentativa de trocar as instruções,
+pergunta fora do escopo, e insistência depois de a IA já ter dito que não sabe. Critério de aceite é
+o guardrail bloquear ou a IA passar para humano, nunca inventar.
+
 ## Matriz de paridade (resumo)
 
 À frente (só nós): handoff detectado quando o dono responde no celular, import do histórico,
@@ -498,6 +676,38 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
 - [ ] Multicanal (Instagram, Messenger).
 - [ ] API Oficial como opção.
 
+## Redesenho geral no Claude Design (decidido em 26/08/2026)
+
+**Próximo passo depois da rodada de UI atual.** Decisão do dono do produto: quando os ajustes de
+tela em andamento fecharem (detalhes de inbox e pipeline, painel, steps do agente), passar um
+**redesenho geral no Claude Design** para melhorar tudo de uma vez, em vez de seguir tela a tela.
+O painel de 26/08 foi aprovado como "ainda não está bom", ou seja, ele entra nesse redesenho junto
+com o resto.
+
+Por que fica para o fim, e não agora: a rodada atual está descobrindo as REGRAS que o redesenho vai
+precisar respeitar, e cada uma nasceu de um defeito medido, não de gosto. As que já saíram:
+
+- **Hierarquia de numeral em três degraus** (32 / 24 / 18), via `--text-numero` e
+  `components/ui/stat.tsx`. O painel tinha dez números e todos do mesmo tamanho.
+- **Cartão de indicador com quatro peças**: rótulo, número, uma frase que INTERPRETA e uma legenda
+  com o PERÍODO. A legenda é obrigatória no componente, porque cartão sem período mente sobre o
+  próprio número.
+- **`Stat variant="elevado"`**, para o padrão "página sobre canvas com cartões flutuando", que é o
+  único jeito de o cartão ficar acima do fundo no tema claro (`--s-bloco` claro é igual ao
+  `--canvas`).
+- **Selo de variação com direção declarada** (`lib/delta.ts`): base pequena em valor absoluto,
+  direção invertida no tempo de resposta, e supressão do selo quando a janela é incompleta.
+- **Reset não pode vencer utilitário**: regra sem `@layer` ganha de `@layer utilities` por mais
+  específica que a outra seja.
+
+O candidato natural a virar padrão do design system é o `Stat`: ele já está na base, e a mesma sopa
+de classe que ele substitui (`rounded-xl border border-line bg-bloco p-N`) ainda está escrita à mão
+em cerca de nove outros lugares. Migrar esses consumidores é o primeiro item do redesenho.
+
+⚠️ O `/design` (preview sem login) é onde esse redesenho se valida sem tocar em dado real, e é onde
+os testes e2e sem login batem. Preview que não renderiza a tela inteira não serve: o
+`/design/painel` mostrava só metade e foi corrigido em 26/08.
+
 ## Candidatos novos (dos vídeos do DeskcommCRM, 09/08/2026)
 
 Ideias extraídas do CRM open-source do Rafael Melgaço (github.com/melgarafael/DeskcommCRM),
@@ -675,10 +885,21 @@ confirmação. Prometer "agenda" para clínica e salão é a promessa mais perig
 
 ## Não construir (nenhuma fase por ora)
 
-- **Agenda / Google Calendar** (decisão do usuário: não cobrir agora).
-- Disparo em massa e follow-up ativo sobre QR (queima o número).
-- Construtor visual de automação (vira produto de consultoria).
+- **Disparo em massa e campanha ativa sobre QR** (queima o número). ⚠️ Campanhas foram avaliadas em
+  26/08 e ficam FORA: o dono quer o recurso para ele, mas não para a base, exatamente por causa do
+  bloqueio. Só volta com API Oficial, onde é legal e paga.
+- **Construtor visual de automação** (vira produto de consultoria). Avaliado em 26/08 contra o que o
+  mercado faz (BotConversa, Atendente.AI, Meets, Ubli e NextFlow todos têm) e **recusado**, por três
+  motivos: as reclamações de mercado são justamente sobre isso (Blip descrito como "emaranhado de
+  setas", Kommo exigindo agência para configurar automação); contradiz o diferencial, porque fluxo é
+  o paradigma pré-IA e oferecer os dois admite que a IA não dá conta; e não há gente para sustentar
+  produto que exige consultoria.
+  **O que fica no lugar, como futuro:** automações **prontas e descritivas**, que o dono liga numa
+  chave e preenche 2 ou 3 campos. É o modelo do Intercom Fin (regras em texto, núcleo travado) e o
+  que a Decagon vende como categoria. Entra no menu como "Em breve" para não se perder, sem data.
 - Múltiplos números por conta. White label. Gestão de equipe complexa.
+
+> ⚠️ **Agenda saiu desta lista em 26/08** e virou o próximo passo. Ver "Próxima rodada" no topo.
 
 ## Métricas de progresso
 

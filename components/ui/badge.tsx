@@ -39,6 +39,26 @@ const badgeVariants = cva(
         dia: "rounded-full bg-panel px-3 py-1 text-legenda font-semibold tracking-wide uppercase text-ink-2",
         /** Tag do contato. */
         tag: "flex items-center gap-1.5 rounded-full border border-line py-0.5 text-legenda",
+        /**
+         * Variação de um indicador (cartão `Stat`). O TOM vem de `lib/delta.ts`,
+         * que sabe a direção certa de cada número: no tempo de resposta menos é
+         * melhor, e sem essa regra o selo ficaria verde num atendimento que
+         * piorou.
+         *
+         * Verde e vermelho aqui são ESTADO ("a conta melhorou / piorou"), o que é
+         * uso legítimo. Mas cor de estado só significa algo se não estiver em
+         * tudo: por isso o padrão é `delta-neutro` e o selo é OPCIONAL no cartão.
+         * A referência que inspirou isto tem selo colorido em 100% dos cartões, e
+         * é assim que verde deixa de ser estado e vira enfeite.
+         *
+         * `-ink` sobre `-surface`, nunca `-fill` como tinta.
+         */
+        "delta-bom":
+          "inline-flex shrink-0 items-center gap-1 rounded-full bg-human-surface px-2 py-0.5 text-legenda tabular-nums text-human-ink",
+        "delta-ruim":
+          "inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-surface px-2 py-0.5 text-legenda tabular-nums text-danger-ink",
+        "delta-neutro":
+          "inline-flex shrink-0 items-center gap-1 rounded-full bg-bloco px-2 py-0.5 text-legenda tabular-nums text-ink-2",
       },
     },
     defaultVariants: { variant: "contorno" },

@@ -2,10 +2,14 @@ import { LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
 import DashboardCards from "@/components/DashboardCards";
+import DashboardBarras from "@/components/DashboardBarras";
 import ValorResumo from "@/components/ValorResumo";
-import { cardVariants } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import { computeMetrics, weekCutoffISO, type WeekMsg } from "@/lib/metrics";
+import {
+  barrasPorDia,
+  computeMetrics,
+  weekCutoffISO,
+  type WeekMsg,
+} from "@/lib/metrics";
 import {
   frasesDeValor,
   mesFechado,
@@ -34,23 +38,16 @@ export default async function PainelPage() {
   const cutoff = weekCutoffISO();
   const mes = mesFechado();
 
-  const [
-    { data: msgs },
-    { data: quals },
-    { data: todasMsgs },
-    { data: todasQuals },
-    { data: cfg },
-  ] = await Promise.all([
-    supabase
-      .from("chat_messages")
-      .select("phone, user_message, bot_message, message_type, created_at")
-      .gte("created_at", cutoff)
-      .limit(5000),
-    supabase
-      .from("conversation_qualifications")
-      .select("phone, created_at")
-      .gte("created_at", cutoff)
-      .limit(2000),
+  // As DUAS consultas de janela de 7 dias saíram (26/08/2026), e não foi por
+  // estética: o acumulado abaixo traz as mesmas colunas e contém as mesmas
+  // linhas, e recortar em memória é o padrão que o mês fechado já usava aqui.
+  // Isso deu duas coisas de graça: o período ANTERIOR para o selo de variação
+  // (sem consulta nova), e o conserto de um bug latente, porque a consulta de 7
+  // dias fazia `.limit(5000)` SEM `order` e um tenant com mais de 5.000 mensagens
+  // na semana recebia um subconjunto arbitrário, com os quatro números
+  // subestimando em silêncio.
+  const [{ data: todasMsgs }, { data: todasQuals }, { data: cfg }, espera] =
+    await Promise.all([
     // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e é
     // ele que trava a mão de quem ia cancelar. O mês fechado é recortado deste
     // conjunto em memória, mais abaixo, em vez de virar duas consultas próprias:
@@ -76,33 +73,81 @@ export default async function PainelPage() {
       .select("agent_config")
       .eq("id", client.id)
       .maybeSingle(),
+    // Conversas com handoff em aberto AGORA. `head: true` = só a contagem, sem
+    // trazer linha nenhuma. É o único número acionável do painel, e por isso é o
+    // único que vale uma consulta própria.
+    supabase
+      .from("conversations")
+      .select("phone", { count: "exact", head: true })
+      .not("handoff_at", "is", null),
   ]);
-
-  const weekMsgs: WeekMsg[] = ((msgs ?? []) as {
-    phone: string;
-    user_message: string | null;
-    bot_message: string | null;
-    message_type: string | null;
-    created_at: string;
-  }[]).map((m) => ({
-    phone: m.phone,
-    hasUser: !!m.user_message,
-    hasBot: !!m.bot_message,
-    manual: m.message_type === "manual",
-    created_at: m.created_at,
-  }));
-
-  const qualPhones = new Set(
-    ((quals ?? []) as { phone: string }[]).map((q) => q.phone)
-  );
-
-  const metrics = computeMetrics(weekMsgs, qualPhones);
 
   const hours =
     (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
 
   const acumuladoMsgs = (todasMsgs ?? []) as ValorMsg[];
   const acumuladoQuals = (todasQuals ?? []) as ValorQual[];
+
+  // ── Janelas de 7 dias, recortadas do acumulado ──────────────────────────────
+  //
+  // `cutoffAnterior` = 14 dias atrás. A janela anterior é [-14d, -7d).
+  const cutoffMs = Date.parse(cutoff);
+  const cutoffAnteriorMs = cutoffMs - 7 * 24 * 60 * 60 * 1000;
+
+  const paraWeekMsg = (m: ValorMsg): WeekMsg => ({
+    phone: m.phone,
+    hasUser: !!m.user_message,
+    hasBot: !!m.bot_message,
+    manual: m.message_type === "manual",
+    created_at: m.created_at,
+  });
+
+  const naJanela = (iso: string, de: number, ate: number) => {
+    const t = Date.parse(iso);
+    return t >= de && t < ate;
+  };
+  // "Agora" derivado do cutoff, e não de `Date.now()` aqui: chamada impura no
+  // corpo de um Server Component é erro de lint (`react-hooks/purity`), e é a
+  // mesma razão pela qual `weekCutoffISO` encapsula o relógio.
+  const agoraMs = cutoffMs + 7 * 24 * 60 * 60 * 1000;
+
+  const metrics = computeMetrics(
+    acumuladoMsgs
+      .filter((m) => naJanela(m.created_at, cutoffMs, Infinity))
+      .map(paraWeekMsg),
+    new Set(
+      acumuladoQuals
+        .filter((q) => naJanela(q.created_at, cutoffMs, Infinity))
+        .map((q) => q.phone)
+    )
+  );
+
+  // ⚠️ GUARDA DE TRUNCAMENTO. O acumulado tem teto de 20.000 linhas, ordenado do
+  // mais novo para o mais velho. Se ele bateu no teto E a linha mais antiga que
+  // veio já é mais nova que 14 dias, a janela anterior está INCOMPLETA, e um selo
+  // calculado sobre janela incompleta mostraria variação inventada. Nesse caso o
+  // período anterior vira `null` e nenhum cartão mostra selo, que é a única saída
+  // honesta.
+  const maisAntiga = acumuladoMsgs[acumuladoMsgs.length - 1]?.created_at;
+  const truncado =
+    acumuladoMsgs.length >= 20000 &&
+    (!maisAntiga || Date.parse(maisAntiga) > cutoffAnteriorMs);
+
+  const metricsAnterior = truncado
+    ? null
+    : computeMetrics(
+        acumuladoMsgs
+          .filter((m) => naJanela(m.created_at, cutoffAnteriorMs, cutoffMs))
+          .map(paraWeekMsg),
+        new Set(
+          acumuladoQuals
+            .filter((q) => naJanela(q.created_at, cutoffAnteriorMs, cutoffMs))
+            .map((q) => q.phone)
+        )
+      );
+
+  const barras = barrasPorDia(acumuladoMsgs, 14, agoraMs);
+  const esperando = espera.error ? null : (espera.count ?? 0);
 
   // Recorte do mês fechado a partir do acumulado. Comparação por instante
   // (Date.parse) e não por string: o banco devolve "…+00:00" e mesFechado gera
@@ -129,13 +174,14 @@ export default async function PainelPage() {
   });
   const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
 
+  // ⚠️ O painel NÃO é mais um cartão branco: é página sobre o canvas, com os
+  // cartões flutuando (`Stat variant="elevado"`). Isso é o que reproduz a
+  // referência aprovada pelo dono nos DOIS temas, e é obrigatório no claro por um
+  // motivo de token: `--s-bloco` claro é `#f3f3f6`, exatamente igual ao
+  // `--canvas`, então cartão `bloco` dentro de cartão branco ficava um degrau
+  // ABAIXO da casca, ou seja, o inverso da referência.
   return (
-    <div
-      className={cn(
-        cardVariants(),
-        "flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-6"
-      )}
-    >
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
       <div>
         <div className="mb-1 flex items-center gap-2">
           <LayoutDashboard size={20} className="text-brand-ink" />
@@ -154,15 +200,16 @@ export default async function PainelPage() {
         frasesAcumuladas={frasesAcumuladas}
       />
 
-      <section className="space-y-3">
-        <h2 className="text-corpo font-semibold">
-          Operação
-          <span className="ml-2 text-legenda font-normal text-ink-3">
-            últimos 7 dias
-          </span>
-        </h2>
-        <DashboardCards metrics={metrics} />
-      </section>
+      {/* O `h2` "Operação · últimos 7 dias" saiu: o período agora está DENTRO de
+          cada cartão, que é o único lugar onde ele não pode ser lido como sendo
+          de outro número. */}
+      <DashboardCards
+        metrics={metrics}
+        anterior={metricsAnterior}
+        esperando={esperando}
+      />
+
+      <DashboardBarras dias={barras} />
     </div>
   );
 }
