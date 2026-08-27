@@ -14,13 +14,25 @@ import { extendTailwindMerge } from "tailwind-merge";
  * Registrando os seis papéis no grupo de tamanho de fonte, `text-corpo` e
  * `text-ink-2` voltam a poder conviver, que é o esperado: um é tamanho, o
  * outro é cor.
+ *
+ * `numero` entra na mesma lista pelo mesmo motivo, e não é opcional: sem ele o
+ * `text-numero` do `StatValor` seria classificado como COR e descartaria
+ * `text-brand-ink` em silêncio, que é exatamente o sintoma descrito acima.
  */
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
       "font-size": [
         {
-          text: ["display", "titulo", "corpo", "apoio", "legenda", "rotulo"],
+          text: [
+            "display",
+            "titulo",
+            "corpo",
+            "apoio",
+            "legenda",
+            "rotulo",
+            "numero",
+          ],
         },
       ],
     },

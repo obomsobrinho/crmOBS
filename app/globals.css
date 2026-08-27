@@ -130,6 +130,19 @@
   --text-rotulo--letter-spacing: 0.08em;
   --text-rotulo--font-weight: 600;
 
+  /* NUMERAL, e não um sétimo papel tipográfico. ESCOPO FECHADO, no precedente do
+     `--brand-grad-end`: vale só para o valor de um cartão de indicador
+     (`StatValor` em components/ui/stat.tsx), nunca para texto corrido, título,
+     rótulo ou botão.
+     Existe porque o painel tinha DEZ números e todos em `--text-display` (24px):
+     a manchete de valor se distinguia apenas por cor de fundo, e sem hierarquia
+     de numeral a tela lia chapada. Com três degraus (32 / 24 / 18) o olho sabe
+     qual número é o principal antes de ler qualquer palavra. */
+  --text-numero: 32px;
+  --text-numero--line-height: 36px;
+  --text-numero--letter-spacing: -0.02em;
+  --text-numero--font-weight: 600;
+
   /* Raio. Cinco degraus mais o balão, que é assinatura do produto.
      A escala é LITERAL de propósito: o padrão do shadcn deriva tudo de
      --radius por calc(var(--radius) * 0.6), o que daria 7,2px e 9,6px onde a
@@ -200,13 +213,24 @@
   --s-composer: #f3f3f6;
   --s-sub: #ffffff;
   --s-painel: #ffffff;
-  --s-bloco: #f1eff8;
+  /* Bloco dentro do cartão. Era #f1eff8, uma lavanda, e o campo dentro dele era
+     #f1eff7: praticamente a MESMA cor (1 unidade de diferença), então bloco e
+     campo só se distinguiam pela borda e a tela clara inteira lia como roxo
+     chapado. Agora é o mesmo cinza neutro da superfície da conversa
+     (`--s-msg`), que é o degrau neutro que o projeto já usa. É a mesma crítica
+     escrita no comentário das superfícies acima: matiz diferente por caixa lê
+     como escolha aleatória, não como hierarquia. */
+  --s-bloco: #f3f3f6;
 
   /* Aliases em uso pelos componentes (migram na rodada das telas). */
   --surface: #ffffff;
   --panel: #f1eff7;
   --chat-bg: #f3f3f6;
-  --input-bg: #f1eff7;
+  /* Campo BRANCO sobre o bloco cinza, que é o que `--s-campo` já declarava logo
+     acima. É o que devolve a escada de três degraus no claro: cartão branco,
+     bloco cinza, campo branco com borda. Com bloco e campo em lavanda quase
+     igual, não existia escada nenhuma. */
+  --input-bg: #ffffff;
 
   /* ── Tinta ── */
   --ink: #171128; /* 15,8:1 */
@@ -584,14 +608,26 @@ h3 {
 }
 
 /* Tailwind v4 não põe cursor:pointer em <button> por padrão. Restaura em
-   tudo que é clicável (exceto desabilitado). */
-button:not(:disabled),
-[role="button"]:not(:disabled),
-[role="switch"]:not(:disabled),
-a[href],
-label[for],
-summary {
-  cursor: pointer;
+   tudo que é clicável (exceto desabilitado).
+   ⚠️ Mora em `@layer base` de propósito, e a razão é cascata de CAMADA, não
+   especificidade: o Tailwind v4 emite os utilitários dentro de `@layer
+   utilities`, e regra SEM camada vence qualquer regra em camada, por mais
+   específica que a outra seja. Solto aqui fora, este reset ganhava de todo
+   `cursor-*` de classe, e foi o que aconteceu com o card do pipeline, que é
+   arrastável e tem `role="button"`: a classe `cursor-grab` estava aplicada e o
+   cursor continuava a mãozinha de clique. O `:where()` fica junto para o reset
+   também não ganhar por especificidade dentro da própria camada. */
+@layer base {
+  :where(
+    button:not(:disabled),
+    [role="button"]:not(:disabled),
+    [role="switch"]:not(:disabled),
+    a[href],
+    label[for],
+    summary
+  ) {
+    cursor: pointer;
+  }
 }
 
 /* Ancorado em brand-ink para funcionar também sobre superfície tingida. */
