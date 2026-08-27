@@ -40,6 +40,37 @@ export function qualReasonLabel(action: QualAction): string {
   return "";
 }
 
+/**
+ * Quem está atendendo uma conversa. UMA pergunta, três respostas possíveis.
+ *
+ * A regra mora aqui porque a lista de conversas e o board do pipeline desenham o
+ * mesmo indicador, e duas cópias da mesma regra é o começo de duas telas
+ * discordando sobre o mesmo contato.
+ *
+ * A invariante que faz isso ter resposta única: **IA e pessoa nunca atendem a
+ * mesma conversa ao mesmo tempo.** Quando alguém responde, a IA é pausada (pelo
+ * nó "Pausar IA (Franck digitou)" do n8n, se a resposta saiu do WhatsApp, ou pelo
+ * `POST /api/send`, se saiu do CRM).
+ *
+ * ⚠️ Isto NÃO responde "precisa de você": essa é outra pergunta, e quem responde
+ * é `handoff_at`. As duas coexistem de propósito, porque pausar não resolve a
+ * pendência: dá para ter uma pessoa atendendo E um handoff em aberto.
+ */
+export type QuemAtende = "ia" | "pessoa" | "ninguem";
+
+export function quemAtende(input: {
+  /** dados_cliente.atendimento_ia === 'pause' */
+  pausada: boolean;
+  /** Existe alguém do time responsável (conversations.assigned_user_id). */
+  temAtendente: boolean;
+}): QuemAtende {
+  if (!input.pausada) return "ia";
+  // Pausada e sem responsável = ninguém atende. É o estado dos contatos que
+  // ficaram travados pelo handoff antigo, e mostrar isso é o ponto: a dívida
+  // vira lista de tarefas visível em vez de silêncio.
+  return input.temAtendente ? "pessoa" : "ninguem";
+}
+
 // Documento da base de conhecimento (RAG). O CRM lista/gerencia; o processamento
 // (extração, chunk, embedding) roda no servidor.
 export interface KnowledgeDoc {

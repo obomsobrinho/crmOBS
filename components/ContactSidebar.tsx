@@ -40,21 +40,32 @@ import {
   type ContatoRow,
 } from "@/lib/inbox";
 import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
+import { quemAtende } from "@/lib/crm";
+import { ouvirIa } from "@/lib/ia-bus";
+import QuemAtendeBadge, { quemAtendeTexto } from "./QuemAtendeBadge";
 import type { InboxItem } from "@/lib/types";
 
 function isPaused(state: string | null | undefined): boolean {
   return state === "pause";
 }
 
-// "Precisa de você" = a IA abriu um handoff e ninguém do time respondeu ainda.
+// "Precisa de você" = existe handoff em aberto. Ponto.
 //
-// Antes este corte era simplesmente "IA pausada", porque o handoff pausava a IA.
-// Isso misturava duas coisas diferentes: "a IA pediu ajuda" e "alguém já
-// assumiu". Como a pausa é porta de mão única, a lista virava depósito (46 dos
-// 47 contatos da OBM estavam nela). Agora o handoff tem data própria, e a pausa
-// só exclui da fila: se um humano assumiu, a conversa não espera por ninguém.
-function needsYou(it: InboxItem, ia: Record<string, string | null>): boolean {
-  return it.handoffAt != null && !isPaused(ia[it.phone]);
+// A regra JÁ FOI duas outras coisas, e as duas estavam erradas por motivos
+// diferentes. Primeiro foi "IA pausada", que misturava "a IA pediu ajuda" com
+// "alguém já assumiu" e transformava a lista em depósito (46 dos 47 contatos da
+// OBM caíam nela). Depois passou a excluir conversa pausada, com o argumento de
+// que "se um humano assumiu, ela não espera por ninguém".
+//
+// O argumento caiu em 22/08/2026, por uma observação do dono do produto:
+// **assumir não é resolver.** Dá para responder uma coisa e o pedido continuar
+// pendente, então pausa e handoff coexistem. O que fecha a pendência é o botão
+// Resolvido (`POST /api/conversations/resolve`), que antes não existia, e era só
+// por isso que a pausa fazia esse papel.
+//
+// Quem atende é OUTRA pergunta, respondida por `quemAtende` (lib/crm).
+function needsYou(it: InboxItem): boolean {
+  return it.handoffAt != null;
 }
 
 // Os quatro cortes da lista. Viraram UM seletor com menu, e não quatro chips
@@ -168,6 +179,14 @@ export default function ContactSidebar({
     };
   }, [refetch, supabase]);
 
+  // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime acima também
+  // vai chegar, mas depois de ir ao Postgres, voltar pelo WebSocket e re-buscar
+  // três tabelas, e nesse intervalo a marca do avatar mostrava o estado antigo
+  // enquanto a chave já mostrava o novo. Aqui a correção é local e imediata.
+  useEffect(() => ouvirIa(({ phone, estado }) => {
+    setIaByPhone((m) => (m[phone] === estado ? m : { ...m, [phone]: estado }));
+  }), []);
+
   // Membros do time (para nomear o atendente de cada conversa). Mudam raramente;
   // uma busca no mount basta (a navegação entre páginas revalida).
   useEffect(() => {
@@ -228,9 +247,11 @@ export default function ContactSidebar({
     };
   }, [query, supabase]);
 
+  // Sem `iaByPhone` nas dependências: a fila deixou de depender do estado da IA
+  // quando "precisa de você" passou a ser só handoff em aberto.
   const needsCount = useMemo(
-    () => items.filter((it) => needsYou(it, iaByPhone)).length,
-    [items, iaByPhone]
+    () => items.filter((it) => needsYou(it)).length,
+    [items]
   );
   const unansweredCount = useMemo(
     () => items.filter((it) => it.lastFrom === "in").length,
@@ -252,7 +273,7 @@ export default function ContactSidebar({
     const q = query.trim().toLowerCase();
     return items
       .filter((it) => {
-        if (filter === "needs" && !needsYou(it, iaByPhone)) return false;
+        if (filter === "needs" && !needsYou(it)) return false;
         if (filter === "unanswered" && it.lastFrom !== "in") return false;
         if (filter === "mine" && it.assignedUserId !== myUserId) return false;
         if (!q) return true;
@@ -271,7 +292,7 @@ export default function ContactSidebar({
             : null;
         return { it, snippet };
       });
-  }, [items, iaByPhone, query, filter, msgMatches, myUserId]);
+  }, [items, query, filter, msgMatches, myUserId]);
 
   return (
     <Card asChild className="flex w-[296px] shrink-0 flex-col overflow-hidden">
@@ -405,10 +426,13 @@ export default function ContactSidebar({
             // qualificação, então reflete o último pedido da pessoa) e há quanto
             // tempo isso está esperando. O tempo sai do PRIMEIRO handoff em
             // aberto, que é a espera de verdade.
-            const needs = needsYou(it, iaByPhone);
+            const needs = needsYou(it);
             const reason = needs && qualByPhone[phone] ? qualByPhone[phone] : null;
             const espera = needs && it.handoffAt ? formatEspera(it.handoffAt) : null;
             const att = it.assignedUserId ? membersById[it.assignedUserId] : null;
+            // Quem atende: outra pergunta, outra resposta. Regra em lib/crm para
+            // a lista e o board do pipeline não discordarem sobre o mesmo contato.
+            const quem = quemAtende({ pausada: paused, temAtendente: !!att });
             // Ao abrir a conversa você a está lendo, então não mostra badge.
             const unread = active ? 0 : it.unread;
             const label = name || prettyPhone(phone);
@@ -427,23 +451,34 @@ export default function ContactSidebar({
                       : "border-l-transparent hover:bg-[var(--active-bg)]"
                   }`}
                 >
-                  <div className="relative shrink-0">
+                  {/* `self-start` não é enfeite: como item de flex, este container
+                      esticava com a altura da linha (42px medidos contra os 36 do
+                      avatar), e aí o `bottom-0` da marca caía 6px abaixo do
+                      avatar, que era o "pendurado" que se via na tela. */}
+                  <div className="relative shrink-0 self-start">
                     <Avatar size="md" style={avatarPair(phone)}>
                       {ini ?? <User size={16} />}
                     </Avatar>
-                    {paused && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span
-                            tabIndex={0}
-                            className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-warn ring-2 ring-surface"
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent side="right">
-                          Você está atendendo (IA pausada)
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                    {/* QUEM ATENDE, no canto de baixo. Era um ponto âmbar aceso
+                        em toda conversa pausada, e âmbar é cor de alerta: por
+                        isso lia como "precisa de você" quando queria dizer só
+                        "tem gente cuidando".
+                        Duas marcas, não três, porque "pessoa" já é dito pelo
+                        avatar do responsável no canto de cima, e com nome.
+                        `surface`/`line`/`ink`, nunca `fill` como tinta. */}
+                    <QuemAtendeBadge
+                      quem={quem}
+                      envolver={(marca) => (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={0}>{marca}</span>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            {quemAtendeTexto(quem)}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    />
                     {att && (
                       <Tooltip>
                         <TooltipTrigger asChild>

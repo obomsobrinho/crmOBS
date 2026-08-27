@@ -9,8 +9,7 @@ import {
   Bot,
   Settings2,
   Plus,
-  ChevronUp,
-  ChevronDown,
+  GripVertical,
   Archive,
   ArchiveRestore,
   X,
@@ -25,6 +24,8 @@ import {
   type ContatoRow,
 } from "@/lib/inbox";
 import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
+import { quemAtende } from "@/lib/crm";
+import QuemAtendeBadge, { quemAtendeTexto } from "./QuemAtendeBadge";
 import {
   buildCards,
   lastQualByPhone,
@@ -342,6 +343,46 @@ export default function PipelineBoard({
     [activeStages, supabase, refetchStages]
   );
 
+  // Reordena por ARRASTE: tira o estágio de onde está, põe no índice do alvo e
+  // reescreve as posições em sequência.
+  //
+  // Reescrever a lista toda, em vez de trocar duas posições como o `moveStage`
+  // faz, é o que permite arrastar para qualquer lugar de uma vez, e ainda
+  // normaliza posições que ficaram com buraco depois de arquivar um estágio.
+  // `moveStage` CONTINUA existindo: virou o caminho de teclado (setas no punho de
+  // arraste), porque arraste nativo do HTML não é operável por teclado, e trocar
+  // as setas por arraste sem isso deixaria a tela inoperável para quem não usa
+  // mouse.
+  const reorderStages = useCallback(
+    async (fromId: number, toId: number) => {
+      if (fromId === toId) return;
+      const ordered = [...activeStages];
+      const de = ordered.findIndex((s) => s.id === fromId);
+      const para = ordered.findIndex((s) => s.id === toId);
+      if (de < 0 || para < 0) return;
+      const [movido] = ordered.splice(de, 1);
+      ordered.splice(para, 0, movido);
+
+      const novaPos = new Map(ordered.map((s, i) => [s.id, i] as const));
+      // Otimista: no /design é o estado final, e em produção tira a espera do
+      // refetch de cima do arraste.
+      setStages((s) =>
+        s.map((st) =>
+          novaPos.has(st.id) ? { ...st, position: novaPos.get(st.id)! } : st
+        )
+      );
+      if (!supabase) return;
+      const res = await Promise.all(
+        ordered.map((s, i) =>
+          supabase.from("pipeline_stages").update({ position: i }).eq("id", s.id)
+        )
+      );
+      if (res.some((r) => r.error)) setError("não foi possível reordenar.");
+      await refetchStages();
+    },
+    [activeStages, supabase, refetchStages]
+  );
+
   return (
     <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Cabeçalho + filtros */}
@@ -500,6 +541,7 @@ export default function PipelineBoard({
         onAdd={addStage}
         onPatch={patchStage}
         onMove={moveStage}
+        onReorder={reorderStages}
       />
     </Card>
   );
@@ -517,6 +559,9 @@ function CardItem({
   const label = card.name || prettyPhone(card.phone);
   const ini = initials(card.name);
   const preview = card.lastPreview.replace(/ \| /g, "  ");
+  // "Pessoa atendendo" não desenha marca própria: o avatar do responsável, que
+  // já aparece no card, diz quem é e com nome.
+  const quem = quemAtende({ pausada: card.paused, temAtendente: !!member });
   return (
     <div
       draggable
@@ -533,18 +578,24 @@ function CardItem({
           onOpen();
         }
       }}
-      className="cursor-pointer rounded-lg border border-line bg-conteudo p-2.5 transition-colors hover:border-line-strong"
+      // `cursor-grab` e não `cursor-pointer`: o card é arrastável, e a mãozinha
+      // aberta é o que diz isso antes de a pessoa tentar. Ele também abre a
+      // conversa no clique, mas arrastar é a ação que precisa de aviso, porque
+      // ninguém descobre arraste por acaso.
+      className="cursor-grab rounded-lg border border-line bg-conteudo p-2.5 transition-colors hover:border-line-strong active:cursor-grabbing"
     >
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">
           <Avatar size="xs" style={avatarPair(card.phone)}>
             {ini ?? <User size={14} />}
           </Avatar>
-          {card.paused && (
-            <span
-              title="Você está atendendo (IA pausada)"
-              className="absolute -right-0.5 -bottom-0.5 h-2.5 w-2.5 rounded-full bg-warn ring-2 ring-conteudo"
-            />
+          {/* Mesma regra (`quemAtende`, lib/crm) E mesmo desenho
+              (`QuemAtendeBadge`) da lista de conversas, para as duas telas não
+              discordarem sobre o mesmo contato nem no dado nem no pixel. */}
+          {quem !== "pessoa" && (
+            <span title={quemAtendeTexto(quem)}>
+              <QuemAtendeBadge quem={quem} tamanho="sm" />
+            </span>
           )}
         </div>
         <span className="min-w-0 flex-1 truncate text-apoio font-medium">
@@ -557,9 +608,13 @@ function CardItem({
         )}
       </div>
 
+      {/* Resumo da IA em tinta NORMAL, não em âmbar. Ele acende sempre que existe
+          uma qualificação, para sempre e em qualquer estágio, então pintá-lo de
+          âmbar dizia "pendência" num card que podia estar fechado há semanas.
+          Âmbar ficou reservado para handoff em aberto, que é pendência de fato. */}
       {card.summary ? (
-        <div className="mt-1.5 flex items-start gap-1 text-legenda text-warn-ink">
-          <Bot size={12} className="mt-0.5 shrink-0 opacity-80" />
+        <div className="mt-1.5 flex items-start gap-1 text-legenda text-ink-2">
+          <Bot size={12} className="mt-0.5 shrink-0 text-ink-3" />
           <span className="line-clamp-2">{card.summary}</span>
         </div>
       ) : (
@@ -598,15 +653,23 @@ function StageManager({
   onAdd,
   onPatch,
   onMove,
+  onReorder,
 }: {
   aberto: boolean;
   stages: Stage[];
   onClose: () => void;
   onAdd: (name: string) => void;
   onPatch: (id: number, patch: Partial<StageRow>) => void;
+  /** Caminho de teclado: sobe ou desce um lugar. */
   onMove: (id: number, dir: -1 | 1) => void;
+  /** Caminho de mouse: solta o arrastado na posição do alvo. */
+  onReorder: (fromId: number, toId: number) => void;
 }) {
   const [newName, setNewName] = useState("");
+  // Quem está sendo arrastado e sobre quem ele está. O segundo existe só para
+  // desenhar a linha de inserção: sem retorno visual, arrastar é adivinhação.
+  const [arrastando, setArrastando] = useState<number | null>(null);
+  const [sobre, setSobre] = useState<number | null>(null);
   const ordered = [...stages]
     .filter((s) => !s.archived)
     .sort((a, b) => a.position - b.position);
@@ -663,6 +726,19 @@ function StageManager({
                 canDown={i < ordered.length - 1}
                 onMove={onMove}
                 onPatch={onPatch}
+                arrastando={arrastando === s.id}
+                alvo={sobre === s.id && arrastando !== null && arrastando !== s.id}
+                onDragStart={() => setArrastando(s.id)}
+                onDragEnter={() => setSobre(s.id)}
+                onDragEnd={() => {
+                  setArrastando(null);
+                  setSobre(null);
+                }}
+                onDropOn={() => {
+                  if (arrastando !== null) onReorder(arrastando, s.id);
+                  setArrastando(null);
+                  setSobre(null);
+                }}
               />
             ))}
           </ul>
@@ -714,12 +790,24 @@ function StageRowItem({
   canDown,
   onMove,
   onPatch,
+  arrastando,
+  alvo,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  onDropOn,
 }: {
   stage: Stage;
   canUp: boolean;
   canDown: boolean;
   onMove: (id: number, dir: -1 | 1) => void;
   onPatch: (id: number, patch: Partial<StageRow>) => void;
+  arrastando: boolean;
+  alvo: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDragEnd: () => void;
+  onDropOn: () => void;
 }) {
   const [name, setName] = useState(stage.name);
 
@@ -730,29 +818,50 @@ function StageRowItem({
   }
 
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-line bg-bloco px-2 py-2">
-      <div className="flex flex-col">
-        <Button
-          variant="ghost"
-          size="none"
-          disabled={!canUp}
-          onClick={() => onMove(stage.id, -1)}
-          aria-label="Subir"
-          className="rounded p-0.5"
-        >
-          <ChevronUp size={14} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="none"
-          disabled={!canDown}
-          onClick={() => onMove(stage.id, 1)}
-          aria-label="Descer"
-          className="rounded p-0.5"
-        >
-          <ChevronDown size={14} />
-        </Button>
-      </div>
+    <li
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        // O HTML exige carga no dataTransfer para o arraste começar no Firefox.
+        e.dataTransfer.setData("text/plain", String(stage.id));
+        onDragStart();
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragEnter={onDragEnter}
+      onDragEnd={onDragEnd}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDropOn();
+      }}
+      // A linha inteira é arrastável, então a mãozinha é dela também, e não só
+      // do punho: quem pega a linha pela borda não descobria que dava para
+      // arrastar. O punho segue existindo para dizer ONDE pegar e para operar por
+      // teclado.
+      className={`flex cursor-grab items-center gap-2 rounded-lg border bg-bloco px-2 py-2 transition-colors active:cursor-grabbing ${
+        arrastando ? "opacity-50" : ""
+      } ${alvo ? "border-brand-ink ring-1 ring-[var(--brand-ink)]" : "border-line"}`}
+    >
+      {/* Punho de arraste. Substituiu as duas setas, mas ELE mesmo responde a
+          seta para cima e para baixo: arraste nativo do HTML não funciona por
+          teclado, e trocar as setas por arraste puro tiraria a reordenação de
+          quem não usa mouse. Um controle, dois jeitos de operar. */}
+      <Button
+        variant="ghost"
+        size="none"
+        aria-label={`Reordenar ${stage.name}. Arraste, ou use as setas para cima e para baixo.`}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp" && canUp) {
+            e.preventDefault();
+            onMove(stage.id, -1);
+          } else if (e.key === "ArrowDown" && canDown) {
+            e.preventDefault();
+            onMove(stage.id, 1);
+          }
+        }}
+        className="cursor-grab rounded p-1 text-ink-3 active:cursor-grabbing"
+      >
+        <GripVertical size={14} />
+      </Button>
 
       {/* Amostra de cor, não botão do sistema: aqui a cor É o conteúdo, então
           nenhuma variante do Button se aplica (todas pintariam por cima). */}

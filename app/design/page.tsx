@@ -59,11 +59,17 @@ const LIST: InboxItem[] = [
 
 export default function DesignPreview() {
   const items = LIST;
-  // IA pausada = um humano assumiu, que não é mais a mesma coisa que handoff
-  // aberto. Aqui é a conversa atribuída à própria pessoa logada, que é como isso
-  // aparece na prática: você assumiu, então a IA saiu da frente.
+  // Os TRÊS estados de "quem atende" (`quemAtende`, lib/crm), porque o indicador
+  // no avatar depende deles e um mock com um estado só não prova nada:
+  //
+  // 1. pausada COM responsável -> pessoa atendendo, mostrada pelo avatar do
+  //    responsável. É a conversa atribuída à pessoa logada: você assumiu, a IA saiu.
+  // 2. pausada SEM responsável -> ninguém atende, e aí sim é alerta. É o estado
+  //    dos contatos que ficaram travados pelo handoff antigo.
+  // 3. não pausada -> a IA atende (todas as outras).
   const initialIa: Record<string, string | null> = {
     "553584774753@s.whatsapp.net": "pause",
+    "553384339086@s.whatsapp.net": "pause",
   };
 
   return (

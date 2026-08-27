@@ -69,7 +69,10 @@ export default function AgentPowerToggle({
         >
           {loading ? "Salvando…" : enabled ? "Agente ativo" : "Desativado"}
         </span>
-        <SwitchTrack checked={enabled}>
+        {/* Verde e não roxo: "Agente ativo" é ESTADO de operação, e verde é a cor
+            de estado do projeto. O rótulo ao lado já era verde, então o trilho
+            roxo fazia a mesma chave dizer duas cores sobre o mesmo estado. */}
+        <SwitchTrack checked={enabled} tom="ativo">
           <SwitchThumb checked={enabled} />
         </SwitchTrack>
       </Switch>

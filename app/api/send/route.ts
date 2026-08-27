@@ -2,22 +2,48 @@ import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Fecha o handoff aberto pela IA (conversations.handoff_at). Best-effort e
-// NUNCA lança: a mensagem já saiu, e falhar aqui não pode virar erro para quem
-// só quis responder. Vai por service_role porque handoff_at não tem grant de
-// UPDATE para o browser (quem abre é o /api/agent, quem fecha é esta rota).
-async function clearHandoff(clientId: string, phone: string): Promise<void> {
+// Responder pelo CRM é ASSUMIR a conversa: pausa a resposta da IA e registra
+// quem assumiu. Best-effort e NUNCA lança: a mensagem já saiu, e falhar aqui não
+// pode virar erro para quem só quis responder.
+//
+// POR QUE PAUSAR (decisão de 22/08/2026): antes o mesmo ato tinha três resultados
+// diferentes. Digitar no WhatsApp pausava a IA (nó "Franck digitou" do n8n),
+// responder pelo CRM não pausava nada, e orientar a IA no coach reativava. A
+// regra passa a ser uma: quem responde assume, e IA e pessoa nunca atendem a
+// mesma conversa ao mesmo tempo.
+//
+// POR QUE NÃO FECHA MAIS O HANDOFF: responder não é resolver. A IA pode ter
+// aberto uma pendência ("vou verificar o horário de sexta") que continua aberta
+// depois de uma resposta qualquer. Quem fecha é o botão Resolvido
+// (`POST /api/conversations/resolve`), que também devolve o atendimento à IA.
+//
+// `assigned_user_id` só é gravado quando está VAZIO: se a conversa já é de
+// alguém, responder não rouba a atribuição de quem já era o dono dela.
+async function assumirConversa(
+  clientId: string,
+  phone: string,
+  userId: string
+): Promise<void> {
   try {
     const svc = createServiceClient();
-    const { error } = await svc
-      .from("conversations")
-      .update({ handoff_at: null })
-      .eq("client_id", clientId)
-      .eq("phone", phone)
-      .not("handoff_at", "is", null);
-    if (error) console.error("falha ao fechar o handoff:", error.message);
+    const [pausa, atribuicao] = await Promise.all([
+      svc
+        .from("dados_cliente")
+        .update({ atendimento_ia: "pause" })
+        .eq("client_id", clientId)
+        .eq("telefone", phone),
+      svc
+        .from("conversations")
+        .update({ assigned_user_id: userId })
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .is("assigned_user_id", null),
+    ]);
+    if (pausa.error) console.error("falha ao pausar a IA:", pausa.error.message);
+    if (atribuicao.error)
+      console.error("falha ao atribuir a conversa:", atribuicao.error.message);
   } catch (e) {
-    console.error("falha ao fechar o handoff:", e);
+    console.error("falha ao assumir a conversa:", e);
   }
 }
 
@@ -125,11 +151,10 @@ export async function POST(req: Request) {
         { status: 502 }
       );
     }
-    // Um humano respondeu, então o handoff que a IA abriu está atendido: limpa
-    // conversations.handoff_at para a conversa sair de "Precisa de você". É este
-    // o gesto que fecha o handoff, e não a chave da IA: responder pelo CRM não
-    // quer dizer que o dono queira a IA desligada dali pra frente.
-    await clearHandoff(client.id, phone);
+    // Um humano respondeu: ele assumiu a conversa. A IA para de responder aqui e
+    // a conversa passa a ter dono. O handoff NÃO é fechado por isso: fechar é o
+    // botão Resolvido, que também devolve o atendimento à IA.
+    await assumirConversa(client.id, phone, client.userId);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

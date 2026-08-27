@@ -5,6 +5,7 @@ import Thread from "./Thread";
 import ContextPanel from "./ContextPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { createClient } from "@/lib/supabase/client";
+import { anunciarIa } from "@/lib/ia-bus";
 import type { Member } from "@/lib/team";
 import type { ChatRow } from "@/lib/types";
 
@@ -121,12 +122,23 @@ export default function ConversationView({
 
   // Abrir a conversa marca como lida (zera o contador). A RLS restringe o update
   // ao tenant do usuário, então filtrar por telefone atinge só a linha dele.
+  //
+  // ⚠️ O `await` NÃO é decoração: o query builder do Supabase é LAZY e só manda a
+  // requisição quando alguém chama `.then()`. Isto era `void supabase...`, que
+  // descarta o valor sem acionar o builder, então o PATCH jamais saía e o
+  // contador de não lidas ficava aceso para sempre. Provado por rede: abrir a
+  // conversa não gerava PATCH nenhum. Com Promise de verdade `void` funciona,
+  // porque ela já está em execução; com builder preguiçoso, não. Os outros
+  // `void supabase.removeChannel(...)` do projeto seguem corretos, porque
+  // `removeChannel` devolve Promise, e não builder.
   useEffect(() => {
-    void supabase
-      .from("conversations")
-      .update({ unread_count: 0 })
-      .eq("phone", phone)
-      .gt("unread_count", 0);
+    void (async () => {
+      await supabase
+        .from("conversations")
+        .update({ unread_count: 0 })
+        .eq("phone", phone)
+        .gt("unread_count", 0);
+    })();
   }, [phone, supabase]);
 
   // Realtime do estado da IA deste contato.
@@ -217,11 +229,19 @@ export default function ConversationView({
     const next = pausada ? "ativa" : "pause";
     const prev = iaState;
     setIaState(next); // otimista
+    // A lista de conversas mostra QUEM está atendendo no canto do avatar, e ela é
+    // outro componente. Sem este aviso ela só descobre pelo realtime (ida ao
+    // Postgres, volta do WebSocket e três consultas), então a marca ficava
+    // atrasada em relação à chave que a pessoa acabou de virar.
+    anunciarIa({ phone, estado: next });
     const { error } = await supabase
       .from("dados_cliente")
       .update({ atendimento_ia: next })
       .eq("telefone", phone);
-    if (error) setIaState(prev); // reverte em caso de falha
+    if (error) {
+      setIaState(prev); // reverte em caso de falha
+      anunciarIa({ phone, estado: prev });
+    }
   }, [iaState, phone, supabase, readOnly]);
 
   return (

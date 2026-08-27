@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Sparkles, Clock } from "lucide-react";
+import { Sparkles, Clock, CheckCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
+import { formatEspera } from "@/lib/format";
+import { Button } from "@/components/ui/button";
 
 // "Entendimento": o que a IA entendeu desta conversa. Lê a qualificação mais
 // recente (conversation_qualifications, gravada por /api/agent). Só leitura.
@@ -21,16 +23,29 @@ export default function AiSummary({
 }) {
   const supabase = createClient();
   const [qual, setQual] = useState<Qualification | null>(null);
+  // Handoff em aberto desta conversa. Vem junto porque é aqui que o pedido
+  // pendente está descrito, e é aqui que faz sentido declarar que acabou.
+  const [handoffAt, setHandoffAt] = useState<string | null>(null);
+  const [resolvendo, setResolvendo] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from("conversation_qualifications")
-      .select("action, summary, preferencia_horario, created_at")
-      .eq("client_id", clientId)
-      .eq("phone", phone)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const [{ data }, { data: conv }] = await Promise.all([
+      supabase
+        .from("conversation_qualifications")
+        .select("action, summary, preferencia_horario, created_at")
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("conversations")
+        .select("handoff_at")
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .maybeSingle(),
+    ]);
+    setHandoffAt((conv?.handoff_at as string | null) ?? null);
     if (!data) {
       setQual(null);
       return;
@@ -43,6 +58,27 @@ export default function AiSummary({
     });
   }, [supabase, clientId, phone]);
 
+  // Declara o pedido resolvido: fecha o handoff e devolve o atendimento para a
+  // IA. Vai por rota (service_role) porque `handoff_at` não tem grant de UPDATE
+  // para o browser, justamente para ninguém tirar conversa da fila por acidente.
+  const resolver = useCallback(async () => {
+    setResolvendo(true);
+    const anterior = handoffAt;
+    setHandoffAt(null); // otimista
+    try {
+      const res = await fetch("/api/conversations/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) setHandoffAt(anterior); // reverte
+    } catch {
+      setHandoffAt(anterior);
+    } finally {
+      setResolvendo(false);
+    }
+  }, [phone, handoffAt]);
+
   useEffect(() => {
     void (async () => {
       await load();
@@ -52,6 +88,14 @@ export default function AiSummary({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversation_qualifications" },
+        () => void load()
+      )
+      // `conversations` também: o handoff é aberto pelo /api/agent e fechado pela
+      // rota de resolver, os dois fora desta tela, então sem isto o bloco só
+      // atualizaria ao trocar de conversa.
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "conversations" },
         () => void load()
       )
       .subscribe();
@@ -88,6 +132,29 @@ export default function AiSummary({
         <p className="text-apoio text-ink-3" style={{ textWrap: "pretty" }}>
           {resumo}
         </p>
+      )}
+
+      {/* Pendência em aberto. Âmbar aqui é o significado certo da cor: alguém
+          espera. Só aparece com handoff aberto, e sai quando for resolvido. */}
+      {handoffAt && (
+        <div className="mt-1 rounded-lg border border-warn-line bg-warn-surface px-3 py-2.5">
+          <p className="text-apoio font-medium text-warn-ink">
+            Esperando você há {formatEspera(handoffAt)}
+          </p>
+          <p className="mt-0.5 text-legenda text-ink-2">
+            Resolver fecha essa pendência e devolve o atendimento para a IA.
+          </p>
+          <Button
+            size="field"
+            variant="outline"
+            onClick={resolver}
+            disabled={resolvendo}
+            className="mt-2 w-full justify-center"
+          >
+            <CheckCheck size={15} />
+            {resolvendo ? "Resolvendo…" : "Resolvido"}
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -43,7 +43,12 @@ const CARDS: PipelineCard[] = [
   card({ phone: "553384266039@s.whatsapp.net", name: "Marina Souza", lastPreview: "Qual o valor do plano anual?", lastFrom: "in", stage: "novo", lastMessageAt: T(10, 12) }),
   card({ phone: "553391589932@s.whatsapp.net", name: "João Pereira", lastFrom: "out", stage: "qualificado", assignedUserId: "u2", lastPreview: "Perfeito, vou verificar", lastMessageAt: T(21, 28) }),
   card({ phone: "553384339086@s.whatsapp.net", name: "Loja do Zé", stage: "aguardando_humano", paused: true, assignedUserId: ME, summary: "Cliente quer marcar uma conversa, prefere terça à tarde.", lastMessageAt: T(17, 18) }),
-  card({ phone: "553384486180@s.whatsapp.net", name: "Beatriz Lima", stage: "fechado", lastFrom: "out", lastPreview: "Obrigada!", lastMessageAt: T(9, 20) }),
+  // Fechado, com resumo, pausada e SEM responsável: é o caso que o dono do
+  // produto reportou (card movido para Fechado que continuava com ponto e resumo
+  // em âmbar, parecendo pendência). Aqui ele prova as duas correções de uma vez:
+  // o resumo sai do âmbar, e o ponto passa a dizer "ninguém atende", que é o que
+  // de fato acontece com a IA pausada e nenhum responsável.
+  card({ phone: "553384486180@s.whatsapp.net", name: "Beatriz Lima", stage: "fechado", lastFrom: "out", lastPreview: "Obrigada!", paused: true, summary: "Cliente perguntou o valor do plano anual e ficou de responder.", lastMessageAt: T(9, 20) }),
 ];
 
 export default function DesignPipelinePage() {

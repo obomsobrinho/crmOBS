@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Switch as SwitchPrimitive } from "radix-ui";
+import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
@@ -51,21 +52,44 @@ function Switch({
  * `checked` nem com `unchecked` e fica sem cor nenhuma. Depender de atributo
  * de ancestral quebra sempre que alguém envolve o componente em outra coisa.
  */
+const trilhoVariants = cva(
+  [
+    "relative flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors",
+    "data-[state=unchecked]:border-line-strong data-[state=unchecked]:bg-campo",
+    "data-[state=checked]:border-transparent",
+  ].join(" "),
+  {
+    variants: {
+      /**
+       * `marca` = roxo, para chave que liga um recurso (a IA de uma conversa).
+       * `ativo` = verde, para chave que representa ESTADO de operação ligado.
+       *
+       * Existe porque a chave "Agente ativo" já tinha o rótulo verde
+       * (`text-human-ink`) com o trilho roxo do lado: a mesma chave dizia duas
+       * cores sobre o mesmo estado. Verde é a cor de estado do projeto, então o
+       * desvio era o trilho.
+       */
+      tom: {
+        marca: "data-[state=checked]:bg-brand",
+        ativo: "data-[state=checked]:bg-human",
+      },
+    },
+    defaultVariants: { tom: "marca" },
+  },
+);
+
 function SwitchTrack({
   className,
   checked,
+  tom,
   ...props
-}: React.ComponentProps<"span"> & { checked: boolean }) {
+}: React.ComponentProps<"span"> &
+  VariantProps<typeof trilhoVariants> & { checked: boolean }) {
   return (
     <span
       data-slot="switch-track"
       data-state={checked ? "checked" : "unchecked"}
-      className={cn(
-        "relative flex h-4 w-7 shrink-0 items-center rounded-full border transition-colors",
-        "data-[state=unchecked]:border-line-strong data-[state=unchecked]:bg-campo",
-        "data-[state=checked]:border-transparent data-[state=checked]:bg-brand",
-        className,
-      )}
+      className={cn(trilhoVariants({ tom, className }))}
       {...props}
     />
   );

@@ -451,7 +451,17 @@ export default function Thread({
                         : "border-brand-line bg-brand-surface text-brand-ink",
                     )}
                   >
-                    {iaPausada ? "IA pausada" : "IA ligada"}
+                    {/* Pausada diz QUEM assumiu, não só que a IA parou: responder
+                        pelo CRM passou a pausar a IA e a atribuir a conversa,
+                        então o cabeçalho pode nomear o responsável em vez de
+                        deixar a pessoa adivinhar de quem é aquele atendimento. */}
+                    {iaPausada
+                      ? attendant
+                        ? attendant.userId === myUserId
+                          ? "Você atendendo"
+                          : `${memberName(attendant.email)} atendendo`
+                        : "IA pausada"
+                      : "IA ligada"}
                     <SwitchTrack checked={!iaPausada}>
                       <SwitchThumb checked={!iaPausada} />
                     </SwitchTrack>
