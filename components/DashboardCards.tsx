@@ -11,21 +11,16 @@ import {
   StatLegenda,
 } from "@/components/ui/stat";
 
-// Os números da operação, em linguagem de dono (não é BI). Componente puro de
-// apresentação: a página calcula por RLS e passa; o /design passa mock.
+// Os três números que respondem "a IA está dando conta?", em linguagem de dono
+// (não é BI). Componente puro de apresentação: quem calcula é a página, por RLS.
 //
-// Cada cartão tem QUATRO peças, e as duas últimas são as que faltavam: rótulo,
-// número, uma frase que INTERPRETA o número, e uma legenda com o PERÍODO. O
-// período no cartão não é enfeite: sem ele a tela mostrava "Leads qualificados 9"
-// (7 dias) ao lado de "19 leads qualificados em julho" (mês), e o dono lia
-// contradição.
-//
-// "Conversas na semana" deixou de ser cartão próprio: não é número sobre o qual
-// ele aja, é o denominador da autonomia, e desceu para a legenda do primeiro
-// cartão, onde trabalha mais ("31 de 42 conversas").
+// Cada cartão tem QUATRO peças: rótulo, número, uma frase que INTERPRETA o
+// número, e uma legenda com o PERÍODO. O período no cartão não é enfeite: sem
+// ele a tela mostrava "Leads qualificados 9" (7 dias) ao lado de "19 leads
+// qualificados em julho" (mês), e o dono lia contradição.
 
 /** Selo de variação, ou a frase de "sem base". Nunca um número inventado. */
-function Selo({ delta }: { delta: Delta }) {
+export function Selo({ delta }: { delta: Delta }) {
   if (delta.tipo === "sem-base") {
     return <span className="text-legenda text-ink-3">{delta.texto}</span>;
   }
@@ -47,46 +42,54 @@ function Selo({ delta }: { delta: Delta }) {
 export default function DashboardCards({
   metrics,
   anterior,
-  esperando,
+  legenda,
+  semBase,
 }: {
   metrics: DashboardMetrics;
   /**
-   * Os mesmos números dos 7 dias ANTERIORES, para a variação. `null` quando não
-   * há período anterior medido, e aí nenhum cartão mostra selo.
+   * Os mesmos números do período ANTERIOR, para a variação. `null` quando não há
+   * período anterior medido, e aí nenhum cartão mostra selo.
    */
   anterior: DashboardMetrics | null;
-  /** Conversas com handoff em aberto AGORA. `null` = não medido. */
-  esperando: number | null;
+  /** Período do cartão, ex.: "últimos 7 dias". */
+  legenda: string;
+  /** Frase de "sem base", ex.: "primeira semana medida". */
+  semBase: string;
 }) {
-  const { conversasSemana, semIntervencao, leadsQualificados, primeiraRespostaMs } =
-    metrics;
-  const pct =
-    conversasSemana > 0 ? Math.round((semIntervencao / conversasSemana) * 100) : 0;
+  const {
+    conversas,
+    semIntervencao,
+    primeiraRespostaMs,
+    amostraMediana,
+    preferiuConfirmar,
+    respostasIa,
+  } = metrics;
 
-  const primeiraSemana = "primeira semana medida";
+  const pct = conversas > 0 ? Math.round((semIntervencao / conversas) * 100) : 0;
 
   const deltaAutonomia = calcularDelta({
     atual: semIntervencao,
     anterior: anterior?.semIntervencao ?? null,
     direcao: "maior-melhor",
-    semBase: primeiraSemana,
-  });
-  const deltaLeads = calcularDelta({
-    atual: leadsQualificados,
-    anterior: anterior?.leadsQualificados ?? null,
-    direcao: "maior-melhor",
-    semBase: primeiraSemana,
+    semBase,
   });
   const deltaResposta = deltaDuracao({
     atualMs: primeiraRespostaMs,
     anteriorMs: anterior?.primeiraRespostaMs ?? null,
-    semBase: primeiraSemana,
+    semBase,
+  });
+  // Direção NEUTRA de propósito. Menos escalada pode ser a base ficando melhor,
+  // e mais escalada pode ser só mais demanda. Pintar de verde ou vermelho
+  // ensinaria o dono a torcer pelo número errado.
+  const deltaConfirmar = calcularDelta({
+    atual: preferiuConfirmar,
+    anterior: anterior?.preferiuConfirmar ?? null,
+    direcao: "neutra",
+    semBase,
   });
 
-  const temEspera = esperando != null && esperando > 0;
-
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <Stat variant="elevado">
         <StatTopo>
           <StatRotulo>Atendidas sem você</StatRotulo>
@@ -94,25 +97,13 @@ export default function DashboardCards({
         </StatTopo>
         <StatValor>{semIntervencao}</StatValor>
         <StatFrase>
-          {conversasSemana > 0
-            ? `A IA resolveu ${pct}% sozinha`
-            : "A IA resolveu sozinha"}
+          A conversa seguiu sem ninguém do time precisar entrar
         </StatFrase>
         <StatLegenda>
-          {conversasSemana > 0
-            ? `${semIntervencao} de ${conversasSemana} conversas, últimos 7 dias`
-            : "últimos 7 dias"}
+          {conversas > 0
+            ? `${semIntervencao} de ${conversas} conversas (${pct}%), ${legenda}`
+            : legenda}
         </StatLegenda>
-      </Stat>
-
-      <Stat variant="elevado">
-        <StatTopo>
-          <StatRotulo>Leads qualificados</StatRotulo>
-          <Selo delta={deltaLeads} />
-        </StatTopo>
-        <StatValor>{leadsQualificados}</StatValor>
-        <StatFrase>A IA identificou e resumiu para você</StatFrase>
-        <StatLegenda>últimos 7 dias</StatLegenda>
       </Stat>
 
       <Stat variant="elevado">
@@ -121,32 +112,43 @@ export default function DashboardCards({
           <Selo delta={deltaResposta} />
         </StatTopo>
         <StatValor>{formatDuration(primeiraRespostaMs)}</StatValor>
-        {/* Diz que é mediana e que é só da IA. O número mudou de significado em
-            26/08, e um cartão que o dono lê como "velocidade do agente" precisa
-            declarar que não está somando humano. */}
         <StatFrase>Mediana, contando só as respostas da IA</StatFrase>
-        <StatLegenda>últimos 7 dias</StatLegenda>
+        {/* O tamanho da amostra vai na legenda: mediana de 3 atendimentos e
+            mediana de 138 não são o mesmo número, e o cartão precisa dizer qual
+            dos dois ele é. */}
+        <StatLegenda>
+          {amostraMediana > 0
+            ? `${amostraMediana} ${
+                amostraMediana === 1
+                  ? "atendimento medido"
+                  : "atendimentos medidos"
+              }, ${legenda}`
+            : legenda}
+        </StatLegenda>
       </Stat>
 
-      {/* O único número ACIONÁVEL do painel, e é por isso que ele existe:
-          transforma relatório em tarefa. Sem selo de propósito, porque é foto de
-          AGORA e não período, e comparar "agora" com "agora da semana passada"
-          não significa nada. */}
-      <Stat variant={temEspera ? "marca" : "elevado"}>
+      {/* A contenção vira PROVA, não falha. É a única forma OBSERVÁVEL de "a IA
+          não inventa": uma promessa de não alucinar é impossível de verificar;
+          uma contagem de vezes em que ela se conteve, não.
+          Em zero a frase VIRA a leitura positiva em vez de o cartão sumir: zero
+          escalada num período com movimento é notícia boa, e esconder o cartão
+          faria o número reaparecer do nada na semana seguinte. */}
+      <Stat variant="elevado">
         <StatTopo>
-          <StatRotulo>Esperando você</StatRotulo>
+          <StatRotulo>Preferiu confirmar</StatRotulo>
+          <Selo delta={deltaConfirmar} />
         </StatTopo>
-        <StatValor className={temEspera ? "text-brand-ink" : ""}>
-          {esperando ?? "sem dados"}
-        </StatValor>
+        <StatValor>{preferiuConfirmar}</StatValor>
         <StatFrase>
-          {esperando == null
-            ? "Não foi possível medir agora"
-            : esperando === 0
-              ? "Nada pendente do seu lado"
-              : "A IA abriu e ninguém respondeu ainda"}
+          {preferiuConfirmar === 0
+            ? "Ela não precisou te passar nada no período"
+            : "Vezes em que ela passou para você em vez de chutar"}
         </StatFrase>
-        <StatLegenda>agora</StatLegenda>
+        <StatLegenda>
+          {respostasIa > 0
+            ? `${preferiuConfirmar} de ${respostasIa} respostas, ${legenda}`
+            : legenda}
+        </StatLegenda>
       </Stat>
     </div>
   );

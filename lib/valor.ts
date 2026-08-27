@@ -12,9 +12,19 @@
 // REGRA QUE NÃO SE NEGOCIA: nunca inventar nem inflar. O cliente confere no
 // WhatsApp dele, e confiança é o nosso eixo de competição. Onde falta dado, a
 // frase é OMITIDA, não estimada.
+//
+// ⚠️ E É POR ISSO QUE O HISTÓRICO IMPORTADO FICA FORA (27/08/2026). Este módulo
+// dizia "resposta da IA é bot_message com message_type <> 'manual'", e
+// `imported` passava por essa peneira, então as respostas que o próprio dono
+// digitou à mão no WhatsApp ANTES da IA existir entravam como trabalho da IA.
+// Medido na OBM: a frase de fim de semana dizia 31 quando a IA mandou 3, e a de
+// conversas sem intervenção dizia 46 de 47 quando eram 2. Agora a regra é uma
+// só e mora em lib/mensagem.ts: o painel conta o que aconteceu DEPOIS que a IA
+// entrou, e o histórico importado segue no inbox, que é o lugar dele.
 
 import type { BusinessHours, DayKey } from "@/lib/agent-prompt";
 import { DAY_ORDER } from "@/lib/agent-prompt";
+import { ehImportada, respostaDaIa, respostaHumana } from "@/lib/mensagem";
 
 // ---------------------------------------------------------------------------
 // Entrada
@@ -306,24 +316,30 @@ export function resumoDeValor(input: ValorInput): ValorResumo {
   const picos = new Map<string, number>();
 
   for (const m of input.msgs) {
+    // Linha do histórico importado não entra em NADA: é o que a empresa fazia
+    // antes de existir agente, e somar isso é inflar a frase que o cliente vai
+    // conferir no WhatsApp dele.
+    if (ehImportada(m.message_type)) continue;
+
     const p = parteLocal(m.created_at);
     if (!p) continue;
 
     const t = Date.parse(m.created_at);
     const temUser = !!m.user_message;
-    const temBot = !!m.bot_message;
-    const manual = m.message_type === "manual";
+    const daIa = respostaDaIa(m);
 
     let e = porTelefone.get(m.phone);
     if (!e) {
       e = { humano: false, primeiraUser: null, primeiraBot: null };
       porTelefone.set(m.phone, e);
     }
-    if (manual) e.humano = true;
+    if (respostaHumana(m)) e.humano = true;
     if (temUser && (e.primeiraUser === null || t < e.primeiraUser)) {
       e.primeiraUser = t;
     }
-    if (temBot && (e.primeiraBot === null || t < e.primeiraBot)) {
+    // Só resposta DA IA conta para o tempo de primeira resposta: este número é
+    // lido como velocidade do agente, e um humano respondendo depois o estraga.
+    if (daIa && (e.primeiraBot === null || t < e.primeiraBot)) {
       e.primeiraBot = t;
     }
 
@@ -338,7 +354,7 @@ export function resumoDeValor(input: ValorInput): ValorResumo {
     // Fora do horário e fim de semana contam a linha em que a IA RESPONDEU.
     // Resposta manual fica de fora de propósito: aquilo foi alguém do time
     // trabalhando de madrugada, e somar as duas inflaria a frase.
-    if (temBot && !manual) {
+    if (daIa) {
       const feriado = ehFeriado(p, cacheFeriados);
       const fimDeSemana = p.diaSemana === 0 || p.diaSemana === 6;
       if (fimDeSemana || feriado) fimDeSemanaOuFeriado++;

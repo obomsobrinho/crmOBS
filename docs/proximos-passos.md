@@ -27,21 +27,17 @@ Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estr
 ## Próxima rodada (decidido em 26/08/2026)
 
 Ordem travada. **Cobrança e checkout saem do caminho crítico**: o lançamento será um **beta
-gratuito** com conhecidos do dono (empresários, clínicas), custeado por ele, para validar uso e
-achar bug antes de vender. Consequência: Asaas e Vercel Pro voltam a ser gatilho do primeiro
-pagante, não pré-requisito.
+gratuito** com conhecidos do dono, custeado por ele, para validar uso e achar bug antes de vender.
+Consequência: Asaas e Vercel Pro voltam a ser gatilho do primeiro pagante, não pré-requisito.
 
-1. **Fechar o MVP do beta.** Bloqueador real e pequeno: o gate de assinatura expulsa o testador
-   quando o trial vence. A saída já existe no código, porque **`trialing` com `trial_ends_at` nulo
-   não bloqueia** de propósito; falta só uma forma de marcar um tenant como beta. Junto: um canal de
-   feedback, e deixar explícito ao testador que publicar é o que solta a IA no cliente real dele.
-   ⚠️ São negócios reais com clientes reais: se a IA errar, o prejuízo de imagem é do testador.
-2. **Agenda** (ver abaixo). É o próximo desenvolvimento.
-3. **Redesenho geral no Claude Design** (seção própria mais abaixo): tapa no visual como um todo,
-   conferir aderência ao padrão e **acertar o tema claro**, que é o que mais destoa hoje. Primeira
-   impressão importa porque o beta é com conhecidos, e o painel já foi aprovado como "ainda não
-   está bom".
-4. **Bateria de testes de segurança da IA** (novo, ver abaixo).
+⚠️ **O testador não é só clínica.** O beta mistura advogado, pediatra, barbeiro, engenheiro e
+comércio. Isso é restrição de produto, não detalhe de texto: nenhuma frase fixa de tela pode assumir
+agendamento, consulta ou paciente. Quem carrega a linguagem do segmento é o preset, nunca a base.
+
+**A ordem única é a da seção "Ordem confirmada do MVP do beta", logo abaixo.** A lista de quatro
+itens que ficava aqui foi absorvida por ela em 26/08 e não existe mais: havia duas numerações
+concorrentes (uma de 4, outra de 6), com redesenho e testes em posições diferentes, e nenhuma das
+duas dizia qual mandava.
 
 ### Agenda (promovida a próximo passo, saiu do "não construir")
 
@@ -69,11 +65,19 @@ O trabalho de verdade tem três partes, em ordem de risco:
    importam), **desenho** (como mostrar) e **gráfico**. É a manchete do beta e a tela onde o
    empresário julga o produto, então tem que ser a melhor tela do sistema.
 2. **Steps do agente.** Mesmo tratamento: pesquisa e desenho antes de implementar.
-3. **Os 4 furos**: marcar tenant de beta, canal de feedback, instrumentação do beta, testes mínimos
-   de segurança da IA.
+3. **Os 4 furos**: marcar tenant de beta (`account_type`, abaixo), canal de feedback,
+   instrumentação do beta, testes mínimos de segurança da IA.
 4. **Design e mobile no Claude Design** (redesenho geral, tema claro, celular).
 5. **Aplicar o design escolhido.**
 6. **Testes** (incluindo a bateria completa de segurança da IA).
+
+**Absorvido por esta lista, e por isso não é item separado em lugar nenhum:** o antigo "Painel geral"
+da Fase 4 (placar da IA, fila do precisa de você, série, consumo contra o limite) é o passo 1, e o
+"Redesenho geral no Claude Design" mais adiante neste documento é o passo 4.
+
+**O que fica para DEPOIS do beta, nesta ordem:** Agenda (Google Calendar, seção própria abaixo),
+cadastro do contato (CPF, nascimento, e-mail), lembrete e mensagem ativa, e só então cobrança
+(Asaas, já construído e parado). Nada disso entra antes de os seis passos fecharem.
 
 Estrutura antes de estética, de propósito: os passos 1 e 2 definem a estrutura das telas, os passos
 4 e 5 são o polimento. Inverter significaria redesenhar duas vezes.
@@ -82,42 +86,88 @@ Estrutura antes de estética, de propósito: os passos 1 e 2 definem a estrutura
 essas duas telas não devem ser "corretas e sem graça". Cada uma tem um ponto de parada para
 aprovação do desenho antes de virar código.
 
-**Acesso do testador: decidido o caminho simples, sem cupom.** A marcação já existe de graça, porque
-`trialing` com `trial_ends_at` **nulo** não bloqueia (comportamento intencional do gate) e o cadastro
-normal sempre grava uma data. Logo **`trial_ends_at IS NULL` já identifica o testador beta**, sem
-migração, sem campo e sem UI. Com 5 a 10 testadores, marcar à mão é trivial. O campo de cupom
-(`referral_code`) continua no roadmap, mas o propósito real dele é atribuição para pagar comissão de
-filiado, e no beta gratuito não há comissão a pagar.
+**Acesso do testador: `trial_ends_at` nulo LIBERA, mas não MARCA. São duas coisas (decidido em
+26/08).** O acesso já está resolvido de graça: `trialing` com `trial_ends_at` nulo não bloqueia
+(comportamento intencional do gate em `lib/billing.ts`), e o cadastro normal sempre grava uma data,
+então zerar a data à mão libera o testador sem migração nenhuma.
 
-### Steps do agente: desenho de referência (26/08)
+O que NÃO está resolvido é identificar quem é quem. Hoje OBM e Loja Teste (contas internas) estão
+exatamente no mesmo estado que um testador estaria: verificado no banco em 26/08, os dois com
+`subscription_status = active` e `trial_ends_at` nulo. Consequências práticas, e são as três que
+doem: não dá para medir o uso do beta sem misturar o dado do próprio dono, não existe consulta que
+responda "quem eu preciso converter quando o beta acabar", e no dia em que a cobrança ligar uma
+conta beta esquecida passa despercebida.
 
-Padrão aprovado pelo dono (referência visual: assistente de onboarding tipo Plain/Kastamer).
-Coluna esquerda com a trilha vertical (ícone, título, descrição; concluído com check e linha cheia,
-futuro apagado com linha tracejada). Coluna direita com "PASSO N DE 4", título grande, um parágrafo
-que explica **por que** o passo importa, os campos, e rodapé com Voltar e Salvar e continuar.
+**Decisão: criar `clients.account_type`** com `interno` / `beta` / `pago` (CHECK no banco, como os
+demais enums de `clients`), escrita só por service_role. É uma migração de uma coluna e é
+pré-requisito do furo "instrumentação do beta", que sem ela não tem como existir.
 
-**Os 4 passos** (a mesma ordem em que o dono pensa o problema):
-1. **Quem atende** (nome do agente, empresa, tom)
-2. **O que ele sabe** (o que a empresa faz, horário, detalhes, base de conhecimento)
-3. **O que ele pode fazer** (objetivos, regras, quando chamar humano)
-4. **Testar e publicar** (bancada de teste e a chave)
+O campo de cupom (`referral_code`) continua no roadmap, mas o propósito real dele é atribuição para
+pagar comissão de filiado, e no beta gratuito não há comissão a pagar.
 
-> Estes títulos já tinham sido recusados como **âncora no topo** da tela antiga. Como **passo** eles
-> funcionam, porque descrevem a sequência natural de configurar um atendente.
+### Steps do agente: desenho FECHADO (26/08)
+
+**Decisão: duas superfícies sobre o mesmo formulário, no padrão setup do WooCommerce (referência
+trazida pelo dono).** Um assistente que roda uma vez e uma tela de configuração permanente com abas,
+e um não anula o outro. Referência visual da trilha: assistente de onboarding tipo Plain/Kastamer.
+
+⚠️ **A regra que faz o padrão funcionar, e que quase todo mundo esquece de copiar: o assistente pede
+MUITO menos que as abas.** O setup do Woo não pergunta imposto por estado. Assistente que mostra os
+mesmos campos fatiados em quatro telas não tira o susto de "20 inputs", ele parcela.
+
+**O dado que dimensiona isso** (verificado em `validateConfig`, `lib/agent-prompt.ts`): o agente vai
+ao ar com **4 campos obrigatórios**, e um deles (`goals`) já vem marcado por padrão. Na prática a
+pessoa digita **três coisas**: nome da empresa, o que a empresa faz e nome do agente. Todo o resto
+(site, endereço, função, tom, detalhes, horário, base de conhecimento, o que não fazer, quando chamar
+humano, aviso de handoff, grupo de notificação) é melhoria, não requisito.
+
+**Superfície 1, o assistente: rota própria, tela cheia, quatro passos.**
+1. **Conectar o WhatsApp** (o QR que já existe em `/connect`)
+2. **Quem atende** (empresa, o que faz, nome do agente, tom; com o preset de segmento antes de tudo,
+   que já preenche boa parte)
+3. **O que ele sabe** (um campo de texto livre, mais o convite opcional a subir um documento)
+4. **Testar e publicar** (a bancada e a chave, no mesmo lugar)
+
+Termina em uns dois minutos e termina **com o agente no ar**, que é o único desfecho que conta. Ao
+concluir, cai em `/agente` já preenchida.
+
+**Superfície 2, a tela `/agente` para sempre: três abas** (quem atende, o que ele sabe, o que ele
+pode fazer). Aba de verdade, que TROCA o conteúdo, e não índice de âncora, que foi recusado em 26/08
+com razão. É o que mata a rolagem de 2.258px (soma medida dos três grupos) e o que salva o celular.
+Ponto de erro na aba que tem campo inválido, senão a validação some atrás da aba fechada.
+
+**Três regras que impedem isso de virar dívida:**
+- **O assistente não é um segundo formulário, é uma segunda COMPOSIÇÃO dos mesmos campos.** Mesmos
+  componentes, mesma validação, mesmo `PUT`. Se ele tiver `Input` próprio, os dois divergem no
+  primeiro ajuste.
+- **Um contador só na conta: o assistente ABSORVE a barra de onboarding.** Os 4 passos dela
+  (conectar, configurar, testar, publicar) viram os 4 passos dele. Manter os dois produz "passo 3 de
+  4" dentro de "passo 2 de 4", que foi exatamente o motivo de o contador ter sido tirado da tela.
+- **A tela permanente perde os numerais e o "continuar para".** Aquilo era o assistente improvisado;
+  com o de verdade existindo, vira ruído.
+
+✅ **A colisão "salvar e continuar" com "salvar já é publicar" some por construção.** Se o assistente
+só existe antes da primeira publicação, gravar a cada passo é inofensivo (a IA está muda enquanto
+`agent_published_at` é nulo), e quem edita agente ATIVO nunca vê assistente.
+
+**Duas ressalvas registradas na decisão:**
+- Rota própria exige porta de volta para quem abandona no meio. É o que a barra de onboarding faz
+  hoje, e é o que sobra dela depois de absorvida: um link fixo enquanto não publicou.
+- **O passo 3 pedir um campo só é uma aposta deliberada:** o agente que sai do assistente é bom, não
+  é ótimo. Quem publica em dois minutos volta para melhorar; quem fecha a aba no campo 14 não volta
+  nunca. Se um dia a escolha for um agente mais completo na saída, o preço é abandono.
+
+**O que JÁ existe e deve ser reaproveitado** (levantado no código em 26/08): todos os campos e a
+validação, os presets por segmento, a base de conhecimento em versão compacta, a bancada de teste
+(`AgentTestDrawer` + `POST /api/playground`), a rota de publicar, o sinal `agent_published_at` e o
+`tabs` na camada base. O que existe hoje na primeira vez **não é assistente**: é a página inteira com
+numeral nos grupos e um botão que ROLA até o próximo. É trabalho de tela, não de arquitetura.
+
+**Título dos passos:** já tinham sido recusados como âncora no topo da tela antiga. Como passo eles
+funcionam, porque descrevem a sequência natural de configurar um atendente.
 
 **O bloco "Guidance"** da referência (3 cartões pequenos com ícone, uma linha e "saiba como") é o que
 entrega "simples mas com opções para explorar": caminho principal curto, aprofundamento opcional.
-
-**Três decisões de desenho que precisam ser respeitadas:**
-- **Assistente na primeira vez, edição livre depois.** Wizard é ótimo na primeira configuração e
-  insuportável na quinta. A trilha da esquerda tem que ser navegável (clicar direto no passo).
-- ⚠️ **"Salvar e continuar" colide com "salvar já é publicar".** O n8n lê `clients.persona` ao vivo,
-  então gravar a cada passo empurraria persona meio configurada para um agente que já atende. Para
-  tenant novo é inofensivo (a IA só fala depois de publicar, via `agent_published_at`). Para quem
-  edita agente ATIVO, é perigoso. Ou o wizard acumula e grava só no fim, ou o botão muda de
-  comportamento quando o agente já está publicado.
-- **No celular a coluna dupla não cabe:** a trilha vira um "Passo N de 4" compacto no topo com o
-  título do passo. Decidir no desenho, não na implementação.
 
 ### Dashboard: promovido a primeira tela (26/08)
 
@@ -125,9 +175,20 @@ Decisão do dono: **o painel passa a ser o primeiro item do menu**, antes de Con
 tela que prova valor, é o que ele mostra ao cliente, e é onde o empresário julga o produto depois que
 a novidade passa.
 
-> Refinamento sugerido, a confirmar: a primeira tela pode depender do **papel**. Quem trabalha na
-> operação (atendente) abre em Conversas; o dono abre no Painel. Os papéis já existem em
-> `user_clients.role`, então o custo é baixo.
+✅ **Confirmado em 26/08: a primeira tela depende do PAPEL.** Quem trabalha na operação (atendente)
+abre em Conversas; o dono abre no Painel. Os papéis já existem em `user_clients.role`, então o custo
+é baixo. ⚠️ Nada disso está aplicado ainda: `components/NavRail.tsx` segue com Conversas em primeiro
+e Painel em terceiro.
+
+**Como a pesquisa do passo 1 tem que ser feita (decisão do dono, 26/08):** um subagente pensa o
+NEGÓCIO **sem olhar o schema**, ou seja, o que o dono de um negócio pequeno precisa saber para
+confiar no atendente e para decidir o que fazer hoje. Só depois esse resultado é confrontado com o
+dado que existe. **Métrica que não tem dado NÃO é descartada:** vira lista de instrumentação para o
+time de desenvolvimento buscar depois. Fazer o contrário (partir do que o banco tem) produz um painel
+correto e sem graça, que é exatamente o que o dono recusou.
+
+⚠️ Lembrar do público misto (advogado, pediatra, barbeiro, engenheiro): a métrica e a frase que a
+interpreta não podem assumir consulta, paciente ou agendamento.
 
 **As quatro perguntas que o painel tem que responder** (é assim que ele deve ser organizado, não por
 tipo de gráfico):
@@ -138,7 +199,11 @@ tipo de gráfico):
    `lib/valor.ts`.
 3. **O que preciso fazer agora?** Fila do "precisa de você", leads qualificados aguardando,
    oportunidades paradas.
-4. **Está crescendo?** Série de 30 dias, horário e dia de pico.
+4. **Está crescendo?** Série temporal, horário e dia de pico. ✅ **Com FILTRO de período (decidido em
+   26/08): dia, semana, quinzena e mês.** Requisito que anda junto: cada período escolhido precisa do
+   período anterior equivalente para o selo de variação, senão o selo some (regra de `lib/delta.ts`).
+   Isso também mexe no teto de linhas da consulta: o painel hoje puxa no máximo 20.000 mensagens e
+   suprime o selo quando a janela anterior fica incompleta.
 
 **Sacadas do painel, em ordem de impacto:**
 - **A manchete tem que ser métrica de DEPENDÊNCIA, não de volume.** "347 conversas" o dono acha
@@ -157,6 +222,177 @@ tipo de gráfico):
 - **Todo número precisa de comparação e de período.** Já resolvido no componente (`Stat` com rótulo,
   número, frase que interpreta e legenda de período) e em `lib/delta.ts`. Aplicar em tudo, sem
   exceção: cartão sem período mente sobre o próprio número.
+
+**Estado real da tela em 26/08, para o passo 1 não recomeçar do zero nem se dar por pronto.** Já
+existe: a manchete de valor percebido, quatro cartões de operação com selo de variação honesto, o
+número acionável "esperando você" (de `conversations.handoff_at`) e um gráfico de barras de 14 dias
+(IA contra time). **Ainda NÃO existe nenhuma das três sacadas de maior impacto desta lista**: antes e
+depois com o histórico importado, "o que a IA não soube responder" e a tradução em horas ou dinheiro.
+Elas não foram recusadas, só não foram feitas, e são elas que separam um painel bonito de um painel
+que o cliente não consegue reproduzir sozinho.
+
+### ✅ Dashboard: FEITO (27/08/2026). Pesquisa, decisões e o que ficou de fora
+
+Passo 1 do MVP do beta, concluído. Esta subseção é o registro inteiro: pesquisa, desenho
+aprovado, decisão de gráfico, o que foi deixado de fora de propósito e a lista de
+instrumentação. Não espalhar isso em outro arquivo.
+
+#### O que a pesquisa achou, e que mudou o escopo
+
+**[DADO] O painel anterior inflava a manchete em 23x.** `lib/valor.ts` e `lib/metrics.ts`
+tratavam como "resposta da IA" qualquer linha com `bot_message` e `message_type <> 'manual'`.
+`imported` não é `'manual'`, então as respostas que o próprio dono digitou à mão no WhatsApp,
+antes de a IA existir, contavam como trabalho da IA. Medido na OBM: 84 das 94 linhas contadas
+como IA eram importadas. Na tela isso virava "31 mensagens respondidas em fim de semana"
+quando a IA mandou **3**, e "46 de 47 conversas atendidas sem intervenção do time" quando eram
+**2**. É exatamente o erro que o produto não pode cometer, porque o cliente confere no WhatsApp
+dele em dez segundos.
+**Conserto:** a regra virou uma só, em `lib/mensagem.ts`, e a decisão é **o painel conta o que
+aconteceu DEPOIS que a IA entrou**. O histórico importado continua no inbox, fora dos números.
+⚠️ Consequência esperada: vários números ficaram MENORES do que a tela mostrava. Menores e
+verdadeiros.
+
+**[DADO] O gráfico de 14 dias renderizava INVISÍVEL em produção.** Medido em `/design/painel`:
+contêiner 128px, coluna **1px**, barra **0px**. Causa: `flex h-32 items-end` deixa a coluna com
+a altura do conteúdo, e a barra tem altura em PORCENTAGEM, que contra pai de altura automática
+resolve para zero. O e2e passava porque contava colunas e legenda e **nunca mediu a altura de
+uma barra**. Consertado (`items-stretch` mais `h-full` na coluna) e coberto por teste novo.
+
+**[DADO] "Antes e depois" não é construível, e o teto NÃO é o nosso código.** A importação
+trouxe **uma mensagem por conversa**: 50 dos 52 contatos com exatamente 1. Dos 46 contatos da
+OBM com histórico, **2** têm recebida e enviada. Sondagem direta na Evolution (27/08) fechou a
+questão: `findMessages` de uma conversa devolve `total: 1` **com e sem paginação**, e o store da
+instância inteira da OBM tem **171 mensagens**. Ou seja, paginar a importação não resolveria.
+**A melhor sacada da lista está bloqueada por dado que o WhatsApp não entrega.**
+⚠️ O único cenário ainda não medido é um **link novo**, onde o sync inicial de histórico pode
+trazer mais. Medir isso no próximo onboarding de verdade antes de investir na feature.
+
+**[DADO] `agent_turns` não serve ao painel no beta.** 21 linhas, todas da Loja Teste (a OBM tem
+zero), 16 em `dry_run`, `guardrail_blocked` **falso em todas**, `silenced` sempre nulo. Responde
+perguntas nossas de margem (custo, cache, uso do RAG), não perguntas do dono. E não guarda
+conteúdo de mensagem, então não diz sozinho o que foi perguntado.
+
+**[DADO] Sinais mortos:** `chat_messages.sender_user_id` está preenchido em **0 de 148** linhas,
+então **relatório por atendente é impossível hoje**; `conversations.status` é sempre `open`; e
+`conversations.handoff_at` **nunca disparou** em produção.
+
+#### Concorrentes (o que dá para afirmar, e o que não dá)
+
+Evidência real (documentação oficial, não marketing) em **Helena, Take Blip, Digisac e Kommo**.
+O resto é alegação de marketing ou não verificado. **ZapResponder (nossa âncora de piso),
+AtendeNex, WiiChat, Convecta AI e BotConversa ficaram SEM verificação**: os painéis estão atrás
+de login. Não descrever essas telas como se tivessem sido vistas.
+
+- **O padrão da categoria** é métrica de call center herdada de helpdesk: volume, tempo médio,
+  ranking por atendente, CSAT, exportação. **Pressupõe que existe equipe para ranquear.**
+- **Só a Blip documenta métrica de IA** (conversas resolvidas contra não resolvidas pela IA,
+  e clusterização de tópicos). Entre as nossas âncoras de preço, ninguém.
+- **Nenhum dashboard encontrado é orientado ao dono solo.** Isso corrobora, com evidência de
+  fora, a frase do `estrategia-2026-07.md` ("métrica é linguagem de gestor, o seu comprador não
+  tem gestor"): a saída não é abandonar o painel, é **não escrevê-lo em linguagem de gestor**.
+- **Antes e depois contra o histórico do próprio cliente: ausente em todos**, estruturalmente.
+
+#### O conjunto que foi ao ar
+
+Organizado pelas quatro perguntas, nesta ordem de leitura:
+
+| bloco | métrica | fonte | estado fino |
+|---|---|---|---|
+| **Manchete** | frase mais forte de `frasesDeValor`, mês fechado + acumulado | `lib/valor.ts` | cai no acumulado; frase com zero é omitida |
+| **Preciso fazer agora** | esperando você **+ idade da mais antiga** | `conversations.handoff_at` | zero vira "Ninguém está esperando você agora" |
+| **Dando conta?** | atendidas sem você, 1a resposta (mediana), **preferiu confirmar** | `chat_messages`, `conversation_qualifications` | tamanho da amostra na legenda |
+| **Passou pra você** | lista de escaladas + "Ensinar a resposta" | `conversation_qualifications.summary` | some quando vazia |
+| **O que me deu** | resto das frases + **última resposta verbatim** | `lib/valor.ts`, `chat_messages` | |
+| **Está crescendo?** | pessoas novas (neutro) + pico + barras | derivado | selo some sem base |
+
+**Três adições aprovadas pelo dono em 27/08, além da lista original:**
+- **"Preferiu confirmar"**: a contenção como PROVA, não como falha. É a única forma
+  *observável* de "a IA não inventa", porque promessa de não alucinar é inverificável e
+  contagem de contenções não é. Direção **neutra**, nunca verde ou vermelho. Em zero, a frase
+  vira a leitura positiva ("Ela não precisou te passar nada") em vez de o cartão sumir.
+  ⚠️ Ambiguidade registrada e **não resolvida**: zero escalada também pode significar IA
+  confiante demais. Se um dia isso importar, é decisão do dono do produto.
+- **Última resposta verbatim**: o medo do dono é linguístico, não estatístico. **Sempre a mais
+  recente, nunca escolhida a dedo.** Um dia vai mostrar uma resposta ruim no topo do painel, e
+  isso é o ponto; no dia em que ele descobrir que a gente curava, a perda de confiança é
+  permanente.
+- **Idade da espera** junto da contagem: "3" é uma fila, "há 6 horas" é um problema.
+
+#### O que ficou DE FORA, de propósito
+
+- **Tradução em horas ou dinheiro.** É modelo, não medição. O custo do erro não é local: no dia
+  em que ele desconfiar do "equivalente a X horas", ele redesconfia dos 213 também. A frase de
+  "fora do horário" já faz o mesmo trabalho emocional com número contado.
+- **Custo por conversa, tokens, cache, latência, similaridade do RAG.** São métricas NOSSAS, de
+  margem. Na tela dele dizem "isto é complicado e pode quebrar".
+- **O rótulo "o que a IA não soube responder".** `action = 'pausar'` também dispara nos gatilhos
+  fixos de escalada, que são política e não buraco de conhecimento. Virou "o que a IA passou
+  para você", que é verdade nos dois casos. O verbo carrega tudo: "preferiu confirmar" é
+  integridade, "não soube" é pedido de reembolso.
+- **Métricas de pipeline.** 3 de 54 conversas têm `stage`, e duplicaria a tela `/pipeline`.
+- **Relatório por atendente.** Bloqueado por dado (ver instrumentação).
+
+#### Decisão de gráfico: à mão, sem biblioteca. Bundle +0 KB
+
+O projeto segue com **zero dependência de gráfico**. A razão mais forte não é bundle, é **cor**:
+neste design system verde, âmbar e vermelho são cores de ESTADO, então sobra **uma única cor
+categórica** (a marca) mais o cinza de contexto. Duas séries é o teto que a paleta permite, e
+duas séries é exatamente o que barra empilhada precisa. Qualquer biblioteca (recharts pesa
+~100 KB gz) ainda teria que receber os tokens por JS, o que quebraria a troca de tema por
+cookie que o resto da casa usa. O gráfico agora **segue o período**: janela de 1 dia sai por
+HORA (24 colunas), as outras por dia (7, 15 ou 30).
+
+#### Filtro de período
+
+Dia, semana, quinzena e mês, em `lib/periodo.ts`. Janela **rolante** e não calendário: o dono
+abre isto numa terça, e "esta semana" seria um dia e meio de dado apresentado como semana.
+Os quatro períodos são calculados **no servidor, numa passada só** sobre o acumulado que a
+página já lê, e o browser só troca qual mostrar: buscar por clique daria quatro idas ao banco e
+uma tela piscando.
+**Período anterior:** a janela igual imediatamente anterior, **exceto "dia"**, que compara com o
+**mesmo dia da semana anterior**, porque o dia anterior de uma segunda é um domingo e o selo
+ficaria alarmante sem significar nada.
+**A guarda de truncamento sobreviveu e foi generalizada:** era fixa em 14 dias, agora é
+parametrizada pelo maior período (60 dias). Se o acumulado bate no teto de 20.000 linhas e a
+linha mais antiga é mais nova que isso, o período anterior vira `null` e **nenhum selo aparece**.
+
+#### Lista de instrumentação (o que falta logar para destravar o resto)
+
+| o que | onde | custo | destrava |
+|---|---|---|---|
+| medir o histórico que chega num link NOVO | próximo onboarding real | baixo (só medir) | decide se antes/depois é viável algum dia |
+| `sender_user_id` no envio manual | `POST /api/send` | baixo | relatório por atendente |
+| intenção do turno (preço, horário, agendamento) | saída do `/api/agent` | médio | "perguntas sobre preço", pergunta mais repetida |
+| agrupar perguntas semelhantes | embedding sobre `summary` | alto | "Ensinar a resposta" com volume de verdade |
+| estado real da conexão | `whatsappConnected` do NavRail hoje é `true` fixo | médio | alarme de desconexão, que é o jeito mais rápido de perder um cliente |
+| índice `(client_id, created_at DESC)` em `chat_messages` | migração `mt_` | baixo | desempenho quando chegar tenant com volume |
+
+#### Dívida deixada em aberto, de propósito
+
+- **A consulta do acumulado traz o TEXTO das mensagens** (`user_message`, `bot_message`) em até
+  20.000 linhas, só para saber se existem. Já era assim; ficou registrado porque é o próximo
+  ponto a doer, e o caminho é a tabela de agregado mensal.
+- ⚠️ **Correção de documentação:** o `CLAUDE.md` dizia que `handoff_at` é limpo pelo
+  `POST /api/send`. Não é: quem limpa é `POST /api/conversations/resolve`.
+
+### Menu: o que fica em "Em breve" (decidido em 26/08)
+
+Hoje `components/NavRail.tsx` promete **Agenda** e **Campanhas**. As duas decisões desta rodada
+mudam isso.
+
+- **Ordem: Painel primeiro**, antes de Conversas, e a tela inicial depende do papel (ver a seção do
+  dashboard).
+- **"Em breve" passa a ser Agenda e Follow-up.** Agenda porque agora ela vai mesmo ser construída, e
+  a promessa virou verdadeira. **Follow-up e não "Fluxos"**, decisão do dono: o cliente final não
+  pensa em fluxo, pensa em "falar de novo com quem sumiu".
+- **Campanhas SAI do menu.** Manter promete disparo em massa sobre conexão QR, que é o cenário de
+  banimento que o projeto decidiu não correr, e atrai o cliente errado logo no beta. Se um dia vier
+  por API Oficial, volta.
+
+⚠️ **Ressalva registrada:** follow-up sobre QR é o mesmo risco de campanha em escala menor. O que
+torna o nome aceitável no menu é o produto por trás dele nascer restrito a **quem já conversou**,
+nunca lista importada nem número frio, com as mitigações da seção "Lembrete e mensagem ativa" abaixo.
+O nome no menu está amarrado a essa regra.
 
 ### Cadastro do contato, além do WhatsApp (novo, 26/08, não perder)
 
@@ -421,7 +657,9 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
       não temos como impedir nem reverter, número dedicado ao atendimento, o que aumenta o risco, e
       a cláusula de contingência (nada se perde no CRM, reconecta outro número, avisar clientes, e
       a API Oficial como caminho com custo por mensagem). Um teste e2e trava os argumentos proibidos.
-- [ ] **Cobrança.** Decidido: **gateway Asaas** (brasileiro, cobre Pix e boleto), **teste de 7 dias
+- [ ] **Cobrança.** ⚠️ **Construída e PARADA de propósito** (26/08): sai do caminho crítico porque o
+      lançamento é beta gratuito, e volta como gatilho do primeiro pagante, depois dos seis passos.
+      Decidido: **gateway Asaas** (brasileiro, cobre Pix e boleto), **teste de 7 dias
       sem cartão**, e **3 planos empacotados** (não é base + usuário adicional avulso). Tabela de
       preços fechada (13/08/2026):
 
@@ -483,11 +721,15 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
       entrada e 93 de saída num turno**, 4,4s, com a persona da Loja Teste (8.532 caracteres). Ou
       seja, a estimativa de ~4 mil tokens por mensagem se confirmou; falta uma semana de tráfego real
       para fechar o custo por conversa.
-- [ ] **Painel geral** (aprovado, escopo do primeiro corte): placar da IA (resolvidas sozinha,
-      passadas para humano, qualificadas), fila do "precisa de você agora", série de 30 dias e
+- [ ] **Painel geral.** ⚠️ **ABSORVIDO pelo passo 1 do MVP do beta** (26/08). Não tratar como item
+      separado: o escopo vale, mas quem manda é a seção "Dashboard: promovido a primeira tela".
+      Escopo do primeiro corte, para não perder: placar da IA (resolvidas sozinha, passadas para
+      humano, qualificadas), fila do "precisa de você agora", série temporal com filtro de período e
       consumo do mês contra o limite do plano. Depende de `agent_turns` acumular histórico para os
       números de qualidade; os de volume já dão para calcular do histórico existente.
-- [ ] **Marca e design system.** Domínio decidido: subdomínio de **obomsobrinho.com.br** (o domínio
+- [ ] **Marca e design system.** ⚠️ A parte de DESIGN virou os passos 4 e 5 do MVP do beta (26/08);
+      o que sobra aqui é a marca em si, que segue bloqueada pelo nome.
+      Domínio decidido: subdomínio de **obomsobrinho.com.br** (o domínio
       que já é do dono). ⚠️ `crm.obomsobrinho.com.br` colide com a própria decisão de não anunciar a
       categoria CRM: preferir `app.`, `atende.` ou o nome do produto como subdomínio.
       **Bloqueado aguardando o nome novo.** O design system atual já é coerente (tokens em
@@ -678,7 +920,8 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
 
 ## Redesenho geral no Claude Design (decidido em 26/08/2026)
 
-**Próximo passo depois da rodada de UI atual.** Decisão do dono do produto: quando os ajustes de
+**Esta seção é o conteúdo dos passos 4 e 5 do MVP do beta**, não um item paralelo. Decisão do dono
+do produto: quando os ajustes de
 tela em andamento fecharem (detalhes de inbox e pipeline, painel, steps do agente), passar um
 **redesenho geral no Claude Design** para melhorar tudo de uma vez, em vez de seguir tela a tela.
 O painel de 26/08 foi aprovado como "ainda não está bom", ou seja, ele entra nesse redesenho junto

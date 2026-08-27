@@ -63,6 +63,17 @@ function numeroOuNull(valor: string): string | null {
   return valor.trim() !== "" && Number.isFinite(n) ? n.toLocaleString("pt-BR") : null;
 }
 
+/**
+ * Qual pedaço renderizar.
+ *
+ * O painel usa os dois separadamente porque entre a manchete e o resto das
+ * frases entram três blocos de outro assunto (a fila, os cartões de operação e
+ * as escaladas), e a manchete precisa ficar no topo da tela. `tudo` continua
+ * sendo o padrão para quem renderiza o resumo inteiro de uma vez, que é o caso
+ * de `/design/valor`.
+ */
+export type ParteDoResumo = "tudo" | "manchete" | "resto";
+
 export default function ValorResumo({
   resumo,
   frases,
@@ -70,6 +81,7 @@ export default function ValorResumo({
   acumulado,
   frasesAcumuladas,
   hrefConfigurar = "/agente",
+  parte = "tudo",
 }: {
   resumo: Resumo;
   frases: FraseValor[];
@@ -81,6 +93,7 @@ export default function ValorResumo({
   frasesAcumuladas?: FraseValor[];
   /** Link para configurar o horário, quando falta. */
   hrefConfigurar?: string;
+  parte?: ParteDoResumo;
 }) {
   const doAcumulado = frasesAcumuladas ?? [];
 
@@ -111,6 +124,26 @@ export default function ValorResumo({
     resumoMostrado.recebidas > 0
       ? `${rotuloPeriodo} · ${resumoMostrado.recebidas.toLocaleString("pt-BR")} mensagens recebidas`
       : rotuloPeriodo;
+
+  // O "resto" é só a grade das frases secundárias: sem manchete, sem o aviso de
+  // horário (que mora junto da manchete, onde o número que falta apareceria).
+  if (parte === "resto") {
+    if (resto.length === 0) return null;
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {resto.map((f) => (
+          <Bloco
+            key={f.key}
+            numero={f.numero}
+            texto={f.texto}
+            periodo={rotuloPeriodo}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const soManchete = parte === "manchete";
 
   return (
     <section className="space-y-3">
@@ -187,7 +220,7 @@ export default function ValorResumo({
             <StatLegenda>{escopo}</StatLegenda>
           </Stat>
 
-          {resto.length > 0 && (
+          {!soManchete && resto.length > 0 && (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {resto.map((f) => (
                 <Bloco

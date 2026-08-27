@@ -8,5 +8,9 @@ export default async function Home() {
   if (!client) redirect("/login");
   // Sem instância conectada → onboarding (conectar WhatsApp).
   if (!client.evolution_instance) redirect("/connect");
-  redirect("/inbox");
+  // A tela inicial depende do PAPEL: quem trabalha na operação abre em
+  // Conversas, o dono abre no Painel. O Painel é o primeiro item do menu para os
+  // dois; mandar um atendente para uma tela que não é o trabalho dele só
+  // adicionaria um clique.
+  redirect(client.role === "dono" ? "/painel" : "/inbox");
 }

@@ -30,7 +30,7 @@ import {
   Users,
   User,
   Calendar,
-  Megaphone,
+  Repeat2,
   LogOut,
   ChevronUp,
   type LucideIcon,
@@ -44,9 +44,13 @@ const NAV: {
   icon: LucideIcon;
   donoOnly?: boolean;
 }[] = [
+  // Painel PRIMEIRO (26/08/2026): é a tela que prova valor, é o que o dono
+  // mostra ao cliente dele, e é onde o empresário julga o produto depois que a
+  // novidade passa. A tela INICIAL, porém, depende do papel (ver app/page.tsx):
+  // quem trabalha na operação abre em Conversas.
+  { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
-  { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
   // a base de conhecimento virou um bloco dentro do grupo "O que ele sabe" do
@@ -61,9 +65,20 @@ const NAV: {
   { href: "/equipe", label: "Equipe", icon: Users },
 ];
 
+// "Em breve" (26/08/2026). Agenda porque ela saiu do "não construir" e agora vai
+// mesmo ser feita (integrando Google Calendar), então a promessa virou verdade.
+//
+// **Campanhas SAIU.** Manter prometia disparo em massa sobre conexão QR, que é o
+// cenário de banimento que o projeto decidiu não correr, e atrai o cliente
+// errado logo no beta. Se um dia vier por API Oficial, volta.
+//
+// **Follow-up e não "Fluxos"**: o cliente final não pensa em fluxo, pensa em
+// "falar de novo com quem sumiu". ⚠️ O nome está amarrado a uma regra: o produto
+// por trás dele nasce restrito a quem JÁ conversou, nunca lista importada nem
+// número frio.
 const SOON = [
   { label: "Agenda", icon: Calendar },
-  { label: "Campanhas", icon: Megaphone },
+  { label: "Follow-up", icon: Repeat2 },
 ];
 
 export default function NavRail({

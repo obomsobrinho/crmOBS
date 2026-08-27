@@ -150,7 +150,43 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   dono). `conversations.stage` referencia `(client_id, key)` por FK; `conversations.stage_source`
   (`human`/`ia`) marca quem moveu (a IA nunca sobrescreve `human`). A IA move o card em
   `/api/agent` via `nextIaStage` (`lib/pipeline.ts`): só avança estágio canônico, no-op seguro.
-  Dashboard (`/painel`) calcula 4 números (`lib/metrics.ts`) por RLS, janela de 7 dias.
+  Dashboard (`/painel`): refeito em 27/08/2026, ver o bloco próprio logo abaixo.
+- **Painel refeito (27/08/2026, passo 1 do MVP do beta).** Pesquisa, decisões e lista de
+  instrumentação em `docs/proximos-passos.md`. O que precisa estar na cabeça antes de tocar nele:
+  - ⚠️ **`imported` NÃO é resposta da IA.** A regra de quem respondeu mora em **`lib/mensagem.ts`**
+    (módulo puro), e vale para `lib/valor.ts` e `lib/metrics.ts`. Antes as duas diziam
+    "`message_type <> 'manual'`", e `imported` passava, então as respostas que o DONO digitou à mão
+    no WhatsApp antes de a IA existir contavam como trabalho da IA: na OBM eram 84 das 94 linhas, e a
+    tela dizia "46 de 47 conversas sem intervenção do time" quando eram 2. **Decisão: o painel conta
+    só o que aconteceu depois que a IA entrou**; o importado segue no inbox, fora dos números.
+  - **`lib/periodo.ts`** (módulo puro) tem as quatro janelas (dia/semana/quinzena/mês), rolantes e
+    não de calendário. O período anterior é a janela igual anterior, **menos "dia"**, que compara com
+    o MESMO dia da semana anterior (segunda contra domingo daria selo alarmante sem significado).
+    `agoraMs()` existe só para embrulhar o relógio: `Date.now()` no corpo de Server Component é erro
+    de `react-hooks/purity`.
+  - **Os 4 períodos são calculados no SERVIDOR numa passada só** e o browser
+    (`components/PainelOperacao.tsx`, o único client component da tela) apenas troca qual mostra.
+    ⚠️ **A manchete NÃO segue o seletor**: ela é mês fechado mais acumulado, e a frase mais forte da
+    tela não pode encolher com um clique. `ValorResumo` ganhou a prop `parte`
+    (`tudo`/`manchete`/`resto`) para a página intercalar outros blocos entre as duas metades.
+  - ⚠️ **Gráfico: `items-end` na linha das colunas QUEBRA as barras.** A coluna precisa de `h-full`
+    (o `justify-end` dela é quem encosta a barra no chão). Com `items-end` a coluna fica com a altura
+    do conteúdo, e a barra, que tem altura em porcentagem, resolve para ZERO. Foi assim que o gráfico
+    de 14 dias renderizou invisível em produção com o e2e passando, porque o teste contava colunas e
+    nunca mediu uma barra. Hoje existe teste de altura.
+  - **Sem biblioteca de gráfico, e a razão é COR**, não bundle: verde, âmbar e vermelho são estado
+    aqui, então existe UMA cor categórica (a marca) mais o cinza. Duas séries é o teto da paleta.
+  - **"Preferiu confirmar"** (`conversation_qualifications` com `action='pausar'`) é a contenção
+    virando prova: é a única forma observável de "a IA não inventa". Direção **neutra**, nunca verde
+    nem vermelho. ⚠️ **Nunca rotular como "o que a IA não soube responder"**: `pausar` também dispara
+    nos gatilhos fixos de escalada, que são política, e o rótulo acusaria a IA de uma falha que ela
+    não cometeu. O rótulo é "o que a IA passou para você".
+  - **A última resposta do agente aparece VERBATIM, sempre a mais recente e nunca escolhida a dedo.**
+    Curar as boas e ser descoberto custa a confiança inteira.
+  - ⚠️ **"Antes e depois" com o histórico importado está BLOQUEADO POR DADO, não adiado.** Sondagem
+    na Evolution em 27/08: `findMessages` devolve `total: 1` por conversa com e sem paginação, e o
+    store da instância inteira da OBM tem 171 mensagens. Paginar a importação não resolve. Só falta
+    medir um link NOVO (sync inicial completo) antes de descartar de vez.
 - **Fase 3.5 (fechamento da IA):** a orquestração do turno saiu de `/api/agent` para
   `processTurn` (`lib/agent-turn.ts`, server-only), reaproveitada pela bancada de teste. Modo
   `dryRun` (não persiste nada) e um bloco de diagnóstico do turno (`lib/agent-diagnostics.ts`,
@@ -169,8 +205,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   marca `conversations.handoff_at` e **segue atendendo**; cada mensagem nova gera handoff novo com
   o resumo do **último** pedido (`conversation_qualifications` já grava uma linha por turno).
   `handoff_at` guarda o **primeiro** handoff em aberto (é ele que dá a espera real, "esperando há
-  6h"), é limpo pelo envio manual (`POST /api/send`, service_role) e é o que alimenta o filtro
-  "Precisa de você". **Pausa volta a significar só o que deveria:** um humano assumiu (nó
+  6h"), é limpo por **`POST /api/conversations/resolve`** (service_role, porque a coluna não tem
+  grant de UPDATE para o browser) e é o que alimenta o filtro "Precisa de você". ⚠️ Este documento
+  já disse que quem limpava era o `POST /api/send`; não é, e nunca foi. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
   `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave. **Bancada de teste** (painel
   lateral dentro de `/agente`, dono-only) fala com o cérebro REAL via `POST /api/playground`
   (sessão do dono, força `dryRun`), sem WhatsApp.
@@ -317,9 +354,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   (1 uso), os dois na tela de atendimento: a migração deles está escrita e **aguardando decisão do
   dono do produto**, porque mexe em 4 pixels de uma tela já aprovada. Avatar usa `avatarPair()` (`lib/inbox.ts`),
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
-- **Camada base shadcn/ui (`components/ui/`, 16 arquivos):** `button`, `input`, `textarea`,
+- **Camada base shadcn/ui (`components/ui/`, 17 arquivos):** `button`, `input`, `textarea`,
   `badge`, `avatar`, `separator`, `card`, `scroll-area`, `dropdown-menu`, `switch`, `tabs`,
-  `tooltip`, `dialog`, `sheet`, `select`, `checkbox`. O `sheet` (painel lateral, drawer) entrou em
+  `tooltip`, `dialog`, `sheet`, `select`, `checkbox`, `stat`. O `stat` (cartão de indicador) entrou
+  em 26/08/2026 com escala de numeral em três degraus (32/24/18) e **legenda de período
+  OBRIGATÓRIA**: cartão de indicador sem período mente sobre o próprio número. A variante `elevado`
+  existe porque `--s-bloco` no claro é igual ao `--canvas`, então cartão `bloco` sobre o canvas
+  ficaria invisível. O `sheet` (painel lateral, drawer) entrou em
   22/08/2026 e é arquivo separado do `dialog` de propósito: o `conteudoVariants` do dialog embute
   `top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2`, e sobrescrever isso por className brigaria
   com o `translate` do centramento (a armadilha do Tailwind v4 documentada abaixo). Animação
@@ -417,10 +458,18 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Testes e2e (Playwright, pasta `e2e/`): `npm run test:e2e -- --project=sem-login` (telas `/design`,
   sem login) e `npm run test:e2e:login` (fluxos com login; credenciais em `.env.e2e.local`, fora do
   git). Detalhes em `e2e/README.md`. Escritas de teste só no tenant da Loja Teste; nunca na OBM.
+- **Menu (`components/NavRail.tsx`, 27/08/2026): Painel PRIMEIRO**, depois Conversas, Pipeline,
+  Agente (dono-only) e Equipe. **"Em breve" é Agenda e Follow-up; Campanhas SAIU** (manter prometia
+  disparo em massa sobre QR, que é o cenário de banimento que o projeto decidiu não correr, e atrai
+  o cliente errado logo no beta). ⚠️ **A tela INICIAL depende do papel** (`app/page.tsx`): dono cai
+  em `/painel`, atendente em `/inbox`.
 - Rotas: `/login`, `/cadastro` (público, cria conta), `/recuperar-senha` (público),
   `/connect` (QR + aviso de risco + import automático), `/inbox`, `/inbox/[id]`, `/pipeline`
-  (board Kanban do funil), `/painel` (dashboard, 4 números), `/agente` (construtor do prompt),
-  `/conhecimento` (base de conhecimento/RAG, dono-only), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
+  (board Kanban do funil), `/painel` (dashboard), `/agente` (construtor do prompt, com a base de
+  conhecimento e a bancada de teste dentro),
+  `/conhecimento` (base de conhecimento/RAG, dono-only; **fora do menu desde 26/08/2026**, a rota
+  segue existindo para não quebrar link salvo, mas o lugar da base é o grupo "O que ele sabe" do
+  `/agente`), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
   gate de assinatura; fora do route group `(app)`), `/definir-senha` (convidado escolhe a senha),
   `/auth/confirm` (verifica o link do e-mail).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
@@ -456,15 +505,43 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
   completa de pares está em `estrategia-2026-07.md` (faixa de R$ 87 a R$ 1.000, com Nexloo, Zappy,
   SocialHub, AtendeNex, Convecta AI, Umbler Talk, WiiChat, Sellflux, GPT Maker, BotConversa e
   outros). Nunca responder "os concorrentes são ZapResponder e Helena" sem abrir essa lista.
-- **Nunca** construir agenda própria completa (usar Google Calendar) nem construtor visual de
-  automações (vira produto que exige consultoria).
-- **Nunca** construir disparo em massa ou follow-up ativo em cima da conexão QR (Baileys): é o
-  cenário de banimento documentado. E nunca escrever material de marketing que anuncie disparo em
-  massa, "não pague a API da Meta" ou proteção contra banimento.
+- **Nunca** construir agenda própria completa nem construtor visual de automações (vira produto que
+  exige consultoria). ⚠️ **Agenda saiu do "não construir" em 26/08/2026** e é o primeiro
+  desenvolvimento DEPOIS do beta, mas **integrando Google Calendar**, e a parte cara dela não é a
+  tela: é dar ferramenta ao agente (function calling em `/api/agent`), que hoje não existe.
+- **Nunca** construir disparo em massa em cima da conexão QR (Baileys): é o cenário de banimento
+  documentado. E nunca escrever material de marketing que anuncie disparo em massa, "não pague a API
+  da Meta" ou proteção contra banimento.
+  ⚠️ **Mensagem ativa deixou de ser proibição total em 26/08/2026** (decisão consciente do dono, com
+  o risco pesado): lembrete de consulta e mensagem de aniversário **vão ser construídos**, e o menu
+  passa a prometer "Follow-up". O que continua valendo: **só para contato com conversa recente**,
+  nunca lista fria nem importada; teto por dia e intervalo aleatório, nunca rajada; saída fácil
+  ("responda SAIR"); e nascer **agnóstico de canal**, porque isso é o argumento mais forte para
+  migrar à API Oficial. Detalhes em `docs/proximos-passos.md`.
 - **01/10/2026:** a Meta passa a cobrar mensagens de serviço na API Oficial. Qualquer conta de
   migração precisa de custo variável, não de zero.
 
 ## Status
+
+### Em andamento: MVP do beta gratuito (decidido em 26/08/2026)
+O lançamento é um **beta gratuito** com conhecidos do dono (advogado, pediatra, barbeiro, engenheiro,
+clínica, comércio), custeado por ele. **Cobrança está construída e PARADA de propósito.** Seis passos,
+nesta ordem, detalhados em `docs/proximos-passos.md`: (1) dashboard, (2) steps do agente, (3) os 4
+furos, (4) design e mobile no Claude Design, (5) aplicar o design, (6) testes. Quatro decisões já
+travadas, **não reabrir**:
+- **`/agente` vira DUAS superfícies** (padrão setup do WooCommerce): um assistente de 4 passos em
+  rota própria, que roda uma vez e pede só os 3 campos que a pessoa precisa digitar, e a tela
+  permanente com **três abas**. O assistente **absorve a barra de onboarding** (um contador só na
+  conta) e some para sempre depois da primeira publicação, o que faz a colisão "salvar e continuar"
+  com "salvar já é publicar" desaparecer por construção.
+- **Painel é o primeiro item do menu** e a tela inicial depende do papel (dono no painel, atendente
+  em conversas).
+- **Menu "Em breve" = Agenda e Follow-up. Campanhas SAI.**
+- **`clients.account_type`** (`interno`/`beta`/`pago`) para marcar o testador: `trial_ends_at` nulo
+  libera o acesso mas não identifica ninguém, e hoje as contas internas estão no mesmo estado.
+- ⚠️ **Público misto:** nenhum texto fixo de tela pode assumir consulta, paciente ou agendamento.
+  Quem carrega a linguagem do segmento é o preset.
+
 **Fases 1, 2, 3 e 3.5 concluídas e verificadas** (detalhes e checkboxes em `docs/proximos-passos.md`).
 - **Fase 1** (inbox de equipe): multi-login (`/equipe`), atribuição, não-lidas, tags, notas,
   respostas rápidas, edição de contato, render de mídia, busca no conteúdo, agente restrito ao dono.
@@ -476,7 +553,7 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
   lead) foi **removido do roadmap** por decisão: o dono acompanha a evolução no `/painel` (semanal).
 - **Fase 3** (CRM): pipeline Kanban (`/pipeline`, `pipeline_stages` por tenant, drag move o card,
   gestão dono-only), a IA move o card em `/api/agent` (`nextIaStage`, só avança, respeita o humano),
-  e dashboard mínimo (`/painel`, 4 números). Dívida `msg1 | msg2` reavaliada e mantida adiada
+  e dashboard mínimo (`/painel`). Dívida `msg1 | msg2` reavaliada e mantida adiada
   (fluxo quente; ver `docs/proximos-passos.md`).
 - **Fase 3.5** (fechamento da IA): guardrail de validação antes de enviar (`lib/guardrail.ts`),
   handoff coach (`conversations.pending_instruction`, a IA retoma sozinha no próximo turno),
