@@ -33,10 +33,12 @@ import {
   Repeat2,
   LogOut,
   ChevronUp,
+  MessageSquarePlus,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
+import FeedbackDialog from "./FeedbackDialog";
 
 const NAV: {
   href: string;
@@ -83,11 +85,18 @@ const SOON = [
 
 export default function NavRail({
   clientName,
+  clientId,
   activeHref,
   role,
   whatsappConnected = true,
 }: {
   clientName: string;
+  /**
+   * Tenant do usuário, usado só pelo canal de feedback. Opcional porque as
+   * telas de `/design` montam o menu sem sessão nenhuma; sem ele o diálogo
+   * simula o envio em vez de estourar erro de RLS no preview.
+   */
+  clientId?: string;
   /** Só para o preview de design (/design): força o item ativo. */
   activeHref?: string;
   /** Papel do usuário: 'dono' | 'atendente'. Esconde itens só-do-dono. */
@@ -101,6 +110,7 @@ export default function NavRail({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [feedbackAberto, setFeedbackAberto] = useState(false);
   const [unreadConvos, setUnreadConvos] = useState(0);
 
   // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
@@ -384,6 +394,16 @@ export default function NavRail({
                 <User size={16} /> Perfil
               </Link>
             </DropdownMenuItem>
+            {/* Feedback vive AQUI, e não num botão flutuante: o botão flutuante
+                cobre conteúdo em toda tela do produto para servir a uma ação
+                que a pessoa usa poucas vezes. O menu do avatar já é o lugar do
+                "coisas sobre mim e sobre a conta". */}
+            <DropdownMenuItem
+              onSelect={() => setFeedbackAberto(true)}
+              className="h-9 px-3 text-apoio hover:bg-[var(--rail-hover)] hover:text-ink focus:bg-[var(--rail-hover)] focus:text-ink"
+            >
+              <MessageSquarePlus size={16} /> Enviar feedback
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="perigo"
               onSelect={logout}
@@ -394,6 +414,15 @@ export default function NavRail({
           </DropdownMenuContent>
         </DropdownMenu>
         </div>
+
+        {/* Fora do DropdownMenu de propósito: o menu desmonta o conteúdo ao
+            fechar, e o diálogo iria junto no mesmo clique que o abre. */}
+        <FeedbackDialog
+          aberto={feedbackAberto}
+          onFechar={() => setFeedbackAberto(false)}
+          clientId={clientId}
+          path={pathname}
+        />
       </nav>
     </Card>
   );

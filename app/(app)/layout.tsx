@@ -36,7 +36,11 @@ export default async function AppLayout({
 
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
-      <NavRail clientName={client.name} role={client.role ?? undefined} />
+      <NavRail
+        clientName={client.name}
+        clientId={client.id}
+        role={client.role ?? undefined}
+      />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {/* Estado da conta: bloqueio (leitura só) ou aviso (trial acabando,
             pagamento em carência). Vem antes do trilho porque é mais urgente. */}

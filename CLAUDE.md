@@ -25,6 +25,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `trial_ends_at`, `grace_until` (carência em atraso), `billing_provider` (`asaas`/`stripe`),
   `billing_customer_id` + `billing_subscription_id` (únicos parciais, o webhook acha o tenant
   por eles), `billing_seats`, `billing_updated_at`.
+  **Beta:** `account_type` (`interno`/`beta`/`pago`, CHECK no banco, **nullable e sem default**;
+  `mt_clients_account_type`, 28/08/2026). ⚠️ **IDENTIFICA, NÃO AUTORIZA:** `accessState` continua
+  decidindo acesso só por `subscription_status` e `trial_ends_at`, e misturar as duas coisas é como
+  um cliente pagante acaba trancado fora. `null` = não classificado, de propósito: chutar um default
+  para quem entrou pelo `/cadastro` inventaria um fato. Marcar é manual (`update clients set
+  account_type = 'beta'`), porque com 5 a 10 testadores uma tela de administração custa mais do que
+  resolve. É a coluna que as consultas de `docs/instrumentacao-beta.md` filtram.
   - **REGRA:** o n8n lê SÓ `persona` (ao vivo, a cada msg). No modo `guiado`, `persona` é a
     **saída compilada** de `agent_config` por `buildPersona` (`lib/agent-prompt.ts`); no
     `avancado`, é texto escrito à mão.
@@ -85,6 +92,16 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - **Tabelas próprias do CRM** (browser faz CRUD via RLS por tenant, não passam pelo n8n): `tags`
   + `conversation_tags` (rótulos por conversa), `conversation_notes` (notas internas, nunca vão
   ao WhatsApp; `author_user_id` = `auth.uid()`), `quick_replies` (mensagens prontas por tenant).
+  **`feedback`** (relatos do beta; `mt_feedback`, 28/08/2026) é a exceção da lista: é a única que o
+  browser **só escreve**. Tem `client_id`, `user_id` (default `auth.uid()`), `message`, `path` (a
+  rota onde a pessoa estava, metade do valor do relato) e `user_agent`. ⚠️ **Sem policy de SELECT E
+  sem grant de SELECT** para `authenticated`: nem o próprio autor relê pelo browser. Quem lê é o dono,
+  por SQL (`docs/instrumentacao-beta.md`), e não existe tela de leitura de propósito, porque uma
+  página interna para um leitor e dez linhas é só mais uma superfície para manter. A UI é um item no
+  menu do avatar (`components/NavRail.tsx` -> `components/FeedbackDialog.tsx`), nunca um botão
+  flutuante. **A confirmação não promete resposta** ("Recebido, obrigado."): é uma pessoa só atendendo
+  dez empresas. ⚠️ **Ninguém é avisado quando um relato chega**, e isso é limitação assumida:
+  notificar exigiria mexer no n8n, que é produção.
 - **`chat_messages`** = as **MENSAGENS**. Uma linha pode ter `user_message` (recebida) e/ou
   `bot_message` (enviada). PK `bigint`.
 - **`user_clients`** = vínculo N:N entre `auth.users` (login) e `clients` (tenant). Tem
@@ -526,8 +543,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   abuso por IP + `provision_tenant`) e `by-instance`.
 
 ## Produto e estratégia (consultar ANTES de decidir escopo)
-Duas fontes de verdade sobre **o que construir e por quê**. Não decidir roadmap, preço nem
-posicionamento sem ler a que se aplica:
+Duas fontes de verdade sobre **o que construir e por quê**, mais um caderno de consultas. Não decidir
+roadmap, preço nem posicionamento sem ler a que se aplica:
 
 - **`docs/proximos-passos.md`** — **FONTE DE VERDADE das decisões de produto e roadmap**: direção
   travada (horizontal, eixo execução/confiança + profundidade de IA, pricing por usuário), matriz
@@ -540,6 +557,12 @@ posicionamento sem ler a que se aplica:
   preço de mercado, risco de banimento, API Oficial vs QR, ou dados de mercado.** ⚠️ As conclusões
   prescritivas antigas dele (vertical em clínicas, vender já, plano único, "não é CRM") estão
   **superadas**; o banner no topo do arquivo lista o que vale. Em conflito, `proximos-passos.md` manda.
+- **`docs/instrumentacao-beta.md`** (28/08/2026) — **as cinco consultas do beta**, para rodar no SQL
+  Editor ou pelo MCP: publicaram o agente e onde pararam, dias de uso real, IA contra time,
+  quem sumiu, e o que os testadores escreveram no `feedback`. **Não existe tela**, e é decisão.
+  ⚠️ **A regra de "resposta da IA" no SQL tem que ser a de `lib/mensagem.ts`**, e o arquivo explica
+  as duas traduções que não são opcionais (`is distinct from` em vez de `<>`, e dia em
+  America/Sao_Paulo). Duas definições do mesmo número é como o produto começa a mentir.
 
 Regras que saem desses documentos e valem para qualquer sugestão minha:
 - **Âncoras de posicionamento** são **ZapResponder** (piso de preço) e **HelenaCRM** (teto), não
@@ -569,7 +592,7 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
 O lançamento é um **beta gratuito** com conhecidos do dono (advogado, pediatra, barbeiro, engenheiro,
 clínica, comércio), custeado por ele. **Cobrança está construída e PARADA de propósito.** Seis passos,
 nesta ordem, detalhados em `docs/proximos-passos.md`: (1) dashboard ✅, (2) steps do agente ✅,
-(3) os 4 furos, (4) design e mobile no Claude Design, (5) aplicar o design, (6) testes. Quatro
+(3) os 4 furos ✅, (4) design e mobile no Claude Design, (5) aplicar o design, (6) testes. Quatro
 decisões já travadas, **não reabrir**:
 - ✅ **`/agente` virou DUAS superfícies** (padrão setup do WooCommerce), feito em 28/08/2026: o
   assistente de `/montagem` e a tela permanente de três abas. Ver o bloco "Montagem e publicação"
@@ -579,8 +602,13 @@ decisões já travadas, **não reabrir**:
 - **Painel é o primeiro item do menu** e a tela inicial depende do papel (dono no painel, atendente
   em conversas).
 - **Menu "Em breve" = Agenda e Follow-up. Campanhas SAI.**
-- **`clients.account_type`** (`interno`/`beta`/`pago`) para marcar o testador: `trial_ends_at` nulo
-  libera o acesso mas não identifica ninguém, e hoje as contas internas estão no mesmo estado.
+- ✅ **`clients.account_type`** (`interno`/`beta`/`pago`) para marcar o testador, feito em
+  28/08/2026: `trial_ends_at` nulo libera o acesso mas não identifica ninguém. Ver o glossário de
+  `clients` acima.
+- ✅ **Segurança da IA provada com o cérebro real** (28/08/2026): 12 conversas-armadilha em `dryRun`
+  na Loja Teste, **nenhuma passou**, e as duas regras do `lib/guardrail.ts` foram vistas disparando
+  (com a persona sabotada de propósito, porque em 10 casos honestos ela nunca precisou). Resultados
+  caso a caso, com a resposta da IA na íntegra e as limitações, em `docs/proximos-passos.md`.
 - ⚠️ **Público misto:** nenhum texto fixo de tela pode assumir consulta, paciente ou agendamento.
   Quem carrega a linguagem do segmento é o preset.
 
@@ -610,8 +638,9 @@ decisões já travadas, **não reabrir**:
   claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
   `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
   `danger-ink` (9,0:1).
-- Testes e2e (Playwright, `e2e/`): **99 sem login** nas telas `/design` (inclui
-  `/design/montagem`, o assistente, e `/design/playground`, o painel de teste) e **10 com login**
+- Testes e2e (Playwright, `e2e/`): **103 sem login** nas telas `/design` (inclui
+  `/design/montagem`, o assistente, `/design/playground`, o painel de teste, e o canal de feedback
+  em `e2e/feedback.design.spec.ts`) e **10 com login**
   (`e2e/*.auth.spec.ts`), estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem**
   cenário e2e para `/pipeline`.
   ⚠️ **Rodar as DUAS suítes antes de fechar um passo.** No passo 1 (painel) só a sem-login foi
