@@ -31,7 +31,8 @@ test.describe("Bancada de teste dentro do /agente", () => {
     });
 
     await page.goto("/agente");
-    await expect(page.getByRole("tab", { name: "Guiado" })).toBeVisible();
+    // A aba "Quem atende" é a que abre, e é onde mora o nome do agente.
+    await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
 
     // Troca o nome do agente e NÃO salva.
     //
@@ -103,9 +104,19 @@ test.describe("Painel com dados reais", () => {
       page.getByRole("heading", { name: "O que a IA fez por você" })
     ).toBeVisible();
 
-    // A seção de operação (7 dias) continua embaixo, e não foi substituída.
-    await expect(page.getByRole("heading", { name: /Operação/ })).toBeVisible();
-    await expect(page.getByText("Conversas na semana")).toBeVisible();
+    // ⚠️ Esta asserção estava QUEBRADA desde o painel novo (27/08/2026) e só
+    // apareceu agora, porque a suíte com login não foi rodada naquele passo. Os
+    // cabeçalhos "Operação" e "Conversas na semana" deixaram de existir quando o
+    // painel virou quatro períodos com seletor: a seção passou a se chamar "A IA
+    // está dando conta?" e a legenda do período mora dentro do cartão.
+    await expect(
+      page.getByRole("heading", { name: "A IA está dando conta?" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Está crescendo?" })
+    ).toBeVisible();
+    // O seletor de período é o que prova que os quatro foram calculados.
+    await expect(page.getByRole("tablist", { name: "Período" })).toBeVisible();
 
     // A tela pode legitimamente não ter frase nenhuma (tenant sem movimento no
     // mês fechado E sem acumulado), e aí o estado vazio é a resposta certa. O que

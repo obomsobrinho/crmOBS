@@ -51,13 +51,12 @@ export async function PUT(
 
   // Gate de pré-requisitos: mesma regra que a UI mostra (lib/onboarding), para
   // não existirem duas opiniões sobre quando dá para ativar. Vale só na primeira
-  // ativação: religar depois não exige testar de novo.
+  // ativação: religar depois não exige nada.
   if (body.enabled && primeiraVez) {
     const faltas = publishBlockers({
       hasInstance: !!mine.evolution_instance,
-      agentConfigured: !!mine.onboarding.steps.find((s) => s.key === "configurar")
-        ?.done,
-      tested: !!mine.onboarding.steps.find((s) => s.key === "testar")?.done,
+      agentConfigured: mine.montagem.feito.configurar,
+      tested: mine.montagem.feito.testar,
       published: !!mine.agentPublishedAt,
     });
     if (faltas.length > 0) {

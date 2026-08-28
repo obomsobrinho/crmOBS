@@ -67,6 +67,53 @@ export const AGENT_PRESETS: AgentPreset[] = [
     }),
   },
   {
+    id: "pediatria",
+    label: "Pediatria",
+    description: "Consultório ou clínica pediátrica.",
+    config: preset({
+      companyWhat: "é um consultório de pediatria.",
+      tone: "amigavel",
+      goals: ["duvidas", "qualificar", "agendar"],
+      // Pediatria é o segmento em que responder demais custa mais caro: quem
+      // escreve está com uma criança doente do outro lado, e uma frase
+      // tranquilizadora errada atrasa atendimento. Por isso os limites aqui
+      // fecham em volta de sintoma, remédio e gravidade, e não só de preço.
+      dontDo: [
+        "nunca dar diagnóstico ou orientação clínica pelo WhatsApp",
+        "nunca indicar remédio, dose ou horário de remédio",
+        "nunca dizer se um sintoma é grave ou se pode esperar",
+      ],
+      escalateWhen: [
+        "quando descreverem febre, dificuldade para respirar ou qualquer sinal de urgência",
+        "quando perguntarem sobre um sintoma ou sobre um remédio",
+        "quando pedirem orçamento ou perguntarem de convênio",
+      ],
+      details:
+        "Faixa etária atendida:\n\nConvênios aceitos:\n\nComo funciona a primeira consulta:\n\nO que levar no dia:\n\nFormas de pagamento:",
+    }),
+  },
+  {
+    id: "engenharia",
+    label: "Engenharia e projetos",
+    description: "Escritório de engenharia, projetos e acompanhamento de obra.",
+    config: preset({
+      companyWhat: "presta serviços de engenharia e projetos.",
+      tone: "profissional",
+      goals: ["duvidas", "qualificar", "agendar"],
+      dontDo: [
+        "nunca estimar prazo ou valor de um projeto por conta própria",
+        "nunca opinar sobre viabilidade técnica sem uma visita",
+        "nunca prometer aprovação em órgão público",
+      ],
+      escalateWhen: [
+        "quando pedirem orçamento ou proposta",
+        "quando descreverem um problema estrutural ou um risco na obra",
+      ],
+      details:
+        "Serviços e tipos de projeto:\n\nRegiões atendidas:\n\nComo funciona a primeira visita ou reunião:\n\nDocumentos que costumam ser necessários:\n\nComo é feita a proposta:",
+    }),
+  },
+  {
     id: "estetica",
     label: "Clínica de estética",
     description: "Estética facial e corporal, procedimentos e pacotes.",

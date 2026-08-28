@@ -3,26 +3,32 @@ import { test, expect } from "@playwright/test";
 // Onboarding guiado e transparência da conexão. Roda sem login nas rotas
 // /design (liberadas pelo proxy em dev).
 
-test.describe("Trilho de onboarding (/design/onboarding)", () => {
-  test("mostra progresso e o próximo passo", async ({ page }) => {
+test.describe("Aviso de montagem (/design/onboarding)", () => {
+  // ⚠️ A BARRA DE QUATRO PASSOS NÃO EXISTE MAIS (28/08/2026). Ela foi absorvida
+  // pelo assistente de `/montagem`, que tem preview próprio em `/design/montagem`.
+  // O que ficou em toda página do app é uma linha com a porta de volta.
+  test("a barra de quatro passos virou uma linha, sem contador", async ({
+    page,
+  }) => {
     await page.goto("/design/onboarding");
-    await expect(page.getByText("Configurar sua conta")).toBeVisible();
-    // Mock: conectado e configurado, falta testar e publicar.
-    await expect(page.getByText("2 de 4")).toBeVisible();
-    await expect(page.getByText(/Próximo: testar a conversa/)).toBeVisible();
-  });
 
-  test("expande a lista com os 4 passos", async ({ page }) => {
-    await page.goto("/design/onboarding");
-    await page.getByRole("button", { name: "Ver todos os passos" }).click();
-    for (const passo of [
-      "Conectar o WhatsApp",
-      "Configurar o agente",
-      "Testar a conversa",
-      "Publicar o agente",
-    ]) {
-      await expect(page.getByText(passo, { exact: true })).toBeVisible();
-    }
+    await expect(page.getByText("Seu agente ainda não está no ar")).toBeVisible();
+    await expect(
+      page.getByText(/Ninguém recebe resposta automática até você ativar/)
+    ).toBeVisible();
+    // A porta de volta, que é a única razão de a linha existir.
+    await expect(
+      page.getByRole("link", { name: /Continuar a montagem/ })
+    ).toHaveAttribute("href", "/montagem");
+
+    // O CONTADOR SUMIU DAQUI. Existe um só na conta, e ele mora dentro do
+    // assistente: dois contadores davam "passo 2 de 3" dentro de "passo 2 de 4".
+    await expect(page.getByText("Configurar sua conta")).toHaveCount(0);
+    await expect(page.getByText(/\d de 4/)).toHaveCount(0);
+    await expect(page.getByRole("progressbar")).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Ver todos os passos" })
+    ).toHaveCount(0);
   });
 
   test("ativar fica travado enquanto falta passo, e diz o que falta", async ({
@@ -33,11 +39,13 @@ test.describe("Trilho de onboarding (/design/onboarding)", () => {
     // deixou de ser "pausado": pausada é a IA de UMA conversa quando um humano
     // assume, e repetir a palavra nos dois lugares confundia os dois estados.
     await expect(page.getByText("Desativado")).toBeVisible();
+    // ⚠️ "testar a conversa" SAIU da lista de pendências (decisão do dono,
+    // 28/08/2026): testar é oferecido no passo 4 do assistente, mas não barra
+    // mais a ativação. Sobraram conectar e configurar.
     await expect(
-      page.getByText(
-        /Antes de ativar o agente, falta: testar a conversa na bancada/
-      )
+      page.getByText(/Antes de ativar o agente, falta: configurar o agente/)
     ).toBeVisible();
+    await expect(page.getByText(/testar a conversa na bancada/)).toHaveCount(0);
     // A chave não é o gate (o gate é a rota, que devolve 409), mas ela não deve
     // convidar ao clique enquanto falta passo.
     await expect(

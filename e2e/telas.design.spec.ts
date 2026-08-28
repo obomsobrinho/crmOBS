@@ -69,12 +69,26 @@ test.describe("Inbox (/design)", () => {
 });
 
 test.describe("Agente (/design/agente)", () => {
-  test("renderiza o construtor guiado/avançado", async ({ page }) => {
+  test("renderiza as três abas mais a saída para o modo avançado", async ({
+    page,
+  }) => {
     await page.goto("/design/agente");
-    // O seletor de modo virou Tabs do Radix na migração, então o papel ARIA é
-    // `tab` dentro de um `tablist`, e não `button` como era antes.
-    await expect(page.getByRole("tab", { name: "Guiado" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Avançado" })).toBeVisible();
+    // As abas agora são as três SEÇÕES do formulário, e trocam conteúdo de
+    // verdade. O par guiado/avançado deixou de ser aba em 28/08/2026: as três
+    // abas são recortes do MESMO formulário e o avançado é outro formulário, e
+    // misturar os dois sentidos numa faixa só fazia "prompt à mão" parecer mais
+    // uma seção da configuração guiada.
+    await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "O que ele sabe" })).toBeVisible();
+    await expect(
+      page.getByRole("tab", { name: "O que ele pode fazer" })
+    ).toBeVisible();
+
+    await expect(page.getByRole("tab", { name: "Guiado" })).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Avançado" })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Escrever o prompt à mão" })
+    ).toBeVisible();
   });
 });
 

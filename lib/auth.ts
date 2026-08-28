@@ -2,7 +2,7 @@ import "server-only";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
-import { onboardingState, type OnboardingState } from "@/lib/onboarding";
+import { montagemState, type MontagemState } from "@/lib/onboarding";
 
 export interface MyClient {
   id: string;
@@ -25,19 +25,20 @@ export interface MyClient {
    */
   access: AccessState;
   /**
-   * PRIMEIRA ativação do agente (null = nunca foi ao ar). NUNCA é limpo: é o que
-   * diz ao onboarding que o trilho acabou. Não confundir com `agentEnabled`.
+   * PRIMEIRA ativação do agente (null = nunca foi ao ar). NUNCA é limpo: é o
+   * sinal que separa MONTAGEM de EDIÇÃO, ou seja, o assistente de `/montagem`
+   * da tela de abas de `/agente`. Não confundir com `agentEnabled`.
    */
   agentPublishedAt: string | null;
   /**
    * Liga-desliga do agente (switch "Agente ativo"). A IA só responde com
    * `agentPublishedAt` preenchido E isto verdadeiro. Existe separado porque
-   * desligar zerando `agentPublishedAt` faria a barra de onboarding reaparecer
-   * em toda página pedindo para publicar de novo, só porque alguém desligou a IA.
+   * desligar zerando `agentPublishedAt` jogaria a conta inteira de volta no
+   * assistente de montagem, só porque alguém desligou a IA por uma hora.
    */
   agentEnabled: boolean;
-  /** Progresso derivado por lib/onboarding.onboardingState. */
-  onboarding: OnboardingState;
+  /** Progresso da montagem, derivado por lib/onboarding.montagemState. */
+  montagem: MontagemState;
 }
 
 // Cliente (tenant) do usuário logado. A RLS já restringe `clients` ao(s)
@@ -51,8 +52,8 @@ export async function getMyClient(): Promise<MyClient | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // As colunas de assinatura e de onboarding vêm no mesmo select (custo zero)
-  // porque o gate e a barra de progresso rodam em toda navegação do app. Só
+  // As colunas de assinatura e de montagem vêm no mesmo select (custo zero)
+  // porque o gate e a linha de aviso rodam em toda navegação do app. Só
   // escalares: `persona` (9 KB na OBM) e `agent_config` ficam FORA de propósito.
   const { data } = await supabase
     .from("clients")
@@ -106,7 +107,7 @@ export async function getMyClient(): Promise<MyClient | null> {
     // tenant lido antes da migration chegaria com undefined, e nesse caso ligado
     // é o comportamento que não derruba quem já estava atendendo.
     agentEnabled: client.agent_enabled !== false,
-    onboarding: onboardingState({
+    montagem: montagemState({
       hasInstance: !!client.evolution_instance,
       agentConfigured: !!client.agent_config_updated_at,
       tested: !!client.onboarding_tested_at,

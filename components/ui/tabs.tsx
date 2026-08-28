@@ -127,6 +127,20 @@ function TabsTrigger({
   );
 }
 
+/**
+ * Painel de uma aba.
+ *
+ * ⚠️ `data-[state=inactive]:hidden` NÃO é enfeite. Com `forceMount`, que é como
+ * a tela do agente usa isto, o Radix mantém os painéis inativos montados E
+ * VISÍVEIS: ele só põe o atributo `hidden` quando o conteúdo não está presente,
+ * e com `forceMount` ele está sempre presente. Sem esta linha os três grupos do
+ * formulário apareciam empilhados, ou seja, exatamente a página de rolagem única
+ * que as abas vieram resolver.
+ *
+ * Esconder por CSS em vez de desmontar é o ponto: `AgentBulletList` guarda o
+ * rascunho ainda não adicionado num estado do pai, e desmontar faria o texto
+ * sumir da tela continuando a ser salvo.
+ */
 function TabsContent({
   className,
   ...props
@@ -134,7 +148,7 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1", className)}
+      className={cn("flex-1 data-[state=inactive]:hidden", className)}
       {...props}
     />
   );

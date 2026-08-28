@@ -47,6 +47,8 @@ test.describe("Tela do agente (/design/agente)", () => {
 
   test("o grupo de avisos mora dentro dos objetivos", async ({ page }) => {
     await page.goto("/design/agente");
+    // Objetivos moram na terceira aba desde 28/08/2026.
+    await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
     // O mock tem "Agendar" marcado, que é o único objetivo que usa o grupo.
     await expect(page.getByText("Grupo de WhatsApp para avisar")).toBeVisible();
     await expect(page.getByPlaceholder("120363000000000000@g.us")).toBeVisible();
@@ -103,7 +105,7 @@ test.describe("Modo avançado: rabo da base (/design/agente)", () => {
     page,
   }) => {
     await page.goto("/design/agente");
-    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.getByRole("button", { name: "Escrever o prompt à mão" }).click();
 
     await expect(page.getByText("Fixo, sempre no fim do seu prompt")).toBeVisible();
     // As quatro que garantem o comportamento. Aparecem no bloco fixo, não na
@@ -129,7 +131,7 @@ test.describe("Modo avançado: rabo da base (/design/agente)", () => {
     // aviso NÃO pode aparecer aqui: avisar sempre treina a pessoa a ignorar.
     await expect(page.getByText(/O prompt tem cerca de/)).toHaveCount(0);
 
-    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.getByRole("button", { name: "Escrever o prompt à mão" }).click();
     await page.locator("textarea").last().fill("Atenda bem e seja simpática.");
 
     // Agora avisa, e diz o número: é custo, não estética. Sem cache, a persona
@@ -140,7 +142,7 @@ test.describe("Modo avançado: rabo da base (/design/agente)", () => {
 
   test("o preview mostra o texto do cliente MAIS o rabo", async ({ page }) => {
     await page.goto("/design/agente");
-    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.getByRole("button", { name: "Escrever o prompt à mão" }).click();
     await page.getByRole("button", { name: "Ver prompt" }).click();
     // Escopado ao painel: "### IDENTIDADE" também aparece na textarea, e o que
     // interessa aqui é o que o n8n vai ler de verdade. Se o preview mostrasse só

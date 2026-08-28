@@ -69,7 +69,20 @@ const DOCS: KnowledgeDoc[] = [
   },
 ];
 
-export default function DesignAgentePage() {
+export default async function DesignAgentePage({
+  searchParams,
+}: {
+  // Next 16: os parâmetros de busca chegam como Promise.
+  searchParams: Promise<{ estado?: string }>;
+}) {
+  // `?estado=montagem` mostra a tela para quem AINDA NÃO publicou. Esse estado
+  // ficou raro depois que a montagem virou rota própria (só chega aqui quem
+  // digita `/agente` antes de ativar, tipicamente para entrar no modo avançado),
+  // mas é justamente por ser raro que ele precisa de preview: é o único lugar
+  // onde o rodapé promete o contrário do de sempre.
+  const { estado } = await searchParams;
+  const jaPublicou = estado !== "montagem";
+
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
       <NavRail clientName="Ótica Vision" activeHref="/agente" />
@@ -80,7 +93,6 @@ export default function DesignAgentePage() {
       <Card className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6">
         <AgentConfigForm
           clientId="preview"
-          instance="crm_preview01"
           initialMode="guiado"
           initialConfig={MOCK}
           initialPersona={null}
@@ -89,12 +101,12 @@ export default function DesignAgentePage() {
           stageNames={{ aguardando_humano: "Aguardando atendimento" }}
           knowledgeDocs={DOCS}
           knowledgeKeyConfigured
-          agentEnabled
-          // Preview no modo EDIÇÃO (agente já no ar), que é o estado da maior
-          // parte da vida da conta. A montagem tem preview próprio, em
-          // /design/agente-montagem.
-          jaPublicou
-          blockers={[]}
+          agentEnabled={jaPublicou}
+          // Por padrão, o modo EDIÇÃO (agente já no ar), que é o estado da maior
+          // parte da vida da conta. A montagem tem preview próprio em
+          // /design/montagem, porque virou outra ROTA do produto.
+          jaPublicou={jaPublicou}
+          blockers={jaPublicou ? [] : ["configurar o agente"]}
           preview
         />
       </Card>

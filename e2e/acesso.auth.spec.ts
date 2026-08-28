@@ -8,8 +8,12 @@ test.describe("Acesso do dono", () => {
     await page.goto("/inbox");
     await expect(page.getByRole("link", { name: "Agente" })).toBeVisible();
     await page.goto("/agente");
-    // Papel ARIA `tab`: o seletor de modo virou Tabs do Radix na migração de UI.
-    await expect(page.getByRole("tab", { name: "Guiado" })).toBeVisible();
+    // Três abas de verdade desde 28/08/2026. O par guiado/avançado deixou de ser
+    // aba: as abas são as SEÇÕES do formulário, e o avançado é outro formulário.
+    await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Escrever o prompt à mão" })
+    ).toBeVisible();
   });
 
   test("Equipe lista o próprio usuário", async ({ page }) => {

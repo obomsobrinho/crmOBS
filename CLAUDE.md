@@ -70,14 +70,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     terça?", cruzando com `agent_turns`. **Restaurar não grava:** carrega a versão no formulário e a
     pessoa salva. Leitura por membro do tenant (RLS), escrita só service_role.
   - **`agent_enabled` (boolean) é o liga-desliga; `agent_published_at` é a PRIMEIRA ativação e
-    NUNCA é limpo.** São separados porque zerar `agent_published_at` ao desligar fazia
-    `onboardingState().complete` virar false e a barra de onboarding reaparecer em toda página
-    pedindo "Publicar o agente", só porque alguém desligou a IA por uma hora. O `processTurn`
-    emudece se qualquer um dos dois barrar. **Vocabulário: "Agente ativo" e "Desativado", nunca
-    "pausado"** (pausada é a IA de UMA conversa quando um humano assume; usar a mesma palavra nos
-    dois lugares faz a pessoa olhar o inbox sem saber qual dos dois parou). Config do agente é editada em `/agente` (**só dono**: a
-    página redireciona atendente e o `PUT` responde 403); write só por service_role (RLS de
-    `clients` não dá UPDATE a `authenticated`).
+    NUNCA é limpo.** São separados porque zerar `agent_published_at` ao desligar jogaria a conta
+    inteira de volta no assistente de `/montagem`, só porque alguém desligou a IA por uma hora. É
+    também o sinal que separa MONTAGEM de EDIÇÃO. O `processTurn` emudece se qualquer um dos dois
+    barrar. **Vocabulário: "Agente ativo" e "Desativado", nunca "pausado"** (pausada é a IA de UMA
+    conversa quando um humano assume; usar a mesma palavra nos dois lugares faz a pessoa olhar o
+    inbox sem saber qual dos dois parou). Config do agente é editada em `/agente` e, na primeira vez,
+    em `/montagem` (**só dono** nas duas: a página redireciona atendente e o `PUT` responde 403);
+    write só por service_role (RLS de `clients` não dá UPDATE a `authenticated`).
 - **`dados_cliente`** = os **CONTATOS/LEADS**: quem manda mensagem no WhatsApp *daquele* tenant
   (ex.: um lead da OBM). "O cliente do seu cliente". PK `bigint`. Único por `(client_id, telefone)`.
   Editável pelo CRM (grant de coluna, browser direto): `atendimento_ia`, `display_name` (nome que
@@ -406,22 +406,62 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   que falha também conta. `/recuperar-senha` e a troca de senha em `/perfil` falam com o Supabase
   Auth **direto do browser** (a troca confere a senha atual antes, porque `updateUser` não pede).
   ⚠️ Cadastro e convite dependem de SMTP configurado no projeto Supabase.
-- **Fase 4 (onboarding e publicação):** `lib/onboarding.ts` (**módulo puro**) define os 4 passos
-  (conectar, configurar, testar, publicar), `onboardingState()` calcula progresso e libera um passo
-  só quando o anterior está feito, e `publishBlockers()` é a MESMA regra usada pela UI e pela rota
-  (sem duas opiniões). Sinais no banco: `evolution_instance`, `agent_config_updated_at`,
-  `onboarding_tested_at` (marcado por `/api/playground` no primeiro teste) e `agent_published_at`.
-  `getMyClient()` traz `onboarding` pronto (só escalares, **nunca** `persona`/`agent_config`).
-  `components/OnboardingBar.tsx` aparece em toda página do app enquanto não publicado.
-  **O interruptor do agente são DUAS colunas** (ver a regra no glossário de `clients`):
-  `agent_published_at` nulo **ou** `agent_enabled` false e o `processTurn` devolve **200 com
-  `messages` vazio** (e NÃO erro) antes de chamar o modelo, então a IA fica muda, não gasta token e
-  **a mensagem do cliente continua sendo gravada** pelo n8n para um humano responder. Vale só fora
-  do `dryRun` (senão o passo "testar" seria impossível). `PUT /api/clients/[id]/publish` recebe
-  `{ enabled: boolean }`, é dono-only, e os 3 passos anteriores são exigidos **só na primeira
-  ativação** (409 com o que falta): quem já testou não testa de novo para religar. Aviso de risco do QR em
-  `/connect` (`components/ConnectionRiskNotice.tsx`): **nunca** prometer proteção contra bloqueio
-  nem usar "não pague a API da Meta" (e2e trava isso).
+- **Montagem e publicação (refeito em 28/08/2026, passo 2 do MVP do beta):** o agente tem **DUAS
+  SUPERFÍCIES sobre UM formulário**, no padrão de setup do WooCommerce. Mapa de campos, decisões e o
+  que ficou de fora em `docs/proximos-passos.md`.
+  - **`/montagem`** é o assistente: tela cheia, fora do route group `(app)`, quatro passos
+    (conectar, quem atende, o que ele sabe, testar e ativar). **Roda uma vez na vida da conta** e
+    some para sempre depois da primeira ativação. Pede **três campos digitados** (nome da empresa, o
+    que a empresa faz, nome do agente), mais um clique de modelo e um de tom.
+  - **`/agente`** é a tela permanente: **três abas de verdade** (quem atende, o que ele sabe, o que
+    ele pode fazer) mais o modo avançado. Perdeu os numerais e os botões "Continuar", que eram um
+    wizard improvisado de quando não existia um de verdade.
+  - ⚠️ **UM formulário, duas composições.** Campos em `components/agente/campos.tsx`, layout em
+    `components/agente/ui.tsx`, estado e `PUT` em `components/agente/useAgentConfig.ts`. A ÚNICA
+    diferença permitida entre as superfícies é `mostrarOpcionais`; qualquer outra é bug, porque campo
+    duplicado diverge na primeira mudança.
+  - ⚠️ **As abas usam `forceMount` E `data-[state=inactive]:hidden`** (o segundo mora na camada
+    base). O Radix desmonta o painel inativo por padrão, e `AgentBulletList` guarda rascunho não
+    adicionado no pai: desmontar faria o texto sumir da tela CONTINUANDO a ser salvo. E com
+    `forceMount` sozinho os três painéis ficam VISÍVEIS, que é a página de rolagem única de volta.
+  - ⚠️ **O modo avançado NÃO é uma quarta aba**: as três abas são recortes do MESMO formulário, o
+    avançado é outro formulário. Ele é um botão à direita da faixa.
+  - **Erro em aba fechada:** o `PUT` devolve `fields`, a tela troca sozinha para a primeira aba com
+    erro e marca a aba com um ponto. Só DEPOIS de tentar salvar.
+  - **Rascunho no navegador** (`components/agente/rascunho.ts`, chave `montagem:{clientId}`): o
+    assistente grava no servidor **UMA vez**, ao sair do passo 3. Se `agent_config_updated_at` for
+    mais novo que o rascunho, o servidor vence. ⚠️ Rascunho não atravessa aparelho. É também por
+    causa dele que `/montagem` carrega o wizard com `ssr: false` (`components/MontagemCliente.tsx`).
+  - **Quatro guardas em `/montagem`**: conta bloqueada vai para `/assinatura`, atendente para
+    `/inbox`, quem já publicou para `/agente`, e **quem está em `prompt_mode = 'avancado'` também**,
+    porque tem persona escrita à mão e o assistente salva pelo guiado. A última não é redundante: um
+    tenant novo pode entrar no avançado por `/agente` ANTES de publicar.
+  - **`lib/onboarding.ts`** (**módulo puro**) tem `PASSOS_MONTAGEM` (os 4 passos, com a frase de por
+    que importa) e `montagemState()` (onde retomar e se acabou). Sinais no banco:
+    `evolution_instance`, `agent_config_updated_at`, `onboarding_tested_at` e `agent_published_at`.
+    `getMyClient()` traz `montagem` pronto (só escalares, **nunca** `persona`/`agent_config`).
+  - **A `OnboardingBar` NÃO EXISTE MAIS.** Virou `components/AvisoMontagem.tsx`: UMA LINHA, sem
+    numeral, sem lista, sem expandir, em toda página do app enquanto o agente não foi ao ar, e só
+    para o dono. O contador de progresso da conta passou a existir num lugar só, dentro do
+    assistente.
+  - ⚠️ **`publishBlockers()` PERDEU O `tested`** (decisão do dono, 28/08/2026): sobraram conectar e
+    configurar. O passo 4 continua oferecendo o teste com destaque, mas ele não barra mais a
+    ativação. `onboarding_tested_at` continua sendo gravado pelo `/api/playground`, agora só como
+    dado.
+  - **O interruptor do agente são DUAS colunas** (ver a regra no glossário de `clients`):
+    `agent_published_at` nulo **ou** `agent_enabled` false e o `processTurn` devolve **200 com
+    `messages` vazio** (e NÃO erro) antes de chamar o modelo, então a IA fica muda, não gasta token e
+    **a mensagem do cliente continua sendo gravada** pelo n8n para um humano responder. Vale só fora
+    do `dryRun`. `PUT /api/clients/[id]/publish` recebe `{ enabled: boolean }`, é dono-only, e os
+    pré-requisitos valem **só na primeira ativação** (409 com o que falta).
+  - Aviso de risco do QR em `/connect` e dentro do passo 1 do assistente
+    (`components/ConnectionRiskNotice.tsx`): **nunca** prometer proteção contra bloqueio nem usar
+    "não pague a API da Meta" (e2e trava isso). ⚠️ `ConnectWhatsApp` ganhou `enquadramento`
+    (`pagina`/`passo`) e `onConectado`: são duas MOLDURAS do mesmo componente, porque o QR, o polling
+    e a importação são a parte que não pode existir duas vezes.
+  - ⚠️ **Furo conhecido no celular:** quem abre o passo 1 no telefone não consegue ler o código na
+    própria tela, e este projeto não tem conexão por código de telefone. A tela diz isso; não
+    inventar pareamento que não existe.
 - **Decisões mantidas de propósito:** `dados_cliente.atendimento_ia` é `text`
   (`'ativa'`/`'reativada'` = ligada, `'pause'` = pausada) — não é boolean. `chat_messages.active`
   é coluna legada morta (mantida). Não sugerir trocar sem pedirem.
@@ -461,12 +501,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - **Menu (`components/NavRail.tsx`, 27/08/2026): Painel PRIMEIRO**, depois Conversas, Pipeline,
   Agente (dono-only) e Equipe. **"Em breve" é Agenda e Follow-up; Campanhas SAIU** (manter prometia
   disparo em massa sobre QR, que é o cenário de banimento que o projeto decidiu não correr, e atrai
-  o cliente errado logo no beta). ⚠️ **A tela INICIAL depende do papel** (`app/page.tsx`): dono cai
-  em `/painel`, atendente em `/inbox`.
+  o cliente errado logo no beta). ⚠️ **A tela INICIAL depende do papel E da montagem**
+  (`app/page.tsx`): dono que ainda não publicou cai em `/montagem`, dono publicado em `/painel`,
+  atendente em `/inbox`.
 - Rotas: `/login`, `/cadastro` (público, cria conta), `/recuperar-senha` (público),
-  `/connect` (QR + aviso de risco + import automático), `/inbox`, `/inbox/[id]`, `/pipeline`
-  (board Kanban do funil), `/painel` (dashboard), `/agente` (construtor do prompt, com a base de
-  conhecimento e a bancada de teste dentro),
+  `/connect` (QR + aviso de risco + import automático), `/montagem` (assistente de 4 passos da
+  primeira configuração, dono-only, fora do `(app)`, some depois da primeira ativação), `/inbox`,
+  `/inbox/[id]`, `/pipeline` (board Kanban do funil), `/painel` (dashboard), `/agente` (três abas do
+  construtor, com a base de conhecimento e a bancada de teste dentro),
   `/conhecimento` (base de conhecimento/RAG, dono-only; **fora do menu desde 26/08/2026**, a rota
   segue existindo para não quebrar link salvo, mas o lugar da base é o grupo "O que ele sabe" do
   `/agente`), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
@@ -526,14 +568,14 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
 ### Em andamento: MVP do beta gratuito (decidido em 26/08/2026)
 O lançamento é um **beta gratuito** com conhecidos do dono (advogado, pediatra, barbeiro, engenheiro,
 clínica, comércio), custeado por ele. **Cobrança está construída e PARADA de propósito.** Seis passos,
-nesta ordem, detalhados em `docs/proximos-passos.md`: (1) dashboard, (2) steps do agente, (3) os 4
-furos, (4) design e mobile no Claude Design, (5) aplicar o design, (6) testes. Quatro decisões já
-travadas, **não reabrir**:
-- **`/agente` vira DUAS superfícies** (padrão setup do WooCommerce): um assistente de 4 passos em
-  rota própria, que roda uma vez e pede só os 3 campos que a pessoa precisa digitar, e a tela
-  permanente com **três abas**. O assistente **absorve a barra de onboarding** (um contador só na
-  conta) e some para sempre depois da primeira publicação, o que faz a colisão "salvar e continuar"
-  com "salvar já é publicar" desaparecer por construção.
+nesta ordem, detalhados em `docs/proximos-passos.md`: (1) dashboard ✅, (2) steps do agente ✅,
+(3) os 4 furos, (4) design e mobile no Claude Design, (5) aplicar o design, (6) testes. Quatro
+decisões já travadas, **não reabrir**:
+- ✅ **`/agente` virou DUAS superfícies** (padrão setup do WooCommerce), feito em 28/08/2026: o
+  assistente de `/montagem` e a tela permanente de três abas. Ver o bloco "Montagem e publicação"
+  acima. O assistente **absorveu a barra de onboarding** (um contador só na conta) e some para
+  sempre depois da primeira publicação, o que fez a colisão "salvar e continuar" com "salvar já é
+  publicar" desaparecer por construção.
 - **Painel é o primeiro item do menu** e a tela inicial depende do papel (dono no painel, atendente
   em conversas).
 - **Menu "Em breve" = Agenda e Follow-up. Campanhas SAI.**
@@ -568,6 +610,11 @@ travadas, **não reabrir**:
   claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
   `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
   `danger-ink` (9,0:1).
-- Testes e2e (Playwright, `e2e/`): **40 sem login** nas telas `/design` (inclui
-  `/design/playground`, que agora abre o painel de teste) e **7 com login** (`e2e/*.auth.spec.ts`),
-  estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem** cenário e2e para `/pipeline`.
+- Testes e2e (Playwright, `e2e/`): **99 sem login** nas telas `/design` (inclui
+  `/design/montagem`, o assistente, e `/design/playground`, o painel de teste) e **10 com login**
+  (`e2e/*.auth.spec.ts`), estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem**
+  cenário e2e para `/pipeline`.
+  ⚠️ **Rodar as DUAS suítes antes de fechar um passo.** No passo 1 (painel) só a sem-login foi
+  rodada, e três testes com login ficaram quebrados por seis dias: dois deles procuravam os
+  cabeçalhos "Operação" e "Conversas na semana", que o painel novo tinha renomeado.
+  `E2E_PORT=3000 npx playwright test --project=logado` reusa um dev server já no ar.

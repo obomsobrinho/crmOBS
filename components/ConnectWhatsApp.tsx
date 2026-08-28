@@ -15,10 +15,28 @@ export default function ConnectWhatsApp({
   clientId,
   clientName,
   hasInstance,
+  enquadramento = "pagina",
+  onConectado,
 }: {
   clientId: string;
   clientName: string;
   hasInstance: boolean;
+  /**
+   * `pagina` = a tela `/connect` inteira (moldura de tela cheia, título próprio,
+   * botão de sair). `passo` = embutido como passo 1 do assistente de montagem,
+   * onde a moldura, o título e o sair já existem em volta.
+   *
+   * ⚠️ São duas MOLDURAS do mesmo componente, e não dois componentes: o QR, o
+   * polling e a importação são justamente a parte que não pode existir duas
+   * vezes.
+   */
+  enquadramento?: "pagina" | "passo";
+  /**
+   * Chamado quando a conexão fecha e a importação termina. Quando existe, ele
+   * SUBSTITUI o redirecionamento para o inbox: dentro do assistente, sair da
+   * rota no meio da montagem perderia o rascunho e o passo.
+   */
+  onConectado?: () => void;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -47,10 +65,17 @@ export default function ConnectWhatsApp({
     }
     setPhase("connected");
     setTimeout(() => {
+      // Dentro do assistente quem decide o que vem depois é o assistente: ele
+      // avança para o passo 2 sem trocar de rota, senão o rascunho da montagem
+      // e o passo atual iriam junto com a navegação.
+      if (onConectado) {
+        onConectado();
+        return;
+      }
       router.replace("/inbox");
       router.refresh();
     }, 1000);
-  }, [router, stopPolling, clientId]);
+  }, [router, stopPolling, clientId, onConectado]);
 
   const startPolling = useCallback(() => {
     stopPolling();
@@ -94,16 +119,37 @@ export default function ConnectWhatsApp({
     return () => stopPolling();
   }, [hasInstance, startPolling, stopPolling]);
 
+  const passo = enquadramento === "passo";
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-4 lg:flex-row lg:items-start lg:justify-center lg:py-10">
-      <div className={cn(cardVariants(), "w-full max-w-md space-y-5 p-6 text-center")}>
-        <div className="flex items-center justify-between">
-          <div className="text-left">
-            <h1 className="text-titulo">Conectar WhatsApp</h1>
-            <p className="text-apoio text-ink-2">{clientName}</p>
+    <div
+      className={
+        passo
+          ? // Dentro do assistente a moldura, o fundo e a rolagem são de fora.
+            // Empilhado e não lado a lado: a coluna do assistente tem 672px, e
+            // duas colunas ali deixariam o QR com menos de 300px.
+            "flex flex-col gap-4"
+          : "flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas p-4 lg:flex-row lg:items-start lg:justify-center lg:py-10"
+      }
+    >
+      <div
+        className={cn(
+          cardVariants(),
+          "space-y-5 p-6 text-center",
+          passo ? "w-full" : "w-full max-w-md"
+        )}
+      >
+        {/* Título e sair só na tela própria: no assistente os dois já existem no
+            cabeçalho, e repetir daria duas saídas e dois títulos na mesma tela. */}
+        {!passo && (
+          <div className="flex items-center justify-between">
+            <div className="text-left">
+              <h1 className="text-titulo">Conectar WhatsApp</h1>
+              <p className="text-apoio text-ink-2">{clientName}</p>
+            </div>
+            <LogoutButton />
           </div>
-          <LogoutButton />
-        </div>
+        )}
 
         {phase === "connected" || phase === "importing" ? (
           <div className="space-y-2 py-8">
@@ -116,7 +162,9 @@ export default function ConnectWhatsApp({
             <p className="text-apoio text-ink-2">
               {phase === "importing"
                 ? "Trazendo contatos e conversas do WhatsApp…"
-                : "Redirecionando…"}
+                : passo
+                  ? "Vamos para o próximo passo…"
+                  : "Redirecionando…"}
             </p>
           </div>
         ) : (
@@ -124,6 +172,15 @@ export default function ConnectWhatsApp({
             <p className="text-apoio text-ink-2">
               Abra o WhatsApp no celular do cliente, em Aparelhos conectados,
               e escaneie o QR code abaixo.
+            </p>
+
+            {/* ⚠️ No celular a pessoa não consegue ler o QR na própria tela, e
+                este projeto NÃO tem conexão por código de telefone. Dizer isso é
+                a única saída honesta; inventar um pareamento que não existe
+                seria pior. */}
+            <p className="text-legenda text-ink-3 sm:hidden">
+              Você vai precisar de um segundo aparelho para ler o código, ou pode
+              abrir esta página no computador.
             </p>
 
             <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-bloco p-4">
@@ -172,8 +229,14 @@ export default function ConnectWhatsApp({
       </div>
 
       {/* Transparência sobre o QR: só faz sentido antes de conectar. Depois de
-          conectado a tela está de saída (redireciona), então sai da frente. */}
-      {phase !== "connected" && phase !== "importing" && <ConnectionRiskNotice />}
+          conectado a tela está de saída, então sai da frente.
+          O aviso tem `max-w-md` próprio, que serve à coluna estreita da tela
+          própria; no assistente ele acompanha a largura do passo. */}
+      {phase !== "connected" && phase !== "importing" && (
+        <div className={passo ? "w-full [&>div]:max-w-none" : "contents"}>
+          <ConnectionRiskNotice />
+        </div>
+      )}
     </div>
   );
 }

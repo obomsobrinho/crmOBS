@@ -12,17 +12,23 @@ test.describe("Item 1: horário sai do modo avançado", () => {
     await page.goto("/design/agente");
 
     // No guiado o horário É dado da empresa e continua lá. Virou sub-bloco (h3)
-    // dentro do grupo "O que ele sabe" na reorganização de 26/08.
+    // dentro da aba "O que ele sabe" na reorganização de 26/08.
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
     await expect(
       page.getByRole("heading", { name: "Horário de atendimento", level: 3 })
     ).toBeVisible();
 
-    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.getByRole("button", { name: "Escrever o prompt à mão" }).click();
 
-    // No avançado sobra uma seção só. O motivo é coerência: nome da empresa
-    // também é dado da empresa e nunca esteve aqui.
-    const titulos = await page.locator("h2").allInnerTexts();
-    expect(titulos).toEqual(["Prompt (modo avançado)"]);
+    // No avançado sobra o prompt e mais nada. O motivo é coerência: nome da
+    // empresa também é dado da empresa e nunca esteve aqui.
+    await expect(page.getByText("Prompt escrito à mão")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Horário de atendimento", level: 3 })
+    ).toHaveCount(0);
+    // E as três abas do guiado somem junto: o avançado é OUTRO formulário, não
+    // mais uma seção deste.
+    await expect(page.getByRole("tab")).toHaveCount(0);
   });
 });
 
@@ -75,26 +81,60 @@ test.describe("Item 3: Resetar no cabeçalho da bancada", () => {
 test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () => {
   const LARGURAS = [1440, 1280, 1024, 768];
 
-  test("os grupos são três, com nome, sempre em uma coluna", async ({ page }) => {
+  test("os três grupos viraram abas de verdade, que trocam o conteúdo", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto("/design/agente");
 
-    // Os nomes são a hierarquia: seis seções de peso igual era o que produzia a
-    // sensação de caos.
-    const titulos = await page.locator("section h2").allInnerTexts();
-    expect(titulos).toEqual([
+    // Os nomes seguem sendo a hierarquia (seis seções de peso igual era o que
+    // produzia a sensação de caos), mas viraram ABAS em 28/08/2026, porque a
+    // rolagem única de 2,6 telas era o problema que nenhum título resolvia.
+    const abas = await page.getByRole("tab").allInnerTexts();
+    expect(abas).toEqual([
       "Quem atende",
       "O que ele sabe",
       "O que ele pode fazer",
     ]);
 
+    // ⚠️ TROCA DE VERDADE, e não índice de âncora, que já tinha sido rejeitado:
+    // um painel visível por vez.
+    //
+    // Mede por LAYOUT (`offsetParent`), e não pelo atributo `hidden`: com
+    // `forceMount` o Radix nunca põe `hidden`, e quem esconde é o
+    // `data-[state=inactive]:hidden` da camada base. Testar o atributo passaria
+    // a mentir no dia em que o CSS caísse.
+    const visiveis = () =>
+      page.evaluate(
+        () =>
+          [...document.querySelectorAll('[data-slot="tabs-content"]')].filter(
+            (p) => (p as HTMLElement).offsetParent !== null
+          ).length
+      );
+    expect(await visiveis()).toBe(1);
+
+    await expect(page.locator("#grupo-quem")).toBeVisible();
+    await expect(page.locator("#grupo-sabe")).toBeHidden();
+
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
+    expect(await visiveis()).toBe(1);
+    await expect(page.locator("#grupo-sabe")).toBeVisible();
+    await expect(page.locator("#grupo-quem")).toBeHidden();
+
+    // ⚠️ Os TRÊS painéis continuam MONTADOS (`forceMount`), mesmo escondidos.
+    // Não é detalhe: `AgentBulletList` guarda o rascunho não adicionado no pai, e
+    // desmontar faria o texto sumir da tela continuando a ser salvo.
+    const montados = await page.locator('[data-slot="tabs-content"]').count();
+    expect(montados).toBe(3);
+
+    // Uma coluna em toda largura, como antes.
     for (const width of LARGURAS) {
       await page.setViewportSize({ width, height: 1200 });
       const xs = await page.evaluate(() => [
         ...new Set(
-          [...document.querySelectorAll("section h2")].map((h) =>
-            Math.round(h.closest("section")!.getBoundingClientRect().left)
-          )
+          [...document.querySelectorAll('[data-slot="tabs-content"]')]
+            .filter((p) => (p as HTMLElement).offsetParent !== null)
+            .map((p) => Math.round(p.getBoundingClientRect().left))
         ),
       ]);
       expect(xs, `largura ${width}`).toHaveLength(1);
@@ -136,42 +176,39 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     }
   });
 
-  test("Detalhes do negócio sai do fim da página e vira o herói do 2º grupo", async ({
+  test("Detalhes do negócio é o primeiro campo da aba 'O que ele sabe'", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto("/design/agente");
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
 
-    // Antes era o ÚLTIMO bloco da tela. É o campo que mais muda a qualidade da
-    // resposta e o único que resolve o aviso de cache de prompt.
+    // Antes era o ÚLTIMO bloco de uma página de 2,6 telas. É o campo que mais
+    // muda a qualidade da resposta e o único que resolve o aviso de cache de
+    // prompt, então abre a aba.
     const pos = await page.evaluate(() => {
       const grupo = document.getElementById("grupo-sabe")!;
       const ta = grupo.querySelector("textarea")!;
       const docs = [...grupo.querySelectorAll("h3")].find((h) =>
         /Documentos/i.test(h.textContent ?? "")
       )!;
+      const abas = [...document.querySelectorAll('[data-slot="tabs-content"]')];
       return {
         // Vem ANTES do bloco de documentos e do horário, ou seja, é o primeiro
-        // campo do grupo. Comparar por posição no documento em vez de por
-        // `firstElementChild`: o cabeçalho do grupo virou um nó próprio quando o
-        // numeral e o estado entraram.
+        // campo da aba.
         ehPrimeiroDoGrupo:
           !!docs &&
           (ta.compareDocumentPosition(docs) &
             Node.DOCUMENT_POSITION_FOLLOWING) !==
             0,
-        grupoIndice: [...document.querySelectorAll("section h2")].findIndex(
-          (h) => h.closest("section") === grupo
-        ),
-        ultimo:
-          document.querySelectorAll("section")[
-            document.querySelectorAll("section").length - 1
-          ] === grupo,
+        // Segunda aba das três, e não a última.
+        indice: abas.indexOf(grupo),
+        total: abas.length,
       };
     });
     expect(pos.ehPrimeiroDoGrupo).toBe(true);
-    expect(pos.grupoIndice).toBe(1);
-    expect(pos.ultimo).toBe(false);
+    expect(pos.indice).toBe(1);
+    expect(pos.total).toBe(3);
   });
 
   test("Objetivos perdem a pintura de marca", async ({ page }) => {
@@ -243,6 +280,7 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/design/agente");
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
 
     const grupo = page.locator("#grupo-sabe");
     await expect(grupo.getByRole("heading", { name: "Documentos" })).toBeVisible();
@@ -267,6 +305,7 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     page,
   }) => {
     await page.goto("/design/agente");
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
     await page.getByRole("button", { name: "Ver todos (4)" }).click();
 
     const painel = page.locator('[data-slot="sheet-content"]');
@@ -283,13 +322,16 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await page.goto("/design/agente");
 
     // A regra que torna recolher um ganho: fechado, a linha mostra o VALOR, então
-    // quem volta para conferir lê sem abrir.
+    // quem volta para conferir lê sem abrir. Os dois blocos ficam em abas
+    // diferentes desde 28/08/2026, cada um dentro do grupo a que pertence.
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
     const horario = page.getByRole("button", {
       name: /Horário de atendimento/,
     });
     await expect(horario).toHaveAttribute("aria-expanded", "false");
     await expect(horario).toContainText("Segunda a sexta: 08:00 às 18:00");
 
+    await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
     const limites = page.getByRole("button", {
       name: /Limites e quando chamar o time/,
     });
@@ -297,10 +339,12 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await expect(limites).toContainText("2 limites, 1 caso de chamar o time");
 
     // Abrir mostra os campos.
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
     await horario.click();
     await expect(horario).toHaveAttribute("aria-expanded", "true");
     await expect(page.getByPlaceholder("Ex.: fechado em feriados")).toBeVisible();
 
+    await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
     await limites.click();
     await expect(
       page.getByPlaceholder("Ex.: nunca dar desconto por conta própria")
@@ -315,7 +359,7 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     // Ele saiu do topo da tela. No guiado o campo que resolve é "Detalhes do
     // negócio"; no avançado é a própria textarea, e é lá que o aviso de fato
     // dispara (o esqueleto vazio do guiado já dá cerca de 2.146 tokens).
-    await page.getByRole("tab", { name: /Avançado/ }).click();
+    await page.getByRole("button", { name: "Escrever o prompt à mão" }).click();
     const ta = page.locator("textarea");
     await ta.fill("Você é a Alê, atendente da Ótica Vision.");
 
@@ -333,46 +377,37 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     expect(ordem).toBe(true);
   });
 
-  test("montagem e edição são a MESMA tela, com voz diferente", async ({
+  test("montagem e edição são DUAS SUPERFÍCIES, não dois estados da mesma tela", async ({
     page,
   }) => {
-    // O pedido do dono era "tem que ser os dois lados": guiado na primeira vez,
-    // edição direta depois. A regra do híbrido é que o acompanhante muda a VOZ da
-    // tela, nunca a estrutura, e é isso que este teste prende.
-    const ler = () =>
-      page.evaluate(() => ({
-        grupos: [...document.querySelectorAll("section h2")].map((h) =>
-          (h as HTMLElement).innerText.replace(/\n/g, " ").trim()
-        ),
-        acompanhante: /Vamos montar seu atendente/.test(document.body.innerText),
-        continuar: [...document.querySelectorAll("button")].filter((b) =>
-          /^Continuar/.test(b.textContent!.trim())
-        ).length,
-      }));
+    // ⚠️ ESTE TESTE AFIRMAVA O CONTRÁRIO até 28/08/2026, quando montar e editar
+    // eram a mesma página com voz diferente. O padrão de setup do WooCommerce
+    // ganhou a discussão: um assistente que roda uma vez em rota própria, e uma
+    // tela permanente de abas. Um não cancela o outro.
+    await page.goto("/design/montagem");
+    const montagem = await page.evaluate(() => ({
+      contador: /Passo \d de 4/.test(document.body.innerText),
+      salvar: [...document.querySelectorAll("button")].some(
+        (b) => b.textContent?.trim() === "Salvar"
+      ),
+      abas: document.querySelectorAll('[role="tab"]').length,
+    }));
 
-    await page.goto("/design/agente-montagem");
-    const montagem = await ler();
     await page.goto("/design/agente");
-    const edicao = await ler();
+    const edicao = await page.evaluate(() => ({
+      contador: /Passo \d de 4/.test(document.body.innerText),
+      salvar: [...document.querySelectorAll("button")].some(
+        (b) => b.textContent?.trim() === "Salvar"
+      ),
+      abas: document.querySelectorAll('[role="tab"]').length,
+    }));
 
-    // Mesma estrutura, mesma ordem, nos dois modos. O numeral é ordem de leitura
-    // da montagem, não passo, então só aparece lá.
-    expect(montagem.grupos).toEqual([
-      "1 Quem atende",
-      "2 O que ele sabe",
-      "3 O que ele pode fazer",
-    ]);
-    expect(edicao.grupos).toEqual([
-      "Quem atende",
-      "O que ele sabe",
-      "O que ele pode fazer",
-    ]);
-
-    expect(montagem.acompanhante).toBe(true);
-    expect(edicao.acompanhante).toBe(false);
-    // "Continuar" só rola, e só na montagem (grupos 1 e 2).
-    expect(montagem.continuar).toBe(2);
-    expect(edicao.continuar).toBe(0);
+    // O assistente conta passos e não tem Salvar avulso: ele grava sozinho ao
+    // sair do passo 3, e a pessoa nunca precisa decidir quando salvar.
+    expect(montagem).toEqual({ contador: true, salvar: false, abas: 0 });
+    // A tela permanente tem abas e Salvar, e NENHUM numeral de passo: aqueles
+    // eram o wizard improvisado.
+    expect(edicao).toEqual({ contador: false, salvar: true, abas: 3 });
   });
 
   test("o rodapé só promete publicação quando ela é verdade", async ({ page }) => {
@@ -380,7 +415,11 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     // `agent_published_at` é nulo, então antes da primeira ativação salvar NÃO
     // publica. A tela dizia que publicava, e assustava o cliente final justamente
     // no momento em que ele está mais inseguro.
-    await page.goto("/design/agente-montagem");
+    //
+    // Este estado ficou raro (quem não publicou vai para `/montagem`), mas não
+    // sumiu: quem digita `/agente` antes de ativar, tipicamente para entrar no
+    // modo avançado, continua caindo aqui.
+    await page.goto("/design/agente?estado=montagem");
     await expect(page.getByText(/Ainda não vai ao ar/)).toBeVisible();
     await expect(page.getByText("Salvar já publica no WhatsApp.")).toHaveCount(0);
 
@@ -389,32 +428,27 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await expect(page.getByText(/Ainda não vai ao ar/)).toHaveCount(0);
   });
 
-  test("um contador de progresso só, mesmo com a barra de onboarding na tela", async ({
-    page,
-  }) => {
-    // Era a objeção principal contra o acompanhante: stepper dentro do passo 2 de
-    // outro stepper. Resolvido pelo sinal, não por desenho: acompanhante e barra
-    // nascem e morrem pelo MESMO `agent_published_at`, e o acompanhante não tem
-    // contador nenhum.
-    await page.goto("/design/agente-montagem");
-    const contadores = await page.evaluate(() =>
-      [...document.querySelectorAll("*")]
-        .filter(
-          (e) =>
-            e.children.length === 0 && /\d+\s+de\s+\d+/.test(e.textContent ?? "")
-        )
-        .map((e) => e.textContent!.trim())
-    );
-    expect(contadores).toHaveLength(1);
+  test("um contador de progresso só na conta inteira", async ({ page }) => {
+    // Era a objeção principal contra montar dentro da tela de edição: stepper
+    // dentro do passo 2 de outro stepper. Resolvido por construção: o assistente
+    // absorveu a barra de onboarding, então o contador existe num lugar só.
+    const contadores = (texto: string) =>
+      (texto.match(/\d+\s+de\s+\d+/g) ?? []).length;
+
+    await page.goto("/design/montagem");
+    expect(contadores(await page.locator("body").innerText())).toBe(1);
+
+    // A linha que sobrou da barra NÃO conta passos.
+    await page.goto("/design/onboarding");
+    expect(contadores(await page.locator("body").innerText())).toBe(0);
   });
 
   test("os presets trocam de lugar, não de existência", async ({ page }) => {
-    // Na montagem são convite e abrem a tela; na edição são ação destrutiva e
-    // ficam no pé do grupo 1, onde foram parar em 26/08.
-    const onde = async (url: string) => {
-      await page.goto(url);
-      return page.evaluate(() => {
-        const chip = (raiz: Element | null) =>
+    // No assistente são convite e abrem o passo; na tela permanente são ação
+    // destrutiva e ficam no pé da aba 1, onde foram parar em 26/08.
+    const chip = () =>
+      page.evaluate(() => {
+        const achar = (raiz: Element | null) =>
           raiz
             ? [...raiz.querySelectorAll("button")].some(
                 (b) =>
@@ -422,24 +456,17 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
                   b.getBoundingClientRect().height > 0
               )
             : false;
-        const acompanhante = [...document.querySelectorAll("div")].find((d) =>
-          /Vamos montar seu atendente/.test((d as HTMLElement).innerText ?? "")
-        );
         return {
-          noAcompanhante: chip(acompanhante ?? null),
-          noGrupo1: chip(document.getElementById("grupo-quem")),
+          convite: achar(document.querySelector('[data-slot="preset-convite"]')),
+          rodape: achar(document.querySelector('[data-slot="preset-rodape"]')),
         };
       });
-    };
 
-    expect(await onde("/design/agente-montagem")).toEqual({
-      noAcompanhante: true,
-      noGrupo1: false,
-    });
-    expect(await onde("/design/agente")).toEqual({
-      noAcompanhante: false,
-      noGrupo1: true,
-    });
+    await page.goto("/design/montagem?passo=quem");
+    expect(await chip()).toEqual({ convite: true, rodape: false });
+
+    await page.goto("/design/agente");
+    expect(await chip()).toEqual({ convite: false, rodape: true });
   });
 
   test("não tem índice de âncoras no topo", async ({ page }) => {

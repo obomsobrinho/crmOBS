@@ -123,10 +123,14 @@ export async function POST(req: NextRequest) {
       personaOverride,
     });
 
-    // Marca o passo "testar" do onboarding na primeira conversa que der certo.
+    // Marca `onboarding_tested_at` na primeira conversa que der certo.
     // Best-effort e só uma vez (a checagem evita escrita em toda mensagem); um
     // erro aqui não pode derrubar o teste do dono.
-    if (!client.onboarding.steps.find((s) => s.key === "testar")?.done) {
+    //
+    // ⚠️ Isto NÃO é mais pré-requisito para ativar (ver `publishBlockers`), mas
+    // segue sendo gravado: é o único registro de que alguém falou com o agente
+    // antes de soltá-lo.
+    if (!client.montagem.feito.testar) {
       const svc = createServiceClient();
       const { error: markErr } = await svc
         .from("clients")

@@ -29,7 +29,7 @@ export default async function AgentePage() {
     supabase
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, evolution_instance, notify_group_jid"
+        "persona, agent_config, prompt_mode, notify_group_jid"
       )
       .eq("id", client!.id)
       .maybeSingle(),
@@ -68,7 +68,6 @@ export default async function AgentePage() {
 
   const persona = (data?.persona as string | null) ?? null;
   const promptMode = (data?.prompt_mode as Mode | null) ?? "guiado";
-  const instance = (data?.evolution_instance as string | null) ?? null;
   const notifyGroup = (data?.notify_group_jid as string | null) ?? null;
 
   // Normaliza o agent_config guardado (pode ser null ou de outra versão).
@@ -94,7 +93,6 @@ export default async function AgentePage() {
     <Card className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6">
       <AgentConfigForm
         clientId={client!.id}
-        instance={instance}
         initialMode={promptMode}
         initialConfig={initialConfig}
         initialPersona={persona}
@@ -106,15 +104,16 @@ export default async function AgentePage() {
         knowledgeKeyConfigured={!!process.env.OPENAI_API_KEY}
         // Atendendo agora = já foi ao ar alguma vez E está ligado na chave.
         agentEnabled={!!client!.agentPublishedAt && client!.agentEnabled}
-        // Separa MONTAGEM de EDIÇÃO. É o mesmo sinal que faz a barra de
-        // onboarding sumir, então existe um contador de progresso só na conta.
+        // Só muda a frase do rodapé (salvar já publica, ou ainda não vai ao ar).
+        // A montagem virou rota própria, mas esta tela CONTINUA aberta a quem
+        // ainda não publicou (decisão do dono): é a única porta para o modo
+        // avançado antes da primeira ativação. Quem cai aqui nesse estado veio de
+        // link direto, porque `/` e o aviso mandam para `/montagem`.
         jaPublicou={!!client!.agentPublishedAt}
         blockers={publishBlockers({
           hasInstance: !!client!.evolution_instance,
-          agentConfigured: !!client!.onboarding.steps.find(
-            (s) => s.key === "configurar"
-          )?.done,
-          tested: !!client!.onboarding.steps.find((s) => s.key === "testar")?.done,
+          agentConfigured: client!.montagem.feito.configurar,
+          tested: client!.montagem.feito.testar,
           published: !!client!.agentPublishedAt,
         })}
       />

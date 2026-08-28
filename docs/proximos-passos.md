@@ -169,6 +169,86 @@ funcionam, porque descrevem a sequência natural de configurar um atendente.
 **O bloco "Guidance"** da referência (3 cartões pequenos com ícone, uma linha e "saiba como") é o que
 entrega "simples mas com opções para explorar": caminho principal curto, aprofundamento opcional.
 
+### ✅ Steps do agente: FEITO (28/08/2026). Mapa de campos, decisões e o que ficou de fora
+
+Passo 2 dos 6 do MVP do beta. O desenho fechado acima foi implementado sem mudança de rumo; o que
+segue é o que ficou decidido no caminho, e é aqui que se olha antes de mexer nas duas telas.
+
+**As duas superfícies, e o que separa uma da outra**
+
+| | Assistente `/montagem` | Tela permanente `/agente` |
+|---|---|---|
+| Quando existe | só antes da primeira ativação | sempre |
+| Estrutura | 4 passos, tela cheia, sem menu | 3 abas dentro do app |
+| Contador | "Passo N de 4" | nenhum |
+| Salvar | automático, UMA vez, ao sair do passo 3 | botão no rodapé |
+| Modo avançado | nunca | botão à direita da faixa de abas |
+
+**Mapa de campos (o artefato aprovado).** O assistente pede **três campos digitados**, mais um clique
+de modelo e um de tom. `validateConfig` reprova só quatro campos e `goals` já vem preenchido, então
+isso é o mínimo real, e não uma estimativa.
+
+| Campo | Assistente | Abas | Por quê |
+|---|---|---|---|
+| `companyName`, `companyWhat`, `agentName` | passo 2 | Quem atende | obrigatórios |
+| `tone` | passo 2 | Quem atende | tem default, mas é 1 clique e muda a voz |
+| modelo do segmento | passo 2, no topo | Quem atende, no pé | no assistente é convite, na aba é ação destrutiva |
+| `companySite`, `companyAddress`, `agentRole` | não | Quem atende | opcionais, não mudam a primeira resposta |
+| `details` | passo 3 | O que ele sabe | é o campo livre do passo 3 |
+| documentos (RAG) | passo 3, opcional | O que ele sabe | nunca bloqueia o avançar |
+| `hours`, `hoursNote` | não | O que ele sabe | alimentam a frase de valor do painel, não o atendimento |
+| `goals` | não | O que ele pode fazer | já vem `["duvidas"]`, e o modelo preenche |
+| `notify_group_jid` | não | O que ele pode fazer | só aparece com "Agendar" marcado |
+| `dontDo`, `escalateWhen`, `handoffNotice`, `neverAdmitAi` | não | O que ele pode fazer | o modelo preenche |
+| modo avançado + persona crua | **nunca** | fora das abas | assistente é guiado por definição |
+
+**Decisões tomadas no caminho (todas do dono)**
+
+1. **Testar deixou de ser exigência para ativar.** `publishBlockers` perdeu o `tested`; sobraram
+   conectar e configurar. O passo 4 continua OFERECENDO o teste, com destaque. Motivo: o gate já
+   valia só na primeira ativação, mas ainda assim transformava a estreia num ritual.
+   `onboarding_tested_at` continua sendo gravado pelo `/api/playground`, agora só como dado.
+2. **O rascunho mora no navegador, não no servidor.** `localStorage`, chave `montagem:{clientId}`.
+   O servidor recebe UMA gravação, ao sair do passo 3. Ganha-se uma linha em `agent_publications` por
+   montagem em vez de três, e a pessoa entende que nada foi ao ar.
+   ⚠️ **Custo assumido: rascunho não atravessa aparelho.** Quem digita no celular e volta no
+   computador começa vazio. Mitigação implementada: se `agent_config_updated_at` do servidor for mais
+   novo que o rascunho, o servidor vence e o rascunho é descartado.
+3. **`/agente` continua acessível antes de publicar.** É a única porta para o modo avançado nesse
+   estado. Quem chega por `/` ou pelo aviso vai para `/montagem`; quem digita `/agente` entra.
+4. **A `OnboardingBar` virou UMA LINHA** (`components/AvisoMontagem.tsx`), sem numeral, sem lista e
+   sem expandir. O contador da conta passou a existir num lugar só.
+5. **Dois presets novos**, pediatria e engenharia: dos seis testadores do beta, esses dois não tinham
+   segmento. O de pediatria fecha os limites em torno de sintoma, remédio e gravidade, e não só de
+   preço, porque ali responder demais custa mais caro.
+6. **A ordem dos passos ficou como estava**, com o QR primeiro, mesmo a pesquisa apontando que é o
+   passo mais caro: é o único que pode falhar por causa externa, e descobrir isso depois de dez
+   minutos de formulário é pior.
+
+**Pesquisa que mudou implementação**
+- **[DADO]** Yan, Conrad, Tourangeau e Couper, *Interacting with Computers* (2010), N=3.179:
+  indicador de progresso que parece lento no começo dobra o abandono (21,8% contra 11,3%) e fica
+  **pior do que não ter indicador nenhum** (12,7%). Por isso o trilho conta PASSOS e não porcentagem:
+  o QR e "digite o nome da empresa" levam tempos incomparáveis.
+- **[DADO]** WooCommerce (documentação oficial): o assistente entrega para um checklist persistente,
+  que é o ponto de reentrada. É de onde sai a linha de aviso.
+- **[DADO]** NNG (*Wizards*) mais Shopify (documentação oficial): travar a ORDEM dos passos, mas
+  deixar adiar os campos opcionais dentro deles. Daí "Deixar para depois" existir só no passo 3.
+- **[NÃO VERIFICADO]** Os números redondos de abandono que circulam ("75% abandona na primeira
+  semana", "38% na primeira tela") são blog de fornecedor sem estudo rastreável. Não foram usados.
+
+**O que ficou de fora, de propósito**
+- **Validação no browser.** Quem diz o que é configuração válida é `validateConfig`, no servidor. Se
+  o `PUT` reprovar, o assistente volta ao passo dono do campo e a tela de abas troca para a aba dona
+  do campo. Repetir a regra no cliente criaria uma segunda opinião que só divergiria em produção.
+- **QR no celular.** ⚠️ **Furo conhecido e não resolvido:** quem abre no celular não consegue ler o
+  código na própria tela, e este projeto não tem conexão por código de telefone. A tela diz isso em
+  vez de fingir. Resolver exige checar se a Evolution expõe pareamento por número.
+- **`clients.account_type`** (`interno`/`beta`/`pago`): segue pendente, fora deste passo.
+- **Associar rótulo e campo** (`htmlFor`/`id` no helper `Field`): defeito de acessibilidade real e
+  antigo, que os testes contornam localizando por estrutura. Fazer direito exige `fieldset`/`legend`
+  nos grupos de caixas de marcar, e é trabalho próprio.
+
 ### Dashboard: promovido a primeira tela (26/08)
 
 Decisão do dono: **o painel passa a ser o primeiro item do menu**, antes de Conversas. Razão: é a
@@ -924,6 +1004,12 @@ criar o usuário no painel do Supabase, INSERT em `user_clients`).
 do produto: quando os ajustes de
 tela em andamento fecharem (detalhes de inbox e pipeline, painel, steps do agente), passar um
 **redesenho geral no Claude Design** para melhorar tudo de uma vez, em vez de seguir tela a tela.
+⚠️ **O painel refeito em 27/08 (passo 1) TAMBÉM foi reprovado no visual pelo dono, e de propósito não
+foi corrigido ali:** a decisão foi seguir para o passo 2 e tratar a aparência dele aqui, junto com o
+resto. Isso é a ordem funcionando (estrutura antes de estética), não pendência esquecida. **Quem for
+fazer o passo 4 não pode assumir que o painel está fechado:** ele é a tela que o dono mais mostra e
+a que mais precisa deste passo.
+
 O painel de 26/08 foi aprovado como "ainda não está bom", ou seja, ele entra nesse redesenho junto
 com o resto.
 
