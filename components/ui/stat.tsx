@@ -75,13 +75,33 @@ function Stat({
   );
 }
 
+const topoVariants = cva("flex items-start justify-between gap-2", {
+  variants: {
+    /**
+     * Altura mínima do cabeçalho do cartão. Geometria mora no `tamanho`, como no
+     * resto da peça.
+     *
+     * `operacao` existe porque na linha de quatro cartões do painel os rótulos
+     * têm larguras diferentes ("Atendidas sem você" quebra em duas linhas,
+     * "Preferiu confirmar" não), e sem um piso comum os quatro numerais ficam em
+     * alturas diferentes. É o defeito que a rodada 3 do desenho apontou.
+     */
+    tamanho: { padrao: "min-h-5", operacao: "min-h-8" },
+  },
+  defaultVariants: { tamanho: "padrao" },
+});
+
 /** Linha do topo: rótulo à esquerda, selo de variação à direita. */
-function StatTopo({ className, ...props }: React.ComponentProps<"div">) {
+function StatTopo({
+  className,
+  tamanho,
+  ...props
+}: React.ComponentProps<"div"> & VariantProps<typeof topoVariants>) {
   return (
     <div
       {...props}
       data-slot="stat-topo"
-      className={cn("flex min-h-5 items-start justify-between gap-2", className)}
+      className={cn(topoVariants({ tamanho, className }))}
     />
   );
 }

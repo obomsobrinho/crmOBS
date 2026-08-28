@@ -1,14 +1,17 @@
 import { LayoutDashboard } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
-import PainelOperacao, {
+import PainelOperacaoBloco, {
   type JanelaCalculada,
-} from "@/components/PainelOperacao";
+} from "@/components/painel/PainelOperacaoBloco";
+import PainelMovimento, {
+  type MovimentoJanela,
+  type MovimentoKey,
+} from "@/components/painel/PainelMovimento";
 import {
-  PainelEspera,
-  PainelEscaladas,
+  PainelFilaLinha,
+  PainelAssuntos,
   PainelUltimaResposta,
-  type Escalada,
 } from "@/components/PainelBlocos";
 import ValorResumo from "@/components/ValorResumo";
 import {
@@ -29,6 +32,12 @@ import {
 } from "@/lib/periodo";
 import { cleanName } from "@/lib/inbox";
 import {
+  barrasDeHora,
+  escolherVerbatim,
+  rotuloHorario,
+  type CandidatoVerbatim,
+} from "@/lib/painel";
+import {
   frasesDeValor,
   mesFechado,
   resumoDeValor,
@@ -42,106 +51,98 @@ export const dynamic = "force-dynamic";
 
 /** Teto de linhas do acumulado. Ver a guarda de truncamento mais abaixo. */
 const TETO = 20000;
-/** Quantos pedidos escalados a lista mostra. */
-const ESCALADAS = 5;
+/** As duas janelas do gráfico de movimento, em dias. */
+const DIAS_MOVIMENTO: Record<MovimentoKey, number> = { "14": 14, "30": 30 };
 
-// Painel. Quatro perguntas, nesta ordem de leitura:
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+// Painel, rodada 3 do desenho.
 //
-// 1. O que a IA fez por você (manchete de dependência, mês fechado + acumulado)
-// 2. O que preciso fazer agora (a fila, o único número acionável)
-// 3. A IA está dando conta? (três cartões, seguem o seletor de período)
-// 4. O que a IA passou para você (escaladas, viram convite a ensinar o agente)
-// 5. O que isso me deu (o resto das frases de valor + a última resposta real)
-// 6. Está crescendo? (pessoas novas + gráfico, seguem o seletor)
+// ARRANJO: coluna principal mais trilha de 380px. Na coluna, a manchete com o
+// gráfico de hora dentro, a operação em quatro cartões e o movimento. Na
+// trilha, os assuntos e a frase real do agente. A fila subiu para o cabeçalho.
 //
-// Tudo por RLS (tenant). O cálculo mora em módulos puros (lib/valor, lib/metrics,
-// lib/periodo, lib/delta, lib/mensagem), então servidor e browser leem a MESMA
-// regra e a página não tem opinião própria sobre número nenhum.
+// ⚠️ CADA BLOCO MANDA NO PRÓPRIO PERÍODO. Não existe mais seletor global, e por
+// isso também não existe mais o aviso escrito de que a manchete "não segue o
+// seletor": aviso de texto explicando um controle era o sintoma de o controle
+// estar no lugar errado.
+//
+// Tudo por RLS (tenant). O cálculo mora em módulos puros (lib/valor,
+// lib/metrics, lib/periodo, lib/delta, lib/mensagem, lib/painel), então servidor
+// e browser leem a MESMA regra e a página não tem opinião própria sobre número
+// nenhum.
 export default async function PainelPage() {
   const client = await requireActiveTenant();
   const supabase = await createClient();
   const mes = mesFechado();
 
-  const [
-    { data: todasMsgs },
-    { data: todasQuals },
-    { data: cfg },
-    espera,
-    { data: ultima },
-  ] = await Promise.all([
-    // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e é
-    // ele que trava a mão de quem ia cancelar. As quatro janelas de período e o
-    // mês fechado são recortados DELE em memória, em vez de virarem consultas
-    // próprias: o acumulado já contém todas, e pedir as mesmas linhas cinco
-    // vezes só multiplicaria o custo da página.
-    //
-    // ⚠️ NUNCA `.limit()` sem `order`. Uma versão anterior fazia exatamente isso
-    // numa consulta de 7 dias, e um tenant com mais de 5.000 mensagens na semana
-    // recebia um subconjunto arbitrário, com os quatro números subestimando em
-    // silêncio. Quando o teto doer de verdade, o caminho é uma tabela de
-    // agregado mensal.
-    supabase
-      .from("chat_messages")
-      .select("phone, user_message, bot_message, message_type, created_at")
-      .order("created_at", { ascending: false })
-      .limit(TETO),
-    supabase
-      .from("conversation_qualifications")
-      .select("id, phone, action, summary, created_at")
-      .order("created_at", { ascending: false })
-      .limit(5000),
-    // O horário de atendimento vive em agent_config (é configuração da empresa,
-    // editada na tela do agente). Sem ele, o resumo omite o número de "fora do
-    // horário" em vez de estimar.
-    supabase
-      .from("clients")
-      .select("agent_config")
-      .eq("id", client.id)
-      .maybeSingle(),
-    // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
-    // número acionável do painel, e por isso o único que vale consulta própria.
-    // A ordenação usa o índice parcial que já existe em (client_id, handoff_at).
-    supabase
-      .from("conversations")
-      .select("phone, handoff_at", { count: "exact" })
-      .not("handoff_at", "is", null)
-      .order("handoff_at", { ascending: true })
-      .limit(1),
-    // A última resposta que a IA de fato mandou. Consulta própria e minúscula
-    // porque precisa do nome do contato, que o acumulado não traz.
-    supabase
-      .from("chat_messages")
-      .select("phone, nomewpp, bot_message, created_at")
-      .not("bot_message", "is", null)
-      .not("message_type", "in", '("manual","imported")')
-      .order("created_at", { ascending: false })
-      .limit(1),
-  ]);
+  const [{ data: todasMsgs }, { data: todasQuals }, { data: cfg }, espera] =
+    await Promise.all([
+      // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e
+      // é ele que trava a mão de quem ia cancelar. As janelas de período, o mês
+      // fechado e as duas do movimento são recortadas DELE em memória, em vez de
+      // virarem consultas próprias.
+      //
+      // ⚠️ NUNCA `.limit()` sem `order`. Uma versão anterior fazia exatamente
+      // isso numa consulta de 7 dias, e um tenant com mais de 5.000 mensagens na
+      // semana recebia um subconjunto arbitrário, com os números subestimando em
+      // silêncio.
+      //
+      // `nomewpp` vem junto agora: o verbatim precisa do nome do contato, e
+      // antes isso era uma quinta consulta só para uma linha.
+      supabase
+        .from("chat_messages")
+        .select(
+          "phone, nomewpp, user_message, bot_message, message_type, created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(TETO),
+      supabase
+        .from("conversation_qualifications")
+        .select("id, phone, action, summary, created_at")
+        .order("created_at", { ascending: false })
+        .limit(5000),
+      // O horário de atendimento vive em agent_config (é configuração da
+      // empresa, editada na tela do agente). Sem ele, o resumo omite o número de
+      // "fora do horário" em vez de estimar, e o gráfico de hora some junto.
+      supabase
+        .from("clients")
+        .select("agent_config")
+        .eq("id", client.id)
+        .maybeSingle(),
+      // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
+      // número acionável do painel, e por isso o único que vale consulta
+      // própria. A ordenação usa o índice parcial em (client_id, handoff_at).
+      supabase
+        .from("conversations")
+        .select("phone, handoff_at", { count: "exact" })
+        .not("handoff_at", "is", null)
+        .order("handoff_at", { ascending: true })
+        .limit(1),
+    ]);
 
   const hours =
     (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
 
-  const acumuladoMsgs = (todasMsgs ?? []) as ValorMsg[];
+  const acumuladoMsgs = (todasMsgs ?? []) as (ValorMsg & {
+    nomewpp: string | null;
+  })[];
   const acumuladoQuals = (todasQuals ?? []) as (ValorQual & {
     id: number;
     summary: string | null;
   })[];
 
-  // O relógio vem de `lib/periodo`, e não de `Date.now()` escrito aqui:
-  // chamada impura no corpo de um Server Component é erro de lint
-  // (`react-hooks/purity`).
+  // O relógio vem de `lib/periodo`, e não de `Date.now()` escrito aqui: chamada
+  // impura no corpo de um Server Component é erro de lint.
   const agora = agoraMs();
 
-  // ── As quatro janelas ───────────────────────────────────────────────────────
+  // ── Guarda de truncamento ──────────────────────────────────────────────────
   //
-  // ⚠️ GUARDA DE TRUNCAMENTO. O acumulado tem teto de linhas, ordenado do mais
-  // novo para o mais velho. Se ele bateu no teto E a linha mais antiga que veio
-  // já é mais nova do que o começo da janela ANTERIOR mais longa (60 dias, do
-  // período "mês"), essa janela está INCOMPLETA, e um selo calculado sobre
-  // janela incompleta mostraria variação inventada. Nesse caso o período
-  // anterior vira `null` e nenhum cartão mostra selo, que é a única saída
-  // honesta. A regra é a mesma de antes, só que agora parametrizada pelo maior
-  // período em vez de fixa em 14 dias.
+  // ⚠️ O acumulado tem teto de linhas, ordenado do mais novo para o mais velho.
+  // Se ele bateu no teto E a linha mais antiga que veio já é mais nova do que o
+  // começo da janela ANTERIOR mais longa, essa janela está INCOMPLETA, e um selo
+  // calculado sobre janela incompleta mostraria variação inventada. Nesse caso o
+  // período anterior vira `null` e nenhum cartão mostra selo.
   const maisAntiga = acumuladoMsgs[acumuladoMsgs.length - 1]?.created_at;
   const truncado =
     acumuladoMsgs.length >= TETO &&
@@ -149,6 +150,10 @@ export default async function PainelPage() {
       Date.parse(maisAntiga) > instanteMaisAntigoNecessario(agora));
 
   const primeiras = primeirasMensagens(acumuladoMsgs as JanelaMsg[]);
+  // Primeira mensagem da conta inteira. O gráfico de movimento usa isto para
+  // marcar como trilho os dias que a conta ainda não teve, em vez de desenhar um
+  // vale que conta uma queda que nunca houve.
+  const desdeMs = primeiras.size > 0 ? Math.min(...primeiras.values()) : null;
 
   const recorte = (de: number, ate: number) => ({
     msgs: (acumuladoMsgs as JanelaMsg[]).filter((m) =>
@@ -159,6 +164,7 @@ export default async function PainelPage() {
     ),
   });
 
+  // ── As quatro janelas da operação ──────────────────────────────────────────
   const janelas = Object.fromEntries(
     ORDEM_PERIODOS.map((k) => {
       const p = PERIODOS[k];
@@ -187,37 +193,45 @@ export default async function PainelPage() {
     })
   ) as Record<PeriodoKey, JanelaCalculada>;
 
+  // ── As duas janelas do movimento ───────────────────────────────────────────
+  //
+  // 14 e 30 dias, e não os quatro períodos da operação: movimento é tendência, e
+  // tendência de 24 horas não existe. São janelas PRÓPRIAS porque o seletor
+  // agora é do bloco.
+  const movimento = Object.fromEntries(
+    (Object.keys(DIAS_MOVIMENTO) as MovimentoKey[]).map((k) => {
+      const dias = DIAS_MOVIMENTO[k];
+      const de = agora - dias * DIA_MS;
+      const anteriorDe = agora - dias * 2 * DIA_MS;
+      const atual = recorte(de, agora);
+      const ant = recorte(anteriorDe, de);
+      const m = computeMetrics({ ...atual, primeiras, de, ate: agora });
+      const j: MovimentoJanela = {
+        dias,
+        barras: barras(atual.msgs, dias, agora),
+        conversas: m.conversas,
+        conversasAnterior: truncado
+          ? null
+          : computeMetrics({ ...ant, primeiras, de: anteriorDe, ate: de })
+              .conversas,
+        pessoasNovas: m.pessoasNovas,
+      };
+      return [k, j];
+    })
+  ) as Record<MovimentoKey, MovimentoJanela>;
+
   // ── A fila ─────────────────────────────────────────────────────────────────
   const esperando = espera.error ? null : (espera.count ?? 0);
   const maisVelha = espera.data?.[0]?.handoff_at as string | null | undefined;
+  const esperaMs = maisVelha ? agora - Date.parse(maisVelha) : null;
   const esperaTexto = maisVelha ? esperaLegivel(maisVelha, agora) : "";
 
-  // ── O que a IA passou para você ────────────────────────────────────────────
+  // ── A frase real do agente ─────────────────────────────────────────────────
   //
-  // Não segue o seletor de período de propósito: é uma lista de pendências, e
-  // uma lista que esvazia quando a pessoa clica em "Dia" pareceria defeito.
-  const escaladas: Escalada[] = acumuladoQuals
-    .filter((q) => q.action === "pausar" && !!q.summary)
-    .slice(0, ESCALADAS)
-    .map((q) => ({
-      id: q.id,
-      quando: esperaLegivel(q.created_at, agora),
-      texto: q.summary as string,
-      guardrail: (q.summary as string).startsWith(
-        "Resposta retida pelo guardrail"
-      ),
-      href: `/inbox/${encodeURIComponent(q.phone)}`,
-    }));
-
-  // ── A última resposta da IA ────────────────────────────────────────────────
-  const ultimaLinha = ultima?.[0] as
-    | {
-        phone: string;
-        nomewpp: string | null;
-        bot_message: string;
-        created_at: string;
-      }
-    | undefined;
+  // A regra mora em lib/painel.ts e é OBJETIVA: a mais recente de uma conversa
+  // que a IA atendeu sozinha, com reserva por comprimento. Nunca escolhida a
+  // dedo. Sai do acumulado que já está em memória, sem consulta nova.
+  const verbatim = escolherVerbatim(acumuladoMsgs as CandidatoVerbatim[]);
 
   // ── Manchete: mês fechado, recortado do acumulado ──────────────────────────
   //
@@ -227,9 +241,10 @@ export default async function PainelPage() {
   const inicioMs = Date.parse(mes.inicioISO);
   const fimMs = Date.parse(mes.fimISO);
   const noMes = (iso: string) => naJanela(Date.parse(iso), inicioMs, fimMs);
+  const msgsDoMes = acumuladoMsgs.filter((m) => noMes(m.created_at));
 
   const resumo = resumoDeValor({
-    msgs: acumuladoMsgs.filter((m) => noMes(m.created_at)),
+    msgs: msgsDoMes,
     quals: acumuladoQuals.filter((q) => noMes(q.created_at)),
     hours,
   });
@@ -243,68 +258,107 @@ export default async function PainelPage() {
   });
   const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
 
-  // O resto das frases (tudo menos a manchete) desce para "o que isso me deu".
+  // ⚠️ O GRÁFICO DE HORA TEM QUE COBRIR A MESMA JANELA DA MANCHETE, senão a soma
+  // das partes roxas não fecha com o número. Quando o mês fechado está vazio, a
+  // manchete cai no acumulado (regra que já existia no ValorResumo), e o gráfico
+  // precisa cair junto. É por isso que a janela é escolhida aqui, e não lá
+  // dentro: o componente não pode ter uma segunda opinião sobre o período.
+  const caiuNoAcumulado = frases.length === 0 && frasesAcumuladas.length > 0;
+  const horas = barrasDeHora({
+    msgs: caiuNoAcumulado ? acumuladoMsgs : msgsDoMes,
+    hours,
+  });
+
+  // O resto das frases (tudo menos a manchete) desce para o fim da coluna.
   // `frasesDeValor` já devolve em ordem de força.
-  const restoDasFrases = (frases.length > 0 ? frases : frasesAcumuladas).slice(1);
+  const restoDasFrases = (frases.length > 0 ? frases : frasesAcumuladas).slice(
+    1
+  );
 
   // ⚠️ O painel NÃO é um cartão branco: é página sobre o canvas, com os cartões
   // flutuando (`Stat variant="elevado"`). É obrigatório no claro por um motivo
-  // de token: `--s-bloco` claro é `#f3f3f6`, exatamente igual ao `--canvas`,
-  // então cartão `bloco` dentro de cartão branco ficaria um degrau ABAIXO da
-  // casca, ou seja, o inverso da referência aprovada.
+  // de token: `--s-bloco` claro é igual ao `--canvas`, então cartão `bloco`
+  // dentro de cartão branco ficaria um degrau ABAIXO da casca.
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-1">
-      <div>
-        <div className="mb-1 flex items-center gap-2">
-          <LayoutDashboard size={20} className="text-brand-ink" />
-          <h1 className="text-titulo">Painel</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+      {/* Cabeçalho: título à esquerda, fila à direita, na MESMA linha. A fila
+          saiu da trilha porque `/painel` é onde o dono cai ao entrar, e o que
+          ele precisa saber primeiro é se tem gente esperando. */}
+      {/* A fila fica AO LADO do título, e não empurrada para a borda oposta da
+          tela: numa janela de 1920 o `justify-between` jogava ela a mais de mil
+          pixels do "Painel", que é o contrário de "ao lado". */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="min-w-0">
+          <div className="mb-1 flex items-center gap-2">
+            <LayoutDashboard size={20} className="text-brand-ink" />
+            <h1 className="text-titulo">Painel</h1>
+          </div>
+          <p className="text-apoio text-ink-2">
+            O que a IA fez pela conta {client?.name ?? ""}.
+          </p>
         </div>
-        <p className="text-apoio text-ink-2">
-          O que a IA fez pela conta {client?.name ?? ""}.
-        </p>
+        <PainelFilaLinha
+          quantas={esperando}
+          esperaMs={esperaMs}
+          espera={esperaTexto}
+        />
       </div>
 
-      <ValorResumo
-        resumo={resumo}
-        frases={frases}
-        periodo={periodo}
-        acumulado={acumulado}
-        frasesAcumuladas={frasesAcumuladas}
-        parte="manchete"
-      />
-
-      <section className="space-y-3">
-        <h2 className="text-rotulo uppercase text-ink-3">
-          O que preciso fazer agora
-        </h2>
-        <PainelEspera quantas={esperando} espera={esperaTexto} />
-      </section>
-
-      <PainelOperacao janelas={janelas} />
-
-      <PainelEscaladas itens={escaladas} />
-
-      {(restoDasFrases.length > 0 || ultimaLinha) && (
-        <section className="space-y-3">
-          <h2 className="text-rotulo uppercase text-ink-3">O que isso me deu</h2>
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col gap-5">
           <ValorResumo
             resumo={resumo}
             frases={frases}
             periodo={periodo}
             acumulado={acumulado}
             frasesAcumuladas={frasesAcumuladas}
-            parte="resto"
+            parte="manchete"
+            horas={horas}
+            rotuloHorario={rotuloHorario(hours)}
           />
-          {ultimaLinha && (
+
+          <PainelOperacaoBloco janelas={janelas} />
+
+          <PainelMovimento janelas={movimento} desdeMs={desdeMs} />
+
+          {/* As demais frases de valor. O desenho da rodada 3 não as mostra, e
+              elas ficam aqui embaixo, fora da primeira tela, em vez de sumirem:
+              apagar conteúdo aprovado em silêncio é decisão do dono, não minha.
+              Ver o relatório do passo. */}
+          {restoDasFrases.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-rotulo uppercase text-ink-3">
+                O que mais ela fez
+              </h2>
+              <ValorResumo
+                resumo={resumo}
+                frases={frases}
+                periodo={periodo}
+                acumulado={acumulado}
+                frasesAcumuladas={frasesAcumuladas}
+                parte="resto"
+              />
+            </section>
+          )}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-5">
+          {/* ⚠️ Placeholder honesto: não existe coluna que classifique o ASSUNTO
+              de um turno. Ver o comentário do componente. Quando existir, esta
+              chamada vira a lista real e o estado vazio some sozinho. */}
+          <PainelAssuntos />
+
+          {verbatim && (
             <PainelUltimaResposta
-              texto={ultimaLinha.bot_message}
-              nome={cleanName(ultimaLinha.nomewpp) ?? "um contato"}
-              quando={esperaLegivel(ultimaLinha.created_at, agora)}
-              href={`/inbox/${encodeURIComponent(ultimaLinha.phone)}`}
+              mensagens={verbatim.mensagens}
+              nome={cleanName(verbatim.nomewpp) ?? "um contato"}
+              quando={esperaLegivel(verbatim.created_at, agora)}
+              href={`/inbox/${encodeURIComponent(verbatim.phone)}`}
+              sozinha={verbatim.sozinha}
             />
           )}
-        </section>
-      )}
+        </div>
+      </div>
     </div>
   );
 }

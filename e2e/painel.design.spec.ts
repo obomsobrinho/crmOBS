@@ -134,13 +134,19 @@ test.describe("Painel: selo de variação", () => {
     page,
   }) => {
     await page.goto("/design/painel");
-    // No período "Dia" as bases são pequenas: pessoas novas vai de 2 para 3.
-    // "+50%" seria verdade aritmética e mentira de leitura, então sai "+1".
+    // No período "Dia" as bases são pequenas: "atendidas sem você" vai de 4 para
+    // 6. "+50%" seria verdade aritmética e mentira de leitura, então sai "+2".
+    //
+    // ⚠️ Este teste mirava em "Pessoas novas", que era o cartão da seção "Está
+    // crescendo?". Essa seção deixou de existir na rodada 3: o gráfico de
+    // movimento responde a mesma pergunta, e o número de pessoas novas foi para
+    // o rodapé dele. A regra testada (base abaixo de PISO_PERCENTUAL sai em
+    // valor absoluto) é exatamente a mesma.
     await periodo(page, "Dia");
     const cartao = page
       .locator('[data-slot="stat"]')
-      .filter({ hasText: "Pessoas novas" });
-    await expect(cartao.locator('[data-slot="badge"]')).toHaveText("+1");
+      .filter({ hasText: "Atendidas sem você" });
+    await expect(cartao.locator('[data-slot="badge"]')).toHaveText("+2");
   });
 
   test("volume nunca é vermelho, mesmo quando cai", async ({ page }) => {
@@ -193,9 +199,12 @@ test.describe("Painel: filtro de período", () => {
 
   test("a legenda do cartão acompanha o período escolhido", async ({ page }) => {
     await page.goto("/design/painel");
+    // O cartão "Objeções que ela segurou" ainda não tem dado, e por isso é ele
+    // que carrega a legenda NUA: os outros três concatenam o denominador antes
+    // do período. A regra em teste é que TODO cartão diz de quando é o número,
+    // inclusive o que ainda não tem número.
     const legenda = page
-      .locator('[data-slot="stat"]')
-      .filter({ hasText: "Pessoas novas" })
+      .locator("[data-em-breve]")
       .locator('[data-slot="stat-legenda"]');
 
     await periodo(page, "Semana");
@@ -205,109 +214,252 @@ test.describe("Painel: filtro de período", () => {
   });
 });
 
-test.describe("Painel: gráfico de movimento", () => {
-  test("as barras têm ALTURA de verdade", async ({ page }) => {
+test.describe("Painel: gráfico de hora dentro da manchete", () => {
+  test("⚠️ a soma das partes roxas É o número da manchete", async ({ page }) => {
     await page.goto("/design/painel");
 
-    // ⚠️ ESTE TESTE EXISTE POR UM DEFEITO MEDIDO EM PRODUÇÃO (27/08/2026): o
-    // gráfico renderizava INVISÍVEL (coluna 1px, barra 0px), porque `items-end`
-    // deixava a coluna com a altura do conteúdo e a barra, que tem altura em
-    // porcentagem, resolvia para zero contra pai automático. O e2e anterior
-    // passava, porque contava colunas e legenda e nunca mediu uma barra.
-    const alturas = await page.evaluate(() => {
-      const secao = document.querySelector('[data-slot="painel-grafico"]')!;
-      return [...secao.querySelectorAll("div[title] > div")].map(
-        (b) => b.getBoundingClientRect().height
-      );
+    // ⚠️ A ASSERÇÃO MAIS IMPORTANTE DA TELA. A manchete diz "N mensagens
+    // respondidas fora do horário" e as barras roxas são essas mesmas linhas,
+    // hora a hora. Se as duas divergirem, o cliente confere no WhatsApp dele em
+    // dez segundos e a tela inteira perde a credibilidade.
+    //
+    // Lê os `data-fora` em vez de medir pixel: altura de barra é proporcional ao
+    // maior valor, não absoluta, então medir pixel não provaria a igualdade.
+    const { soma, manchete } = await page.evaluate(() => {
+      const horas = [
+        ...document.querySelectorAll('[data-slot="painel-horas"] .painel-hora'),
+      ];
+      return {
+        soma: horas.reduce(
+          (s, h) => s + Number((h as HTMLElement).dataset.fora ?? 0),
+          0
+        ),
+        manchete: document
+          .querySelector('[data-slot="stat-valor"]')
+          ?.textContent?.trim(),
+      };
     });
 
-    expect(alturas.length).toBeGreaterThan(0);
-    expect(Math.max(...alturas)).toBeGreaterThan(10);
+    expect(soma).toBeGreaterThan(0);
+    expect(String(soma)).toBe(manchete);
   });
 
-  test("o número de colunas segue o período", async ({ page }) => {
+  test("são 24 colunas e as barras têm ALTURA de verdade", async ({ page }) => {
     await page.goto("/design/painel");
-    const secao = page
-      .locator('[data-slot="painel-grafico"]');
 
-    await periodo(page, "Semana");
-    await expect(secao.locator("div[title]")).toHaveCount(7);
-    await periodo(page, "Quinzena");
-    await expect(secao.locator("div[title]")).toHaveCount(15);
-    // Uma janela de 24h vira 24 colunas POR HORA: uma coluna só não é gráfico.
-    await periodo(page, "Dia");
-    await expect(secao.locator("div[title]")).toHaveCount(24);
+    // ⚠️ ESTE TESTE EXISTE POR UM DEFEITO MEDIDO EM PRODUÇÃO (27/08/2026): um
+    // gráfico renderizou INVISÍVEL (coluna 1px, barra 0px), porque `items-end`
+    // deixava a coluna com a altura do conteúdo e a barra, que tem altura em
+    // porcentagem, resolvia para zero contra pai automático. O e2e da época
+    // passava, porque contava colunas e nunca mediu uma barra.
+    const m = await page.evaluate(() => {
+      const raiz = document.querySelector('[data-slot="painel-horas"]')!;
+      const alturas = [...raiz.querySelectorAll(".painel-barra")].map(
+        (b) => b.getBoundingClientRect().height
+      );
+      return {
+        colunas: raiz.querySelectorAll(".painel-hora").length,
+        barras: alturas.length,
+        maior: Math.max(...alturas),
+        zeradas: alturas.filter((h) => h === 0).length,
+      };
+    });
+
+    expect(m.colunas).toBe(24);
+    expect(m.barras).toBeGreaterThan(0);
+    expect(m.maior).toBeGreaterThan(10);
+    expect(m.zeradas).toBe(0);
   });
 
-  test("balde sem movimento aparece em vez de sumir", async ({ page }) => {
+  test("a legenda avisa que fim de semana conta como fora", async ({ page }) => {
     await page.goto("/design/painel");
-    const colunas = page
-      .locator('[data-slot="painel-grafico"]')
-      .locator("div[title]");
+    const g = page.locator('[data-slot="painel-horas"]');
+    // Sem esta frase, uma barra roxa às 14h pareceria defeito: dentro ou fora
+    // considera o DIA DA SEMANA, não só a hora.
+    await expect(g.getByText(/incluindo fim de semana e feriado/)).toBeVisible();
+  });
 
-    // Balde vazio vira risco no chão. Sem ele o eixo encurta e o buraco, que é a
-    // informação, desaparece.
-    const vazios = await colunas.evaluateAll(
-      (els) =>
-        els.filter((e) =>
-          /: 0 da IA, 0 do time/.test(e.getAttribute("title") ?? "")
+  test("uma mesma hora empilha as duas partes", async ({ page }) => {
+    await page.goto("/design/painel");
+    // A pilha é a peça central: a hora comercial tem cinza em cima e roxo
+    // embaixo (o roxo vem do fim de semana). Se nenhuma hora tivesse as duas, o
+    // gráfico seria só duas faixas de cor e a legenda não faria sentido.
+    const empilhadas = await page.evaluate(
+      () =>
+        [
+          ...document.querySelectorAll(
+            '[data-slot="painel-horas"] .painel-hora'
+          ),
+        ].filter(
+          (h) =>
+            Number((h as HTMLElement).dataset.fora ?? 0) > 0 &&
+            Number((h as HTMLElement).dataset.dentro ?? 0) > 0
         ).length
     );
-    expect(vazios).toBe(1);
-  });
-
-  test("as duas séries têm legenda", async ({ page }) => {
-    await page.goto("/design/painel");
-    const secao = page
-      .locator('[data-slot="painel-grafico"]');
-    // Sem legenda as duas cores não significam nada.
-    await expect(secao.getByText(/respondidas pela IA/)).toBeVisible();
-    await expect(secao.getByText(/respondidas pelo time/)).toBeVisible();
-  });
-
-  test("nada de biblioteca de gráfico: as barras são CSS", async ({ page }) => {
-    await page.goto("/design/painel");
-    const secao = page
-      .locator('[data-slot="painel-grafico"]');
-    // Decisão registrada: a paleta só tem UMA cor categórica (a marca), porque
-    // verde, âmbar e vermelho são estado. Duas séries é o teto, e barra
-    // empilhada em CSS entrega isso com bundle zero.
-    await expect(secao.locator("svg")).toHaveCount(0);
-    await expect(secao.locator("canvas")).toHaveCount(0);
+    expect(empilhadas).toBeGreaterThan(0);
   });
 });
 
-test.describe("Painel: o que precisa de mim", () => {
-  test("a fila mostra a IDADE da espera e leva para algum lugar", async ({
+test.describe("Painel: movimento", () => {
+  test("é uma área de UMA série, e a divisão IA/time virou texto", async ({
     page,
   }) => {
     await page.goto("/design/painel");
+    const secao = page.locator('[data-slot="painel-movimento"]');
+    await expect(secao).toBeVisible();
+
+    // Uma série só: a paleta tem UMA cor categórica (a marca), porque verde,
+    // âmbar e vermelho são estado. A segunda informação desceu para o rodapé.
+    await expect(
+      secao.locator('[data-slot="painel-area"] polyline')
+    ).toHaveCount(1);
+    await expect(secao.getByText(/respondidas pela IA/)).toBeVisible();
+    await expect(secao.getByText(/pelo time/)).toBeVisible();
+  });
+
+  test("o rodapé traz pico, média e menor dia", async ({ page }) => {
+    await page.goto("/design/painel");
+    const secao = page.locator('[data-slot="painel-movimento"]');
+    await expect(secao.getByText(/pico de \d+/)).toBeVisible();
+    await expect(secao.getByText(/média de [\d,]+ por dia/)).toBeVisible();
+    await expect(secao.getByText(/menor dia \d+/)).toBeVisible();
+  });
+
+  test("o seletor de 14 e 30 dias troca o número de pontos", async ({
+    page,
+  }) => {
+    await page.goto("/design/painel");
+    const secao = page.locator('[data-slot="painel-movimento"]');
+
+    await expect(secao.locator(".painel-dia")).toHaveCount(14);
+    await secao.getByRole("tab", { name: "30 dias" }).click();
+    await expect(secao.locator(".painel-dia")).toHaveCount(30);
+  });
+
+  test("um dia sem movimento aparece, em vez de sumir do eixo", async ({
+    page,
+  }) => {
+    await page.goto("/design/painel");
+    // O buraco É a informação (um dia sem conversa). Se a série pulasse o dia, o
+    // eixo encurtaria e o vale desapareceria.
+    const secao = page.locator('[data-slot="painel-movimento"]');
+    await expect(
+      secao.locator(".painel-balao").filter({ hasText: /\b0 conversas/ })
+    ).toHaveCount(1);
+  });
+
+  test("nada de biblioteca de gráfico", async ({ page }) => {
+    await page.goto("/design/painel");
+    const secao = page.locator('[data-slot="painel-movimento"]');
+    // O SVG é da casa (um `polyline` e um `path`, escritos à mão). Biblioteca
+    // receberia os tokens por JS e quebraria a troca de tema por cookie.
+    await expect(secao.locator("canvas")).toHaveCount(0);
+    await expect(secao.locator('[data-slot="painel-area"]')).toHaveCount(1);
+  });
+});
+
+test.describe("Painel: a fila, no cabeçalho", () => {
+  test("mostra a IDADE da espera e leva para algum lugar", async ({ page }) => {
+    await page.goto("/design/painel");
     // "3" é uma fila; "a mais antiga há 6 horas" é um problema. A idade é a
     // informação, e é ela que transforma relatório em tarefa.
-    await expect(page.getByText("3 pessoas esperando você")).toBeVisible();
-    await expect(page.getByText(/A mais antiga há 6 horas/)).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /Ver quem está esperando/ })
-    ).toBeVisible();
+    const fila = page.locator('[data-slot="painel-fila"]').first();
+    await expect(fila).toContainText("3");
+    await expect(fila).toContainText("pessoas esperando");
+    await expect(fila).toContainText("a mais antiga há 6 horas");
+    await expect(fila).toHaveAttribute("href", "/inbox");
+  });
+
+  test("está no CABEÇALHO, acima da manchete, e não na trilha", async ({
+    page,
+  }) => {
+    await page.goto("/design/painel");
+    const acima = await page.evaluate(() => {
+      const fila = document.querySelector('[data-slot="painel-fila"]')!;
+      const manchete = document.querySelector('[data-slot="stat"]')!;
+      return (
+        fila.getBoundingClientRect().bottom <=
+        manchete.getBoundingClientRect().top
+      );
+    });
+    expect(acima).toBe(true);
+  });
+
+  test("neutra até o limiar, âmbar depois", async ({ page }) => {
+    await page.goto("/design/painel");
+    // Âmbar em toda fila ensinaria a ignorar o âmbar. O limiar é uma constante
+    // nomeada (ESPERA_AVISO_MS), porque veio da ferramenta de desenho.
+    const filas = page.locator('[data-slot="painel-fila"][data-urgente]');
+    await expect(filas.filter({ hasText: "há 6 horas" })).toHaveAttribute(
+      "data-urgente",
+      "sim"
+    );
+    await expect(filas.filter({ hasText: "há 12 minutos" })).toHaveAttribute(
+      "data-urgente",
+      "nao"
+    );
   });
 
   test("a fila não tem selo de variação", async ({ page }) => {
     await page.goto("/design/painel");
     // É foto de AGORA, não período: comparar "agora" com "agora da semana
     // passada" não significa nada.
-    const bloco = page
-      .locator("div")
-      .filter({ hasText: /^3 pessoas esperando você/ })
-      .first();
-    await expect(bloco.locator('[data-slot="badge"]')).toHaveCount(0);
+    const fila = page.locator('[data-slot="painel-fila"]').first();
+    await expect(fila.locator('[data-slot="badge"]')).toHaveCount(0);
   });
 
   test("zero é um presente, não uma tela vazia", async ({ page }) => {
     await page.goto("/design/painel");
-    // O estado zero aparece na seção de estados finos do preview.
     await expect(
       page.getByText("Ninguém está esperando você agora.")
     ).toBeVisible();
+  });
+});
+
+test.describe("Painel: blocos sem dado ainda", () => {
+  test("⚠️ o número é XX, nunca um valor plausível", async ({ page }) => {
+    await page.goto("/design/painel");
+
+    // O eixo do produto é que a IA não inventa. Um número plausível, mesmo
+    // borrado ou esmaecido, é indistinguível de medição num print ampliado, e
+    // isso é a única coisa que esta tela não pode fazer.
+    const assuntos = page.locator('[data-slot="painel-assuntos"]');
+    await expect(assuntos.getByText("XX")).toHaveCount(3);
+
+    const objecoes = page.locator("[data-em-breve]");
+    await expect(objecoes).toHaveCount(1);
+    await expect(objecoes).toContainText("XX");
+    await expect(objecoes).toContainText("Em breve");
+  });
+
+  test("os rótulos dos assuntos são POSICIONAIS, não conteúdo", async ({
+    page,
+  }) => {
+    await page.goto("/design/painel");
+    const assuntos = page.locator('[data-slot="painel-assuntos"]');
+    // Escrever um assunto de mentira ("Garantia da lente antirreflexo XX")
+    // sugeriria que o sistema já sabe qual é e só não contou, que é uma mentira
+    // mais sutil que o número.
+    await expect(assuntos.getByText("1º assunto mais perguntado")).toBeVisible();
+    await expect(assuntos.getByText("2º assunto mais perguntado")).toBeVisible();
+    await expect(assuntos.getByText("3º assunto mais perguntado")).toBeVisible();
+    await expect(assuntos).toContainText("Em breve");
+    // E diz POR QUE ainda não tem número, em vez de só mostrar caixas vazias.
+    await expect(assuntos).toContainText(/preferimos não mostrar número/);
+  });
+
+  test("as barras do placeholder são cinzas, não roxas", async ({ page }) => {
+    await page.goto("/design/painel");
+    // Roxo é a cor de dado REAL nesta tela. Barra roxa lê como medição.
+    const roxas = await page.evaluate(
+      () =>
+        [
+          ...document
+            .querySelector('[data-slot="painel-assuntos"]')!
+            .querySelectorAll("div"),
+        ].filter((d) => d.className.includes("bg-brand")).length
+    );
+    expect(roxas).toBe(0);
   });
 });
 
@@ -325,23 +477,58 @@ test.describe("Painel: prova de que a IA não inventa", () => {
     await expect(cartao).toContainText("em vez de chutar");
   });
 
-  test("a lista de escaladas não acusa a IA de não saber", async ({ page }) => {
+  test("nada na tela acusa a IA de não saber", async ({ page }) => {
     await page.goto("/design/painel");
-    const secao = page.locator('[data-slot="painel-escaladas"]');
-    await expect(secao).toBeVisible();
     // `action = 'pausar'` também dispara por política, não só por buraco de
-    // conhecimento. Chamar tudo de "não soube responder" seria overclaim.
-    await expect(secao).not.toContainText("não soube");
-    await expect(
-      secao.getByRole("link", { name: /Ensinar a resposta/ }).first()
-    ).toBeVisible();
+    // conhecimento. Chamar isso de "não soube responder" seria overclaim.
+    const texto = await page.locator("body").innerText();
+    expect(texto).not.toContain("não soube");
   });
 
-  test("a última resposta do agente aparece na íntegra", async ({ page }) => {
+  test("a resposta do agente aparece na íntegra e diz se foi sozinha", async ({
+    page,
+  }) => {
     await page.goto("/design/painel");
     const secao = page.locator('[data-slot="painel-ultima-resposta"]');
     await expect(secao).toBeVisible();
-    await expect(secao).toContainText("Oi, Marcelo!");
+    await expect(secao).toContainText("Trabalhamos de segunda a sexta");
+    // A regra de escolha é objetiva (lib/painel.escolherVerbatim) e o rótulo diz
+    // o que dá peso à frase: ninguém do time entrou depois dela.
+    await expect(secao).toContainText("deu conta sozinha");
+  });
+});
+
+test.describe("Painel: cada bloco manda no próprio período", () => {
+  test("não existe seletor global nem aviso de que algo não o segue", async ({
+    page,
+  }) => {
+    await page.goto("/design/painel");
+
+    // ⚠️ O aviso escrito "não segue o seletor" era o SINTOMA de o controle estar
+    // no lugar errado. Com o seletor dentro de cada bloco, ele deixou de ser
+    // necessário, e reintroduzir o texto significaria que o global voltou.
+    const texto = await page.locator("body").innerText();
+    expect(texto).not.toMatch(/não segue o seletor/i);
+
+    // Dois seletores independentes: o da operação (4 períodos) e o do movimento
+    // (14 e 30 dias). Cada um dentro do próprio bloco.
+    await expect(
+      page.locator('[data-slot="painel-operacao"]').getByRole("tablist")
+    ).toHaveCount(1);
+    await expect(
+      page.locator('[data-slot="painel-movimento"]').getByRole("tablist")
+    ).toHaveCount(1);
+  });
+
+  test("trocar o período da operação NÃO mexe na manchete", async ({ page }) => {
+    await page.goto("/design/painel");
+    const manchete = page.locator('[data-slot="stat-valor"]').first();
+    const antes = await manchete.textContent();
+
+    await periodo(page, "Mês");
+    // A frase mais forte da tela é mês fechado mais acumulado, e não pode
+    // encolher com um clique em outro bloco.
+    await expect(manchete).toHaveText(antes ?? "");
   });
 });
 

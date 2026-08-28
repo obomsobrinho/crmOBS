@@ -104,19 +104,46 @@ test.describe("Painel com dados reais", () => {
       page.getByRole("heading", { name: "O que a IA fez por você" })
     ).toBeVisible();
 
-    // ⚠️ Esta asserção estava QUEBRADA desde o painel novo (27/08/2026) e só
-    // apareceu agora, porque a suíte com login não foi rodada naquele passo. Os
-    // cabeçalhos "Operação" e "Conversas na semana" deixaram de existir quando o
-    // painel virou quatro períodos com seletor: a seção passou a se chamar "A IA
-    // está dando conta?" e a legenda do período mora dentro do cartão.
+    // ⚠️ Esta asserção JÁ QUEBROU DUAS VEZES por renomeação de cabeçalho, nas
+    // duas vezes porque a suíte com login não foi rodada no passo que renomeou.
+    // Na rodada 3 do desenho (29/08/2026) "A IA está dando conta?" virou "A
+    // operação" e "Está crescendo?" virou o cartão "Movimento".
     await expect(
-      page.getByRole("heading", { name: "A IA está dando conta?" })
+      page.getByRole("heading", { name: "A operação" })
     ).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: "Está crescendo?" })
-    ).toBeVisible();
-    // O seletor de período é o que prova que os quatro foram calculados.
+    await expect(page.getByRole("heading", { name: "Movimento" })).toBeVisible();
+    // Dois seletores, um por bloco: não existe mais seletor global. O da
+    // operação prova que os quatro períodos foram calculados no servidor.
     await expect(page.getByRole("tablist", { name: "Período" })).toBeVisible();
+    await expect(
+      page.getByRole("tablist", { name: "Janela do movimento" })
+    ).toBeVisible();
+
+    // ⚠️ A IGUALDADE, CONTRA DADO REAL. Na Loja Teste o horário está
+    // configurado, então o gráfico de hora pode aparecer. Quando aparece, a soma
+    // das partes roxas TEM que ser o número da manchete: é o mesmo conjunto de
+    // linhas, contado pela mesma regra. Quando a manchete do período é outra
+    // frase, o gráfico não é renderizado, e aí não há o que comparar.
+    const grafico = page.locator('[data-slot="painel-horas"]');
+    if ((await grafico.count()) > 0) {
+      const { soma, manchete } = await page.evaluate(() => {
+        const horas = [
+          ...document.querySelectorAll(
+            '[data-slot="painel-horas"] .painel-hora'
+          ),
+        ];
+        return {
+          soma: horas.reduce(
+            (s, h) => s + Number((h as HTMLElement).dataset.fora ?? 0),
+            0
+          ),
+          manchete: document
+            .querySelector('[data-slot="stat-valor"]')
+            ?.textContent?.trim(),
+        };
+      });
+      expect(String(soma)).toBe(manchete);
+    }
 
     // A tela pode legitimamente não ter frase nenhuma (tenant sem movimento no
     // mês fechado E sem acumulado), e aí o estado vazio é a resposta certa. O que

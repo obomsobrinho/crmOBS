@@ -1,11 +1,15 @@
 import { LayoutDashboard } from "lucide-react";
 import NavRail from "@/components/NavRail";
-import PainelOperacao, {
+import PainelOperacaoBloco, {
   type JanelaCalculada,
-} from "@/components/PainelOperacao";
+} from "@/components/painel/PainelOperacaoBloco";
+import PainelMovimento, {
+  type MovimentoJanela,
+  type MovimentoKey,
+} from "@/components/painel/PainelMovimento";
 import {
-  PainelEspera,
-  PainelEscaladas,
+  PainelFilaLinha,
+  PainelAssuntos,
   PainelUltimaResposta,
 } from "@/components/PainelBlocos";
 import ValorResumo from "@/components/ValorResumo";
@@ -21,6 +25,7 @@ import {
   rotuloDoMes,
   type ValorResumo as Resumo,
 } from "@/lib/valor";
+import type { BarraHora } from "@/lib/painel";
 import {
   Stat,
   StatTopo,
@@ -163,6 +168,23 @@ const JANELAS = Object.fromEntries(
   })
 ) as Record<PeriodoKey, JanelaCalculada>;
 
+const MOVIMENTO = {
+  "14": {
+    dias: 14,
+    barras: barras(sintetico(14), 14, AGORA),
+    conversas: 42,
+    conversasAnterior: 36,
+    pessoasNovas: 17,
+  },
+  "30": {
+    dias: 30,
+    barras: barras(sintetico(30), 30, AGORA),
+    conversas: 151,
+    conversasAnterior: 128,
+    pessoasNovas: 61,
+  },
+} satisfies Record<MovimentoKey, MovimentoJanela>;
+
 const PERIODO = rotuloDoMes(2026, 7);
 
 const MES: Resumo = {
@@ -191,31 +213,46 @@ const ACUMULADO: Resumo = {
   temHorario: true,
 };
 
-const ESCALADAS = [
-  {
-    id: 1,
-    quando: "há 2 horas",
-    texto:
-      "Pessoa perguntou se o pagamento pode ser parcelado e em quantas vezes.",
-    guardrail: false,
-    href: "/inbox",
-  },
-  {
-    id: 2,
-    quando: "há 5 horas",
-    texto:
-      "Resposta retida pelo guardrail: mencionou um valor (R$ 180) que não está na base.",
-    guardrail: true,
-    href: "/inbox",
-  },
-  {
-    id: 3,
-    quando: "há 1 dia",
-    texto: "Pessoa quer remarcar o horário de sexta e perguntou por outro dia.",
-    guardrail: false,
-    href: "/inbox",
-  },
-];
+/** Horário comercial do preview, para a metade cinza da coluna. */
+const ABERTO = (hora: number) => hora >= 8 && hora <= 18;
+
+/**
+ * As 24 colunas do preview.
+ *
+ * ⚠️ A SOMA DE `fora` TEM QUE SER EXATAMENTE `MES.atendidasForaDoHorario`, que é
+ * o número da manchete. Na tela real quem garante isso é `barrasDeHora`, que
+ * conta as mesmas linhas que a manchete conta; aqui, sem banco, a distribuição é
+ * feita à mão e o RESTO do arredondamento cai na última hora, para o total
+ * fechar sempre. O e2e confere essa igualdade lendo os `data-fora`.
+ *
+ * ⚠️ TODA hora recebe uma parte `fora`, inclusive as do meio do dia, e isso não
+ * é enfeite: fora do expediente inclui FIM DE SEMANA. Um sábado às 14h é fora,
+ * para quem abre de segunda a sexta. Se o preview deixasse as horas comerciais
+ * só com cinza, ele não mostraria a pilha, que é a peça central do gráfico, e a
+ * legenda ("incluindo fim de semana e feriado") pareceria não ter sentido.
+ */
+function horasSintetico(): BarraHora[] {
+  // Forma plausível de um dia: pouco de madrugada, pico no fim da tarde.
+  const peso = [
+    3, 2, 1, 1, 1, 1, 2, 4, 7, 9, 10, 10, 8, 9, 10, 11, 12, 12, 9, 7, 6, 5, 4, 3,
+  ];
+  const total = MES.atendidasForaDoHorario ?? 0;
+  const somaPeso = peso.reduce((a, b) => a + b, 0);
+  const somaAberto = peso.reduce((s, p, hora) => (ABERTO(hora) ? s + p : s), 0);
+
+  const colunas: BarraHora[] = peso.map((p, hora) => ({
+    hora,
+    // O cinza só existe em hora comercial, e não precisa fechar com nada.
+    dentro: ABERTO(hora) ? Math.round((p / somaAberto) * 273) : 0,
+    fora: Math.floor((p / somaPeso) * total),
+  }));
+
+  const falta = total - colunas.reduce((s, c) => s + c.fora, 0);
+  colunas[23].fora += falta;
+  return colunas;
+}
+
+const HORAS = horasSintetico();
 
 export default function DesignPainelPage() {
   return (
@@ -223,54 +260,73 @@ export default function DesignPainelPage() {
       <NavRail clientName="Ótica Vision" activeHref="/painel" role="dono" />
       {/* Sem cartão de página, igual à tela real: os cartões flutuam sobre o
           canvas (`Stat variant="elevado"`). */}
-      <div className="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto pr-1">
-        <div>
-          <div className="mb-1 flex items-center gap-2">
-            <LayoutDashboard size={20} className="text-brand-ink" />
-            <h1 className="text-titulo">Painel</h1>
+      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+        {/* A fila fica AO LADO do título, e não empurrada para a borda oposta
+            da tela. Ver o comentário na tela real. */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <div className="min-w-0">
+            <div className="mb-1 flex items-center gap-2">
+              <LayoutDashboard size={20} className="text-brand-ink" />
+              <h1 className="text-titulo">Painel</h1>
+            </div>
+            <p className="text-apoio text-ink-2">
+              O que a IA fez pela conta Ótica Vision.
+            </p>
           </div>
-          <p className="text-apoio text-ink-2">
-            O que a IA fez pela conta Ótica Vision.
-          </p>
+          {/* Acima do limiar de aviso, para o preview mostrar o estado âmbar. */}
+          <PainelFilaLinha
+            quantas={3}
+            esperaMs={6 * 60 * 60 * 1000}
+            espera="há 6 horas"
+          />
         </div>
 
-        <ValorResumo
-          resumo={MES}
-          frases={frasesDeValor(MES, PERIODO)}
-          periodo={PERIODO}
-          acumulado={ACUMULADO}
-          frasesAcumuladas={frasesDeValor(ACUMULADO, "desde o início")}
-          parte="manchete"
-        />
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="flex min-w-0 flex-col gap-5">
+            <ValorResumo
+              resumo={MES}
+              frases={frasesDeValor(MES, PERIODO)}
+              periodo={PERIODO}
+              acumulado={ACUMULADO}
+              frasesAcumuladas={frasesDeValor(ACUMULADO, "desde o início")}
+              parte="manchete"
+              horas={HORAS}
+              rotuloHorario="Segunda a sexta: 08:00 às 18:00"
+            />
 
-        <section className="space-y-3">
-          <h2 className="text-rotulo uppercase text-ink-3">
-            O que preciso fazer agora
-          </h2>
-          <PainelEspera quantas={3} espera="há 6 horas" />
-        </section>
+            <PainelOperacaoBloco janelas={JANELAS} />
 
-        <PainelOperacao janelas={JANELAS} />
+            <PainelMovimento janelas={MOVIMENTO} />
 
-        <PainelEscaladas itens={ESCALADAS} />
+            <section className="space-y-3">
+              <h2 className="text-rotulo uppercase text-ink-3">
+                O que mais ela fez
+              </h2>
+              <ValorResumo
+                resumo={MES}
+                frases={frasesDeValor(MES, PERIODO)}
+                periodo={PERIODO}
+                acumulado={ACUMULADO}
+                frasesAcumuladas={frasesDeValor(ACUMULADO, "desde o início")}
+                parte="resto"
+              />
+            </section>
+          </div>
 
-        <section className="space-y-3">
-          <h2 className="text-rotulo uppercase text-ink-3">O que isso me deu</h2>
-          <ValorResumo
-            resumo={MES}
-            frases={frasesDeValor(MES, PERIODO)}
-            periodo={PERIODO}
-            acumulado={ACUMULADO}
-            frasesAcumuladas={frasesDeValor(ACUMULADO, "desde o início")}
-            parte="resto"
-          />
-          <PainelUltimaResposta
-            texto="Oi, Marcelo! Trabalhamos de segunda a sexta, das 8h às 18h. Pode me dizer o que você precisa que eu já adianto pra você?"
-            nome="Marcelo A."
-            quando="há 14 minutos"
-            href="/inbox"
-          />
-        </section>
+          <div className="flex min-w-0 flex-col gap-5">
+            <PainelAssuntos />
+            <PainelUltimaResposta
+              mensagens={[
+                "Oi! Trabalhamos de segunda a sexta, das 8h às 18h.",
+                "Pode me dizer o que você precisa que eu já adianto pra você?",
+              ]}
+              nome="Marcelo A."
+              quando="há 14 minutos"
+              href="/inbox"
+              sozinha
+            />
+          </div>
+        </div>
 
         {/* ── ESTADOS FINOS ────────────────────────────────────────────────
             Não faz parte da tela. Existe para o preview provar, sem dado real,
@@ -294,7 +350,7 @@ export default function DesignPainelPage() {
             </Stat>
 
             <Stat variant="elevado">
-              <StatTopo>
+              <StatTopo tamanho="operacao">
                 <StatRotulo>Tempo de 1a resposta</StatRotulo>
                 <span className="text-legenda text-ink-3">
                   primeira semana medida
@@ -305,7 +361,15 @@ export default function DesignPainelPage() {
               <StatLegenda>3 atendimentos medidos, últimos 7 dias</StatLegenda>
             </Stat>
 
-            <PainelEspera quantas={0} espera="" />
+            {/* Fila zerada e fila neutra (abaixo do limiar de aviso). */}
+            <div className="flex flex-col justify-center gap-3">
+              <PainelFilaLinha quantas={0} esperaMs={null} espera="" />
+              <PainelFilaLinha
+                quantas={2}
+                esperaMs={12 * 60 * 1000}
+                espera="há 12 minutos"
+              />
+            </div>
           </div>
 
           {/* Antes e depois: só apareceria se o histórico importado sustentasse.

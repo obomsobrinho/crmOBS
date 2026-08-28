@@ -252,6 +252,51 @@ isso é o mínimo real, e não uma estimativa.
   antigo, que os testes contornam localizando por estrutura. Fazer direito exige `fieldset`/`legend`
   nos grupos de caixas de marcar, e é trabalho próprio.
 
+### ✅ Rodada 3 do desenho do painel: APLICADA (29/08/2026)
+
+O desenho aprovado nas três rodadas virou código. **O que entrou com dado real, o que entrou como
+estado vazio, e o que eu decidi sem você e precisa da sua palavra.**
+
+#### Com dado real
+
+| Bloco | Estado |
+|---|---|
+| Arranjo (coluna + trilha de 380px) | ✅ medido em 1920: coluna 1268px, trilha 380px, cartão 305px |
+| Manchete com o gráfico de hora dentro | ✅ igualdade fecha: 213 = 213 no preview, **1 = 1 na Loja Teste** |
+| Operação, 4 cartões, seletor no bloco | ✅ 3 com número real, o 4º é estado vazio |
+| Movimento (área, 14/30 dias) | ✅ uma série, rodapé com pico, média e menor dia |
+| Fila no cabeçalho, neutra ou âmbar | ✅ limiar em `ESPERA_AVISO_MS` |
+| Verbatim com a regra nova | ✅ conversa atendida sozinha, com reserva por tamanho |
+| Animação (entrada, troca, hover) | ✅ CSS da casa mais `useContagem`, com `prefers-reduced-motion` |
+
+#### Estado vazio, à espera de instrumentação
+
+"Assuntos em alta" e "Objeções que ela segurou" saem com `XX`, rótulo posicional e barra cinza.
+Não existe coluna que classifique assunto nem objeção: `conversation_qualifications` tem `action`,
+`summary` e `preferencia_horario`, e nada mais. Os dois somem sozinhos quando o dado existir, porque
+quem decide é a página e não um interruptor.
+
+#### ⚠️ Cinco decisões que EU tomei e que você precisa confirmar
+
+1. **O gráfico de hora conta RESPOSTA DA IA, não mensagem recebida**, e por isso o rótulo mudou para
+   "em que horas a IA respondeu". A 3d manda a soma roxa fechar com a manchete E rotula o bloco como
+   "mensagens que chegaram, 486 recebidas": são conjuntos diferentes. Escolhi preservar a igualdade,
+   que o brief chama de regra mais importante, e sacrificar o rótulo.
+2. **`VERBATIM_MIN_CHARS = 120`**, escolhido por mim. Não estava em lugar nenhum do material.
+3. **"Pessoas novas" perdeu o cartão** junto com a seção "Está crescendo?", que a rodada 3 substitui
+   pelo movimento. Em vez de descartar a métrica, ela foi para o rodapé do movimento.
+4. **As frases secundárias de valor continuam na tela**, no fim da coluna, sob o título "O que mais
+   ela fez". A rodada 3 não as mostra. Apagar conteúdo aprovado em silêncio é decisão sua.
+5. **A paleta cinza NÃO foi neutralizada.** A 1d pede cinza sem matiz nos dois temas; hoje `--canvas`,
+   `--ink` e `--line` têm matiz roxa. Trocar isso repinta as 15 telas do produto, não só o painel, e
+   está fora do que "aplicar o redesenho do painel" autoriza.
+
+#### O que o acordeão de assuntos NÃO tem
+
+A 3b desenha os estados aberto e fechado de cada assunto, com resumo e os pedidos que o formaram.
+Nada disso foi construído: sem assunto para listar, um acordeão que abre para revelar `XX` seria
+teatro. Quando a instrumentação existir, a 3b volta a ser a referência.
+
 ### Dashboard: promovido a primeira tela (26/08)
 
 Decisão do dono: **o painel passa a ser o primeiro item do menu**, antes de Conversas. Razão: é a
@@ -476,6 +521,41 @@ mudam isso.
 torna o nome aceitável no menu é o produto por trás dele nascer restrito a **quem já conversou**,
 nunca lista importada nem número frio, com as mitigações da seção "Lembrete e mensagem ativa" abaixo.
 O nome no menu está amarrado a essa regra.
+
+### Inteligência de negócio a partir da conversa (anotado em 28/08, é caminho, não roadmap)
+
+⚠️ **Nada aqui está priorizado.** É a direção que o painel deve seguir DEPOIS que ele estiver no ar,
+registrada para não se perder. Tudo depende de instrumentação que ainda não existe (classificar o que
+o cliente pediu em cada turno, e agrupar pergunta parecida).
+
+**A tese, que é o que importa reter:** o painel de hoje fala **da ferramenta** ("a IA trabalhou por
+você"). Toda métrica desse tipo é variação da mesma frase, e a manchete já a diz melhor. O salto é
+falar **do negócio do cliente**, e o ativo que permite isso é raro: **este CRM é o único sistema que
+ouve todos os clientes falando com as próprias palavras.** O contador vê nota fiscal, o banco vê
+dinheiro, a rede social vê curtida. Só o WhatsApp tem a frase do cliente, e hoje ela morre no celular
+do dono.
+
+Três coisas nesse ângulo, em ordem de impacto:
+
+- **O que pedem e você não tem.** Produtos e serviços que os clientes pediram e a empresa não oferece
+  ("5 pessoas pediram lente de contato este mês"). É a única da lista que gera **receita nova** em
+  vez de eficiência, e é impossível de descobrir por outro caminho.
+- **Onde você perde o cliente.** A última pergunta antes do silêncio ("das 20 que perguntaram preço,
+  12 pararam de responder depois"). Não acusa a IA: aponta que o preço ou a forma de apresentá-lo
+  afasta gente. Desconfortável de propósito. ⚠️ Serve também para **evoluir a IA**: é o sinal mais
+  direto de qual resposta está matando a conversa.
+- **O que reclamam.** Não o que perguntam, o que reclamam ("6 pessoas mencionaram demora na entrega").
+  É pesquisa de satisfação saindo de graça de conversa que já aconteceu.
+
+**A provocação maior, para quando houver base:** talvez o mais impactante para um dono de barbearia
+não seja um painel, e sim **três frases por semana**. Não "17 objeções seguradas", e sim "aumente o
+preço, ninguém reclamou em 40 conversas" ou "cinco pessoas pediram algo que você não vende". A tela
+mostraria **conclusão**, não número. Gráfico é o que sabemos fazer; conclusão é o que o cliente quer
+comprar. É a única coisa desta seção que seria diferencial de verdade, em vez de paridade bem feita.
+
+**Ideia relacionada, do dono:** tendência de MERCADO, e não só do próprio tenant (o que está em alta
+no segmento dele, cruzando a base). Difícil e depende de volume, mas é a evolução natural do bloco
+"assuntos em alta".
 
 ### Cadastro do contato, além do WhatsApp (novo, 26/08, não perder)
 

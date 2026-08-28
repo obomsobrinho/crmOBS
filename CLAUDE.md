@@ -181,11 +181,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     o MESMO dia da semana anterior (segunda contra domingo daria selo alarmante sem significado).
     `agoraMs()` existe só para embrulhar o relógio: `Date.now()` no corpo de Server Component é erro
     de `react-hooks/purity`.
-  - **Os 4 períodos são calculados no SERVIDOR numa passada só** e o browser
-    (`components/PainelOperacao.tsx`, o único client component da tela) apenas troca qual mostra.
-    ⚠️ **A manchete NÃO segue o seletor**: ela é mês fechado mais acumulado, e a frase mais forte da
-    tela não pode encolher com um clique. `ValorResumo` ganhou a prop `parte`
+  - **Os 4 períodos são calculados no SERVIDOR numa passada só** e o browser apenas troca qual
+    mostra. ⚠️ **A manchete NÃO segue seletor nenhum**: ela é mês fechado mais acumulado, e a frase
+    mais forte da tela não pode encolher com um clique. `ValorResumo` tem a prop `parte`
     (`tudo`/`manchete`/`resto`) para a página intercalar outros blocos entre as duas metades.
+  - ⚠️ **RODADA 3 DO DESENHO, APLICADA EM 29/08/2026.** A estrutura mudou; ver o bloco "Painel,
+    rodada 3" logo abaixo. `components/PainelOperacao.tsx`, `components/DashboardCards.tsx` e
+    `components/DashboardBarras.tsx` **não existem mais**.
   - ⚠️ **Gráfico: `items-end` na linha das colunas QUEBRA as barras.** A coluna precisa de `h-full`
     (o `justify-end` dela é quem encosta a barra no chão). Com `items-end` a coluna fica com a altura
     do conteúdo, e a barra, que tem altura em porcentagem, resolve para ZERO. Foi assim que o gráfico
@@ -198,12 +200,63 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     nem vermelho. ⚠️ **Nunca rotular como "o que a IA não soube responder"**: `pausar` também dispara
     nos gatilhos fixos de escalada, que são política, e o rótulo acusaria a IA de uma falha que ela
     não cometeu. O rótulo é "o que a IA passou para você".
-  - **A última resposta do agente aparece VERBATIM, sempre a mais recente e nunca escolhida a dedo.**
-    Curar as boas e ser descoberto custa a confiança inteira.
+  - **A resposta do agente aparece VERBATIM e nunca escolhida a dedo.** Curar as boas e ser
+    descoberto custa a confiança inteira. ⚠️ A REGRA de escolha mudou na rodada 3 (ver abaixo).
   - ⚠️ **"Antes e depois" com o histórico importado está BLOQUEADO POR DADO, não adiado.** Sondagem
     na Evolution em 27/08: `findMessages` devolve `total: 1` por conversa com e sem paginação, e o
     store da instância inteira da OBM tem 171 mensagens. Paginar a importação não resolve. Só falta
     medir um link NOVO (sync inicial completo) antes de descartar de vez.
+- **Painel, rodada 3 do desenho (aplicada em 29/08/2026, passo 5 do MVP do beta).** Arranjo, blocos
+  e animação vêm das pranchas aprovadas; mapa do que ficou de fora em `docs/proximos-passos.md`.
+  - **Arranjo:** coluna principal mais trilha de 380px. Coluna: manchete (com o gráfico de hora
+    DENTRO), operação em 4 cartões, movimento. Trilha: assuntos e a frase real do agente. A fila
+    subiu para o cabeçalho. Medido em 1920: coluna 1268px, trilha 380px, cartão 305px, e a operação
+    fecha em 594px, dentro dos 1080 sem rolar.
+  - ⚠️ **CADA BLOCO MANDA NO PRÓPRIO PERÍODO. Não existe mais seletor global.** A operação tem os 4
+    períodos, o movimento tem 14 e 30 dias, e a manchete não segue nenhum. O antigo aviso escrito
+    "não segue o seletor" SUMIU e não pode voltar: ele era o sintoma de o controle estar no lugar
+    errado, e existe e2e que falha se o texto reaparecer.
+  - ⚠️ **O GRÁFICO DE HORA CONTA RESPOSTA DA IA, NÃO MENSAGEM RECEBIDA**, e essa é a decisão que
+    sustenta a tela. A soma das partes ROXAS é EXATAMENTE o número da manchete, porque `barrasDeHora`
+    (`lib/painel.ts`) conta as mesmas linhas que `atendidasForaDoHorario` conta, classificadas por
+    `dentroDoHorario`. Contar chegadas daria outro conjunto (uma mensagem que chegou às 23h e o time
+    respondeu no dia seguinte entra num e não no outro) e a igualdade quebraria. Por isso o rótulo é
+    "em que horas a IA respondeu" e não "quando as mensagens chegaram": o desenho trazia o rótulo de
+    chegada, e mantê-lo seria mentir sobre o que a barra mede. **Existe teste da igualdade nas duas
+    suítes**, e ele passou contra dado real (Loja Teste, 1 = 1).
+    Dentro ou fora considera o DIA DA SEMANA: 14h de domingo é fora. **Sem manchete de "fora do
+    horário" o gráfico é omitido**, porque não teria com o que fechar.
+  - **Dois limiares nomeados em `lib/painel.ts`**, os dois vindos de fora do produto:
+    `ESPERA_AVISO_MS` (2h, veio da ferramenta de desenho) decide quando a fila passa de neutra a
+    âmbar; `VERBATIM_MIN_CHARS` (120, **escolhido por mim, não pelo dono**) é o piso de tamanho da
+    frase de reserva do verbatim.
+  - **Verbatim: a regra mudou.** Era "a mais recente da IA" e caía em "Perfeito, até amanhã!" metade
+    das vezes. Agora é a mais recente de uma conversa que a IA atendeu SOZINHA, com reserva na mais
+    recente acima de `VERBATIM_MIN_CHARS`. Continua objetiva e aplicada sempre.
+    ⚠️ `escolherVerbatim` devolve `mensagens: string[]`, não uma string: o n8n grava um turno de duas
+    mensagens numa linha só unido por `" | "`, e o painel era o último lugar que ainda mostrava o
+    pipe na tela (visto na Loja Teste em 29/08).
+  - ⚠️ **DOIS BLOCOS SAEM COMO ESTADO VAZIO, à espera de instrumentação que não existe:** "Assuntos
+    em alta" (na trilha) e o 4º cartão da operação, "Objeções que ela segurou". Classificar o assunto
+    ou a objeção de um turno exigiria coluna nova; `conversation_qualifications` só tem `action`,
+    `summary` e `preferencia_horario`. Três regras tornam isso honesto e nenhuma é opcional: o número
+    é **literalmente `XX`** (nunca plausível, nunca borrado, porque print ampliado de "17" borrado
+    destrói o eixo do produto), os rótulos são **posicionais** ("1º assunto mais perguntado"), e as
+    barras são **cinzas** (roxo é a cor de dado real). Os dois somem sozinhos quando o dado existir:
+    quem decide é a página, não um interruptor para alguém lembrar de desligar.
+  - **Animação é CSS da casa mais um `useContagem`.** Tokens novos no `globals.css`: `--ease-dado`
+    (curva de DADO, `cubic-bezier(0.165, 0.84, 0.44, 1)`) ao lado do `--ease-out` que já era a curva
+    de INTERFACE, mais `--dur-cartao` 320ms, `--dur-numero` 900ms, `--dur-barra` 700ms e `--dur-troca`
+    420ms. Classes `.painel-cartao`, `.painel-barra`, `.painel-area`, `.painel-hora`, `.painel-balao`,
+    `.painel-guia`, `.painel-pressiona`. ⚠️ **A barra cresce em `height` e não em `scaleY`**: com
+    scaleY o raio de 3px do topo chega esmagado. O keyframe lê `var(--altura)`, que a coluna define
+    inline. `prefers-reduced-motion` leva tudo ao valor final no primeiro quadro, e hover e acordeão
+    continuam funcionando, só sem transição.
+  - ⚠️ **`data-slot` de fora do `Stat` é IGNORADO** (regra 4 da camada base: o `data-slot` é escrito
+    DEPOIS do spread). O cartão sem dado se marca com `data-em-breve`, e foi medido: o marcador sumia.
+  - ⚠️ **Ícone do lucide também é `svg` com `polyline` dentro.** Um teste que contasse `svg polyline`
+    no cartão de movimento pegava as setas do selo e via três séries; por isso a área tem
+    `data-slot="painel-area"`.
 - **Fase 3.5 (fechamento da IA):** a orquestração do turno saiu de `/api/agent` para
   `processTurn` (`lib/agent-turn.ts`, server-only), reaproveitada pela bancada de teste. Modo
   `dryRun` (não persiste nada) e um bloco de diagnóstico do turno (`lib/agent-diagnostics.ts`,
@@ -638,7 +691,7 @@ decisões já travadas, **não reabrir**:
   claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
   `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
   `danger-ink` (9,0:1).
-- Testes e2e (Playwright, `e2e/`): **103 sem login** nas telas `/design` (inclui
+- Testes e2e (Playwright, `e2e/`): **114 sem login** nas telas `/design` (inclui
   `/design/montagem`, o assistente, `/design/playground`, o painel de teste, e o canal de feedback
   em `e2e/feedback.design.spec.ts`) e **10 com login**
   (`e2e/*.auth.spec.ts`), estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem**

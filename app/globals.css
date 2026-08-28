@@ -377,6 +377,20 @@
   --dur-slow: 240ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 
+  /* ⚠️ DUAS CURVAS, e trocar uma pela outra muda a SENSAÇÃO, não só o número.
+     `--ease-out` é a curva de INTERFACE (algo abrindo, um fundo entrando).
+     `--ease-dado` é a curva de DADO (um número correndo, uma barra crescendo):
+     desacelera muito mais no fim, então o valor final assenta em vez de chegar.
+     As duas vêm da rodada 3 do desenho do painel. */
+  --ease-dado: cubic-bezier(0.165, 0.84, 0.44, 1);
+  /* Entrada da tela: cartão, número, barra. Todos começam JUNTOS. */
+  --dur-cartao: 320ms;
+  --dur-numero: 900ms;
+  --dur-barra: 700ms;
+  /* Troca de período DENTRO de um bloco: o número corre do valor atual para o
+     novo, e a área se redesenha, na mesma duração. */
+  --dur-troca: 420ms;
+
   /* ── Ponte para o shadcn: os apontamentos ──
      Escrita UMA vez, só aqui, e NÃO existe cópia no bloco escuro de propósito.
      `:root` e `[data-theme="dark"]` casam com o MESMO elemento (o <html>), com
@@ -794,13 +808,147 @@ select:focus-visible,
   animation: fundo-sai var(--dur-fast) var(--ease-out);
 }
 
+/* ── Painel: entrada da tela (rodada 3 do desenho) ──
+   Tudo começa NO MESMO INSTANTE. O único escalonamento é o dos cartões, 40ms
+   entre eles, e ele existe para dar ordem de leitura, não para varrer a tela.
+   Barra e número não escalonam de propósito: stagger por hora ou por dia vira
+   varredura da esquerda para a direita, que é exatamente o efeito que o dono
+   recusou nas rodadas anteriores.
+
+   ⚠️ ANIMAÇÃO DE ENTRADA, NÃO DE RE-RENDER. Estas classes usam `animation`, que
+   roda uma vez quando o nó é montado. Trocar o período NÃO remonta o cartão
+   (o React reaproveita o nó), então a entrada não se repete, que é o
+   comportamento pedido. Quem cuida da troca é o JS da contagem. */
+.painel-cartao {
+  animation: painel-cartao-entra var(--dur-cartao) var(--ease-out) both;
+  animation-delay: calc(var(--passo, 0) * 40ms);
+}
+@keyframes painel-cartao-entra {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* A barra cresce a partir da BASE. Cresce em `height` e não em `scaleY` de
+   propósito: com scaleY o raio de 3px do topo é esmagado junto durante os 700ms
+   e a barra chega deformada. O keyframe pode ler `var(--altura)` porque a
+   propriedade customizada é resolvida no elemento, e é a própria coluna que a
+   define inline com a porcentagem final. */
+.painel-barra {
+  height: var(--altura);
+  animation: painel-barra-cresce var(--dur-barra) var(--ease-dado) both;
+}
+@keyframes painel-barra-cresce {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--altura);
+  }
+}
+
+/* A área do movimento. `transform-origin: bottom` porque ela cresce do eixo
+   para cima, e o traço usa `vector-effect: non-scaling-stroke` no SVG para não
+   engordar durante o crescimento. */
+.painel-area {
+  animation: painel-area-cresce var(--dur-barra) var(--ease-dado) both;
+  transform-origin: bottom;
+}
+@keyframes painel-area-cresce {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* ── Painel: mouse nos gráficos ──
+   CSS puro, sem estado no React. A regra do desenho é "a coluna sob o cursor
+   fica em opacidade 1 e as outras em 0.45", e isso é exatamente o que um par
+   pai:hover / filho:hover faz, sem um `useState` que re-renderizaria 24 colunas
+   a cada pixel de movimento do mouse.
+
+   ⚠️ A transição é 120ms LINEAR e não a curva da casa: realce de hover com
+   curva desacelerada chega atrasado e parece que a interface está pensando. */
+.painel-hora {
+  opacity: 1;
+  transition: opacity 120ms linear;
+}
+.painel-horas:hover .painel-hora {
+  opacity: 0.45;
+}
+.painel-horas .painel-hora:hover {
+  opacity: 1;
+}
+
+/* O balão de valor. Aparece em 120ms e NÃO tem transição de posição: ele já
+   nasce ancorado no centro da própria coluna, então não existe arrasto atrás do
+   mouse. Invisível ao ponteiro para não piscar quando o cursor passa por cima
+   dele. */
+.painel-balao {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms linear;
+}
+.painel-hora:hover .painel-balao,
+.painel-dia:hover .painel-balao {
+  opacity: 1;
+}
+
+/* A guia vertical do movimento, junto com o ponto na série. Mesma regra. */
+.painel-dia .painel-guia {
+  opacity: 0;
+  transition: opacity 120ms linear;
+}
+.painel-dia:hover .painel-guia {
+  opacity: 1;
+}
+
+/* Pressionado: 1px para baixo, SEM transição. Resposta imediata é o ponto
+   inteiro; qualquer duração aqui faria o clique parecer mole. */
+.painel-pressiona:active {
+  transform: translateY(1px);
+}
+
 /* Quem pediu menos movimento no sistema recebe menos movimento. Vale para a
-   mensagem que entra na conversa também, que já existia sem essa guarda. */
+   mensagem que entra na conversa também, que já existia sem essa guarda.
+
+   ⚠️ No painel a regra é "valor final no primeiro quadro", e NÃO "elemento
+   invisível": `animation: none` com `both` deixaria o nó no estado `from`, ou
+   seja, barra de altura zero e cartão transparente. Por isso cada um também tem
+   o valor final declarado fora do keyframe. Hover e acordeão continuam
+   funcionando, só sem transição. */
 @media (prefers-reduced-motion: reduce) {
   .msg-in,
   .anim-flutuante,
   .anim-lateral,
-  .anim-fundo {
+  .anim-fundo,
+  .painel-cartao,
+  .painel-barra,
+  .painel-area {
     animation: none;
+  }
+  .painel-cartao {
+    opacity: 1;
+    transform: none;
+  }
+  .painel-area {
+    transform: none;
+  }
+  /* ⚠️ Hover e acordeão CONTINUAM funcionando, só sem transição: quem pediu
+     menos movimento não pediu menos informação. O balão ainda aparece, o realce
+     ainda acontece, tudo no primeiro quadro. */
+  .painel-transicao,
+  .painel-hora,
+  .painel-balao,
+  .painel-dia .painel-guia,
+  .painel-corpo {
+    transition: none;
   }
 }

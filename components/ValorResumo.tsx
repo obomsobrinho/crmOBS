@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Clock, CalendarClock, Settings2 } from "lucide-react";
 import type { FraseValor, ValorResumo as Resumo } from "@/lib/valor";
+import type { BarraHora } from "@/lib/painel";
+import PainelHoras from "@/components/painel/PainelHoras";
 import {
   Stat,
   StatTopo,
@@ -17,7 +19,7 @@ import {
 // de valor mora em lib/valor.ts, e duas opiniões sobre o mesmo número é o começo
 // de um número inventado.
 //
-// A diferença de propósito importa: o DashboardCards responde "como foi a
+// A diferença de propósito importa: a operação responde "como foi a
 // semana"; aqui a pergunta é "o que eu perderia se cancelasse". Por isso o
 // destaque é a FRASE, e não o número solto.
 //
@@ -82,6 +84,8 @@ export default function ValorResumo({
   frasesAcumuladas,
   hrefConfigurar = "/agente",
   parte = "tudo",
+  horas,
+  rotuloHorario = "",
 }: {
   resumo: Resumo;
   frases: FraseValor[];
@@ -94,6 +98,14 @@ export default function ValorResumo({
   /** Link para configurar o horário, quando falta. */
   hrefConfigurar?: string;
   parte?: ParteDoResumo;
+  /**
+   * As 24 colunas do gráfico de hora, JÁ calculadas por `barrasDeHora` sobre a
+   * MESMA janela da manchete. Ausente = sem gráfico, e é o caso de quem não tem
+   * horário configurado.
+   */
+  horas?: BarraHora[];
+  /** Horário da empresa em uma linha, para a legenda do gráfico. */
+  rotuloHorario?: string;
 }) {
   const doAcumulado = frasesAcumuladas ?? [];
 
@@ -108,6 +120,12 @@ export default function ValorResumo({
 
   const manchete = mostradas[0] ?? null;
   const resto = mostradas.slice(1);
+
+  // O gráfico de hora acompanha a manchete de "fora do horário" e MAIS NENHUMA.
+  // A chave vem de `frasesDeValor`, que é quem ordena as frases por força; se a
+  // mais forte do período for outra, o gráfico não tem com o que fechar.
+  const mostrarHoras =
+    !!horas && horas.length > 0 && manchete?.key === "fora-do-horario";
 
   // Total acumulado da MESMA frase da manchete. Só aparece quando a manchete é
   // do mês (senão diria a mesma coisa duas vezes) e quando o valor é numérico.
@@ -195,7 +213,7 @@ export default function ValorResumo({
               32px da tela: é a frase que a pessoa precisa ler mesmo se não ler
               mais nada aqui. Antes ela tinha o mesmo tamanho de número dos outros
               nove blocos e se distinguia só pela cor de fundo. */}
-          <Stat variant="marca" tamanho="manchete">
+          <Stat variant="marca" tamanho="manchete" className="painel-cartao">
             <StatTopo>
               {/* `h2` de verdade: o cartão É a seção, e o rótulo é o título dela.
                   Sem isso a página ficaria com um `h1` e nenhum `h2`. */}
@@ -205,18 +223,38 @@ export default function ValorResumo({
                 </h2>
               </StatRotulo>
             </StatTopo>
-            <StatValor tamanho="manchete" className="text-brand-ink">
-              {manchete.numero}
-            </StatValor>
-            <StatFrase tamanho="manchete">{manchete.texto}</StatFrase>
-            {totalDaManchete && (
-              <p className="text-apoio text-ink-2">
-                <span className="font-semibold tabular-nums text-ink">
-                  {totalDaManchete}
-                </span>{" "}
-                desde o início desta conta.
-              </p>
-            )}
+
+            {/* Frase à esquerda, gráfico à direita. A coluna da esquerda é fixa
+                em 400px para o numeral e a frase não mudarem de largura quando o
+                gráfico aparece ou some. */}
+            <div className="grid gap-8 xl:grid-cols-[400px_1fr]">
+              <div className="flex min-w-0 flex-col gap-2">
+                <StatValor tamanho="manchete" className="text-brand-ink">
+                  {manchete.numero}
+                </StatValor>
+                <StatFrase tamanho="manchete">{manchete.texto}</StatFrase>
+                {totalDaManchete && (
+                  <p className="text-apoio text-ink-2">
+                    <span className="font-semibold tabular-nums text-ink">
+                      {totalDaManchete}
+                    </span>{" "}
+                    desde o início desta conta.
+                  </p>
+                )}
+              </div>
+
+              {/* ⚠️ O GRÁFICO SÓ APARECE COM A MANCHETE DE FORA DO HORÁRIO, e
+                  isso não é detalhe de layout: a soma das partes roxas TEM que
+                  ser o número da manchete. Se a frase mais forte for outra (a
+                  conta sem horário configurado, ou um mês sem nenhuma resposta
+                  fora do expediente), as duas coisas passariam a falar de
+                  conjuntos diferentes lado a lado, e o cliente leria isso como
+                  erro. Sem gráfico é melhor do que gráfico que não fecha. */}
+              {mostrarHoras && (
+                <PainelHoras colunas={horas!} rotuloDentro={rotuloHorario} />
+              )}
+            </div>
+
             <StatLegenda>{escopo}</StatLegenda>
           </Stat>
 
