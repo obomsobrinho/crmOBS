@@ -409,7 +409,10 @@ test.describe("Painel: a fila", () => {
   });
 
   test("neutra até o limiar, âmbar depois", async ({ page }) => {
-    await page.goto("/design/painel");
+    // ⚠️ Os dois estados juntos só existem na rota de estados de borda: a tela
+    // real mostra um por vez, e o preview `/design/painel` é réplica da prancha,
+    // então nada que a prancha não tem pode morar lá.
+    await page.goto("/design/painel-estados");
     // Âmbar em toda fila ensinaria a ignorar o âmbar. O limiar é uma constante
     // nomeada (ESPERA_AVISO_MS), porque veio da ferramenta de desenho.
     const filas = page.locator('[data-slot="painel-fila"][data-urgente]');
@@ -417,7 +420,7 @@ test.describe("Painel: a fila", () => {
       "data-urgente",
       "sim"
     );
-    await expect(filas.filter({ hasText: "há 12 minutos" })).toHaveAttribute(
+    await expect(filas.filter({ hasText: "Ninguém está esperando" })).toHaveAttribute(
       "data-urgente",
       "nao"
     );
@@ -432,7 +435,7 @@ test.describe("Painel: a fila", () => {
   });
 
   test("zero é um presente, não uma tela vazia", async ({ page }) => {
-    await page.goto("/design/painel");
+    await page.goto("/design/painel-estados");
     await expect(
       page.getByText("Ninguém está esperando você agora.")
     ).toBeVisible();

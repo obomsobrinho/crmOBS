@@ -28,14 +28,6 @@ import {
   type ValorResumo as Resumo,
 } from "@/lib/valor";
 import type { BarraHora } from "@/lib/painel";
-import {
-  Stat,
-  StatTopo,
-  StatRotulo,
-  StatValor,
-  StatFrase,
-  StatLegenda,
-} from "@/components/ui/stat";
 
 // Preview de design do Painel (dev-only, liberado pelo proxy).
 //
@@ -384,69 +376,6 @@ export default function DesignPainelPage() {
             />
           </div>
         </div>
-
-        {/* ── ESTADOS FINOS ────────────────────────────────────────────────
-            Não faz parte da tela. Existe para o preview provar, sem dado real,
-            que conta nova não vê parede de zeros nem número inventado. */}
-        <section className="space-y-3">
-          <h2 className="text-rotulo uppercase text-ink-3">
-            Estados finos (não faz parte da tela)
-          </h2>
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-            <Stat variant="vazio" tamanho="manchete">
-              <StatTopo>
-                <StatRotulo>Conta nova, dia 1</StatRotulo>
-              </StatTopo>
-              <StatFrase tamanho="manchete">
-                O agente entrou no ar hoje. Assim que a primeira pessoa escrever,
-                o resumo aparece aqui.
-              </StatFrase>
-              <StatLegenda>
-                Nenhum número é mostrado enquanto não existe atendimento medido.
-              </StatLegenda>
-            </Stat>
-
-            <Stat variant="elevado">
-              <StatTopo tamanho="operacao">
-                <StatRotulo>Tempo de 1a resposta</StatRotulo>
-                <span className="text-legenda text-ink-3">
-                  primeira semana medida
-                </span>
-              </StatTopo>
-              <StatValor>14s</StatValor>
-              <StatFrase>Mediana, contando só as respostas da IA</StatFrase>
-              <StatLegenda>3 atendimentos medidos, últimos 7 dias</StatLegenda>
-            </Stat>
-
-            {/* Fila zerada e fila em aviso (acima do limiar). */}
-            <PainelFilaCartao quantas={0} esperaMs={null} espera="" />
-            <PainelFilaCartao
-              quantas={3}
-              esperaMs={6 * 60 * 60 * 1000}
-              espera="há 6 horas"
-            />
-          </div>
-
-          {/* Antes e depois: só apareceria se o histórico importado sustentasse.
-              Medido em 27/08/2026, ele NÃO sustenta (50 dos 52 contatos vieram
-              com uma única mensagem, e a Evolution devolve `total: 1` por
-              conversa), então na tela real este bloco não existe. Fica aqui como
-              registro do desenho, para não ser redescoberto do zero. */}
-          <Stat variant="vazio" tamanho="manchete">
-            <StatTopo>
-              <StatRotulo>
-                Antes e depois (não existe na tela: sem dado que sustente)
-              </StatRotulo>
-            </StatTopo>
-            <StatFrase tamanho="manchete">
-              Antes, quem te escrevia esperava 3h20 por uma resposta. Hoje espera
-              18 segundos.
-            </StatFrase>
-            <StatLegenda>
-              Depende de um histórico importado que o WhatsApp não entrega hoje.
-            </StatLegenda>
-          </Stat>
-        </section>
       </div>
     </div>
   );
