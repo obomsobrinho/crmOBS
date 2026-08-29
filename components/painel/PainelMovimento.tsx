@@ -160,7 +160,10 @@ export default function PainelMovimento({
           ser lido ANTES do desenho, que é o arranjo que a rodada 3 fechou. */}
       <div className="flex">
         <div className="w-[220px] shrink-0 p-6">
-          <h2 className="text-rotulo uppercase text-ink-3">Movimento</h2>
+          {/* Título de BLOCO (16/22, caixa normal), e não rótulo de seção em
+              caixa alta: é assim na prancha, e é o que separa o título de um
+              cartão do rótulo de uma seção da página. */}
+          <h2 className="text-bloco text-ink">Movimento</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
             Conversas por dia
             {j.conversasAnterior !== null &&
@@ -176,8 +179,16 @@ export default function PainelMovimento({
             {j.conversas === 1 ? "conversa" : "conversas"} nos últimos {j.dias}{" "}
             dias
           </p>
-          <div className="mt-2 flex">
+          {/* O selo traz CONTRA O QUE está comparando ("+17% vs. 36"), como na
+              prancha: porcentagem sozinha obriga a pessoa a procurar a base no
+              subtítulo, e a base é metade da informação. */}
+          <div className="mt-2 flex items-baseline gap-1.5">
             <Selo delta={delta} />
+            {j.conversasAnterior !== null && delta.tipo === "selo" && (
+              <span className="text-legenda text-ink-3">
+                vs. {j.conversasAnterior}
+              </span>
+            )}
           </div>
         </div>
 
@@ -280,9 +291,12 @@ export default function PainelMovimento({
           média de {media.toLocaleString("pt-BR")} por dia
           {menor && ` · menor dia ${total(menor)}, ${nomeDoDia(menor.chave)}`}
         </p>
-        {/* A divisão IA contra time saiu do gráfico e virou texto. "Pessoas
-            novas" entrou aqui junto: era o cartão da antiga seção "Está
-            crescendo?", que este gráfico substituiu. */}
+        {/* A divisão IA contra time saiu do gráfico e virou texto.
+            ⚠️ "Pessoas novas" NÃO entra aqui: a prancha traz só as duas séries,
+            e eu tinha acrescentado o terceiro número por conta própria para não
+            perder a métrica quando a seção "Está crescendo?" saiu. Perder a
+            métrica é decisão do dono; encher o rodapé não era minha. Ela
+            continua sendo calculada e chega no `MovimentoJanela`. */}
         <p className="text-legenda text-ink-3">
           <span className="font-semibold text-brand-ink">
             {somaIa.toLocaleString("pt-BR")}
@@ -291,11 +305,7 @@ export default function PainelMovimento({
           <span className="font-semibold text-ink-2">
             {somaTime.toLocaleString("pt-BR")}
           </span>{" "}
-          pelo time ·{" "}
-          <span className="font-semibold text-ink-2">
-            {j.pessoasNovas.toLocaleString("pt-BR")}
-          </span>{" "}
-          {j.pessoasNovas === 1 ? "pessoa nova" : "pessoas novas"}
+          pelo time
         </p>
       </div>
     </section>

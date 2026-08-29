@@ -138,6 +138,15 @@ export function rotuloHorario(hours: BusinessHours | null): string {
 export interface CandidatoVerbatim {
   phone: string;
   nomewpp: string | null;
+  /**
+   * A pergunta do cliente.
+   *
+   * ⚠️ Vem na MESMA linha que a resposta: é assim que o n8n grava, uma linha com
+   * `user_message` e `bot_message` juntos e UM `created_at`. É por isso que dá
+   * para mostrar o par pergunta/resposta, e é pelo mesmo motivo que NÃO dá para
+   * medir quanto tempo a IA levou: não existem dois instantes no dado.
+   */
+  user_message?: string | null;
   bot_message: string | null;
   message_type: string | null;
   created_at: string;
@@ -155,6 +164,8 @@ export interface Verbatim {
    * fala de verdade".
    */
   mensagens: string[];
+  /** A pergunta que gerou a resposta. `null` quando a linha não tem. */
+  pergunta: string | null;
   phone: string;
   nomewpp: string | null;
   created_at: string;
@@ -214,6 +225,7 @@ export function escolherVerbatim(
 
   const monta = (m: CandidatoVerbatim): Verbatim => ({
     mensagens: separarMensagens(m.bot_message as string),
+    pergunta: m.user_message?.trim() || null,
     phone: m.phone,
     nomewpp: m.nomewpp,
     created_at: m.created_at,

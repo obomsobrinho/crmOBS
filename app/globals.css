@@ -111,6 +111,15 @@
   --text-titulo--letter-spacing: -0.01em;
   --text-titulo--font-weight: 600;
 
+  /* TÍTULO DE BLOCO, 16/22 600. A prancha lista este papel na tabela 1d e a
+     escala da casa não tinha: o título de um cartão saía ou como `titulo` (18,
+     grande demais ao lado do numeral) ou como `rotulo` (12 em caixa alta, que é
+     rótulo de SEÇÃO e não título). "Movimento" é o caso: na prancha ele é um
+     título em caixa normal, não um rótulo. */
+  --text-bloco: 16px;
+  --text-bloco--line-height: 22px;
+  --text-bloco--font-weight: 600;
+
   --text-corpo: 15px;
   --text-corpo--line-height: 22px;
 

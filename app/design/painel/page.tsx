@@ -367,6 +367,10 @@ export default function DesignPainelPage() {
             />
             <PainelAssuntos itens={ASSUNTOS} periodo="7 dias" totalPerguntas={39} />
             <PainelUltimaResposta
+              pergunta="Boa noite! Vocês cobram pela avaliação? E quanto tempo demora?"
+              perguntaHora="21h34"
+              latencia="9 segundos"
+              foraDoHorario
               mensagens={[
                 "Oi, Marcela! A avaliação com o time é sem custo e leva uns 20 minutos. Tenho horário amanhã às 10h ou às 15h30, qual fica melhor pra você?",
               ]}

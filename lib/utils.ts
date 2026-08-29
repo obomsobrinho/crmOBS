@@ -39,6 +39,8 @@ const twMerge = extendTailwindMerge({
             // em silêncio.
             "manchete",
             "destaque",
+            // Título de bloco (16/22), pelo mesmo motivo dos dois acima.
+            "bloco",
           ],
         },
       ],

@@ -37,6 +37,7 @@ import {
   rotuloHorario,
   type CandidatoVerbatim,
 } from "@/lib/painel";
+import { dentroDoHorario, parteLocal } from "@/lib/valor";
 import {
   frasesDeValor,
   mesFechado,
@@ -232,6 +233,17 @@ export default async function PainelPage() {
   // que a IA atendeu sozinha, com reserva por comprimento. Nunca escolhida a
   // dedo. Sai do acumulado que já está em memória, sem consulta nova.
   const verbatim = escolherVerbatim(acumuladoMsgs as CandidatoVerbatim[]);
+  // Hora da pergunta e se a resposta saiu com a empresa fechada. As duas saem
+  // do MESMO instante, porque pergunta e resposta moram na mesma linha.
+  // ⚠️ A LATÊNCIA não é passada: com um `created_at` só, a diferença entre
+  // pergunta e resposta não existe no dado, e estimá-la seria inventar.
+  const parteVerbatim = verbatim ? parteLocal(verbatim.created_at) : null;
+  const verbatimForaDoHorario =
+    !!parteVerbatim && !!hours && !dentroDoHorario(parteVerbatim, hours);
+  const dois = (n: number) => String(n).padStart(2, "0");
+  const verbatimHora = parteVerbatim
+    ? dois(parteVerbatim.hora) + "h" + dois(parteVerbatim.minuto)
+    : undefined;
 
   // ── Manchete: mês fechado, recortado do acumulado ──────────────────────────
   //
@@ -333,6 +345,9 @@ export default async function PainelPage() {
               etiqueta={
                 verbatim.sozinha ? "atendida só pela IA" : "a mais recente"
               }
+              pergunta={verbatim.pergunta ?? undefined}
+              perguntaHora={verbatimHora}
+              foraDoHorario={verbatimForaDoHorario}
             />
           )}
         </div>

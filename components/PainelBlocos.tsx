@@ -202,6 +202,10 @@ export function PainelUltimaResposta({
   quando,
   href,
   etiqueta = "a mais recente",
+  pergunta,
+  perguntaHora,
+  latencia,
+  foraDoHorario = false,
 }: {
   /**
    * O turno já separado em mensagens.
@@ -219,6 +223,27 @@ export function PainelUltimaResposta({
   href: string;
   /** Canto direito do cabeçalho. A prancha usa "a mais recente". */
   etiqueta?: string;
+  /**
+   * A PERGUNTA do cliente que gerou esta resposta.
+   *
+   * ⚠️ É ela que dá sentido à citação: a resposta sozinha prova que o agente
+   * escreve bem, o PAR prova que ele entendeu. Ausente, o bloco degrada para só
+   * a resposta, que é o que dá para mostrar.
+   */
+  pergunta?: string;
+  /** Hora da pergunta, já legível ("21h34"). */
+  perguntaHora?: string;
+  /**
+   * Quanto tempo depois a IA respondeu, já legível ("9 segundos").
+   *
+   * ⚠️ Opcional porque nem sempre dá para medir: o n8n grava pergunta e resposta
+   * na MESMA linha de `chat_messages`, com um único `created_at`, então a
+   * diferença entre as duas não existe no dado. Sem ela a frase sai sem o tempo,
+   * em vez de inventar um número.
+   */
+  latencia?: string;
+  /** A resposta saiu com a empresa fechada. É a prova do valor, então é selo. */
+  foraDoHorario?: boolean;
 }) {
   return (
     <section
@@ -232,10 +257,36 @@ export function PainelUltimaResposta({
         <span className="shrink-0 text-legenda text-ink-3">{etiqueta}</span>
       </div>
 
+      {/* A PERGUNTA primeiro, em balão de recebido, como na conversa. */}
+      {pergunta && (
+        <>
+          <p className="text-legenda text-ink-3">
+            {nome} perguntou{perguntaHora ? `, às ${perguntaHora}` : ""}
+          </p>
+          <p className="mt-1.5 rounded-lg border border-line bg-bloco px-3 py-2 text-apoio text-ink-2">
+            {pergunta}
+          </p>
+        </>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <p className="text-legenda text-ink-3">
+          A IA respondeu{latencia ? `, ${latencia} depois` : ""}
+        </p>
+        {/* "Fora do horário" é a PROVA do valor: a empresa estava fechada e
+            alguém foi atendido. Verde porque é notícia boa, e verde neste
+            sistema é estado, não enfeite. */}
+        {foraDoHorario && (
+          <span className="shrink-0 rounded-full bg-human-surface px-2 py-0.5 text-legenda font-semibold text-human-ink">
+            fora do horário
+          </span>
+        )}
+      </div>
+
       {/* Uma linha por mensagem, como saiu no WhatsApp: o agente responde em 1
           ou 2 mensagens, e juntar as duas num parágrafo só faria a citação
           parecer um texto corrido que ele nunca mandou. */}
-      <div className="space-y-1.5 border-l-2 border-brand-line pl-3">
+      <div className="mt-1.5 space-y-1.5 border-l-2 border-brand-line pl-3">
         {mensagens.map((m, i) => (
           <p key={i} className="text-corpo italic text-ink-2">
             {m}
