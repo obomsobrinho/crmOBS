@@ -296,21 +296,12 @@ export default function DesignPainelPage() {
 
             <PainelOperacaoBloco janelas={JANELAS} />
 
+            {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A prancha da rodada 3
+                termina a coluna no movimento, e as frases secundárias de valor
+                não aparecem em lugar nenhum dela. Elas continuam existindo em
+                `frasesDeValor` e no `/design/valor`; o que saiu foi a seção no
+                painel. */}
             <PainelMovimento janelas={MOVIMENTO} />
-
-            <section className="space-y-3">
-              <h2 className="text-rotulo uppercase text-ink-3">
-                O que mais ela fez
-              </h2>
-              <ValorResumo
-                resumo={MES}
-                frases={frasesDeValor(MES, PERIODO)}
-                periodo={PERIODO}
-                acumulado={ACUMULADO}
-                frasesAcumuladas={frasesDeValor(ACUMULADO, "desde o início")}
-                parte="resto"
-              />
-            </section>
           </div>
 
           <div className="flex min-w-0 flex-col gap-5">

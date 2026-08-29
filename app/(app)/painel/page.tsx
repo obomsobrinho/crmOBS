@@ -269,12 +269,6 @@ export default async function PainelPage() {
     hours,
   });
 
-  // O resto das frases (tudo menos a manchete) desce para o fim da coluna.
-  // `frasesDeValor` já devolve em ordem de força.
-  const restoDasFrases = (frases.length > 0 ? frases : frasesAcumuladas).slice(
-    1
-  );
-
   // ⚠️ O painel NÃO é um cartão branco: é página sobre o canvas, com os cartões
   // flutuando (`Stat variant="elevado"`). É obrigatório no claro por um motivo
   // de token: `--s-bloco` claro é igual ao `--canvas`, então cartão `bloco`
@@ -319,27 +313,12 @@ export default async function PainelPage() {
 
           <PainelOperacaoBloco janelas={janelas} />
 
+          {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A coluna termina no
+              movimento, como na prancha da rodada 3. As frases secundárias de
+              valor continuam existindo em `frasesDeValor` e aparecem no
+              `/design/valor` e no passo de cancelar; o que saiu foi a seção no
+              painel, que o desenho não tem. */}
           <PainelMovimento janelas={movimento} desdeMs={desdeMs} />
-
-          {/* As demais frases de valor. O desenho da rodada 3 não as mostra, e
-              elas ficam aqui embaixo, fora da primeira tela, em vez de sumirem:
-              apagar conteúdo aprovado em silêncio é decisão do dono, não minha.
-              Ver o relatório do passo. */}
-          {restoDasFrases.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-rotulo uppercase text-ink-3">
-                O que mais ela fez
-              </h2>
-              <ValorResumo
-                resumo={resumo}
-                frases={frases}
-                periodo={periodo}
-                acumulado={acumulado}
-                frasesAcumuladas={frasesAcumuladas}
-                parte="resto"
-              />
-            </section>
-          )}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">

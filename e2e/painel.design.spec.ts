@@ -47,19 +47,31 @@ test.describe("Painel: hierarquia de numeral", () => {
       const manchete = document
         .querySelector('[data-slot="stat"]')!
         .querySelector('[data-slot="stat-valor"]')!;
+      // O numeral do movimento não é um `Stat`: é o número grande da coluna
+      // esquerda daquele cartão. Precisa entrar na medição, senão o degrau de
+      // 44px não seria conferido por ninguém.
+      const mov = document.querySelector(
+        '[data-slot="painel-movimento"] .font-display'
+      )!;
       return {
-        distintos: [...new Set(vals.map(px))].sort((a, b) => a - b),
+        cartoes: [...new Set(vals.map(px))].sort((a, b) => a - b),
         manchete: px(manchete),
+        movimento: px(mov),
         maior: Math.max(...vals.map(px)),
       };
     });
 
-    expect(tamanhos.distintos).toEqual([18, 32, 68]);
+    // ⚠️ Só DOIS tamanhos de `stat-valor` na tela: 68 na manchete e 32 nos
+    // quatro cartões da operação. O degrau de 18px saiu junto com a seção
+    // "O que mais ela fez", que a prancha da rodada 3 não tem.
+    expect(tamanhos.cartoes).toEqual([32, 68]);
     // A manchete é o primeiro cartão da tela E o maior numeral, com folga: 68
     // contra 32 é o dobro, e é essa distância que faz a tela ter ordem de
     // leitura antes de qualquer palavra ser lida.
     expect(tamanhos.manchete).toBe(68);
     expect(tamanhos.manchete).toBe(tamanhos.maior);
+    // E o movimento fica no degrau do meio, 44, entre a manchete e o cartão.
+    expect(tamanhos.movimento).toBe(44);
   });
 
   test("todo cartão diz de qual período é o número", async ({ page }) => {

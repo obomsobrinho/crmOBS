@@ -166,8 +166,13 @@
      caem aqui, que é o comportamento certo. */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* 10px é o raio INTERNO da prancha (bloco dentro do cartão, campo, pílula
+     retangular). */
+  --radius-lg: 10px;
+  /* 14px, e não 16px: é o raio de CARTÃO medido na prancha. O `rounded-xl` é o
+     que a camada base usa em todo cartão, então trocar o token acerta a tela
+     inteira de uma vez, em vez de espalhar `rounded-[14px]` pelos componentes. */
+  --radius-xl: 14px;
 
   /* ── Ponte para os nomes que o shadcn espera ──
      A FRONTEIRA, e ela é permanente: token do shadcn é dono de SUPERFÍCIE,
@@ -204,10 +209,10 @@
   /* ── Superfícies, do fundo para cima ──
      Menu e conversa em `sunken`, lista e painel em `raised` com sombra,
      campos em `inset`. É a hierarquia do escuro, invertida. */
-  --canvas: #f3f3f6;
-  --sunken: #eceaf3;
+  --canvas: #f4f4f4;
+  --sunken: #ececec;
   --raised: #ffffff;
-  --inset: #f1eff7;
+  --inset: #f4f4f4;
 
   /* Superfícies. São TRÊS, e a contenção é o ponto: lista, conversa e painel
      dividem `--s-conteudo`, e o que separa as colunas é uma linha de 1px, nunca
@@ -216,17 +221,17 @@
      aleatória em vez de hierarquia. */
   --s-menu: #ffffff;
   --s-conteudo: #ffffff;
-  --s-msg: #f3f3f6;
+  --s-msg: #f4f4f4;
   --s-campo: #ffffff;
   /* Barra da linha selecionada: o roxo da marca. Era a tinta principal, um
      preto que não existia em mais nada no produto. */
   --sel-bar: #6b21e8;
   /* Relevo do balão. Sem ele, balão branco sobre a conversa dá 1,05:1 e some. */
-  --b-shadow: 0 1px 1px rgba(23, 17, 40, 0.16);
+  --b-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
   /* Aliases de compatibilidade: as telas fora do atendimento ainda os usam. */
   --s-lista: #ffffff;
   --s-lista-sel: #ffffff;
-  --s-composer: #f3f3f6;
+  --s-composer: #f4f4f4;
   --s-sub: #ffffff;
   --s-painel: #ffffff;
   /* Bloco dentro do cartão. Era #f1eff8, uma lavanda, e o campo dentro dele era
@@ -236,12 +241,12 @@
      (`--s-msg`), que é o degrau neutro que o projeto já usa. É a mesma crítica
      escrita no comentário das superfícies acima: matiz diferente por caixa lê
      como escolha aleatória, não como hierarquia. */
-  --s-bloco: #f3f3f6;
+  --s-bloco: #f4f4f4;
 
   /* Aliases em uso pelos componentes (migram na rodada das telas). */
   --surface: #ffffff;
-  --panel: #f1eff7;
-  --chat-bg: #f3f3f6;
+  --panel: #f4f4f4;
+  --chat-bg: #f4f4f4;
   /* Campo BRANCO sobre o bloco cinza, que é o que `--s-campo` já declarava logo
      acima. É o que devolve a escada de três degraus no claro: cartão branco,
      bloco cinza, campo branco com borda. Com bloco e campo em lavanda quase
@@ -249,13 +254,13 @@
   --input-bg: #ffffff;
 
   /* ── Tinta ── */
-  --ink: #171128; /* 15,8:1 */
-  --ink-2: #4b4468; /* 8,1:1, texto secundário */
-  --ink-3: #6b6486; /* 5,5:1, piso de texto (mínimo 12px) */
-  --ink-faint: #a9a2c0; /* NUNCA texto: ícone e divisor */
+  --ink: #171717; /* 15,8:1 */
+  --ink-2: #525252; /* 8,1:1, texto secundário */
+  --ink-3: #6e6e6e; /* 5,5:1, piso de texto (mínimo 12px) */
+  --ink-faint: #a3a3a3; /* NUNCA texto: ícone e divisor */
   /* Aliases legados. */
-  --ink-muted: #4b4468;
-  --ink-dim: #6b6486;
+  --ink-muted: #525252;
+  --ink-dim: #6e6e6e;
 
   /* ── Marca e IA ── */
   --brand-fill: #6b21e8; /* 6,9:1 com tinta branca */
@@ -321,18 +326,18 @@
   --danger-border: rgba(220, 38, 38, 0.3);
 
   /* ── Estrutura ── */
-  --line: rgba(90, 50, 180, 0.14);
-  --line-strong: rgba(90, 50, 180, 0.24);
-  --active-bg: rgba(20, 10, 40, 0.05);
-  --selected-bg: #f3f3f6;
-  --panel-shadow: 0 6px 20px -14px rgba(60, 40, 120, 0.3);
+  --line: oklch(0 0 0 / 8%);
+  --line-strong: oklch(0 0 0 / 18%);
+  --active-bg: oklch(0 0 0 / 5%);
+  --selected-bg: #f4f4f4;
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.04);
   --bubble-shadow: 0 1px 1.5px rgba(11, 20, 26, 0.1);
 
   /* ── Balões: recebido branco, você verde claro, IA roxo claro ──
      A tinta já é escura nos três, então os três passam AA. */
   --bubble-in-bg: #ffffff;
-  --bubble-in-fg: #171128;
-  --bubble-in-hora: #6b6486;
+  --bubble-in-fg: #171717;
+  --bubble-in-hora: #6e6e6e;
   --bubble-you-bg: #d9fdd3;
   --bubble-you-fg: #06251b;
   --bubble-you-hora: #2c6b4f;
@@ -441,39 +446,39 @@
 [data-theme="dark"] {
   /* Mesmos papéis do claro. O canvas escurece para o painel principal ganhar
      borda de luz e a moldura sumir. */
-  --canvas: #0a0b10;
-  --sunken: #0c0d12;
-  --raised: #15161d;
-  --inset: #1b1d23;
+  --canvas: #0a0a0a;
+  --sunken: #0d0d0d;
+  --raised: #171717;
+  --inset: #1f1f1f;
 
   /* Mesmas três superfícies do claro, com a hierarquia invertida: aqui o
      conteúdo é MAIS CLARO que o fundo, e a conversa é o ponto mais escuro da
      tela. É o que faz a área de mensagens ler como fundo nos dois temas usando
      a mesma marcação. */
-  --s-menu: #1b1d23;
-  --s-conteudo: #1b1d23;
-  --s-msg: #0c0d12;
-  --s-campo: #22242c;
+  --s-menu: #0d0d0d;
+  --s-conteudo: #171717;
+  --s-msg: #0d0d0d;
+  --s-campo: #1f1f1f;
   --sel-bar: #b98cff;
   --b-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --s-lista: #1b1d23;
-  --s-lista-sel: #1b1d23;
-  --s-composer: #0c0d12;
-  --s-sub: #1b1d23;
-  --s-painel: #1b1d23;
-  --s-bloco: #22232c;
+  --s-lista: #171717;
+  --s-lista-sel: #171717;
+  --s-composer: #0d0d0d;
+  --s-sub: #171717;
+  --s-painel: #171717;
+  --s-bloco: #1f1f1f;
 
-  --surface: #15161d;
-  --panel: #1f2029;
-  --chat-bg: #0c0d12;
-  --input-bg: #1b1d23;
+  --surface: #171717;
+  --panel: #1f1f1f;
+  --chat-bg: #0d0d0d;
+  --input-bg: #1f1f1f;
 
-  --ink: #eef0f5; /* 15,0:1 */
-  --ink-2: #b6b8ca; /* 9,3:1 */
-  --ink-3: #8b8ea6; /* 5,7:1, piso de texto */
-  --ink-faint: #5a5c72; /* NUNCA texto */
-  --ink-muted: #b6b8ca;
-  --ink-dim: #8b8ea6;
+  --ink: #f5f5f5; /* 15,0:1 */
+  --ink-2: #b4b4b4; /* 9,3:1 */
+  --ink-3: #8c8c8c; /* 5,7:1, piso de texto */
+  --ink-faint: #5c5c5c; /* NUNCA texto */
+  --ink-muted: #b4b4b4;
+  --ink-dim: #8c8c8c;
 
   --brand-fill: #7b35f0; /* 5,8:1 com tinta branca */
   --brand-on: #ffffff;
@@ -525,10 +530,10 @@
   --danger-bg: rgba(239, 68, 68, 0.12);
   --danger-border: rgba(239, 68, 68, 0.3);
 
-  --line: rgba(160, 158, 196, 0.12);
-  --line-strong: rgba(160, 158, 196, 0.22);
+  --line: oklch(1 0 0 / 10%);
+  --line-strong: oklch(1 0 0 / 22%);
   --active-bg: rgba(255, 255, 255, 0.05);
-  --selected-bg: #191a22;
+  --selected-bg: #1f1f1f;
   --panel-shadow: none;
   --bubble-shadow: none;
 
