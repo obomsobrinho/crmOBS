@@ -379,31 +379,33 @@ test.describe("Painel: movimento", () => {
   });
 });
 
-test.describe("Painel: a fila, no cabeçalho", () => {
+test.describe("Painel: a fila", () => {
   test("mostra a IDADE da espera e leva para algum lugar", async ({ page }) => {
     await page.goto("/design/painel");
-    // "3" é uma fila; "a mais antiga há 6 horas" é um problema. A idade é a
+    // "3" é uma fila; "a mais antiga há 12 minutos" é um problema. A idade é a
     // informação, e é ela que transforma relatório em tarefa.
     const fila = page.locator('[data-slot="painel-fila"]').first();
     await expect(fila).toContainText("3");
-    await expect(fila).toContainText("pessoas esperando");
-    await expect(fila).toContainText("a mais antiga há 6 horas");
-    await expect(fila).toHaveAttribute("href", "/inbox");
+    await expect(fila).toContainText("pessoas esperando você");
+    await expect(fila).toContainText("A mais antiga há 12 minutos");
+    await expect(
+      fila.getByRole("link", { name: /Ver quem está esperando/ })
+    ).toBeVisible();
   });
 
-  test("está no CABEÇALHO, acima da manchete, e não na trilha", async ({
-    page,
-  }) => {
+  test("é um CARTÃO da trilha, ao lado da manchete", async ({ page }) => {
     await page.goto("/design/painel");
-    const acima = await page.evaluate(() => {
+    // ⚠️ Já esteve no cabeçalho, numa linha só. A prancha da rodada 3 põe de
+    // volta como cartão no topo da trilha, e é a prancha que manda.
+    const naTrilha = await page.evaluate(() => {
       const fila = document.querySelector('[data-slot="painel-fila"]')!;
-      const manchete = document.querySelector('[data-slot="stat"]')!;
-      return (
-        fila.getBoundingClientRect().bottom <=
-        manchete.getBoundingClientRect().top
-      );
+      const manchete = document.querySelector("[data-manchete]")!;
+      const f = fila.getBoundingClientRect();
+      const m = manchete.getBoundingClientRect();
+      // À direita da manchete e começando na mesma altura dela.
+      return f.left >= m.right && Math.abs(f.top - m.top) < 24;
     });
-    expect(acima).toBe(true);
+    expect(naTrilha).toBe(true);
   });
 
   test("neutra até o limiar, âmbar depois", async ({ page }) => {
@@ -444,43 +446,44 @@ test.describe("Painel: blocos sem dado ainda", () => {
     // O eixo do produto é que a IA não inventa. Um número plausível, mesmo
     // borrado ou esmaecido, é indistinguível de medição num print ampliado, e
     // isso é a única coisa que esta tela não pode fazer.
-    const assuntos = page.locator('[data-slot="painel-assuntos"]');
-    await expect(assuntos.getByText("XX")).toHaveCount(3);
-
+    //
+    // ⚠️ Aqui sobra UM bloco sem dado, o cartão de objeções. O de assuntos tem
+    // conteúdo mockado no preview, porque `/design/painel` é a réplica da
+    // prancha; o estado vazio DELE é conferido na suíte com login, contra o
+    // tenant real, que é onde ele de fato aparece.
     const objecoes = page.locator("[data-em-breve]");
     await expect(objecoes).toHaveCount(1);
     await expect(objecoes).toContainText("XX");
     await expect(objecoes).toContainText("Em breve");
   });
 
-  test("os rótulos dos assuntos são POSICIONAIS, não conteúdo", async ({
-    page,
-  }) => {
+  test("os assuntos trazem contagem e variação NEUTRA", async ({ page }) => {
     await page.goto("/design/painel");
     const assuntos = page.locator('[data-slot="painel-assuntos"]');
-    // Escrever um assunto de mentira ("Garantia da lente antirreflexo XX")
-    // sugeriria que o sistema já sabe qual é e só não contou, que é uma mentira
-    // mais sutil que o número.
-    await expect(assuntos.getByText("1º assunto mais perguntado")).toBeVisible();
-    await expect(assuntos.getByText("2º assunto mais perguntado")).toBeVisible();
-    await expect(assuntos.getByText("3º assunto mais perguntado")).toBeVisible();
-    await expect(assuntos).toContainText("Em breve");
-    // E diz POR QUE ainda não tem número, em vez de só mostrar caixas vazias.
-    await expect(assuntos).toContainText(/preferimos não mostrar número/);
+    await expect(assuntos).toContainText("perguntas, vs. os 7 dias anteriores");
+
+    // A variação de um assunto nunca é verde nem vermelha: mais pergunta sobre
+    // um assunto não é boa nem má notícia, é demanda. Pintar ensinaria o dono a
+    // torcer pelo número errado.
+    const selosColoridos = await page.evaluate(
+      () =>
+        document.querySelectorAll(
+          '[data-slot="painel-assuntos"] [data-slot="badge"]'
+        ).length
+    );
+    expect(selosColoridos).toBe(0);
   });
 
-  test("as barras do placeholder são cinzas, não roxas", async ({ page }) => {
+  test("abrir um assunto fecha o outro", async ({ page }) => {
     await page.goto("/design/painel");
-    // Roxo é a cor de dado REAL nesta tela. Barra roxa lê como medição.
-    const roxas = await page.evaluate(
-      () =>
-        [
-          ...document
-            .querySelector('[data-slot="painel-assuntos"]')!
-            .querySelectorAll("div"),
-        ].filter((d) => d.className.includes("bg-brand")).length
-    );
-    expect(roxas).toBe(0);
+    const assuntos = page.locator('[data-slot="painel-assuntos"]');
+    const linhas = assuntos.locator("button[aria-expanded]");
+    await expect(linhas.first()).toHaveAttribute("aria-expanded", "true");
+
+    await linhas.nth(1).click();
+    await expect(linhas.nth(1)).toHaveAttribute("aria-expanded", "true");
+    // Um aberto por vez (3d): abrir um fecha o outro no mesmo quadro.
+    await expect(linhas.first()).toHaveAttribute("aria-expanded", "false");
   });
 });
 
@@ -512,13 +515,11 @@ test.describe("Painel: prova de que a IA não inventa", () => {
     await page.goto("/design/painel");
     const secao = page.locator('[data-slot="painel-ultima-resposta"]');
     await expect(secao).toBeVisible();
-    await expect(secao).toContainText("Trabalhamos de segunda a sexta");
-    // A regra de escolha é objetiva (lib/painel.escolherVerbatim) e o rótulo diz
-    // o que dá peso à frase: ninguém do time entrou depois dela.
-    await expect(secao).toContainText("atendida só pela IA");
-    // Duas mensagens, duas linhas. O n8n grava o turno unido por " | ", e o
-    // painel era o último lugar que ainda mostrava o pipe na tela.
-    await expect(secao.locator("p.italic")).toHaveCount(2);
+    await expect(secao).toContainText("A avaliação com o time é sem custo");
+    await expect(secao).toContainText("a mais recente");
+    await expect(secao).toContainText("para Marcela A.");
+    // ⚠️ O n8n grava um turno de duas mensagens numa linha só, unido por " | ",
+    // e o painel era o último lugar que ainda mostrava o pipe na tela.
     await expect(secao).not.toContainText(" | ");
   });
 });

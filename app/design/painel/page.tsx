@@ -8,10 +8,12 @@ import PainelMovimento, {
   type MovimentoKey,
 } from "@/components/painel/PainelMovimento";
 import {
-  PainelFilaLinha,
-  PainelAssuntos,
+  PainelFilaCartao,
   PainelUltimaResposta,
 } from "@/components/PainelBlocos";
+import PainelAssuntos, {
+  type AssuntoEmAlta,
+} from "@/components/painel/PainelAssuntos";
 import ValorResumo from "@/components/ValorResumo";
 import { barras, type DashboardMetrics, type JanelaMsg } from "@/lib/metrics";
 import {
@@ -254,6 +256,74 @@ function horasSintetico(): BarraHora[] {
 
 const HORAS = horasSintetico();
 
+/**
+ * Assuntos mockados, com a mesma FORMA da prancha: cinco linhas, contagem
+ * decrescente, variação sempre neutra e um deles aberto.
+ *
+ * ⚠️ O CONTEÚDO é neutro de segmento de propósito. A prancha foi desenhada para
+ * uma ótica e fala em consulta e lente; aqui os testadores do beta são advogado,
+ * pediatra, barbeiro, engenheiro, clínica e comércio, e existe e2e que reprova
+ * a tela se um texto assumir um único ramo. O que o preview precisa provar é o
+ * ARRANJO, não o vocabulário de uma empresa fictícia.
+ */
+const ASSUNTOS: AssuntoEmAlta[] = [
+  {
+    titulo: "Garantia do que foi entregue",
+    contagem: 14,
+    variacao: "↗ +6",
+    resumo:
+      "A procura por garantia cresceu bastante nesta semana, quase sempre depois de seis meses de uso.",
+    pedidos: [
+      { texto: "Deu problema depois de 8 meses, tem garantia?", quando: "há 2 h" },
+      { texto: "Descolou sozinho, vocês trocam?", quando: "ontem" },
+      { texto: "Quanto tempo dura a garantia?", quando: "há 2 d" },
+    ],
+  },
+  {
+    titulo: "Convênio e reembolso",
+    contagem: 9,
+    variacao: "↗ +4",
+    resumo:
+      "Nove pessoas perguntaram se é coberto por convênio, e sete citaram o convênio da empresa onde trabalham.",
+    pedidos: [
+      { texto: "Vocês atendem o convênio da empresa?", quando: "ontem" },
+      { texto: "Dá nota fiscal para pedir reembolso?", quando: "há 3 d" },
+    ],
+  },
+  {
+    titulo: "Preço do plano mais completo",
+    contagem: 7,
+    variacao: "igual",
+    resumo:
+      "O interesse no plano mais completo se manteve estável, e a maioria pede o valor antes de marcar.",
+    pedidos: [
+      { texto: "Quanto custa o mais simples?", quando: "há 6 h" },
+      { texto: "O mais completo serve para qualquer caso?", quando: "há 4 d" },
+    ],
+  },
+  {
+    titulo: "Horário de sábado",
+    contagem: 5,
+    variacao: "↘ −2",
+    resumo:
+      "Menos gente perguntou o horário de sábado depois que a resposta automática passou a citar o horário.",
+    pedidos: [
+      { texto: "Abre sábado que horas?", quando: "há 2 d" },
+      { texto: "Sábado vocês fecham ao meio-dia?", quando: "há 5 d" },
+    ],
+  },
+  {
+    titulo: "Troca e devolução",
+    contagem: 4,
+    variacao: "novo",
+    resumo:
+      "Assunto novo nesta semana: quatro pedidos de troca, três deles dentro dos 30 dias da compra.",
+    pedidos: [
+      { texto: "Comprei semana passada e queria outra cor", quando: "ontem" },
+    ],
+  },
+];
+
 export default function DesignPainelPage() {
   return (
     <div className="flex h-screen gap-3 bg-canvas p-3">
@@ -261,8 +331,6 @@ export default function DesignPainelPage() {
       {/* Sem cartão de página, igual à tela real: os cartões flutuam sobre o
           canvas (`Stat variant="elevado"`). */}
       <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
-        {/* A fila fica AO LADO do título, e não empurrada para a borda oposta
-            da tela. Ver o comentário na tela real. */}
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2">
@@ -273,12 +341,6 @@ export default function DesignPainelPage() {
               O que a IA fez pela conta Ótica Vision.
             </p>
           </div>
-          {/* Acima do limiar de aviso, para o preview mostrar o estado âmbar. */}
-          <PainelFilaLinha
-            quantas={3}
-            esperaMs={6 * 60 * 60 * 1000}
-            espera="há 6 horas"
-          />
         </div>
 
         <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -305,16 +367,20 @@ export default function DesignPainelPage() {
           </div>
 
           <div className="flex min-w-0 flex-col gap-5">
-            <PainelAssuntos />
+            {/* Abaixo do limiar de aviso: o cartão neutro, como na prancha. */}
+            <PainelFilaCartao
+              quantas={3}
+              esperaMs={12 * 60 * 1000}
+              espera="há 12 minutos"
+            />
+            <PainelAssuntos itens={ASSUNTOS} periodo="7 dias" totalPerguntas={39} />
             <PainelUltimaResposta
               mensagens={[
-                "Oi! Trabalhamos de segunda a sexta, das 8h às 18h.",
-                "Pode me dizer o que você precisa que eu já adianto pra você?",
+                "Oi, Marcela! A avaliação com o time é sem custo e leva uns 20 minutos. Tenho horário amanhã às 10h ou às 15h30, qual fica melhor pra você?",
               ]}
-              nome="Marcelo A."
+              nome="Marcela A."
               quando="há 14 minutos"
               href="/inbox"
-              sozinha
             />
           </div>
         </div>
@@ -352,15 +418,13 @@ export default function DesignPainelPage() {
               <StatLegenda>3 atendimentos medidos, últimos 7 dias</StatLegenda>
             </Stat>
 
-            {/* Fila zerada e fila neutra (abaixo do limiar de aviso). */}
-            <div className="flex flex-col justify-center gap-3">
-              <PainelFilaLinha quantas={0} esperaMs={null} espera="" />
-              <PainelFilaLinha
-                quantas={2}
-                esperaMs={12 * 60 * 1000}
-                espera="há 12 minutos"
-              />
-            </div>
+            {/* Fila zerada e fila em aviso (acima do limiar). */}
+            <PainelFilaCartao quantas={0} esperaMs={null} espera="" />
+            <PainelFilaCartao
+              quantas={3}
+              esperaMs={6 * 60 * 60 * 1000}
+              espera="há 6 horas"
+            />
           </div>
 
           {/* Antes e depois: só apareceria se o histórico importado sustentasse.

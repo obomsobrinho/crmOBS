@@ -160,4 +160,38 @@ test.describe("Painel com dados reais", () => {
     expect(texto).not.toContain("—");
     expect(texto).not.toContain("–");
   });
+
+  test("sem assunto classificado, o bloco diz XX e não inventa", async ({
+    page,
+  }) => {
+    await page.goto("/painel");
+
+    // ⚠️ ESTE É O LUGAR CERTO PARA ESTA ASSERÇÃO. O preview `/design/painel` é
+    // réplica da prancha e mostra assuntos MOCKADOS; quem não tem assunto
+    // nenhum é o tenant real, porque classificar o assunto de um turno exige
+    // instrumentação que não existe (`conversation_qualifications` só guarda
+    // action, summary e preferência de horário).
+    //
+    // As três regras que tornam o vazio honesto: número literalmente `XX`,
+    // rótulo POSICIONAL e barra CINZA. Um valor plausível, mesmo borrado, é
+    // indistinguível de medição num print ampliado, e "a IA não inventa" é o
+    // eixo do produto.
+    const assuntos = page.locator('[data-slot="painel-assuntos"]');
+    await expect(assuntos).toBeVisible();
+    await expect(assuntos.getByText("XX")).toHaveCount(3);
+    await expect(assuntos.getByText("1º assunto mais perguntado")).toBeVisible();
+    await expect(assuntos).toContainText("Em breve");
+    await expect(assuntos).toContainText(/preferimos não mostrar número/);
+
+    // Roxo é a cor de dado REAL nesta tela: barra roxa leria como medição.
+    const roxas = await page.evaluate(
+      () =>
+        [
+          ...document
+            .querySelector('[data-slot="painel-assuntos"]')!
+            .querySelectorAll("div"),
+        ].filter((d) => d.className.includes("bg-brand")).length
+    );
+    expect(roxas).toBe(0);
+  });
 });

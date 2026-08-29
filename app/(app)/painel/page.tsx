@@ -9,10 +9,10 @@ import PainelMovimento, {
   type MovimentoKey,
 } from "@/components/painel/PainelMovimento";
 import {
-  PainelFilaLinha,
-  PainelAssuntos,
+  PainelFilaCartao,
   PainelUltimaResposta,
 } from "@/components/PainelBlocos";
+import PainelAssuntos from "@/components/painel/PainelAssuntos";
 import ValorResumo from "@/components/ValorResumo";
 import {
   barras,
@@ -278,9 +278,6 @@ export default async function PainelPage() {
       {/* Cabeçalho: título à esquerda, fila à direita, na MESMA linha. A fila
           saiu da trilha porque `/painel` é onde o dono cai ao entrar, e o que
           ele precisa saber primeiro é se tem gente esperando. */}
-      {/* A fila fica AO LADO do título, e não empurrada para a borda oposta da
-          tela: numa janela de 1920 o `justify-between` jogava ela a mais de mil
-          pixels do "Painel", que é o contrário de "ao lado". */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <div className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
@@ -291,11 +288,6 @@ export default async function PainelPage() {
             O que a IA fez pela conta {client?.name ?? ""}.
           </p>
         </div>
-        <PainelFilaLinha
-          quantas={esperando}
-          esperaMs={esperaMs}
-          espera={esperaTexto}
-        />
       </div>
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -322,9 +314,14 @@ export default async function PainelPage() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-5">
-          {/* ⚠️ Placeholder honesto: não existe coluna que classifique o ASSUNTO
-              de um turno. Ver o comentário do componente. Quando existir, esta
-              chamada vira a lista real e o estado vazio some sozinho. */}
+          <PainelFilaCartao
+            quantas={esperando}
+            esperaMs={esperaMs}
+            espera={esperaTexto}
+          />
+          {/* ⚠️ Sem `itens`, e por isso sai o estado vazio honesto: não existe
+              coluna que classifique o ASSUNTO de um turno. Quando existir, a
+              página passa a lista e o placeholder some sozinho. */}
           <PainelAssuntos />
 
           {verbatim && (
@@ -333,7 +330,9 @@ export default async function PainelPage() {
               nome={cleanName(verbatim.nomewpp) ?? "um contato"}
               quando={esperaLegivel(verbatim.created_at, agora)}
               href={`/inbox/${encodeURIComponent(verbatim.phone)}`}
-              sozinha={verbatim.sozinha}
+              etiqueta={
+                verbatim.sozinha ? "atendida só pela IA" : "a mais recente"
+              }
             />
           )}
         </div>
