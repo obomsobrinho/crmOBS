@@ -302,8 +302,12 @@ export default async function PainelPage() {
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col gap-5">
+      {/* ⚠️ GRADE DE LINHAS COMPARTILHADAS. Ver a explicação em
+          app/design/painel/page.tsx: com duas colunas em `flex`, o verbatim caía
+          desalinhado do movimento; com linhas compartilhadas os dois começam e
+          terminam juntos, seja qual for a altura do conteúdo. */}
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr_auto]">
+        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
           <ValorResumo
             resumo={resumo}
             frases={frases}
@@ -315,17 +319,22 @@ export default async function PainelPage() {
             rotuloHorario={rotuloHorario(hours)}
           />
 
+        </div>
+
+        <div className="min-w-0 xl:col-start-1 xl:row-start-2">
           <PainelOperacaoBloco janelas={janelas} />
+        </div>
 
           {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A coluna termina no
               movimento, como na prancha da rodada 3. As frases secundárias de
               valor continuam existindo em `frasesDeValor` e aparecem no
               `/design/valor` e no passo de cancelar; o que saiu foi a seção no
               painel, que o desenho não tem. */}
+        <div className="min-w-0 [&>section]:h-full xl:col-start-1 xl:row-start-3">
           <PainelMovimento janelas={movimento} desdeMs={desdeMs} />
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2">
           <PainelFilaCartao
             quantas={esperando}
             esperaMs={esperaMs}
@@ -335,6 +344,9 @@ export default async function PainelPage() {
               coluna que classifique o ASSUNTO de um turno. Quando existir, a
               página passa a lista e o placeholder some sozinho. */}
           <PainelAssuntos />
+        </div>
+
+        <div className="min-w-0 [&>section]:h-full xl:col-start-2 xl:row-start-3">
 
           {verbatim && (
             <PainelUltimaResposta

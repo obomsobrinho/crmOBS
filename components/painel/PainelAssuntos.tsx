@@ -67,7 +67,7 @@ export default function PainelAssuntos({
       data-slot="painel-assuntos"
       className="overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 px-[22px] pb-3 pt-[18px]">
+      <div className="flex flex-wrap items-start justify-between gap-2 px-[22px] pb-2.5 pt-4">
         <div className="min-w-0">
           <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
             <TrendingUp size={13} aria-hidden />
@@ -98,7 +98,7 @@ export default function PainelAssuntos({
                   type="button"
                   onClick={() => setAberto(estaAberto ? null : i)}
                   aria-expanded={estaAberto}
-                  className="painel-pressiona flex w-full items-center gap-3 px-[22px] py-3 text-left transition-colors hover:bg-[var(--active-bg)]"
+                  className="painel-pressiona flex w-full items-center gap-3 px-[22px] py-2.5 text-left transition-colors hover:bg-[var(--active-bg)]"
                 >
                   <span className="min-w-0 flex-1">
                     <span
@@ -109,7 +109,7 @@ export default function PainelAssuntos({
                       {it.titulo}
                     </span>
                     {/* Trilha proporcional à contagem, na cor da série. */}
-                    <span className="mt-1.5 block h-[3px] rounded-sm bg-line">
+                    <span className="mt-1 block h-[3px] rounded-sm bg-line">
                       <span
                         className="block h-full rounded-sm bg-brand"
                         style={{ width: `${(it.contagem / maior) * 100}%` }}
@@ -132,9 +132,9 @@ export default function PainelAssuntos({
                 </button>
 
                 {estaAberto && (
-                  <div className="px-[22px] pb-4">
+                  <div className="px-[22px] pb-3">
                     <p className="text-apoio text-ink-2">{it.resumo}</p>
-                    <p className="mt-3 text-legenda font-semibold uppercase tracking-[0.06em] text-ink-3">
+                    <p className="mt-2.5 text-legenda font-semibold uppercase tracking-[0.06em] text-ink-3">
                       Os pedidos que formaram este assunto
                     </p>
                     <ul className="mt-1.5 space-y-1">

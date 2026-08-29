@@ -335,8 +335,18 @@ export default function DesignPainelPage() {
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="flex min-w-0 flex-col gap-5">
+        {/* ⚠️ GRADE DE LINHAS COMPARTILHADAS, e não duas colunas independentes.
+            Com duas colunas em `flex`, cada lado empilha por conta própria e o
+            "A última resposta" caía onde sobrava, desalinhado do "Movimento". Na
+            prancha os dois começam na MESMA linha.
+
+            A grade resolve por construção: a coluna principal ocupa as linhas 1,
+            2 e 3 (manchete, operação, movimento) e a trilha ocupa as linhas 1 e 2
+            num bloco só (fila mais assuntos) e a linha 3 sozinha (o verbatim). O
+            topo da linha 3 é o maior dos dois lados, então os dois cartões
+            começam juntos, seja qual for a altura do conteúdo. */}
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr_auto]">
+          <div className="min-w-0 xl:col-start-1 xl:row-start-1">
             <ValorResumo
               resumo={MES}
               frases={frasesDeValor(MES, PERIODO)}
@@ -347,25 +357,36 @@ export default function DesignPainelPage() {
               horas={HORAS}
               rotuloHorario="Segunda a sexta: 08:00 às 18:00"
             />
+          </div>
 
+          <div className="min-w-0 xl:col-start-1 xl:row-start-2">
             <PainelOperacaoBloco janelas={JANELAS} />
+          </div>
 
-            {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A prancha da rodada 3
-                termina a coluna no movimento, e as frases secundárias de valor
-                não aparecem em lugar nenhum dela. Elas continuam existindo em
-                `frasesDeValor` e no `/design/valor`; o que saiu foi a seção no
-                painel. */}
+          {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A prancha da rodada 3
+              termina a coluna no movimento, e as frases secundárias de valor não
+              aparecem em lugar nenhum dela. */}
+          <div className="min-w-0 [&>section]:h-full xl:col-start-1 xl:row-start-3">
             <PainelMovimento janelas={MOVIMENTO} />
           </div>
 
-          <div className="flex min-w-0 flex-col gap-5">
+          {/* A trilha ocupa as duas primeiras linhas; os assuntos esticam para
+              preencher, que é o que a prancha mostra. */}
+          <div className="flex min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2">
             {/* Abaixo do limiar de aviso: o cartão neutro, como na prancha. */}
             <PainelFilaCartao
               quantas={3}
               esperaMs={12 * 60 * 1000}
               espera="há 12 minutos"
             />
-            <PainelAssuntos itens={ASSUNTOS} periodo="7 dias" totalPerguntas={39} />
+            <PainelAssuntos
+              itens={ASSUNTOS}
+              periodo="7 dias"
+              totalPerguntas={39}
+            />
+          </div>
+
+          <div className="min-w-0 [&>section]:h-full xl:col-start-2 xl:row-start-3">
             <PainelUltimaResposta
               pergunta="Boa noite! Vocês cobram pela avaliação? E quanto tempo demora?"
               perguntaHora="21h34"

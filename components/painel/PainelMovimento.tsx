@@ -136,7 +136,7 @@ export default function PainelMovimento({
   return (
     <section
       data-slot="painel-movimento"
-      className="painel-cartao relative overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
+      className="painel-cartao relative flex flex-col overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
       style={{ "--passo": 4 } as React.CSSProperties}
     >
       {/* O seletor flutua no canto do cartão, e não numa linha própria: a área
@@ -158,7 +158,7 @@ export default function PainelMovimento({
           em cima, gráfico embaixo em largura inteira) foi a primeira tentativa e
           está errado: come altura da primeira tela e tira do número o papel de
           ser lido ANTES do desenho, que é o arranjo que a rodada 3 fechou. */}
-      <div className="flex">
+      <div className="flex flex-1">
         <div className="w-[220px] shrink-0 p-6">
           {/* Título de BLOCO (16/22, caixa normal), e não rótulo de seção em
               caixa alta: é assim na prancha, e é o que separa o título de um
@@ -194,7 +194,7 @@ export default function PainelMovimento({
 
         {/* A área sangra à direita e embaixo: sem respiro deste lado, e o
             `overflow-hidden` do cartão corta o que passar. */}
-        <div className="relative h-40 min-w-0 flex-1 self-end">
+        <div className="relative min-h-40 min-w-0 flex-1 self-stretch">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"

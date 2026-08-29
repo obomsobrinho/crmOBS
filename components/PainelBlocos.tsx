@@ -54,7 +54,7 @@ export function PainelFilaCartao({
     <section
       data-slot="painel-fila"
       data-urgente={urgente ? "sim" : "nao"}
-      className={`rounded-xl border p-[22px] ${
+      className={`rounded-xl border px-[22px] py-4 ${
         urgente
           ? "border-warn-line bg-warn-surface"
           : "border-line bg-raised shadow-[var(--panel-shadow)]"
