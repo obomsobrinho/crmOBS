@@ -222,6 +222,13 @@ export default function ValorResumo({
                   <CalendarClock size={13} aria-hidden />O que a IA fez por você
                 </h2>
               </StatRotulo>
+              {/* O período no CANTO do cartão, como a prancha mostra.
+                  ⚠️ É RÓTULO, NÃO CONTROLE: sem seta e sem clique. A manchete é
+                  mês fechado mais acumulado e não segue seletor nenhum, então
+                  uma pílula com seta prometeria uma escolha que não existe. */}
+              <span className="shrink-0 rounded-full border border-brand-line px-2.5 py-0.5 text-legenda text-ink-2">
+                {rotuloPeriodo}
+              </span>
             </StatTopo>
 
             {/* Frase à esquerda, gráfico à direita. A coluna da esquerda é fixa
@@ -233,14 +240,6 @@ export default function ValorResumo({
                   {manchete.numero}
                 </StatValor>
                 <StatFrase tamanho="manchete">{manchete.texto}</StatFrase>
-                {totalDaManchete && (
-                  <p className="text-apoio text-ink-2">
-                    <span className="font-semibold tabular-nums text-ink">
-                      {totalDaManchete}
-                    </span>{" "}
-                    desde o início desta conta.
-                  </p>
-                )}
               </div>
 
               {/* ⚠️ O GRÁFICO SÓ APARECE COM A MANCHETE DE FORA DO HORÁRIO, e
@@ -255,7 +254,22 @@ export default function ValorResumo({
               )}
             </div>
 
-            <StatLegenda>{escopo}</StatLegenda>
+            {/* Rodapé do cartão, separado por linha: o acumulado à esquerda (é
+                ele que trava a mão de quem ia cancelar) e o escopo do número à
+                direita. Duas pontas, como a prancha. */}
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-brand-line pt-4">
+              {totalDaManchete ? (
+                <p className="text-apoio text-ink-2">
+                  <span className="font-semibold tabular-nums text-ink">
+                    {totalDaManchete}
+                  </span>{" "}
+                  desde o início desta conta.
+                </p>
+              ) : (
+                <span />
+              )}
+              <StatLegenda>{escopo}</StatLegenda>
+            </div>
           </Stat>
 
           {!soManchete && resto.length > 0 && (

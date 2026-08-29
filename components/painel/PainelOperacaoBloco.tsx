@@ -83,7 +83,17 @@ export default function PainelOperacaoBloco({
   return (
     <section data-slot="painel-operacao" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-rotulo uppercase text-ink-3">A operação</h2>
+        <div className="min-w-0">
+          <h2 className="text-rotulo uppercase text-ink-3">A operação</h2>
+          {/* O escopo do bloco inteiro, dito uma vez. Os cartões repetem o
+              período na legenda de cada um, porque cartão sem período mente
+              sobre o próprio número, mas quem lê o bloco precisa saber CONTRA O
+              QUE os selos comparam, e isso só cabe aqui. */}
+          <p className="mt-0.5 text-legenda text-ink-3">
+            {p.legenda[0].toUpperCase() + p.legenda.slice(1)}, comparados com o
+            período anterior
+          </p>
+        </div>
         <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoKey)}>
           <TabsList variant="segmentado" aria-label="Período">
             {ORDEM_PERIODOS.map((k) => (

@@ -494,7 +494,11 @@ test.describe("Painel: prova de que a IA não inventa", () => {
     await expect(secao).toContainText("Trabalhamos de segunda a sexta");
     // A regra de escolha é objetiva (lib/painel.escolherVerbatim) e o rótulo diz
     // o que dá peso à frase: ninguém do time entrou depois dela.
-    await expect(secao).toContainText("deu conta sozinha");
+    await expect(secao).toContainText("atendida só pela IA");
+    // Duas mensagens, duas linhas. O n8n grava o turno unido por " | ", e o
+    // painel era o último lugar que ainda mostrava o pipe na tela.
+    await expect(secao.locator("p.italic")).toHaveCount(2);
+    await expect(secao).not.toContainText(" | ");
   });
 });
 

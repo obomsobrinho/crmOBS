@@ -226,13 +226,16 @@ export function PainelUltimaResposta({
       data-slot="painel-ultima-resposta"
       className="rounded-xl border border-line bg-raised p-5 shadow-[var(--panel-shadow)]"
     >
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
-          <MessageSquareQuote size={13} aria-hidden />
-          Como ela fala
+          <MessageSquareQuote size={13} aria-hidden />A última resposta do agente
         </h2>
-        <span className="text-legenda text-ink-3">
-          {quando} · para {nome}
+        {/* ⚠️ A prancha escreve "a mais recente" aqui porque foi desenhada antes
+            de a regra de escolha mudar. Hoje é a mais recente de uma conversa
+            que a IA atendeu SOZINHA, e repetir o texto antigo descreveria errado
+            o que a tela faz. */}
+        <span className="shrink-0 text-legenda text-ink-3">
+          {sozinha ? "atendida só pela IA" : "a mais recente"}
         </span>
       </div>
       {/* Uma linha por mensagem, como saiu no WhatsApp: o agente responde em 1
@@ -245,20 +248,20 @@ export function PainelUltimaResposta({
           </p>
         ))}
       </div>
-      {/* Dizer que a conversa correu sozinha é o que dá peso à frase: a mesma
-          resposta vale mais quando ninguém do time entrou depois dela. */}
-      <p className="mt-2 text-legenda text-ink-3">
-        {sozinha
-          ? "Desta conversa a IA deu conta sozinha, do início ao fim."
-          : "Alguém do time também respondeu nesta conversa."}
-      </p>
-      <Link
-        href={href}
-        className="painel-pressiona mt-3 flex w-fit items-center gap-1.5 text-legenda font-semibold text-brand-ink transition-opacity hover:opacity-80"
-      >
-        Ver a conversa
-        <ArrowRight size={13} aria-hidden />
-      </Link>
+      {/* Rodapé de duas pontas: quando e para quem à esquerda, o caminho para a
+          conversa à direita. */}
+      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <span className="text-legenda text-ink-3">
+          {quando} · para {nome}
+        </span>
+        <Link
+          href={href}
+          className="painel-pressiona flex shrink-0 items-center gap-1.5 text-legenda font-semibold text-brand-ink transition-opacity hover:opacity-80"
+        >
+          Ver a conversa
+          <ArrowRight size={13} aria-hidden />
+        </Link>
+      </div>
     </section>
   );
 }

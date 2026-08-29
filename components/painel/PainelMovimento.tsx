@@ -136,42 +136,51 @@ export default function PainelMovimento({
   return (
     <section
       data-slot="painel-movimento"
-      className="painel-cartao overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
+      className="painel-cartao relative overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
       style={{ "--passo": 4 } as React.CSSProperties}
     >
-      <div className="flex flex-wrap items-start gap-4 p-6 pb-0">
-        {/* Coluna do número. Fica à esquerda e a área sangra à direita: é o
-            arranjo que a rodada 3 fechou, e ele existe para o número ser lido
-            antes do desenho, não depois. */}
-        <div className="min-w-0 shrink-0 basis-[220px]">
-          <div className="mb-1 flex items-center gap-2">
-            <h2 className="text-rotulo uppercase text-ink-3">Movimento</h2>
-            <Selo delta={delta} />
-          </div>
-          <div className="font-display text-numero tabular-nums text-ink">
+      {/* O seletor flutua no canto do cartão, e não numa linha própria: a área
+          precisa da largura inteira à direita, e uma linha só para a pílula
+          comeria altura da primeira tela. */}
+      <div className="absolute right-5 top-5 z-10">
+        <Tabs value={key} onValueChange={(v) => setKey(v as MovimentoKey)}>
+          <TabsList variant="segmentado" aria-label="Janela do movimento">
+            {ORDEM.map((k) => (
+              <TabsTrigger key={k} value={k} variant="segmentado">
+                {k} dias
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+
+      {/* ⚠️ NÚMERO À ESQUERDA E ÁREA À DIREITA, NA MESMA LINHA. Empilhar (número
+          em cima, gráfico embaixo em largura inteira) foi a primeira tentativa e
+          está errado: come altura da primeira tela e tira do número o papel de
+          ser lido ANTES do desenho, que é o arranjo que a rodada 3 fechou. */}
+      <div className="flex">
+        <div className="w-[220px] shrink-0 p-6">
+          <h2 className="text-rotulo uppercase text-ink-3">Movimento</h2>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            Conversas por dia
+            {j.conversasAnterior !== null &&
+              ` · ${j.conversasAnterior} no período anterior`}
+          </p>
+          <div className="mt-3 font-display text-numero tabular-nums text-ink">
             <NumeroAnimado valor={j.conversas} />
           </div>
           <p className="text-apoio text-ink-2">
             {j.conversas === 1 ? "conversa" : "conversas"} nos últimos {j.dias}{" "}
             dias
           </p>
+          <div className="mt-2 flex">
+            <Selo delta={delta} />
+          </div>
         </div>
 
-        <div className="ml-auto shrink-0">
-          <Tabs value={key} onValueChange={(v) => setKey(v as MovimentoKey)}>
-            <TabsList variant="segmentado" aria-label="Janela do movimento">
-              {ORDEM.map((k) => (
-                <TabsTrigger key={k} value={k} variant="segmentado">
-                  {k} dias
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
-
-      {/* A área sangra embaixo e à direita. `overflow-hidden` está no cartão. */}
-      <div className="relative mt-2 h-40">
+        {/* A área sangra à direita e embaixo: sem respiro deste lado, e o
+            `overflow-hidden` do cartão corta o que passar. */}
+        <div className="relative h-40 min-w-0 flex-1 self-end">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
@@ -254,9 +263,12 @@ export default function PainelMovimento({
             );
           })}
         </div>
+        </div>
       </div>
 
-      <div className="border-t border-line px-6 py-3.5">
+      {/* Rodapé numa linha só, com as duas pontas: leitura do gráfico à
+          esquerda, quem respondeu à direita. Separado por linha interna. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line px-6 py-3.5">
         <p className="text-legenda text-ink-3">
           {pico && total(pico) > 0
             ? `pico de ${total(pico)} na ${nomeDoDia(pico.chave)}, ${legivel(pico.chave)}`
@@ -265,8 +277,10 @@ export default function PainelMovimento({
           média de {media.toLocaleString("pt-BR")} por dia
           {menor && ` · menor dia ${total(menor)}, ${nomeDoDia(menor.chave)}`}
         </p>
-        {/* A divisão IA contra time saiu do gráfico e virou esta linha. */}
-        <p className="mt-0.5 text-legenda text-ink-3">
+        {/* A divisão IA contra time saiu do gráfico e virou texto. "Pessoas
+            novas" entrou aqui junto: era o cartão da antiga seção "Está
+            crescendo?", que este gráfico substituiu. */}
+        <p className="text-legenda text-ink-3">
           <span className="font-semibold text-brand-ink">
             {somaIa.toLocaleString("pt-BR")}
           </span>{" "}
@@ -278,9 +292,7 @@ export default function PainelMovimento({
           <span className="font-semibold text-ink-2">
             {j.pessoasNovas.toLocaleString("pt-BR")}
           </span>{" "}
-          {j.pessoasNovas === 1
-            ? "pessoa falou com você pela primeira vez"
-            : "pessoas falaram com você pela primeira vez"}
+          {j.pessoasNovas === 1 ? "pessoa nova" : "pessoas novas"}
         </p>
       </div>
     </section>

@@ -39,7 +39,17 @@ export default async function RootLayout({
       suppressHydrationWarning
       className={`${manrope.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      {/* ⚠️ `suppressHydrationWarning` também no BODY, e não só no html.
+          Extensão de navegador escreve atributo no `<body>` ANTES de o React
+          carregar, e aí a hidratação acusa uma diferença que não é do nosso
+          código. Medido em 28/08/2026: o diff do React apontava exatamente
+          `cz-shortcut-listen="true"` (ColorZilla), e o mesmo erro aparecia no
+          `/login`, uma tela sem nada de dinâmico.
+          Isto silencia só o aviso do PRÓPRIO elemento, um nível, então uma
+          diferença de verdade dentro da árvore continua sendo reportada. */}
+      <body className="min-h-full" suppressHydrationWarning>
+        {children}
+      </body>
     </html>
   );
 }
