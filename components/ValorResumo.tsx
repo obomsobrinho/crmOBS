@@ -213,7 +213,25 @@ export default function ValorResumo({
               32px da tela: é a frase que a pessoa precisa ler mesmo se não ler
               mais nada aqui. Antes ela tinha o mesmo tamanho de número dos outros
               nove blocos e se distinguia só pela cor de fundo. */}
-          <Stat variant="marca" tamanho="manchete" className="painel-cartao">
+          {/* ⚠️ `elevado`, e NÃO `marca`. Até a rodada 2 a manchete tinha
+              superfície roxa de largura inteira; a rodada 3 tirou isso e a
+              deixou no MESMO cinza dos outros cartões (medido na prancha:
+              oklch(0.205 0 0), idêntico ao cartão de indicador). Quem carrega a
+              hierarquia agora é o numeral de 68px em tinta de marca, não o
+              fundo. Cartão roxo com número pequeno errava nas duas pontas. */}
+          <Stat
+            variant="elevado"
+            tamanho="manchete"
+            className="painel-cartao"
+            // ⚠️ `data-manchete` e NÃO `data-slot`: o `Stat` escreve o
+            // `data-slot` DEPOIS do spread (regra 4 da camada base), então um
+            // vindo de fora é sobrescrito por "stat". Existe porque os testes
+            // achavam a manchete por `.bg-brand-surface`, e a superfície roxa
+            // saiu na rodada 3: sem um marcador próprio, a manchete só se
+            // distingue dos outros cartões por cor, que é justamente o que
+            // mudou.
+            data-manchete="sim"
+          >
             <StatTopo>
               {/* `h2` de verdade: o cartão É a seção, e o rótulo é o título dela.
                   Sem isso a página ficaria com um `h1` e nenhum `h2`. */}
@@ -226,7 +244,7 @@ export default function ValorResumo({
                   ⚠️ É RÓTULO, NÃO CONTROLE: sem seta e sem clique. A manchete é
                   mês fechado mais acumulado e não segue seletor nenhum, então
                   uma pílula com seta prometeria uma escolha que não existe. */}
-              <span className="shrink-0 rounded-full border border-brand-line px-2.5 py-0.5 text-legenda text-ink-2">
+              <span className="shrink-0 rounded-full border border-line px-2.5 py-0.5 text-legenda text-ink-2">
                 {rotuloPeriodo}
               </span>
             </StatTopo>
@@ -257,7 +275,7 @@ export default function ValorResumo({
             {/* Rodapé do cartão, separado por linha: o acumulado à esquerda (é
                 ele que trava a mão de quem ia cancelar) e o escopo do número à
                 direita. Duas pontas, como a prancha. */}
-            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-brand-line pt-4">
+            <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line pt-4">
               {totalDaManchete ? (
                 <p className="text-apoio text-ink-2">
                   <span className="font-semibold tabular-nums text-ink">

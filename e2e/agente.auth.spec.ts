@@ -149,7 +149,7 @@ test.describe("Painel com dados reais", () => {
     // mês fechado E sem acumulado), e aí o estado vazio é a resposta certa. O que
     // NÃO pode é quebrar nem inventar número: se existe manchete, ela tem
     // conteúdo; se não existe, o aviso de vazio está lá.
-    const manchete = page.locator(".bg-brand-surface");
+    const manchete = page.locator("[data-manchete]");
     if ((await manchete.count()) > 0) {
       await expect(manchete.first()).not.toBeEmpty();
     } else {

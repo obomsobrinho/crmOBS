@@ -29,7 +29,7 @@ test.describe("Valor percebido (/design/valor)", () => {
 
     // Manchete: seis blocos iguais não têm hierarquia, e sem hierarquia a pessoa
     // não lê nenhum. A frase mais forte fica em superfície da marca.
-    const manchete = page.locator(".bg-brand-surface").first();
+    const manchete = page.locator("[data-manchete]").first();
     await expect(manchete).toContainText("213");
     await expect(manchete).toContainText(
       /mensagens respondidas fora do horário de atendimento/
@@ -56,7 +56,7 @@ test.describe("Valor percebido (/design/valor)", () => {
     const secao = page
       .locator("section")
       .filter({ hasText: /desde o início, sem ninguém do time/ });
-    await expect(secao.locator(".bg-brand-surface")).toContainText("1876");
+    await expect(secao.locator("[data-manchete]")).toContainText("1876");
     // E o estado vazio não aparece junto do acumulado.
     await expect(secao.getByText("Ainda sem movimento no período")).toHaveCount(0);
   });
@@ -74,7 +74,7 @@ test.describe("Valor percebido (/design/valor)", () => {
     const semHorario = page
       .locator("section")
       .filter({ hasText: "Falta o horário de atendimento" });
-    await expect(semHorario.locator(".bg-brand-surface")).toContainText(
+    await expect(semHorario.locator("[data-manchete]")).toContainText(
       /fim de semana ou feriado/
     );
   });

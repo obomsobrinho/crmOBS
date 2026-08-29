@@ -47,10 +47,18 @@ const statVariants = cva("flex flex-col rounded-xl border", {
       /** Sem dado ainda. Tracejado é convite a preencher, não erro. */
       vazio: "border-dashed border-line-strong",
     },
-    /** Geometria mora aqui: padding e respiro entre as peças. */
+    /**
+     * Geometria mora aqui: padding e respiro entre as peças.
+     *
+     * Os valores vêm MEDIDOS da prancha da rodada 3 (29/08/2026): manchete com
+     * respiro de 28px na vertical e 32px na horizontal, cartão de indicador com
+     * 22px. Não são arredondados para a escala do Tailwind de propósito: a
+     * diferença de 2px por cartão, vezes quatro numa linha, é parte do que fazia
+     * a operação fechar mais baixa que o desenho.
+     */
     tamanho: {
-      manchete: "gap-2 p-6",
-      padrao: "gap-1.5 p-5",
+      manchete: "gap-3 px-8 py-7",
+      padrao: "gap-1.5 p-[22px]",
       compacto: "gap-1 p-4",
     },
   },
@@ -126,11 +134,22 @@ function StatRotulo({
   );
 }
 
+/**
+ * QUATRO degraus de numeral, medidos na prancha da rodada 3 (29/08/2026):
+ * 68 na manchete, 44 no movimento, 32 no cartão de indicador, 18 no bloco
+ * secundário.
+ *
+ * ⚠️ Eram TRÊS e todos pequenos demais: a manchete usava os mesmos 32px do
+ * cartão de indicador, e o cartão usava 24. O resultado é que a tela lia chapada
+ * e a frase mais forte não se distinguia de um número qualquer, que foi
+ * exatamente o que o dono apontou comparando com o desenho.
+ */
 const valorVariants = cva("font-display tabular-nums", {
   variants: {
     tamanho: {
-      manchete: "text-numero",
-      padrao: "text-display",
+      manchete: "text-manchete",
+      destaque: "text-destaque",
+      padrao: "text-numero",
       compacto: "text-titulo",
     },
   },

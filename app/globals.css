@@ -143,6 +143,22 @@
   --text-numero--letter-spacing: -0.02em;
   --text-numero--font-weight: 600;
 
+  /* ⚠️ MAIS DOIS DEGRAUS DE NUMERAL, medidos na prancha da rodada 3 (29/08/2026)
+     e não escolhidos aqui: manchete 68/68 e o número do movimento 44/48.
+     Sem eles a tela usava 32px para os três papéis, e a manchete, que é a frase
+     que a pessoa precisa ler mesmo sem ler mais nada, saía do mesmo tamanho de
+     um cartão qualquer. Foi a divergência que mais pesou quando o dono comparou
+     a tela com a prancha. */
+  --text-manchete: 68px;
+  --text-manchete--line-height: 68px;
+  --text-manchete--letter-spacing: -0.03em;
+  --text-manchete--font-weight: 600;
+
+  --text-destaque: 44px;
+  --text-destaque--line-height: 48px;
+  --text-destaque--letter-spacing: -0.025em;
+  --text-destaque--font-weight: 600;
+
   /* Raio. Cinco degraus mais o balão, que é assinatura do produto.
      A escala é LITERAL de propósito: o padrão do shadcn deriva tudo de
      --radius por calc(var(--radius) * 0.6), o que daria 7,2px e 9,6px onde a

@@ -32,6 +32,13 @@ const twMerge = extendTailwindMerge({
             "legenda",
             "rotulo",
             "numero",
+            // ⚠️ Os dois degraus de numeral da rodada 3 (68 e 44) entram AQUI,
+            // e esquecer isso repetiria o bug descrito acima: `text-manchete`
+            // seria classificado como COR, entraria em conflito com
+            // `text-brand-ink` no `StatValor` da manchete e descartaria a cor
+            // em silêncio.
+            "manchete",
+            "destaque",
           ],
         },
       ],

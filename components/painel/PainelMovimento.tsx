@@ -166,7 +166,10 @@ export default function PainelMovimento({
             {j.conversasAnterior !== null &&
               ` · ${j.conversasAnterior} no período anterior`}
           </p>
-          <div className="mt-3 font-display text-numero tabular-nums text-ink">
+          {/* 44/48 (`text-destaque`), medido na prancha: é o degrau ENTRE a
+              manchete de 68 e o cartão de indicador de 32. Com 32 aqui, o
+              movimento lia com o mesmo peso de um cartão da operação. */}
+          <div className="mt-3 font-display text-destaque tabular-nums text-ink">
             <NumeroAnimado valor={j.conversas} />
           </div>
           <p className="text-apoio text-ink-2">

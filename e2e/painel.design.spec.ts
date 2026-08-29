@@ -28,11 +28,18 @@ async function periodo(
 }
 
 test.describe("Painel: hierarquia de numeral", () => {
-  test("três degraus de número, e a manchete é o maior", async ({ page }) => {
+  test("quatro degraus de número, e a manchete é o maior", async ({ page }) => {
     await page.goto("/design/painel");
 
     // O defeito que isto conserta: os dez números da tela usavam o MESMO
     // `text-display` (24px), e a manchete só se distinguia por cor de fundo.
+    //
+    // ⚠️ Os degraus vêm MEDIDOS da prancha da rodada 3 (29/08/2026): 68 na
+    // manchete, 44 no movimento, 32 no cartão de indicador, 18 no bloco
+    // secundário. Antes eram três e todos pequenos, com a manchete nos mesmos
+    // 32px de um cartão qualquer, e foi a divergência que o dono apontou ao
+    // comparar a tela com o desenho. Não afrouxar estes números sem medir a
+    // prancha de novo.
     const tamanhos = await page.evaluate(() => {
       const px = (e: Element) =>
         Math.round(parseFloat(getComputedStyle(e).fontSize));
@@ -47,9 +54,11 @@ test.describe("Painel: hierarquia de numeral", () => {
       };
     });
 
-    expect(tamanhos.distintos).toEqual([18, 24, 32]);
-    // A manchete é o primeiro cartão da tela E o maior numeral.
-    expect(tamanhos.manchete).toBe(32);
+    expect(tamanhos.distintos).toEqual([18, 32, 68]);
+    // A manchete é o primeiro cartão da tela E o maior numeral, com folga: 68
+    // contra 32 é o dobro, e é essa distância que faz a tela ter ordem de
+    // leitura antes de qualquer palavra ser lida.
+    expect(tamanhos.manchete).toBe(68);
     expect(tamanhos.manchete).toBe(tamanhos.maior);
   });
 
