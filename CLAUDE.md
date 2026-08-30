@@ -405,8 +405,21 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   O CRM é **subproduto da OBS** (O Bom Sobrinho): herda família tipográfica (Manrope + Space
   Grotesk) e o roxo; pode ter marca-filha própria, desde que derivada do bloco com "OBS" em espaço
   negativo. O nome do produto ainda não existe, então **nada de nome fixo em componente**.
-- **Design system (tokens em `app/globals.css`):** fonte da verdade é o projeto **"OBS CRM"** no
-  Claude Design. Quatro regras que valem em toda UI nova:
+- **Design system: `docs/design-system/`** (gerado do código em 30/08/2026). Os tokens vivem em
+  `app/globals.css` e a camada base em `components/ui/`; os documentos explicam o PORQUÊ, que é o
+  que o código não guarda. São 8 arquivos: marca, cor, superfície, tipografia, geometria, animação,
+  camada base e **pendências** (o que está medido e ainda sem decisão).
+  ⚠️ A pasta `Desktop/DesingSystem/` está **obsoleta**: cita tokens já apagados (`--ink-dim`,
+  `--ink-muted`, `--accent`), não cita nenhum papel tipográfico atual e afirma que o projeto não usa
+  Radix. Não consultar.
+  **A hierarquia de título tem TRÊS níveis** (fechada em 30/08/2026): `text-titulo` 18 = título da
+  PÁGINA; `text-cartao` 16 caixa normal = título de bloco COM ESTRUTURA PRÓPRIA (faixa de
+  cabeçalho, lista, gráfico); `text-rotulo` 12 CAIXA ALTA = rótulo de um VALOR, cartão simples que
+  vai direto ao conteúdo, ou sub-bloco recolhível. Os dois últimos NÃO são intercambiáveis.
+  ⚠️ **Papel tipográfico não pode repetir nome de cor:** `text-bloco` colidia com `--color-bloco` e
+  o Tailwind resolvia COR, não tamanho (`color: var(--s-bloco)`), então o título nascia sem os 16px
+  e sem o peso 600. Por isso o papel chama-se `cartao`.
+  Quatro regras que valem em toda UI nova:
   1. **Cada matiz tem 4 papéis:** `fill` (fundo cheio), `on` (tinta sobre o fill), `ink` (a cor como
      TEXTO ou ícone sobre superfície) e `surface`/`line`. **NUNCA usar `fill` como cor de texto**
      (é o que produzia as 18 reprovações WCAG AA) e nunca usar `ink` como fundo. Ou seja:
