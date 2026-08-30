@@ -65,9 +65,15 @@ export default function PainelAssuntos({
   return (
     // ⚠️ `min-h-0` mais coluna: sem os dois, o `overflow-y-auto` da lista não
     // tem contra o que resolver e o cartão volta a crescer com o conteúdo.
+    //
+    // ⚠️ `flex-1` é o que faz ele PREENCHER a trilha. Com lista cheia o cartão
+    // já ocupava tudo por encolher a partir do conteúdo, mas no ESTADO VAZIO o
+    // conteúdo é curto e sobrava um buraco de 161px entre ele e a citação do
+    // agente, medido na tela real. É o vazio que precisa crescer, porque é ele
+    // que a conta nova vê.
     <section
       data-slot="painel-assuntos"
-      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
     >
       {/* Cabeçalho com o mesmo respiro do cartão de movimento (18px em cima e
           embaixo) e o divisor de borda-suave atravessando o cartão. */}
