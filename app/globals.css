@@ -92,6 +92,7 @@
 
   /* Linhas estruturais. */
   --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
   --color-line-strong: var(--line-strong);
 
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
@@ -111,14 +112,22 @@
   --text-titulo--letter-spacing: -0.01em;
   --text-titulo--font-weight: 600;
 
-  /* TÍTULO DE BLOCO, 16/22 600. A prancha lista este papel na tabela 1d e a
+  /* TÍTULO DE CARTÃO, 16/22 600. A prancha lista este papel na tabela 1d e a
      escala da casa não tinha: o título de um cartão saía ou como `titulo` (18,
      grande demais ao lado do numeral) ou como `rotulo` (12 em caixa alta, que é
      rótulo de SEÇÃO e não título). "Movimento" é o caso: na prancha ele é um
-     título em caixa normal, não um rótulo. */
-  --text-bloco: 16px;
-  --text-bloco--line-height: 22px;
-  --text-bloco--font-weight: 600;
+     título em caixa normal, não um rótulo.
+
+     ⚠️ CHAMA-SE `cartao` E NÃO `bloco` POR CAUSA DE UMA COLISÃO REAL. Existe
+     `--color-bloco` (a superfície `--s-bloco`), e diante de `text-bloco` o
+     Tailwind resolve COR, não tamanho: a regra emitida era
+     `.text-bloco { color: var(--s-bloco) }`. O título nascia com 400 de peso e
+     16px só por herança, e ninguém via porque o `text-ink` ao lado devolvia a
+     cor certa. Medido no navegador em 30/08/2026. Nome de papel tipográfico não
+     pode repetir nome de cor. */
+  --text-cartao: 16px;
+  --text-cartao--line-height: 22px;
+  --text-cartao--font-weight: 600;
 
   --text-corpo: 15px;
   --text-corpo--line-height: 22px;
@@ -336,6 +345,10 @@
 
   /* ── Estrutura ── */
   --line: oklch(0 0 0 / 8%);
+  /* Divisor INTERNO de cartão (a `--line2` da prancha): cabeçalho, rodapé e
+     separador de lista. Mais fraco que `--line`, que é a borda do cartão, e a
+     diferença é o que faz o cartão ter contorno sem parecer uma tabela. */
+  --line-soft: oklch(0 0 0 / 6%);
   --line-strong: oklch(0 0 0 / 18%);
   --active-bg: oklch(0 0 0 / 5%);
   --selected-bg: #f4f4f4;
@@ -540,6 +553,7 @@
   --danger-border: rgba(239, 68, 68, 0.3);
 
   --line: oklch(1 0 0 / 10%);
+  --line-soft: oklch(1 0 0 / 6%);
   --line-strong: oklch(1 0 0 / 22%);
   --active-bg: rgba(255, 255, 255, 0.05);
   --selected-bg: #1f1f1f;

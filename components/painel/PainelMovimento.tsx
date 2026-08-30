@@ -116,9 +116,11 @@ export default function PainelMovimento({
   const delta = calcularDelta({
     atual: j.conversas,
     anterior: j.conversasAnterior,
-    // Volume é NEUTRO e nunca vermelho: mês fraco é o mercado do cliente, não a
-    // IA falhando, e pintar isso de vermelho joga o mercado dele na nossa conta.
-    direcao: "neutra",
+    // ⚠️ `maior-melhor`, e não `neutra`, porque é o que a prancha desenha: o
+    // selo de +17% é VERDE nela. O custo, dito por inteiro: uma QUEDA de volume
+    // passa a sair vermelha, e mês fraco costuma ser o mercado do cliente e não
+    // a IA falhando. Voltar para `neutra` é uma linha, e é decisão do dono.
+    direcao: "maior-melhor",
     semBase: "sem período anterior completo",
   });
 
@@ -139,14 +141,38 @@ export default function PainelMovimento({
       className="painel-cartao relative flex flex-col overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
       style={{ "--passo": 4 } as React.CSSProperties}
     >
-      {/* O seletor flutua no canto do cartão, e não numa linha própria: a área
-          precisa da largura inteira à direita, e uma linha só para a pílula
-          comeria altura da primeira tela. */}
-      <div className="absolute right-5 top-5 z-10">
+      {/* ⚠️ CABEÇALHO PRÓPRIO, com uma linha que atravessa o cartão inteiro.
+          O seletor já flutuou no canto, por cima da área, e estava errado: na
+          prancha ele mora nesta faixa, ao lado do título, e a faixa termina num
+          divisor de borda-suave (a `--line2` dela) de ponta a ponta. */}
+      <div className="flex items-start justify-between gap-5 border-b border-line-soft px-6 py-[18px]">
+        <div className="min-w-0">
+          {/* Título de BLOCO (16/22, caixa normal) em Space Grotesk, e não
+              rótulo de seção em caixa alta: é assim na prancha, e é o que
+              separa o título de um CARTÃO do rótulo de uma SEÇÃO da página. */}
+          <h2 className="font-display text-cartao text-ink">Movimento</h2>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            Conversas por dia
+            {j.conversasAnterior !== null &&
+              ` · ${j.conversasAnterior} no período anterior`}
+          </p>
+        </div>
         <Tabs value={key} onValueChange={(v) => setKey(v as MovimentoKey)}>
-          <TabsList variant="segmentado" aria-label="Janela do movimento">
+          {/* ⚠️ Bandeja no CANVAS, e não na cor do cartão: aqui ela está DENTRO
+              de um cartão, então precisa recuar em vez de subir. Na operação,
+              que flutua sobre o canvas, vale o padrão da variante. */}
+          <TabsList
+            variant="painel"
+            className="bg-canvas"
+            aria-label="Janela do movimento"
+          >
             {ORDEM.map((k) => (
-              <TabsTrigger key={k} value={k} variant="segmentado">
+              <TabsTrigger
+                key={k}
+                value={k}
+                variant="painel"
+                className="py-1 text-legenda"
+              >
                 {k} dias
               </TabsTrigger>
             ))}
@@ -158,37 +184,36 @@ export default function PainelMovimento({
           em cima, gráfico embaixo em largura inteira) foi a primeira tentativa e
           está errado: come altura da primeira tela e tira do número o papel de
           ser lido ANTES do desenho, que é o arranjo que a rodada 3 fechou. */}
-      <div className="flex flex-1">
-        <div className="w-[220px] shrink-0 p-6">
-          {/* Título de BLOCO (16/22, caixa normal), e não rótulo de seção em
-              caixa alta: é assim na prancha, e é o que separa o título de um
-              cartão do rótulo de uma seção da página. */}
-          <h2 className="text-bloco text-ink">Movimento</h2>
-          <p className="mt-0.5 text-legenda text-ink-3">
-            Conversas por dia
-            {j.conversasAnterior !== null &&
-              ` · ${j.conversasAnterior} no período anterior`}
-          </p>
+      <div className="flex flex-1 items-end gap-5">
+        <div className="w-[210px] shrink-0 py-5 pl-6">
           {/* 44/48 (`text-destaque`), medido na prancha: é o degrau ENTRE a
               manchete de 68 e o cartão de indicador de 32. Com 32 aqui, o
               movimento lia com o mesmo peso de um cartão da operação. */}
-          <div className="mt-3 font-display text-destaque tabular-nums text-ink">
+          {/* ⚠️ Marcado. O título do cartão também é `font-display` desde que
+              passou a usar Space Grotesk como na prancha, então "o primeiro
+              .font-display do cartão" deixou de ser o numeral: o teste de
+              degraus de numeral media 16px em vez de 44. */}
+          <div
+            data-slot="painel-movimento-numero"
+            className="font-display text-destaque tabular-nums text-ink"
+          >
             <NumeroAnimado valor={j.conversas} />
           </div>
-          <p className="text-apoio text-ink-2">
+          <p className="mt-0.5 text-apoio text-ink-2">
             {j.conversas === 1 ? "conversa" : "conversas"} nos últimos {j.dias}{" "}
             dias
           </p>
-          {/* O selo traz CONTRA O QUE está comparando ("+17% vs. 36"), como na
-              prancha: porcentagem sozinha obriga a pessoa a procurar a base no
-              subtítulo, e a base é metade da informação. */}
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <Selo delta={delta} />
-            {j.conversasAnterior !== null && delta.tipo === "selo" && (
-              <span className="text-legenda text-ink-3">
-                vs. {j.conversasAnterior}
-              </span>
-            )}
+          {/* O selo traz CONTRA O QUE está comparando, numa peça só: "+17%
+              vs. 36", como na prancha. */}
+          <div className="mt-2.5">
+            <Selo
+              delta={delta}
+              sufixo={
+                j.conversasAnterior !== null
+                  ? `vs. ${j.conversasAnterior}`
+                  : undefined
+              }
+            />
           </div>
         </div>
 
@@ -282,8 +307,8 @@ export default function PainelMovimento({
 
       {/* Rodapé numa linha só, com as duas pontas: leitura do gráfico à
           esquerda, quem respondeu à direita. Separado por linha interna. */}
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line px-6 py-3.5">
-        <p className="text-legenda text-ink-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line-soft px-6 py-3">
+        <p className="text-legenda text-ink-2">
           {pico && total(pico) > 0
             ? `pico de ${total(pico)} na ${nomeDoDia(pico.chave)}, ${legivel(pico.chave)}`
             : "sem pico no período"}

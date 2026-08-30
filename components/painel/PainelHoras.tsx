@@ -24,10 +24,26 @@ const EIXO = [0, 6, 12, 18, 23];
 export default function PainelHoras({
   colunas,
   rotuloDentro,
+  rotulo = "Em que horas as mensagens chegaram",
+  escopo,
 }: {
   colunas: BarraHora[];
   /** Horário da empresa em uma linha, ex.: "Segunda a sexta: 08:00 às 18:00". */
   rotuloDentro: string;
+  /**
+   * O título do gráfico.
+   *
+   * ⚠️ O PADRÃO É O DA PRANCHA ("as mensagens chegaram"), por pedido do dono em
+   * 30/08/2026, e ele NÃO descreve o que a barra mede hoje: `barrasDeHora`
+   * conta RESPOSTA DA IA, que é o que faz a soma das partes roxas fechar
+   * exatamente com o número da manchete. Contar chegada daria outro conjunto
+   * (mensagem que chega às 23h e é respondida no dia seguinte entra num e não
+   * no outro) e a igualdade quebraria. É prop justamente para a troca ser uma
+   * linha, seja qual for o lado que o dono decidir fechar.
+   */
+  rotulo?: string;
+  /** Canto direito do cabeçalho, ex.: "julho de 2026 · 486 recebidas". */
+  escopo?: string;
 }) {
   const total = (c: BarraHora) => c.dentro + c.fora;
   // A hora mais cheia vale 100%. Piso de 1 para não dividir por zero.
@@ -35,14 +51,19 @@ export default function PainelHoras({
 
   return (
     <div data-slot="painel-horas" className="min-w-0">
-      <p className="mb-2 text-legenda text-ink-3">Em que horas a IA respondeu</p>
+      <div className="mb-2.5 flex items-baseline justify-between gap-3">
+        <span className="text-apoio font-semibold text-ink-2">{rotulo}</span>
+        {escopo && (
+          <span className="shrink-0 text-legenda text-ink-3">{escopo}</span>
+        )}
+      </div>
 
       {/* ⚠️ NUNCA `items-end` nesta linha, e a coluna PRECISA de `h-full`. Com
           `items-end` a coluna fica com a altura do conteúdo, e a barra, que tem
           altura em PORCENTAGEM, resolve para ZERO. Foi assim que o gráfico de 14
           dias renderizou invisível em produção com o e2e passando. Quem encosta
           a barra no chão é o `justify-end` da coluna. */}
-      <div className="painel-horas flex h-24 gap-[5px]">
+      <div className="painel-horas flex h-24 gap-[5px] border-b border-line-soft pb-1.5">
         {colunas.map((c) => {
           const t = total(c);
           const pctDentro = `${(c.dentro / maior) * 100}%`;

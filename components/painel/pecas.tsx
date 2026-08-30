@@ -25,7 +25,21 @@ import { useContagem } from "@/components/painel/useContagem";
  * menos é melhor, e sem essa regra o selo ficaria verde num atendimento que
  * piorou.
  */
-export function Selo({ delta }: { delta: Delta }) {
+export function Selo({
+  delta,
+  sufixo,
+}: {
+  delta: Delta;
+  /**
+   * A BASE da comparação, DENTRO da pílula. Ex.: "vs. 36".
+   *
+   * Dentro e não ao lado porque na prancha o selo do movimento é uma peça só
+   * ("↗ +17% vs. 36"). Porcentagem sozinha obriga a pessoa a caçar a base no
+   * subtítulo, e a base é metade da informação. Some junto com o selo quando
+   * não há período anterior, que é o certo: sem base não há o que citar.
+   */
+  sufixo?: string;
+}) {
   if (delta.tipo === "sem-base") {
     return <span className="text-legenda text-ink-3">{delta.texto}</span>;
   }
@@ -40,6 +54,7 @@ export function Selo({ delta }: { delta: Delta }) {
     <Badge variant={variant}>
       {delta.texto !== "igual" && <Seta size={12} aria-hidden />}
       {delta.texto}
+      {sufixo && <span className="font-medium opacity-80">{sufixo}</span>}
     </Badge>
   );
 }

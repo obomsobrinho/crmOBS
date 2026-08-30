@@ -54,7 +54,7 @@ export function PainelFilaCartao({
     <section
       data-slot="painel-fila"
       data-urgente={urgente ? "sim" : "nao"}
-      className={`rounded-xl border px-[22px] py-4 ${
+      className={`rounded-xl border px-[22px] py-5 ${
         urgente
           ? "border-warn-line bg-warn-surface"
           : "border-line bg-raised shadow-[var(--panel-shadow)]"
@@ -83,7 +83,11 @@ export function PainelFilaCartao({
         </p>
       ) : (
         <>
-          <p className="mt-2 flex items-baseline gap-2">
+          {/* ⚠️ A FRASE ACOMPANHA O NUMERAL, em corpo 600 na tinta cheia, e não
+              em apoio na tinta 2. É assim na prancha, e a razão é que "3" e
+              "pessoas esperando você" são UMA informação: enfraquecer a segunda
+              metade faz o número parecer um enfeite ao lado de um rótulo. */}
+          <p className="mb-1.5 mt-2.5 flex items-baseline gap-2.5">
             <span
               className={`font-display text-numero tabular-nums ${
                 urgente ? "text-warn-ink" : "text-ink"
@@ -91,19 +95,19 @@ export function PainelFilaCartao({
             >
               {quantas}
             </span>
-            <span className="text-apoio text-ink-2">
+            <span className="text-corpo font-semibold text-ink">
               {quantas === 1
                 ? "pessoa esperando você"
                 : "pessoas esperando você"}
             </span>
           </p>
-          <p className="mt-1 text-legenda text-ink-3">
+          <p className="text-apoio text-ink-2">
             {espera ? `A mais antiga ${espera}. ` : ""}A IA avisou que ia
             verificar.
           </p>
           <Link
             href={href}
-            className={`painel-pressiona mt-4 flex h-9 items-center justify-center gap-1.5 rounded-lg border text-apoio font-semibold transition-colors ${
+            className={`painel-pressiona mt-3.5 flex h-9 items-center justify-center gap-1.5 rounded-[10px] border text-apoio font-semibold transition-colors ${
               urgente
                 ? "border-transparent bg-warn text-[var(--warn-on)] hover:brightness-105"
                 : "border-line bg-bloco text-ink hover:bg-[var(--active-bg)]"

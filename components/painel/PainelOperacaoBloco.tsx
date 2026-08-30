@@ -81,10 +81,13 @@ export default function PainelOperacaoBloco({
   });
 
   return (
-    <section data-slot="painel-operacao" className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section data-slot="painel-operacao" className="space-y-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-6">
         <div className="min-w-0">
-          <h2 className="text-rotulo uppercase text-ink-3">A operação</h2>
+          {/* Título de BLOCO em Space Grotesk, como na prancha, e não rótulo em
+              caixa alta na tinta 3. Caixa alta é para RÓTULO de indicador,
+              dentro do cartão; o cabeçalho de um bloco da página é título. */}
+          <h2 className="font-display text-cartao text-ink">A operação</h2>
           {/* O escopo do bloco inteiro, dito uma vez. Os cartões repetem o
               período na legenda de cada um, porque cartão sem período mente
               sobre o próprio número, mas quem lê o bloco precisa saber CONTRA O
@@ -95,9 +98,9 @@ export default function PainelOperacaoBloco({
           </p>
         </div>
         <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoKey)}>
-          <TabsList variant="segmentado" aria-label="Período">
+          <TabsList variant="painel" aria-label="Período">
             {ORDEM_PERIODOS.map((k) => (
-              <TabsTrigger key={k} value={k} variant="segmentado">
+              <TabsTrigger key={k} value={k} variant="painel">
                 {PERIODOS[k].aba}
               </TabsTrigger>
             ))}

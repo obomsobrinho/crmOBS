@@ -268,7 +268,16 @@ export default function ValorResumo({
                   conjuntos diferentes lado a lado, e o cliente leria isso como
                   erro. Sem gráfico é melhor do que gráfico que não fecha. */}
               {mostrarHoras && (
-                <PainelHoras colunas={horas!} rotuloDentro={rotuloHorario} />
+                <PainelHoras
+                  colunas={horas!}
+                  rotuloDentro={rotuloHorario}
+                  // O escopo do gráfico no canto, como na prancha: de quando é
+                  // e sobre quantas mensagens. Sem o total, "em que horas" não
+                  // diz de que universo as barras são fatia.
+                  escopo={`${rotuloPeriodo} · ${resumoMostrado.recebidas.toLocaleString(
+                    "pt-BR"
+                  )} recebidas`}
+                />
               )}
             </div>
 

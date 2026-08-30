@@ -56,6 +56,22 @@ const listaVariants = cva("flex items-center gap-1", {
       sublinhado: "",
       /** Bandeja com moldura, no mesmo fundo de campo do resto da casa. */
       segmentado: "w-fit rounded-lg border border-line bg-[var(--input-bg)] p-1",
+      /**
+       * A do painel. Mesmo esqueleto do `segmentado` e DIFERENTE onde importa:
+       * a aba ativa é a superfície de bloco, nunca o fill da marca.
+       *
+       * ⚠️ Não dá para reaproveitar `segmentado`: lá o ativo é roxo cheio
+       * porque ele alterna o MODO do agente (guiado/avançado), que é escolha de
+       * estado. Aqui ele só troca a janela de um gráfico, e roxo cheio num
+       * seletor de período rouba a cor da série, que no painel é a única cor
+       * categórica que existe.
+       *
+       * A bandeja nasce na cor do CARTÃO, que é onde a operação a usa (ela
+       * flutua sobre o canvas). Dentro de um cartão ela precisa recuar para o
+       * canvas, e quem faz isso é o chamador, por className.
+       */
+      painel:
+        "w-fit gap-[2px] rounded-[10px] border border-line bg-raised p-[3px]",
     },
   },
   defaultVariants: { variant: "sublinhado" },
@@ -90,6 +106,11 @@ const gatilhoVariants = cva(
           "items-center gap-1.5 rounded-md px-3 text-apoio font-medium",
           "h-[var(--h-control)] text-ink-2 hover:text-ink",
           "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+        ],
+        painel: [
+          "items-center rounded-[7px] px-3 py-[5px] text-apoio font-medium",
+          "text-ink-2 hover:bg-bloco hover:text-ink",
+          "data-[state=active]:bg-bloco data-[state=active]:font-semibold data-[state=active]:text-ink",
         ],
       },
     },

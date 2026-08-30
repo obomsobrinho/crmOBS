@@ -345,7 +345,11 @@ export default function DesignPainelPage() {
             num bloco só (fila mais assuntos) e a linha 3 sozinha (o verbatim). O
             topo da linha 3 é o maior dos dois lados, então os dois cartões
             começam juntos, seja qual for a altura do conteúdo. */}
-        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_1fr_auto]">
+        {/* ⚠️ `xl:flex-1` mais `xl:min-h-0` NÃO é enfeite: é o que dá à grade
+            uma altura DEFINIDA. Sem isso as linhas resolvem pela altura do
+            conteúdo, a lista de assuntos volta a crescer sem limite e a rolagem
+            interna dela não tem contra o que resolver. */}
+        <div className="grid min-w-0 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_auto_1fr]">
           <div className="min-w-0 xl:col-start-1 xl:row-start-1">
             <ValorResumo
               resumo={MES}
@@ -372,7 +376,15 @@ export default function DesignPainelPage() {
 
           {/* A trilha ocupa as duas primeiras linhas; os assuntos esticam para
               preencher, que é o que a prancha mostra. */}
-          <div className="flex min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2">
+          {/* ⚠️ `xl:h-0 xl:min-h-full` NÃO é gambiarra, é o conserto de um efeito
+              real da grade: este bloco ATRAVESSA as linhas 1 e 2, e como as duas
+              são `auto`, a grade somava a altura de CONTEÚDO dele (fila mais a
+              lista inteira de assuntos) e distribuía a sobra nas duas linhas.
+              O sintoma era um vão de 43px embaixo da manchete e outro embaixo da
+              operação. Com `h-0` a contribuição intrínseca dele vira zero, quem
+              dimensiona as linhas passa a ser só a coluna principal, e
+              `min-h-full` devolve a altura das duas linhas para ele preencher. */}
+          <div className="flex min-h-0 min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:h-0 xl:min-h-full">
             {/* Abaixo do limiar de aviso: o cartão neutro, como na prancha. */}
             <PainelFilaCartao
               quantas={3}

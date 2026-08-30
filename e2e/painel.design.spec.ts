@@ -50,8 +50,12 @@ test.describe("Painel: hierarquia de numeral", () => {
       // O numeral do movimento não é um `Stat`: é o número grande da coluna
       // esquerda daquele cartão. Precisa entrar na medição, senão o degrau de
       // 44px não seria conferido por ninguém.
+      //
+      // ⚠️ Pelo `data-slot` e NÃO por `.font-display`: o título do cartão também
+      // é Space Grotesk desde 30/08/2026, então "o primeiro .font-display" virou
+      // o TÍTULO, e este teste passou a medir 16px achando que media 44.
       const mov = document.querySelector(
-        '[data-slot="painel-movimento"] .font-display'
+        '[data-slot="painel-movimento-numero"]'
       )!;
       return {
         cartoes: [...new Set(vals.map(px))].sort((a, b) => a - b),

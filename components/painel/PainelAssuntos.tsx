@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { TrendingUp, ChevronDown, ArrowRight, Sparkles } from "lucide-react";
+import { ChevronDown, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 // "Assuntos em alta": o que mais perguntam para a IA, em acordeão.
@@ -63,16 +63,20 @@ export default function PainelAssuntos({
   const maior = temDado ? Math.max(...itens.map((i) => i.contagem)) : 1;
 
   return (
+    // ⚠️ `min-h-0` mais coluna: sem os dois, o `overflow-y-auto` da lista não
+    // tem contra o que resolver e o cartão volta a crescer com o conteúdo.
     <section
       data-slot="painel-assuntos"
-      className="overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
+      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2 px-[22px] pb-2.5 pt-4">
+      {/* Cabeçalho com o mesmo respiro do cartão de movimento (18px em cima e
+          embaixo) e o divisor de borda-suave atravessando o cartão. */}
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-line-soft px-[22px] py-[18px]">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
-            <TrendingUp size={13} aria-hidden />
-            Assuntos em alta
-          </h2>
+          {/* Título de BLOCO em Space Grotesk, igual ao "Movimento". O ícone
+              saiu junto com a caixa alta: os dois eram do papel RÓTULO, e este
+              é o título de um cartão. */}
+          <h2 className="font-display text-cartao text-ink">Assuntos em alta</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
             {temDado
               ? `${totalPerguntas ?? 0} perguntas, vs. os ${periodo} anteriores`
@@ -80,7 +84,7 @@ export default function PainelAssuntos({
           </p>
         </div>
         {temDado ? (
-          <span className="shrink-0 rounded-full border border-line bg-bloco px-2.5 py-0.5 text-legenda text-ink-2">
+          <span className="flex h-[26px] shrink-0 items-center rounded-full border border-line bg-bloco px-2.5 text-legenda text-ink-2">
             {periodo}
           </span>
         ) : (
@@ -89,7 +93,12 @@ export default function PainelAssuntos({
       </div>
 
       {temDado ? (
-        <div className="divide-y divide-line border-t border-line">
+        /* ⚠️ ROLAGEM DENTRO DO CARTÃO, e não altura livre. A lista é o único
+           bloco da trilha que cresce com o conteúdo, e era ela que empurrava o
+           cartão para baixo e abria um vão entre a operação e o movimento na
+           coluna ao lado. Com a rolagem, quem manda na altura é a grade da
+           página, e a linha de base dos dois lados fecha. */
+        <div className="min-h-0 flex-1 divide-y divide-line-soft overflow-y-auto">
           {itens.map((it, i) => {
             const estaAberto = aberto === i;
             return (
@@ -98,46 +107,55 @@ export default function PainelAssuntos({
                   type="button"
                   onClick={() => setAberto(estaAberto ? null : i)}
                   aria-expanded={estaAberto}
-                  className="painel-pressiona flex w-full items-center gap-3 px-[22px] py-2.5 text-left transition-colors hover:bg-[var(--active-bg)]"
+                  className="painel-pressiona block w-full px-[22px] py-3 text-left transition-colors hover:bg-bloco"
                 >
-                  <span className="min-w-0 flex-1">
+                  {/* Linha de cima: o assunto à esquerda, contagem e seta à
+                      direita. A VARIAÇÃO desceu para a linha da barra, como na
+                      prancha: ela é leitura da barra, não do título. */}
+                  <span className="flex items-baseline justify-between gap-2.5">
                     <span
-                      className={`block truncate text-apoio ${
-                        estaAberto ? "font-semibold text-ink" : "text-ink-2"
+                      className={`min-w-0 truncate text-corpo ${
+                        estaAberto ? "font-semibold text-ink" : "text-ink"
                       }`}
                     >
                       {it.titulo}
                     </span>
-                    {/* Trilha proporcional à contagem, na cor da série. */}
-                    <span className="mt-1 block h-[3px] rounded-sm bg-line">
-                      <span
-                        className="block h-full rounded-sm bg-brand"
-                        style={{ width: `${(it.contagem / maior) * 100}%` }}
+                    <span className="flex shrink-0 items-baseline gap-2">
+                      <span className="font-display text-[15px] font-semibold tabular-nums text-ink">
+                        {it.contagem}
+                      </span>
+                      <ChevronDown
+                        size={12}
+                        aria-hidden
+                        className={`shrink-0 text-ink-3 transition-transform duration-200 ${
+                          estaAberto ? "rotate-180" : ""
+                        }`}
                       />
                     </span>
                   </span>
-                  <span className="shrink-0 font-display text-[15px] font-semibold tabular-nums text-ink">
-                    {it.contagem}
+                  {/* Barra proporcional em DUAS peças com respiro entre elas, e
+                      não um preenchimento dentro de um trilho: é o desenho da
+                      prancha, e o respiro é o que deixa claro onde o roxo acaba
+                      quando a proporção é alta. */}
+                  <span className="mt-[7px] flex items-center gap-2.5">
+                    <span
+                      className="h-[3px] shrink-0 rounded-sm bg-brand"
+                      style={{ width: `${(it.contagem / maior) * 100}%` }}
+                    />
+                    <span className="h-[3px] min-w-0 flex-1 rounded-sm bg-line-soft" />
+                    <span className="shrink-0 text-legenda text-ink-3">
+                      {it.variacao}
+                    </span>
                   </span>
-                  <span className="shrink-0 text-legenda text-ink-3">
-                    {it.variacao}
-                  </span>
-                  <ChevronDown
-                    size={12}
-                    aria-hidden
-                    className={`shrink-0 text-ink-3 transition-transform duration-200 ${
-                      estaAberto ? "rotate-180" : ""
-                    }`}
-                  />
                 </button>
 
                 {estaAberto && (
-                  <div className="px-[22px] pb-3">
+                  <div className="px-[22px] pb-4">
                     <p className="text-apoio text-ink-2">{it.resumo}</p>
-                    <p className="mt-2.5 text-legenda font-semibold uppercase tracking-[0.06em] text-ink-3">
+                    <p className="mb-1.5 mt-2.5 text-legenda font-semibold uppercase tracking-[0.06em] text-ink-3">
                       Os pedidos que formaram este assunto
                     </p>
-                    <ul className="mt-1.5 space-y-1">
+                    <ul className="space-y-[3px]">
                       {it.pedidos.map((p) => (
                         <li key={p.texto} className="text-legenda text-ink-3">
                           {p.texto} · {p.quando}
@@ -158,7 +176,7 @@ export default function PainelAssuntos({
           })}
         </div>
       ) : (
-        <div className="border-t border-line px-[22px] py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-[22px] py-4">
           {/* ⚠️ Número literalmente `XX`, rótulo POSICIONAL e barra CINZA. Um
               valor plausível, mesmo borrado, é indistinguível de medição num
               print ampliado, e "a IA não inventa" é o eixo do produto. */}

@@ -39,8 +39,14 @@ const twMerge = extendTailwindMerge({
             // em silêncio.
             "manchete",
             "destaque",
-            // Título de bloco (16/22), pelo mesmo motivo dos dois acima.
-            "bloco",
+            // Título de cartão (16/22), pelo mesmo motivo dos dois acima.
+            //
+            // ⚠️ Chama-se `cartao` e NÃO `bloco`: já existe `--color-bloco`, e
+            // com os dois nomes iguais o Tailwind resolvia `text-bloco` como
+            // COR (a regra emitida era `color: var(--s-bloco)`), então o título
+            // nascia sem os 16px e sem o peso 600. Nome de papel tipográfico
+            // não pode repetir nome de cor.
+            "cartao",
           ],
         },
       ],

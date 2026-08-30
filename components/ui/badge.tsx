@@ -54,11 +54,11 @@ const badgeVariants = cva(
          * `-ink` sobre `-surface`, nunca `-fill` como tinta.
          */
         "delta-bom":
-          "inline-flex shrink-0 items-center gap-1 rounded-full bg-human-surface px-2 py-0.5 text-legenda tabular-nums text-human-ink",
+          "inline-flex shrink-0 items-center gap-1 rounded-full border border-human-line bg-human-surface px-2 py-0.5 text-legenda font-semibold tabular-nums text-human-ink",
         "delta-ruim":
-          "inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-surface px-2 py-0.5 text-legenda tabular-nums text-danger-ink",
+          "inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-line bg-danger-surface px-2 py-0.5 text-legenda font-semibold tabular-nums text-danger-ink",
         "delta-neutro":
-          "inline-flex shrink-0 items-center gap-1 rounded-full bg-bloco px-2 py-0.5 text-legenda tabular-nums text-ink-2",
+          "inline-flex shrink-0 items-center gap-1 rounded-full border border-line-soft bg-bloco px-2 py-0.5 text-legenda font-semibold tabular-nums text-ink-2",
       },
     },
     defaultVariants: { variant: "contorno" },
