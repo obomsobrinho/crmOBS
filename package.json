@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "test:e2e:login": "playwright test --project=setup --project=logado"
+    "test:e2e:login": "playwright test --project=setup --project=logado",
+    "design:export": "node scripts/exportar-design-system.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.3",

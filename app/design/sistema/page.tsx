@@ -203,7 +203,13 @@ function Amostra({
       </div>
       <p className="mt-1.5 truncate text-legenda text-ink-2">{rotulo}</p>
       <p className="truncate font-mono text-[11px] text-ink-3">{token}</p>
-      <p className="truncate font-mono text-[11px] text-ink-faint">
+      {/* `data-token` existe para o HTML EXPORTADO conseguir recalcular este
+          valor sozinho. Sem ele, o export congelaria o número do tema em que a
+          foto foi tirada e mentiria ao trocar de tema. */}
+      <p
+        data-token={token}
+        className="truncate font-mono text-[11px] text-ink-faint"
+      >
         {valor || "sem valor"}
       </p>
     </div>
@@ -226,7 +232,13 @@ function AmostraTinta({
         {rotulo}
       </p>
       <p className="mt-1 truncate font-mono text-[11px] text-ink-3">{token}</p>
-      <p className="truncate font-mono text-[11px] text-ink-faint">
+      {/* `data-token` existe para o HTML EXPORTADO conseguir recalcular este
+          valor sozinho. Sem ele, o export congelaria o número do tema em que a
+          foto foi tirada e mentiria ao trocar de tema. */}
+      <p
+        data-token={token}
+        className="truncate font-mono text-[11px] text-ink-faint"
+      >
         {valor || "sem valor"}
       </p>
     </div>
@@ -543,7 +555,10 @@ export default function DesignSistemaPage() {
               {/* A checagem é FEITA aqui, não afirmada: se um dia os dois
                   divergirem, o aviso some sozinho. */}
               {mesmaCor && (
-                <p className="mt-4 text-legenda text-warn-ink">
+                <p
+                  data-aviso="raised-igual-conteudo"
+                  className="mt-4 text-legenda text-warn-ink"
+                >
                   ⚠️ --raised e --s-conteudo estão no MESMO valor ({v["--raised"]}
                   ). Dois nomes, uma cor. Pendência 3.
                 </p>
@@ -590,7 +605,7 @@ export default function DesignSistemaPage() {
                     Painel
                   </p>
                   <p className="text-legenda text-ink-3">
-                    <code>text-titulo</code> · título da PÁGINA · {m.titulo}
+                    <code>text-titulo</code> · título da PÁGINA · <span data-medida="titulo">{m.titulo}</span>
                   </p>
                 </li>
                 <li>
@@ -602,7 +617,7 @@ export default function DesignSistemaPage() {
                   </p>
                   <p className="text-legenda text-ink-3">
                     <code>text-cartao</code> · título de bloco COM ESTRUTURA
-                    PRÓPRIA (faixa, lista, gráfico) · {m.cartao}
+                    PRÓPRIA (faixa, lista, gráfico) · <span data-medida="cartao">{m.cartao}</span>
                   </p>
                 </li>
                 <li>
@@ -614,7 +629,7 @@ export default function DesignSistemaPage() {
                   </p>
                   <p className="text-legenda text-ink-3">
                     <code>text-rotulo</code> · rótulo de um VALOR, cartão simples
-                    ou sub-bloco recolhível · {m.rotulo}
+                    ou sub-bloco recolhível · <span data-medida="rotulo">{m.rotulo}</span>
                   </p>
                 </li>
               </ol>
@@ -633,7 +648,7 @@ export default function DesignSistemaPage() {
                     text-display
                   </p>
                   <p className="text-legenda text-ink-3">
-                    {m.display} ·{" "}
+                    <span data-medida="display">{m.display}</span> ·{" "}
                     <span className="text-warn-ink">sem uso hoje</span>
                   </p>
                 </div>
@@ -642,21 +657,21 @@ export default function DesignSistemaPage() {
                   <p data-papel="corpo" className="text-corpo text-ink">
                     text-corpo, texto de leitura e mensagem
                   </p>
-                  <p className="text-legenda text-ink-3">{m.corpo}</p>
+                  <p className="text-legenda text-ink-3"><span data-medida="corpo">{m.corpo}</span></p>
                 </div>
                 <Separator />
                 <div>
                   <p data-papel="apoio" className="text-apoio text-ink-2">
                     text-apoio, o mais usado da interface
                   </p>
-                  <p className="text-legenda text-ink-3">{m.apoio}</p>
+                  <p className="text-legenda text-ink-3"><span data-medida="apoio">{m.apoio}</span></p>
                 </div>
                 <Separator />
                 <div>
                   <p data-papel="legenda" className="text-legenda text-ink-3">
                     text-legenda, metadado e escopo
                   </p>
-                  <p className="text-legenda text-ink-3">{m.legenda}</p>
+                  <p className="text-legenda text-ink-3"><span data-medida="legenda">{m.legenda}</span></p>
                 </div>
               </div>
             </Bloco>
@@ -674,7 +689,7 @@ export default function DesignSistemaPage() {
                     213
                   </p>
                   <p className="text-legenda text-ink-3">
-                    text-manchete · {m.manchete}
+                    text-manchete · <span data-medida="manchete">{m.manchete}</span>
                   </p>
                 </div>
                 <div>
@@ -685,7 +700,7 @@ export default function DesignSistemaPage() {
                     42
                   </p>
                   <p className="text-legenda text-ink-3">
-                    text-destaque · {m.destaque}
+                    text-destaque · <span data-medida="destaque">{m.destaque}</span>
                   </p>
                 </div>
                 <div>
@@ -696,7 +711,7 @@ export default function DesignSistemaPage() {
                     31
                   </p>
                   <p className="text-legenda text-ink-3">
-                    text-numero · {m.numero}
+                    text-numero · <span data-medida="numero">{m.numero}</span>
                   </p>
                 </div>
               </div>
@@ -734,7 +749,7 @@ export default function DesignSistemaPage() {
                       style={{ borderRadius: `var(${token})` }}
                     />
                     <p className="mt-1.5 text-legenda text-ink-2">{classe}</p>
-                    <p className="font-mono text-[11px] text-ink-3">
+                    <p data-token={token} className="font-mono text-[11px] text-ink-3">
                       {v[token] || "sem valor"}
                     </p>
                     <p className="text-[11px] text-ink-faint">{uso}</p>
@@ -763,7 +778,7 @@ export default function DesignSistemaPage() {
                     >
                       {nome}
                     </div>
-                    <span className="font-mono text-[11px] text-ink-3">
+                    <span data-token={token} className="font-mono text-[11px] text-ink-3">
                       {v[token] || "sem valor"}
                     </span>
                     <span className="text-legenda text-ink-3">{uso}</span>
@@ -832,7 +847,7 @@ export default function DesignSistemaPage() {
                     <p className="truncate font-mono text-[11px] text-ink-2">
                       {t}
                     </p>
-                    <p className="font-mono text-[11px] text-ink-faint">
+                    <p data-token={t} className="font-mono text-[11px] text-ink-faint">
                       {v[t] || "sem valor"}
                     </p>
                   </div>
