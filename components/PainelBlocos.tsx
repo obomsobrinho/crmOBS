@@ -250,11 +250,15 @@ export function PainelUltimaResposta({
   foraDoHorario?: boolean;
 }) {
   return (
+    // ⚠️ Coluna com `overflow-hidden`: é o que permite este cartão ENCOLHER
+    // quando a tela é mais baixa. Sem isso o texto da citação virava um piso de
+    // altura, e uma resposta longa do agente sozinha empurrava a página para
+    // fora da primeira tela. Quem cede é a citação, e só ela.
     <section
       data-slot="painel-ultima-resposta"
-      className="rounded-xl border border-line bg-raised p-[22px] shadow-[var(--panel-shadow)]"
+      className="flex flex-col overflow-hidden rounded-xl border border-line bg-raised p-[22px] shadow-[var(--panel-shadow)]"
     >
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+      <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
           <MessageSquareQuote size={13} aria-hidden />A última resposta do agente
         </h2>
@@ -290,7 +294,7 @@ export function PainelUltimaResposta({
       {/* Uma linha por mensagem, como saiu no WhatsApp: o agente responde em 1
           ou 2 mensagens, e juntar as duas num parágrafo só faria a citação
           parecer um texto corrido que ele nunca mandou. */}
-      <div className="mt-1.5 space-y-1.5 border-l-2 border-brand-line pl-3">
+      <div className="mt-1.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto border-l-2 border-brand-line pl-3">
         {mensagens.map((m, i) => (
           <p key={i} className="text-corpo italic text-ink-2">
             {m}
@@ -300,7 +304,7 @@ export function PainelUltimaResposta({
 
       {/* Rodapé de duas pontas: quando e para quem à esquerda, o caminho para a
           conversa à direita. */}
-      <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div className="mt-3 flex shrink-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="text-legenda text-ink-3">
           {quando} · para {nome}
         </span>

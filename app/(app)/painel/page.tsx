@@ -310,8 +310,15 @@ export default async function PainelPage() {
           isso as linhas resolvem pela altura do conteúdo, a lista de assuntos
           cresce sem limite e a rolagem interna dela não tem contra o que
           resolver. A linha elástica é a TERCEIRA (movimento e verbatim), porque
-          é ela que a prancha estica até o fim da tela. */}
-      <div className="grid min-w-0 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_auto_1fr]">
+          é ela que a prancha estica até o fim da tela.
+
+          ⚠️ Ela é `minmax(220px, 1fr)` e NÃO `1fr`. `1fr` sozinho é
+          `minmax(auto, 1fr)`, ou seja, o mínimo é o min-content do cartão, e era
+          ele que impedia a tela de caber em janela mais baixa: quem abre o
+          navegador com barra de favoritos perde ~100px e ganhava um resto de
+          rolagem. Com o piso explícito a linha cede até 220px e a tela fecha;
+          abaixo disso a rolagem volta, que é o certo em monitor pequeno. */}
+      <div className="grid min-w-0 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_auto_minmax(220px,1fr)]">
         <div className="min-w-0 xl:col-start-1 xl:row-start-1">
           <ValorResumo
             resumo={resumo}

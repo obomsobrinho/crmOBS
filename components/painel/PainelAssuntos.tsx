@@ -136,13 +136,31 @@ export default function PainelAssuntos({
                   {/* Barra proporcional em DUAS peças com respiro entre elas, e
                       não um preenchimento dentro de um trilho: é o desenho da
                       prancha, e o respiro é o que deixa claro onde o roxo acaba
-                      quando a proporção é alta. */}
+                      quando a proporção é alta.
+
+                      ⚠️ A proporção vai em `flex-grow`, NUNCA em `width: %`. Com
+                      porcentagem, a linha do maior assunto pedia 100% da largura
+                      e os dois `gap` de 10px mais a variação sobravam para fora:
+                      a lista ganhava rolagem HORIZONTAL, e só naquela linha
+                      (medido: 392px de conteúdo em 368px de caixa). Com
+                      `flex-grow` a divisão acontece DEPOIS de descontar respiro
+                      e texto, então não existe transbordo possível. */}
                   <span className="mt-[7px] flex items-center gap-2.5">
-                    <span
-                      className="h-[3px] shrink-0 rounded-sm bg-brand"
-                      style={{ width: `${(it.contagem / maior) * 100}%` }}
-                    />
-                    <span className="h-[3px] min-w-0 flex-1 rounded-sm bg-line-soft" />
+                    <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                      <span
+                        className="h-[3px] rounded-sm bg-brand"
+                        style={{ flexGrow: it.contagem, flexBasis: 0 }}
+                      />
+                      {/* O trilho cinza só existe quando sobra o que marcar: no
+                          maior assunto ele teria largura zero e ainda comeria um
+                          respiro de 10px, empurrando a variação. */}
+                      {it.contagem < maior && (
+                        <span
+                          className="h-[3px] rounded-sm bg-line-soft"
+                          style={{ flexGrow: maior - it.contagem, flexBasis: 0 }}
+                        />
+                      )}
+                    </span>
                     <span className="shrink-0 text-legenda text-ink-3">
                       {it.variacao}
                     </span>

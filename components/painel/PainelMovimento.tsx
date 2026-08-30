@@ -219,7 +219,12 @@ export default function PainelMovimento({
 
         {/* A área sangra à direita e embaixo: sem respiro deste lado, e o
             `overflow-hidden` do cartão corta o que passar. */}
-        <div className="relative min-h-40 min-w-0 flex-1 self-stretch">
+        {/* ⚠️ Piso de 100px e NÃO de 160px. A área escala sozinha (o SVG é
+            `preserveAspectRatio="none"` em `inset-0`), então o piso serve só
+            para o gráfico não virar um risco. Com 160 aqui o cartão tinha
+            min-content alto demais e era ele que impedia a tela de caber em
+            monitor com barra de favoritos. */}
+        <div className="relative min-h-[100px] min-w-0 flex-1 self-stretch">
         <svg
           viewBox={`0 0 ${W} ${H}`}
           preserveAspectRatio="none"
