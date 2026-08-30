@@ -15,8 +15,37 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   Stat,
   StatTopo,
@@ -319,6 +348,7 @@ export default function DesignSistemaPage() {
 
   const [ligado, setLigado] = React.useState(true);
   const [aba, setAba] = React.useState("um");
+  const [dialogAberto, setDialogAberto] = React.useState(false);
 
   const mesmaCor =
     !!v["--raised"] && v["--raised"] === v["--s-conteudo"];
@@ -917,6 +947,17 @@ export default function DesignSistemaPage() {
                 <Button size="icon-chrome" aria-label="ícone 28">
                   <Paperclip size={14} />
                 </Button>
+                {/* ⚠️ O sétimo TEM que aparecer, senão o título afirma 7 e a
+                    amostra mostra 6, que é exatamente o que um design system
+                    não pode fazer. Ele não tem altura nem raio próprios, então
+                    a moldura tracejada é da AMOSTRA, e não do botão: sem ela
+                    não haveria o que ver, e com ela eu estaria inventando
+                    geometria que a variante não tem. */}
+                <span className="rounded-lg border border-dashed border-line-strong px-2 py-1">
+                  <Button size="none" variant="ghost">
+                    none
+                  </Button>
+                </span>
               </div>
             </Bloco>
 
@@ -1130,6 +1171,111 @@ export default function DesignSistemaPage() {
                   <p className="text-apoio text-ink-2">variant menu</p>
                 </Card>
               </div>
+            </Bloco>
+
+            <Bloco
+              titulo="Select · 2 tamanhos"
+              nota="A lista abre em camada flutuante (portal), então o que dá para mostrar parado é o gatilho, que é a aparência que fica na tela o tempo todo."
+            >
+              <div className="flex flex-wrap items-center gap-4">
+                <Select defaultValue="todos">
+                  <SelectTrigger
+                    className="w-56"
+                    aria-label="Exemplo de select"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">size field, 40px</SelectItem>
+                    <SelectItem value="um">Outra opção</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select defaultValue="todos">
+                  <SelectTrigger
+                    size="control"
+                    className="w-56"
+                    aria-label="Exemplo de select compacto"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">size control, 32px</SelectItem>
+                    <SelectItem value="um">Outra opção</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Bloco>
+
+            <Bloco
+              titulo="Camadas flutuantes"
+              nota="Dialog, Sheet e DropdownMenu vivem em portal: o painel só existe depois do clique, então aqui aparece o GATILHO. No HTML exportado eles ficam congelados, porque o React não vai junto."
+            >
+              <div className="flex flex-wrap items-center gap-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="control">
+                      DropdownMenu
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuLabel>Um rótulo</DropdownMenuLabel>
+                    <DropdownMenuItem>Um item</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>Outro item</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Controlado por estado, e NÃO por `DialogTrigger`: a base não
+                    exporta gatilho, e é assim que as telas da casa usam. */}
+                <Button
+                  variant="outline"
+                  size="control"
+                  onClick={() => setDialogAberto(true)}
+                >
+                  Dialog · tamanho confirmacao
+                </Button>
+                <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+                  <DialogContent tamanho="confirmacao">
+                    <DialogTitle>Confirmação</DialogTitle>
+                    <DialogDescription>
+                      Entra e sai com `.anim-flutuante` e `.anim-fundo`.
+                    </DialogDescription>
+                  </DialogContent>
+                </Dialog>
+
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="control">
+                      Sheet · tamanho padrao
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent>
+                    <SheetTitle>Painel lateral</SheetTitle>
+                    <SheetDescription>
+                      Arquivo separado do dialog, com `.anim-lateral` própria: o
+                      centramento do dialog brigaria com o translate daqui.
+                    </SheetDescription>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </Bloco>
+
+            <Bloco
+              titulo="ScrollArea e Separator"
+              nota="A barra imita a nativa que o globals.css já estiliza: 8px, em overlay, sem setas. O `fade` acende a sombra de rolagem no topo e no fim."
+            >
+              <ScrollArea className="h-28 rounded-lg border border-line bg-bloco p-3">
+                <div className="space-y-2">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <React.Fragment key={i}>
+                      <p className="text-apoio text-ink-2">
+                        Linha {i + 1} de uma lista que rola
+                      </p>
+                      {i < 7 && <Separator />}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </ScrollArea>
             </Bloco>
 
             <Bloco
