@@ -304,7 +304,11 @@ export default function KnowledgeManager({
       <div className="space-y-2">
         {campoArquivo}
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-rotulo uppercase text-ink-3">Documentos</h3>
+          {/* Título de nível 2 (`text-cartao`), e não rótulo: ele encabeça um
+              bloco COM ESTRUTURA PRÓPRIA, a lista de arquivos com ações. Rótulo
+              em caixa alta é para o VALOR de um indicador ou para um sub-bloco
+              recolhível. Ver docs/design-system/fundamentos-tipografia.md. */}
+          <h3 className="font-display text-cartao text-ink">Documentos</h3>
           <Button variant="outline" onClick={escolherArquivo} disabled={uploading}>
             {uploading ? (
               <Loader2 size={14} className="animate-spin" />

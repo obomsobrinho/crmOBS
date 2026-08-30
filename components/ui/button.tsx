@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
  * 4. `bg-accent` virou `var(--active-bg)`: no shadcn `accent` é superfície de
  *    hover, aqui `accent` é a cor da marca e está em uso como TEXTO em outras
  *    telas. Ver a nota da ponte no globals.css.
- * 5. `rounded-md` (8px) virou `rounded-lg` (12px), o degrau de botão da casa.
+ * 5. `rounded-md` (8px) virou `rounded-lg` (10px), o degrau de botão da casa.
  * 6. `disabled:pointer-events-none` virou `disabled:cursor-not-allowed`, senão
  *    o botão desabilitado perde o cursor de "não pode" que ele tem hoje.
  * 7. As variantes `dark:` sumiram: nossos tokens já viram sozinhos por tema.

@@ -182,7 +182,10 @@ export default function TeamManager({
 
       <div>
         <div className="mb-2 flex items-baseline gap-2">
-          <span className="text-rotulo uppercase text-ink-3">Membros</span>
+          {/* Título de nível 2 (`text-cartao`): encabeça a lista de membros,
+              que é bloco com estrutura própria. Ver
+              docs/design-system/fundamentos-tipografia.md. */}
+          <h2 className="font-display text-cartao text-ink">Membros</h2>
           <span className="text-legenda tabular-nums text-ink-3">
             {members.length}
           </span>

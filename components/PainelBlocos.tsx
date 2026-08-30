@@ -5,6 +5,7 @@ import {
   MessageSquareQuote,
   ArrowRight,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
 
 // Blocos pequenos do painel, sem estado, juntos num arquivo só para a página não
@@ -105,17 +106,24 @@ export function PainelFilaCartao({
             {espera ? `A mais antiga ${espera}. ` : ""}A IA avisou que ia
             verificar.
           </p>
-          <Link
-            href={href}
-            className={`painel-pressiona mt-3.5 flex h-9 items-center justify-center gap-1.5 rounded-[10px] border text-apoio font-semibold transition-colors ${
-              urgente
-                ? "border-transparent bg-warn text-[var(--warn-on)] hover:brightness-105"
-                : "border-line bg-bloco text-ink hover:bg-[var(--active-bg)]"
+          {/* ⚠️ `Button` com `asChild`, e NÃO classe solta. Isto era um `<Link>`
+              com `h-9 rounded-[10px]` escrito à mão, que é literalmente o
+              `size="primary"` da base (36px = --h-primary, 10px = rounded-lg)
+              reescrito em outro lugar. Quando o degrau de altura mudar, este
+              botão só mudaria junto se alguém lembrasse dele. */}
+          <Button
+            asChild
+            variant={urgente ? "warn" : "outline"}
+            size="primary"
+            className={`painel-pressiona mt-3.5 w-full justify-center ${
+              urgente ? "" : "bg-bloco"
             }`}
           >
-            Ver quem está esperando
-            <ArrowRight size={14} aria-hidden />
-          </Link>
+            <Link href={href}>
+              Ver quem está esperando
+              <ArrowRight size={14} aria-hidden />
+            </Link>
+          </Button>
         </>
       )}
     </section>
