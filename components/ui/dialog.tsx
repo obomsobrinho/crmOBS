@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
  *   em opacidade e escala, e NÃO repete o `translate` do centramento: no
  *   Tailwind v4 o translate é propriedade separada do `transform`, então
  *   repetir somaria e deslocaria o modal. Ver a nota no globals.css.
- * - `bg-background` virou `bg-conteudo`. Um modal é superfície de conteúdo
+ * - `bg-background` virou `bg-raised`. Um modal é superfície de conteúdo
  *   flutuante, a mesma família do menu suspenso, e no tema escuro ela é mais
  *   clara que o fundo, não mais escura.
  * - Nenhuma classe de foco: o foco é global no globals.css.
@@ -47,7 +47,7 @@ const conteudoVariants = cva(
   // `w-[calc(100%-2rem)]` e não `w-full`: o modal antigo ganhava a folga das
   // bordas de um `p-4` no fundo escuro. Aqui o fundo não empurra ninguém (o
   // painel se centra por translate), então a folga precisa virar largura.
-  "anim-flutuante fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-line bg-conteudo shadow-[var(--panel-shadow)]",
+  "anim-flutuante fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]",
   {
     variants: {
       tamanho: {

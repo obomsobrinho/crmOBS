@@ -426,16 +426,25 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
      `text-brand-ink`, não `text-accent`; `text-warn-ink`, não `text-warn`.
   2. **Tinta em 4 níveis:** `ink` > `ink-2` > `ink-3` (piso de texto, mínimo 12px) > `ink-faint`
      (**nunca** texto, só ícone e divisor). Os nomes `text-ink-muted` e `text-ink-dim` **não existem mais**: eram aliases e foram removidos em 17/08/2026.
-  3. **Seis papéis tipográficos** com entrelinha travada: `text-display`, `text-titulo`,
-     `text-corpo`, `text-apoio`, `text-legenda`, `text-rotulo`. Nada abaixo de 12px na interface.
+  3. **Papéis tipográficos** com entrelinha travada: `text-titulo` (18), `text-cartao` (16),
+     `text-corpo` (15), `text-apoio` (13), `text-legenda` e `text-rotulo` (12). Nada abaixo de 12px
+     na interface. Numeral é escopo à parte: `manchete` 68, `destaque` 44, `numero` 32.
   4. **O azul `--brand-grad-end` (#4464d4)** existe só porque a logo termina nele. Escopo fechado:
      gradiente de marca, símbolo e superfície decorativa a partir de 28px. Não pinta texto, ícone
-     nem estado.
-  ⚠️ Os aliases de @theme (`--color-accent`, `--color-ia`, `--color-ink-muted`, `--color-ink-dim`)
-  e as classes `.btn-primary`, `.glass`, `.panel` e `--radius-2xl` **FORAM REMOVIDOS** em
-  17/08/2026, quando o último consumidor migrou. Sobram só `--surface` (4 usos) e `--panel`
-  (1 uso), os dois na tela de atendimento: a migração deles está escrita e **aguardando decisão do
-  dono do produto**, porque mexe em 4 pixels de uma tela já aprovada. Avatar usa `avatarPair()` (`lib/inbox.ts`),
+     nem estado. ✅ **Decisão do dono, 30/08/2026: MANTER assim**, sem entrar na paleta e sem
+     recalibrar a logo. A regra "o sistema não tem azul" tem exatamente uma exceção, e ela é a logo.
+  5. **Cartão respira 24px** (`p-6`), decisão do dono em 30/08/2026. Duas exceções deliberadas: a
+     manchete do painel (28/32, medida da prancha) e bloco DENTRO de cartão (16px).
+  ⚠️ **FAXINA DE 30/08/2026, e o vocabulário mudou.** A superfície de cartão agora tem UM nome:
+  **`bg-raised`**. `--s-conteudo` e `bg-conteudo` **não existem mais** (eram a mesma cor com outro
+  nome; os 17 usos migraram). Também saíram, todos por não ter nenhum consumidor: o papel
+  `text-display`, a variante `segmentado` das abas, os utilitários `bg-sunken`, `bg-inset`,
+  `bg-lista`, `bg-lista-sel`, `bg-composer`, `bg-sub`, `bg-painel` e `bg-chat`, e o legado
+  `--surface` / `--panel`. Provado por retrato numérico de 12 telas nos dois temas: 4812 elementos,
+  zero diferença de cor, fonte, respiro ou raio.
+  Antes disso, os aliases (`--color-accent`, `--color-ia`, `--color-ink-muted`, `--color-ink-dim`)
+  e as classes `.btn-primary`, `.glass`, `.panel` e `--radius-2xl` já tinham saído em 17/08/2026.
+  Avatar usa `avatarPair()` (`lib/inbox.ts`),
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
 - **Camada base shadcn/ui (`components/ui/`, 17 arquivos):** `button`, `input`, `textarea`,
   `badge`, `avatar`, `separator`, `card`, `scroll-area`, `dropdown-menu`, `switch`, `tabs`,

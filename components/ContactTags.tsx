@@ -113,7 +113,7 @@ export default function ContactTags({
             <Badge
               key={t.id}
               variant="tag"
-              className="bg-surface pl-2 pr-1"
+              className="bg-raised pl-2 pr-1"
             >
               <span
                 className="h-2 w-2 rounded-full"
@@ -143,7 +143,7 @@ export default function ContactTags({
       </div>
 
       {open && (
-        <div className="mt-2 rounded-lg border border-line bg-surface p-2.5">
+        <div className="mt-2 rounded-lg border border-line bg-raised p-2.5">
           {available.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
               {available.map((t) => (

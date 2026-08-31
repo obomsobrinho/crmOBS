@@ -83,7 +83,7 @@ export default function PainelHoras({
               {/* O balão. Ancorado no centro da própria coluna e acima do topo
                   do gráfico, então ele não precisa seguir o mouse: já nasce no
                   lugar certo, e por isso não existe arrasto atrás do cursor. */}
-              <div className="painel-balao absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line-strong bg-conteudo px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
+              <div className="painel-balao absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line-strong bg-raised px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
                 <span className="font-semibold tabular-nums">{c.hora}h</span>
                 {t === 0 ? (
                   <span className="text-ink-3"> · sem resposta</span>

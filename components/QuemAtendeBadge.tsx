@@ -39,7 +39,7 @@ export default function QuemAtendeBadge({
 
   const conteudo =
     quem === "ia" ? (
-      <span className={`${caixa} bg-conteudo text-ink-3`}>
+      <span className={`${caixa} bg-raised text-ink-3`}>
         <Bot size={glifo} />
       </span>
     ) : (

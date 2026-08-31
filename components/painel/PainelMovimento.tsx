@@ -282,7 +282,7 @@ export default function PainelMovimento({
                     style={{ top: `${(p.y / H) * 100}%` }}
                   />
                 )}
-                <div className="painel-balao absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line-strong bg-conteudo px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
+                <div className="painel-balao absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line-strong bg-raised px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
                   {inexistente ? (
                     <span className="text-ink-3">
                       {legivel(p.barra.chave)} · antes desta conta

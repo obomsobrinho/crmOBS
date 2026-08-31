@@ -90,7 +90,7 @@ function SelectContent({
         data-slot="select-content"
         position={position}
         className={cn(
-          "anim-flutuante relative z-50 min-w-[8rem] overflow-hidden rounded-xl border border-line bg-conteudo shadow-[var(--panel-shadow)]",
+          "anim-flutuante relative z-50 min-w-[8rem] overflow-hidden rounded-xl border border-line bg-raised shadow-[var(--panel-shadow)]",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className,

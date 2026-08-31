@@ -389,7 +389,7 @@ export default function AgentConfigForm({
           da CONTENT BOX do container de rolagem, então com `pb-6` no cartão a
           faixa parava 24px acima do fim e dava para ver conteúdo passando por
           baixo dela. Quem dá o respiro de baixo é o `py-3` daqui. */}
-      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-line bg-conteudo px-6 py-3">
+      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-line bg-raised px-6 py-3">
         {/* ⚠️ A frase depende de `jaPublicou`, e isso é CORREÇÃO, não estilo.
             "Salvar já publica no WhatsApp" era dito a todo mundo, mas
             `lib/agent-turn.ts` devolve turno silencioso quando

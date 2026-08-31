@@ -67,7 +67,7 @@ function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(
-          "anim-flutuante z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border border-line bg-conteudo p-1 shadow-[var(--panel-shadow)]",
+          "anim-flutuante z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-xl border border-line bg-raised p-1 shadow-[var(--panel-shadow)]",
           className,
         )}
         {...props}

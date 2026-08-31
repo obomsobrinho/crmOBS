@@ -18,7 +18,7 @@ const cardVariants = cva("border border-line shadow-[var(--panel-shadow)]", {
   variants: {
     variant: {
       /** Lista, conversa e painel: as três dividem a mesma superfície. */
-      conteudo: "rounded-xl bg-conteudo",
+      conteudo: "rounded-xl bg-raised",
       /** A coluna de navegação, que tem superfície própria. */
       menu: "rounded-xl bg-menu",
     },

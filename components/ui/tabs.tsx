@@ -9,12 +9,15 @@ import { cn } from "@/lib/utils";
 /**
  * Abas, em duas formas.
  *
- * `sublinhado` (padrão) é a do composer, descrita abaixo. `segmentado` é o
- * alternador de modo do /agente: dois botões numa bandeja com moldura, e o
- * ativo ganha o fill da marca. Ele era um par de `<button>` solto, sem `role`
- * nenhum, e o ativo usava `brand-grad`, cujo escopo o próprio sistema fecha em
- * "superfície decorativa a partir de 28px". Trazê-lo para cá dá
- * `role="tablist"`, navegação por seta e foco itinerante de graça.
+ * `sublinhado` (padrão) é a do composer, descrita abaixo. `painel` é a bandeja
+ * segmentada dos seletores de período.
+ *
+ * ⚠️ Existiu uma terceira, `segmentado`, com a aba ativa em roxo cheio. Ela foi
+ * REMOVIDA em 30/08/2026 por não ter nenhum consumidor: o comentário aqui a
+ * descrevia como "o alternador de modo do /agente", mas o `AgentConfigForm` usa
+ * a variante padrão, e o alternador virou um botão. Variante sem uso é pior que
+ * ausente, porque quem lê o design system a considera disponível e a adota sem
+ * saber que ela nunca foi aprovada em tela nenhuma.
  *
  * ── sublinhado ──
  *
@@ -54,17 +57,10 @@ const listaVariants = cva("flex items-center gap-1", {
   variants: {
     variant: {
       sublinhado: "",
-      /** Bandeja com moldura, no mesmo fundo de campo do resto da casa. */
-      segmentado: "w-fit rounded-lg border border-line bg-[var(--input-bg)] p-1",
       /**
-       * A do painel. Mesmo esqueleto do `segmentado` e DIFERENTE onde importa:
-       * a aba ativa é a superfície de bloco, nunca o fill da marca.
-       *
-       * ⚠️ Não dá para reaproveitar `segmentado`: lá o ativo é roxo cheio
-       * porque ele alterna o MODO do agente (guiado/avançado), que é escolha de
-       * estado. Aqui ele só troca a janela de um gráfico, e roxo cheio num
-       * seletor de período rouba a cor da série, que no painel é a única cor
-       * categórica que existe.
+       * A do painel: bandeja com moldura, e a aba ativa na superfície de BLOCO,
+       * nunca no fill da marca. Roxo cheio num seletor de período roubaria a cor
+       * da série, que no painel é a única cor categórica que existe.
        *
        * A bandeja nasce na cor do CARTÃO, que é onde a operação a usa (ela
        * flutua sobre o canvas). Dentro de um cartão ela precisa recuar para o
@@ -101,11 +97,6 @@ const gatilhoVariants = cva(
           "flex-col items-center gap-1.5 px-2.5 pt-1 text-legenda",
           "text-ink-3 hover:text-ink-2",
           "data-[state=active]:font-semibold data-[state=active]:text-ink",
-        ],
-        segmentado: [
-          "items-center gap-1.5 rounded-md px-3 text-apoio font-medium",
-          "h-[var(--h-control)] text-ink-2 hover:text-ink",
-          "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
         ],
         painel: [
           "items-center rounded-[7px] px-3 py-[5px] text-apoio font-medium",

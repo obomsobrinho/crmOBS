@@ -18,9 +18,9 @@ Um único `surface` não dava conta de menu, lista, conversa, composer e painel 
 
 ## Superfícies nomeadas por função
 
-A tela de atendimento tem tokens próprios (`--s-menu`, `--s-conteudo`, `--s-msg`, `--s-campo`,
-`--s-bloco`), e a contenção é o ponto: **lista, conversa e painel dividem `--s-conteudo`**, e o
-que separa as colunas é uma linha de 1px, **nunca meio tom**.
+A tela de atendimento tem tokens próprios (`--s-menu`, `--s-msg`, `--s-campo`, `--s-bloco`), e a
+contenção é o ponto: **lista, conversa e painel dividem `--raised`**, e o que separa as colunas é
+uma linha de 1px, **nunca meio tom**.
 
 A versão anterior dava um cinza de matiz diferente para cada coluna (lavanda, quase branco,
 cinza) e o resultado lia como escolha aleatória em vez de hierarquia. A mesma crítica derrubou o
@@ -37,22 +37,21 @@ contato). **Dentro de um cartão a separação é linha de 1px, nunca outro cart
 `components/ui/card.tsx` não tem `CardHeader` nem `CardFooter`: eles empilhariam moldura dentro de
 moldura.
 
-## Duplicação conhecida
+## A faxina de 30/08/2026
 
-⚠️ **`--raised` e `--s-conteudo` têm o MESMO valor nos dois temas** (`#ffffff` no claro, `#171717`
-no escuro). Dois nomes, uma cor. O painel usa `bg-raised` (6 usos), o resto do app usa
-`bg-conteudo` (18 usos). Medido em 30/08/2026, sem decisão ainda. Ver
-[pendencias.md](pendencias.md).
+Três coisas saíram, e nenhuma mudou um pixel (o retrato numérico de 12 telas nos dois temas,
+4812 elementos, ficou idêntico fora o spinner que gira):
 
-## Utilitários de superfície sem nenhum uso
-
-Existem no `@theme` e não são chamados por ninguém: `bg-sunken`, `bg-inset`, `bg-lista`,
-`bg-composer`, `bg-sub`, `bg-painel`, `bg-chat`. Contados em 30/08/2026.
-
-## Legado ainda em uso
-
-`--surface` (4 usos) e `--panel` (1 uso, o badge "dia"). A migração deles está escrita e
-**aguardando decisão do dono do produto**, porque mexe em pixels de uma tela já aprovada.
+- **`--s-conteudo` deixou de existir.** Tinha o MESMO valor de `--raised` nos dois temas
+  (`#ffffff` / `#171717`), e dois nomes para uma cor é como uma mudança de superfície passa a
+  exigir dois lugares para não divergir. Ficou `raised`, que é o nome do SISTEMA; `conteudo` era
+  da nomenclatura antiga, por função. Os 17 usos de `bg-conteudo` viraram `bg-raised` e a ponte do
+  shadcn (`--card`, `--popover`) foi reapontada.
+- **Oito utilitários sem nenhum consumidor**: `bg-sunken`, `bg-inset`, `bg-lista`,
+  `bg-lista-sel`, `bg-composer`, `bg-sub`, `bg-painel` e `bg-chat`. Utilitário disponível é
+  convite a compor camada que o sistema não tem.
+- **O legado `--surface` e `--panel`.** A tag do contato foi para `bg-raised` e o separador de dia
+  da conversa foi para `bg-bloco`; os dois destinos já tinham exatamente o mesmo valor da origem.
 
 ## Sombra
 

@@ -405,7 +405,7 @@ export default function Thread({
           um amontoado. Em cima fica quem é a pessoa e o que dá para fazer; a
           faixa de baixo é referência, num tom próprio e com tipo menor. */}
       <header
-        className={`relative z-10 shrink-0 border-b border-line bg-conteudo transition-shadow ${rolou ? "sombra-rolagem" : ""
+        className={`relative z-10 shrink-0 border-b border-line bg-raised transition-shadow ${rolou ? "sombra-rolagem" : ""
           }`}
       >
         <div className="flex items-center gap-3 px-4 pb-2 pt-2.5">

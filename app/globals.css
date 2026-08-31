@@ -33,16 +33,27 @@
    ───────────────────────────────────────────────────────────── */
 
 @theme inline {
-  /* Superfícies em quatro camadas (novo sistema). */
-  --color-canvas: var(--canvas);
-  --color-sunken: var(--sunken);
-  --color-raised: var(--raised);
-  --color-inset: var(--inset);
+  /* Superfícies em quatro camadas. ESTE é o sistema, e o vocabulário que uma
+     tela nova deve usar: canvas (fundo da janela), sunken (recuado), raised
+     (cartão), inset (campo e bloco dentro do cartão).
 
-  /* Aliases de superfície mantidos: os componentes ainda usam estes nomes. */
-  --color-surface: var(--surface);
-  --color-panel: var(--panel);
-  --color-chat: var(--chat-bg);
+     ⚠️ FAXINA DE 30/08/2026. Saíram os aliases de `@theme` que não tinham NENHUM
+     consumidor: `sunken`, `inset`, `lista`, `lista-sel`, `composer`, `sub`,
+     `painel` e `chat`. Eles geravam utilitários `bg-*` que ninguém escrevia, e
+     um utilitário disponível é um convite a compor camada que o sistema não
+     tem. As VARIÁVEIS de valor continuam vivas logo abaixo, porque outros
+     tokens apontam para elas: o que saiu foi só a ponte para o Tailwind.
+
+     ⚠️ `--color-conteudo` também saiu, e este é o caso interessante:
+     `--s-conteudo` e `--raised` tinham o MESMO valor nos dois temas (#ffffff no
+     claro, #171717 no escuro). Dois nomes para uma cor é como uma mudança de
+     superfície passa a exigir dois lugares para não divergir. Ficou `raised`,
+     que é o nome do SISTEMA de camadas; `conteudo` era da nomenclatura antiga,
+     por função. Os 17 usos de `bg-conteudo` viraram `bg-raised`, e o retrato
+     numérico das 12 telas nos dois temas não mudou em nenhum pixel. */
+  --color-canvas: var(--canvas);
+  --color-raised: var(--raised);
+
 
   /* Superfícies nomeadas por FUNÇÃO (tela de atendimento, rodada 5). Cada
      coluna tem a sua porque a hierarquia do claro é invertida no escuro: no
@@ -50,15 +61,9 @@
      claro da tela e a conversa é o mais escuro. Um único `surface` não dava
      conta de menu, lista, conversa, composer e painel ao mesmo tempo. */
   --color-menu: var(--s-menu);
-  --color-conteudo: var(--s-conteudo);
-  --color-lista: var(--s-lista);
-  --color-lista-sel: var(--s-lista-sel);
   --color-msg: var(--s-msg);
-  --color-composer: var(--s-composer);
-  --color-sub: var(--s-sub);
-  --color-painel: var(--s-painel);
-  --color-bloco: var(--s-bloco);
   --color-campo: var(--s-campo);
+  --color-bloco: var(--s-bloco);
 
   /* Tinta. */
   --color-ink: var(--ink);
@@ -98,15 +103,15 @@
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-space-grotesk), var(--font-manrope), sans-serif;
 
-  /* Seis papéis tipográficos. Tamanho e entrelinha travados juntos, para que o
-     mesmo tamanho nunca mais apareça com dois ritmos. O peso fica na marcação
-     em `corpo` e `apoio`, que têm variante forte em 600. Piso absoluto da
-     interface: 12px (papel legenda). */
-  --text-display: 24px;
-  --text-display--line-height: 28px;
-  --text-display--letter-spacing: -0.015em;
-  --text-display--font-weight: 600;
+  /* Papéis tipográficos. Tamanho e entrelinha travados juntos, para que o mesmo
+     tamanho nunca mais apareça com dois ritmos. O peso fica na marcação em
+     `corpo` e `apoio`, que têm variante forte em 600. Piso absoluto da
+     interface: 12px (papel legenda).
 
+     ⚠️ `--text-display` (24px) foi REMOVIDO em 30/08/2026: tinha ZERO
+     consumidores. Ele nasceu quando o painel usava 24px em dez números ao mesmo
+     tempo; a hierarquia de numeral (68/44/32) resolveu aquilo e o papel ficou
+     órfão. Papel que ninguém usa é convite a alguém usar sem saber por quê. */
   --text-titulo: 18px;
   --text-titulo--line-height: 24px;
   --text-titulo--letter-spacing: -0.01em;
@@ -233,12 +238,11 @@
   --inset: #f4f4f4;
 
   /* Superfícies. São TRÊS, e a contenção é o ponto: lista, conversa e painel
-     dividem `--s-conteudo`, e o que separa as colunas é uma linha de 1px, nunca
+     dividem `--raised`, e o que separa as colunas é uma linha de 1px, nunca
      meio tom. A versão anterior dava um cinza de matiz diferente para cada
      coluna (lavanda, quase branco, cinza) e o resultado lia como escolha
      aleatória em vez de hierarquia. */
   --s-menu: #ffffff;
-  --s-conteudo: #ffffff;
   --s-msg: #f4f4f4;
   --s-campo: #ffffff;
   /* Barra da linha selecionada: o roxo da marca. Era a tinta principal, um
@@ -246,12 +250,13 @@
   --sel-bar: #6b21e8;
   /* Relevo do balão. Sem ele, balão branco sobre a conversa dá 1,05:1 e some. */
   --b-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
-  /* Aliases de compatibilidade: as telas fora do atendimento ainda os usam. */
-  --s-lista: #ffffff;
-  --s-lista-sel: #ffffff;
-  --s-composer: #f4f4f4;
-  --s-sub: #ffffff;
-  --s-painel: #ffffff;
+  /* ⚠️ FAXINA DE 30/08/2026. Saíram daqui `--s-lista`, `--s-lista-sel`,
+     `--s-composer`, `--s-sub`, `--s-painel`, `--surface`, `--panel` e
+     `--chat-bg`. Eram "aliases de compatibilidade" de uma migração que terminou:
+     no fim, ZERO referências, nem no CSS nem no TSX. Os dois últimos usos reais
+     foram migrados junto (a tag do contato para `bg-raised`, o separador de dia
+     para `bg-bloco`), e os dois já tinham exatamente o mesmo valor do destino,
+     então nenhum pixel mudou. */
   /* Bloco dentro do cartão. Era #f1eff8, uma lavanda, e o campo dentro dele era
      #f1eff7: praticamente a MESMA cor (1 unidade de diferença), então bloco e
      campo só se distinguiam pela borda e a tela clara inteira lia como roxo
@@ -261,10 +266,6 @@
      como escolha aleatória, não como hierarquia. */
   --s-bloco: #f4f4f4;
 
-  /* Aliases em uso pelos componentes (migram na rodada das telas). */
-  --surface: #ffffff;
-  --panel: #f4f4f4;
-  --chat-bg: #f4f4f4;
   /* Campo BRANCO sobre o bloco cinza, que é o que `--s-campo` já declarava logo
      acima. É o que devolve a escada de três degraus no claro: cartão branco,
      bloco cinza, campo branco com borda. Com bloco e campo em lavanda quase
@@ -443,9 +444,9 @@
      sair de sincronia. */
   --background: var(--canvas);
   --foreground: var(--ink);
-  --card: var(--s-conteudo);
+  --card: var(--raised);
   --card-foreground: var(--ink);
-  --popover: var(--s-conteudo);
+  --popover: var(--raised);
   --popover-foreground: var(--ink);
   --primary: var(--brand-fill);
   --primary-foreground: var(--brand-on);
@@ -478,21 +479,12 @@
      tela. É o que faz a área de mensagens ler como fundo nos dois temas usando
      a mesma marcação. */
   --s-menu: #0d0d0d;
-  --s-conteudo: #171717;
   --s-msg: #0d0d0d;
   --s-campo: #1f1f1f;
   --sel-bar: #b98cff;
   --b-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --s-lista: #171717;
-  --s-lista-sel: #171717;
-  --s-composer: #0d0d0d;
-  --s-sub: #171717;
-  --s-painel: #171717;
   --s-bloco: #1f1f1f;
 
-  --surface: #171717;
-  --panel: #1f1f1f;
-  --chat-bg: #0d0d0d;
   --input-bg: #1f1f1f;
 
   --ink: #f5f5f5; /* 15,0:1 */

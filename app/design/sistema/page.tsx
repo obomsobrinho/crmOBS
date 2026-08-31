@@ -312,7 +312,6 @@ const TOKENS = [
   "--sunken",
   "--raised",
   "--inset",
-  "--s-conteudo",
   "--radius-sm",
   "--radius-md",
   "--radius-lg",
@@ -350,8 +349,6 @@ export default function DesignSistemaPage() {
   const [aba, setAba] = React.useState("um");
   const [dialogAberto, setDialogAberto] = React.useState(false);
 
-  const mesmaCor =
-    !!v["--raised"] && v["--raised"] === v["--s-conteudo"];
 
   return (
     <TooltipProvider>
@@ -582,17 +579,12 @@ export default function DesignSistemaPage() {
                   valor={v["--inset"]}
                 />
               </div>
-              {/* A checagem é FEITA aqui, não afirmada: se um dia os dois
-                  divergirem, o aviso some sozinho. */}
-              {mesmaCor && (
-                <p
-                  data-aviso="raised-igual-conteudo"
-                  className="mt-4 text-legenda text-warn-ink"
-                >
-                  ⚠️ --raised e --s-conteudo estão no MESMO valor ({v["--raised"]}
-                  ). Dois nomes, uma cor. Pendência 3.
-                </p>
-              )}
+              {/* Aqui morava um aviso de que `--raised` e `--s-conteudo` eram a
+                  mesma cor com dois nomes. Saiu porque o defeito foi corrigido
+                  em 30/08/2026: `--s-conteudo` deixou de existir e os 17 usos de
+                  `bg-conteudo` viraram `bg-raised`. O aviso era CALCULADO, então
+                  ele sumiria sozinho de qualquer forma; tirar o código junto é o
+                  que evita a próxima pessoa procurar um token que já era. */}
             </Bloco>
 
             <Bloco
@@ -1023,8 +1015,8 @@ export default function DesignSistemaPage() {
             </Bloco>
 
             <Bloco
-              titulo="Tabs · 3 variantes"
-              nota="segmentado tem ZERO usos hoje (pendência 4). painel existe porque roxo cheio num seletor de período roubaria a cor da série."
+              titulo="Tabs · 2 variantes"
+              nota="A variante segmentado foi removida em 30/08/2026 por nao ter nenhum consumidor. painel existe porque roxo cheio num seletor de periodo roubaria a cor da serie."
             >
               <div className="flex flex-wrap items-start gap-8">
                 <div>
@@ -1055,21 +1047,6 @@ export default function DesignSistemaPage() {
                       </TabsTrigger>
                       <TabsTrigger value="tres" variant="painel">
                         Mês
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <div>
-                  <p className="mb-2 text-legenda text-ink-3">
-                    segmentado (sem uso)
-                  </p>
-                  <Tabs value={aba} onValueChange={setAba}>
-                    <TabsList variant="segmentado">
-                      <TabsTrigger value="um" variant="segmentado">
-                        Guiado
-                      </TabsTrigger>
-                      <TabsTrigger value="dois" variant="segmentado">
-                        Avançado
                       </TabsTrigger>
                     </TabsList>
                   </Tabs>

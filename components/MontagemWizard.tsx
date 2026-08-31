@@ -390,7 +390,7 @@ export default function MontagemWizard({
 
       {/* Rodapé grudado: no celular o conteúdo rola e o par voltar/continuar
           precisa continuar alcançável com o polegar. */}
-      <footer className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-line bg-conteudo px-4 py-3 sm:px-6">
+      <footer className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-line bg-raised px-4 py-3 sm:px-6">
         <Button
           variant="outline"
           size="field"

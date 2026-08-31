@@ -77,8 +77,9 @@ número.**
 `barra` e vira `--aba-cor`. É a do composer e a do `/agente`.
 `painel`: bandeja com moldura e pílula ativa em **superfície**, nunca no fill da marca. Roxo cheio
 num seletor de período roubaria a cor da série, que no painel é a única cor categórica.
-`segmentado`: bandeja com pílula ativa em roxo cheio. ⚠️ **Zero usos hoje.** Ver
-[pendencias.md](pendencias.md).
+⚠️ Existiu uma terceira, `segmentado`, com a pílula ativa em roxo cheio. Foi **removida em
+30/08/2026** por não ter nenhum consumidor. Variante sem uso é pior que ausente: quem lê o design
+system a considera disponível e a adota sem saber que ela nunca foi aprovada em tela nenhuma.
 
 ⚠️ **Não existe `TabsContent` no composer**, de propósito: os três modos dividem UM editor só, e
 envolvê-lo em painéis o desmontaria a cada troca de aba, perdendo foco e posição do cursor. O
@@ -120,12 +121,11 @@ Tamanhos `xl` (44), `lg` (40), `md` (36), `sm` (32), `xs` (28). A cor sai de `av
 Sem variantes. `dropdown-menu` e `tooltip` usam `.anim-flutuante`. A `scroll-area` imita a barra
 nativa que o `globals.css` já estiliza.
 
-## Divergências medidas em 30/08/2026
+## O que a faxina de 30/08/2026 tirou daqui
 
-- **`bg-raised` (6 usos, todos no painel) contra `bg-conteudo` (18 usos, resto do app)**, sendo a
-  mesma cor nos dois temas.
-- **O botão "Ver quem está esperando"** (`components/PainelBlocos.tsx`) é um
-  `<Button size="primary">` escrito à mão: `h-9` é 36px (`--h-primary`) e `rounded-[10px]` é
-  `rounded-lg`. O `Button` já tem `asChild`.
+- A variante `segmentado` das abas (zero usos).
+- `bg-conteudo`, que era a mesma cor de `bg-raised` com outro nome. Ficou `raised`.
+- O botão "Ver quem está esperando" do painel, que era um `<Button size="primary">` reescrito em
+  classe solta, virou `Button asChild`.
 
 Ver [pendencias.md](pendencias.md).

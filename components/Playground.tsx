@@ -226,7 +226,7 @@ export default function Playground({
                       className={`max-w-[80%] rounded-xl px-3.5 py-2 text-apoio leading-snug whitespace-pre-wrap ${
                         t.role === "user"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-conteudo text-ink"
+                          : "bg-raised text-ink"
                       }`}
                     >
                       {t.content}
@@ -344,7 +344,7 @@ function HandoffPanel({
             )}
           </div>
         ) : (
-          <div className="rounded-lg bg-conteudo px-3 py-2.5 text-apoio text-ink-2">
+          <div className="rounded-lg bg-raised px-3 py-2.5 text-apoio text-ink-2">
             {diag
               ? "Nenhum handoff neste turno. A IA seguiu sozinha."
               : "Nenhum handoff aberto. Quando a IA precisar de um humano, aparece aqui pra você orientar ou assumir."}
@@ -435,7 +435,7 @@ function ClassificationPanel({
               {diag.ragMatches.map((m, i) => (
                 <li
                   key={i}
-                  className="flex items-baseline gap-2 rounded-lg bg-conteudo px-2.5 py-1.5"
+                  className="flex items-baseline gap-2 rounded-lg bg-raised px-2.5 py-1.5"
                   title={m.preview}
                 >
                   <span className="shrink-0 text-legenda font-semibold tabular-nums text-human-ink">

@@ -126,7 +126,7 @@ export default function BillingCheckout({
             IA responde dentro do WhatsApp), e este é o único momento em que ela
             para para olhar. Números reais, nunca inflados. */}
         {frasesAcumuladas.length > 0 && (
-          <div className="space-y-2 rounded-lg border border-line bg-conteudo p-3">
+          <div className="space-y-2 rounded-lg border border-line bg-raised p-3">
             <p className="text-legenda uppercase text-ink-3">
               O que a IA já fez nesta conta
             </p>

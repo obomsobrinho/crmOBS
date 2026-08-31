@@ -25,37 +25,43 @@ mais fraco dos dois.
 intenção era outra, é só corrigir. Não há o que construir aqui de qualquer forma: identidade para
 fundo claro é trabalho de marca, não de código.
 
-## 3. `--raised` e `--s-conteudo` são a mesma cor
+## 3. `--raised` e `--s-conteudo` eram a mesma cor ✅ RESOLVIDO E APLICADO
 
-`#ffffff` no claro e `#171717` no escuro, nos dois casos. Dois nomes para uma cor. O painel usa
-`bg-raised` (6 usos), o resto do app usa `bg-conteudo` (18 usos).
+Tinham `#ffffff` no claro e `#171717` no escuro, os dois. Dois nomes para uma cor: o painel usava
+`bg-raised` (6 usos) e o resto do app usava `bg-conteudo` (17 usos).
 
-**Escolha:** unificar num nome só, ou manter os dois e escrever quando usar cada um. Enquanto
-estiver assim, uma mudança de superfície precisa ser feita em dois lugares para não divergir.
+**Resolvido em 30/08/2026: ficou `raised`.** É o nome do SISTEMA de camadas
+(canvas/sunken/raised/inset); `conteudo` era da nomenclatura antiga, por função. Os 17 usos de
+`bg-conteudo` viraram `bg-raised`, a ponte do shadcn (`--card`, `--popover`) foi reapontada, e
+`--s-conteudo` deixou de existir.
 
-## 4. A variante `segmentado` das abas não tem nenhum uso
+## 4. A variante `segmentado` das abas não tinha uso ✅ RESOLVIDA E REMOVIDA
 
-`components/ui/tabs.tsx` a descreve como "o alternador de modo do `/agente`", mas o
-`AgentConfigForm` usa a variante padrão. **Zero call sites.**
+`components/ui/tabs.tsx` a descrevia como "o alternador de modo do `/agente`", mas o
+`AgentConfigForm` usa a variante padrão e o alternador virou um botão. **Zero call sites.**
 
-**Escolha:** apagar, ou adotar em algum lugar. Enquanto existir, o comentário da variante `painel`
-se compara a algo que ninguém vê.
+**Removida em 30/08/2026**, junto com a amostra dela na galeria. Sobraram duas: `sublinhado` e
+`painel`.
 
-## 5. `text-display` (24px) não tem nenhum uso
+## 5. `text-display` (24px) não tinha uso ✅ RESOLVIDO E REMOVIDO
 
-É um dos papéis tipográficos declarados e não é chamado por ninguém. As duas ocorrências no código
-são menções dentro de comentários.
+Era um dos papéis tipográficos declarados e não era chamado por ninguém: as duas ocorrências no
+código eram menções dentro de comentários.
 
-**Escolha:** apagar o papel, ou identificar onde ele deveria estar sendo usado.
+**Removido em 30/08/2026.** Ele nasceu quando o painel usava 24px em dez números ao mesmo tempo;
+a hierarquia de numeral (68/44/32) resolveu aquilo e o papel ficou órfão.
 
-## 6. Sete utilitários de superfície sem uso
+## 6. Sete utilitários de superfície sem uso ✅ RESOLVIDO E REMOVIDO
 
-`bg-sunken`, `bg-inset`, `bg-lista`, `bg-composer`, `bg-sub`, `bg-painel`, `bg-chat`.
+Eram `bg-sunken`, `bg-inset`, `bg-lista`, `bg-lista-sel`, `bg-composer`, `bg-sub`, `bg-painel` e
+`bg-chat`. **Removidos em 30/08/2026**, junto com as variáveis de valor que ficaram órfãs. Um
+utilitário disponível é um convite a compor camada que o sistema não tem.
 
-## 7. Legado `--surface` e `--panel`
+## 7. Legado `--surface` e `--panel` ✅ RESOLVIDO E APLICADO
 
-`--surface` tem 4 usos e `--panel` tem 1 (o badge `dia`). A migração está escrita e **aguarda
-decisão**, porque mexe em pixels de uma tela já aprovada.
+**Migrados em 30/08/2026.** A tag do contato foi de `bg-surface` para `bg-raised`, e o separador de
+dia da conversa foi de `bg-panel` para `bg-bloco`. Os dois destinos já tinham exatamente o mesmo
+valor da origem, então nenhum pixel mudou. As variáveis foram removidas.
 
 ## 8. Respiro de cartão: 22 contra 24 ✅ RESOLVIDO E APLICADO
 
@@ -73,26 +79,29 @@ DENTRO de um cartão usa 16px.
 1920x930 a tela ainda fecha com sobra 0 e movimento e verbatim alinhados em 0; abaixo disso a
 rolagem volta, que é o comportamento combinado para monitor pequeno.
 
-## 9. Um botão escrito à mão
+## 9. Um botão escrito à mão ✅ RESOLVIDO E APLICADO
 
-O "Ver quem está esperando" (`components/PainelBlocos.tsx`) é um `<Button size="primary">`
-reescrito em classe solta: `h-9` é 36px (`--h-primary`) e `rounded-[10px]` é `rounded-lg`. O
-`Button` já tem `asChild`. Correção pequena, sem decisão envolvida.
+O "Ver quem está esperando" (`components/PainelBlocos.tsx`) era um `<Button size="primary">`
+reescrito em classe solta: `h-9` é 36px (`--h-primary`) e `rounded-[10px]` é `rounded-lg`.
 
-## 10. Comentário errado no `button.tsx`
+**Aplicado em 30/08/2026:** virou `Button asChild`. Medido antes e depois nos dois estados: 36px de
+altura, raio 10px, 13px peso 600, âmbar #f9a63a com tinta #241403 no urgente. Idêntico.
 
-Diz que `rounded-lg` é 12px. O token é 10px.
+## 10. Comentário errado no `button.tsx` ✅ RESOLVIDO
 
-## 11. Nível 2 de título faltando em duas telas
+Dizia que `rounded-lg` é 12px. O token é 10px. **Corrigido em 30/08/2026.**
+
+## 11. Nível 2 de título faltando em duas telas ✅ RESOLVIDO E APLICADO
 
 Pela regra de hierarquia (ver [fundamentos-tipografia.md](fundamentos-tipografia.md)), estes dois
-encabeçam blocos com estrutura própria e estão com tratamento de rótulo:
+encabeçam blocos com estrutura própria e estavam com tratamento de rótulo:
 
-- `KnowledgeManager` → "DOCUMENTOS", que encabeça a lista de arquivos com ações.
-- `TeamManager` → "MEMBROS", que encabeça a lista de membros.
+- `KnowledgeManager` → "Documentos", que encabeça a lista de arquivos com ações.
+- `TeamManager` → "Membros", que encabeça a lista de membros.
 
-**Decidido em 30/08/2026 manter os dois papéis** (16 branco e 12 caixa alta). Falta aplicar a
-regra nesses dois lugares.
+**Decidido em 30/08/2026 manter os dois papéis** (16 caixa normal e 12 caixa alta), e os dois
+lugares acima passaram a usar `text-cartao`. O "Membros" era um `<span>` e virou `<h2>`, que é o
+que ele sempre foi semanticamente.
 
 ## 12. Mobile
 

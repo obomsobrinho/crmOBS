@@ -272,7 +272,7 @@ export default function ConversationView({
         />
       </div>
       {showContext && (
-        <aside className="hidden w-[296px] shrink-0 border-l border-line bg-conteudo lg:block">
+        <aside className="hidden w-[296px] shrink-0 border-l border-line bg-raised lg:block">
           <ScrollArea fade className="h-full">
             <ContextPanel
               name={name}

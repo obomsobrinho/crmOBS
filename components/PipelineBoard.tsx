@@ -582,7 +582,7 @@ function CardItem({
       // aberta é o que diz isso antes de a pessoa tentar. Ele também abre a
       // conversa no clique, mas arrastar é a ação que precisa de aviso, porque
       // ninguém descobre arraste por acaso.
-      className="cursor-grab rounded-lg border border-line bg-conteudo p-2.5 transition-colors hover:border-line-strong active:cursor-grabbing"
+      className="cursor-grab rounded-lg border border-line bg-raised p-2.5 transition-colors hover:border-line-strong active:cursor-grabbing"
     >
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">

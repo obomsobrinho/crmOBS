@@ -47,7 +47,7 @@ function SheetTrigger({
  * mesma sopa de classe com um número trocado, e sopa repetida é variante.
  */
 const conteudoVariants = cva(
-  "anim-lateral fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-conteudo shadow-[var(--panel-shadow)]",
+  "anim-lateral fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-raised shadow-[var(--panel-shadow)]",
   {
     variants: {
       tamanho: {

@@ -17,7 +17,6 @@ Piso absoluto da interface: **12px**.
 
 | papel | tamanho / entrelinha | peso | uso |
 | --- | --- | --- | --- |
-| `text-display` | 24 / 28, `-0.015em` | 600 | **sem uso hoje** |
 | `text-titulo` | 18 / 24, `-0.01em` | 600 | **título da PÁGINA** ("Painel", "Pipeline", "Agente de IA") |
 | `text-cartao` | 16 / 22 | 600 | **título de CARTÃO ou de bloco** ("Movimento", "A operação") |
 | `text-corpo` | 15 / 22 | herda | texto de leitura, mensagem |
@@ -79,6 +78,8 @@ Os nomes estão registrados no grupo `font-size` do `extendTailwindMerge`, em `l
 ## Uso medido, 30/08/2026
 
 `text-apoio` 165 · `text-legenda` 154 · `text-titulo` 28 · `text-rotulo` 21 · `text-corpo` 18 ·
-`text-destaque` 3 · `text-cartao` 3 · `text-numero` 2 · `text-manchete` 1 · **`text-display` 0**.
+`text-destaque` 3 · `text-cartao` 3 · `text-numero` 2 · `text-manchete` 1.
 
-`text-display` não tem nenhum uso real. Ver [pendencias.md](pendencias.md).
+⚠️ Existiu um `text-display` (24/28). Foi **removido em 30/08/2026** por não ter nenhum
+consumidor: ele nasceu quando o painel usava 24px em dez números ao mesmo tempo, a hierarquia de
+numeral resolveu aquilo e o papel ficou órfão.
