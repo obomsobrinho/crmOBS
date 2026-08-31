@@ -77,7 +77,7 @@ export default function PainelAssuntos({
     >
       {/* Cabeçalho com o mesmo respiro do cartão de movimento (18px em cima e
           embaixo) e o divisor de borda-suave atravessando o cartão. */}
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-line-soft px-[22px] py-[18px]">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-line-soft px-6 py-[18px]">
         <div className="min-w-0">
           {/* Título de BLOCO em Space Grotesk, igual ao "Movimento". O ícone
               saiu junto com a caixa alta: os dois eram do papel RÓTULO, e este
@@ -113,7 +113,7 @@ export default function PainelAssuntos({
                   type="button"
                   onClick={() => setAberto(estaAberto ? null : i)}
                   aria-expanded={estaAberto}
-                  className="painel-pressiona block w-full px-[22px] py-3 text-left transition-colors hover:bg-bloco"
+                  className="painel-pressiona block w-full px-6 py-3 text-left transition-colors hover:bg-bloco"
                 >
                   {/* Linha de cima: o assunto à esquerda, contagem e seta à
                       direita. A VARIAÇÃO desceu para a linha da barra, como na
@@ -174,7 +174,7 @@ export default function PainelAssuntos({
                 </button>
 
                 {estaAberto && (
-                  <div className="px-[22px] pb-4">
+                  <div className="px-6 pb-4">
                     <p className="text-apoio text-ink-2">{it.resumo}</p>
                     <p className="mb-1.5 mt-2.5 text-legenda font-semibold uppercase tracking-[0.06em] text-ink-3">
                       Os pedidos que formaram este assunto
@@ -200,7 +200,7 @@ export default function PainelAssuntos({
           })}
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-[22px] py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {/* ⚠️ Número literalmente `XX`, rótulo POSICIONAL e barra CINZA. Um
               valor plausível, mesmo borrado, é indistinguível de medição num
               print ampliado, e "a IA não inventa" é o eixo do produto. */}

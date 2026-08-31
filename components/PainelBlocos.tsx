@@ -55,7 +55,7 @@ export function PainelFilaCartao({
     <section
       data-slot="painel-fila"
       data-urgente={urgente ? "sim" : "nao"}
-      className={`rounded-xl border px-[22px] py-5 ${
+      className={`rounded-xl border p-6 ${
         urgente
           ? "border-warn-line bg-warn-surface"
           : "border-line bg-raised shadow-[var(--panel-shadow)]"
@@ -264,7 +264,7 @@ export function PainelUltimaResposta({
     // fora da primeira tela. Quem cede é a citação, e só ela.
     <section
       data-slot="painel-ultima-resposta"
-      className="flex flex-col overflow-hidden rounded-xl border border-line bg-raised p-[22px] shadow-[var(--panel-shadow)]"
+      className="flex flex-col overflow-hidden rounded-xl border border-line bg-raised p-6 shadow-[var(--panel-shadow)]"
     >
       <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-2">
         <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">

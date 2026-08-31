@@ -50,15 +50,19 @@ const statVariants = cva("flex flex-col rounded-xl border", {
     /**
      * Geometria mora aqui: padding e respiro entre as peças.
      *
-     * Os valores vêm MEDIDOS da prancha da rodada 3 (29/08/2026): manchete com
-     * respiro de 28px na vertical e 32px na horizontal, cartão de indicador com
-     * 22px. Não são arredondados para a escala do Tailwind de propósito: a
-     * diferença de 2px por cartão, vezes quatro numa linha, é parte do que fazia
-     * a operação fechar mais baixa que o desenho.
+     * A manchete vem MEDIDA da prancha da rodada 3 (29/08/2026): 28px na
+     * vertical e 32px na horizontal. Ela é caso próprio e não entra na regra
+     * abaixo.
+     *
+     * ⚠️ O cartão de indicador usa 24px (`p-6`) por DECISÃO DO DONO, 30/08/2026:
+     * a prancha do painel dava 22 e o resto do produto (`/agente`, `/equipe`) já
+     * usava 24, e conviver com os dois é como um respiro vira dois. O 24 ganhou
+     * por ser o que mais telas já usavam. Custo aceito e medido: a operação
+     * fecha alguns pixels mais alta que a prancha.
      */
     tamanho: {
       manchete: "gap-3 px-8 py-7",
-      padrao: "gap-1.5 p-[22px]",
+      padrao: "gap-1.5 p-6",
       compacto: "gap-1 p-4",
     },
   },

@@ -1,23 +1,29 @@
 # Pendências do design system
 
-Tudo aqui foi **medido em 30/08/2026** e nada foi decidido. Cada item diz qual é a evidência e qual
-é a escolha, para a decisão ser do dono do produto e não de quem estiver codando.
+Medido em **30/08/2026**. Cada item diz qual é a evidência e qual é a escolha, para a decisão ser do
+dono do produto e não de quem estiver codando. O que já foi decidido fica marcado como **RESOLVIDO**
+e permanece aqui como registro, com o custo que a escolha teve.
 
 Isto **não é o roadmap**. Roadmap de produto é `docs/proximos-passos.md`.
 
-## 1. Marca: o gradiente termina numa cor que o sistema não tem
+## 1. Marca: o gradiente termina numa cor que o sistema não tem ✅ RESOLVIDO
 
 O gradiente oficial vai de `#8C2CE7` a `#4464D4`, e **nem o site nem o produto têm azul no sistema
 de cores**. A única peça oficial da identidade usa uma cor que o sistema não conhece.
 
-**Escolha:** ou o azul entra como cor de sistema, ou a logo é recalibrada para o roxo. Hoje ele
-sobrevive por escopo fechado (`--brand-grad-end`, só em `.brand-grad`), o que é contenção, não
-resposta.
+**Decisão do dono, 30/08/2026: MANTER como está.** O azul segue vivendo por escopo fechado
+(`--brand-grad-end`, só em `.brand-grad`), sem entrar na paleta e sem recalibrar a logo. É contenção
+assumida, e não descuido: quem for mexer na marca depois precisa saber que a regra "o sistema não
+tem azul" tem exatamente uma exceção, e que ela é a logo.
 
-## 2. Marca: não existe identidade para fundo claro
+## 2. Marca: não existe identidade para fundo claro ✅ ACEITO POR ORA
 
 Nem logo, nem roxo calibrado. O gradiente da marca sobre branco fica pesado, e o tema claro já é o
 mais fraco dos dois.
+
+**Decisão do dono, 30/08/2026: segue como está.** ⚠️ Registrado a partir de um "ok" curto; se a
+intenção era outra, é só corrigir. Não há o que construir aqui de qualquer forma: identidade para
+fundo claro é trabalho de marca, não de código.
 
 ## 3. `--raised` e `--s-conteudo` são a mesma cor
 
@@ -51,13 +57,21 @@ são menções dentro de comentários.
 `--surface` tem 4 usos e `--panel` tem 1 (o badge `dia`). A migração está escrita e **aguarda
 decisão**, porque mexe em pixels de uma tela já aprovada.
 
-## 8. Respiro de cartão: 22 contra 24
+## 8. Respiro de cartão: 22 contra 24 ✅ RESOLVIDO E APLICADO
 
-O painel usa 22px, `/agente` e `/equipe` usam 24px. O 22 vem da prancha do painel; o 24 é o que as
-outras telas já usavam.
+O painel usava 22px, `/agente` e `/equipe` usavam 24px. O 22 vinha da prancha do painel; o 24 era o
+que as outras telas já usavam.
 
-**Escolha:** adotar um dos dois como token (`--pad-cartao`) e migrar o outro, ou aceitar os dois
-com uma regra escrita.
+**Decisão do dono, 30/08/2026: 24px.** Aplicado em 8 lugares (`p-6` / `px-6`): o cartão de indicador
+da base, a fila, o verbatim, os quatro pontos do cartão de assuntos e o bloco da própria galeria.
+
+**Regra que fica:** cartão respira **24px**. Duas exceções, e as duas são deliberadas: a manchete do
+painel usa 28 na vertical e 32 na horizontal (medida da prancha, cartão de peso próprio), e bloco
+DENTRO de um cartão usa 16px.
+
+**Custo, medido:** o piso de altura da tela do painel foi de ~907px para ~911px de viewport. Em
+1920x930 a tela ainda fecha com sobra 0 e movimento e verbatim alinhados em 0; abaixo disso a
+rolagem volta, que é o comportamento combinado para monitor pequeno.
 
 ## 9. Um botão escrito à mão
 

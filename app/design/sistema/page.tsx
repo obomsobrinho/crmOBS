@@ -190,7 +190,7 @@ function Bloco({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-raised p-[22px] shadow-[var(--panel-shadow)]">
+    <div className="rounded-xl border border-line bg-raised p-6 shadow-[var(--panel-shadow)]">
       <h3 className="font-display text-cartao text-ink">{titulo}</h3>
       {nota && <p className="mt-1 max-w-3xl text-legenda text-ink-3">{nota}</p>}
       <div className="mt-4">{children}</div>

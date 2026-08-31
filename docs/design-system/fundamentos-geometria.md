@@ -39,18 +39,19 @@ altura, sempre; o que muda é o peso visual.
 
 ## Respiro de cartão
 
-Não há um token, e há divergência medida em 30/08/2026:
+**Cartão respira 24px** (`p-6`). Decisão do dono em 30/08/2026: o painel usava 22 (vindo da prancha)
+e o resto do produto já usava 24, e conviver com os dois é como um respiro vira dois.
 
-| onde | padding |
-| --- | --- |
-| painel: cartão de indicador, verbatim, assuntos | **22px** |
-| painel: manchete | `32px 28px` |
-| painel: fila | `20px 22px` |
-| `/agente`, `/equipe`: cartão de página | **24px** |
-| bloco dentro do cartão (`agente/ui.tsx`, `TeamManager`) | **16px** (`p-4`) |
+Duas exceções, as duas deliberadas:
 
-O 22 vem da prancha do painel; o 24 é o que as outras telas já usavam. Ver
-[pendencias.md](pendencias.md).
+| onde | padding | por quê |
+| --- | --- | --- |
+| **cartão, o padrão** | **24px** (`p-6`) | a regra |
+| painel: manchete | `28px 32px` | cartão de peso próprio, medida da prancha |
+| bloco DENTRO de um cartão | 16px (`p-4`) | outro nível, não é cartão |
+
+⚠️ Não existe token `--pad-cartao`: `p-6` já resolve para 24px pela escala do Tailwind (`--spacing`
+é `.25rem`), e um token que só embrulha um utilitário existente é mais um nome para manter.
 
 ## Foco
 
