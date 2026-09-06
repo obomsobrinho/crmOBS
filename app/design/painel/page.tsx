@@ -168,14 +168,12 @@ const MOVIMENTO = {
     barras: barras(sintetico(14), 14, AGORA),
     conversas: 42,
     conversasAnterior: 36,
-    pessoasNovas: 17,
   },
   "30": {
     dias: 30,
     barras: barras(sintetico(30), 30, AGORA),
     conversas: 151,
     conversasAnterior: 128,
-    pessoasNovas: 61,
   },
 } satisfies Record<MovimentoKey, MovimentoJanela>;
 

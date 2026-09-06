@@ -29,16 +29,6 @@ export interface MovimentoJanela {
   conversas: number;
   /** Conversas no período anterior de mesmo tamanho. `null` = sem base. */
   conversasAnterior: number | null;
-  /**
-   * Contatos cuja PRIMEIRA mensagem nesta conta caiu na janela.
-   *
-   * ⚠️ Vive aqui porque a seção "Está crescendo?" deixou de existir na rodada 3,
-   * e este número era o cartão dela. Ele não aparece no desenho aprovado, mas
-   * `computeMetrics` continua calculando: descartar em silêncio uma métrica que
-   * o dono já lia seria pior do que colocá-la no rodapé de quem responde a mesma
-   * pergunta. Ver o relatório do passo.
-   */
-  pessoasNovas: number;
 }
 
 export type MovimentoKey = "14" | "30";
@@ -322,11 +312,13 @@ export default function PainelMovimento({
           {menor && ` · menor dia ${total(menor)}, ${nomeDoDia(menor.chave)}`}
         </p>
         {/* A divisão IA contra time saiu do gráfico e virou texto.
-            ⚠️ "Pessoas novas" NÃO entra aqui: a prancha traz só as duas séries,
-            e eu tinha acrescentado o terceiro número por conta própria para não
-            perder a métrica quando a seção "Está crescendo?" saiu. Perder a
-            métrica é decisão do dono; encher o rodapé não era minha. Ela
-            continua sendo calculada e chega no `MovimentoJanela`. */}
+            ⚠️ "Pessoas novas" NÃO entra aqui, e a decisão é de 31/08/2026: a
+            prancha traz só as duas séries. O número (contatos cuja PRIMEIRA
+            mensagem na conta caiu na janela) continua saindo de `computeMetrics`
+            e é o único que separa crescimento de repetição, mas ONDE ele aparece
+            é pauta da próxima rodada de desenho, não do rodapé. Ele deixou de
+            viajar por `MovimentoJanela` porque atravessava três arquivos sem
+            nenhum consumidor. */}
         <p className="text-legenda text-ink-3">
           <span className="font-semibold text-brand-ink">
             {somaIa.toLocaleString("pt-BR")}

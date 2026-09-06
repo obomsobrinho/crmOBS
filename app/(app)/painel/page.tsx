@@ -215,7 +215,6 @@ export default async function PainelPage() {
           ? null
           : computeMetrics({ ...ant, primeiras, de: anteriorDe, ate: de })
               .conversas,
-        pessoasNovas: m.pessoasNovas,
       };
       return [k, j];
     })
