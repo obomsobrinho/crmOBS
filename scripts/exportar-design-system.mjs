@@ -64,14 +64,11 @@ const SCRIPT_EMBUTIDO = `
       if (alvo) alvo.textContent = medida;
     });
 
-    // O aviso de cor duplicada é CALCULADO, não afirmado: some sozinho no dia
-    // em que os dois tokens divergirem.
-    var aviso = document.querySelector('[data-aviso="raised-igual-conteudo"]');
-    if (aviso) {
-      var a = cs.getPropertyValue("--raised").trim();
-      var b = cs.getPropertyValue("--s-conteudo").trim();
-      aviso.style.display = a && a === b ? "" : "none";
-    }
+    // Aqui morava o aviso calculado de "--raised e --s-conteudo são a mesma
+    // cor". Ele resolveu o que existia para resolver: os dois viraram um só em
+    // 30/08/2026 e --s-conteudo deixou de existir, então a leitura passou a
+    // devolver string vazia e o aviso nunca mais poderia acender.
+    // (Sem crase aqui: este bloco mora DENTRO de um template literal.)
   }
 
   var botao = document.getElementById("ds-tema");
@@ -111,7 +108,7 @@ async function main() {
   // Dá tempo de os efeitos preencherem os valores e as animações assentarem.
   await pagina.waitForTimeout(2500);
 
-  const { corpo, css, temAviso } = await pagina.evaluate(async () => {
+  const { corpo, css } = await pagina.evaluate(async () => {
     // O CSS compilado do Tailwind, buscado inteiro. É ele que carrega os tokens
     // dos dois temas e todas as classes usadas na página.
     const folhas = [...document.querySelectorAll("link[rel=stylesheet]")].map(
@@ -131,7 +128,6 @@ async function main() {
     return {
       corpo: (header?.outerHTML || "") + (main?.outerHTML || ""),
       css: partes.join("\n"),
-      temAviso: !!document.querySelector('[data-aviso="raised-igual-conteudo"]'),
     };
   });
 
@@ -222,7 +218,6 @@ ${cabecalho}
 
   const kb = Math.round(Buffer.byteLength(html, "utf8") / 1024);
   console.log(`\nescrito: ${DESTINO}  (${kb} KB)`);
-  console.log(`aviso de cor duplicada na foto: ${temAviso ? "sim" : "não"}`);
   console.log(`@font-face do next/font removidos: ${fontesRemovidas}`);
 }
 

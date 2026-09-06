@@ -123,10 +123,10 @@ export default function TeamManager({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto">
       {isOwner && (
-        // `bg-bloco` e não `bg-surface`: este formulário mora DENTRO do cartão
-        // da página, e bloco é a superfície de quem mora dentro. Com a antiga,
-        // no tema escuro ele tinha exatamente a cor do pai e só a borda o
-        // separava do fundo.
+        // `bg-bloco` e não a superfície de cartão: este formulário mora DENTRO
+        // do cartão da página, e bloco é a superfície de quem mora dentro. Com
+        // a de cartão, no tema escuro ele tinha exatamente a cor do pai e só a
+        // borda o separava do fundo.
         <form
           onSubmit={invite}
           className="rounded-xl border border-line bg-bloco p-4"

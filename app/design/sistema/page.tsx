@@ -665,16 +665,13 @@ export default function DesignSistemaPage() {
 
             <Bloco titulo="Papéis de texto">
               <div className="space-y-3">
-                <div>
-                  <p data-papel="display" className="text-display text-ink">
-                    text-display
-                  </p>
-                  <p className="text-legenda text-ink-3">
-                    <span data-medida="display">{m.display}</span> ·{" "}
-                    <span className="text-warn-ink">sem uso hoje</span>
-                  </p>
-                </div>
-                <Separator />
+                {/* Aqui morava uma amostra de `text-display` (24px) marcada
+                    como "sem uso hoje". O papel foi REMOVIDO em 30/08/2026 e a
+                    amostra ficou pintando uma classe que não existe: o texto
+                    caía no tamanho herdado e a medida ao lado anunciava 15px
+                    embaixo do rótulo "text-display". Papel sem token não pode
+                    ter vitrine, senão a galeria oferece o que o sistema não
+                    tem. O porquê da remoção está em fundamentos-tipografia. */}
                 <div>
                   <p data-papel="corpo" className="text-corpo text-ink">
                     text-corpo, texto de leitura e mensagem

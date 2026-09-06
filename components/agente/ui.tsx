@@ -23,8 +23,9 @@ import { CACHE_SAFE_TOKENS } from "@/lib/agent-prompt";
 /**
  * Bloco com título. Chamava-se `Card`, e o nome foi trocado quando a base ganhou
  * o seu: são coisas diferentes. `Card` é a moldura da PÁGINA; este é um bloco
- * DENTRO dela, e por isso usa `bg-bloco`, a superfície de quem mora dentro. Com
- * `bg-surface` ele tinha a mesma cor do pai no tema escuro.
+ * DENTRO dela, e por isso usa `bg-bloco`, a superfície de quem mora dentro.
+ * Com a superfície de cartão ele nascia com a MESMA cor do pai no tema escuro,
+ * e só a borda o separava.
  *
  * ⚠️ PERDEU `numero` e `continuarPara` em 28/08/2026. Os dois eram um wizard
  * improvisado dentro de uma página de rolagem única, e agora existe um wizard de

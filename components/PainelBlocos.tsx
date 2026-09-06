@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  Clock3,
-  CheckCircle2,
-  MessageSquareQuote,
-  ArrowRight,
-} from "lucide-react";
+import { CheckCircle2, MessageSquareQuote, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
 
@@ -127,69 +122,6 @@ export function PainelFilaCartao({
         </>
       )}
     </section>
-  );
-}
-
-/**
- * A mesma fila em UMA LINHA, para o cabeçalho da página.
- *
- * Existe ao lado do cartão porque o cartão ocupa um bloco inteiro da trilha para
- * um número que, na maioria dos dias, é zero. Qual das duas a tela usa é decisão
- * de arranjo, e hoje a prancha usa o cartão.
- */
-export function PainelFilaLinha({
-  quantas,
-  esperaMs,
-  espera,
-  href = "/inbox",
-}: {
-  quantas: number | null;
-  esperaMs: number | null;
-  espera: string;
-  href?: string;
-}) {
-  if (quantas === null) {
-    return (
-      <p data-slot="painel-fila" className="text-apoio text-ink-3">
-        Não foi possível medir a fila agora.
-      </p>
-    );
-  }
-
-  if (quantas === 0) {
-    return (
-      <p
-        data-slot="painel-fila"
-        className="flex items-center gap-2 text-apoio text-ink-2"
-      >
-        <CheckCircle2 size={15} className="shrink-0 text-human-ink" />
-        Ninguém está esperando você agora.
-      </p>
-    );
-  }
-
-  const urgente = esperaMs !== null && esperaMs >= ESPERA_AVISO_MS;
-
-  return (
-    <Link
-      href={href}
-      data-slot="painel-fila"
-      data-urgente={urgente ? "sim" : "nao"}
-      className={`painel-pressiona flex w-fit items-center gap-2 rounded-lg border px-3 py-1.5 text-apoio transition-colors ${
-        urgente
-          ? "border-warn-line bg-warn-surface text-warn-ink hover:brightness-105"
-          : "border-line bg-bloco text-ink-2 hover:bg-[var(--active-bg)]"
-      }`}
-    >
-      <Clock3
-        size={15}
-        className={`shrink-0 ${urgente ? "text-warn-ink" : "text-ink-3"}`}
-      />
-      <span className="font-semibold tabular-nums">{quantas}</span>
-      {quantas === 1 ? "pessoa esperando" : "pessoas esperando"}
-      {espera && <span className="text-ink-3">· a mais antiga {espera}</span>}
-      <ArrowRight size={13} aria-hidden className="shrink-0" />
-    </Link>
   );
 }
 
