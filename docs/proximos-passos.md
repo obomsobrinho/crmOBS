@@ -557,6 +557,44 @@ comprar. É a única coisa desta seção que seria diferencial de verdade, em ve
 no segmento dele, cruzando a base). Difícil e depende de volume, mas é a evolução natural do bloco
 "assuntos em alta".
 
+### Tela de Clientes (levantado pelo dono em 31/08, provável entrar ANTES do beta)
+
+**A lacuna:** o sistema tem **conversas**, não **clientes**. `dados_cliente` já guarda todo mundo que
+mandou mensagem (o contato nasce amarrado ao telefone, automaticamente), mas **não existe tela que
+liste isso**. Quem nunca escreveu não existe no produto, e quem falou há seis meses só é encontrável
+rolando o inbox. É paridade básica de CRM, e o dono avalia que os testadores vão perguntar por ela.
+
+**O que a tela precisa fazer:**
+- listar os contatos que já existem, com busca (nome, telefone e os campos preenchidos)
+- abrir a ficha de um contato e **completar o que falta**: é aqui que mora o "Cadastro do contato"
+  descrito logo abaixo (CPF, nascimento, e-mail), junto com notas, tags e campos personalizados que
+  hoje só existem no painel lateral do atendimento
+- **criar um contato à mão** e iniciar conversa por ali, com a IA assumindo em seguida
+- sinalizar **contato frio**, quem não fala há muito tempo
+
+**Reuso:** `dados_cliente` (com `custom_fields`), `ContactFields`, `ContactNotes`, `ContactTags`,
+`avatarPair` e a resolução de nome de `lib/inbox.ts` já existem. A ficha é recomposição, não código
+novo.
+
+⚠️ **Edita nos DOIS lugares** (decisão do dono, 31/08): na tela de Clientes e no painel do contato
+dentro da conversa. Isso é praticidade, e tem uma regra que vem junto: **um formulário, duas
+superfícies**, exatamente como `/montagem` e `/agente` fazem hoje com `components/agente/campos.tsx`.
+Se a ficha for implementada duas vezes, o campo que alguém adicionar num lugar some no outro na
+primeira mudança. Se as duas superfícies mostrarem conjuntos diferentes de campos (por exemplo, o
+painel lateral com um subconjunto, para caber nos 310px), isso é **uma prop**, como o
+`mostrarOpcionais` do agente, e não um segundo componente.
+
+⚠️ **Ressalva registrada, e vale para UMA parte só.** Iniciar conversa com contato **criado à mão** é
+mensagem ativa para número frio, que é o caso de MAIOR risco de banimento, e contradiz a mitigação
+travada em 26/08 ("só para contato com conversa recente, nunca lista fria"). **Decisão do dono em
+31/08: construir mesmo assim, com alerta.** O alerta precisa distinguir os dois casos, porque o risco
+é diferente: abrir conversa com quem já falou é rotina; escrever para quem nunca falou é exposição. A
+regra de não fazer disparo em lista continua valendo: isto é envio um a um.
+
+**Onde encaixa:** é tela nova, então precisa de desenho. Como é lista mais ficha, que é o padrão mais
+conhecido que existe, pode nascer com o design system em vez de prancha própria. Sugestão de ordem:
+depois de aplicar o design (passo 5) e antes dos testes (passo 6), para o passo 6 já cobrir ela.
+
 ### Cadastro do contato, além do WhatsApp (novo, 26/08, não perder)
 
 Hoje `dados_cliente` guarda o que o WhatsApp entrega (telefone, nome) mais `display_name` e
