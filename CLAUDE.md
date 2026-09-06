@@ -153,6 +153,27 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - **`nomewpp = "Você"`:** a Evolution devolve `pushName = "Você"` em mensagens ENVIADAS. Isso NÃO
   é nome de contato. Sempre resolver nome via `lib/inbox.ts` (`cleanName` / `rowsToInbox` /
   `bestName`): melhor nome não-"Você" da conversa, senão o telefone.
+- **Realtime cai, e a tela precisa saber (31/08/2026).** Sintoma que abriu o assunto: bolinha de
+  4 não lidas acesa com o banco **já em zero**. O contador do servidor estava certo o tempo todo
+  (o gatilho `sync_conversation` só incrementa com `user_message` não nula e tipo diferente de
+  `imported`, então responder nunca sobe o número); o que faltava era a lista perceber que o
+  WebSocket tinha morrido. Duas regras saem disso, e valem para qualquer tela que assine realtime:
+  (1) **`.subscribe()` nunca sem callback** — `CHANNEL_ERROR` e `TIMED_OUT` passavam em silêncio.
+  `SUBSCRIBED` chega de novo a cada reassinatura automática, e é aí que se re-busca, porque entre
+  a queda e a volta ninguém recebeu evento. ⚠️ **A primeira assinatura é pulada de propósito**: os
+  dados acabaram de vir do servidor, e re-buscar ali seriam três consultas jogadas fora em toda
+  abertura do inbox (existe e2e que falha se o carregamento passar a re-buscar).
+  (2) **Refetch ao voltar o foco** (`visibilitychange` + `focus`), que cobre o socket derrubado
+  pelo sistema operacional enquanto a máquina dormia, cuja detecção demora.
+  ⚠️ **Assinar tabela fora da publicação é handler morto e silencioso:**
+  `conversation_qualifications` era escutada pela `ContactSidebar` e **não estava** em
+  `supabase_realtime` (`mt_realtime_conversation_qualifications` corrigiu). A `REPLICA IDENTITY`
+  dela fica no default (PK), e não `FULL` como as outras três, porque a tabela é append-only e só
+  o INSERT interessa; se um dia houver update ou delete, aí precisa de `FULL`, senão a RLS do
+  realtime não consegue avaliar a linha antiga e o evento é descartado.
+  ⚠️ **Teste de coisa AUSENTE conta requisição, não pixel.** O e2e que existia para "marcar como
+  lida" só conferia que saiu um PATCH com status < 400: navegava por URL, nunca clicava na lista
+  e nunca olhava a bolinha, então não pegava nada disso.
 - **Env server-only** (nunca `NEXT_PUBLIC`): `SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`,
   `EVOLUTION_API_KEY` (apikey GLOBAL da Evolution), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`,
   `N8N_LOOKUP_SECRET`, `OPENAI_API_KEY` (cérebro do agente + embeddings do RAG),

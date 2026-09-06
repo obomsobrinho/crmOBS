@@ -29,6 +29,49 @@ test("abrir a conversa marca como lida de verdade", async ({ page }) => {
   expect(patches.every((s) => s < 400)).toBe(true);
 });
 
+test("voltar para a aba re-busca a lista (recuperação do realtime)", async ({
+  page,
+}) => {
+  // Regressão do defeito de 31/08/2026: uma bolinha de 4 não lidas ficou acesa
+  // com o banco JÁ em zero. O contador do servidor estava certo o tempo todo; o
+  // que faltava era a lista saber que o realtime tinha caído. O `.subscribe()`
+  // era chamado sem callback, então `CHANNEL_ERROR` e `TIMED_OUT` passavam em
+  // silêncio, e nada re-buscava ao voltar o foco: a lista congelava com os
+  // números que tinha até alguém apertar F5.
+  //
+  // O teste conta REQUISIÇÃO, e não pixel, porque o defeito é a AUSÊNCIA de uma
+  // busca. Medido dos dois lados antes de escrever: sem a correção o foco provoca
+  // ZERO GETs; com ela, um por evento.
+  //
+  // ⚠️ Ele trava também a outra metade da decisão: o carregamento tem que ficar
+  // em ZERO. A primeira assinatura do canal é pulada de propósito, porque nessa
+  // hora a lista acabou de vir do servidor e re-buscar seriam três consultas
+  // jogadas fora em toda abertura do inbox.
+  let gets = 0;
+  page.on("request", (r) => {
+    if (r.url().includes("/rest/v1/conversations") && r.method() === "GET") {
+      gets++;
+    }
+  });
+
+  await page.goto("/inbox");
+  await page.waitForSelector('a[href^="/inbox/"]', { timeout: 20_000 });
+  await page.waitForTimeout(3_000);
+  expect(
+    gets,
+    "abrir o inbox não deve re-buscar: o servidor acabou de entregar a lista"
+  ).toBe(0);
+
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect.poll(() => gets, { timeout: 10_000 }).toBeGreaterThan(0);
+
+  const aposFoco = gets;
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange"))
+  );
+  await expect.poll(() => gets, { timeout: 10_000 }).toBeGreaterThan(aposFoco);
+});
+
 test("a rota de resolver responde e é repetível", async ({ page }) => {
   // Contrato da rota, sem depender de existir handoff aberto: resolver duas vezes
   // é inofensivo (o UPDATE simplesmente não casa linha nenhuma na segunda), e é

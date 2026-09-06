@@ -155,7 +155,19 @@ export default function ContactSidebar({
 
   // Realtime: uma mudança nas conversas (o trigger atualiza a cada mensagem) ou
   // no estado da IA re-busca a lista.
+  //
+  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO. Antes o `.subscribe()` era
+  // chamado sem callback, então `CHANNEL_ERROR` e `TIMED_OUT` passavam em
+  // silêncio: se o WebSocket morria (máquina dormiu, queda de rede, aba parada há
+  // horas), a lista congelava com os números que tinha e só F5 consertava. Foi
+  // assim que uma bolinha de 4 não lidas ficou acesa com o banco já em zero.
+  // `SUBSCRIBED` chega de novo a cada reassinatura automática do supabase-js, e é
+  // exatamente aí que a lista pode estar velha: entre a queda e a volta ninguém
+  // recebeu evento. A PRIMEIRA assinatura é pulada de propósito, porque nessa
+  // hora `initial` acabou de vir do servidor e re-buscar seriam três consultas
+  // jogadas fora em toda abertura do inbox.
   useEffect(() => {
+    let primeira = true;
     const channel = supabase
       .channel("inbox-list")
       .on(
@@ -173,11 +185,37 @@ export default function ContactSidebar({
         { event: "*", schema: "public", table: "conversation_qualifications" },
         () => void refetch()
       )
-      .subscribe();
+      .subscribe((status: string) => {
+        if (status !== "SUBSCRIBED") return;
+        if (primeira) {
+          primeira = false;
+          return;
+        }
+        void refetch();
+      });
     return () => {
       void supabase.removeChannel(channel);
     };
   }, [refetch, supabase]);
+
+  // Rede de segurança do de cima: voltar para a aba re-busca a lista.
+  //
+  // A reassinatura cobre a queda que o cliente PERCEBE. Esta cobre a que ele não
+  // percebe: um socket derrubado pelo sistema operacional enquanto a máquina
+  // dormia pode demorar a ser detectado, e nesse meio-tempo a pessoa está olhando
+  // número velho. Voltar o foco é o instante exato em que ela vai acreditar no
+  // que está na tela.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") void refetch();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [refetch]);
 
   // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime acima também
   // vai chegar, mas depois de ir ao Postgres, voltar pelo WebSocket e re-buscar
