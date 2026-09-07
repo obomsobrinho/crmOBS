@@ -478,6 +478,12 @@ export default function PipelineBoard({
             // que é a hierarquia ao contrário.
             <div
               key={stage.key}
+              // Marcadores para o e2e. A coluna não tinha como ser encontrada a
+              // não ser por classe de layout, e teste preso a classe quebra na
+              // primeira mudança de estilo sem que nada de verdade tenha
+              // quebrado.
+              data-slot="pipeline-coluna"
+              data-stage={stage.key}
               onDragOver={(e) => {
                 e.preventDefault();
                 if (dragOverKey !== stage.key) setDragOverKey(stage.key);
@@ -565,6 +571,8 @@ function CardItem({
   return (
     <div
       draggable
+      data-slot="pipeline-card"
+      data-phone={card.phone}
       onDragStart={(e) => {
         e.dataTransfer.setData("text/plain", card.phone);
         e.dataTransfer.effectAllowed = "move";

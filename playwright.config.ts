@@ -57,5 +57,25 @@ export default defineConfig({
       },
       dependencies: ["setup"],
     },
+    // Testes que afirmam AUSÊNCIA ("isto não deve acontecer") e por isso não
+    // toleram outro worker escrevendo no mesmo tenant ao mesmo tempo.
+    //
+    // ⚠️ Existe porque um deles quebrou de verdade: o teste do realtime exige que
+    // abrir o inbox NÃO re-busque a lista, e os testes de pipeline, rodando em
+    // paralelo, escrevem em `conversations`. O realtime fez o que devia, a lista
+    // re-buscou, e a asserção de zero caiu com 5. O código estava certo e o teste
+    // errado. `dependencies` faz este projeto começar só depois que o `logado`
+    // inteiro terminou, e um worker só impede que eles briguem entre si.
+    {
+      name: "logado-serial",
+      testMatch: /.*\.serial\.spec\.ts/,
+      fullyParallel: false,
+      workers: 1,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/dono.json",
+      },
+      dependencies: ["logado"],
+    },
   ],
 });

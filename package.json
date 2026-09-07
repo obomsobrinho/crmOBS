@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
-    "test:e2e:login": "playwright test --project=setup --project=logado",
+    "test:e2e:login": "playwright test --project=setup --project=logado --project=logado-serial",
     "design:export": "node scripts/exportar-design-system.mjs"
   },
   "dependencies": {
