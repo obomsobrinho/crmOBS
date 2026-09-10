@@ -639,6 +639,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   abuso por IP + `provision_tenant`) e `by-instance`.
 
 ## Produto e estratégia (consultar ANTES de decidir escopo)
+
+> 🧭 **Chegando agora no projeto? Comece por `docs/handoff.md`.** Ele é mapa e estado, não conteúdo:
+> diz o que ler e em que ordem, em que passo do beta o produto está, o que estava em andamento na
+> última sessão, e as quatro coisas que um agente novo erra se ninguém contar. Escrito em 07/09/2026,
+> quando o dono trocou de plano do Claude e o histórico das conversas se perdeu.
+
 Duas fontes de verdade sobre **o que construir e por quê**, mais um caderno de consultas. Não decidir
 roadmap, preço nem posicionamento sem ler a que se aplica:
 
@@ -734,12 +740,35 @@ decisões já travadas, **não reabrir**:
   claro, zero diferenças de estilo). Um defeito de contraste foi corrigido em **7 lugares**:
   `--danger-fill` usado como TEXTO dava ~3,2:1 no escuro, e virou o par `danger-surface`/
   `danger-ink` (9,0:1).
-- Testes e2e (Playwright, `e2e/`): **114 sem login** nas telas `/design` (inclui
-  `/design/montagem`, o assistente, `/design/playground`, o painel de teste, e o canal de feedback
-  em `e2e/feedback.design.spec.ts`) e **10 com login**
-  (`e2e/*.auth.spec.ts`), estes últimos batendo no **cérebro real** em `dryRun`. Ainda **sem**
-  cenário e2e para `/pipeline`.
+- Testes e2e (Playwright, `e2e/`), **quatro projetos**, e a divisão importa:
+  - **`sem-login`** (114): telas `/design`, com dado FALSO. Provam desenho, texto e regra de
+    escrita, nunca funcionamento. Incluem `/design/montagem`, `/design/playground` e o feedback.
+  - **`logado`** (`*.auth.spec.ts`): banco de verdade, tenant Loja Teste, parte deles batendo no
+    **cérebro real** em `dryRun`. Cobrem acesso, agente, **pipeline** e **guardas da `/montagem`**.
+  - **`logado-serial`** (`*.serial.spec.ts`): um worker só, `dependencies: ["logado"]`.
+  - **`setup`**: grava o storageState do dono.
+
+  Total com login: **19 passando, 1 pulado** (07/09/2026).
+
+  ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
+  projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca
+  ZERO buscas" e passou a receber 5 no dia em que a suíte do pipeline nasceu: os testes de pipeline
+  escrevem em `conversations` no MESMO tenant, e o realtime, funcionando como deveria, mandava a
+  lista se atualizar. **O código estava certo e o teste errado.** Todo teste novo de "isto NÃO deve
+  acontecer" vai para `*.serial.spec.ts`.
+  ⚠️ Bloquear o WebSocket com `routeWebSocket` NÃO seria substituto: sem conexão o `SUBSCRIBED`
+  nunca dispara, a guarda que pula a primeira assinatura deixaria de ser exercida, e o teste
+  passaria até com ela removida.
+  ⚠️ **Arraste HTML5 não se testa com `locator.dragTo()`**: no Chromium controlado ele move o
+  ponteiro e `dragstart`/`drop` não disparam. `e2e/pipeline.auth.spec.ts` despacha os três eventos
+  com UM `DataTransfer` compartilhado e **recarrega a página** para provar que o estágio persistiu,
+  porque o board move o card em memória antes de falar com o banco.
   ⚠️ **Rodar as DUAS suítes antes de fechar um passo.** No passo 1 (painel) só a sem-login foi
   rodada, e três testes com login ficaram quebrados por seis dias: dois deles procuravam os
   cabeçalhos "Operação" e "Conversas na semana", que o painel novo tinha renomeado.
   `E2E_PORT=3000 npx playwright test --project=logado` reusa um dev server já no ar.
+  ⚠️ **Buracos declarados**, com o motivo escrito dentro do próprio spec e não aqui: atendente não
+  gerencia o funil, conta bloqueada vai para `/assinatura`, modo avançado vai para `/agente`. Os
+  três exigem fixture que não existe (segunda sessão, conta vencida, conta avançada que ainda não
+  publicou). Sem cobertura nenhuma: envio manual, convite de equipe, upload da base de conhecimento
+  e mobile.

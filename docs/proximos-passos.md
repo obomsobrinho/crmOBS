@@ -24,6 +24,87 @@ Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estr
   dinâmico, mitigada com `loading.tsx`; não é motivo de troca de stack. Reavaliar só se o produto
   virar uma SPA pura com backend próprio à parte (não é o caso).
 
+## Achados medidos entre 31/08 e 07/09/2026, SEM decisão do dono
+
+Levantados em conversa e comprovados no código ou no banco. Nenhum foi corrigido, e nenhum é
+decisão de quem estiver codando. Estão aqui porque só existiam no chat, e chat se perde.
+
+### A1. Trocar de conversa custa ~0,9s, e quase tudo é viagem de rede em série
+
+**Não é volume de dado.** O banco tem 149 mensagens no total, 54 conversas, 160 kB, e o índice
+`(client_id, phone, created_at)` cobre a consulta. Uma conversa de UMA mensagem levou 887ms de
+mediana em três rodadas, medidas com login real a partir da máquina do dono:
+
+| # | onde | o quê | ms |
+|---|---|---|---|
+| 1 | `proxy.ts` | `auth.getUser()` | 51-110 |
+| 2 | `getMyClient` | `auth.getUser()` de novo | 51-72 |
+| 3 | `getMyClient` | `select clients` | 237-612 |
+| 4 | `getMyClient` | `select user_clients` (o papel) | 187-263 |
+| 5 | `ThreadPage` | `Promise.all` das 4 consultas | 249-347 |
+
+**A causa é estrutural:** em `app/(app)/inbox/[id]/page.tsx` o `await getMyClient()` está **antes**
+do `Promise.all`, mas nenhuma das 4 consultas precisa dele (ele só alimenta `userId`, `clientId` e
+`readOnly` no fim). Medida a hipótese de rodar os dois blocos juntos: **402ms contra 887ms**.
+
+Três achados menores no mesmo caminho: `auth.getUser()` roda duas vezes por request (proxy e
+`getMyClient`), e cada uma é um `GET /auth/v1/user` pela rede; `lib/supabase/server.ts` **não é
+memoizado** por request (zero uso de `cache()`), então cada chamada cria um client novo; e o
+`staleTimes.dynamic` do Next tem padrão **0**, então voltar a uma conversa já aberta refaz tudo.
+
+⚠️ **O que NÃO é o problema, e cheguei a suspeitar que fosse:** o layout do inbox não re-executa. A
+doc do Next é explícita, "shared layouts won't automatically be refetched on every navigation". Os
+269ms do `getInbox()` (500 conversas mais todos os contatos) entram só na primeira carga.
+
+⚠️ **RESSALVA QUE MUDA A CONCLUSÃO:** isso foi medido **da máquina do dono**, onde cada viagem
+atravessa a internet até o Supabase. Em produção na Vercel, com função e banco na mesma região, a
+mesma viagem custa poucos milissegundos. **Não existe configuração de região no projeto** (nem
+`vercel.json`, nem `region` no `next.config.ts`), então não se sabe onde a função roda.
+**Pergunta em aberto para o dono: a lentidão aparece no site publicado ou só em `npm run dev`?**
+A resposta decide se isto é só arquitetura (vale corrigir de qualquer jeito) ou também região.
+
+### A2. Usuário em dois tenants cai num deles POR ACASO
+
+`getMyClient()` (`lib/auth.ts`) faz `.from("clients").select(...).limit(1).maybeSingle()`, **sem
+`order()` e sem filtro**. Com dois vínculos em `user_clients`, a RLS devolve os dois e o Postgres
+decide qual vem primeiro. **Não existe seletor de conta em lugar nenhum da interface.**
+
+Descoberto ao tentar criar o fixture de atendente: `franckantonnywork@gmail.com` já era dono do
+tenant "testesnovo", e adicioná-lo à Loja Teste teria produzido exatamente esse estado.
+
+Não é problema de teste, é de produto: vai morder quando um contador, um sócio ou uma agência local
+for convidado para duas contas de cliente. **Decisão do dono:** ou o produto ganha troca de conta,
+ou assume que um login pertence a um tenant só e o convite recusa quem já tem vínculo.
+
+### A3. Os e-mails do Supabase Auth dizem "DeskCRM", e o assunto está em inglês
+
+O convite chega com assunto "You have been invited" e corpo "Você foi convidado para o DeskCRM".
+**"DeskCRM" não existe em lugar nenhum do produto**; `lib/brand.ts` diz "O Bom Sobrinho".
+
+⚠️ **Esse texto NÃO está no repositório.** Mora no painel do Supabase, em Authentication → Emails,
+e o MCP não tem ferramenta para editá-lo. São quatro templates: convite, confirmação de cadastro,
+recuperação de senha e troca de e-mail.
+
+**Decisão pendente antes de escrever:** qual nome usar. "O Bom Sobrinho" é o nome da AGÊNCIA, e o
+`CLAUDE.md` registra que o produto ainda não tem nome próprio. Um convite que chega em nome da
+agência, para o cliente de um cliente, pode confundir.
+
+### A4. O fixture de atendente está bloqueado
+
+Provar "atendente não gerencia o funil", "atendente é redirecionado da `/montagem`" e o 403 do
+`agent-config` exige uma **segunda sessão**, de um usuário com `role='atendente'` na Loja Teste. O
+`auth.setup.ts` grava um storageState só, o do dono. Escrever esses testes com a sessão do dono
+provaria o contrário do que eles afirmam.
+
+Sugestão feita e ainda não respondida: usar `franckantonnywork+atendente@gmail.com` (o Gmail entrega
+no mesmo inbox), que não encosta no tenant "testesnovo" e deixa o usuário só na Loja Teste.
+
+### A5. A conta "testesnovo" está bloqueada
+
+Criada em 03/09 pelo `/cadastro`, com `trial_ends_at` em 04/09. Quem tentar refazer o caminho de
+montagem com ela cai em `/assinatura`, não no assistente. Não é defeito, é o gate funcionando; está
+aqui só para não custar meia hora de confusão a quem for testar.
+
 ## Próxima rodada (decidido em 26/08/2026)
 
 Ordem travada. **Cobrança e checkout saem do caminho crítico**: o lançamento será um **beta
