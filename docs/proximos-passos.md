@@ -105,6 +105,83 @@ Criada em 03/09 pelo `/cadastro`, com `trial_ends_at` em 04/09. Quem tentar refa
 montagem com ela cai em `/assinatura`, não no assistente. Não é defeito, é o gate funcionando; está
 aqui só para não custar meia hora de confusão a quem for testar.
 
+## Plano da demo (decidido em 10/09/2026): estabilidade antes de desenho
+
+Depois da revisão externa de 10/09 (verificada item a item contra código e workflow), o dono
+travou a prioridade: **o canal não pode falhar e o testador tem que confiar.** Tela fica para
+depois. Onze entregas, agrupadas pelo que trava em quem, e não por tema:
+
+| Precisa de | Entregas |
+|---|---|
+| **ninguém** (agente faz sozinho) | C1 a C5 abaixo |
+| **o dono acordado** (mexe em produção e a prova exige WhatsApp real) | canal endurecido (grupo, dedupe, fallback); rotação do segredo (duas pontas, n8n e Vercel) |
+| **uma decisão do dono** | fixture de atendente (qual e-mail); propagação da base (qual abordagem) |
+| **decisão de celular** (gaveta) | mobile com pareamento por código; tela de Clientes |
+
+⚠️ **Os três itens que a revisão pôs no topo (dedupe, grupo, fallback) estão todos na segunda
+linha.** O que se faz sozinho aumenta confiança e cobertura; **não destrava a demo.** O canal
+continua igual até uma sessão com o dono presente. Para essa sessão, a prova será por **webhook
+simulado** (mesmo `key.id` duas vezes, um JID `@g.us`) mais **uma** mensagem real no fim, para
+o dono não precisar mandar vinte à mão.
+
+### Contratos do que se faz sozinho, na ordem de execução
+
+Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba **entre** contratos.
+
+**C1. Workflows do n8n versionados no repositório** (pequeno)
+- *Entrega:* `n8n/obs-atendimento.json` e `n8n/crm-envio-manual.json`, mais `n8n/README.md`
+  dizendo como restaurar e onde entra o segredo.
+- *Muda:* nada no n8n. Só leitura.
+- *Segurança:* o valor do `x-lookup-secret` sai do JSON e vira o marcador `{{N8N_LOOKUP_SECRET}}`.
+  Hoje ele está em texto puro no nó `Atendente`, e exportar sem tratar commitaria o segredo.
+- *Prova:* JSON válido, 45 e 11 nós, `grep` do valor real no repo devolve zero.
+- *Destrava:* diff e rollback para tudo que vier no canal.
+
+**C2. Textos dos quatro e-mails do Supabase Auth** (pequeno)
+- *Entrega:* `docs/emails-supabase.md` com assunto e corpo (convite, confirmação, recuperação,
+  troca de e-mail), em português, sem "DeskCRM", sem travessão.
+- *Muda no código:* `app/api/team/invite/route.ts` passa `data: { company_name }` como o cadastro
+  já faz, senão o template não tem o nome da empresa no convite de equipe.
+- ⚠️ *Restrição:* cadastro e convite de equipe usam o **mesmo** template "Invite user". O texto tem
+  que servir para quem criou a própria conta E para quem foi chamado. "Você foi convidado" está
+  errado para metade dos casos. Direção: "Defina sua senha para entrar no atendimento de
+  {{ .Data.company_name }}".
+- *Aplicar é do dono:* o texto mora no painel do Supabase, sem ferramenta para editar daqui.
+- *Prova:* variáveis conferidas na doc do Supabase; texto passa nas regras de escrita do projeto.
+
+**C3. O app diz quando o WhatsApp caiu** (médio)
+- *Entrega:* aviso em toda página do app enquanto `state != 'open'`, no mesmo lugar e peso do
+  `BillingBanner`. Painel deixa de mostrar zero sem explicar.
+- *Fonte:* `GET /api/clients/[id]/whatsapp-status`, que já existe e devolve `state`.
+- ⚠️ *Não pode custar uma viagem por página:* a checagem é no browser, depois do carregamento, com
+  intervalo, e nunca no Server Component (a latência de troca de conversa já é o achado A1).
+- *Prova:* o componente renderiza cada estado (`open`, `close`, `connecting`, `unknown`) com prop
+  forçada; e2e cobre o estado `close`. Queda real não dá para forçar na Loja Teste.
+
+**C4. As 12 armadilhas rodam por comando** (médio a grande)
+- *Entrega:* `e2e/armadilhas.ia.spec.ts` num projeto Playwright **próprio** (`ia`), fora de
+  `logado`: cada caso chama o modelo de verdade, e rodar 12 chamadas em toda execução da suíte
+  custa dinheiro. Roda quando alguém pedir ou antes de publicar mudança na base.
+- *Fonte dos casos:* a tabela da bateria de 28/08 neste documento (12 linhas, com `action`
+  esperada e veredito).
+- *Asserções mecanizáveis:* `action` igual à esperada; guardrail `passou`; resposta **sem** preço,
+  URL ou telefone que não esteja na persona nem no RAG. Leitura humana do texto não entra.
+- *Prova:* 12 de 12 hoje; e o caso 11 (persona sabotada) faz o guardrail **bloquear**, como em
+  28/08.
+- *Por quê agora:* "IA que não inventa" é o posicionamento, e hoje é prova de uma vez só. Qualquer
+  ajuste no prompt durante o beta regride sem ninguém ver.
+
+**C5. Trocar de conversa em menos da metade do tempo** (pequeno a médio)
+- *Entrega:* `app/(app)/inbox/[id]/page.tsx` com `getMyClient()` **dentro** do `Promise.all`;
+  `lib/supabase/server.ts` e `getMyClient` memoizados por request com `React.cache()`.
+- *Base:* achado A1. Medido 887ms sequencial contra 402ms em paralelo, numa conversa de uma
+  mensagem.
+- ⚠️ *Risco:* `getMyClient` roda em toda página. A rede é a suíte com login inteira, que exercita
+  autenticação de ponta a ponta. Por isso é o último da fila.
+- *Prova:* suíte com login verde duas vezes; medição antes e depois com o mesmo script.
+- *Fica de fora:* colocação de região na Vercel, porque não se sabe onde a função roda e o dono
+  ainda não disse se a lentidão aparece no site publicado.
+
 ## Próxima rodada (decidido em 26/08/2026)
 
 Ordem travada. **Cobrança e checkout saem do caminho crítico**: o lançamento será um **beta
