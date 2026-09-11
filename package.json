@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test:e2e": "playwright test",
     "test:e2e:login": "playwright test --project=setup --project=logado --project=logado-serial",
+    "test:e2e:ia": "playwright test --project=setup --project=ia",
     "design:export": "node scripts/exportar-design-system.mjs"
   },
   "dependencies": {

@@ -24,6 +24,20 @@ try {
 const PORTA = process.env.E2E_PORT ?? "3001";
 const BASE = `http://localhost:${PORTA}`;
 
+// O projeto `ia` (as 12 armadilhas contra o cérebro real) SÓ EXISTE quando foi
+// pedido pelo nome na linha de comando. Cada execução dele faz 12 chamadas ao
+// modelo, que custam dinheiro; `npm run test:e2e` (todos os projetos) não pode
+// pagar isso sem querer. `--project=ia` e `--project ia` entram; o resto, não.
+//
+// ⚠️ Os WORKERS recarregam este arquivo sem os argumentos da linha de comando
+// (o `argv` deles é o do processo filho), e um projeto que existe no processo
+// principal e não existe no worker falha com "Project ia not found". Por isso a
+// decisão é copiada para o ambiente, que o worker herda.
+const IA_PEDIDO =
+  process.env.E2E_IA === "1" ||
+  process.argv.some((a) => a === "ia" || a === "--project=ia");
+if (IA_PEDIDO) process.env.E2E_IA = "1";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -77,5 +91,27 @@ export default defineConfig({
       },
       dependencies: ["logado"],
     },
+    // As 12 armadilhas contra o cérebro real (`*.ia.spec.ts`). Condicional a
+    // `IA_PEDIDO` (ver o topo): fora de `logado` porque paga 12 chamadas ao
+    // modelo, e fora da lista padrão para ninguém pagar sem querer.
+    //
+    // `retries: 1` de propósito e só aqui: o modelo não é determinístico, e uma
+    // repetição separa "a base regrediu" de "o modelo variou uma vez". Duas
+    // falhas seguidas do mesmo caso é sinal de verdade.
+    ...(IA_PEDIDO
+      ? [
+          {
+            name: "ia",
+            testMatch: /.*\.ia\.spec\.ts/,
+            retries: 1,
+            workers: 3,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: "e2e/.auth/dono.json",
+            },
+            dependencies: ["setup"],
+          },
+        ]
+      : []),
   ],
 });
