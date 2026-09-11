@@ -72,6 +72,8 @@ Os cinco achados medidos estão em `docs/proximos-passos.md`, na seção "Achado
 - **A2** Usuário em dois tenants cai num deles por acaso (`getMyClient` usa `limit(1)` sem `order`).
 - **A3** Os e-mails do Supabase Auth dizem "DeskCRM" e o assunto está em inglês. O texto não está no
   repositório, e falta decidir qual nome usar.
+  **Texto novo pronto em `docs/emails-supabase.md` (11/09/2026), sem nome de produto; aplicar no painel do
+  Supabase é do dono.**
 - **A4** O fixture de atendente está bloqueado, e sem ele três testes não podem ser escritos com
   honestidade.
 - **A5** A conta "testesnovo" está com o teste vencido.

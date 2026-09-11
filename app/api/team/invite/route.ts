@@ -74,8 +74,13 @@ export async function POST(req: NextRequest) {
   const origin = new URL(req.url).origin;
   const redirectTo = `${origin}/auth/confirm?next=/definir-senha`;
 
+  // `company_name` vai em user_metadata porque o template "Invite user" do
+  // Supabase é UM só, compartilhado com o cadastro (/api/signup, que já manda
+  // o mesmo campo): o e-mail diz "entrar no atendimento de {{ .Data.company_name }}"
+  // e, sem isto, o convidado de equipe receberia o texto com o nome em branco.
   const { data, error } = await svc.auth.admin.inviteUserByEmail(email, {
     redirectTo,
+    data: { company_name: mine.name },
   });
   if (error || !data?.user) {
     // 422 = e-mail já registrado (usuário já tem conta).
