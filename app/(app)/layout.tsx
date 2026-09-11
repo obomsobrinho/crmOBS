@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import NavRail from "@/components/NavRail";
 import AvisoMontagem from "@/components/AvisoMontagem";
 import BillingBanner from "@/components/BillingBanner";
+import WhatsAppBanner from "@/components/WhatsAppBanner";
 import { getMyClient } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +46,12 @@ export default async function AppLayout({
         {/* Estado da conta: bloqueio (leitura só) ou aviso (trial acabando,
             pagamento em carência). Vem antes do trilho porque é mais urgente. */}
         <BillingBanner access={client.access} isOwner={client.role === "dono"} />
+        {/* Estado do WhatsApp: some quando a instância está `open`. A checagem
+            é no BROWSER, com intervalo, e nunca aqui: este layout roda em toda
+            navegação, e uma chamada à Evolution por página faria a tela inteira
+            esperar por API de terceiro (achado A1, latência de troca de
+            conversa). */}
+        <WhatsAppBanner clientId={client.id} />
         {/* Porta de volta para a montagem: uma linha, em toda página, até o
             agente ir ao ar. NÃO conta passos, porque o único contador da conta
             mora dentro do assistente.

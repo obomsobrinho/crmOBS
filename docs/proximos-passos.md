@@ -128,16 +128,18 @@ o dono não precisar mandar vinte à mão.
 
 Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba **entre** contratos.
 
-**C1. Workflows do n8n versionados no repositório** (pequeno)
+✅ **C1. Workflows do n8n versionados no repositório** (pequeno, feito em 11/09/2026)
 - *Entrega:* `n8n/obs-atendimento.json` e `n8n/crm-envio-manual.json`, mais `n8n/README.md`
   dizendo como restaurar e onde entra o segredo.
 - *Muda:* nada no n8n. Só leitura.
 - *Segurança:* o valor do `x-lookup-secret` sai do JSON e vira o marcador `{{N8N_LOOKUP_SECRET}}`.
   Hoje ele está em texto puro no nó `Atendente`, e exportar sem tratar commitaria o segredo.
+  ⚠️ *Visto ao exportar:* o segredo estava em **dois** nós, `Atendente` e `Sobe mídia recebida`; e o
+  `pinData` carregava a apikey da Evolution. Os dois saíram (`n8n/README.md`).
 - *Prova:* JSON válido, 45 e 11 nós, `grep` do valor real no repo devolve zero.
 - *Destrava:* diff e rollback para tudo que vier no canal.
 
-**C2. Textos dos quatro e-mails do Supabase Auth** (pequeno)
+✅ **C2. Textos dos quatro e-mails do Supabase Auth** (pequeno, feito em 11/09/2026)
 - *Entrega:* `docs/emails-supabase.md` com assunto e corpo (convite, confirmação, recuperação,
   troca de e-mail), em português, sem "DeskCRM", sem travessão.
 - *Muda no código:* `app/api/team/invite/route.ts` passa `data: { company_name }` como o cadastro
@@ -149,7 +151,7 @@ Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba 
 - *Aplicar é do dono:* o texto mora no painel do Supabase, sem ferramenta para editar daqui.
 - *Prova:* variáveis conferidas na doc do Supabase; texto passa nas regras de escrita do projeto.
 
-**C3. O app diz quando o WhatsApp caiu** (médio)
+✅ **C3. O app diz quando o WhatsApp caiu** (médio, feito em 11/09/2026)
 - *Entrega:* aviso em toda página do app enquanto `state != 'open'`, no mesmo lugar e peso do
   `BillingBanner`. Painel deixa de mostrar zero sem explicar.
 - *Fonte:* `GET /api/clients/[id]/whatsapp-status`, que já existe e devolve `state`.

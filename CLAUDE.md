@@ -174,6 +174,15 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   ⚠️ **Teste de coisa AUSENTE conta requisição, não pixel.** O e2e que existia para "marcar como
   lida" só conferia que saiu um PATCH com status < 400: navegava por URL, nunca clicava na lista
   e nunca olhava a bolinha, então não pegava nada disso.
+- **O app diz quando o WhatsApp caiu (11/09/2026, C3 do plano da demo).** `components/WhatsAppBanner.tsx`
+  fica no `(app)/layout.tsx` logo abaixo do `BillingBanner`, mesmo lugar e peso, e aparece enquanto o
+  estado da instância for diferente de `open` (`close` vermelho, `connecting` âmbar, `unknown` neutro,
+  os três com link para `/connect`). ⚠️ **A checagem é no BROWSER, depois do carregamento, a cada 60s e
+  ao voltar o foco, e nunca no Server Component:** o layout roda em toda navegação e uma chamada à
+  Evolution por página faria a tela esperar por API de terceiro (achado A1). Fonte:
+  `GET /api/clients/[id]/whatsapp-status`. `estadoForcado` é só para o preview `/design/conexao` e
+  para o teste; o layout nunca passa. O e2e com login intercepta a rota com `page.route` para forçar
+  `close`, porque queda real não dá para provocar na Loja Teste.
 - **Env server-only** (nunca `NEXT_PUBLIC`): `SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`,
   `EVOLUTION_API_KEY` (apikey GLOBAL da Evolution), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`,
   `N8N_LOOKUP_SECRET`, `OPENAI_API_KEY` (cérebro do agente + embeddings do RAG),
