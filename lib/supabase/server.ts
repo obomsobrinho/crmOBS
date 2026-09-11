@@ -1,9 +1,17 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 // Client autenticado por sessão (cookies) para Server Components e Route
 // Handlers. A RLS por tenant é aplicada com o JWT do usuário logado.
-export async function createClient() {
+//
+// MEMOIZADO POR REQUEST com `React.cache` (C5 do plano da demo, achado A1): o
+// layout do app, a página e `getMyClient()` chamavam isto separadamente na
+// mesma navegação e cada chamada criava um client novo. Dentro de um request
+// todos agora recebem a MESMA instância (mesmos cookies, mesma sessão). O
+// escopo é o request: nada vaza entre usuários, porque o React descarta o cache
+// quando o request termina.
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -27,4 +35,4 @@ export async function createClient() {
       },
     }
   );
-}
+});

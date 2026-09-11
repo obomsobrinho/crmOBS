@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
@@ -45,7 +46,15 @@ export interface MyClient {
 // tenant(s) do usuário, então um simples select retorna o dele. Também resolve
 // o papel do usuário nesse tenant (a policy de user_clients libera a própria
 // linha), usado para gatear ações de dono (convidar/remover membro).
-export async function getMyClient(): Promise<MyClient | null> {
+//
+// MEMOIZADO POR REQUEST com `React.cache` (C5 do plano da demo, achado A1).
+// Numa navegação do app isto rodava DUAS vezes em série (o layout do route
+// group e a página), e cada execução são três viagens ao Supabase: getUser,
+// clients, user_clients. Agora a segunda chamada no mesmo request devolve o
+// resultado da primeira. Escopo por request, então um usuário nunca recebe o
+// tenant do outro; e dentro de um request o tenant não muda, então o valor
+// memoizado é sempre o atual.
+export const getMyClient = cache(async function getMyClient(): Promise<MyClient | null> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -55,13 +64,22 @@ export async function getMyClient(): Promise<MyClient | null> {
   // As colunas de assinatura e de montagem vêm no mesmo select (custo zero)
   // porque o gate e a linha de aviso rodam em toda navegação do app. Só
   // escalares: `persona` (9 KB na OBM) e `agent_config` ficam FORA de propósito.
-  const { data } = await supabase
-    .from("clients")
-    .select(
-      "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at"
-    )
-    .limit(1)
-    .maybeSingle();
+  //
+  // `clients` e `user_clients` saem JUNTOS: a segunda só precisa de `user.id`,
+  // que já existe, e a policy de `user_clients` devolve só as linhas do próprio
+  // usuário, então filtrar pelo tenant depois, em memória, dá o mesmo resultado
+  // que filtrar no banco. Eram três viagens em série (getUser, clients,
+  // user_clients); ficam duas.
+  const [{ data }, { data: memberships }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select(
+        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at"
+      )
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("user_clients").select("client_id, role").eq("user_id", user.id),
+  ]);
   if (!data) return null;
 
   const client = data as {
@@ -79,12 +97,10 @@ export async function getMyClient(): Promise<MyClient | null> {
     onboarding_tested_at: string | null;
   };
 
-  const { data: membership } = await supabase
-    .from("user_clients")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("client_id", client.id)
-    .maybeSingle();
+  const membership =
+    (memberships as { client_id: string; role: string }[] | null)?.find(
+      (m) => m.client_id === client.id
+    ) ?? null;
 
   return {
     id: client.id,
@@ -114,7 +130,7 @@ export async function getMyClient(): Promise<MyClient | null> {
       published: !!client.agent_published_at,
     }),
   };
-}
+});
 
 /**
  * Gate das páginas que só existem com a conta em dia (pipeline, painel, agente,

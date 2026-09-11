@@ -18,9 +18,15 @@ export default async function ThreadPage({
   const { id } = await params;
   const phone = decodeURIComponent(id);
   const supabase = await createClient();
-  const client = await getMyClient();
 
-  const [{ data: rows }, { data: cliente }, { data: conv }, members] =
+  // `getMyClient()` DENTRO do Promise.all (C5 do plano da demo, achado A1).
+  // Ele estava antes, em série, e nenhuma das quatro consultas precisa dele:
+  // ele só alimenta `userId`, `clientId` e `readOnly` no fim. Medido em
+  // 07/09/2026: 887ms em série contra 402ms em paralelo, numa conversa de uma
+  // mensagem. Com a memoização por request em `lib/auth.ts`, aqui ele costuma
+  // voltar do cache do layout, mas a ordem continua certa se um dia deixar de
+  // voltar.
+  const [{ data: rows }, { data: cliente }, { data: conv }, members, client] =
     await Promise.all([
       supabase
         .from("chat_messages")
@@ -38,6 +44,7 @@ export default async function ThreadPage({
         .eq("phone", phone)
         .maybeSingle(),
       fetchMembers(supabase),
+      getMyClient(),
     ]);
 
   const initialRows = (rows ?? []) as ChatRow[];

@@ -178,7 +178,7 @@ Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba 
 - *Por quê agora:* "IA que não inventa" é o posicionamento, e hoje é prova de uma vez só. Qualquer
   ajuste no prompt durante o beta regride sem ninguém ver.
 
-**C5. Trocar de conversa em menos da metade do tempo** (pequeno a médio)
+✅ **C5. Trocar de conversa em menos da metade do tempo** (pequeno a médio, feito em 11/09/2026; a meta do título NÃO foi atingida na medição de TTFB, ver abaixo)
 - *Entrega:* `app/(app)/inbox/[id]/page.tsx` com `getMyClient()` **dentro** do `Promise.all`;
   `lib/supabase/server.ts` e `getMyClient` memoizados por request com `React.cache()`.
 - *Base:* achado A1. Medido 887ms sequencial contra 402ms em paralelo, numa conversa de uma
@@ -188,6 +188,16 @@ Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba 
 - *Prova:* suíte com login verde duas vezes; medição antes e depois com o mesmo script.
 - *Fica de fora:* colocação de região na Vercel, porque não se sabe onde a função roda e o dono
   ainda não disse se a lentidão aparece no site publicado.
+  ✅ *Feito em 11/09/2026, e o que saiu diferente:* além do `Promise.all` e do `React.cache` nos dois
+  módulos, as consultas a `clients` e `user_clients` dentro de `getMyClient` passaram a sair juntas
+  (a segunda só precisa de `user.id`; o filtro pelo tenant virou `find` em memória sobre as linhas que a
+  policy já restringe ao próprio usuário). **Medição, TTFB do documento em `npm run dev` na máquina do dono,
+  9 navegações por rodada, duas rodadas antes e duas depois:** conversa de 1 mensagem **656 e 791 ms ->
+  445 e 469 ms**; conversa de 16 mensagens **652 e 708 ms -> 438 e 458 ms**. É 35 a 40% a menos, e não
+  a metade: o que sobra é a cadeia em série que a arquitetura ainda impõe (`getUser` no `proxy.ts`, depois
+  `getUser` de novo no `getMyClient`, depois as consultas), e a hipótese de 887 -> 402 ms do achado A1 media
+  só o bloco da página, não o request inteiro. Próximo corte, se o dono quiser: passar o usuário do proxy
+  para o render (um `getUser` a menos) e o `staleTimes.dynamic` do Next. Região na Vercel segue de fora.
 
 ## Próxima rodada (decidido em 26/08/2026)
 

@@ -150,6 +150,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - **Supabase clients:** `lib/supabase/client.ts` (browser, sessão em cookie, singleton),
   `lib/supabase/server.ts` (Server Components/route handlers), `lib/supabase/service.ts`
   (service_role — **só no servidor, nunca no browser**). `lib/auth.ts` → `getMyClient()`.
+  ⚠️ **`createClient()` (server) e `getMyClient()` são MEMOIZADOS POR REQUEST com `React.cache`**
+  (11/09/2026, C5 do plano da demo): layout e página chamam os dois na mesma navegação e antes cada
+  chamada eram viagens novas ao Supabase. O escopo é o request (nada atravessa usuários). Consequência
+  para quem escreve rota: dentro de um mesmo request, mudar algo em `clients` e chamar `getMyClient()`
+  de novo devolve o valor ANTIGO; ler o que acabou de gravar exige consulta própria. Dentro do
+  `getMyClient`, `clients` e `user_clients` saem em paralelo e o papel é escolhido em memória pelo
+  `client_id`. Medido: troca de conversa caiu de ~656 para ~445 ms de TTFB no dev (35 a 40%, não a
+  metade; o resto é `getUser` duas vezes em série, proxy e `getMyClient`).
 - **`nomewpp = "Você"`:** a Evolution devolve `pushName = "Você"` em mensagens ENVIADAS. Isso NÃO
   é nome de contato. Sempre resolver nome via `lib/inbox.ts` (`cleanName` / `rowsToInbox` /
   `bestName`): melhor nome não-"Você" da conversa, senão o telefone.
