@@ -580,6 +580,11 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   é coluna legada morta (mantida). Não sugerir trocar sem pedirem.
 
 ## n8n (⚠️ produção)
+- **Os dois workflows estão versionados em `n8n/`** (`obs-atendimento.json`, 45 nós, e
+  `crm-envio-manual.json`, 11 nós; exportados em 11/09/2026, só leitura). O `n8n/README.md` diz
+  como restaurar. ⚠️ O `x-lookup-secret` está em texto puro em **DOIS** nós do OBS Atendimento
+  (`Atendente` e `Sobe mídia recebida`); no export os dois viram o marcador `{{N8N_LOOKUP_SECRET}}`.
+  Reexportar sem passar por essa troca commita o segredo.
 - **Arquitetura da IA (cutover APLICADO e ativo):** o cérebro do agente saiu do n8n e roda em
   `POST /api/agent` (stateless; persona + histórico de `chat_messages` + AGORA + retrieval do RAG +
   guardrail; saída `{ output: { messages, action, summary, preferencia_horario }, diagnostics }`).

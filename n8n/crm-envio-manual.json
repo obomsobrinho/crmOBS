@@ -1,0 +1,608 @@
+{
+  "id": "MkDoUMLyZZzZBrjQ",
+  "name": "CRM Envio Manual",
+  "active": true,
+  "nodes": [
+    {
+      "id": "webhook-crm",
+      "name": "Webhook CRM",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-envio-manual",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "2530da5d-6d18-4849-b69d-36cb3b714c4e"
+    },
+    {
+      "id": "evo-send",
+      "name": "Evolution send",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Webhook CRM').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook CRM').item.json.body.phone }}",
+        "messageText": "={{ $('Webhook CRM').item.json.body.text }}",
+        "options_message": {
+          "delay": 0,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      }
+    },
+    {
+      "id": "save-manual",
+      "name": "Salva manual (chat_messages)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.phone }}"
+            },
+            {
+              "fieldId": "bot_message",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.text }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "manual"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.client_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "id": "pause-ia-crm",
+      "name": "Pausar IA (CRM)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "operation": "update",
+        "tableId": "dados_cliente",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "telefone",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook CRM').item.json.body.phone }}"
+            },
+            {
+              "keyName": "client_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Webhook CRM').item.json.body.client_id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "atendimento_ia",
+              "fieldValue": "pause"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "id": "ff8f2173-42b3-44a4-b97c-c4bf403d77d0",
+      "name": "Tem mídia?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        180,
+        -40
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "hasmedia",
+              "leftValue": "={{ !!($('Webhook CRM').item.json.body.media && $('Webhook CRM').item.json.body.media.url) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e05458c9-55a4-47d9-b3fd-924f9525cdb2",
+      "name": "Salva manual mídia",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        620,
+        -200
+      ],
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.phone }}"
+            },
+            {
+              "fieldId": "bot_message",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.text }}"
+            },
+            {
+              "fieldId": "media_url",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.media.path }}"
+            },
+            {
+              "fieldId": "media_type",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.media.type }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "manual"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Webhook CRM').item.json.body.client_id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "id": "895e6ac9-7dcc-4dfc-8c02-3c15098df51f",
+      "name": "Tipo de mídia",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        400,
+        -240
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mt1",
+                    "leftValue": "={{ $('Webhook CRM').item.json.body.media.type }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mt2",
+                    "leftValue": "={{ $('Webhook CRM').item.json.body.media.type }}",
+                    "rightValue": "video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "video"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mt3",
+                    "leftValue": "={{ $('Webhook CRM').item.json.body.media.type }}",
+                    "rightValue": "audio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mt4",
+                    "leftValue": "={{ $('Webhook CRM').item.json.body.media.type }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "document"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      }
+    },
+    {
+      "id": "a0f0eaed-9441-4a0f-b68a-1f8481f0fc95",
+      "name": "Envia imagem",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -420
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-image",
+        "instanceName": "={{ $('Webhook CRM').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook CRM').item.json.body.phone }}",
+        "media": "={{ $('Webhook CRM').item.json.body.media.url }}",
+        "mimetype": "={{ $('Webhook CRM').item.json.body.media.mime }}",
+        "caption": "={{ $('Webhook CRM').item.json.body.text }}",
+        "fileName": "={{ $('Webhook CRM').item.json.body.media.filename }}",
+        "options_message": {
+          "delay": 0,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      }
+    },
+    {
+      "id": "68116c53-9bb8-463e-9aab-dd1ff6da8879",
+      "name": "Envia vídeo",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -300
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-video",
+        "instanceName": "={{ $('Webhook CRM').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook CRM').item.json.body.phone }}",
+        "media": "={{ $('Webhook CRM').item.json.body.media.url }}",
+        "mimetype": "={{ $('Webhook CRM').item.json.body.media.mime }}",
+        "caption": "={{ $('Webhook CRM').item.json.body.text }}",
+        "fileName": "={{ $('Webhook CRM').item.json.body.media.filename }}",
+        "options_message": {
+          "delay": 0,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      }
+    },
+    {
+      "id": "d5e4fc1e-6e27-4398-90ff-5073a9e0406b",
+      "name": "Envia áudio",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -180
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-audio",
+        "instanceName": "={{ $('Webhook CRM').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook CRM').item.json.body.phone }}",
+        "media": "={{ $('Webhook CRM').item.json.body.media.url }}",
+        "mimetype": "={{ $('Webhook CRM').item.json.body.media.mime }}",
+        "fileName": "={{ $('Webhook CRM').item.json.body.media.filename }}",
+        "options_message": {
+          "delay": 0
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      }
+    },
+    {
+      "id": "2f1fa363-b9d2-4da2-855a-6f6acc20fbd8",
+      "name": "Envia documento",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -60
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-document",
+        "instanceName": "={{ $('Webhook CRM').item.json.body.instance }}",
+        "remoteJid": "={{ $('Webhook CRM').item.json.body.phone }}",
+        "media": "={{ $('Webhook CRM').item.json.body.media.url }}",
+        "mimetype": "={{ $('Webhook CRM').item.json.body.media.mime }}",
+        "caption": "={{ $('Webhook CRM').item.json.body.text }}",
+        "fileName": "={{ $('Webhook CRM').item.json.body.media.filename }}",
+        "options_message": {
+          "delay": 0,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Evolution send": {
+      "main": [
+        [
+          {
+            "node": "Salva manual (chat_messages)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva manual (chat_messages)": {
+      "main": [
+        [
+          {
+            "node": "Pausar IA (CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook CRM": {
+      "main": [
+        [
+          {
+            "node": "Tem mídia?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem mídia?": {
+      "main": [
+        [
+          {
+            "node": "Tipo de mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Evolution send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva manual mídia": {
+      "main": [
+        [
+          {
+            "node": "Pausar IA (CRM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo de mídia": {
+      "main": [
+        [
+          {
+            "node": "Envia imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia vídeo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia áudio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia documento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia documento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia imagem": {
+      "main": [
+        [
+          {
+            "node": "Salva manual mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia vídeo": {
+      "main": [
+        [
+          {
+            "node": "Salva manual mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia áudio": {
+      "main": [
+        [
+          {
+            "node": "Salva manual mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia documento": {
+      "main": [
+        [
+          {
+            "node": "Salva manual mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true
+  },
+  "meta": null
+}
