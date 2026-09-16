@@ -114,7 +114,7 @@ depois. Onze entregas, agrupadas pelo que trava em quem, e não por tema:
 | Precisa de | Entregas |
 |---|---|
 | **ninguém** (agente faz sozinho) | C1 a C5 abaixo |
-| **o dono acordado** (mexe em produção e a prova exige WhatsApp real) | canal endurecido (grupo, dedupe, fallback); rotação do segredo (duas pontas, n8n e Vercel) |
+| **o dono acordado** (mexe em produção e a prova exige WhatsApp real) | canal endurecido (grupo, dedupe, fallback); higiene do workflow (`pinData` com apikey e telefone, `Sticky` velho). Rotação do segredo: o dono relatou ter feito em 11/09 nas duas pontas, confirmar antes de tratar como fechada |
 | **uma decisão do dono** | fixture de atendente (qual e-mail); propagação da base (qual abordagem) |
 | **decisão de celular** (gaveta) | mobile com pareamento por código; tela de Clientes |
 

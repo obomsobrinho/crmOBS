@@ -31,36 +31,54 @@ WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste re
 O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
 desligada de propósito**.
 
-## 3. Estado em 07/09/2026
+## 3. Estado em 16/09/2026
 
-- **Árvore limpa, tudo enviado.** Os 25 commits que estavam parados desde a última versão publicada
-  foram para `origin/main` neste dia.
-- **Banco com 30 migrations aplicadas.** Não há migration pendente.
-- **Verificação da última rodada:** 114 e2e sem login, 19 com login (1 pulado), `tsc` 0, `eslint` 0,
-  `npm run build` limpo.
-- **Passo do MVP do beta:** 3 de 6 fechados (painel, montagem, os quatro furos). O passo 4 (design e
-  mobile) está em andamento; 5 (aplicar) e 6 (testes) não começaram.
+- **Árvore limpa, tudo enviado.** Último commit `1a8daba`.
+- **Banco com 30 migrations aplicadas.** Nenhuma pendente.
+- **Verificação da última rodada (11/09):** 116 e2e sem login, 21 com login (1 pulado), projeto `ia`
+  12 de 12, `tsc` 0, `eslint` 0, `npm run build` limpo.
+- **Plano da demo:** os cinco contratos que se faziam sem o dono (C1 a C5) **fecharam em 11/09**.
+  Relatório completo, com o que saiu diferente do contrato, em `docs/relatorio-noite-2026-09-10.md`.
+  Depois dele, duas decisões do dono já entraram: toda manipulação abre handoff (`b510ecd`) e os
+  e-mails ganharam logo e contato de suporte (`1a8daba`).
+- **Rotação do `x-lookup-secret`:** o dono relatou ter colado o valor novo na Vercel, redeployado e
+  recebido resposta do agente numa mensagem real, em 11/09. ⚠️ Não é verificável a partir do
+  repositório; o export em `n8n/` só tem o marcador. Confirmar com ele antes de tratar como feito.
+- **Ordem do MVP do beta mudou em 10/09:** estabilidade e confiança antes de desenho. Os passos 4 e
+  5 (design, mobile) foram para depois da demo.
 
-## 4. O que estava acontecendo quando isto foi escrito
+## 4. O que vem agora
 
-Uma rodada de **cobertura de teste**, com um plano de quatro passos acordado com o dono:
+O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O que falta se divide
+em dois grupos, e o critério é quem precisa estar na sala.
 
-1. ✅ Subir os commits parados.
-2. **Em andamento:** escrever os testes reais que faltam. Já entraram o pipeline (que tinha zero
-   cobertura) e duas das quatro guardas da `/montagem`.
-3. Depois: apagar os testes de design cuja cobertura ficou duplicada, **migrando para as telas reais
-   as asserções que travam REGRA e não aparência** (travessão, "nenhum texto fixo assume um único
-   segmento", o `XX` que nunca vira número plausível, a igualdade entre a soma das barras roxas e a
-   manchete, volume nunca em vermelho).
-4. Por fim, `/simplify`.
+**Com o dono presente** (mexe no n8n em produção, e a prova exige WhatsApp real):
 
-⚠️ **O passo 3 tem uma armadilha já identificada:** `e2e/publico.design.spec.ts` **não é** teste de
-design, apesar do nome. Ele testa `/cadastro`, `/login` e `/recuperar-senha`, que são páginas reais,
-e um dos casos é de **segurança** ("responde igual para qualquer e-mail, não vira verificador de
-contas"). Não apagar na faxina.
+- **Canal endurecido, numa janela só:** filtro de grupo (o nó `Rotas` só confere se o telefone
+  existe; JID `@g.us` passa), dedupe por `key.id` (o nó `Dados` nem extrai esse campo), e fallback
+  quando `/api/agent` falha (hoje são 2 tentativas e depois silêncio). Mesmo workflow, mesma bateria
+  de prova: **webhook simulado** (mesmo `key.id` duas vezes, um JID de grupo) mais **uma** mensagem
+  real no fim. `validateOnly` antes de aplicar. Os workflows estão versionados em `n8n/`, então há
+  diff e rollback.
+- **Higiene do workflow no n8n:** o `pinData` do `Webhook EVO` carrega a apikey da Evolution e um
+  telefone real, e o `Sticky README` está desatualizado. Os dois saíram do export e continuam no n8n.
 
-⚠️ As rotas `/design` **não custam nada em produção**: `proxy.ts` as bloqueia quando
-`NODE_ENV=production`. O custo delas é manutenção, não risco.
+**Uma decisão do dono, depois anda sozinho:**
+
+- **Fixture de atendente:** qual e-mail. Sugerido `franckantonnywork+atendente@gmail.com`, porque o
+  endereço sem sufixo já é dono do tenant "testesnovo". Destrava três testes de permissão hoje
+  declarados como buraco.
+- **Propagação da base do prompt:** melhoria na base não chega em quem já publicou (a persona é
+  compilada e gravada no save). Escolher entre guardar só a camada do cliente e compilar na leitura,
+  ou recompilar em massa a cada mudança da base.
+
+**Depois disso, na ordem que estava:** apagar os testes de design com cobertura duplicada, migrando
+para as telas reais as asserções que travam REGRA (travessão, segmento único, o `XX`, a soma das
+barras roxas, volume nunca vermelho); depois `/simplify`.
+
+⚠️ `e2e/publico.design.spec.ts` **não é** teste de design, apesar do nome: testa `/cadastro`,
+`/login` e `/recuperar-senha`, e um caso é de segurança. Não apagar na faxina. As rotas `/design`
+não custam nada em produção (`proxy.ts` bloqueia); o custo é manutenção.
 
 ## 5. O que está em aberto e depende do dono
 
