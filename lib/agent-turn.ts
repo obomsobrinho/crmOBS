@@ -1,6 +1,11 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildFallbackPersona } from "@/lib/agent-prompt";
+import {
+  buildAdvancedPersona,
+  buildFallbackPersona,
+  buildPersona,
+  validateConfig,
+} from "@/lib/agent-prompt";
 import {
   runAgent,
   type AgentOutput,
@@ -67,6 +72,59 @@ export interface ProcessTurnParams {
   personaOverride?: string | null;
 }
 
+// Monta a persona A CADA TURNO, a partir da configuração do tenant (decisão de
+// 17/09/2026). Antes o texto vinha pronto de `clients.persona`, grudado no
+// momento do Salvar, e a consequência era que melhoria na base do prompt só
+// chegava em quem salvasse de novo: quem publicou em agosto seguia com a base de
+// agosto para sempre. Montar na leitura é o padrão em produto multi-tenant, e
+// não custa o cache de prompt, porque a string sai idêntica enquanto a
+// configuração e a base não mudarem (a ordem do prefixo é a de `lib/agent.ts`).
+//
+// ⚠️ `clients.persona` NÃO deixou de existir nem de ser gravada: ela é o
+// registro do que foi publicado (é o que `agent_publications` guarda, e o que
+// responde "o que o agente estava dizendo na terça") e é a QUEDA daqui. Se a
+// montagem falhar, por configuração incompleta ou qualquer outro motivo, o pior
+// caso vira o comportamento antigo, nunca um agente mudo.
+//
+// ⚠️ O preço da decisão, que é real: mudança na base entra em produção para
+// todos os tenants na mensagem seguinte, sem revisão. O portão combinado com o
+// dono é `npm run test:e2e:ia` verde antes de subir deploy que mexa na base.
+function personaDoTenant(client: {
+  persona?: unknown;
+  agent_config?: unknown;
+  prompt_mode?: unknown;
+  name?: unknown;
+}): string {
+  const salva =
+    typeof client.persona === "string" && client.persona.trim()
+      ? client.persona
+      : null;
+  const empresa =
+    typeof client.name === "string" && client.name.trim()
+      ? client.name
+      : "a empresa";
+  try {
+    if (client.prompt_mode === "avancado") {
+      // Texto escrito à mão. O que está salvo já traz o rabo da base de quando
+      // foi salvo; `buildAdvancedPersona` tira o antigo e cola o de hoje, então
+      // rodar de novo é idempotente e o avançado também recebe melhoria da base.
+      if (!salva) return buildFallbackPersona(empresa);
+      const cfg = client.agent_config as { handoffNotice?: string } | null;
+      return buildAdvancedPersona(salva, { handoffNotice: cfg?.handoffNotice });
+    }
+    if (client.agent_config) {
+      // Mesma validação do save. Config que não passa cai para a persona salva
+      // em vez de virar erro: o tenant está atendendo, e recusar o turno seria
+      // trocar um prompt velho por nenhum atendimento.
+      const r = validateConfig(client.agent_config);
+      if (r.ok) return buildPersona(r.value);
+    }
+  } catch {
+    // Montagem de texto nunca derruba atendimento.
+  }
+  return salva ?? buildFallbackPersona(empresa);
+}
+
 export async function processTurn(
   params: ProcessTurnParams
 ): Promise<{ output: AgentOutput; diagnostics: TurnDiagnostics }> {
@@ -75,13 +133,14 @@ export async function processTurn(
   const svc = createServiceClient();
   const t0 = Date.now();
 
-  // Persona do tenant (o n8n lia clients.persona ao vivo; seguimos igual). NÃO
-  // recompilar: persona já é o system prompt final. As colunas de assinatura vêm
-  // no mesmo select para o gate abaixo.
+  // Configuração do tenant. A persona é MONTADA NA LEITURA (ver
+  // `personaDoTenant`), então o que importa aqui é `agent_config` +
+  // `prompt_mode`; `persona` vem junto porque é a queda. As colunas de
+  // assinatura vêm no mesmo select para o gate abaixo.
   const { data: client, error: clientErr } = await svc
     .from("clients")
     .select(
-      "persona, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled"
+      "persona, agent_config, prompt_mode, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled"
     )
     .eq("id", clientId)
     .maybeSingle();
@@ -153,11 +212,7 @@ export async function processTurn(
     params.personaOverride.trim()
       ? params.personaOverride
       : null;
-  const persona =
-    emEdicao ??
-    (typeof client.persona === "string" && client.persona.trim()
-      ? client.persona
-      : buildFallbackPersona((client.name as string) ?? "a empresa"));
+  const persona = emEdicao ?? personaDoTenant(client);
 
   // Histórico: no dryRun vem do chamador (playground); em produção sai de
   // chat_messages (escopo client_id + phone). A mensagem atual ainda não está
