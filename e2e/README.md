@@ -37,6 +37,17 @@ modos. Credenciais em `.env.e2e.local`: `E2E_EMAIL`, `E2E_PASSWORD`,
 `E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD` (o atendente existe desde
 17/09/2026; os três testes de permissão dele ainda não foram escritos).
 
+## Permissões do atendente
+
+O projeto `atendente` (`*.att.spec.ts`) roda com a sessão do SEGUNDO usuário, que o
+`auth.setup.ts` grava em `e2e/.auth/atendente.json`. Ele existe porque as asserções
+de lá afirmam AUSÊNCIA de poder (não vê o Agente, não gerencia o funil, a montagem
+redireciona, a rota dono-only recusa), e com a sessão do dono cada uma provaria o
+contrário do que afirma.
+
+⚠️ **Nada nesse projeto escreve no banco**, e é regra, não acaso: um teste de
+permissão que consegue escrever já falhou antes de asserir qualquer coisa.
+
 ## Armadilhas da IA (cérebro real, custa dinheiro)
 
 As 12 armadilhas da bateria de 28/08/2026 (`armadilhas.ia.spec.ts`) chamam o

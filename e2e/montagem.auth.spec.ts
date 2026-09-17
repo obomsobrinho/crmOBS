@@ -48,9 +48,8 @@ test.describe("Guardas do assistente de montagem", () => {
 //    `accessState` como função pura, que é onde a decisão mora de verdade
 //    (`lib/billing.ts`), e deixar o redirecionamento para verificação manual.
 //
-// 2. ATENDENTE vai para `/inbox`.
-//    Falta: uma segunda sessão, de um usuário com `role='atendente'` na Loja
-//    Teste. O `auth.setup.ts` grava um storageState só, o do dono.
+// 2. ✅ ATENDENTE vai para `/inbox`: COBERTO desde 17/09/2026, em
+//    `atendente.att.spec.ts`. O `auth.setup.ts` passou a gravar duas sessões.
 //
 // 3. MODO AVANÇADO vai para `/agente`.
 //    Falta: uma conta em `prompt_mode='avancado'` que ainda NÃO publicou, que é

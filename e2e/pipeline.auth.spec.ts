@@ -218,10 +218,7 @@ test.describe("Pipeline", () => {
   });
 });
 
-// ⚠️ FALTA COBRIR, e não dá para fingir: **atendente não gerencia o funil.** A
-// RLS de `pipeline_stages` exige `role='dono'` para criar, renomear e arquivar, e
-// o botão "Gerenciar estágios" só aparece para o dono. Provar isso exige uma
-// segunda sessão, de um usuário atendente, que o `auth.setup.ts` não grava: hoje
-// existe um storageState só, o do dono. Escrever o teste com a sessão do dono
-// provaria o contrário do que ele afirma. Fica registrado como buraco até existir
-// a segunda sessão.
+// ✅ **Atendente não gerencia o funil: coberto desde 17/09/2026**, em
+// `atendente.att.spec.ts` (projeto `atendente`, sessão própria gravada pelo
+// `auth.setup.ts`). Ficou fora daqui de propósito: com a sessão do dono, que é a
+// deste arquivo, a asserção provaria o contrário do que afirma.

@@ -55,7 +55,8 @@ export default defineConfig({
     timeout: 120_000,
   },
   projects: [
-    // Prepara a sessão logada (dono) uma vez; os testes autenticados reusam.
+    // Prepara as sessões logadas (dono e atendente) uma vez; os testes
+    // autenticados reusam.
     { name: "setup", testMatch: /auth\.setup\.ts/ },
     {
       name: "sem-login",
@@ -68,6 +69,19 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/dono.json",
+      },
+      dependencies: ["setup"],
+    },
+    // Permissões do ATENDENTE. Projeto próprio porque é a única forma honesta de
+    // provar o que é dono-only: com a sessão do dono, cada uma dessas asserções
+    // provaria o contrário do que afirma. Existe desde 17/09/2026, quando o
+    // segundo usuário passou a existir no tenant de teste.
+    {
+      name: "atendente",
+      testMatch: /.*.att.spec.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/atendente.json",
       },
       dependencies: ["setup"],
     },
