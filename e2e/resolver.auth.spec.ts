@@ -1,12 +1,16 @@
 import { test, expect } from "@playwright/test";
 
 // Item 8, parte de servidor: o botão Resolvido, e a correção do "marcar como
-// lida". COM LOGIN e contra o banco de verdade (tenant Loja Teste).
+// lida". COM LOGIN e contra o banco de verdade (tenant de teste; desde
+// 17/09/2026 é a OBS).
 //
 // NÃO existe teste automático para "responder pelo CRM pausa a IA": aquele
 // caminho manda mensagem de verdade no WhatsApp pelo n8n, e teste não faz isso.
 // Essa parte é verificação manual do dono.
 
+// Telefone só para o contrato da rota de resolver, que responde 200 mesmo sem
+// casar linha nenhuma. Não precisa existir no tenant, e é por isso que ele
+// sobreviveu à troca do tenant de teste enquanto o teste de cima quebrou.
 const FONE = "553398620145@s.whatsapp.net";
 
 test("abrir a conversa marca como lida de verdade", async ({ page }) => {
@@ -24,7 +28,15 @@ test("abrir a conversa marca como lida de verdade", async ({ page }) => {
     }
   });
 
-  await page.goto(`/inbox/${encodeURIComponent(FONE)}`);
+  // ⚠️ A conversa sai da LISTA, não de um telefone fixo. A versão anterior
+  // navegava direto para um número escrito no arquivo, e quebrou inteira no dia
+  // em que o tenant de teste mudou: o número não existe no tenant novo, então
+  // nenhum PATCH saía e o teste acusava um bug que não existia. Clicar na lista
+  // também é o caminho que a pessoa faz de verdade.
+  await page.goto("/inbox");
+  const primeira = page.locator('a[href^="/inbox/"]').first();
+  await expect(primeira).toBeVisible({ timeout: 15_000 });
+  await primeira.click();
   await expect.poll(() => patches.length, { timeout: 15_000 }).toBeGreaterThan(0);
   expect(patches.every((s) => s < 400)).toBe(true);
 });

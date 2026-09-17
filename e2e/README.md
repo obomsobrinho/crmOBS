@@ -24,14 +24,24 @@ npm run test:e2e:login
 O projeto `setup` (`auth.setup.ts`) faz login uma vez e salva a sessão em
 `e2e/.auth/dono.json`; os testes `*.auth.spec.ts` reusam esse estado.
 
-As escritas de teste devem ficar restritas ao tenant da Loja Teste e limpar o que
-criarem. Não mexer na OBM.
+⚠️ **O tenant de teste mudou em 17/09/2026: passou a ser a OBS.** O que era usado
+antes apontava para o WhatsApp de uma clínica com contato real chegando, o que é
+o oposto do que a regra queria proteger. A OBS é o número do próprio dono, parado.
+As escritas de teste ficam restritas a ele e limpam o que criarem.
+
+⚠️ **A OBS está em `prompt_mode = 'avancado'`, e isso quebrou três testes** que
+assumiam formulário guiado ou um telefone escrito no arquivo. A lição vale para
+teste novo: **não travar o modo do tenant nem o número da conversa.** Quem precisa
+de uma conversa pega a primeira da lista; quem precisa do construtor trata os dois
+modos. Credenciais em `.env.e2e.local`: `E2E_EMAIL`, `E2E_PASSWORD`,
+`E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD` (o atendente existe desde
+17/09/2026; os três testes de permissão dele ainda não foram escritos).
 
 ## Armadilhas da IA (cérebro real, custa dinheiro)
 
 As 12 armadilhas da bateria de 28/08/2026 (`armadilhas.ia.spec.ts`) chamam o
-modelo de verdade via `/api/playground`, em `dryRun`, com a sessão do dono da
-Loja Teste. Ficam num projeto próprio, `ia`, que **só existe quando é pedido
+modelo de verdade via `/api/playground`, em `dryRun`, com a sessão do dono do
+tenant de teste. Ficam num projeto próprio, `ia`, que **só existe quando é pedido
 pelo nome**: `npm run test:e2e` não o roda, de propósito, porque cada execução
 são 12 chamadas pagas.
 

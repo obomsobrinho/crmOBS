@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-// Testes COM LOGIN (sessão de dono da Loja Teste, reusada de auth.setup.ts).
+// Testes COM LOGIN (sessão de dono do tenant de teste, reusada de auth.setup.ts;
+// desde 17/09/2026 esse tenant é a OBS, que está em modo avançado).
 //
 // Estes testes falam com o cérebro REAL: chamam o modelo de verdade via
 // /api/playground em dryRun. É de propósito, porque o que precisa ser provado
@@ -31,23 +32,54 @@ test.describe("Bancada de teste dentro do /agente", () => {
     });
 
     await page.goto("/agente");
-    // A aba "Quem atende" é a que abre, e é onde mora o nome do agente.
-    await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
 
-    // Troca o nome do agente e NÃO salva.
-    //
-    // Localizado pela estrutura, e não por getByLabel: o helper `Field` do
-    // formulário desenha o rótulo como <label> SEM htmlFor, e os inputs não têm
-    // id, então rótulo e controle não estão associados. É um defeito de
-    // acessibilidade de verdade (o leitor de tela anuncia campo sem nome), mas
-    // consertar direito exige fieldset/legend nos grupos de caixas de marcar, o
-    // que é trabalho próprio e não passageiro deste teste.
-    // Sem `exact`: o rótulo de campo obrigatório carrega um asterisco junto.
-    const campoNome = page
-      .getByText("Nome do agente")
-      .locator("xpath=following::input[1]");
-    await expect(campoNome).toBeVisible();
-    await campoNome.fill(NOME_NOVO);
+    // ⚠️ O tenant de teste pode estar nos DOIS modos, e o campo que carrega a
+    // marca é outro em cada um. Este teste travava o guiado e quebrou quando o
+    // tenant de teste virou a OBS, que escreve o prompt à mão. A prova é a mesma
+    // nos dois: escrever algo na tela, NÃO salvar, e ver aquilo aparecer na
+    // resposta do modelo. Trocar de modo aqui seria pior que tratar os dois: no
+    // avançado o tenant pode não ter `agent_config`, e o formulário guiado
+    // abriria vazio, reprovando no 400 de configuração incompleta.
+    const paraGuiado = page.getByRole("button", {
+      name: "Voltar ao formulário guiado",
+    });
+    const paraAvancado = page.getByRole("button", {
+      name: "Escrever o prompt à mão",
+    });
+    await expect(paraGuiado.or(paraAvancado)).toBeVisible();
+    const noAvancado = await paraGuiado.isVisible();
+
+    if (noAvancado) {
+      // Uma instrução no FIM do texto do tenant, onde a recência ajuda: pedir um
+      // nome brigaria com a identidade que a persona dele já declara no começo.
+      const campo = page.locator("textarea").first();
+      await expect(campo).toBeVisible();
+      const atual = await campo.inputValue();
+      await campo.fill(
+        atual +
+          `
+
+Inclua sempre a palavra ${NOME_NOVO} em qualquer resposta que você der.`
+      );
+    } else {
+      // A aba "Quem atende" é a que abre, e é onde mora o nome do agente.
+      await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
+
+      // Troca o nome do agente e NÃO salva.
+      //
+      // Localizado pela estrutura, e não por getByLabel: o helper `Field` do
+      // formulário desenha o rótulo como <label> SEM htmlFor, e os inputs não têm
+      // id, então rótulo e controle não estão associados. É um defeito de
+      // acessibilidade de verdade (o leitor de tela anuncia campo sem nome), mas
+      // consertar direito exige fieldset/legend nos grupos de caixas de marcar, o
+      // que é trabalho próprio e não passageiro deste teste.
+      // Sem `exact`: o rótulo de campo obrigatório carrega um asterisco junto.
+      const campoNome = page
+        .getByText("Nome do agente")
+        .locator("xpath=following::input[1]");
+      await expect(campoNome).toBeVisible();
+      await campoNome.fill(NOME_NOVO);
+    }
 
     await page.getByRole("button", { name: "Testar o agente" }).click();
     const painel = page.locator('[data-slot="sheet-content"]');
