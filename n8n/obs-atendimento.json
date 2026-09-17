@@ -94,6 +94,12 @@
               "name": "filename",
               "value": "={{ $json.body.data.message.documentMessage?.fileName || $json.body.data.message.documentWithCaptionMessage?.message?.documentMessage?.fileName || '' }}",
               "type": "string"
+            },
+            {
+              "id": "d13",
+              "name": "messageId",
+              "value": "={{ $json.body.data.key.id || '' }}",
+              "type": "string"
             }
           ]
         },
@@ -115,10 +121,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -129,6 +135,15 @@
                       "type": "string",
                       "operation": "exists",
                       "singleValue": true
+                    }
+                  },
+                  {
+                    "id": "r4",
+                    "leftValue": "={{ $('Dados').item.json.Telefone }}",
+                    "rightValue": "@g.us",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notContains"
                     }
                   }
                 ],
@@ -1351,8 +1366,8 @@
     },
     {
       "parameters": {
-        "content": "## OBS Atendimento v2\n\nMudanças vs v1:\n- Output estruturado direto no Agent (eliminou Parser Chain — 1 LLM call a menos por turno)\n- Persona qualificadora alinhada ao site OBS (sistemas + automações + agentes)\n- Action via campo `action` no schema (none/agendar/pausar) — sem string mágica 338201\n- Summary do agente já vai pro grupo (eliminou Aggregate + Code + Basic LLM Chain de resumo)\n- Debounce com lockcount Redis (15s, era 40s)\n- Áudio: Whisper. Imagem: GPT-4o-mini vision. Branch único cada.\n\nAjuste antes de ativar:\n- Número pessoal hardcoded em \"Rotas\" ([telefone pessoal removido]@s.whatsapp.net)\n- Group ID hardcoded em \"Notifica grupo\" (120363417940885420@g.us)\n- Instance Evolution: agente_obm\n\nCredentials reaproveitadas do v1: Agente OBM (Postgres, Supabase, Evolution), OpenAi account 2, Redis account.",
-        "height": 320,
+        "content": "## OBS Atendimento (multi-tenant)\n\nO cérebro NÃO mora mais aqui: o nó \"Atendente\" (HTTP Request) chama\nPOST https://atendimento.obomsobrinho.com.br/api/agent, autenticado pelo header\nx-lookup-secret (valor só em env, nunca neste texto). Este workflow é o cano:\nrecebe o webhook da Evolution, resolve o tenant, junta áudio/imagem/texto,\nfaz o debounce e envia a resposta.\n\nTenant resolvido pelo `instance` do payload (nó \"Resolve tenant\", contra\nclients.evolution_instance). Grupo de notificação (nó \"Notifica grupo\") é o\nnotify_group_jid de cada tenant, não é mais fixo.\n\nDebounce com lockcount Redis (15s). Áudio: Whisper. Imagem: GPT-4o-mini vision.\nUm branch para cada.\n\nDesde 17/09/2026 (canal endurecido):\n- \"Rotas\" recusa JID de grupo (@g.us).\n- \"Dedupe (Redis)\" + \"Primeira entrega?\" barram reentrega do mesmo key.id\n  (TTL 300s). messageId vazio passa de propósito.\n- \"Atendente\" tem saída de erro: grava a mensagem do cliente, responde\n  \"Recebi sua mensagem, já te respondo por aqui.\" e avisa o grupo.\n\nHandoff: \"Pausa IA (handoff)\" e \"Pausa IA (agendado)\" estão DESATIVADOS desde\n20/08/2026 (a IA avisa e segue atendendo; ver CLAUDE.md do CRM). Só\n\"Pausar IA (Franck digitou)\" fica ativo, para quando um humano assume.\n\nCredenciais: Supabase account, postgresn8n, redisn8n, Evo Global, OpenAI account.\n\nNão ativar nem alterar nós sem confirmar com o dono.",
+        "height": 460,
         "width": 520,
         "color": 5
       },
@@ -1476,7 +1491,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://crm-obs.vercel.app/api/agent",
+        "url": "https://atendimento.obomsobrinho.com.br/api/agent",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1501,20 +1516,13 @@
       ],
       "retryOnFail": true,
       "maxTries": 2,
-      "waitBetweenTries": 1000
+      "waitBetweenTries": 1000,
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "667caa8d-26db-49ac-8339-9bd544c9a9a9",
-      "name": "Sobe mídia recebida",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.4,
-      "position": [
-        3808,
-        -32
-      ],
       "parameters": {
         "method": "POST",
-        "url": "https://crm-obs.vercel.app/api/inbound-media",
+        "url": "https://atendimento.obomsobrinho.com.br/api/inbound-media",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -1529,10 +1537,183 @@
         "jsonBody": "={{ JSON.stringify({ client_id: $('Resolve tenant').first().json.id, base64: $('Dados').item.json.base64, mime: $('Dados').item.json.mime, filename: $('Dados').item.json.filename, type: $('Dados').item.json.tipo }) }}",
         "options": {}
       },
-      "onError": "continueRegularOutput",
+      "id": "667caa8d-26db-49ac-8339-9bd544c9a9a9",
+      "name": "Sobe mídia recebida",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3808,
+        -32
+      ],
       "retryOnFail": true,
       "maxTries": 2,
-      "waitBetweenTries": 1000
+      "waitBetweenTries": 1000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a7ab7c65-19e2-4cf4-83a6-6a7af964a093",
+      "name": "Dedupe (Redis)",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2880,
+        176
+      ],
+      "parameters": {
+        "operation": "incr",
+        "key": "=dedupe:{{ $('Dados').item.json.messageId }}",
+        "expire": true,
+        "ttl": 300
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      }
+    },
+    {
+      "id": "9f7e9a78-c311-43fa-b593-0d0f1be99cb7",
+      "name": "Primeira entrega?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3072,
+        176
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "dd1",
+              "leftValue": "={{ Number(Object.values($json)[0]) }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "dd2",
+              "leftValue": "={{ $('Dados').item.json.messageId }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "2bab306f-6e3e-4087-866e-93369434aec2",
+      "name": "Salva user (IA falhou)",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        6800,
+        420
+      ],
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Dados').item.json.Telefone }}"
+            },
+            {
+              "fieldId": "user_message",
+              "fieldValue": "={{ $('Combina mensagens').item.json.mensagem_completa }}"
+            },
+            {
+              "fieldId": "bot_message",
+              "fieldValue": "Recebi sua mensagem, já te respondo por aqui."
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "={{ $('Dados').item.json.tipo }}"
+            },
+            {
+              "fieldId": "nomewpp",
+              "fieldValue": "={{ $('Dados').item.json.NomeWpp }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Resolve tenant').first().json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "43404081-3b9f-4894-b230-4b45e27b8750",
+      "name": "Fallback ao cliente",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        7008,
+        420
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Dados').item.json.instance }}",
+        "remoteJid": "={{ $('Dados').item.json.Telefone }}",
+        "messageText": "Recebi sua mensagem, já te respondo por aqui.",
+        "options_message": {}
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "82460f71-cccf-4e0c-b184-e252acd5b993",
+      "name": "Avisa falha no grupo",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        7216,
+        420
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "={{ $('Dados').item.json.instance }}",
+        "remoteJid": "={{ $('Resolve tenant').first().json.notify_group_jid }}",
+        "messageText": "=⚠️ A IA não respondeu e o cliente recebeu só o aviso de espera.\n\n*Contato:* {{ $('Dados').item.json.NomeWpp }} wa.me/{{ $('Dados').item.json.Telefone.split('@')[0] }}\n\n*Mensagem:* {{ $('Combina mensagens').item.json.mensagem_completa }}\n\nAssuma a conversa pelo CRM.",
+        "options_message": {}
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -2007,6 +2188,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Salva user (IA falhou)",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -2025,7 +2213,51 @@
       "main": [
         [
           {
+            "node": "Dedupe (Redis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dedupe (Redis)": {
+      "main": [
+        [
+          {
+            "node": "Primeira entrega?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Primeira entrega?": {
+      "main": [
+        [
+          {
             "node": "Get Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva user (IA falhou)": {
+      "main": [
+        [
+          {
+            "node": "Fallback ao cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback ao cliente": {
+      "main": [
+        [
+          {
+            "node": "Avisa falha no grupo",
             "type": "main",
             "index": 0
           }

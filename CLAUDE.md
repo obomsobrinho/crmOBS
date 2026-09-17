@@ -597,8 +597,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   é coluna legada morta (mantida). Não sugerir trocar sem pedirem.
 
 ## n8n (⚠️ produção)
-- **Os dois workflows estão versionados em `n8n/`** (`obs-atendimento.json`, 45 nós, e
-  `crm-envio-manual.json`, 11 nós; exportados em 11/09/2026, só leitura). O `n8n/README.md` diz
+- **Os dois workflows estão versionados em `n8n/`** (`obs-atendimento.json`, 50 nós, e
+  `crm-envio-manual.json`, 11 nós; exportados em 17/09/2026, só leitura). O `n8n/README.md` diz
   como restaurar. ⚠️ O `x-lookup-secret` está em texto puro em **DOIS** nós do OBS Atendimento
   (`Atendente` e `Sobe mídia recebida`); no export os dois viram o marcador `{{N8N_LOOKUP_SECRET}}`.
   Reexportar sem passar por essa troca commita o segredo.
@@ -606,9 +606,28 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `POST /api/agent` (stateless; persona + histórico de `chat_messages` + AGORA + retrieval do RAG +
   guardrail; saída `{ output: { messages, action, summary, preferencia_horario }, diagnostics }`).
   O n8n é só o cano: o nó `Atendente` do workflow ativo "OBS Atendimento" é um HTTP Request (POST)
-  para `https://crm-obs.vercel.app/api/agent` com o header `x-lookup-secret` (valor só em env, nunca
+  para `https://atendimento.obomsobrinho.com.br/api/agent` com o header `x-lookup-secret` (valor só em env, nunca
   no código/chat). Depende de `OPENAI_API_KEY` no ambiente do app (Vercel); sem ela responde 501.
   Modelo: `gpt-5.4-mini`.
+- **Canal endurecido (17/09/2026, janela com o dono).** Três defeitos do cano fechados numa vez:
+  (1) **grupo é recusado** no nó `Rotas` (condição nova: o telefone não contém `@g.us`; antes a
+  única condição era existir, e JID de grupo passava, então a IA respondia dentro de grupo);
+  (2) **dedupe por `key.id`**, com `messageId` novo no nó `Dados` e os nós `Dedupe (Redis)`
+  (`incr` em `dedupe:{messageId}`, TTL 300s) e `Primeira entrega?` entre `Rotas` e `Get Lead`.
+  ⚠️ **A condição é um OU: `messageId` vazio PASSA**, senão toda mensagem sem id colidiria na
+  mesma chave e só a primeira de cada 5 minutos seria atendida;
+  (3) **fallback na saída de erro do `Atendente`**: `Salva user (IA falhou)` grava a mensagem do
+  cliente em `chat_messages`, `Fallback ao cliente` responde "Recebi sua mensagem, já te respondo
+  por aqui." e `Avisa falha no grupo` chama o time.
+  ⚠️ **O que o item 3 conserta não é só o silêncio: é a PERDA.** `Salva chat_messages` vem DEPOIS
+  do `Atendente`, então, sem a saída de erro, a mensagem do cliente não era gravada em lugar nenhum
+  quando o cérebro falhava, e ninguém ficava sabendo que alguém tinha escrito.
+- ⚠️ **O domínio mudou em 17/09/2026 e derrubou o canal em silêncio.** `crm-obs.vercel.app`
+  passou a responder **404** ("deployment could not be found"), e os DOIS nós que chamam o app
+  (`Atendente` e `Sobe mídia recebida`) apontavam para lá. O agente ficou mudo e as mensagens do
+  período não foram gravadas. Hoje os dois apontam para `https://atendimento.obomsobrinho.com.br`.
+  **Trocar de domínio exige mexer no n8n**, e o `git grep` do domínio antigo é o jeito de achar
+  todos os lugares (a logo dos e-mails do Supabase também estava nele).
 - Bot **"OBS Atendimento"**: resolve o tenant pelo `instance` do payload (nó `Resolve tenant` →
   Supabase), carimba `client_id`, usa a `persona`/instância/memória do tenant. Memória isolada por
   `client_id:telefone`.

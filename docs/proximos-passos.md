@@ -114,8 +114,8 @@ depois. Onze entregas, agrupadas pelo que trava em quem, e não por tema:
 | Precisa de | Entregas |
 |---|---|
 | **ninguém** (agente faz sozinho) | C1 a C5 abaixo |
-| **o dono acordado** (mexe em produção e a prova exige WhatsApp real) | canal endurecido (grupo, dedupe, fallback); higiene do workflow (`pinData` com apikey e telefone, `Sticky` velho). Rotação do segredo: o dono relatou ter feito em 11/09 nas duas pontas, confirmar antes de tratar como fechada |
-| **uma decisão do dono** | fixture de atendente (qual e-mail); propagação da base (qual abordagem) |
+| **o dono acordado** (mexe em produção e a prova exige WhatsApp real) | ✅ **FECHADO em 17/09/2026**: canal endurecido (grupo, dedupe, fallback com gravação garantida) e higiene (o dono já tinha limpado o `pinData`; o `Sticky` foi atualizado). No meio disso apareceu a **queda do canal por troca de domínio**, corrigida na mesma janela. Ver `n8n/README.md` |
+| **uma decisão do dono** | ✅ **DECIDIDOS em 17/09/2026**: o tenant de teste passou a ser a **OBS**, com atendente `franckantonny@gmail.com` (os três testes ainda não foram escritos); a base do prompt passa a ser **montada na leitura**, dentro do `/api/agent`, com queda para `clients.persona` |
 | **decisão de celular** (gaveta) | mobile com pareamento por código; tela de Clientes |
 
 ⚠️ **Os três itens que a revisão pôs no topo (dedupe, grupo, fallback) estão todos na segunda
@@ -123,6 +123,28 @@ linha.** O que se faz sozinho aumenta confiança e cobertura; **não destrava a 
 continua igual até uma sessão com o dono presente. Para essa sessão, a prova será por **webhook
 simulado** (mesmo `key.id` duas vezes, um JID `@g.us`) mais **uma** mensagem real no fim, para
 o dono não precisar mandar vinte à mão.
+
+### Janela do dono, 17/09/2026: o que saiu diferente
+
+Três mudanças no `OBS Atendimento`, todas com `validateOnly` antes e prova por webhook simulado.
+O workflow foi de 45 para 50 nós. O que o contrato não previa:
+
+1. ⚠️ **O canal estava FORA DO AR e ninguém sabia.** O domínio de produção tinha mudado para
+   `atendimento.obomsobrinho.com.br` e os dois nós que chamam o app ainda apontavam para
+   `crm-obs.vercel.app`, que responde 404. Descoberto porque a mensagem de teste do dedupe falhou
+   no `Atendente` com a URL **real**, antes de qualquer sabotagem minha. Corrigido na mesma janela
+   e provado com o agente respondendo de verdade (execução 744).
+2. **O fallback conserta PERDA, não só silêncio.** `Salva chat_messages` vem depois do `Atendente`,
+   então quando o cérebro falhava a mensagem do cliente não era gravada em lugar nenhum. A saída de
+   erro grava primeiro e só depois responde e avisa. Isso não estava no contrato.
+3. **A higiene já estava feita** pelo dono (`pinData` vazio, `Sticky` atualizado). O que eu tinha
+   visto como "limpo" numa primeira olhada foi sorte: eu havia conferido no nó, e `pinData` é chave
+   do workflow. A conferência certa é no JSON da API.
+4. **O dedupe passa quando `messageId` vem vazio**, de propósito. Sem esse OU, toda mensagem sem id
+   cairia na mesma chave do Redis e só a primeira de cada 5 minutos seria atendida.
+5. **Defeito herdado, não corrigido:** o nó `Notifica grupo` escreve `\n` literal, então o aviso
+   de lead novo sai com as quebras de linha cruas no WhatsApp. O nó novo nasceu igual e foi
+   corrigido; o antigo ficou, porque é texto que o dono lê todo dia e mexer é decisão dele.
 
 ### Contratos do que se faz sozinho, na ordem de execução
 
@@ -1116,7 +1138,7 @@ promovidos de "Candidatos novos".
 
 **Fase 4 — Comercializável**
 
-Pré-requisitos já resolvidos: o app **está no ar** (Vercel, `crm-obs.vercel.app`) e o cutover está
+Pré-requisitos já resolvidos: o app **está no ar** (Vercel; o domínio era `crm-obs.vercel.app` e passou a ser `atendimento.obomsobrinho.com.br` em 17/09/2026) e o cutover está
 ativo, então "deploy" não é mais bloqueio. O que falta é transformar o sistema em **produto que
 alguém consegue assinar sozinho**. Hoje criar um tenant ainda exige SQL na mão (INSERT em `clients`,
 criar o usuário no painel do Supabase, INSERT em `user_clients`).

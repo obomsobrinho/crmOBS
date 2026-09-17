@@ -11,7 +11,7 @@ painel do Supabase for resetado.
 - **Sender name** (Authentication, Emails, SMTP Settings): `Atendimento - OBS` (aplicado pelo
   dono em 11/09/2026).
 - **Rodapé padrão**, presente nos quatro templates: logo mais contato de suporte.
-  - Logo hospedada em produção: `https://crm-obs.vercel.app/marca/obs-mark-light.png`.
+  - Logo hospedada em produção: `https://atendimento.obomsobrinho.com.br/marca/obs-mark-light.png`.
   - E-mail de suporte: `obomsobrinho@gmail.com` (provisório, até existir e-mail com domínio
     próprio).
   - Telefone: `(33) 98403-3279`.
@@ -50,7 +50,7 @@ escolher uma senha.</p>
 <a href="{{ .SiteURL }}/recuperar-senha">{{ .SiteURL }}/recuperar-senha</a>.</p>
 <p>Se você não esperava este e-mail, pode ignorar: nada acontece sem a senha.</p>
 <hr>
-<p><img src="https://crm-obs.vercel.app/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
+<p><img src="https://atendimento.obomsobrinho.com.br/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
 <p>Dúvidas? Fale com a gente: <a href="mailto:obomsobrinho@gmail.com">obomsobrinho@gmail.com</a> ou (33) 98403-3279.</p>
 ```
 
@@ -77,7 +77,7 @@ mesmo assim, para não sobrar um e-mail em inglês.
 <p><a href="{{ .ConfirmationURL }}">Confirmar e-mail</a></p>
 <p>Se você não fez esse pedido, pode ignorar este e-mail.</p>
 <hr>
-<p><img src="https://crm-obs.vercel.app/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
+<p><img src="https://atendimento.obomsobrinho.com.br/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
 <p>Dúvidas? Fale com a gente: <a href="mailto:obomsobrinho@gmail.com">obomsobrinho@gmail.com</a> ou (33) 98403-3279.</p>
 ```
 
@@ -98,7 +98,7 @@ nega que a conta existe.
 <p>O link vale por uma hora e funciona uma vez.</p>
 <p>Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>
 <hr>
-<p><img src="https://crm-obs.vercel.app/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
+<p><img src="https://atendimento.obomsobrinho.com.br/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
 <p>Dúvidas? Fale com a gente: <a href="mailto:obomsobrinho@gmail.com">obomsobrinho@gmail.com</a> ou (33) 98403-3279.</p>
 ```
 
@@ -120,7 +120,7 @@ pronto para quando existir. Por padrão o Supabase pede confirmação nos **dois
 <p>Se não foi você, não clique e troque sua senha em
 <a href="{{ .SiteURL }}/perfil">{{ .SiteURL }}/perfil</a>.</p>
 <hr>
-<p><img src="https://crm-obs.vercel.app/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
+<p><img src="https://atendimento.obomsobrinho.com.br/marca/obs-mark-light.png" alt="OBS" width="32" height="32"></p>
 <p>Dúvidas? Fale com a gente: <a href="mailto:obomsobrinho@gmail.com">obomsobrinho@gmail.com</a> ou (33) 98403-3279.</p>
 ```
 

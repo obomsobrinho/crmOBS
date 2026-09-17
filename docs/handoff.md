@@ -31,9 +31,9 @@ WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste re
 O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
 desligada de propósito**.
 
-## 3. Estado em 16/09/2026
+## 3. Estado em 17/09/2026
 
-- **Árvore limpa, tudo enviado.** Último commit `1a8daba`.
+- **Árvore limpa, tudo enviado.** Último commit no dia, ver `git log -1`.
 - **Banco com 30 migrations aplicadas.** Nenhuma pendente.
 - **Verificação da última rodada (11/09):** 116 e2e sem login, 21 com login (1 pulado), projeto `ia`
   12 de 12, `tsc` 0, `eslint` 0, `npm run build` limpo.
@@ -47,34 +47,40 @@ desligada de propósito**.
 - **Ordem do MVP do beta mudou em 10/09:** estabilidade e confiança antes de desenho. Os passos 4 e
   5 (design, mobile) foram para depois da demo.
 
+- ⚠️ **O domínio de produção mudou para `https://atendimento.obomsobrinho.com.br` (17/09/2026),
+  e isso tinha derrubado o canal em silêncio.** `crm-obs.vercel.app` respondia 404, e os dois nós
+  do n8n que chamam o app apontavam para lá: o agente não respondia ninguém e as mensagens do
+  período **não foram gravadas**. Descoberto por acaso, ao provar o fallback. Já corrigido no n8n e
+  nos documentos, incluindo a logo dos e-mails do Supabase.
+- **Canal endurecido FEITO (17/09/2026):** filtro de grupo, dedupe por `key.id` e fallback com
+  gravação garantida. O workflow foi de 45 para 50 nós, está reexportado em `n8n/` e provado por
+  webhook simulado (execuções 740, 742, 743 e 744). Detalhe em `n8n/README.md`.
+- **Higiene do workflow: já estava feita pelo dono.** `pinData` vazio e `Sticky README` atualizado
+  (o Sticky ganhou as três mudanças novas nesta sessão).
+- **Fixture de atendente: resolvido.** O tenant de teste passou a ser a **OBS**, e o atendente é
+  `franckantonny@gmail.com`. As variáveis em `.env.e2e.local` são `E2E_EMAIL`, `E2E_PASSWORD`,
+  `E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD`. ⚠️ A regra antiga "nunca na OBM" mudou de
+  alvo: o tenant que **não** pode receber escrita de teste é o de 7 contatos, que atende gente de
+  verdade. Os três testes de permissão ainda não foram escritos.
+- **Propagação da base: decidida, não implementada.** A persona passa a ser montada na LEITURA,
+  dentro do `/api/agent`, com queda para `clients.persona` se a montagem falhar. O n8n não é
+  tocado, porque quem lê a persona é o nosso código, não ele.
+
 ## 4. O que vem agora
 
-O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O que falta se divide
-em dois grupos, e o critério é quem precisa estar na sala.
+O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O grupo que exigia o
+dono na sala **fechou em 17/09/2026** (ver a seção 3). O que sobra anda sozinho, nesta ordem:
 
-**Com o dono presente** (mexe no n8n em produção, e a prova exige WhatsApp real):
-
-- **Canal endurecido, numa janela só:** filtro de grupo (o nó `Rotas` só confere se o telefone
-  existe; JID `@g.us` passa), dedupe por `key.id` (o nó `Dados` nem extrai esse campo), e fallback
-  quando `/api/agent` falha (hoje são 2 tentativas e depois silêncio). Mesmo workflow, mesma bateria
-  de prova: **webhook simulado** (mesmo `key.id` duas vezes, um JID de grupo) mais **uma** mensagem
-  real no fim. `validateOnly` antes de aplicar. Os workflows estão versionados em `n8n/`, então há
-  diff e rollback.
-- **Higiene do workflow no n8n:** o `pinData` do `Webhook EVO` carrega a apikey da Evolution e um
-  telefone real, e o `Sticky README` está desatualizado. Os dois saíram do export e continuam no n8n.
-
-**Uma decisão do dono, depois anda sozinho:**
-
-- **Fixture de atendente:** qual e-mail. Sugerido `franckantonnywork+atendente@gmail.com`, porque o
-  endereço sem sufixo já é dono do tenant "testesnovo". Destrava três testes de permissão hoje
-  declarados como buraco.
-- **Propagação da base do prompt:** melhoria na base não chega em quem já publicou (a persona é
-  compilada e gravada no save). Escolher entre guardar só a camada do cliente e compilar na leitura,
-  ou recompilar em massa a cada mudança da base.
-
-**Depois disso, na ordem que estava:** apagar os testes de design com cobertura duplicada, migrando
-para as telas reais as asserções que travam REGRA (travessão, segmento único, o `XX`, a soma das
-barras roxas, volume nunca vermelho); depois `/simplify`.
+1. **Montar a persona na leitura** (decisão de 17/09). Em `lib/agent-turn.ts`, trocar o select de
+   `persona` por `agent_config` + `prompt_mode` e montar no request: `buildPersona` no guiado,
+   `buildAdvancedPersona` no avançado, com queda para `clients.persona` se a montagem falhar.
+   `clients.persona` vira registro, não deixa de ser gravada. **O n8n não é tocado.**
+   ⚠️ O preço da decisão: mudança na base entra em produção para todos na mensagem seguinte, sem
+   revisão. O portão combinado é `npm run test:e2e:ia` verde antes de subir deploy que mexa na base.
+2. **Os três testes de permissão do atendente**, agora que o fixture existe (seção 3).
+3. **Apagar os testes de design com cobertura duplicada**, migrando para as telas reais as asserções
+   que travam REGRA (travessão, segmento único, o `XX`, a soma das barras roxas, volume nunca
+   vermelho); depois `/simplify`.
 
 ⚠️ `e2e/publico.design.spec.ts` **não é** teste de design, apesar do nome: testa `/cadastro`,
 `/login` e `/recuperar-senha`, e um caso é de segurança. Não apagar na faxina. As rotas `/design`
@@ -92,8 +98,8 @@ Os cinco achados medidos estão em `docs/proximos-passos.md`, na seção "Achado
   repositório, e falta decidir qual nome usar.
   **Texto novo pronto em `docs/emails-supabase.md` (11/09/2026), sem nome de produto; aplicar no painel do
   Supabase é do dono.**
-- **A4** O fixture de atendente está bloqueado, e sem ele três testes não podem ser escritos com
-  honestidade.
+- ✅ **A4 resolvido em 17/09/2026.** O fixture existe: tenant OBS, atendente `franckantonny@gmail.com`,
+  variáveis `E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD` no `.env.e2e.local`. Faltam os três testes.
 - **A5** A conta "testesnovo" está com o teste vencido.
 
 Além desses: **mobile** é a única pendência aberta do design system
