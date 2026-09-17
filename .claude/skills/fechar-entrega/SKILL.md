@@ -40,7 +40,9 @@ e avise o usuário do custo antes.
 
 - `git status` limpo de untracked: temporário e relatório de debug vão para o scratchpad da sessão,
   nunca na raiz do repo.
-- Escrita de teste **só no tenant Loja Teste, nunca na OBM**.
+- Escrita de teste **só no tenant OBS** (decisão de 17/09/2026). O tenant com 7 contatos atende
+  gente de verdade e nunca recebe escrita de teste. Credenciais em `.env.e2e.local`: `E2E_EMAIL`,
+  `E2E_PASSWORD`, `E2E_ATTENDANT_EMAIL`, `E2E_ATTENDANT_PASSWORD`.
 - Mensagem no padrão do repositório (`git log -8` mostra o tom: o porquê, o que mudou, como foi
   provado). **Nunca travessão** (`—` ou `–`) na mensagem.
 - Se a entrega fechou um item do "Plano da demo", marque na tabela de `docs/proximos-passos.md` e
