@@ -54,6 +54,10 @@ export interface PipelineCard {
   stage: string | null;
   summary: string | null; // resumo da IA (motivo do handoff), se houver
   paused: boolean; // atendimento_ia === 'pause'
+  /** Handoff em aberto: é o que vira "Sua vez" no card. */
+  handoffAt: string | null;
+  /** Quem pôs o card nesta coluna: 'ia', 'human' ou null (nunca foi movido). */
+  stageSource: "human" | "ia" | null;
 }
 
 // Última qualificação (summary) por telefone. A lista já vem do mais recente.
@@ -68,7 +72,8 @@ export function lastQualByPhone(
 export function buildCards(
   items: InboxItem[],
   ia: Record<string, string | null>,
-  qual: Record<string, string>
+  qual: Record<string, string>,
+  source: Record<string, "human" | "ia" | null> = {}
 ): PipelineCard[] {
   return items.map((it) => ({
     phone: it.phone,
@@ -81,6 +86,8 @@ export function buildCards(
     stage: it.stage,
     summary: qual[it.phone] ?? null,
     paused: ia[it.phone] === "pause",
+    handoffAt: it.handoffAt ?? null,
+    stageSource: source[it.phone] ?? null,
   }));
 }
 
@@ -175,4 +182,74 @@ export function slugifyStage(name: string, taken: string[]): string {
   let i = 2;
   while (taken.includes(`${base}_${i}`)) i++;
   return `${base}_${i}`;
+}
+
+
+// ---------------------------------------------------------------------------
+// Texto dos cards (rodada de design de 18/09/2026). Puros de propósito: a regra
+// de "o que este card está esperando" é a mesma na tela e no teste.
+// ---------------------------------------------------------------------------
+
+/**
+ * Idade em palavra, do jeito que o desenho pede: "hoje", "1 dia", "12 dias".
+ * ⚠️ Conta DIAS DE CALENDÁRIO em America/Sao_Paulo, e não blocos de 24h: uma
+ * mensagem de ontem às 23h é "1 dia" mesmo com duas horas de diferença, porque é
+ * assim que a pessoa lê a própria agenda.
+ */
+export function idadeEmDias(iso: string | null, agora = Date.now()): string | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  const dia = (d: number) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date(d));
+  const a = dia(ms);
+  const b = dia(agora);
+  if (a === b) return "hoje";
+  const dias = Math.round(
+    (Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000
+  );
+  if (dias <= 0) return "hoje";
+  return dias === 1 ? "1 dia" : `${dias} dias`;
+}
+
+/**
+ * A linha "de onde veio" no pé do card.
+ * ⚠️ O desenho escreve "Ana moveu", com o NOME de quem moveu. O banco não guarda
+ * isso: `stage_source` diz só se foi humano ou IA, e o responsável do card não é
+ * necessariamente quem arrastou. Então o texto do time é impessoal, porque pôr um
+ * nome ali seria inventar um fato sobre uma pessoa.
+ */
+export function origemDoCard(source: "human" | "ia" | null): string {
+  if (source === "ia") return "A IA moveu";
+  if (source === "human") return "Movido pelo time";
+  return "Entrou pelo WhatsApp";
+}
+
+/**
+ * Subtítulo da coluna: "mais antigo há 1 dia", "2 esperando você". Devolve null
+ * quando não há o que dizer, e a coluna então não desenha a linha.
+ */
+export function resumoDaColuna(
+  cards: PipelineCard[],
+  agora = Date.now()
+): string | null {
+  if (cards.length === 0) return null;
+  const partes: string[] = [];
+  const esperando = cards.filter((c) => c.handoffAt).length;
+  if (esperando > 0)
+    partes.push(
+      esperando === 1 ? "1 esperando você" : `${esperando} esperando você`
+    );
+  const antigo = cards
+    .map((c) => Date.parse(c.lastMessageAt))
+    .filter((n) => !Number.isNaN(n))
+    .sort((a, b) => a - b)[0];
+  const idade = antigo ? idadeEmDias(new Date(antigo).toISOString(), agora) : null;
+  if (idade && idade !== "hoje") partes.push(`mais antigo há ${idade}`);
+  return partes.length ? partes.join(" · ") : null;
 }

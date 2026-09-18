@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatTime, prettyPhone } from "@/lib/format";
+import { formatEspera, prettyPhone } from "@/lib/format";
 import {
   buildInbox,
   initials,
@@ -37,8 +37,12 @@ import {
   type PipelineCard,
   type Stage,
   type StageRow,
+  idadeEmDias,
+  origemDoCard,
+  resumoDaColuna,
 } from "@/lib/pipeline";
 import { Avatar } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -89,6 +93,10 @@ export default function PipelineBoard({
   const [search, setSearch] = useState("");
   const [attFilter, setAttFilter] = useState<string>("all"); // all | none | userId
   const [stageFilter, setStageFilter] = useState<string>("all");
+  // Recorte por "esperando você" (handoff em aberto). É o mesmo conceito do
+  // filtro "Precisa de você" da lista de conversas, com o mesmo dado, para as
+  // duas telas não contarem coisas diferentes com o mesmo nome.
+  const [soEsperando, setSoEsperando] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +109,10 @@ export default function PipelineBoard({
         supabase
           .from("conversations")
           .select(
-            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage"
+            // handoff_at e stage_source entraram com o desenho de 18/09/2026:
+            // o primeiro vira "Sua vez" no card e o subtítulo da coluna, o
+            // segundo vira a linha de origem no pé do card.
+            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage, handoff_at, stage_source"
           )
           .order("last_message_at", { ascending: false })
           .limit(500),
@@ -121,7 +132,13 @@ export default function PipelineBoard({
     const qual = lastQualByPhone(
       (quals ?? []) as { phone: string; summary: string | null }[]
     );
-    setCards(buildCards(items, ia, qual));
+    const source: Record<string, "human" | "ia" | null> = {};
+    for (const c of (convs ?? []) as { phone: string; stage_source?: string | null }[])
+      source[c.phone] =
+        c.stage_source === "human" || c.stage_source === "ia"
+          ? c.stage_source
+          : null;
+    setCards(buildCards(items, ia, qual, source));
   }, [supabase]);
 
   const refetchStages = useCallback(async () => {
@@ -184,6 +201,7 @@ export default function PipelineBoard({
   const filteredCards = useMemo(() => {
     const q = search.trim().toLowerCase();
     return cards.filter((c) => {
+      if (soEsperando && !c.handoffAt) return false;
       if (attFilter === "none" && c.assignedUserId) return false;
       if (attFilter !== "all" && attFilter !== "none" && c.assignedUserId !== attFilter)
         return false;
@@ -193,7 +211,15 @@ export default function PipelineBoard({
       }
       return true;
     });
-  }, [cards, search, attFilter]);
+  }, [cards, search, attFilter, soEsperando]);
+
+  // Conta sobre TODOS os cards, não sobre os filtrados: o número no botão diz
+  // quantas conversas esperam você no funil inteiro, e ele não pode encolher
+  // porque alguém filtrou por atendente.
+  const esperandoCount = useMemo(
+    () => cards.filter((c) => c.handoffAt).length,
+    [cards]
+  );
 
   const columns = useMemo(() => {
     const cols = stageColumns(stages, filteredCards);
@@ -436,6 +462,26 @@ export default function PipelineBoard({
           </SelectContent>
         </Select>
 
+        {/* "Esperando você", com a contagem (desenho de 18/09/2026). Fica ao lado
+            dos outros recortes porque é o mesmo gesto, e some quando não há
+            nenhum: um filtro que sempre mostra zero só ocupa espaço. */}
+        {esperandoCount > 0 && (
+          <Button
+            variant="outline"
+            onClick={() => setSoEsperando((v) => !v)}
+            aria-pressed={soEsperando}
+            className={cn(
+              "gap-1.5 text-warn-ink",
+              soEsperando
+                ? "border-warn-line bg-warn-surface"
+                : "hover:bg-warn-surface"
+            )}
+          >
+            Esperando você
+            <span className="tabular-nums">{esperandoCount}</span>
+          </Button>
+        )}
+
         {isOwner && (
           <Button
             variant="outline"
@@ -505,23 +551,44 @@ export default function PipelineBoard({
                   : "border-line"
               }`}
             >
-              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: stageColor(stage.color) }}
-                  aria-hidden
-                />
-                <span className="truncate text-apoio font-semibold">
-                  {stage.name}
-                </span>
-                <span className="ml-auto text-legenda tabular-nums text-ink-3">
-                  {colCards.length}
-                </span>
+              <div className="border-b border-line px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: stageColor(stage.color) }}
+                    aria-hidden
+                  />
+                  <span className="truncate text-apoio font-semibold">
+                    {stage.name}
+                  </span>
+                  <span className="ml-auto text-legenda tabular-nums text-ink-3">
+                    {colCards.length}
+                  </span>
+                </div>
+                {/* Subtítulo da coluna (desenho de 18/09/2026): quantos esperam
+                    você e há quanto tempo está o mais parado. É o que transforma
+                    uma pilha de cards em "onde o funil travou", que é a pergunta
+                    que a tela existe para responder. Some sozinho quando não há o
+                    que dizer, em vez de virar uma linha vazia em toda coluna. */}
+                {(() => {
+                  const resumo = resumoDaColuna(colCards);
+                  return resumo ? (
+                    <div
+                      data-slot="pipeline-coluna-resumo"
+                      className="mt-0.5 truncate text-legenda text-ink-3"
+                      suppressHydrationWarning
+                    >
+                      {resumo}
+                    </div>
+                  ) : null;
+                })()}
               </div>
               <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
                 {colCards.length === 0 && (
+                  // "Nenhuma conversa aqui" e não "Vazio": vazio descreve a caixa,
+                  // a frase descreve o funil, e é o funil que a pessoa está lendo.
                   <div className="px-2 py-6 text-center text-legenda text-ink-3">
-                    Vazio
+                    Nenhuma conversa aqui
                   </div>
                 )}
                 {colCards.map((c) => (
@@ -564,10 +631,11 @@ function CardItem({
 }) {
   const label = card.name || prettyPhone(card.phone);
   const ini = initials(card.name);
-  const preview = card.lastPreview.replace(/ \| /g, "  ");
+  const preview = card.lastPreview.replace(/ | /g, "  ");
   // "Pessoa atendendo" não desenha marca própria: o avatar do responsável, que
   // já aparece no card, diz quem é e com nome.
   const quem = quemAtende({ pausada: card.paused, temAtendente: !!member });
+  const idade = idadeEmDias(card.lastMessageAt);
   return (
     <div
       draggable
@@ -590,7 +658,7 @@ function CardItem({
       // aberta é o que diz isso antes de a pessoa tentar. Ele também abre a
       // conversa no clique, mas arrastar é a ação que precisa de aviso, porque
       // ninguém descobre arraste por acaso.
-      className="cursor-grab rounded-lg border border-line bg-raised p-2.5 transition-colors hover:border-line-strong active:cursor-grabbing"
+      className="cursor-grab rounded-lg border border-line bg-raised p-3 transition-colors hover:border-line-strong active:cursor-grabbing"
     >
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">
@@ -614,6 +682,17 @@ function CardItem({
             {card.unread > 99 ? "99+" : card.unread}
           </Badge>
         )}
+        {/* IDADE, e não hora do relógio (desenho de 18/09/2026). Num quadro de
+            funil o que importa é "parado há quanto tempo", e "17:36" não conta
+            isso: o card de 12 dias e o de hoje mostravam a mesma coisa. */}
+        {idade && (
+          <span
+            className="shrink-0 text-legenda tabular-nums text-ink-3"
+            suppressHydrationWarning
+          >
+            {idade}
+          </span>
+        )}
       </div>
 
       {/* Resumo da IA em tinta NORMAL, não em âmbar. Ele acende sempre que existe
@@ -621,27 +700,44 @@ function CardItem({
           âmbar dizia "pendência" num card que podia estar fechado há semanas.
           Âmbar ficou reservado para handoff em aberto, que é pendência de fato. */}
       {card.summary ? (
-        <div className="mt-1.5 flex items-start gap-1 text-legenda text-ink-2">
+        <div className="mt-2 flex items-start gap-1 text-legenda text-ink-2">
           <Bot size={12} className="mt-0.5 shrink-0 text-ink-3" />
           <span className="line-clamp-2">{card.summary}</span>
         </div>
       ) : (
-        <div className="mt-1.5 truncate text-legenda text-ink-2">
+        <div className="mt-2 truncate text-legenda text-ink-2">
           {card.lastFrom === "out" ? `Você: ${preview}` : preview}
         </div>
       )}
 
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <span
-          className="text-legenda tabular-nums text-ink-3"
-          suppressHydrationWarning
-        >
-          {formatTime(card.lastMessageAt)}
+      {/* "Sua vez": handoff em aberto, o único âmbar do card.
+          ⚠️ O desenho traz aqui uma frase por card dizendo o que fazer ("Cobrar
+          o retorno ou mover para Fechado") e, nos cards sem handoff, o que a IA
+          está fazendo ("está montando o orçamento pela tabela"). Esse texto NÃO
+          existe no banco: `conversation_qualifications` guarda action, summary e
+          preferência de horário, e nada disso vira instrução em prosa. Escrever
+          uma frase plausível ali seria inventar o estado da conversa na tela em
+          que o time decide o que fazer. Fica só o rótulo, que é verdade. */}
+      {card.handoffAt && (
+        <div className="mt-2 flex items-center gap-1.5 rounded-lg border border-warn-line bg-warn-surface px-2 py-1 text-legenda text-warn-ink">
+          <Bot size={11} className="shrink-0 opacity-80" />
+          <span className="shrink-0 font-medium">Sua vez</span>
+          {/* A ESPERA vem do mesmo `formatEspera` da lista de conversas: as duas
+              telas falam do mesmo contato e não podem discordar no número. */}
+          <span className="truncate tabular-nums" suppressHydrationWarning>
+            · {formatEspera(card.handoffAt)} esperando
+          </span>
+        </div>
+      )}
+
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="truncate text-legenda text-ink-3">
+          {origemDoCard(card.stageSource)}
         </span>
         {member && (
           <span
             title={`Atendente: ${memberName(member.email)}`}
-            className="flex items-center gap-1 text-legenda text-ink-3"
+            className="flex shrink-0 items-center gap-1 text-legenda text-ink-3"
           >
             <Avatar size="3xs" style={avatarPair(member.email)}>
               {memberInitials(member.email).slice(0, 1)}

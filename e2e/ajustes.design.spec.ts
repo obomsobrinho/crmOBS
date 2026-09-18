@@ -651,3 +651,82 @@ test.describe("Item 8: card do pipeline", () => {
     ).toHaveCount(0);
   });
 });
+
+// Desenho de 18/09/2026 aplicado ao Kanban (pasta "Kanban com chips e cards
+// inteligentes"). O que estes testes travam é o que o desenho pediu E o que ele
+// pediu e NÃO foi feito, que é a parte fácil de alguém "consertar" sem saber.
+test.describe("Kanban redesenhado", () => {
+  test("o card mostra IDADE, e não a hora do relógio", async ({ page }) => {
+    await page.goto("/design/pipeline");
+    const card = page.locator('[data-slot="pipeline-card"]').first();
+    await expect(card).toBeVisible();
+    // "hoje", "1 dia", "12 dias". Num funil o que importa é há quanto tempo o
+    // card está parado; "17:36" dizia a mesma coisa para o de hoje e o de 12 dias.
+    await expect(card).toContainText(/hoje|\d+ dias?/);
+    await expect(card).not.toContainText(/^\d{2}:\d{2}$/);
+  });
+
+  test("a coluna diz quantos esperam você e há quanto tempo está o mais parado", async ({
+    page,
+  }) => {
+    await page.goto("/design/pipeline");
+    const resumos = page.locator('[data-slot="pipeline-coluna-resumo"]');
+    await expect(resumos.first()).toBeVisible();
+    await expect(
+      resumos.filter({ hasText: /esperando você/ }).first()
+    ).toBeVisible();
+    await expect(
+      resumos.filter({ hasText: /mais antigo há/ }).first()
+    ).toBeVisible();
+  });
+
+  test('"Sua vez" só aparece em card com handoff em aberto', async ({ page }) => {
+    await page.goto("/design/pipeline");
+    const comHandoff = page
+      .locator('[data-slot="pipeline-card"]')
+      .filter({ hasText: "Sua vez" });
+    const total = page.locator('[data-slot="pipeline-card"]');
+    const n = await comHandoff.count();
+    expect(n).toBeGreaterThan(0);
+    // Âmbar é pendência de verdade, e pendência de verdade é handoff aberto. Se
+    // todo card tivesse o selo, ele não diria nada.
+    expect(n).toBeLessThan(await total.count());
+    await expect(comHandoff.first()).toContainText(/esperando/);
+  });
+
+  test("o filtro Esperando você recorta o quadro", async ({ page }) => {
+    await page.goto("/design/pipeline");
+    // ⚠️ Esperar a tela ASSENTAR antes de clicar. Clicar logo depois do goto
+    // passa na checagem de visibilidade do Playwright e mesmo assim erra o
+    // botão: a posição é medida antes da hidratação, a barra reflui, e o clique
+    // aterrissa no div da barra. O sintoma é cruel, porque o teste não falha no
+    // clique, falha na asserção seguinte, parecendo bug de produto.
+    const botao = page.getByRole("button", { name: /Esperando você/ });
+    await expect(botao).toBeVisible();
+    await page.waitForTimeout(600);
+    const todos = await page.locator('[data-slot="pipeline-card"]').count();
+    await botao.click();
+    const depois = page.locator('[data-slot="pipeline-card"]');
+    await expect(depois.first()).toBeVisible();
+    // `expect.poll`: o recorte é estado do React, e ler a contagem no quadro
+    // seguinte ao clique pega a lista velha.
+    await expect.poll(() => depois.count()).toBeLessThan(todos);
+    for (const c of await depois.all())
+      await expect(c).toContainText("Sua vez");
+  });
+
+  test("⚠️ o card NÃO escreve o que fazer nem o que a IA está fazendo", async ({
+    page,
+  }) => {
+    await page.goto("/design/pipeline");
+    const quadro = page.locator("body");
+    // O desenho traz uma frase por card ("A IA está montando o orçamento pela
+    // tabela", "Cobrar o retorno ou mover para Fechado"). Esse dado NÃO existe:
+    // conversation_qualifications guarda action, summary e preferência de
+    // horário, e nada disso vira instrução em prosa. Escrever uma frase
+    // plausível seria inventar o estado da conversa na tela onde o time decide o
+    // que fazer, que é o oposto do que o produto promete.
+    await expect(quadro).not.toContainText(/A IA está /);
+    await expect(quadro).not.toContainText(/Cobrar o retorno/);
+  });
+});

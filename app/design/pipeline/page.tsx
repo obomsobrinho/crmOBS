@@ -7,8 +7,17 @@ import type { PipelineCard, Stage } from "@/lib/pipeline";
 // login: estágios e cards mock; arrastar e gerenciar simulam em memória.
 export const dynamic = "force-dynamic";
 
-const T = (h: number, m: number, day = 28) =>
-  new Date(2026, 6, day, h, m).toISOString();
+// ⚠️ Datas RELATIVAS a hoje, e não fixas em julho de 2026. O card passou a
+// mostrar IDADE em vez da hora do relógio (desenho de 18/09/2026), e com data
+// fixa o preview inteiro dizia "52 dias" em todo card, o que esconde justamente
+// o que o desenho quer provar: card de hoje, card de dias atrás, e a coluna
+// dizendo há quanto tempo está parado o mais velho.
+const T = (h: number, m: number, diasAtras = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - diasAtras);
+  d.setHours(h, m, 0, 0);
+  return d.toISOString();
+};
 
 const ME = "00000000-0000-0000-0000-000000000001";
 const MEMBERS: Member[] = [
@@ -34,21 +43,27 @@ function card(p: Partial<PipelineCard> & { phone: string }): PipelineCard {
     stage: null,
     summary: null,
     paused: false,
+    handoffAt: null,
+    stageSource: null,
     ...p,
   };
 }
 
 const CARDS: PipelineCard[] = [
   card({ phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Olá, vim pelo QR code!", lastFrom: "in", unread: 2, stage: "novo", lastMessageAt: T(11, 48) }),
-  card({ phone: "553384266039@s.whatsapp.net", name: "Marina Souza", lastPreview: "Qual o valor do plano anual?", lastFrom: "in", stage: "novo", lastMessageAt: T(10, 12) }),
-  card({ phone: "553391589932@s.whatsapp.net", name: "João Pereira", lastFrom: "out", stage: "qualificado", assignedUserId: "u2", lastPreview: "Perfeito, vou verificar", lastMessageAt: T(21, 28) }),
-  card({ phone: "553384339086@s.whatsapp.net", name: "Loja do Zé", stage: "aguardando_humano", paused: true, assignedUserId: ME, summary: "Cliente quer marcar uma conversa, prefere terça à tarde.", lastMessageAt: T(17, 18) }),
+  card({ phone: "553384266039@s.whatsapp.net", name: "Marina Souza", lastPreview: "Qual o valor do plano anual?", lastFrom: "in", stage: "novo", lastMessageAt: T(10, 12, 1) }),
+  card({ phone: "553391589932@s.whatsapp.net", name: "João Pereira", lastFrom: "out", stage: "qualificado", assignedUserId: "u2", lastPreview: "Perfeito, vou verificar", lastMessageAt: T(21, 28, 3), stageSource: "human" }),
+  card({ phone: "553384339086@s.whatsapp.net", name: "Loja do Zé", stage: "aguardando_humano", paused: true, assignedUserId: ME, summary: "Cliente quer marcar uma conversa, prefere terça à tarde.", lastMessageAt: T(17, 18, 1), handoffAt: T(9, 5, 1), stageSource: "ia" }),
+  // Handoff aberto HÁ DIAS: é o card que o desenho mostra como "12 dias" e o que
+  // faz a coluna dizer "mais antigo há N". Sem ele o preview não exercita nem o
+  // âmbar de "Sua vez" nem o subtítulo da coluna.
+  card({ phone: "553398620145@s.whatsapp.net", name: "Rafael Tobias", stage: "qualificado", summary: "Pediu orçamento da armação infantil e não voltou.", lastMessageAt: T(15, 40, 12), handoffAt: T(15, 40, 12), stageSource: "ia" }),
   // Fechado, com resumo, pausada e SEM responsável: é o caso que o dono do
   // produto reportou (card movido para Fechado que continuava com ponto e resumo
   // em âmbar, parecendo pendência). Aqui ele prova as duas correções de uma vez:
   // o resumo sai do âmbar, e o ponto passa a dizer "ninguém atende", que é o que
   // de fato acontece com a IA pausada e nenhum responsável.
-  card({ phone: "553384486180@s.whatsapp.net", name: "Beatriz Lima", stage: "fechado", lastFrom: "out", lastPreview: "Obrigada!", paused: true, summary: "Cliente perguntou o valor do plano anual e ficou de responder.", lastMessageAt: T(9, 20) }),
+  card({ phone: "553384486180@s.whatsapp.net", name: "Beatriz Lima", stage: "fechado", lastFrom: "out", lastPreview: "Obrigada!", paused: true, summary: "Cliente perguntou o valor do plano anual e ficou de responder.", lastMessageAt: T(9, 20, 5) }),
 ];
 
 export default function DesignPipelinePage() {

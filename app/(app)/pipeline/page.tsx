@@ -29,7 +29,7 @@ export default async function PipelinePage() {
       supabase
         .from("conversations")
         .select(
-          "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage"
+          "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage, handoff_at, stage_source"
         )
         .order("last_message_at", { ascending: false })
         .limit(500),
@@ -50,13 +50,19 @@ export default async function PipelinePage() {
   const qual = lastQualByPhone(
     (quals ?? []) as { phone: string; summary: string | null }[]
   );
+  // Quem pôs cada card na coluna em que está. Vem da MESMA consulta, então não
+  // custa viagem nenhuma.
+  const source: Record<string, "human" | "ia" | null> = {};
+  for (const c of (convs ?? []) as { phone: string; stage_source?: string | null }[])
+    source[c.phone] =
+      c.stage_source === "human" || c.stage_source === "ia" ? c.stage_source : null;
 
   return (
     <PipelineBoard
       clientId={client?.id ?? ""}
       myRole={client?.role ?? null}
       initialStages={((stages ?? []) as StageRow[]).map(rowToStage)}
-      initialCards={buildCards(items, ia, qual)}
+      initialCards={buildCards(items, ia, qual, source)}
     />
   );
 }
