@@ -78,7 +78,7 @@ export default defineConfig({
     // segundo usuário passou a existir no tenant de teste.
     {
       name: "atendente",
-      testMatch: /.*.att.spec.ts/,
+      testMatch: /.*\.att\.spec\.ts/,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/atendente.json",

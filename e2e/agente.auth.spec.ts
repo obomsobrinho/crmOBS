@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { modoDoAgente } from "./modo-agente";
 
 // Testes COM LOGIN (sessão de dono do tenant de teste, reusada de auth.setup.ts;
 // desde 17/09/2026 esse tenant é a OBS, que está em modo avançado).
@@ -40,16 +41,7 @@ test.describe("Bancada de teste dentro do /agente", () => {
     // resposta do modelo. Trocar de modo aqui seria pior que tratar os dois: no
     // avançado o tenant pode não ter `agent_config`, e o formulário guiado
     // abriria vazio, reprovando no 400 de configuração incompleta.
-    const paraGuiado = page.getByRole("button", {
-      name: "Voltar ao formulário guiado",
-    });
-    const paraAvancado = page.getByRole("button", {
-      name: "Escrever o prompt à mão",
-    });
-    await expect(paraGuiado.or(paraAvancado)).toBeVisible();
-    const noAvancado = await paraGuiado.isVisible();
-
-    if (noAvancado) {
+    if ((await modoDoAgente(page)) === "avancado") {
       // Uma instrução no FIM do texto do tenant, onde a recência ajuda: pedir um
       // nome brigaria com a identidade que a persona dele já declara no começo.
       const campo = page.locator("textarea").first();
@@ -88,13 +80,38 @@ Inclua sempre a palavra ${NOME_NOVO} em qualquer resposta que você der.`
     await painel
       .getByPlaceholder("Escreva como um cliente escreveria...")
       .fill("Oi! Com quem eu falo?");
+    // Waiters ARMADOS antes do clique: depois dele a requisição já pode ter
+    // saído, e `waitForRequest` só enxerga o que vier a partir da chamada.
+    const requisicao = page.waitForRequest(
+      (r) => r.url().includes("/api/playground") && r.method() === "POST"
+    );
+    const resposta = page.waitForResponse(
+      (r) => r.url().includes("/api/playground"),
+      { timeout: 90_000 }
+    );
     await painel.getByRole("button", { name: "Enviar" }).click();
 
-    // A resposta tem que trazer o nome que está no CAMPO, não o que está salvo.
-    // Se a rota usasse a persona do banco, aqui viria o nome antigo.
-    await expect(painel.getByText(new RegExp(NOME_NOVO, "i")).first()).toBeVisible({
-      timeout: 90_000,
-    });
+    // ⚠️ A PROVA É O CORPO DA REQUISIÇÃO, e não o texto da resposta. A versão
+    // anterior pedia ao modelo que repetisse uma palavra e conferia se ela
+    // aparecia na tela: passou duas vezes e falhou na terceira, porque o modelo
+    // não é obrigado a obedecer a uma instrução dessas, e a falha lia como
+    // "a bancada usou a persona salva" quando não era isso.
+    // O que o teste afirma é que a bancada manda a configuração EM EDIÇÃO, e isso
+    // se vê no corpo do POST, de forma determinística e sem depender do modelo.
+    const corpo = (await requisicao).postDataJSON() as {
+      mode?: string;
+      persona?: string;
+      config?: { agentName?: string };
+    };
+    if (corpo.mode === "avancado") {
+      expect(corpo.persona).toContain(NOME_NOVO);
+    } else {
+      expect(corpo.config?.agentName).toBe(NOME_NOVO);
+    }
+
+    // E o cérebro real responde de verdade, em dryRun. O QUE ele respondeu não
+    // entra em asserção, pelo motivo acima; que ele respondeu, sim.
+    expect((await resposta).status()).toBe(200);
 
     expect(salvamentos).toEqual([]);
   });
@@ -192,14 +209,14 @@ test.describe("Painel com dados reais", () => {
     expect(texto).not.toContain("—");
     expect(texto).not.toContain("–");
 
-    // ⚠️ Público misto: o beta tem advogado, pediatra, barbeiro, engenheiro,
-    // clínica e comércio. Quem carrega a linguagem do segmento é o preset, nunca
-    // a tela. Esta regra só existia contra `/design/painel`, com dado falso; aqui
-    // ela passa a valer também contra a tela real, onde o texto do tenant entra
-    // no meio do texto fixo e é exatamente onde o vazamento aconteceria.
-    expect(texto).not.toMatch(/consulta/i);
-    expect(texto).not.toMatch(/paciente/i);
-    expect(texto).not.toMatch(/agendamento/i);
+    // ⚠️ A regra de PÚBLICO MISTO (nenhum texto fixo diz consulta, paciente ou
+    // agendamento) fica em `/design/painel` e NÃO é conferida aqui. Ela foi trazida
+    // para cá em 18/09/2026 e revertida no mesmo dia, por um motivo que não tem
+    // conserto: o texto desta tela inclui o que o TENANT escreveu, porque a frase
+    // do agente aparece na íntegra no painel. O primeiro testador que for clínica
+    // deixaria a suíte vermelha acusando vazamento NOSSO num texto que é do
+    // cliente. A regra fala das nossas strings fixas, então o lugar dela é a tela
+    // de design, onde todo o texto é nosso e controlado pelo teste.
   });
 
   test("sem assunto classificado, o bloco diz XX e não inventa", async ({

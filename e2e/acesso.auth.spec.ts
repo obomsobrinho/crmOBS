@@ -1,39 +1,31 @@
 import { test, expect } from "@playwright/test";
+import {
+  botaoParaAvancado,
+  botaoParaGuiado,
+  modoDoAgente,
+} from "./modo-agente";
 
 // Testes com login (sessão de DONO reusada de auth.setup.ts). Cobrem o acesso
-// do dono; os testes do atendente (não vê Agente, 403 na API) usam
-// E2E_ATTENDANT_EMAIL, que passou a existir em 17/09/2026 e ainda não tem specs.
+// do dono; o espelho deles, o que o atendente NÃO pode, vive em
+// `atendente.att.spec.ts` (projeto `atendente`, sessão própria desde
+// 17/09/2026), porque com a sessão do dono cada uma daquelas asserções provaria
+// o contrário do que afirma.
 test.describe("Acesso do dono", () => {
   test("vê o item Agente e abre o construtor", async ({ page }) => {
     await page.goto("/inbox");
     await expect(page.getByRole("link", { name: "Agente" })).toBeVisible();
     await page.goto("/agente");
-    // ⚠️ O tenant de teste pode estar em QUALQUER um dos dois modos, e a tela é
-    // outra em cada um: o guiado mostra as três abas, o avançado mostra um campo
-    // de texto só. Este teste travava a forma guiada e quebrou no dia em que o
-    // tenant de teste virou a OBS, que escreve o prompt à mão. Em vez de assumir
-    // um modo, prova as DUAS superfícies, trocando pelo botão. A troca é estado
-    // local do formulário: nada é salvo, e a persona do tenant não é tocada.
-    // ⚠️ Esperar o interruptor de modo ANTES de decidir qual caminho seguir. A
-    // tela é client component e demora a hidratar; um `isVisible()` cru responde
-    // "não" para um botão que aparece dois segundos depois.
-    const paraGuiado = page.getByRole("button", {
-      name: "Voltar ao formulário guiado",
-    });
-    const paraAvancado = page.getByRole("button", {
-      name: "Escrever o prompt à mão",
-    });
-    await expect(paraGuiado.or(paraAvancado)).toBeVisible();
-    if (await paraGuiado.isVisible()) {
+    // Sem assumir o modo do tenant (a espera pela hidratação mora no helper).
+    // Se abriu no avançado, prova aquela superfície e volta pelo botão: a troca
+    // é estado local do formulário, nada é salvo, e a persona não é tocada.
+    if ((await modoDoAgente(page)) === "avancado") {
       await expect(page.getByText("Prompt escrito à mão")).toBeVisible();
-      await paraGuiado.click();
+      await botaoParaGuiado(page).click();
     }
     // Três abas de verdade desde 28/08/2026. O par guiado/avançado deixou de ser
     // aba: as abas são as SEÇÕES do formulário, e o avançado é outro formulário.
     await expect(page.getByRole("tab", { name: "Quem atende" })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Escrever o prompt à mão" })
-    ).toBeVisible();
+    await expect(botaoParaAvancado(page)).toBeVisible();
   });
 
   test("Equipe lista o próprio usuário", async ({ page }) => {

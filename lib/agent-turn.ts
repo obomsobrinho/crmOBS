@@ -72,6 +72,14 @@ export interface ProcessTurnParams {
   personaOverride?: string | null;
 }
 
+/**
+ * Texto que vale alguma coisa, ou nada. Colunas de `clients` chegam como
+ * `unknown` do Supabase, e o cuidado é sempre o mesmo: string em branco é tão
+ * ausente quanto `null`, e persona ou nome só de espaço não pode virar prompt.
+ */
+const texto = (v: unknown): string | null =>
+  typeof v === "string" && v.trim() ? v : null;
+
 // Monta a persona A CADA TURNO, a partir da configuração do tenant (decisão de
 // 17/09/2026). Antes o texto vinha pronto de `clients.persona`, grudado no
 // momento do Salvar, e a consequência era que melhoria na base do prompt só
@@ -95,14 +103,10 @@ function personaDoTenant(client: {
   prompt_mode?: unknown;
   name?: unknown;
 }): string {
-  const salva =
-    typeof client.persona === "string" && client.persona.trim()
-      ? client.persona
-      : null;
-  const empresa =
-    typeof client.name === "string" && client.name.trim()
-      ? client.name
-      : "a empresa";
+  const salva = texto(client.persona);
+  // Sem normalizar para "a empresa" aqui: `buildFallbackPersona` já faz esse
+  // default. Duas cópias do mesmo literal é uma para esquecer de mudar.
+  const empresa = texto(client.name) ?? "";
   try {
     if (client.prompt_mode === "avancado") {
       // Texto escrito à mão. O que está salvo já traz o rabo da base de quando
@@ -206,12 +210,7 @@ export async function processTurn(
 
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
   // dryRun: fora dele a única fonte é o banco.
-  const emEdicao =
-    dryRun &&
-    typeof params.personaOverride === "string" &&
-    params.personaOverride.trim()
-      ? params.personaOverride
-      : null;
+  const emEdicao = dryRun ? texto(params.personaOverride) : null;
   const persona = emEdicao ?? personaDoTenant(client);
 
   // Histórico: no dryRun vem do chamador (playground); em produção sai de
