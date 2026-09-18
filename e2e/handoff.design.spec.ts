@@ -22,7 +22,11 @@ test.describe("Handoff na lista de conversas (/design)", () => {
     await page.goto("/design");
     // Um só: a conversa com handoff aberto. A do Franck está com a IA pausada
     // (alguém assumiu), e por isso não entra na fila.
-    const urgente = page.getByRole("button", { name: "Precisa de você" });
+    // O recorte virou CHIP em 18/09/2026 (desenho do atendimento), e o rótulo
+    // encurtou de "Precisa de você" para "Esperando", que é como o cabeçalho de
+    // grupo da lista já chamava a mesma coisa. O dado por trás é o mesmo:
+    // handoff em aberto.
+    const urgente = page.getByRole("button", { name: /Esperando/ });
     await expect(urgente).toContainText("1");
     await urgente.click();
     await expect(page.getByRole("link", { name: /Franck/ })).toHaveCount(0);

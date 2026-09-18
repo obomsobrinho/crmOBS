@@ -34,12 +34,13 @@ test.describe("Inbox (/design)", () => {
     // uma aba do campo de escrita, em vez de um formulário próprio.
     await expect(page.getByText("Notas", { exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
-    // Os filtros viraram um seletor só: três moram no menu e "Precisa de você"
-    // ganhou botão próprio, porque é o corte que faz alguém largar o que está
-    // fazendo. "Não lidas" deixou de existir e virou "Sem resposta", no menu.
+    // Os filtros viraram CHIPS em 18/09/2026, no lugar do menu suspenso: o menu
+    // escondia a contagem, e dava para ter três conversas esperando por você sem
+    // nada na tela dizendo isso. "Precisa de você" virou "Esperando", o mesmo
+    // nome do grupo da lista.
     await expect(page.getByRole("button", { name: /Todas/ })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Precisa de você" })
+      page.getByRole("button", { name: /Esperando/ })
     ).toBeVisible();
   });
 
@@ -175,5 +176,40 @@ test.describe("Assinatura (/design/assinatura)", () => {
     expect(texto).not.toContain("mais popular");
     expect(texto).not.toContain("recomendado");
     expect(texto).not.toContain("melhor custo");
+  });
+});
+
+// Desenho do atendimento aplicado em 18/09/2026 (pasta "Formulário enviado,
+// aguardando respostas"), dentro da estrutura de cartões que já existia: o dono
+// pediu para manter cartão de conversas, cartão de chat e cartão de detalhes.
+test.describe("Lista de conversas redesenhada", () => {
+  test("a lista vem agrupada por estado, com contagem", async ({ page }) => {
+    await page.goto("/design");
+    const grupos = page.locator('[data-slot="inbox-grupo"]');
+    await expect(grupos.first()).toBeVisible();
+    // A ordem é a da urgência, e é ela que responde "por onde eu começo?" sem
+    // ninguém filtrar nada.
+    const textos = (await grupos.allInnerTexts()).join(" | ");
+    expect(textos).toMatch(/Esperando você|Assumidas pelo time|A IA está atendendo/);
+  });
+
+  test("o filtro mostra o número junto do rótulo", async ({ page }) => {
+    await page.goto("/design");
+    const chips = page.locator('[data-slot="inbox-chip"]');
+    await expect(chips.first()).toBeVisible();
+    // O menu suspenso antigo escondia a contagem atrás de um clique: dava para
+    // ter conversas esperando por você sem nada na tela dizendo isso.
+    for (const c of await chips.all()) await expect(c).toContainText(/\d+/);
+  });
+
+  test("filtrar desliga o agrupamento", async ({ page }) => {
+    await page.goto("/design");
+    const chip = page.locator('[data-slot="inbox-chip"]').filter({ hasText: /Esperando/ });
+    await expect(chip).toBeVisible();
+    await page.waitForTimeout(400);
+    await chip.click();
+    // Com a lista recortada, um cabeçalho repetindo o nome do filtro é ruído: a
+    // lista inteira já é daquele grupo.
+    await expect(page.locator('[data-slot="inbox-grupo"]')).toHaveCount(0);
   });
 });

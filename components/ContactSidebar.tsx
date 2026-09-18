@@ -1,27 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Search,
   User,
   Bot,
-  SlidersHorizontal,
-  ChevronDown,
-  Check,
-  TriangleAlert,
 } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -73,11 +63,42 @@ function needsYou(it: InboxItem): boolean {
 // 296px, e duas linhas de chip no topo é o que dava aspecto de rascunho.
 type FiltroKey = "all" | "unanswered" | "mine" | "needs";
 
-const ROTULO: Record<FiltroKey, string> = {
+/**
+ * Em que grupo a conversa entra na lista (desenho de 18/09/2026).
+ *
+ * A ordem é a da urgência, e é ela que faz a lista responder "por onde eu
+ * começo?" sem ninguém filtrar nada: quem espera por você, depois o que o time
+ * já assumiu, depois o que a IA está tocando sozinha.
+ *
+ * ⚠️ O grupo é DERIVADO do mesmo dado dos filtros (handoff aberto, responsável),
+ * nunca de um campo novo: dois jeitos de dizer "esperando você" é como a lista e
+ * o contador passam a discordar.
+ */
+type Grupo = "espera" | "time" | "ia";
+
+const GRUPO_ROTULO: Record<Grupo, string> = {
+  espera: "Esperando você",
+  time: "Assumidas pelo time",
+  ia: "A IA está atendendo",
+};
+
+const GRUPO_ORDEM: Grupo[] = ["espera", "time", "ia"];
+
+function grupoDe(it: InboxItem): Grupo {
+  if (needsYou(it)) return "espera";
+  return it.assignedUserId ? "time" : "ia";
+}
+
+/**
+ * Rótulo CURTO, para o chip. "Precisa de você" não cabe na faixa de 296px e
+ * "Esperando" é como o grupo da lista já chama a mesma coisa: dois nomes para o
+ * mesmo recorte é o começo de duas contagens diferentes.
+ */
+const CHIP_ROTULO: Record<FiltroKey, string> = {
   all: "Todas",
   unanswered: "Sem resposta",
   mine: "Suas",
-  needs: "Precisa de você",
+  needs: "Esperando",
 };
 
 // Trecho curto ao redor do termo encontrado, para mostrar onde bateu.
@@ -115,7 +136,6 @@ export default function ContactSidebar({
   // "unanswered" = a última mensagem foi do contato, ou seja, a bola está com a
   // gente. É o corte que o operador realmente faz ao abrir a tela.
   const [filter, setFilter] = useState<FiltroKey>("all");
-  const [filtroAberto, setFiltroAberto] = useState(false);
   // phone -> texto da mensagem que casou com a busca (conteúdo, não só nome).
   const [msgMatches, setMsgMatches] = useState<Record<string, string>>({});
   const pathname = usePathname();
@@ -329,8 +349,27 @@ export default function ContactSidebar({
             ? makeSnippet(msgMatches[it.phone], query.trim())
             : null;
         return { it, snippet };
-      });
+      })
+      // Ordena por GRUPO só quando a lista está inteira e sem busca. Com filtro
+      // ou busca ativos o recorte já É o agrupamento, e reordenar ali só faria o
+      // resultado da busca sair de uma ordem que a pessoa não pediu.
+      .sort((a, b) =>
+        filter === "all" && !q
+          ? GRUPO_ORDEM.indexOf(grupoDe(a.it)) - GRUPO_ORDEM.indexOf(grupoDe(b.it))
+          : 0
+      );
   }, [items, query, filter, msgMatches, myUserId]);
+
+  // Quantas conversas em cada grupo, para o cabeçalho de seção.
+  const porGrupo = useMemo(() => {
+    const c: Record<Grupo, number> = { espera: 0, time: 0, ia: 0 };
+    for (const { it } of results) c[grupoDe(it)] += 1;
+    return c;
+  }, [results]);
+
+  // O agrupamento vale para a lista INTEIRA. Filtrada, a lista já é de um grupo
+  // só, e um cabeçalho repetindo o nome do filtro seria ruído.
+  const agrupar = filter === "all" && !query.trim();
 
   return (
     <Card asChild className="flex w-[296px] shrink-0 flex-col overflow-hidden">
@@ -342,87 +381,50 @@ export default function ContactSidebar({
           <Badge variant="contagem">{items.length}</Badge>
         </div>
 
-        {/* Seletor de filtro mais o atalho de urgente. "Precisa de você" ganha
-            botão próprio porque é o corte que faz alguém largar o que está
-            fazendo; os outros três moram no menu. */}
-        <div className="flex items-center gap-1.5">
-          {/* O painel abria por `absolute top-[88px]` ancorado no AVÔ, um número
-              mágico que só funcionava porque o cabeçalho tem altura fixa, e
-              ainda ficava preso dentro do cartão por causa do overflow-hidden.
-              Agora sai em portal. Os 270px são a largura útil do cartão (296
-              menos a borda de 1px de cada lado e o respiro de 12px), e os 10px
-              de deslocamento são a distância que o painel já tinha do gatilho. */}
-          <DropdownMenu open={filtroAberto} onOpenChange={setFiltroAberto}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="control"
-                className="min-w-0 flex-1 shrink"
-              >
-                <SlidersHorizontal size={14} className="shrink-0 text-ink-3" />
-                <span className="min-w-0 truncate">{ROTULO[filter]}</span>
-                <span className="shrink-0 tabular-nums text-ink-3">
-                  {contagem[filter]}
-                </span>
-                <ChevronDown size={14} className="ml-auto shrink-0 text-ink-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={10}
-              className="w-[270px]"
-            >
-              {(["all", "unanswered", "mine", "needs"] as FiltroKey[])
-                .filter((k) => k !== "mine" || myUserId)
-                .map((k) => (
-                  <DropdownMenuItem
-                    key={k}
-                    onSelect={() => setFilter(k)}
-                    className={cn(
-                      "h-[34px]",
-                      filter === k && "font-semibold text-ink",
-                    )}
-                  >
-                    <span className="flex w-3.5 shrink-0 text-brand-ink">
-                      {filter === k && <Check size={14} />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{ROTULO[k]}</span>
-                    <span className="shrink-0 tabular-nums text-ink-3">
-                      {contagem[k]}
-                    </span>
-                  </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* CHIPS de filtro (desenho de 18/09/2026), no lugar do menu suspenso.
+            O menu escondia o recorte atrás de um clique e, pior, escondia a
+            CONTAGEM: dava para ter três conversas esperando por você sem nada na
+            tela dizendo isso. Chip mostra rótulo e número ao mesmo tempo, que é o
+            que faz a pessoa decidir sem abrir nada.
 
-          {needsCount > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
+            ⚠️ São QUATRO e não os três do desenho: "Sem resposta" existe no
+            produto e some se eu copiar o desenho ao pé da letra. Apagar um
+            recorte porque ele não coube numa prancha é decisão de produto, e não
+            de aplicação de desenho; eles envolvem com `flex-wrap`. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {(["all", "needs", "unanswered", "mine"] as FiltroKey[])
+            .filter((k) => k !== "mine" || myUserId)
+            // Chip com zero não entra, EXCETO "Todas": um filtro que não recorta
+            // nada só ocupa a faixa e ainda sugere que há algo ali.
+            .filter((k) => k === "all" || contagem[k] > 0)
+            .map((k) => {
+              const ativo = filter === k;
+              const urgente = k === "needs";
+              return (
                 <Button
+                  key={k}
                   variant="outline"
-                  size="control"
-                  onClick={() =>
-                    setFilter((f) => (f === "needs" ? "all" : "needs"))
-                  }
-                  aria-pressed={filter === "needs"}
-                  // O conteúdo visível é ícone mais número, então sem isto o
-                  // botão não tem nome acessível: leitor de tela anunciaria só
-                  // "3". Tooltip não serve como nome (só existe no hover).
-                  aria-label="Precisa de você"
+                  size="chrome"
+                  data-slot="inbox-chip"
+                  aria-pressed={ativo}
+                  onClick={() => setFilter(k)}
                   className={cn(
-                    "gap-1.5 text-warn-ink",
-                    filter === "needs"
-                      ? "border-[var(--warn-line)] bg-[var(--warn-surface)]"
-                      : "hover:bg-[var(--warn-surface)]",
+                    "gap-1.5",
+                    urgente && "text-warn-ink",
+                    ativo
+                      ? urgente
+                        ? "border-warn-line bg-warn-surface font-semibold"
+                        : "border-line-strong bg-[var(--active-bg)] font-semibold text-ink"
+                      : urgente
+                        ? "hover:bg-warn-surface"
+                        : "text-ink-2"
                   )}
                 >
-                  <TriangleAlert size={14} className="shrink-0" />
-                  <span className="tabular-nums">{needsCount}</span>
+                  {CHIP_ROTULO[k]}
+                  <span className="tabular-nums opacity-80">{contagem[k]}</span>
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Precisa de você</TooltipContent>
-            </Tooltip>
-          )}
+              );
+            })}
         </div>
 
         {/* Busca depois dos filtros: recortar por estado é o gesto de todo dia,
@@ -455,8 +457,12 @@ export default function ContactSidebar({
           </div>
         )}
         <ul>
-          {results.map(({ it, snippet }) => {
+          {results.map(({ it, snippet }, indice) => {
             const { phone, name, lastPreview, lastFrom, lastMessageAt } = it;
+            // Cabeçalho de seção: só no PRIMEIRO item de cada grupo.
+            const grupo = grupoDe(it);
+            const abreGrupo =
+              agrupar && (indice === 0 || grupoDe(results[indice - 1].it) !== grupo);
             const href = `/inbox/${encodeURIComponent(phone)}`;
             const active = activePhone ? activePhone === phone : pathname === href;
             const paused = isPaused(iaByPhone[phone]);
@@ -479,7 +485,27 @@ export default function ContactSidebar({
             const preview =
               lastFrom === "out" ? `Você: ${cleanPreview}` : cleanPreview;
             return (
-              <li key={phone}>
+              <Fragment key={phone}>
+                {abreGrupo && (
+                  <li
+                    data-slot="inbox-grupo"
+                    className="flex items-center gap-2 px-3 pb-1 pt-3 text-rotulo text-ink-3"
+                  >
+                    {/* O ponto herda a cor do grupo: âmbar só em "esperando
+                        você", porque âmbar aqui significa pendência e não
+                        categoria. Os outros dois são neutros de propósito. */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        grupo === "espera" ? "bg-warn-ink" : "bg-ink-faint"
+                      )}
+                    />
+                    <span className="min-w-0 truncate">{GRUPO_ROTULO[grupo]}</span>
+                    <span className="shrink-0 tabular-nums">{porGrupo[grupo]}</span>
+                  </li>
+                )}
+              <li>
                 <Link
                   href={href}
                   aria-current={active ? "page" : undefined}
@@ -593,6 +619,7 @@ export default function ContactSidebar({
                   </div>
                 </Link>
               </li>
+              </Fragment>
             );
           })}
           </ul>
