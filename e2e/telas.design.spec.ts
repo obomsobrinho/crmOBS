@@ -213,3 +213,27 @@ test.describe("Lista de conversas redesenhada", () => {
     await expect(page.locator('[data-slot="inbox-grupo"]')).toHaveCount(0);
   });
 });
+
+test.describe("Conversa redesenhada", () => {
+  test("o entendimento da IA é a primeira linha da conversa", async ({ page }) => {
+    await page.goto("/design");
+    const faixa = page.locator('[data-slot="conversa-entendimento"]');
+    await expect(faixa).toBeVisible();
+    await expect(faixa).toContainText(/O cliente quer/i);
+    // ⚠️ Uma vez só na tela. Antes o mesmo texto morava na coluna da direita;
+    // ter os dois é a mesma frase duas vezes, e a de cima é a que se lê primeiro.
+    await expect(page.getByText("Entendimento", { exact: true })).toHaveCount(0);
+  });
+
+  test("os modos do composer dizem PARA ONDE o texto vai", async ({ page }) => {
+    await page.goto("/design");
+    // Eram abas sublinhadas. Viraram botões porque trocar de modo aqui não troca
+    // a vista do mesmo conteúdo: troca o destino, que é o erro caro desta tela
+    // (mandar para o cliente o que era nota).
+    await expect(page.getByRole("tab", { name: /Responder ao cliente/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
+    await expect(page.getByText("vai para o WhatsApp do cliente")).toBeVisible();
+    await page.getByRole("tab", { name: /Nota interna/ }).click();
+    await expect(page.getByText("fica só entre vocês")).toBeVisible();
+  });
+});

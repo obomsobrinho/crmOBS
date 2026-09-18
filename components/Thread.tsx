@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import AiSummary from "./AiSummary";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
@@ -609,6 +610,15 @@ export default function Thread({
           )}
         </div>
       </header>
+
+      {/* "O CLIENTE QUER": o entendimento da IA virou FAIXA no topo da conversa
+          (desenho de 18/09/2026). Antes morava só na coluna da direita, onde
+          disputava atenção com dados cadastrais e sumia junto com a coluna quando
+          alguém clicava em "Ocultar cliente". É a primeira pergunta que quem abre
+          a conversa faz, então é a primeira linha que ele lê. */}
+      {conversationId != null && (
+        <AiSummary phone={phone} clientId={clientId} variante="faixa" />
+      )}
 
       {/* ⚠️ Aqui a conversa GANHA largura, por decisão registrada: a barra
           nativa reservava 10px de layout e a do Radix é sobreposta. É a única

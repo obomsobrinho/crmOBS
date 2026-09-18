@@ -282,7 +282,6 @@ export default function ConversationView({
               members={members}
               myUserId={myUserId}
               conversationId={conversationId}
-              clientId={clientId}
               editableName={displayName}
               customFields={customFields}
               contactExists={contactExists}

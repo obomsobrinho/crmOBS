@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sparkles, Clock, CheckCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
 import { formatEspera } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 // "Entendimento": o que a IA entendeu desta conversa. Lê a qualificação mais
 // recente (conversation_qualifications, gravada por /api/agent). Só leitura.
@@ -17,9 +18,20 @@ import { Button } from "@/components/ui/button";
 export default function AiSummary({
   phone,
   clientId,
+  variante = "painel",
+  direita,
 }: {
   phone: string;
   clientId: string;
+  /**
+   * `painel` é o bloco da coluna da direita. `faixa` é a linha larga que fica
+   * logo abaixo do cabeçalho da conversa (desenho de 18/09/2026): "O CLIENTE
+   * QUER ..." é a primeira coisa que a pessoa lê ao abrir, e no painel lateral
+   * ela disputava atenção com dados cadastrais.
+   */
+  variante?: "painel" | "faixa";
+  /** Só na faixa: o que aparece na ponta direita (quem assumiu). */
+  direita?: ReactNode;
 }) {
   const supabase = createClient();
   const [qual, setQual] = useState<Qualification | null>(null);
@@ -109,6 +121,62 @@ export default function AiSummary({
   const pedido = qual ? qualReasonLabel(qual.action) : "";
   const horario = qual?.preferenciaHorario ?? "";
   const resumo = qual?.summary ?? "";
+
+  if (variante === "faixa") {
+    return (
+      <div
+        data-slot="conversa-entendimento"
+        className={cn(
+          "flex shrink-0 items-center gap-2.5 border-b px-4 py-2",
+          handoffAt
+            ? "border-warn-line bg-warn-surface"
+            : "border-line bg-raised"
+        )}
+      >
+        <span
+          className={cn(
+            "flex shrink-0 items-center gap-1.5 text-rotulo uppercase",
+            handoffAt ? "text-warn-ink" : "text-brand-ink"
+          )}
+        >
+          <Sparkles size={13} className="shrink-0" />
+          O cliente quer
+        </span>
+        {/* Uma linha só e sem quebrar o layout: o resumo pode ser longo, e a
+            faixa não pode empurrar a conversa para baixo a cada turno da IA. */}
+        <span className="min-w-0 flex-1 truncate text-apoio text-ink">
+          {resumo || pedido || "Ainda não disse"}
+        </span>
+        {horario && (
+          <span className="hidden shrink-0 items-center gap-1 text-legenda text-ink-2 lg:flex">
+            <Clock size={13} className="shrink-0 text-ink-3" />
+            {horario}
+          </span>
+        )}
+        {handoffAt && (
+          <>
+            <span
+              className="shrink-0 text-legenda font-medium text-warn-ink"
+              suppressHydrationWarning
+            >
+              esperando há {formatEspera(handoffAt)}
+            </span>
+            <Button
+              size="chrome"
+              variant="outline"
+              onClick={resolver}
+              disabled={resolvendo}
+              className="shrink-0"
+            >
+              <CheckCheck size={14} />
+              {resolvendo ? "Resolvendo…" : "Resolvido"}
+            </Button>
+          </>
+        )}
+        {direita}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3">

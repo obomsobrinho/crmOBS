@@ -103,6 +103,24 @@ const gatilhoVariants = cva(
           "text-ink-2 hover:bg-bloco hover:text-ink",
           "data-[state=active]:bg-bloco data-[state=active]:font-semibold data-[state=active]:text-ink",
         ],
+        /**
+         * `acao`: a aba desenhada como BOTÃO (composer, 18/09/2026). Existe
+         * porque ali trocar de aba não troca a vista do mesmo conteúdo, troca
+         * PARA ONDE o texto vai, e sublinhado não carrega essa consequência.
+         *
+         * A cor do modo ativo chega por `data-cor` e não por className solta:
+         * são três modos com três cores de estado já nomeadas no sistema
+         * (human, warn, brand), e escrever a tríade à mão em cada gatilho é como
+         * a quarta nasce com a cor errada.
+         */
+        acao: [
+          "items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-apoio font-medium",
+          "text-ink-2 hover:bg-[var(--active-bg)] hover:text-ink",
+          "data-[state=active]:font-semibold",
+          "data-[cor=human]:data-[state=active]:border-[var(--human-line)] data-[cor=human]:data-[state=active]:bg-[var(--human-surface)] data-[cor=human]:data-[state=active]:text-human-ink",
+          "data-[cor=warn]:data-[state=active]:border-warn-line data-[cor=warn]:data-[state=active]:bg-warn-surface data-[cor=warn]:data-[state=active]:text-warn-ink",
+          "data-[cor=brand]:data-[state=active]:border-brand-line data-[cor=brand]:data-[state=active]:bg-brand-surface data-[cor=brand]:data-[state=active]:text-brand-ink",
+        ],
       },
     },
     defaultVariants: { variant: "sublinhado" },

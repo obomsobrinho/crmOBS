@@ -245,33 +245,44 @@ export default function MessageComposer({
           </div>
         )}
 
-        {/* Abas DENTRO da casa, no topo. A versão anterior tinha a moldura das
-            abas por fora da moldura do campo, o que empilhava duas bordas e
-            fazia o conjunto parecer duas peças aparafusadas. */}
-        {/* `contents` no Root: o Radix precisa de um elemento para segurar o
-            contexto das abas, mas ele não pode participar do layout, senão a
-            fila de abas passaria a viver dentro de uma caixa que a moldura do
-            composer não previa. Com display:contents o Root some do fluxo e a
-            lista continua sendo filha direta da moldura, como sempre foi. */}
+        {/* MODOS COMO BOTÕES, no topo da casa (desenho de 18/09/2026). Eram abas
+            sublinhadas, e aba comunica "vista do mesmo conteúdo": aqui trocar de
+            modo troca PARA ONDE o texto vai, que é a decisão mais consequente
+            desta tela. Responder sai no WhatsApp do cliente; nota fica entre
+            vocês; orientar fala com a IA. O botão do modo ativo carrega a cor do
+            modo, que é a mesma que colore a moldura e o botão de ação.
+
+            ⚠️ Segue sendo `role="tablist"` do Radix por baixo, e não três botões
+            soltos: o que muda é a pele. Com botões soltos some a navegação por
+            seta e o foco itinerante, que é acessibilidade que já estava paga. */}
         <Tabs
           value={mode}
           onValueChange={(v) => setMode(v as Mode)}
           className="contents"
         >
-          <TabsList className="gap-1 px-2 pt-1.5">
-            <TabsTrigger value="responder" barra="var(--human-fill)">
-              Responder
+          <TabsList className="flex-wrap gap-1.5 px-2.5 pb-1 pt-2.5">
+            <TabsTrigger value="responder" variant="acao" data-cor="human">
+              <Send size={14} />
+              Responder ao cliente
             </TabsTrigger>
             {onAddNote && (
-              <TabsTrigger value="nota" barra="var(--warn-fill)">
+              <TabsTrigger value="nota" variant="acao" data-cor="warn">
+                <StickyNote size={14} />
                 Nota interna
               </TabsTrigger>
             )}
             {onInstruct && (
-              <TabsTrigger value="orientar" barra="var(--brand-fill)">
-                Orientar
+              <TabsTrigger value="orientar" variant="acao" data-cor="brand">
+                <Sparkles size={14} />
+                Orientar a IA
               </TabsTrigger>
             )}
+            {/* O destino, escrito. O desenho põe esta frase ao lado dos botões, e
+                ela é o que impede o erro caro da tela: mandar para o cliente o
+                que era para ser nota. */}
+            <span className={`ml-auto hidden shrink-0 pr-1 text-legenda lg:block ${skin.hint}`}>
+              {skin.destino}
+            </span>
           </TabsList>
         </Tabs>
 
@@ -389,6 +400,8 @@ const SKIN: Record<
   {
     frame: string;
     hint: string;
+    /** Para onde vai o que está sendo escrito. Aparece ao lado dos modos. */
+    destino: string;
     variant: React.ComponentProps<typeof Button>["variant"];
     placeholder: string;
     action: string;
@@ -401,6 +414,7 @@ const SKIN: Record<
     variant: "send",
     placeholder: "Escreva uma mensagem",
     action: "Enviar mensagem",
+    destino: "vai para o WhatsApp do cliente",
     Icon: Send,
   },
   nota: {
@@ -409,6 +423,7 @@ const SKIN: Record<
     variant: "warn",
     placeholder: "Anotar algo sobre este contato",
     action: "Salvar nota interna",
+    destino: "fica só entre vocês",
     Icon: StickyNote,
   },
   orientar: {
@@ -417,6 +432,7 @@ const SKIN: Record<
     variant: "brand",
     placeholder: "Diga o que a IA deve responder",
     action: "Orientar e reativar a IA",
+    destino: "fala com a IA, nao com o cliente",
     Icon: Sparkles,
   },
 };

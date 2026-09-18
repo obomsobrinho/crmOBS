@@ -12,7 +12,6 @@ import { initials, avatarPair } from "@/lib/inbox";
 import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields from "./ContactFields";
-import AiSummary from "./AiSummary";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
 // ponto final, que numa legenda de rodapé vira ruído.
@@ -40,7 +39,6 @@ export default function ContextPanel({
   members,
   myUserId,
   conversationId,
-  clientId,
   editableName,
   customFields,
   contactExists,
@@ -53,7 +51,9 @@ export default function ContextPanel({
   members: Member[];
   myUserId: string;
   conversationId: number | null;
-  clientId: string;
+  /** ⚠️ `clientId` SAIU daqui junto com o Entendimento (18/09/2026): nada mais
+   *  neste painel consulta por tenant, e prop que ninguém usa vira prop que
+   *  alguém passa errado. */
   editableName: string | null;
   customFields: Record<string, unknown> | null;
   contactExists: boolean;
@@ -93,7 +93,10 @@ export default function ContextPanel({
         </div>
       </div>
 
-      <AiSummary phone={phone} clientId={clientId} />
+      {/* ⚠️ O "Entendimento" SAIU daqui em 18/09/2026: virou a faixa "O cliente
+          quer" no topo da conversa. Ter os dois seria a mesma frase duas vezes na
+          mesma tela, e a de cima é a que a pessoa lê primeiro. O componente
+          continua com a variante `painel`, que é a que o preview de design usa. */}
 
       <ContactNotes
         conversationId={conversationId}
