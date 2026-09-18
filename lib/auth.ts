@@ -76,6 +76,15 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       .select(
         "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at"
       )
+      // ⚠️ `order` ANTES do `limit(1)`, e não é detalhe (achado A2): sem ordenação
+      // o banco devolve qualquer uma das linhas que a RLS liberou, então um
+      // usuário que pertence a DOIS tenants cairia num hoje e no outro amanhã,
+      // sem nada na tela explicando. Ordenar pelo mais antigo faz a escolha ser
+      // sempre a mesma e ser a previsível: o tenant com que a pessoa começou.
+      // ⚠️ Isto NÃO é multi-tenant de verdade: quem está em dois só enxerga um, e
+      // trocar pela interface não existe. É decisão de produto em aberto; o que
+      // este `order` resolve é o sorteio, não a falta do seletor.
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
     supabase.from("user_clients").select("client_id, role").eq("user_id", user.id),

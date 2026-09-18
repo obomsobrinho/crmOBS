@@ -191,6 +191,15 @@ test.describe("Painel com dados reais", () => {
     const texto = await page.locator("body").innerText();
     expect(texto).not.toContain("—");
     expect(texto).not.toContain("–");
+
+    // ⚠️ Público misto: o beta tem advogado, pediatra, barbeiro, engenheiro,
+    // clínica e comércio. Quem carrega a linguagem do segmento é o preset, nunca
+    // a tela. Esta regra só existia contra `/design/painel`, com dado falso; aqui
+    // ela passa a valer também contra a tela real, onde o texto do tenant entra
+    // no meio do texto fixo e é exatamente onde o vazamento aconteceria.
+    expect(texto).not.toMatch(/consulta/i);
+    expect(texto).not.toMatch(/paciente/i);
+    expect(texto).not.toMatch(/agendamento/i);
   });
 
   test("sem assunto classificado, o bloco diz XX e não inventa", async ({

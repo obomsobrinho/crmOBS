@@ -163,7 +163,13 @@ O workflow foi de 45 para 50 nós. O que o contrato não previa:
   contato real chegando. Três testes quebraram por assumir modo guiado e telefone fixo, e foram
   consertados para não assumir nenhum dos dois.
 
-**Sobra do plano:** apagar os testes de design com cobertura duplicada e depois `/simplify`.
+⚠️ **A faxina dos testes de design não se sustentou** (investigada em 18/09/2026): a sobreposição é
+de meia dúzia de asserções em 123 testes, e os de `/design` cobrem estados que o dado real não
+produz. A única parte verdadeira foi feita: a regra de segmento único passou a valer também contra a
+tela real. **Sobra:** `/simplify` no código.
+
+✅ **Bateria das 12 armadilhas rodada em 18/09/2026 depois da mudança da persona: 12 de 12**, casos
+11 e 12 com o guardrail bloqueando.
 
 ### Contratos do que se faz sozinho, na ordem de execução
 

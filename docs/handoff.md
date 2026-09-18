@@ -83,11 +83,19 @@ dono na sala **fechou em 17/09/2026** (ver a seção 3).
 - **Os três testes que a troca do tenant quebrou.** Não eram bug: assumiam modo guiado e um telefone
   escrito no arquivo.
 
-**O que sobrou, e é o único item aberto do plano:**
+⚠️ **A faxina dos testes de design foi INVESTIGADA e o plano não se sustentou (18/09/2026).** A
+sobreposição real é de uma meia dúzia de asserções em 123 testes. O resto não é duplicata: os testes
+de `/design` rodam com **dado falso feito para criar situações que o dado real não tem** (volume
+caindo, dia sem movimento, amostra pequena, soma de barras maior que zero). Apagar não removeria
+redundância, removeria cobertura, e em dois casos o teste de design é o MAIS FORTE dos dois: na tela
+real a soma das barras compara 1 com 1 hoje.
 
-1. **Apagar os testes de design com cobertura duplicada**, migrando para as telas reais as asserções
-   que travam REGRA (travessão, segmento único, o `XX`, a soma das barras roxas, volume nunca
-   vermelho); depois `/simplify`.
+O que sobrou de verdadeiro do item foi feito: a regra de **segmento único** (nenhum texto fixo diz
+consulta, paciente ou agendamento) passou a valer também contra a tela REAL, que é onde o texto do
+tenant se mistura ao texto fixo e onde o vazamento aconteceria. As outras quatro regras já valiam
+nos dois lugares.
+
+**Sobra do plano:** `/simplify` no código (não nos testes), quando o dono quiser.
 
 ⚠️ **Duas coisas dependem do dono antes do próximo deploy:**
 
