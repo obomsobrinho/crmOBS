@@ -730,3 +730,30 @@ test.describe("Kanban redesenhado", () => {
     await expect(quadro).not.toContainText(/Cobrar o retorno/);
   });
 });
+
+test.describe("Aba ativa do /agente", () => {
+  test("a aba ativa tem barra COLORIDA, e a inativa não tem", async ({ page }) => {
+    await page.goto("/design/agente");
+    const abas = page.getByRole("tab");
+    await expect(abas.first()).toBeVisible();
+    // ⚠️ Mede a COR da barra, não a classe nem o negrito. O defeito que isto
+    // trava (relatado pelo dono em 18/09/2026) era exatamente uma barra presente
+    // no DOM e transparente na tela, porque `--aba-cor` não tinha valor: as três
+    // abas se distinguiam só por peso de fonte, e ninguém achava a ativa.
+    const cores = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-slot="tabs-trigger"]')].map((t) => {
+        const barra = t.querySelector('[data-slot="tabs-trigger-bar"]');
+        return {
+          ativa: t.getAttribute("data-state") === "active",
+          cor: barra ? getComputedStyle(barra).backgroundColor : "",
+        };
+      })
+    );
+    const ativa = cores.find((c) => c.ativa);
+    expect(ativa, "nenhuma aba ativa").toBeTruthy();
+    expect(ativa!.cor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(ativa!.cor).not.toBe("transparent");
+    for (const c of cores.filter((x) => !x.ativa))
+      expect(c.cor).toBe("rgba(0, 0, 0, 0)");
+  });
+});

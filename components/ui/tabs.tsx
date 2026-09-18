@@ -117,13 +117,22 @@ function TabsTrigger({
   ...props
 }: React.ComponentProps<typeof TabsPrimitive.Trigger> &
   VariantProps<typeof gatilhoVariants> & {
-    /** Cor da barra quando a aba está ativa. Só em `sublinhado`. */
+    /**
+     * Cor da barra da aba ativa. Só em `sublinhado`.
+     * ⚠️ Opcional no TIPO, nunca no resultado: sem valor a barra cai na cor da
+     * marca. Antes, quem esquecesse a prop ganhava `--aba-cor` indefinida, a
+     * barra saía transparente, e a aba ativa se distinguia só por negrito mais
+     * um degrau de tinta. As três abas do `/agente` viveram assim desde que
+     * nasceram, e o dono só conseguiu nomear o problema em 18/09/2026 ("não dá
+     * para identificar qual está ativa"). Componente de base não pode ter um
+     * jeito silencioso de sair errado.
+     */
     barra?: string;
   }) {
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      style={barra ? ({ "--aba-cor": barra } as React.CSSProperties) : undefined}
+      style={{ "--aba-cor": barra ?? "var(--brand-fill)" } as React.CSSProperties}
       className={cn(gatilhoVariants({ variant, className }))}
       {...props}
     >
