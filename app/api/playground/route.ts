@@ -3,12 +3,7 @@ import { getMyClient } from "@/lib/auth";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  buildAdvancedPersona,
-  buildPersona,
-  validateConfig,
-  LIMITS,
-} from "@/lib/agent-prompt";
+import { compilePersona } from "@/lib/agent-prompt";
 
 // Bancada de teste (playground), dono-only. Fala direto com o cérebro REAL
 // (processTurn, o mesmo do /api/agent) em modo dryRun: não persiste nada (nem
@@ -19,7 +14,7 @@ import {
 // PERSONA EM EDIÇÃO: o corpo pode trazer a configuração que a pessoa está mexendo
 // no `/agente` (`mode` mais `config` ou `persona`), e aí o teste roda contra ela
 // em vez da que está salva. É o que resolve o problema real: salvar JÁ É publicar
-// (o n8n lê `clients.persona` ao vivo), então testar salvando é mexer no agente
+// (a persona salva vira a base do que o turno monta), então testar salvando é mexer no agente
 // que está atendendo cliente de verdade.
 //
 // Quem COMPILA é o servidor, sempre. O browser manda a configuração crua e aqui
@@ -66,36 +61,46 @@ export async function POST(req: NextRequest) {
   // Persona da configuração em edição. Ausente = testa a que está salva, que é o
   // comportamento antigo e segue valendo.
   let personaOverride: string | null = null;
+  // ⚠️ MESMO despacho do save e do turno (`compilePersona`). Se a bancada
+  // compilasse por conta própria, ela testaria um texto que o agente nunca vai
+  // receber, que é o oposto do que ela existe para provar.
   if (body.mode === "guiado") {
     // Mesma validação do save. Config incompleta não é teste válido: uma persona
     // sem nome de empresa responde outra coisa, e o teste diria pouco. Devolve os
     // campos que faltam para a bancada apontar onde.
-    const r = validateConfig(body.config);
+    const r = compilePersona({ mode: "guiado", config: body.config });
     if (!r.ok) {
-      return NextResponse.json(
-        { error: "configuração incompleta", fields: r.errors },
-        { status: 400 }
-      );
+      if (r.motivo === "campos") {
+        return NextResponse.json(
+          { error: "configuração incompleta", fields: r.fields },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
     }
-    personaOverride = buildPersona(r.value);
+    personaOverride = r.persona;
   } else if (body.mode === "avancado") {
-    const escrito = typeof body.persona === "string" ? body.persona : "";
-    if (!escrito.trim()) {
-      return NextResponse.json(
-        { error: "o prompt não pode ficar vazio" },
-        { status: 400 }
-      );
-    }
     // `buildAdvancedPersona` faz as duas coisas que importam: tira do texto dele
     // qualquer seção da base (para não duplicar) e RECOLA o rabo invariante. Sem
     // recolar, o teste rodaria sem contrato de saída e não provaria nada.
-    personaOverride = buildAdvancedPersona(escrito, {
+    const r = compilePersona({
+      mode: "avancado",
+      persona: body.persona,
       handoffNotice:
         typeof body.handoffNotice === "string" ? body.handoffNotice : undefined,
     });
-  }
-  if (personaOverride && personaOverride.length > LIMITS.persona) {
-    return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
+    if (!r.ok) {
+      return NextResponse.json(
+        {
+          error:
+            r.motivo === "vazio"
+              ? "o prompt não pode ficar vazio"
+              : "prompt muito longo",
+        },
+        { status: 400 }
+      );
+    }
+    personaOverride = r.persona;
   }
 
   const apiKey = process.env.OPENAI_API_KEY;

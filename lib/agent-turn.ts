@@ -1,11 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  buildAdvancedPersona,
-  buildFallbackPersona,
-  buildPersona,
-  validateConfig,
-} from "@/lib/agent-prompt";
+import { buildFallbackPersona, compilePersona } from "@/lib/agent-prompt";
 import {
   runAgent,
   type AgentOutput,
@@ -16,7 +11,11 @@ import { applyGuardrail } from "@/lib/guardrail";
 import { embedTexts, toVector } from "@/lib/rag";
 import { nextIaStage } from "@/lib/pipeline";
 import { accessState } from "@/lib/billing";
-import type { TurnDiagnostics, RagMatchDiag } from "@/lib/agent-diagnostics";
+import type {
+  TurnDiagnostics,
+  RagMatchDiag,
+  PersonaOrigem,
+} from "@/lib/agent-diagnostics";
 
 // Orquestração de um turno do agente. STATELESS por turno; reaproveitável pelas
 // duas rotas: /api/agent (n8n, autenticado pelo segredo) e a bancada de teste
@@ -102,31 +101,33 @@ function personaDoTenant(client: {
   agent_config?: unknown;
   prompt_mode?: unknown;
   name?: unknown;
-}): string {
+}): { persona: string; origem: PersonaOrigem } {
   const salva = texto(client.persona);
   // Sem normalizar para "a empresa" aqui: `buildFallbackPersona` já faz esse
   // default. Duas cópias do mesmo literal é uma para esquecer de mudar.
   const empresa = texto(client.name) ?? "";
   try {
-    if (client.prompt_mode === "avancado") {
-      // Texto escrito à mão. O que está salvo já traz o rabo da base de quando
-      // foi salvo; `buildAdvancedPersona` tira o antigo e cola o de hoje, então
-      // rodar de novo é idempotente e o avançado também recebe melhoria da base.
-      if (!salva) return buildFallbackPersona(empresa);
-      const cfg = client.agent_config as { handoffNotice?: string } | null;
-      return buildAdvancedPersona(salva, { handoffNotice: cfg?.handoffNotice });
-    }
-    if (client.agent_config) {
-      // Mesma validação do save. Config que não passa cai para a persona salva
-      // em vez de virar erro: o tenant está atendendo, e recusar o turno seria
-      // trocar um prompt velho por nenhum atendimento.
-      const r = validateConfig(client.agent_config);
-      if (r.ok) return buildPersona(r.value);
-    }
+    const cfg = client.agent_config as { handoffNotice?: string } | null;
+    const r =
+      client.prompt_mode === "avancado"
+        ? compilePersona({
+            mode: "avancado",
+            persona: salva,
+            handoffNotice: cfg?.handoffNotice,
+          })
+        : compilePersona({ mode: "guiado", config: client.agent_config });
+    if (r.ok) return { persona: r.persona, origem: "montada" };
+    // ⚠️ "longo" NÃO cai para a salva: quem salva recusa acima do limite, mas no
+    // atendimento trocar o prompt de hoje por um de meses atrás é pior que servir
+    // um prompt comprido. Vai montado, e a origem registra que passou do limite.
+    if (r.motivo === "longo")
+      return { persona: r.persona, origem: "montada_longa" };
   } catch {
     // Montagem de texto nunca derruba atendimento.
   }
-  return salva ?? buildFallbackPersona(empresa);
+  return salva
+    ? { persona: salva, origem: "salva" }
+    : { persona: buildFallbackPersona(empresa), origem: "fallback" };
 }
 
 export async function processTurn(
@@ -211,7 +212,13 @@ export async function processTurn(
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
   // dryRun: fora dele a única fonte é o banco.
   const emEdicao = dryRun ? texto(params.personaOverride) : null;
-  const persona = emEdicao ?? personaDoTenant(client);
+  // ⚠️ A ORIGEM da persona entra no diagnóstico, e não é enfeite: as quedas de
+  // `personaDoTenant` são silenciosas por construção (servir o prompt antigo é
+  // melhor que emudecer), e sem registrar isso uma regressão em que TODO tenant
+  // volta para a persona salva seria invisível. "salva" em produção é ALARME.
+  const doTenant = emEdicao ? null : personaDoTenant(client);
+  const persona = emEdicao ?? doTenant!.persona;
+  const personaOrigem: PersonaOrigem = emEdicao ? "override" : doTenant!.origem;
 
   // Histórico: no dryRun vem do chamador (playground); em produção sai de
   // chat_messages (escopo client_id + phone). A mensagem atual ainda não está
@@ -381,6 +388,7 @@ export async function processTurn(
   }
 
   const diagnostics: TurnDiagnostics = {
+    personaOrigem,
     latencyMs: Date.now() - t0,
     action: output.action,
     summary: output.summary,
@@ -469,6 +477,10 @@ function silentTurn(
   return {
     output: { messages: [], action: "none", summary: "", preferencia_horario: "" },
     diagnostics: {
+      // Turno silenciado não chega a montar persona: nada foi lido do tenant e
+      // nenhum prompt foi para o modelo. "fallback" seria mentira, então a
+      // origem aqui é a que descreve o que houve.
+      personaOrigem: "nenhuma",
       latencyMs: Date.now() - t0,
       action: "none",
       summary: "",

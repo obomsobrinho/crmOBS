@@ -710,6 +710,53 @@ export function buildAdvancedPersona(
   return [head, buildBaseTail(opts)].filter(Boolean).join("\n\n");
 }
 
+/**
+ * O DESPACHO "modo -> persona", num lugar só.
+ *
+ * ⚠️ Esta árvore existia copiada à mão em TRÊS lugares (o `PUT` de agent-config,
+ * o `POST` do playground e o `processTurn`), e a terceira cópia nasceu em
+ * 17/09/2026 junto com a decisão de montar a persona na LEITURA. O objetivo
+ * inteiro daquela decisão é salvar e ler produzirem o MESMO texto; três cópias do
+ * despacho é exatamente como os dois lados divergem de novo, em silêncio.
+ *
+ * Devolve o texto pronto ou o motivo de não ter dado, e **não sabe nada de HTTP**:
+ * quem traduz motivo em 400 é a rota, porque cada uma responde diferente. O limite
+ * de tamanho entra aqui de propósito, senão ele seria invariante só de quem salva,
+ * e o caminho de leitura poderia servir ao modelo um prompt que o save recusaria.
+ */
+export type CompiladoPersona =
+  | { ok: true; persona: string; config?: AgentConfig; removed?: string[] }
+  | { ok: false; motivo: "campos"; fields: Record<string, string> }
+  | { ok: false; motivo: "vazio" }
+  | { ok: false; motivo: "longo"; persona: string };
+
+export function compilePersona(
+  input:
+    | { mode: "guiado"; config: unknown }
+    | { mode: "avancado"; persona: unknown; handoffNotice?: string }
+): CompiladoPersona {
+  if (input.mode === "guiado") {
+    const r = validateConfig(input.config);
+    if (!r.ok) return { ok: false, motivo: "campos", fields: r.errors };
+    const persona = buildPersona(r.value);
+    if (persona.length > LIMITS.persona)
+      return { ok: false, motivo: "longo", persona };
+    return { ok: true, persona, config: r.value };
+  }
+
+  const escrito = typeof input.persona === "string" ? input.persona : "";
+  if (!escrito.trim()) return { ok: false, motivo: "vazio" };
+  // O texto salvo já traz o rabo de quando foi salvo: `buildAdvancedPersona`
+  // tira o antigo e cola o de hoje, então recompilar é idempotente.
+  const { removed } = stripBaseTail(escrito);
+  const persona = buildAdvancedPersona(escrito, {
+    handoffNotice: input.handoffNotice,
+  });
+  if (persona.length > LIMITS.persona)
+    return { ok: false, motivo: "longo", persona };
+  return { ok: true, persona, removed };
+}
+
 // Prompt mínimo para tenant que ainda não configurou nada (persona nula).
 // Handoff-first: cumprimenta, não inventa, e passa pro time. Com o contrato
 // de OUTPUT completo pra não quebrar o parser do n8n.

@@ -21,6 +21,7 @@ const STAGE_NAMES: Record<string, string> = {
 };
 
 const diag = (over: Partial<TurnDiagnostics>): TurnDiagnostics => ({
+  personaOrigem: "montada",
   latencyMs: 1840,
   action: "none",
   summary: "",

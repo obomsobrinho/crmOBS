@@ -16,7 +16,25 @@ export interface GuardrailDiag {
   draft: string | null; // a resposta original retida (só para exibir no teste)
 }
 
+/**
+ * De onde veio o prompt que o modelo recebeu. `montada` é o caminho normal desde
+ * 17/09/2026 (base de hoje + configuração do tenant, montadas na leitura).
+ * ⚠️ `salva` em produção é ALARME, não informação: significa que a montagem
+ * falhou e o tenant voltou a servir o texto congelado do último Salvar, que é
+ * exatamente o problema que a montagem na leitura veio resolver.
+ * `montada_longa` passou do `LIMITS.persona` que o Salvar recusaria, e
+ * `nenhuma` é o turno silenciado, que não chega a montar prompt nenhum.
+ */
+export type PersonaOrigem =
+  | "nenhuma"
+  | "montada"
+  | "montada_longa"
+  | "salva"
+  | "fallback"
+  | "override";
+
 export interface TurnDiagnostics {
+  personaOrigem: PersonaOrigem;
   latencyMs: number; // tempo do turno (retrieval + modelo + guardrail)
   action: string; // espelha output.action
   summary: string; // espelha output.summary

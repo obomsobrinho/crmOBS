@@ -1,19 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
-import {
-  buildAdvancedPersona,
-  buildPersona,
-  normalizeHours,
-  stripBaseTail,
-  validateConfig,
-  LIMITS,
-} from "@/lib/agent-prompt";
+import { compilePersona, normalizeHours } from "@/lib/agent-prompt";
 
 // Salva a configuração do agente do tenant logado.
-// - modo "guiado": grava agent_config + persona compilada (buildPersona).
+// - modo "guiado": grava agent_config + a persona compilada.
 // - modo "avancado": grava a persona escrita à mão, sem tocar em agent_config.
-// O n8n lê SEMPRE `clients.persona` ao vivo, então o efeito é imediato.
+// A compilação é a de `compilePersona`, a MESMA que o playground e o turno usam.
+// ⚠️ Desde 17/09/2026 quem atende NÃO lê esta coluna: a persona é montada na
+// leitura, dentro do processTurn. O que se grava aqui é o registro publicado
+// (e a queda, se a montagem falhar), não o que vai ao modelo.
 // Write via service_role: a RLS de `clients` não tem policy de UPDATE para
 // `authenticated` (um update do browser afetaria 0 linhas em silêncio).
 export async function PUT(
@@ -87,17 +83,21 @@ export async function PUT(
       agent_config_updated_at: new Date().toISOString(),
     };
   } else if (body.mode === "guiado") {
-    const result = validateConfig(body.config);
+    // ⚠️ `compilePersona` é o MESMO despacho que o playground e o `processTurn`
+    // usam. Era código copiado nos três, e como a leitura passou a montar a
+    // persona a cada turno (17/09/2026), duas cópias divergindo significaria o
+    // agente atendendo com um texto que o Salvar nunca produziria.
+    const result = compilePersona({ mode: "guiado", config: body.config });
     if (!result.ok) {
-      return NextResponse.json(
-        { error: "configuração incompleta", fields: result.errors },
-        { status: 400 }
-      );
-    }
-    const persona = buildPersona(result.value);
-    if (persona.length > LIMITS.persona) {
+      if (result.motivo === "campos") {
+        return NextResponse.json(
+          { error: "configuração incompleta", fields: result.fields },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
     }
+    const persona = result.persona;
 
     // Existe persona manual (nunca configurada pela UI) → exige confirmação.
     const hasManual =
@@ -112,7 +112,7 @@ export async function PUT(
     }
 
     update = {
-      agent_config: result.value,
+      agent_config: result.config,
       persona,
       prompt_mode: "guiado",
       agent_config_updated_at: new Date().toISOString(),
@@ -122,25 +122,27 @@ export async function PUT(
     // recolado no fim (precedência, quando chamar humano, anti-manipulação,
     // OUTPUT). Sem isso, quem está no avançado nunca mais recebe melhoria nossa,
     // que foi exatamente o que aconteceu com a regra de handoff.
-    const escrito = typeof body.persona === "string" ? body.persona : "";
-    if (!escrito.trim()) {
-      return NextResponse.json(
-        { error: "o prompt não pode ficar vazio" },
-        { status: 400 }
-      );
-    }
     // O handoffNotice do tenant, quando ele tem agent_config. Sem config vale o
     // padrão: o rabo não pode depender de dado que o tenant talvez não tenha.
     const cfgAtual = current?.agent_config as { handoffNotice?: string } | null;
-    const { removed } = stripBaseTail(escrito);
-    const persona = buildAdvancedPersona(escrito, {
+    const result = compilePersona({
+      mode: "avancado",
+      persona: body.persona,
       handoffNotice: cfgAtual?.handoffNotice,
     });
-    if (persona.length > LIMITS.persona) {
-      return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          error:
+            result.motivo === "vazio"
+              ? "o prompt não pode ficar vazio"
+              : "prompt muito longo",
+        },
+        { status: 400 }
+      );
     }
-    update = { persona, prompt_mode: "avancado" };
-    removidos = removed;
+    update = { persona: result.persona, prompt_mode: "avancado" };
+    removidos = result.removed ?? [];
   }
 
   const { data, error } = await svc

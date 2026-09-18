@@ -35,9 +35,23 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   - ⚠️ **REGRA REVISTA EM 17/09/2026: o n8n NÃO lê a persona, e não lê desde o cutover.** Ele manda
     só `client_id`, telefone, instância e mensagem; quem busca no Supabase é o nosso `processTurn`.
     O comentário antigo no código dizia o contrário e induziu ao erro.
-    **A persona é MONTADA NA LEITURA**, a cada turno, por `personaDoTenant` (`lib/agent-turn.ts`):
-    `buildPersona(agent_config)` no guiado, `buildAdvancedPersona(persona)` no avançado (que tira o
-    rabo antigo e cola o de hoje, então é idempotente). **Motivo:** o texto era grudado e gravado no
+    **A persona é MONTADA NA LEITURA**, a cada turno, por `personaDoTenant` (`lib/agent-turn.ts`),
+    que chama **`compilePersona` (`lib/agent-prompt.ts`)**: `buildPersona(agent_config)` no guiado,
+    `buildAdvancedPersona(persona)` no avançado (que tira o rabo antigo e cola o de hoje, então é
+    idempotente).
+    ⚠️ **`compilePersona` é o despacho "modo -> persona" e existe UMA vez**: os TRÊS caminhos
+    (o `PUT` de agent-config, o `POST` do playground e o `processTurn`) chamam ela. Era código
+    copiado à mão nos três, e como salvar e ler têm que produzir o MESMO texto, cópia divergindo
+    significa o agente atendendo com algo que o Salvar nunca produziria. O limite `LIMITS.persona`
+    mora dentro dela pelo mesmo motivo. **Nada de HTTP ali dentro**: ela devolve o motivo
+    (`campos`/`vazio`/`longo`) e cada rota traduz para o seu 400.
+    ⚠️ **`diagnostics.personaOrigem` diz DE ONDE veio o prompt** (`montada`, `montada_longa`,
+    `salva`, `fallback`, `override`, `nenhuma`). Existe porque as quedas são silenciosas de
+    propósito, e **`salva` em produção é ALARME**: significa que a montagem falhou e o tenant voltou
+    a servir o texto congelado do último Salvar, que é o problema que a montagem na leitura veio
+    resolver. Sem esse campo, essa regressão seria invisível. ⚠️ Ele NÃO é gravado em `agent_turns`
+    (a tabela tem colunas fixas e isso exigiria migração): hoje aparece na bancada e na resposta ao
+    n8n. **Motivo:** o texto era grudado e gravado no
     Salvar, então melhoria na base só chegava em quem salvasse de novo, e a OBS ficou dias com a
     regra de anti-manipulação antiga depois de a nova existir no código.
     `clients.persona` continua gravada no Salvar e em `agent_publications`: virou REGISTRO e a QUEDA
