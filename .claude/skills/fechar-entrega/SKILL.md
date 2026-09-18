@@ -33,8 +33,20 @@ Se um dev server já estiver no ar na 3000, `E2E_PORT=3000 npx playwright test -
 reusa ele em vez de subir outro.
 
 **`npm run test:e2e:ia` NÃO entra aqui.** São 12 chamadas pagas ao cérebro real por execução.
-Só rode se a mudança tocou persona, guardrail, `lib/agent-prompt.ts` ou `lib/agent-turn.ts`,
-e avise o usuário do custo antes.
+Rode em TRÊS casos, e avise o custo antes:
+
+1. O **texto da base** mudou: `buildBaseTail` ou `buildPersona` em `lib/agent-prompt.ts`. É o caso
+   principal, porque esse texto vale para todos os tenants e, desde 17/09/2026, chega a todos na
+   mensagem seguinte (a persona é montada na leitura).
+2. A **regra do guardrail** mudou (`lib/guardrail.ts`).
+3. O **modelo** mudou (`OPENAI_AGENT_MODEL`) ou a montagem do prompt em `lib/agent.ts`.
+
+Mais uma vez, fora de mudança de código: **antes de abrir o beta**, como linha de base.
+
+⚠️ **Mexer em `lib/agent-turn.ts` NÃO é motivo por si só**, e a versão anterior desta skill dizia
+que era. A bateria manda a configuração FIXA no corpo da requisição, então ela nunca passa pelo
+código que monta a persona a partir do tenant: rodar por causa disso paga 12 chamadas para provar
+outra coisa.
 
 ## Antes do commit
 
