@@ -32,9 +32,20 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   para quem entrou pelo `/cadastro` inventaria um fato. Marcar é manual (`update clients set
   account_type = 'beta'`), porque com 5 a 10 testadores uma tela de administração custa mais do que
   resolve. É a coluna que as consultas de `docs/instrumentacao-beta.md` filtram.
-  - **REGRA:** o n8n lê SÓ `persona` (ao vivo, a cada msg). No modo `guiado`, `persona` é a
-    **saída compilada** de `agent_config` por `buildPersona` (`lib/agent-prompt.ts`); no
-    `avancado`, é texto escrito à mão.
+  - ⚠️ **REGRA REVISTA EM 17/09/2026: o n8n NÃO lê a persona, e não lê desde o cutover.** Ele manda
+    só `client_id`, telefone, instância e mensagem; quem busca no Supabase é o nosso `processTurn`.
+    O comentário antigo no código dizia o contrário e induziu ao erro.
+    **A persona é MONTADA NA LEITURA**, a cada turno, por `personaDoTenant` (`lib/agent-turn.ts`):
+    `buildPersona(agent_config)` no guiado, `buildAdvancedPersona(persona)` no avançado (que tira o
+    rabo antigo e cola o de hoje, então é idempotente). **Motivo:** o texto era grudado e gravado no
+    Salvar, então melhoria na base só chegava em quem salvasse de novo, e a OBS ficou dias com a
+    regra de anti-manipulação antiga depois de a nova existir no código.
+    `clients.persona` continua gravada no Salvar e em `agent_publications`: virou REGISTRO e a QUEDA
+    (se a montagem falhar, o pior caso é o comportamento antigo, nunca um agente mudo).
+    ⚠️ **O preço, e ele é real:** mudança na base entra em produção para TODOS na mensagem seguinte,
+    sem revisão. O portão combinado com o dono é `npm run test:e2e:ia` verde antes de subir deploy
+    que mexa na base. O cache de prompt não sofre: a string sai idêntica enquanto configuração e base
+    não mudarem, e a ordem do prefixo continua a de `lib/agent.ts`.
   - **ESTRUTURA BASE DO PROMPT (decisão de 22/08/2026, contexto em `docs/proximos-passos.md`):
     TRÊS CAMADAS, e a ordem é a defesa.** (1) base que abre (identidade, contexto, tom, fontes e
     honestidade), (2) conteúdo do cliente cercado por `--- início/fim ---`, (3) **base que fecha**
@@ -651,7 +662,15 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Dev: `npm run dev` (porta 3001 via `.claude/launch.json`). Build/checagem de tipos: `npm run build`.
 - Testes e2e (Playwright, pasta `e2e/`): `npm run test:e2e -- --project=sem-login` (telas `/design`,
   sem login) e `npm run test:e2e:login` (fluxos com login; credenciais em `.env.e2e.local`, fora do
-  git). Detalhes em `e2e/README.md`. Escritas de teste só no tenant da Loja Teste; nunca na OBM.
+  git). Detalhes em `e2e/README.md`.
+  ⚠️ **O TENANT DE TESTE MUDOU EM 17/09/2026: é a OBS.** O anterior apontava para o WhatsApp de uma
+  clínica com contato real chegando, que é o oposto do que a regra queria proteger; a OBS é o número
+  do próprio dono, parado. Decisão dele, com o risco pesado: a suíte com login escreve no CRM desse
+  tenant (move card, zera não lidas), mas nunca manda mensagem nem acorda o agente.
+  ⚠️ **A OBS está em `prompt_mode = 'avancado'`, e isso quebrou três testes** que assumiam formulário
+  guiado ou um telefone escrito no arquivo. Regra para teste novo: **não travar o modo do tenant nem
+  o número da conversa.** Quem precisa de conversa pega a primeira da lista; quem precisa do
+  construtor trata os dois modos.
 - **Menu (`components/NavRail.tsx`, 27/08/2026): Painel PRIMEIRO**, depois Conversas, Pipeline,
   Agente (dono-only) e Equipe. **"Em breve" é Agenda e Follow-up; Campanhas SAIU** (manter prometia
   disparo em massa sobre QR, que é o cenário de banimento que o projeto decidiu não correr, e atrai
@@ -784,10 +803,19 @@ decisões já travadas, **não reabrir**:
 - Testes e2e (Playwright, `e2e/`), **quatro projetos**, e a divisão importa:
   - **`sem-login`** (114): telas `/design`, com dado FALSO. Provam desenho, texto e regra de
     escrita, nunca funcionamento. Incluem `/design/montagem`, `/design/playground` e o feedback.
-  - **`logado`** (`*.auth.spec.ts`): banco de verdade, tenant Loja Teste, parte deles batendo no
-    **cérebro real** em `dryRun`. Cobrem acesso, agente, **pipeline** e **guardas da `/montagem`**.
+  - **`logado`** (`*.auth.spec.ts`): banco de verdade, tenant de teste (a OBS desde 17/09/2026),
+    parte deles batendo no **cérebro real** em `dryRun`. Cobrem acesso, agente, **pipeline** e
+    **guardas da `/montagem`**.
+  - **`atendente`** (`*.att.spec.ts`, 17/09/2026): sessão do SEGUNDO usuário, gravada pelo
+    `auth.setup.ts` em `e2e/.auth/atendente.json`. Existe porque as asserções dele afirmam AUSÊNCIA
+    de poder (não vê o Agente e a rota redireciona, a montagem redireciona, não gerencia o funil,
+    rota dono-only responde 403), e com a sessão do dono cada uma provaria o contrário do que diz.
+    ⚠️ **Nada nele escreve no banco**, e é regra: teste de permissão que consegue escrever já falhou
+    antes de asserir. ⚠️ O 403 usa `/api/team/invite` e **não** o `PUT` de `agent-config`: este leva
+    o id do tenant no caminho e responde 403 nos DOIS casos (tenant errado e papel errado), e o id
+    não aparece em lugar nenhum que o browser veja, porque a RLS o torna implícito.
   - **`logado-serial`** (`*.serial.spec.ts`): um worker só, `dependencies: ["logado"]`.
-  - **`setup`**: grava o storageState do dono.
+  - **`setup`**: grava os storageState do dono E do atendente.
   - **`ia`** (`*.ia.spec.ts`, 11/09/2026, C4 do plano da demo): as 12 armadilhas da bateria de 28/08 contra o
     **cérebro real** em `dryRun`, via `POST /api/playground` com a configuração FIXA no corpo (cópia da que a Loja
     Teste tinha em 28/08, para o resultado não mudar quando alguém editar o tenant). ⚠️ **Só existe quando pedido
@@ -803,7 +831,8 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **21 passando, 1 pulado** (11/09/2026); sem login **116**; `ia` **12 de 12** (11/09/2026).
+  Total com login: **26 passando, 1 pulado** (17/09/2026, já com o projeto `atendente`); sem login
+  **116**; `ia` **12 de 12** (11/09/2026).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
   projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca
@@ -822,8 +851,8 @@ decisões já travadas, **não reabrir**:
   rodada, e três testes com login ficaram quebrados por seis dias: dois deles procuravam os
   cabeçalhos "Operação" e "Conversas na semana", que o painel novo tinha renomeado.
   `E2E_PORT=3000 npx playwright test --project=logado` reusa um dev server já no ar.
-  ⚠️ **Buracos declarados**, com o motivo escrito dentro do próprio spec e não aqui: atendente não
-  gerencia o funil, conta bloqueada vai para `/assinatura`, modo avançado vai para `/agente`. Os
-  três exigem fixture que não existe (segunda sessão, conta vencida, conta avançada que ainda não
-  publicou). Sem cobertura nenhuma: envio manual, convite de equipe, upload da base de conhecimento
+  ⚠️ **Buracos declarados**, com o motivo escrito dentro do próprio spec e não aqui. ✅ O do
+  atendente FECHOU em 17/09/2026 com o projeto `atendente`. Seguem abertos: conta bloqueada vai para
+  `/assinatura` (exige conta vencida) e modo avançado vai para `/agente` (exige conta avançada que
+  ainda não publicou). Sem cobertura nenhuma: envio manual, convite de equipe, upload da base de conhecimento
   e mobile.

@@ -31,7 +31,7 @@ WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste re
 O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
 desligada de propósito**.
 
-## 3. Estado em 17/09/2026
+## 3. Estado em 17/09/2026 (sessão da noite)
 
 - **Árvore limpa, tudo enviado.** Último commit no dia, ver `git log -1`.
 - **Banco com 30 migrations aplicadas.** Nenhuma pendente.
@@ -69,18 +69,32 @@ desligada de propósito**.
 ## 4. O que vem agora
 
 O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O grupo que exigia o
-dono na sala **fechou em 17/09/2026** (ver a seção 3). O que sobra anda sozinho, nesta ordem:
+dono na sala **fechou em 17/09/2026** (ver a seção 3).
 
-1. **Montar a persona na leitura** (decisão de 17/09). Em `lib/agent-turn.ts`, trocar o select de
-   `persona` por `agent_config` + `prompt_mode` e montar no request: `buildPersona` no guiado,
-   `buildAdvancedPersona` no avançado, com queda para `clients.persona` se a montagem falhar.
-   `clients.persona` vira registro, não deixa de ser gravada. **O n8n não é tocado.**
-   ⚠️ O preço da decisão: mudança na base entra em produção para todos na mensagem seguinte, sem
-   revisão. O portão combinado é `npm run test:e2e:ia` verde antes de subir deploy que mexa na base.
-2. **Os três testes de permissão do atendente**, agora que o fixture existe (seção 3).
-3. **Apagar os testes de design com cobertura duplicada**, migrando para as telas reais as asserções
+✅ **Fechados na mesma sessão de 17/09:**
+
+- **Persona montada na leitura.** `personaDoTenant` em `lib/agent-turn.ts`: `buildPersona` no
+  guiado, `buildAdvancedPersona` no avançado, queda para `clients.persona` se falhar. O n8n não foi
+  tocado. Provado contra o banco: a OBS troca a seção ANTI-MANIPULAÇÃO antiga pela nova sem ninguém
+  salvar nada.
+- **Permissões do atendente.** Projeto `atendente` (`*.att.spec.ts`), quatro provas, com a sessão
+  que o `auth.setup.ts` passou a gravar. Fechou os buracos declarados em `pipeline.auth.spec.ts` e
+  `montagem.auth.spec.ts`.
+- **Os três testes que a troca do tenant quebrou.** Não eram bug: assumiam modo guiado e um telefone
+  escrito no arquivo.
+
+**O que sobrou, e é o único item aberto do plano:**
+
+1. **Apagar os testes de design com cobertura duplicada**, migrando para as telas reais as asserções
    que travam REGRA (travessão, segmento único, o `XX`, a soma das barras roxas, volume nunca
    vermelho); depois `/simplify`.
+
+⚠️ **Duas coisas dependem do dono antes do próximo deploy:**
+
+- **Os commits de 17/09 estão LOCAIS.** A montagem na leitura só vale no WhatsApp depois do deploy, e
+  é ela que leva a regra nova de anti-manipulação para a OBS.
+- **O portão `npm run test:e2e:ia` não foi rodado** nesta sessão. Ele custa 12 chamadas pagas, e a
+  mudança da persona é exatamente o caso que ele existe para cobrir.
 
 ⚠️ `e2e/publico.design.spec.ts` **não é** teste de design, apesar do nome: testa `/cadastro`,
 `/login` e `/recuperar-senha`, e um caso é de segurança. Não apagar na faxina. As rotas `/design`

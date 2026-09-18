@@ -146,6 +146,25 @@ O workflow foi de 45 para 50 nós. O que o contrato não previa:
    de lead novo sai com as quebras de linha cruas no WhatsApp. O nó novo nasceu igual e foi
    corrigido; o antigo ficou, porque é texto que o dono lê todo dia e mexer é decisão dele.
 
+### O que fechou depois da janela, na mesma sessão de 17/09/2026
+
+- **Persona montada na leitura** (decisão do dono nesta sessão, depois de olhar como o mercado trata
+  o assunto). Camadas montadas a cada turno em `personaDoTenant` (`lib/agent-turn.ts`), que é o
+  padrão em produto multi-tenant; o que o mercado faz e este produto NÃO faz é pinar versão da base
+  por tenant com canário, e a razão é escala: com 5 a 10 tenants não há tráfego para dividir. O
+  portão equivalente, na escala daqui, é a bateria das 12 armadilhas antes do deploy.
+  ⚠️ **A descoberta que destravou a decisão:** eu havia dito que essa abordagem exigiria mexer no
+  n8n, e estava errado. O n8n manda só `client_id`, telefone e mensagem; quem lê a persona é o
+  nosso código desde o cutover. Um comentário desatualizado em `lib/agent-turn.ts` afirmava o
+  contrário.
+- **Permissões do atendente**, com sessão própria e projeto `atendente` no Playwright. Fecha os
+  buracos declarados por escrito em `pipeline.auth.spec.ts` e `montagem.auth.spec.ts`.
+- **O tenant de teste virou a OBS**, decisão do dono: o anterior era o WhatsApp de uma clínica com
+  contato real chegando. Três testes quebraram por assumir modo guiado e telefone fixo, e foram
+  consertados para não assumir nenhum dos dois.
+
+**Sobra do plano:** apagar os testes de design com cobertura duplicada e depois `/simplify`.
+
 ### Contratos do que se faz sozinho, na ordem de execução
 
 Cada um fecha inteiro antes do próximo começar. Se o orçamento acabar, acaba **entre** contratos.
