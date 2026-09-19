@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, Pencil } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +20,17 @@ import {
 // O modo anterior era um botão "Editar" que trocava a lista inteira por um
 // formulário com Cancelar e Salvar, ou seja, três cliques para corrigir uma
 // letra.
+//
+// ⚠️ APARÊNCIA REFEITA EM 18/09/2026 pelo desenho aprovado. O bloco era uma
+// lista de linhas soltas com o valor colado no rótulo; agora é uma TABELA de
+// pares: rótulo fixo de 86px à esquerda em tinta de apoio, valor ALINHADO À
+// DIREITA em tinta principal e peso 600, e um fio de 1px fechando cada linha.
+// O alinhamento à direita é o que faz a coluna ler como cadastro e não como
+// texto corrido: os valores formam uma segunda margem, e o olho compara "QR
+// Code" com "Plano anual" sem ter que atravessar o rótulo.
+// O cabeçalho do bloco também mudou: o rótulo "DADOS" ganhou um FILETE que
+// ocupa o resto da linha, que é o que separa um bloco do outro agora que a
+// coluna não tem mais borda entre seções.
 export default function ContactFields({
   phone,
   initialDisplayName,
@@ -79,14 +90,11 @@ export default function ContactFields({
   }
 
   return (
-    <div className="flex flex-col gap-0.5 border-t border-line pt-3">
-      <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-rotulo uppercase text-ink-3">
-          Dados
-        </span>
+    <div className="flex flex-col gap-2 px-4 pt-4">
+      <CabecalhoBloco rotulo="Dados">
         {status !== "idle" && (
           <span
-            className={`ml-auto text-legenda ${
+            className={`shrink-0 text-legenda font-normal ${
               status === "erro" ? "text-danger-ink" : "text-ink-3"
             }`}
           >
@@ -97,39 +105,76 @@ export default function ContactFields({
                 : "não deu para salvar"}
           </span>
         )}
+      </CabecalhoBloco>
+
+      <div className="flex flex-col">
+        <Linha
+          rotulo="Nome"
+          valor={name}
+          placeholder="Como você chama este contato"
+          onChange={setName}
+          onCommit={() => void salvar(name, fields)}
+        />
+
+        {fields.map((f, i) => (
+          <Linha
+            key={i}
+            rotulo={f.key}
+            rotuloEditavel
+            onRotulo={(v) => setField(i, { key: v })}
+            valor={f.value}
+            placeholder="Não informado"
+            onChange={(v) => setField(i, { value: v })}
+            onCommit={() => void salvar(name, fields)}
+            onRemover={() => remover(i)}
+          />
+        ))}
       </div>
 
-      <Linha
-        rotulo="Nome"
-        valor={name}
-        placeholder="Como você chama este contato"
-        onChange={setName}
-        onCommit={() => void salvar(name, fields)}
-      />
-
-      {fields.map((f, i) => (
-        <Linha
-          key={i}
-          rotulo={f.key}
-          rotuloEditavel
-          onRotulo={(v) => setField(i, { key: v })}
-          valor={f.value}
-          placeholder="Não informado"
-          onChange={(v) => setField(i, { value: v })}
-          onCommit={() => void salvar(name, fields)}
-          onRemover={() => remover(i)}
-        />
-      ))}
-
+      {/* "+ Adicionar campo": ação de TEXTO na tinta da marca, sem ícone e sem
+          moldura, como no desenho. Era um botão com moldura de 28px e um sinal
+          de mais desenhado, que num bloco de linhas sem moldura nenhuma lia como
+          o elemento mais pesado do bloco. O "+" agora é literal, dentro do
+          rótulo. */}
       <Button
         variant="brand-ghost"
-        size="chrome"
+        size="none"
         onClick={() => setFields((f) => [...f, { key: "", value: "" }])}
-        className="mt-1 gap-1 self-start"
+        className="self-start rounded-sm text-apoio font-semibold hover:bg-transparent hover:opacity-80"
       >
-        <Plus size={13} /> Adicionar campo
+        + Adicionar campo
       </Button>
     </div>
+  );
+}
+
+/**
+ * Cabeçalho de bloco da coluna: rótulo em caixa alta, filete ocupando o resto da
+ * linha e, opcionalmente, uma ação ou um estado na ponta direita.
+ *
+ * ⚠️ Vive aqui e não em `components/ui/` porque é a moldura DESTA coluna, e a
+ * camada base só recebe o que já apareceu em mais de uma tela. `ContactNotes`
+ * importa daqui, que é o que impede as duas cabeças de divergirem no primeiro
+ * ajuste.
+ * O filete é `line-soft` (o divisor INTERNO de cartão) e não `line`: com a linha
+ * de borda de cartão ele lia como fim de tabela, e não como continuação do
+ * rótulo.
+ */
+export function CabecalhoBloco({
+  rotulo,
+  children,
+}: {
+  rotulo: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <span className="flex items-center gap-[7px]">
+      <span className="shrink-0 text-rotulo uppercase text-ink-3">
+        {rotulo}
+      </span>
+      <span aria-hidden className="h-px min-w-3 flex-1 bg-line-soft" />
+      {children}
+    </span>
   );
 }
 
@@ -159,7 +204,10 @@ function Linha({
   onRemover?: () => void;
 }) {
   return (
-    <div className="group -mx-1.5 flex items-baseline gap-2 rounded-lg px-1.5 py-1 transition-colors hover:bg-[var(--active-bg)]">
+    <div
+      data-slot="painel-dado"
+      className="group flex items-baseline gap-2.5 border-b border-line-soft py-1.5"
+    >
       {rotuloEditavel ? (
         <Input
           variant="limpo"
@@ -168,10 +216,10 @@ function Linha({
           onBlur={onCommit}
           placeholder="Campo"
           aria-label="Nome do campo"
-          className="w-[92px] shrink-0 rounded text-legenda text-ink-3 focus:bg-[var(--active-bg)]"
+          className="w-[86px] shrink-0 rounded-sm text-legenda font-normal text-ink-3 focus:bg-[var(--active-bg)]"
         />
       ) : (
-        <span className="w-[92px] shrink-0 text-legenda text-ink-3">
+        <span className="w-[86px] shrink-0 text-legenda font-normal text-ink-3">
           {rotulo}
         </span>
       )}
@@ -185,25 +233,26 @@ function Linha({
         }}
         placeholder={placeholder}
         aria-label={rotulo || "Valor do campo"}
-        className="w-auto flex-1 rounded text-apoio font-medium text-ink placeholder:font-normal focus:bg-[var(--active-bg)]"
+        className="w-auto flex-1 rounded-sm text-right text-apoio font-semibold text-ink placeholder:font-normal placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
       />
-      {onRemover ? (
-        <Button
-          variant="ghost"
-          size="none"
-          onClick={onRemover}
-          aria-label="Remover campo"
-          className="text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger-ink group-hover:opacity-100"
-        >
-          <X size={13} />
-        </Button>
-      ) : (
-        <Pencil
-          size={13}
-          aria-hidden
-          className="shrink-0 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100"
-        />
-      )}
+      {/* GUTTER FIXO de 12px, presente até na linha do Nome, que não tem o que
+          remover. É ele que mantém TODOS os valores na mesma margem direita:
+          sem o espaço vazio, a linha com botão terminaria 20px antes das
+          outras, e o alinhamento à direita, que é o ponto do desenho, se perde
+          justamente nas linhas que o dono do CRM criou. */}
+      <span className="flex w-3 shrink-0 justify-center">
+        {onRemover && (
+          <Button
+            variant="ghost"
+            size="none"
+            onClick={onRemover}
+            aria-label="Remover campo"
+            className="rounded-sm text-ink-3 opacity-0 transition-opacity hover:bg-transparent hover:text-danger-ink focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            <X size={12} />
+          </Button>
+        )}
+      </span>
     </div>
   );
 }

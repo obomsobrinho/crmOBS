@@ -282,6 +282,9 @@ export default function ConversationView({
               members={members}
               myUserId={myUserId}
               conversationId={conversationId}
+              // As tags entraram na coluna do cliente (desenho de 18/09/2026), e
+              // criar ou aplicar rótulo é escrita por tenant.
+              clientId={clientId}
               editableName={displayName}
               customFields={customFields}
               contactExists={contactExists}

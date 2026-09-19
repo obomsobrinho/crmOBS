@@ -35,7 +35,6 @@ import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
-import ContactTags from "./ContactTags";
 import { memberName, memberInitials, type Member } from "@/lib/team";
 
 type Pending = {
@@ -679,21 +678,14 @@ export default function Thread({
           </span>
         </div>
 
-        {/* SEGUNDA FAIXA, e ela sobreviveu por um motivo só: as TAGS.
-          O desenho aprovado tem um cabeçalho de 62px, uma linha só, e leva as
-          tags para a coluna de dados do cliente. Essa coluna
-          (`components/ContextPanel.tsx`) é de outra rodada e está fora do que
-          esta pode tocar, então apagar as tags daqui agora tiraria do produto a
-          única forma de rotular uma conversa, sem destino para onde mandá-la.
-          Elas ficam nesta faixa rasa até a coluna do cliente ser refeita, e aí
-          esta linha inteira sai.
-          ⚠️ Quem estava aqui e JÁ SUBIU é o chip de quem atende: ele agora mora
-          na linha do nome, junto da chave da IA, como no desenho. */}
-        <div className="flex flex-wrap items-center gap-2 px-[22px] pb-2.5">
-          {conversationId != null && (
-            <ContactTags conversationId={conversationId} clientId={clientId} />
-          )}
-        </div>
+        {/* ⚠️ A FAIXA DAS TAGS SAIU daqui em 18/09/2026, junto com o redesenho da
+          coluna do cliente: as tags moram lá agora, que é onde o desenho as põe e
+          onde o resto do cadastro do contato já estava. Enquanto as duas existiam,
+          a mesma tag aparecia duas vezes na mesma tela. Com a linha fora, o
+          cabeçalho fecha nos 62px do desenho, em vez dos 73px que sobravam com
+          uma faixa vazia de 10px.
+          Quem estava aqui e JÁ TINHA SUBIDO é o chip de quem atende: ele mora na
+          linha do nome, junto da chave da IA. */}
       </header>
 
       {/* "O CLIENTE QUER": o entendimento da IA virou FAIXA no topo da conversa

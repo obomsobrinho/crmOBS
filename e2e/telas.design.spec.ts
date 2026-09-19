@@ -29,7 +29,15 @@ test.describe("Inbox (/design)", () => {
     await expect(
       page.getByRole("button", { name: /Você|Ninguém assumiu ainda/ }).first()
     ).toBeVisible();
-    await expect(page.getByText("Tags", { exact: true })).toBeVisible();
+    // ⚠️ ATUALIZADO EM 18/09/2026, ao aplicar o desenho da coluna do cliente.
+    // Este teste exigia um rótulo "Tags" visível, que era a segunda faixa do
+    // cabeçalho da conversa. No desenho aprovado as tags são chips na coluna do
+    // cliente e NÃO têm rótulo: um chip colorido com o nome dentro já diz o que
+    // é, e o rótulo gastava largura numa coluna de 292px. O que prova que a
+    // seção continua existindo é o convite a preencher.
+    await expect(
+      page.getByRole("button", { name: "+ tag" })
+    ).toBeVisible();
     // "Notas internas" virou só "Notas" no painel, e escrever nota passou a ser
     // uma aba do campo de escrita, em vez de um formulário próprio.
     await expect(page.getByText("Notas", { exact: true })).toBeVisible();
@@ -66,6 +74,162 @@ test.describe("Inbox (/design)", () => {
     ).toBeVisible();
     // Sem Cancelar e Salvar: gravar ao perder o foco é o que tirou os cliques.
     await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────
+// COLUNA DO CLIENTE, desenho aprovado de 18/09/2026.
+//
+// Estes testes travam o que o desenho PEDE e o código anterior não fazia. Cada
+// um nasceu de uma divergência real entre a prancha e a tela, e não de uma
+// leitura genérica de "ficou parecido": o dono comparou as duas e a frase foi
+// "você nem alterou nada aqui".
+// ─────────────────────────────────────────────────────────────
+test.describe("Coluna do cliente (/design)", () => {
+  // A coluna é a última <aside> da tela; a primeira é a lista de conversas.
+  const coluna = (page: import("@playwright/test").Page) =>
+    page.locator("aside").last();
+
+  test("os dois números de contexto são cartões, e não uma linha de rodapé", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const cartoes = coluna(page).locator('[data-slot="painel-metrica"]');
+    await expect(cartoes).toHaveCount(2);
+    await expect(cartoes.first()).toContainText("Cliente desde");
+    await expect(cartoes.nth(1)).toContainText("Mensagens");
+    // O valor fica ACIMA do rótulo, e é ele que tem o peso. Sem esta asserção o
+    // teste passaria com os dois na mesma linha, que é o formato antigo.
+    const ordem = await cartoes.first().evaluate((el) => {
+      const [valor, rotulo] = [...el.children] as HTMLElement[];
+      return {
+        valorEmCima:
+          valor.getBoundingClientRect().top < rotulo.getBoundingClientRect().top,
+        pesoValor: getComputedStyle(valor).fontWeight,
+        pesoRotulo: getComputedStyle(rotulo).fontWeight,
+      };
+    });
+    expect(ordem.valorEmCima).toBe(true);
+    expect(Number(ordem.pesoValor)).toBeGreaterThan(Number(ordem.pesoRotulo));
+
+    // ⚠️ E A LINHA DE RODAPÉ NÃO PODE VOLTAR. Ela dizia exatamente o mesmo
+    // ("Cliente desde 20 jul · 68 mensagens") no pé da coluna, e ter as duas
+    // seria o mesmo número duas vezes na mesma tela. O desenho ainda traz essa
+    // linha, mas com `margin-top:auto` dentro de um `overflow:hidden`: medida no
+    // navegador, ela cai fora da altura da coluna e nunca aparece.
+    await expect(
+      coluna(page).getByText(/Cliente desde .* · \d+ mensage/)
+    ).toHaveCount(0);
+  });
+
+  test("o cadastro é uma tabela de pares, com o valor alinhado à direita", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const linhas = coluna(page).locator('[data-slot="painel-dado"]');
+    await expect(linhas.first()).toBeVisible();
+
+    const medida = await linhas.first().evaluate((el) => {
+      const rotulo = el.querySelector("span") as HTMLElement;
+      const valor = el.querySelector("input") as HTMLInputElement;
+      return {
+        larguraRotulo: Math.round(rotulo.getBoundingClientRect().width),
+        alinhamento: getComputedStyle(valor).textAlign,
+        // O fio que fecha a linha é o que faz o bloco ler como cadastro.
+        fio: getComputedStyle(el).borderBottomWidth,
+      };
+    });
+    // 86px, medido no desenho. É a coluna fixa que alinha todos os rótulos.
+    expect(medida.larguraRotulo).toBe(86);
+    // ⚠️ O alinhamento à direita é o ponto do bloco: os valores formam uma
+    // segunda margem, e dá para comparar um com o outro sem atravessar o
+    // rótulo. Antes eles nasciam colados no rótulo, cada um começando num lugar.
+    expect(medida.alinhamento).toBe("right");
+    expect(medida.fio).not.toBe("0px");
+  });
+
+  test("as tags saíram do cabeçalho da conversa e moram na coluna do cliente", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    // O convite a preencher existe, e existe DENTRO da coluna.
+    const maisTag = coluna(page).getByRole("button", { name: "+ tag" });
+    await expect(maisTag).toBeVisible();
+    // ⚠️ E não existe em mais lugar nenhum da tela. O cabeçalho da conversa
+    // tinha uma segunda faixa só para hospedar as tags, com um rótulo "TAGS" e
+    // um botão "Adicionar"; o desenho aprovado tem cabeçalho de uma linha só.
+    await expect(page.getByRole("button", { name: "+ tag" })).toHaveCount(1);
+    await expect(page.getByText("Tags", { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Adicionar", exact: true })
+    ).toHaveCount(0);
+
+    // O chip abre o seletor no lugar, sem tirar a pessoa da conversa.
+    await maisTag.click();
+    await expect(coluna(page).getByPlaceholder("Nova tag")).toBeVisible();
+  });
+
+  test("cada bloco abre com rótulo em caixa alta e um filete até a borda", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    // É o filete que separa um bloco do outro agora que a coluna deixou de ter
+    // uma borda entre seções. Sem ele o rótulo fica boiando sobre a lista.
+    for (const nome of ["Dados", "Notas"]) {
+      const rotulo = coluna(page).getByText(nome, { exact: true });
+      await expect(rotulo).toBeVisible();
+      const estilo = await rotulo.evaluate((el) => {
+        const c = getComputedStyle(el);
+        const fio = el.nextElementSibling as HTMLElement;
+        return {
+          caixaAlta: c.textTransform,
+          tamanho: c.fontSize,
+          fioLargura: Math.round(fio.getBoundingClientRect().width),
+          fioAltura: Math.round(fio.getBoundingClientRect().height),
+        };
+      });
+      expect(estilo.caixaAlta).toBe("uppercase");
+      // Piso da interface, e o papel `rotulo` da casa.
+      expect(estilo.tamanho).toBe("12px");
+      expect(estilo.fioAltura).toBe(1);
+      // Ocupa o resto da linha, e não um traço decorativo de 20px.
+      expect(estilo.fioLargura).toBeGreaterThan(150);
+    }
+  });
+
+  test("o telefone é o endereço de WhatsApp: ponto e tinta verdes, e leva ao wa.me", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const tel = coluna(page).locator('[data-slot="painel-telefone"]');
+    await expect(tel).toHaveAttribute("href", /wa\.me\//);
+    // `human-ink` (o papel de TINTA do verde), nunca `human-fill`. Era cinza de
+    // rodapé, do mesmo peso da hora da última mensagem.
+    const cor = await tel.evaluate((el) => getComputedStyle(el).color);
+    const verde = await page.evaluate(() =>
+      getComputedStyle(document.documentElement)
+        .getPropertyValue("--human-ink")
+        .trim()
+    );
+    // Compara pelo token, e não por um hex escrito no teste: assim o teste não
+    // vira um segundo lugar onde a cor está declarada.
+    const paraRgb = async (hex: string) =>
+      page.evaluate((h) => {
+        const d = document.createElement("div");
+        d.style.color = h;
+        document.body.append(d);
+        const c = getComputedStyle(d).color;
+        d.remove();
+        return c;
+      }, hex);
+    expect(cor).toBe(await paraRgb(verde));
+  });
+
+  test("não usa travessão em texto visível", async ({ page }) => {
+    await page.goto("/design");
+    const texto = (await coluna(page).innerText()) ?? "";
+    expect(texto).not.toContain("—");
+    expect(texto).not.toContain("–");
   });
 });
 
