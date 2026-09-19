@@ -96,19 +96,29 @@ e abaixo existe a mesma superfície e nada que projete coisa nenhuma.
 **No escuro não existe sombra**: a separação vem de superfície e linha. No claro a sombra é
 obrigatória no balão, senão branco sobre a conversa dá 1,05:1 e some.
 
-**Sombra de rolagem** (`.sombra-rolagem`, com `data-borda="topo|fundo"` e `data-visivel="sim|nao"`)
-acende na borda de cima da conversa quando ela passa por baixo do cabeçalho, e na de baixo enquanto
-sobra conversa atrás da caixa de escrita. É o que diferencia "acabou" de "tem mais, continue
-rolando".
+⚠️ **SOMBRA DE ROLAGEM NÃO EXISTE MAIS** (19/09/2026). Fica registrado porque foram três tentativas
+no mesmo dia, e a última é a conclusão, não mais uma variação.
 
-⚠️ **Não é `box-shadow`, e isso mudou em 19/09/2026 por causa de um defeito.** Eram duas sombras de
-caixa, uma no `<header>` da conversa e outra no bloco do composer. `box-shadow` pinta para FORA do
-elemento, então ela caía em cima de quem estivesse ao lado: com a faixa "O cliente quer" entrando
-entre o cabeçalho e a conversa (18/09), a sombra do cabeçalho, que tem `z-10`, era desenhada sobre
-uma superfície opaca com borda própria, e o resultado lia como uma faixa cinza com borda, não como
-sombra. Hoje é **um elemento absoluto por borda, DENTRO da própria área que rola**: 8px de degradê
-translúcido (`--sombra-rolagem-cor`, um valor por tema), que não tem como invadir o vizinho. Quem
-desenha a divisão continua sendo o `border-b` do cabeçalho.
+1. Eram duas `box-shadow`, uma no `<header>` da conversa e outra no bloco do composer. `box-shadow`
+   pinta para FORA do elemento, então ela caía em cima do vizinho: com a faixa "O cliente quer"
+   entrando entre o cabeçalho e a conversa (18/09), a sombra do cabeçalho, que tem `z-10`, era
+   desenhada sobre uma superfície opaca com borda própria, e o resultado lia como faixa cinza.
+2. Viraram um elemento absoluto por borda, DENTRO da área que rola, onde não têm como invadir
+   ninguém. Resolveu o vazamento e não resolveu a leitura: a de baixo continuava lendo como risco
+   solto, porque ali não há mudança de superfície nenhuma (conversa e composer são a mesma).
+3. Saíram as duas. **Quem diz "tem mais conversa deste lado" é a DISSOLUÇÃO** (a prop `fade` do
+   `ScrollArea`), que já só aparece do lado que tem conteúdo escondido. O que separa o cabeçalho da
+   conversa é o `border-b` dele, que sempre esteve lá.
+
+**Duas regras saem daí, e valem para qualquer borda de área rolável:**
+
+- **Um sinal por fato.** Se a dissolução já diz que há conteúdo escondido, uma sombra em cima dela é
+  ruído. Foi assim que ela foi parar em dois prints do dono.
+- **A dissolução tem que ser MAIOR que o item que ela dissolve.** O padrão do `ScrollArea` é 28px e
+  serve para lista de texto sobre superfície lisa; a conversa passa 80px porque o balão dela tem
+  65px em média. Em 28px o balão ainda está em quase metade da opacidade quando a borda chega: ele
+  não dissolve, ele é **fatiado**, com o corte reto no meio de uma linha de texto. Por isso `fade`
+  aceita um número, e quem tem item alto e opaco passa o seu.
 
 ## Tema
 

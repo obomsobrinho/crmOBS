@@ -195,25 +195,16 @@ export default function Thread({
   const [rowsProp, setRowsProp] = useState<ChatRow[]>(initialRows);
   const [pending, setPending] = useState<Pending[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
-  // `rolou` = há conversa passando por baixo do cabeçalho, e é o que acende a
-  // sombra de cima DENTRO da área que rola, sem invadir o vizinho.
+  // ⚠️ NÃO EXISTE MAIS ESTADO DE ROLAGEM AQUI (19/09/2026, quarta rodada). Eram
+  // `rolou` e `temMais`, e os dois só serviam para acender as sombras das bordas.
+  // As duas sombras saíram: quem diz "tem mais conversa deste lado" é a
+  // DISSOLUÇÃO do `ScrollArea`, que já faz a própria medida para a máscara. O
+  // Thread não precisa medir de novo, e por isso o `onViewportScroll` também
+  // saiu daqui.
   //
-  // ⚠️ O par dele, `temMais`, SAIU em 19/09/2026 junto com a sombra de baixo:
-  // quem avisa que sobrou conversa embaixo é a dissolução do ScrollArea, que já
-  // depende do mesmo cálculo e não precisa de estado aqui.
-  const [rolou, setRolou] = useState(false);
-
-  const medirRolagem = useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    setRolou(el.scrollTop > 4);
-  }, []);
-  const onScroll = useCallback(
-    (e: React.UIEvent<HTMLDivElement>) => medirRolagem(e.currentTarget),
-    [medirRolagem],
-  );
   // O esmaecimento das pontas mora no ScrollArea (prop `fade`), porque as três
-  // listas da tela precisam dele. Aqui fica só `rolou`, que serve a outra coisa:
-  // acender a sombra do cabeçalho.
+  // listas da tela precisam dele; o que é desta tela é só o TAMANHO dele
+  // (`ESMAECIMENTO_CONVERSA`).
   const bottomRef = useRef<HTMLDivElement>(null);
   /** O elemento que rola de verdade, dentro do ScrollArea. */
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -305,14 +296,13 @@ export default function Thread({
       const el = viewportRef.current;
       if (!el) return;
       el.scrollTo({ top: el.scrollHeight, behavior });
-      // Mede aqui também: `rolou` e `temMais` só nasceriam no primeiro evento
-      // de rolagem, e até lá a máscara de esmaecimento ficaria errada (sem
-      // desbotar em cima, apesar de já haver conversa escondida atrás do
-      // cabeçalho).
-      medirRolagem(el);
+      // ⚠️ A medida que existia aqui SAIU com as sombras: quem mede agora é o
+      // próprio `ScrollArea`, e ele já faz isso na montagem e a cada mudança de
+      // tamanho do conteúdo (`ResizeObserver`), justamente para a máscara não
+      // nascer errada antes do primeiro evento de rolagem.
     });
     return () => cancelAnimationFrame(id);
-  }, [bubbles, phone, medirRolagem]);
+  }, [bubbles, phone]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -444,12 +434,13 @@ export default function Thread({
           hora da última mensagem dividiam o mesmo bloco, e o resultado lia como
           um amontoado. Em cima fica quem é a pessoa e o que dá para fazer; a
           faixa de baixo é referência, num tom próprio e com tipo menor. */}
-      {/* ⚠️ A SOMBRA DE ROLAGEM SAIU DAQUI em 19/09/2026. Ela era um
-        `box-shadow` no cabeçalho, e `box-shadow` pinta para FORA do elemento:
-        com a faixa "O cliente quer" entre o cabeçalho e a conversa, a sombra
-        caía sobre uma superfície opaca e virava um borrão cinza com borda, que
-        foi o print do dono. Hoje ela mora dentro da própria área que rola, uma
-        por borda. Ver o bloco `.sombra-rolagem` no globals.css. */}
+      {/* ⚠️ O CABEÇALHO NÃO PROJETA SOMBRA NENHUMA, e essa história teve três
+        capítulos em 19/09/2026. Era um `box-shadow` aqui, e `box-shadow` pinta
+        para FORA: com a faixa "O cliente quer" entre ele e a conversa, a sombra
+        caía sobre uma superfície opaca e virava um borrão cinza com borda.
+        Virou um elemento absoluto dentro da área que rola, e ainda assim lia
+        como risco. No fim saiu: quem diz que há conversa passando por baixo é a
+        DISSOLUÇÃO, e o que separa as superfícies é o `border-b` desta faixa. */}
       <header className="relative z-10 shrink-0 border-b border-line bg-raised">
         <div className="flex h-[62px] items-center gap-3.5 pl-[22px] pr-5">
           <Avatar size="lg" style={avatarPair(phone)}>
@@ -733,7 +724,6 @@ export default function Thread({
           viewportClassName="py-3"
           viewportRef={viewportRef}
           fade={ESMAECIMENTO_CONVERSA}
-          onViewportScroll={onScroll}
         >
           {/* COLUNA DE LEITURA de 960px, centrada (medida do desenho). A conversa
               ocupava a largura inteira do cartão, e em 1920 isso dá uma linha de
@@ -794,20 +784,15 @@ export default function Thread({
           </div>
           <div ref={bottomRef} />
         </ScrollArea>
-        <span
-          aria-hidden
-          data-slot="sombra-rolagem"
-          data-borda="topo"
-          data-visivel={rolou ? "sim" : "nao"}
-          className="sombra-rolagem"
-        />
-        {/* ⚠️ NÃO EXISTE SOMBRA DE BAIXO, e ela saiu em 19/09/2026 depois do
-            segundo retorno do dono. Quem diz "tem mais conversa aqui embaixo" é
-            a DISSOLUÇÃO (`ESMAECIMENTO_CONVERSA`), que já só aparece quando há
-            conteúdo escondido. Empilhar uma sombra de 8px em cima de 80px de
-            degradê era o segundo sinal para a mesma coisa, no mesmo lugar, e o
-            que ele viu foi sujeira. A de CIMA fica, porque lá existe uma
-            mudança real de superfície: o cabeçalho é branco e a conversa não. */}
+        {/* ⚠️ NÃO EXISTE SOMBRA DE ROLAGEM EM BORDA NENHUMA, e as duas saíram em
+            19/09/2026, a de baixo primeiro e a de cima logo depois, a pedido do
+            dono ("aplique o mesmo no header"). Quem diz "tem mais conversa deste
+            lado" é a DISSOLUÇÃO (`ESMAECIMENTO_CONVERSA`), que já só aparece
+            quando há conteúdo escondido daquele lado. Empilhar uma sombra de 8px
+            em cima de 80px de degradê é um segundo sinal para o mesmo fato, no
+            mesmo lugar, e é isso que lia como sujeira na borda.
+            O que separa o cabeçalho da conversa é a `border-b` dele, que já
+            estava lá; a conversa passa por baixo dissolvendo. */}
       </div>
 
       <div className="relative z-10 shrink-0">

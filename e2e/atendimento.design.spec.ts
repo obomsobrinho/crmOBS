@@ -52,18 +52,25 @@ async function esperarEscritas(escritas: unknown[], quantas: number) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Item 1: a sombra de rolagem estava bugada
+// Item 1: a borda da conversa
 //
-// O dono mandou print de uma faixa cinza clara com borda visível acima da caixa
-// de escrita, e disse que acontecia também no cabeçalho. Eram duas `box-shadow`,
-// e `box-shadow` pinta para FORA do elemento: a do cabeçalho (que tem `z-10`)
-// caía sobre a faixa "O cliente quer", opaca e com borda própria, e lia como
-// caixa. Hoje é um elemento absoluto por borda, dentro da área que rola.
+// Começou como "a sombra de rolagem está bugada" (print de uma faixa cinza com
+// borda acima da caixa de escrita) e terminou com AS DUAS SOMBRAS FORA. Três
+// tentativas no mesmo dia, e vale registrar a conclusão em vez das variações:
 //
-// ⚠️ Os testes medem PIXEL, e não classe. Um teste que contasse a classe passava
-// com o defeito inteiro na tela, que foi como ele chegou até aqui.
+// 1. Eram duas `box-shadow`, e `box-shadow` pinta para FORA do elemento: a do
+//    cabeçalho caía sobre a faixa "O cliente quer", opaca e com borda própria.
+// 2. Viraram um elemento absoluto por borda, dentro da área que rola. Parou de
+//    invadir o vizinho e continuou lendo como risco.
+// 3. Saíram as duas. Quem diz "tem mais conversa deste lado" é a DISSOLUÇÃO, e
+//    ela já só aparece do lado que tem conteúdo escondido.
+//
+// ⚠️ A regra que sobrou, e é o que estes testes trancam: **um sinal por fato**, e
+// **a dissolução tem que ser MAIOR que o item que ela dissolve**. Os dois testes
+// medem PIXEL, e não classe: um teste que contasse classe passava com o defeito
+// inteiro na tela, que foi como ele chegou até aqui.
 // ─────────────────────────────────────────────────────────────────────
-test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
+test.describe("Item 1: a conversa dissolve nas bordas, sem sombra nenhuma", () => {
   /** Rola a conversa para o meio, onde as duas bordas têm conteúdo escondido. */
   async function rolarAoMeio(page: import("@playwright/test").Page) {
     // `.first()`: a coluna do cliente também é um ScrollArea dentro do <main>.
@@ -71,64 +78,47 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
       .locator('main [data-slot="scroll-area-viewport"]')
       .first();
     await expect(viewport).toBeVisible();
-    // ⚠️ Esperar a sombra de CIMA acender antes de rolar. A conversa abre na
+    // ⚠️ Esperar a máscara de CIMA aparecer antes de rolar. A conversa abre na
     // última mensagem, e quem pula para lá é um efeito de montagem: rolar antes
     // dele perde a rolagem, porque o efeito ainda vai jogar tudo para o fim.
-    // Essa sombra acesa é o sinal de que a medida já aconteceu.
-    await expect(
-      page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]')
-    ).toHaveAttribute("data-visivel", "sim");
+    // A máscara já aplicada é o sinal de que a medida aconteceu.
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .toMatch(/linear-gradient/);
     await viewport.evaluate((el) => {
       el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
     });
-    await expect(
-      page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]')
-    ).toHaveAttribute("data-visivel", "sim");
+    // No meio, a máscara dissolve os DOIS lados.
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .toMatch(/calc\(100% - \d+px\)/);
+    return viewport;
   }
 
-  test("é um degradê de poucos pixels, e não uma superfície", async ({ page }) => {
+  test("não existe sombra de rolagem em borda nenhuma", async ({ page }) => {
     await page.goto("/design");
     await rolarAoMeio(page);
 
-    const sombras = await page
-      .locator('[data-slot="sombra-rolagem"]')
-      .evaluateAll((els) =>
-        els.map((e) => {
-          const c = getComputedStyle(e);
-          return {
-            borda: (e as HTMLElement).dataset.borda,
-            altura: e.getBoundingClientRect().height,
-            fundo: c.backgroundColor,
-            degrade: c.backgroundImage,
-          };
-        })
-      );
-    // ⚠️ UMA, e não duas. A de baixo saiu em 19/09/2026 (ver o teste próprio
-    // logo abaixo): quem avisa que sobrou conversa embaixo é a dissolução.
-    expect(sombras).toHaveLength(1);
-    for (const s of sombras) {
-      // Poucos pixels. A queixa era uma FAIXA: qualquer coisa alta o bastante
-      // para ler como bloco já é o defeito de volta.
-      expect(s.altura, s.borda).toBeLessThanOrEqual(12);
-      // E a cor não é sólida: fundo transparente, tudo num degradê que termina
-      // em transparente.
-      expect(s.fundo, s.borda).toBe("rgba(0, 0, 0, 0)");
-      expect(s.degrade, s.borda).toMatch(/linear-gradient/);
-      expect(s.degrade, s.borda).toMatch(/rgba\(0, 0, 0, 0\)/);
-    }
-    // ⚠️ `toHaveCSS` e não uma leitura direta: a sombra acende por `transition`
-    // de opacidade, e a medida crua pegava o meio da interpolação (0.698…), que
-    // não é nem a origem nem o destino. Mesmo cuidado dos gatilhos do composer.
-    await expect(
-      page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]')
-    ).toHaveCSS("opacity", "1");
+    // 1. Nenhum elemento de sombra sobrou, nem em cima nem embaixo.
+    await expect(page.locator('[data-slot="sombra-rolagem"]')).toHaveCount(0);
+
+    // 2. E nenhum vizinho da conversa desenha `box-shadow`. Era daí que o borrão
+    //    saía, e são as superfícies opacas que ele sujava.
+    const sombras = await page.evaluate(() => {
+      const composer = document.querySelector("main form")!.closest("div")!;
+      return [
+        document.querySelector("main header")!,
+        document.querySelector('[data-slot="conversa-entendimento"]')!,
+        composer,
+        document.querySelector('main [data-slot="scroll-area"]')!,
+      ].map((e) => getComputedStyle(e).boxShadow);
+    });
+    for (const s of sombras) expect(s).toBe("none");
   });
 
-  test("o fim da conversa DISSOLVE, e não é cortado por uma linha", async ({
-    page,
-  }) => {
+  test("a dissolução é maior que o balão que ela dissolve", async ({ page }) => {
     await page.goto("/design");
-    await rolarAoMeio(page);
+    const viewport = await rolarAoMeio(page);
 
     const medido = await page.evaluate(() => {
       const vp = document.querySelector(
@@ -137,106 +127,60 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
       const baloes = [
         ...document.querySelectorAll('[data-slot="conversa-balao"]'),
       ].map((b) => b.getBoundingClientRect().height);
-      const casou = getComputedStyle(vp).maskImage.match(
-        /calc\(100% - (\d+)px\)/
-      );
+      const mask = getComputedStyle(vp).maskImage;
       return {
-        dissolucao: casou ? Number(casou[1]) : 0,
+        cima: Number(mask.match(/rgb\(0, 0, 0\) (\d+)px/)?.[1] ?? 0),
+        baixo: Number(mask.match(/calc\(100% - (\d+)px\)/)?.[1] ?? 0),
         balaoMedio: Math.round(
           baloes.reduce((a, b) => a + b, 0) / (baloes.length || 1)
         ),
-        sombraDeBaixo: document.querySelectorAll(
-          '[data-slot="sombra-rolagem"][data-borda="fundo"]'
-        ).length,
       };
     });
 
-    // ⚠️ A REGRA QUE ESTE TESTE TRANCA: a dissolução tem que ser MAIOR que o item
-    // que ela dissolve. O balão desta tela tem 65px em média e o padrão do
-    // ScrollArea é 28px, que serve para lista de texto: nessa distância o balão
-    // ainda está em quase metade da opacidade quando a borda chega, então ele não
-    // dissolve, ele é FATIADO, com o corte reto no meio de uma linha de texto.
-    // Foi o print que o dono mandou.
+    // ⚠️ A REGRA, e não o número: o balão desta tela tem 65px em média e o padrão
+    // do ScrollArea é 28px, que serve para lista de texto sobre superfície lisa.
+    // Nessa distância o balão ainda está em quase metade da opacidade quando a
+    // borda chega, então ele não dissolve, ele é FATIADO, com o corte reto no
+    // meio de uma linha de texto. Foi o print que o dono mandou.
     expect(medido.balaoMedio).toBeGreaterThan(28);
-    expect(medido.dissolucao).toBeGreaterThan(medido.balaoMedio);
-    // E não existe sombra de baixo: duas marcas para o mesmo fato, no mesmo
-    // lugar, é o que ele leu como sujeira na borda da caixa de escrita.
-    expect(medido.sombraDeBaixo).toBe(0);
+    expect(medido.cima).toBeGreaterThan(medido.balaoMedio);
+    expect(medido.baixo).toBeGreaterThan(medido.balaoMedio);
+    // E as duas bordas recebem o MESMO tratamento, que foi o pedido do dono
+    // depois de aprovar a de baixo: "aplique o mesmo no header".
+    expect(medido.cima).toBe(medido.baixo);
+
+    // A máscara dissolve o CONTEÚDO, não pinta cor por cima: é o que faz ela
+    // funcionar igual sobre a textura de rede e sobre a superfície limpa.
+    await expect(viewport).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   });
 
-  test("ninguém mais desenha sombra, e ela não sai da área que rola", async ({
-    page,
-  }) => {
+  test("só dissolve o lado que tem conteúdo escondido", async ({ page }) => {
     await page.goto("/design");
-    await rolarAoMeio(page);
-
-    const medido = await page.evaluate(() => {
-      const faixa = document.querySelector(
-        '[data-slot="conversa-entendimento"]'
-      )!;
-      // A caixa de escrita é o irmão seguinte da moldura da conversa.
-      const composer = document.querySelector('[data-slot="sombra-rolagem"]')!
-        .parentElement!.nextElementSibling!;
-      const vizinhos = [
-        document.querySelector("main header")!,
-        faixa,
-        composer,
-      ].map((e) => ({
-        sombra: getComputedStyle(e).boxShadow,
-        topo: e.getBoundingClientRect().top,
-        fundo: e.getBoundingClientRect().bottom,
-      }));
-      const sombras = [
-        ...document.querySelectorAll('[data-slot="sombra-rolagem"]'),
-      ].map((e) => {
-        const r = e.getBoundingClientRect();
-        return { topo: r.top, fundo: r.bottom };
-      });
-      return { vizinhos, sombras };
-    });
-
-    // 1. Cabeçalho, faixa do entendimento e caixa de escrita não desenham sombra
-    //    nenhuma. Era daí que o borrão saía, e são as superfícies opacas que ele
-    //    sujava.
-    for (const v of medido.vizinhos) expect(v.sombra).toBe("none");
-    // 2. E a sombra não INVADE nenhum dos três. `box-shadow` pinta para fora do
-    //    elemento, então a versão antiga não tinha como não invadir; esta é
-    //    absoluta dentro da área que rola.
-    for (const s of medido.sombras) {
-      for (const v of medido.vizinhos) {
-        const cruza = s.topo < v.fundo && s.fundo > v.topo;
-        expect(cruza, `${s.topo}-${s.fundo} contra ${v.topo}-${v.fundo}`).toBe(
-          false
-        );
-      }
-    }
-  });
-
-  test("apagada quando não há conteúdo escondido daquele lado", async ({
-    page,
-  }) => {
-    await page.goto("/design");
-    const topo = page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]');
-    // A conversa abre na última mensagem, então em cima há conteúdo escondido.
-    // Sombra acesa sem nada atrás dela é decoração, e decoração que finge ser
-    // sinal é pior que nenhum sinal.
-    //
-    // ⚠️ ATUALIZADO EM 19/09/2026: a metade deste teste que afirmava a sombra de
-    // BAIXO apagada saiu porque a sombra de baixo saiu. O que ela dizia agora é
-    // dito pela dissolução, e o teste acima prova que ela existe.
-    await expect(topo).toHaveAttribute("data-visivel", "sim");
-
-    await page
+    const viewport = page
       .locator('main [data-slot="scroll-area-viewport"]')
-      .first()
-      .evaluate((el) => {
-        el.scrollTop = 0;
-      });
-    await expect(topo).toHaveAttribute("data-visivel", "nao");
-    await expect(topo).toHaveCSS("opacity", "0");
+      .first();
+    // A conversa abre na última mensagem: em cima há conteúdo escondido e
+    // embaixo não. Dissolver o fim sem nada atrás dele apagaria a última
+    // mensagem sem motivo, que é decoração fingindo ser sinal.
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .toMatch(/^linear-gradient\(rgba\(0, 0, 0, 0\)/);
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .not.toMatch(/calc\(100% - \d+px\)/);
+
+    // No topo, o contrário: nada escondido em cima, e o fim dissolve.
+    await viewport.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .toMatch(/calc\(100% - \d+px\)/);
+    await expect
+      .poll(() => viewport.evaluate((el) => getComputedStyle(el).maskImage))
+      .not.toMatch(/^linear-gradient\(rgba\(0, 0, 0, 0\)/);
   });
 });
-
 // ─────────────────────────────────────────────────────────────────────
 // Item 2: filtro por período na lista de conversas
 //

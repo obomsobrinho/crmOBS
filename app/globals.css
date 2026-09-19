@@ -765,53 +765,27 @@ select:focus-visible,
    conversa com os detalhes do contato), e dentro de um cartão a separação é
    linha de 1px, nunca outro cartão. */
 
-/* Sombra de rolagem: acende na borda de cima da conversa quando ela passa por
-   baixo do cabeçalho, e na de baixo enquanto sobra conversa atrás da caixa de
-   escrita. É o que diferencia "acabou" de "tem mais, continue rolando".
+/* ⚠️ A SOMBRA DE ROLAGEM NÃO EXISTE MAIS, nem de cima nem de baixo (19/09/2026).
+   Fica registrado porque foram três tentativas no mesmo dia e a última é a
+   conclusão, não mais uma variação:
 
-   ⚠️ REFEITA EM 19/09/2026, e o formato mudou por um defeito, não por gosto.
-   Eram DUAS `box-shadow`, uma no `<header>` e outra no bloco do composer. Duas
-   coisas quebraram junto:
+   1. Eram DUAS `box-shadow`, uma no `<header>` e outra no bloco do composer.
+      `box-shadow` pinta para FORA do elemento, então ela caía por cima do
+      vizinho: com a faixa "O cliente quer" (que entrou em 18/09) entre o
+      cabeçalho, que tem `z-10`, e a conversa, o borrão atravessava uma
+      superfície opaca com borda própria e lia como faixa cinza, não como sombra.
+   2. Viraram um elemento absoluto por borda, DENTRO da área que rola, onde não
+      têm como invadir ninguém. Resolveu o vazamento e não resolveu a leitura: a
+      de baixo continuava lendo como risco solto, porque ali não há mudança de
+      superfície nenhuma (conversa e composer são a mesma).
+   3. Saíram as duas. **Quem diz "tem mais conversa deste lado" é a DISSOLUÇÃO**
+      (a prop `fade` do `ScrollArea`, 80px na conversa), que já só aparece do
+      lado que tem conteúdo escondido e não precisa de segunda marca. O que
+      separa o cabeçalho da conversa é a `border-b` dele, que sempre esteve lá.
 
-   1. O `<header>` tem `z-10` e a faixa "O cliente quer" (que entrou em 18/09,
-      entre ele e a conversa) é irmã ESTÁTICA, então a sombra do cabeçalho era
-      pintada POR CIMA dela. A faixa é opaca e tem borda própria, e o resultado
-      era um borrão cinza atravessando uma superfície inteira, com duas bordas
-      visíveis: a "faixa cinza clara com borda" do print do dono.
-   2. `box-shadow` sai do elemento para FORA, então ela some por cima de quem
-      estiver ao lado. Não existe onde pendurá-la sem invadir o vizinho.
-
-   Agora é UM elemento por borda, ABSOLUTO DENTRO da própria área que rola. Ele
-   não pode invadir cabeçalho, faixa nem composer por construção, e continua
-   sendo o mesmo sinal: 8px de degradê que dissolve, nunca uma caixa. A cor é
-   translúcida e única por tema (o dono confirmou que resolver no claro resolve
-   no escuro, então não é calibragem de token por tema). */
-:root {
-  --sombra-rolagem-cor: rgba(23, 17, 40, 0.16);
-}
-[data-theme="dark"] {
-  --sombra-rolagem-cor: rgba(0, 0, 0, 0.5);
-}
-.sombra-rolagem {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 8px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity var(--dur-slow) var(--ease-out);
-}
-.sombra-rolagem[data-visivel="sim"] {
-  opacity: 1;
-}
-.sombra-rolagem[data-borda="topo"] {
-  top: 0;
-  background-image: linear-gradient(
-    to bottom,
-    var(--sombra-rolagem-cor),
-    transparent
-  );
-}
+   A regra que sobra, e vale para qualquer borda de área rolável desta casa:
+   **um sinal por fato.** Se a dissolução já diz que há conteúdo escondido, uma
+   sombra em cima dela é ruído, e foi assim que ela foi parar em dois prints. */
 /* Fundo de rede neural da conversa (19/09/2026), ver components/FundoRede.tsx.
    A cor é a da MARCA e a força é um token por tema: no escuro ele fica mais
    apagado ainda, por pedido do dono, porque sobre superfície escura o mesmo

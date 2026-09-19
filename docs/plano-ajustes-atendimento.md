@@ -279,3 +279,26 @@ Três mudanças:
 
 Testes: entrou um que mede a dissolução contra a altura média do balão (é a regra, não o número), e
 os que afirmavam a sombra de baixo foram atualizados ou substituídos, com o motivo escrito dentro.
+
+---
+
+## Quarta rodada do item 1 (19/09/2026): "aplique o mesmo no header"
+
+O dono aprovou o tratamento de baixo e pediu o mesmo em cima. **As duas sombras de rolagem saíram**,
+e com elas o estado `rolou`, o `medirRolagem`, o `onViewportScroll` do Thread, a classe
+`.sombra-rolagem` e os tokens dela. A dissolução já valia para as duas bordas (a máscara do
+`ScrollArea` usa a mesma distância nos dois lados), então em cima não havia o que acrescentar: havia
+o que tirar.
+
+O que sobrou separando o cabeçalho da conversa é o `border-b` dele, que sempre esteve lá, e a
+conversa passa por baixo dissolvendo em 80px.
+
+**A conclusão, que vale para qualquer borda de área rolável desta casa:**
+
+- **Um sinal por fato.** Se a dissolução já diz que há conteúdo escondido, uma sombra em cima dela é
+  ruído. Foi assim que ela foi parar em dois prints.
+- **A dissolução tem que ser maior que o item que ela dissolve.**
+
+O bloco de testes do item 1 foi reescrito inteiro: ele afirmava a existência e a forma das sombras, e
+agora afirma a ausência delas e a regra da dissolução (maior que o balão médio, igual nas duas
+bordas, e só do lado que tem conteúdo escondido). Nada foi apagado sem substituto.

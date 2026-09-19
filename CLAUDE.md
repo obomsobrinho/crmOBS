@@ -536,11 +536,17 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
 - **Três mudanças de superfície em 19/09/2026 (ajustes do atendimento, `docs/design-system/
   fundamentos-superficie.md` tem o porquê inteiro):**
-  1. **A sombra de rolagem não é mais `box-shadow`.** É `.sombra-rolagem`, UM elemento absoluto por
-     borda DENTRO da área que rola (`data-borda="topo|fundo"`, `data-visivel="sim|nao"`), 8px de
-     degradê. Ela era `box-shadow` no `<header>`, e `box-shadow` pinta para FORA: com a faixa "O
-     cliente quer" entre o cabeçalho e a conversa, o borrão caía sobre uma superfície opaca e lia
-     como faixa cinza com borda. `.sombra-rolagem-topo` não existe mais.
+  1. ⚠️ **A SOMBRA DE ROLAGEM NÃO EXISTE MAIS**, nem de cima nem de baixo. Foram três tentativas no
+     mesmo dia: `box-shadow` no `<header>` (pintava para FORA e caía sobre a faixa "O cliente quer",
+     opaca, lendo como faixa cinza), depois um elemento absoluto por borda dentro da área que rola
+     (parou de invadir e continuou lendo como risco), e por fim nenhuma.
+     **Quem diz "tem mais conversa deste lado" é a DISSOLUÇÃO** (a prop `fade` do `ScrollArea`), que
+     já só aparece do lado com conteúdo escondido; o que separa cabeçalho e conversa é o `border-b`
+     dele. Duas regras saem daí, e valem para qualquer borda de área rolável:
+     **(a) um sinal por fato** (sombra em cima da dissolução é ruído, e foi o que gerou dois prints
+     do dono); **(b) a dissolução tem que ser MAIOR que o item que ela dissolve** — o padrão é 28px
+     e serve para lista de texto, a conversa passa **80** porque o balão dela tem 65px em média, e
+     em 28px ele não dissolve, ele é FATIADO. Por isso `fade` aceita número.
   2. **Variante `sutil` do `Input`**, para campo dentro de tabela de pares (a coluna do cliente):
      moldura visível ANTES do clique, altura de controle. ⚠️ A borda é `line` (8%) e não
      `line-soft`: no tema claro a coluna, `--input-bg` e `--s-campo` são todos `#fff`, então a cor
