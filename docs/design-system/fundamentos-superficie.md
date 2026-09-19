@@ -53,6 +53,24 @@ Três coisas saíram, e nenhuma mudou um pixel (o retrato numérico de 12 telas 
 - **O legado `--surface` e `--panel`.** A tag do contato foi para `bg-raised` e o separador de dia
   da conversa foi para `bg-bloco`; os dois destinos já tinham exatamente o mesmo valor da origem.
 
+## Textura
+
+**Fundo de rede neural** (`components/FundoRede.tsx`, classe `.fundo-rede`, token `--rede-forca`).
+Uma rede de nós ligados por fios, com ícones do domínio dentro de alguns nós, atrás da ÁREA DE
+MENSAGENS e de mais nada: não entra em cabeçalho, lista nem coluna do cliente. Força 7,5% no claro e
+5% no escuro, na cor da marca.
+
+É o único lugar do sistema com textura, e ele obedece a quatro regras:
+
+1. **SVG em `currentColor`, nunca imagem rasterizada.** Um raster não vira com o tema e ainda pesa
+   no bundle para servir de textura de 7%.
+2. **`<pattern>`, e não `background-image` com data URI.** Data URI não lê variável de CSS, então a
+   alternativa seria repetir o SVG inteiro no `globals.css`, uma vez por tema.
+3. **Não rola.** É absoluto no contêiner da conversa, irmão do ScrollArea, e o conteúdo passa por
+   cima. Padrão que anda com a rolagem chama atenção, e a decisão é discrição.
+4. **O balão vence o fundo, por construção.** Todo balão tem superfície OPACA, então o padrão só
+   pinta o vão entre balões e nunca fica atrás de texto. Há teste travando isso.
+
 ## Sombra
 
 | token | claro | escuro |

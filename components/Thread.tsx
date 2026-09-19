@@ -30,6 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import AiSummary from "./AiSummary";
+import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
@@ -706,12 +707,17 @@ export default function Thread({
           invadir o cabeçalho, a faixa do entendimento ou a caixa de escrita.
           Quem desenha a borda continua sendo o vizinho (`border-b` no
           cabeçalho); a sombra só diz que há conversa escondida atrás dela. */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col bg-msg">
+        {/* O fundo de rede neural, SÓ ATRÁS DAS MENSAGENS (pedido do dono). Ele
+            mora aqui, e não dentro do ScrollArea, porque assim não rola junto
+            com a conversa. ⚠️ A superfície `bg-msg` SUBIU do ScrollArea para
+            este contêiner: opaca lá dentro, ela cobriria o fundo. */}
+        <FundoRede />
         {/* ⚠️ Aqui a conversa GANHA largura, por decisão registrada: a barra
             nativa reservava 10px de layout e a do Radix é sobreposta. É a única
             mudança de pixel assumida nesta rodada. */}
         <ScrollArea
-          className="min-h-0 flex-1 bg-msg"
+          className="min-h-0 flex-1"
           viewportClassName="py-3"
           viewportRef={viewportRef}
           fade

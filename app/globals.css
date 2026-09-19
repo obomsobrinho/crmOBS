@@ -812,6 +812,22 @@ select:focus-visible,
     transparent
   );
 }
+/* Fundo de rede neural da conversa (19/09/2026), ver components/FundoRede.tsx.
+   A cor é a da MARCA e a força é um token por tema: no escuro ele fica mais
+   apagado ainda, por pedido do dono, porque sobre superfície escura o mesmo
+   valor lê mais forte. Nada aqui chega perto de texto: todo balão tem fundo
+   opaco, então o padrão só pinta o vão entre balões. */
+:root {
+  --rede-forca: 0.075;
+}
+[data-theme="dark"] {
+  --rede-forca: 0.05;
+}
+.fundo-rede {
+  color: var(--brand-ink);
+  opacity: var(--rede-forca);
+}
+
 .sombra-rolagem[data-borda="fundo"] {
   bottom: 0;
   background-image: linear-gradient(

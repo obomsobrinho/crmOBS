@@ -393,6 +393,82 @@ test.describe("Item 3: os dados do contato parecem editáveis", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// Item 4: fundo de rede neural atrás das mensagens
+//
+// Decisão do dono: só atrás das mensagens, bem discreto, nos dois temas (no
+// escuro mais apagado ainda). Não entra em cabeçalho, lista nem painel do
+// cliente.
+// ─────────────────────────────────────────────────────────────────────
+test.describe("Item 4: o fundo de rede fica só atrás das mensagens", () => {
+  test("existe atrás da conversa, e em nenhuma outra superfície", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const fundo = page.locator('[data-slot="fundo-rede"]');
+    await expect(fundo).toHaveCount(1);
+
+    const onde = await page.evaluate(() => {
+      const f = document.querySelector('[data-slot="fundo-rede"]')!;
+      const area = document
+        .querySelector('main [data-slot="scroll-area"]')!
+        .getBoundingClientRect();
+      const r = f.getBoundingClientRect();
+      return {
+        dentroDoCabecalho: !!f.closest("header"),
+        // A lista de conversas e a coluna do cliente são <aside>.
+        dentroDeAside: !!f.closest("aside"),
+        cobreAConversa:
+          Math.abs(r.top - area.top) < 2 && Math.abs(r.width - area.width) < 2,
+      };
+    });
+    expect(onde.dentroDoCabecalho).toBe(false);
+    expect(onde.dentroDeAside).toBe(false);
+    expect(onde.cobreAConversa).toBe(true);
+  });
+
+  test("é discreto, e o balão continua vencendo o fundo", async ({ page }) => {
+    await page.goto("/design");
+    const opacidade = await page
+      .locator('[data-slot="fundo-rede"]')
+      .evaluate((e) => Number(getComputedStyle(e).opacity));
+    expect(opacidade).toBeGreaterThan(0);
+    expect(opacidade).toBeLessThanOrEqual(0.12);
+
+    // ⚠️ O contraste do texto é garantido por CONSTRUÇÃO, não por calibragem:
+    // todo balão tem fundo OPACO, então o padrão nunca fica atrás de letra. O
+    // dia em que alguém puser um balão translúcido, este teste avisa.
+    const fundos = await page
+      .locator('[data-slot="conversa-balao"]')
+      .evaluateAll((els) =>
+        els.map((e) => getComputedStyle(e).backgroundColor)
+      );
+    expect(fundos.length).toBeGreaterThan(0);
+    for (const cor of fundos) {
+      const alfa = cor.startsWith("rgba") ? Number(cor.split(",")[3]) : 1;
+      expect(alfa, cor).toBe(1);
+    }
+  });
+
+  test("não anda com a rolagem", async ({ page }) => {
+    await page.goto("/design");
+    const fundo = page.locator('[data-slot="fundo-rede"]');
+    const antes = await fundo.evaluate((e) => e.getBoundingClientRect().top);
+    // Ele é irmão do ScrollArea e não filho do viewport: o conteúdo passa por
+    // cima dele. Um padrão que anda junto com a rolagem chama atenção, e a
+    // decisão do dono é discrição.
+    await page
+      .locator('main [data-slot="scroll-area-viewport"]')
+      .first()
+      .evaluate((el) => {
+        el.scrollTop = 0;
+      });
+    await expect
+      .poll(() => fundo.evaluate((e) => e.getBoundingClientRect().top))
+      .toBe(antes);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Item 5: IA e humano não podem atender a mesma conversa
 //
 // A invariante "IA e pessoa nunca atendem a mesma conversa" já era a regra de
