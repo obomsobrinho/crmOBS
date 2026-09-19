@@ -23,10 +23,19 @@ conversa e na área de mensagens.
 - `components/ui/scroll-area.tsx`, a máscara `fade` (gradiente com `ESMAECIMENTO`), que atua na MESMA
   região e pode estar somando com a sombra.
 
-**Suspeita a confirmar antes de mexer:** a rodada de design de 18/09 acrescentou sombra de painel na
-casa do composer e mudou superfícies; a sombra de rolagem provavelmente está sendo desenhada sobre
-uma superfície que agora tem outra cor, e o que era degradê virou bloco. **Reproduzir nos DOIS temas
-antes de alterar valor**, porque os tokens são diferentes por tema e o print veio do claro.
+⚠️ **São DUAS sombras, e o dono localizou as duas** (19/09, depois do print): uma **em cima do
+cabeçalho** e outra **logo abaixo da faixa "O cliente quer"**. Ele confirmou que **acontece nos dois
+temas** e que **resolver no claro resolve no escuro**, então não é calibragem de token por tema.
+
+Duas sombras em sequência apontam para empilhamento: o `<header>` e a faixa do entendimento são
+irmãos, os dois `shrink-0` com `z-10`, e a faixa entrou DEPOIS (18/09), entre o cabeçalho e a área
+rolável. A sombra que era do cabeçalho passou a cair sobre a faixa, e a faixa virou uma segunda borda
+com sombra própria. Conferir também se o `fade` do `ScrollArea` (máscara com `ESMAECIMENTO`) está
+somando com elas na mesma região: três degradês empilhados explicam a "faixa cinza com borda" do
+print melhor que qualquer valor de token.
+
+**Quem deve ter sombra é UM elemento só**, o último antes da área que rola. Provável conserto: a
+sombra sai do cabeçalho e passa para a faixa quando ela existe, em vez de os dois a desenharem.
 
 **Como fechar:** a sombra é sinal de "tem conteúdo além da borda". Ela pode sumir, mas a informação
 não: se o degradê não funcionar sobre a superfície nova, trocar por uma linha de 1px que aparece só
