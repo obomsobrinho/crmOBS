@@ -548,6 +548,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   3. **`.fundo-rede`** (`components/FundoRede.tsx`): a ÚNICA textura do sistema, só atrás da área de
      mensagens, SVG em `currentColor` com `<pattern>`, força por tema (`--rede-forca`). Não rola com
      a conversa e o balão sempre vence, porque todo balão é opaco.
+     ⚠️ **Ela DISSOLVE nas quatro bordas e tem a largura da COLUNA DE LEITURA (960px, centrada)**, e
+     as duas coisas são a mesma ideia: **fundo é o que passa por trás do conteúdo, e nunca deve ser
+     visto sozinho.** Sem a máscara ela acabava em corte seco na linha do composer, e como conversa e
+     composer têm a MESMA superfície, a única coisa que mudava ali era a textura ligar e desligar: o
+     dono leu a faixa resultante como sombra quebrada. Sem o limite de largura, em tela larga com as
+     colunas fechadas ela ficava sozinha nas calhas vazias ("as laterais estão ruins").
+     **Daí sai a regra da sombra de rolagem: ela tem a largura de quem a projeta.** A de cima é de
+     ponta a ponta (o cabeçalho é); a de baixo acompanha os 960px da caixa de escrita.
 - **Camada base shadcn/ui (`components/ui/`, 17 arquivos):** `button`, `input`, `textarea`,
   `badge`, `avatar`, `separator`, `card`, `scroll-area`, `dropdown-menu`, `switch`, `tabs`,
   `tooltip`, `dialog`, `sheet`, `select`, `checkbox`, `stat`. O `stat` (cartão de indicador) entrou

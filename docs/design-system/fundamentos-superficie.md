@@ -60,7 +60,9 @@ Uma rede de nós ligados por fios, com ícones do domínio dentro de alguns nós
 MENSAGENS e de mais nada: não entra em cabeçalho, lista nem coluna do cliente. Força 7,5% no claro e
 5% no escuro, na cor da marca.
 
-É o único lugar do sistema com textura, e ele obedece a quatro regras:
+É o único lugar do sistema com textura, e ele obedece a seis regras. As duas últimas nasceram de um
+segundo retorno do dono no mesmo dia, e as duas são a MESMA ideia dita de dois jeitos: **fundo é o
+que passa por trás do conteúdo, e nunca deve ser visto sozinho.**
 
 1. **SVG em `currentColor`, nunca imagem rasterizada.** Um raster não vira com o tema e ainda pesa
    no bundle para servir de textura de 7%.
@@ -70,6 +72,19 @@ MENSAGENS e de mais nada: não entra em cabeçalho, lista nem coluna do cliente.
    cima. Padrão que anda com a rolagem chama atenção, e a decisão é discrição.
 4. **O balão vence o fundo, por construção.** Todo balão tem superfície OPACA, então o padrão só
    pinta o vão entre balões e nunca fica atrás de texto. Há teste travando isso.
+5. **Dissolve nas quatro bordas** (`mask-image` com dois degradês cruzados por `mask-composite`).
+   ⚠️ Na primeira versão ela ia de ponta a ponta e ACABAVA em corte seco onde a caixa de escrita
+   começa. Como a conversa e o composer têm a MESMA superfície, a única coisa que mudava naquela
+   linha era a textura ligar e desligar, e o resultado era uma faixa cinza atravessando o cartão,
+   que o dono leu como sombra quebrada. Provado escondendo o SVG: a borda fica limpa.
+6. **Tem a largura da COLUNA DE LEITURA** (960px, centrada), e não a do cartão. Em tela larga com as
+   colunas laterais fechadas sobram centenas de pixels de superfície vazia dos dois lados, e lá a
+   textura não fica atrás de nada: fica sozinha. Onde não há conteúdo, textura é sujeira.
+
+**A regra que sai de (6) e vale além da textura: a sombra tem a largura de quem a projeta.** A de
+cima é de ponta a ponta porque o cabeçalho é; a de baixo acompanha os 960px porque quem a projeta é a
+caixa de escrita, branca e centrada. Na largura toda, ela atravessava as laterais vazias, onde acima
+e abaixo existe a mesma superfície e nada que projete coisa nenhuma.
 
 ## Sombra
 

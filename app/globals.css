@@ -823,13 +823,50 @@ select:focus-visible,
 [data-theme="dark"] {
   --rede-forca: 0.05;
 }
+/* ⚠️ A TEXTURA DISSOLVE NAS QUATRO BORDAS, e isso não é enfeite (19/09/2026,
+   segunda rodada). Na primeira versão ela ia de ponta a ponta e ACABAVA em corte
+   seco onde a caixa de escrita começa: como a conversa e o composer têm a MESMA
+   superfície, a única coisa que mudava naquela linha era a textura ligar e
+   desligar, e o resultado era uma faixa cinza atravessando o cartão inteiro, que
+   foi o segundo print do dono. Provado escondendo o SVG: a borda fica limpa.
+   Com a máscara, o padrão some antes de chegar na borda e não existe linha para
+   ver. Os dois degradês se cruzam por `mask-composite`. */
 .fundo-rede {
   color: var(--brand-ink);
   opacity: var(--rede-forca);
+  --rede-fade-y: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 40px,
+    #000 calc(100% - 72px),
+    transparent 100%
+  );
+  --rede-fade-x: linear-gradient(
+    to right,
+    transparent 0,
+    #000 120px,
+    #000 calc(100% - 120px),
+    transparent 100%
+  );
+  -webkit-mask-image: var(--rede-fade-y), var(--rede-fade-x);
+  mask-image: var(--rede-fade-y), var(--rede-fade-x);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
+/* ⚠️ A DE BAIXO ACOMPANHA A COLUNA DE LEITURA, e não a largura do cartão
+   (19/09/2026, segunda rodada). Quem projeta esta sombra é a CAIXA DE ESCRITA,
+   que é branca, tem 960px e fica centrada. Na largura toda, a sombra atravessava
+   as laterais vazias, onde acima e abaixo dela existe a mesma superfície e nada
+   que projete coisa nenhuma: ali ela lia como um risco solto, que é a queixa das
+   "laterais". A de cima continua de ponta a ponta porque quem a projeta, o
+   cabeçalho, também é. A regra: a sombra tem a largura de quem a projeta. */
 .sombra-rolagem[data-borda="fundo"] {
   bottom: 0;
+  left: 50%;
+  right: auto;
+  width: min(calc(100% - 40px), 960px);
+  transform: translateX(-50%);
   background-image: linear-gradient(
     to top,
     var(--sombra-rolagem-cor),

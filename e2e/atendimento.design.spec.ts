@@ -417,13 +417,98 @@ test.describe("Item 4: o fundo de rede fica só atrás das mensagens", () => {
         dentroDoCabecalho: !!f.closest("header"),
         // A lista de conversas e a coluna do cliente são <aside>.
         dentroDeAside: !!f.closest("aside"),
-        cobreAConversa:
-          Math.abs(r.top - area.top) < 2 && Math.abs(r.width - area.width) < 2,
+        // ⚠️ ATUALIZADO NA SEGUNDA RODADA DE 19/09: este teste exigia que a
+        // textura tivesse a LARGURA DA ÁREA. Ela passou a ter a largura da
+        // COLUNA DE LEITURA (no máximo 960px, centrada), porque em tela larga
+        // sobrava superfície vazia dos dois lados e lá a textura não fica atrás
+        // de nada, fica sozinha na tela. O que o teste sempre quis dizer é que
+        // ela cobre a conversa e nada além dela, e isso agora é "contida na
+        // área", medido junto com o confinamento no teste próprio abaixo.
+        colada: Math.abs(r.top - area.top) < 2,
+        contida: r.left >= area.left - 1 && r.right <= area.right + 1,
       };
     });
     expect(onde.dentroDoCabecalho).toBe(false);
     expect(onde.dentroDeAside).toBe(false);
-    expect(onde.cobreAConversa).toBe(true);
+    expect(onde.colada).toBe(true);
+    expect(onde.contida).toBe(true);
+  });
+
+  test("dissolve nas bordas, em vez de acabar em corte seco", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    // ⚠️ O DEFEITO QUE ESTE TESTE TRANCA, e ele chegou até o dono: a conversa e a
+    // caixa de escrita têm a MESMA superfície, então na linha onde uma acaba e a
+    // outra começa a única coisa que mudava era a textura ligar e desligar. O
+    // resultado era uma faixa cinza atravessando o cartão inteiro, que ele leu
+    // como sombra quebrada. Com a máscara o padrão some antes da borda e não
+    // existe linha para ver.
+    const mascara = await page
+      .locator('[data-slot="fundo-rede"]')
+      .evaluate((e) => {
+        const c = getComputedStyle(e);
+        return { imagem: c.maskImage, composicao: c.maskComposite };
+      });
+    // Dois degradês, um por eixo, cruzados: fade em cima, embaixo e nos dois
+    // lados. Um eixo só deixaria a borda do outro em pé.
+    expect(mascara.imagem.match(/linear-gradient/g) ?? []).toHaveLength(2);
+    expect(mascara.imagem).toMatch(/to right/);
+    expect(mascara.composicao).toMatch(/intersect/);
+  });
+
+  test("em tela larga a textura fica na coluna de leitura, não nas calhas", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1600, height: 950 });
+    await page.goto("/design");
+    // Com a coluna do cliente fechada a conversa passa dos 960px, que é o caso
+    // em que o dono viu o problema: "as laterais estão ruins". Fundo é o que
+    // passa por TRÁS do conteúdo; onde não há conteúdo, é só sujeira.
+    await page.getByRole("button", { name: "Ocultar cliente" }).click();
+    const medido = await page.evaluate(() => {
+      const f = document
+        .querySelector('[data-slot="fundo-rede"]')!
+        .getBoundingClientRect();
+      const area = document
+        .querySelector('main [data-slot="scroll-area"]')!
+        .getBoundingClientRect();
+      return {
+        textura: Math.round(f.width),
+        area: Math.round(area.width),
+        // Centrada: a calha que sobra é igual dos dois lados.
+        folgaEsquerda: Math.round(f.left - area.left),
+        folgaDireita: Math.round(area.right - f.right),
+      };
+    });
+    expect(medido.area).toBeGreaterThan(960);
+    expect(medido.textura).toBe(960);
+    expect(Math.abs(medido.folgaEsquerda - medido.folgaDireita)).toBeLessThan(2);
+  });
+
+  test("a sombra de baixo tem a largura de quem a projeta", async ({ page }) => {
+    await page.goto("/design");
+    // Quem projeta a sombra de baixo é a CAIXA DE ESCRITA, branca e centrada em
+    // 960px, e não o cartão. Na largura toda ela atravessava as laterais vazias,
+    // onde acima e abaixo existe a mesma superfície e nada que projete coisa
+    // nenhuma: lá ela lia como um risco solto. A de cima continua de ponta a
+    // ponta porque o cabeçalho também é.
+    const medido = await page.evaluate(() => {
+      const r = (s: string) =>
+        document.querySelector(s)!.getBoundingClientRect();
+      const fundo = r('[data-slot="sombra-rolagem"][data-borda="fundo"]');
+      const topo = r('[data-slot="sombra-rolagem"][data-borda="topo"]');
+      const form = r("main form");
+      const cabecalho = r("main header");
+      return {
+        fundo: [Math.round(fundo.left), Math.round(fundo.width)],
+        form: [Math.round(form.left), Math.round(form.width)],
+        topo: Math.round(topo.width),
+        cabecalho: Math.round(cabecalho.width),
+      };
+    });
+    expect(medido.fundo).toEqual(medido.form);
+    expect(medido.topo).toBe(medido.cabecalho);
   });
 
   test("é discreto, e o balão continua vencendo o fundo", async ({ page }) => {

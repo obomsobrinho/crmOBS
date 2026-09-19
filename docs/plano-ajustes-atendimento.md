@@ -214,3 +214,41 @@ que tenha passado o dia inteiro em "Tudo". Isso é intencional por enquanto, por
 "Hoje é o padrão ao abrir" e guardar a escolha (em `localStorage`) contradiz isso na segunda visita.
 Se a intenção era "Hoje na primeira vez, depois o que eu deixei", é uma linha de código, mas é
 decisão de produto e não de aplicação: fica aqui em vez de eu resolver sozinho.
+
+---
+
+## Segunda rodada do item 4 (19/09/2026)
+
+O dono voltou com um print do composer: "o sombreamento de cima ficou bom, mas do chat ainda está
+ruim, as laterais estão ruins".
+
+⚠️ **Não era a sombra, era a TEXTURA.** Provado escondendo o SVG no navegador: com
+`display:none` no `.fundo-rede`, a borda acima da caixa de escrita fica limpa, sem faixa nenhuma. A
+conversa e o composer têm a MESMA superfície (`bg-msg`), então na linha onde uma acaba e a outra
+começa a única coisa que mudava era a textura ligar e desligar. Um corte seco de textura sobre
+superfície contínua lê como faixa cinza atravessando o cartão, e foi isso que ele viu.
+
+E "as laterais" é o mesmo defeito pelo outro eixo: em 1920 com as colunas laterais fechadas, a
+conversa passa de 1690px enquanto a coluna de leitura tem 960, então sobravam ~365px de superfície
+vazia dos dois lados com textura em cima e nada por cima dela. **Fundo é o que passa por trás do
+conteúdo; onde não há conteúdo, é só sujeira.**
+
+Três mudanças:
+
+1. **A textura dissolve nas quatro bordas** (`mask-image` com dois degradês cruzados por
+   `mask-composite: intersect`). Ela some antes de chegar na borda, e não existe linha para ver.
+2. **A textura tem a largura da coluna de leitura** (960px, centrada). As calhas ficam limpas.
+3. **A sombra de baixo tem a largura de quem a projeta**, que é a caixa de escrita (960px, branca,
+   centrada), e não a do cartão. A de cima continua de ponta a ponta porque o cabeçalho também é.
+
+**Sobre o componente pronto: não existe.** O shadcn tem um utilitário `scroll-fade` (máscara por
+scroll-driven animations, sem JS), que é o mesmo trabalho que a prop `fade` do nosso `ScrollArea` já
+faz e que não resolveria nada disto: o defeito não era o esmaecimento, era a textura. E não há
+componente de padrão de fundo. Adotar o `scroll-fade` seria trocar código nosso equivalente por uma
+dependência, então ficou de fora.
+
+Testes: o que afirmava "a textura tem a largura da área" foi ATUALIZADO com o motivo (o que ele
+sempre quis dizer é "cobre a conversa e nada além dela", agora medido como contenção), e entraram
+três novos: a máscara existe nos dois eixos e cruza, em 1600 com a coluna do cliente fechada a
+textura fica em 960 centrados dentro de uma área maior, e a sombra de baixo tem exatamente o
+retângulo da caixa de escrita enquanto a de cima tem o do cabeçalho.
