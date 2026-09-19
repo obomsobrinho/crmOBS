@@ -46,12 +46,19 @@ test.describe("Bancada de teste dentro do /agente", () => {
       // nome brigaria com a identidade que a persona dele já declara no começo.
       const campo = page.locator("textarea").first();
       await expect(campo).toBeVisible();
-      const atual = await campo.inputValue();
+      // ⚠️ SUBSTITUI o texto inteiro, em vez de acrescentar ao do tenant. Duas
+      // razões, e a segunda só apareceu depois de a suíte falhar em dias
+      // diferentes com testes diferentes:
+      // 1. a persona do tenant de teste está a poucas dezenas de caracteres do
+      //    teto de `LIMITS.persona` (texto dele mais o rabo invariante da base),
+      //    então qualquer frase acrescentada faz a rota responder 400 "prompt
+      //    muito longo". A falha lia como bancada quebrada e era o limite;
+      // 2. o que este teste afirma é que a bancada manda o que está NA TELA, e
+      //    um prompt curto escrito aqui prova isso melhor: se a rota usasse a
+      //    persona salva, o corpo não teria esta frase.
+      // Nada é salvo, então trocar o texto da tela não toca no agente que atende.
       await campo.fill(
-        atual +
-          `
-
-Inclua sempre a palavra ${NOME_NOVO} em qualquer resposta que você der.`
+        `Você é ${NOME_NOVO}, atendente da loja. Responda em uma frase curta.`
       );
     } else {
       // A aba "Quem atende" é a que abre, e é onde mora o nome do agente.
@@ -111,7 +118,11 @@ Inclua sempre a palavra ${NOME_NOVO} em qualquer resposta que você der.`
 
     // E o cérebro real responde de verdade, em dryRun. O QUE ele respondeu não
     // entra em asserção, pelo motivo acima; que ele respondeu, sim.
-    expect((await resposta).status()).toBe(200);
+    // O corpo entra na MENSAGEM da asserção: quando isto falha, "esperava 200,
+    // veio 400" não diz nada, e o motivo ("prompt muito longo", "configuração
+    // incompleta") é exatamente o que separa bug de teste mal escrito.
+    const res = await resposta;
+    expect(res.status(), await res.text()).toBe(200);
 
     expect(salvamentos).toEqual([]);
   });

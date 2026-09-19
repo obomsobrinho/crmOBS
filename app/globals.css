@@ -248,6 +248,17 @@
   /* Barra da linha selecionada: o roxo da marca. Era a tinta principal, um
      preto que não existia em mais nada no produto. */
   --sel-bar: #6b21e8;
+  /* SUPERFÍCIE da linha selecionada, o par do `--sel-bar` acima.
+     Nasceu em 18/09/2026, ao aplicar o desenho do atendimento: a lista usava
+     `--active-bg` (preto a 5%) tanto no HOVER quanto na SELEÇÃO, e o efeito é o
+     que o dono do produto descreveu como "a conversa selecionada não está no
+     tom": um cinza neutro que, além de não ser da marca, some assim que o
+     ponteiro passa por cima de outra linha, porque as duas ficam da mesma cor.
+     É a marca diluída sobre o cartão (~9% de `--brand-fill`), medida na prancha.
+     ⚠️ Papel, não cor: quem seleciona linha usa este token; quem só destaca sob
+     o ponteiro continua em `--active-bg`. São dois estados, e por isso duas
+     cores. */
+  --sel-bg: #f3f0fc;
   /* Relevo do balão. Sem ele, balão branco sobre a conversa dá 1,05:1 e some. */
   --b-shadow: 0 1px 1px rgba(0, 0, 0, 0.16);
   /* ⚠️ FAXINA DE 30/08/2026. Saíram daqui `--s-lista`, `--s-lista-sel`,
@@ -403,6 +414,19 @@
   --chip-fg: #4b4468;
   --chip-line: rgba(58, 31, 122, 0.16);
 
+  /* ── Chip de filtro ATIVO (lista de conversas) ──
+     O desenho de 18/09/2026 marca o recorte ativo por INVERSÃO de tinta, e não
+     por peso da fonte: fundo na tinta principal, rótulo na superfície do
+     cartão. Antes o chip ativo se distinguia só por `font-semibold` mais uma
+     borda um degrau mais forte, e numa faixa de quatro chips isso não se lê a
+     um metro de distância, e a pessoa não sabia qual recorte estava vendo.
+     ⚠️ Definido com `var()` e NÃO repetido no bloco escuro de propósito:
+     `--ink` e `--raised` já viram por tema, então a inversão acontece sozinha
+     (no escuro vira chip claro com tinta escura, que é o que a prancha mostra).
+     Duplicar o valor aqui seria abrir a porta para os dois temas divergirem. */
+  --chip-ativo-bg: var(--ink);
+  --chip-ativo-fg: var(--raised);
+
   /* ── Escala de controle (altura) ──
      Quatro degraus, e não sete controles todos em 40px. Quem for do mesmo
      degrau tem a MESMA altura, sempre; o que muda é o peso visual.
@@ -482,6 +506,11 @@
   --s-msg: #0d0d0d;
   --s-campo: #1f1f1f;
   --sel-bar: #b98cff;
+  /* A mesma conta do claro, do outro lado: ~10% de `--brand-fill` sobre
+     `--raised`. Escrito como valor literal (e não `color-mix`) porque é assim
+     que todo o resto deste arquivo declara superfície, e uma cor calculada em
+     dois lugares diferentes é como os dois temas começam a discordar. */
+  --sel-bg: #211a2d;
   --b-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --s-bloco: #1f1f1f;
 

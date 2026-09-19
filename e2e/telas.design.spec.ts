@@ -190,7 +190,111 @@ test.describe("Lista de conversas redesenhada", () => {
     // A ordem é a da urgência, e é ela que responde "por onde eu começo?" sem
     // ninguém filtrar nada.
     const textos = (await grupos.allInnerTexts()).join(" | ");
-    expect(textos).toMatch(/Esperando você|Assumidas pelo time|A IA está atendendo/);
+    // Duas mudanças de 18/09/2026 nesta linha, e as duas são do desenho:
+    // 1. "IA atendendo" e não "A IA está atendendo": em caixa alta o artigo só
+    //    gastava largura.
+    // 2. A flag `i`. O rótulo virou `uppercase` no CSS, e `innerText` devolve o
+    //    texto COMO É PINTADO ("ESPERANDO VOCÊ"), não como está no JSX. Sem a
+    //    flag o teste falharia por causa da caixa, que é justamente o que o
+    //    papel `text-rotulo` existe para impor.
+    expect(textos).toMatch(/Esperando você/i);
+    expect(textos).toMatch(/Assumidas pelo time/i);
+    expect(textos).toMatch(/IA atendendo/i);
+  });
+
+  // ── O que a fidelidade ao desenho travou (18/09/2026) ────────────────
+  // Estes quatro nasceram de um retorno do dono na tela aplicada: "cores que não
+  // tem, filtros errados, conversa selecionada não está no tom". Nenhum deles
+  // checava nada antes, porque o esqueleto (agrupar, chip, contar) já passava
+  // com a cor errada.
+
+  test("cada grupo tem a SUA cor, e as três são diferentes", async ({ page }) => {
+    await page.goto("/design");
+    const grupos = page.locator('[data-slot="inbox-grupo"]');
+    await expect(grupos.first()).toBeVisible();
+    const cores = await grupos.evaluateAll((els) =>
+      els.map((e) => getComputedStyle(e).color)
+    );
+    expect(cores.length).toBeGreaterThanOrEqual(3);
+    // Eram três cabeçalhos cinza com um ponto âmbar no primeiro, e a lista lia
+    // como "uma seção que importa e duas sobras". Cada estado tem dono: âmbar é
+    // pendência, verde é humano, roxo é a IA.
+    expect(new Set(cores).size).toBe(cores.length);
+  });
+
+  test("a conversa aberta tem barra da marca e fundo PRÓPRIO, não o do hover", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const aberta = page.locator('[data-slot="inbox-item"][aria-current="page"]');
+    await expect(aberta).toBeVisible();
+    const medida = await aberta.evaluate((el) => {
+      const raiz = getComputedStyle(document.documentElement);
+      const barra = el.querySelector('[data-slot="inbox-barra"]') as HTMLElement;
+      const pinta = (v: string) => {
+        // Resolve o token para o mesmo formato que o getComputedStyle devolve.
+        const s = document.createElement("span");
+        s.style.color = v.trim();
+        document.body.appendChild(s);
+        const cor = getComputedStyle(s).color;
+        s.remove();
+        return cor;
+      };
+      return {
+        fundo: getComputedStyle(el).backgroundColor,
+        barra: getComputedStyle(barra).backgroundColor,
+        selBg: pinta(raiz.getPropertyValue("--sel-bg")),
+        selBar: pinta(raiz.getPropertyValue("--sel-bar")),
+        activeBg: pinta(raiz.getPropertyValue("--active-bg")),
+      };
+    });
+    // A barra é o roxo da marca, e a largura dela (3px) é o que o desenho pede.
+    expect(medida.barra).toBe(medida.selBar);
+    // ⚠️ E o fundo NÃO é `--active-bg`. Seleção e hover usavam a mesma cor, e
+    // por isso passar o ponteiro em outra linha apagava o "você está aqui".
+    expect(medida.fundo).toBe(medida.selBg);
+    expect(medida.fundo).not.toBe(medida.activeBg);
+  });
+
+  test("quem espera por você tem barra âmbar mesmo com a conversa fechada", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const barras = page.locator(
+      '[data-slot="inbox-item"]:not([aria-current]) [data-slot="inbox-barra"]'
+    );
+    await expect(barras.first()).toBeVisible();
+    const cores = await barras.evaluateAll((els) =>
+      els.map((e) => getComputedStyle(e).backgroundColor)
+    );
+    const pintadas = cores.filter((c) => !c.includes("rgba(0, 0, 0, 0)"));
+    // Exatamente uma no mock: a conversa com handoff aberto há 6h. Se TODAS
+    // tivessem barra, ela não diria nada; se nenhuma tivesse, a fila só
+    // apareceria depois de alguém filtrar.
+    expect(pintadas).toHaveLength(1);
+    expect(cores.length).toBeGreaterThan(1);
+  });
+
+  test("o chip de filtro ativo se distingue por COR, não só por peso", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const chips = page.locator('[data-slot="inbox-chip"]');
+    await expect(chips.first()).toBeVisible();
+    const fundos = await chips.evaluateAll((els) =>
+      els.map((e) => ({
+        ativo: e.getAttribute("data-ativo") === "sim",
+        fundo: getComputedStyle(e).backgroundColor,
+        tinta: getComputedStyle(e).color,
+      }))
+    );
+    const ativo = fundos.find((f) => f.ativo);
+    expect(ativo).toBeTruthy();
+    // O ativo inverte: fundo na tinta, rótulo na superfície. Antes ele mudava só
+    // `font-weight` e a borda um degrau, o que não se lê a um metro da tela.
+    for (const outro of fundos.filter((f) => !f.ativo)) {
+      expect(ativo!.fundo).not.toBe(outro.fundo);
+    }
   });
 
   test("o filtro mostra o número junto do rótulo", async ({ page }) => {

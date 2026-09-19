@@ -124,44 +124,13 @@ test.describe("Pipeline", () => {
     await expect.poll(() => page.locator(CARD).count()).toBe(cardsAntes);
   });
 
-  test("dono cria, renomeia e arquiva um estágio", async ({ page }) => {
-    const nome = `Teste e2e ${Date.now()}`;
-    const renomeado = `${nome} renomeado`;
-
-    await page.goto("/pipeline");
-    await page.waitForSelector(COLUNA, { timeout: 20_000 });
-    const antes = await page.locator(COLUNA).count();
-
-    await page.getByRole("button", { name: "Gerenciar estágios" }).click();
-    await expect(page.getByText("Estágios do pipeline")).toBeVisible();
-
-    // Criar: vira coluna no board, atrás do modal.
-    await page.getByLabel("Nome do novo estágio").fill(nome);
-    await page.getByRole("button", { name: "Criar" }).click();
-    await expect.poll(() => page.locator(COLUNA).count()).toBe(antes + 1);
-
-    // ⚠️ A linha do estágio NÃO se acha por `hasText`. O nome dela mora no
-    // `value` de um `<input>`, e `hasText` casa com texto de nó, não com valor de
-    // campo. Quem carrega o nome em texto acessível é o `aria-label` do punho de
-    // arraste ("Reordenar <nome>. Arraste, ou use as setas...").
-    const linhaDe = (n: string) =>
-      page.locator("li").filter({
-        has: page.locator(`[aria-label^="Reordenar ${n}."]`),
-      });
-
-    // Renomear: o campo salva no blur, e não num botão de salvar.
-    const linha = linhaDe(nome);
-    await linha.getByRole("textbox").fill(renomeado);
-    await linha.getByRole("textbox").blur();
-    await expect(page.locator(COLUNA, { hasText: renomeado })).toBeVisible();
-
-    // Arquivar: some do board. É o único jeito de tirar um estágio da tela, e é
-    // por isso que este teste se limpa arquivando em vez de apagando.
-    await linhaDe(renomeado)
-      .getByRole("button", { name: "Arquivar estágio" })
-      .click();
-    await expect.poll(() => page.locator(COLUNA).count()).toBe(antes);
-  });
+  // ⚠️ "dono cria, renomeia e arquiva um estágio" MUDOU DE ARQUIVO em
+  // 18/09/2026: foi para `pipeline.serial.spec.ts`. Ele CRIA e ARQUIVA estágio no
+  // tenant compartilhado e confere a contagem de colunas antes e depois; qualquer
+  // outro worker mexendo em estágio no meio disso derruba a contagem. A falha
+  // rodava entre testes diferentes a cada execução e lia como instabilidade do
+  // produto. É o mesmo motivo que criou o projeto `logado-serial`. Não trazer de
+  // volta para cá.
 
   test("arrastar um card muda a coluna E PERSISTE no banco", async ({
     page,

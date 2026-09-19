@@ -15,7 +15,18 @@ test.describe("Handoff na lista de conversas (/design)", () => {
     // O mock tem um handoff aberto há 6 horas. A espera vem do PRIMEIRO handoff
     // em aberto, que é a espera de verdade da pessoa.
     await expect(page.getByText("6h", { exact: true })).toBeVisible();
-    await expect(page.getByText(/esperando você/)).toBeVisible();
+    // ⚠️ A FRASE ENCURTOU em 18/09/2026, ao aplicar o desenho do atendimento: a
+    // espera saiu da linha da prévia (onde escrevia "6h · esperando você" NO
+    // LUGAR da última mensagem) e virou um chip próprio embaixo, com "6h
+    // esperando". O "você" saiu porque o cabeçalho do grupo logo acima já diz
+    // "Esperando você", e repetir dentro do item gastava a largura que o "· IA
+    // pausada" ocupa. A REGRA testada é a mesma: existe handoff em aberto e a
+    // lista diz há quanto tempo.
+    // `.first()`: o grupo "Esperando você" abre a lista, então o primeiro chip
+    // de estado é o dele. Os outros dizem quem assumiu.
+    await expect(
+      page.locator('[data-slot="inbox-estado"]').first()
+    ).toContainText(/esperando/);
   });
 
   test("IA pausada NÃO conta como precisa de você", async ({ page }) => {
@@ -30,7 +41,11 @@ test.describe("Handoff na lista de conversas (/design)", () => {
     await expect(urgente).toContainText("1");
     await urgente.click();
     await expect(page.getByRole("link", { name: /Franck/ })).toHaveCount(0);
-    await expect(page.getByText(/esperando você/)).toBeVisible();
+    // Mesma troca de frase do teste acima: o chip de estado passou a dizer "6h
+    // esperando", sem o "você" que o cabeçalho de grupo já carrega.
+    await expect(
+      page.locator('[data-slot="inbox-estado"]').first()
+    ).toContainText(/esperando/);
   });
 
   test("aviso de handoff é um campo do construtor", async ({ page }) => {
