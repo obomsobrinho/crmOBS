@@ -15,6 +15,10 @@ import { createClient } from "@/lib/supabase/client";
 import { formatBytes, type KnowledgeDoc } from "@/lib/crm";
 import { Button } from "@/components/ui/button";
 import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
+import {
   Sheet,
   SheetContent,
   SheetTitle,
@@ -283,12 +287,14 @@ export default function KnowledgeManager({
             </Button>
           </SheetClose>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        {/* Regra da casa: área rolável dissolve nas bordas. Formulário mais
+            lista, então o degrau é o padrão. */}
+        <AreaRolavel className="flex min-h-0 flex-1 flex-col gap-4 p-5">
           {avisoChave}
           {avisoErro}
           {areaArraste}
           {lista()}
-        </div>
+        </AreaRolavel>
       </SheetContent>
     </Sheet>
   );
@@ -366,7 +372,11 @@ export default function KnowledgeManager({
       {avisoErro}
       {areaArraste}
 
-      <div className="min-h-0 flex-1 overflow-y-auto">{lista()}</div>
+      {/* Lista de documentos: o degrau de LISTA, porque o item tem titulo,
+          estado e tamanho em tres linhas. */}
+      <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
+        {lista()}
+      </AreaRolavel>
     </div>
   );
 }

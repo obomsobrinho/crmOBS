@@ -21,6 +21,10 @@ import { avatarPair } from "@/lib/inbox";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -121,7 +125,10 @@ export default function TeamManager({
   }
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto">
+    <AreaRolavel
+      tamanho={DISSOLVER_LISTA}
+      className="flex min-h-0 min-w-0 flex-1 flex-col gap-5"
+    >
       {isOwner && (
         // `bg-bloco` e não a superfície de cartão: este formulário mora DENTRO
         // do cartão da página, e bloco é a superfície de quem mora dentro. Com
@@ -288,6 +295,6 @@ export default function TeamManager({
           </DialogContent>
         )}
       </Dialog>
-    </div>
+    </AreaRolavel>
   );
 }

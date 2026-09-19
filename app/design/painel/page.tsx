@@ -1,4 +1,8 @@
 import { LayoutDashboard } from "lucide-react";
+import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
 import NavRail from "@/components/NavRail";
 import PainelOperacaoBloco, {
   type JanelaCalculada,
@@ -320,7 +324,10 @@ export default function DesignPainelPage() {
       <NavRail clientName="Ótica Vision" activeHref="/painel" role="dono" />
       {/* Sem cartão de página, igual à tela real: os cartões flutuam sobre o
           canvas (`Stat variant="elevado"`). */}
-      <div className="flex min-w-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+      <AreaRolavel
+        tamanho={DISSOLVER_LISTA}
+        className="flex min-w-0 flex-1 flex-col gap-5 pr-1"
+      >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2">
@@ -420,7 +427,7 @@ export default function DesignPainelPage() {
             />
           </div>
         </div>
-      </div>
+      </AreaRolavel>
     </div>
   );
 }

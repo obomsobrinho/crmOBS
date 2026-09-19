@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DISSOLVER_BALAO } from "@/components/ui/dissolver-rolagem";
 import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
 import {
   Tooltip,
@@ -37,18 +38,6 @@ import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 import { memberName, memberInitials, type Member } from "@/lib/team";
-
-/**
- * Em quantos pixels a conversa se dissolve nas bordas.
- *
- * ⚠️ 80 e não os 28px padrão do `ScrollArea`, e o número é MEDIDO: o balão desta
- * tela tem 65px de altura em média e os mais longos passam de 77. Com 28px o
- * balão ainda estava em quase metade da opacidade quando a borda chegava, então
- * ele não dissolvia, ele era FATIADO, com o corte reto passando no meio de uma
- * linha de texto. Foi o print que o dono mandou em 19/09. A dissolução precisa
- * ser MAIOR que o item que ela dissolve; aqui ela cobre o balão inteiro.
- */
-const ESMAECIMENTO_CONVERSA = 80;
 
 type Pending = {
   tempId: string;
@@ -204,7 +193,7 @@ export default function Thread({
   //
   // O esmaecimento das pontas mora no ScrollArea (prop `fade`), porque as três
   // listas da tela precisam dele; o que é desta tela é só o TAMANHO dele
-  // (`ESMAECIMENTO_CONVERSA`).
+  // (`DISSOLVER_BALAO`).
   const bottomRef = useRef<HTMLDivElement>(null);
   /** O elemento que rola de verdade, dentro do ScrollArea. */
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -723,7 +712,9 @@ export default function Thread({
           className="min-h-0 flex-1"
           viewportClassName="py-3"
           viewportRef={viewportRef}
-          fade={ESMAECIMENTO_CONVERSA}
+          fade={DISSOLVER_BALAO}
+          seta
+          setaRotulo="Ver as mensagens mais recentes"
         >
           {/* COLUNA DE LEITURA de 960px, centrada (medida do desenho). A conversa
               ocupava a largura inteira do cartão, e em 1920 isso dá uma linha de
@@ -787,7 +778,7 @@ export default function Thread({
         {/* ⚠️ NÃO EXISTE SOMBRA DE ROLAGEM EM BORDA NENHUMA, e as duas saíram em
             19/09/2026, a de baixo primeiro e a de cima logo depois, a pedido do
             dono ("aplique o mesmo no header"). Quem diz "tem mais conversa deste
-            lado" é a DISSOLUÇÃO (`ESMAECIMENTO_CONVERSA`), que já só aparece
+            lado" é a DISSOLUÇÃO (`DISSOLVER_BALAO`), que já só aparece
             quando há conteúdo escondido daquele lado. Empilhar uma sombra de 8px
             em cima de 80px de degradê é um segundo sinal para o mesmo fato, no
             mesmo lugar, e é isso que lia como sujeira na borda.

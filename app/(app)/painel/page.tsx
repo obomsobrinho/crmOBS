@@ -15,6 +15,10 @@ import {
 import PainelAssuntos from "@/components/painel/PainelAssuntos";
 import ValorResumo from "@/components/ValorResumo";
 import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
+import {
   barras,
   computeMetrics,
   esperaLegivel,
@@ -285,7 +289,10 @@ export default async function PainelPage() {
   // de token: `--s-bloco` claro é igual ao `--canvas`, então cartão `bloco`
   // dentro de cartão branco ficaria um degrau ABAIXO da casca.
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-1">
+    <AreaRolavel
+      tamanho={DISSOLVER_LISTA}
+      className="flex min-h-0 flex-1 flex-col gap-5 pr-1"
+    >
       {/* Cabeçalho: título à esquerda, fila à direita, na MESMA linha. A fila
           saiu da trilha porque `/painel` é onde o dono cai ao entrar, e o que
           ele precisa saber primeiro é se tem gente esperando. */}
@@ -382,6 +389,6 @@ export default async function PainelPage() {
           )}
         </div>
       </div>
-    </div>
+    </AreaRolavel>
   );
 }

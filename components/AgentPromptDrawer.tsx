@@ -11,6 +11,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { Button } from "@/components/ui/button";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import {
   Sheet,
   SheetTrigger,
@@ -143,7 +144,9 @@ export default function AgentPromptDrawer({
           </SheetClose>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        {/* Regra da casa: area rolavel dissolve nas bordas. Texto corrido,
+            entao o degrau e o padrao. */}
+        <AreaRolavel className="min-h-0 flex-1 p-5">
           {/* 12px é o piso da interface, e o prompt não abre exceção. */}
           <pre className="rounded-xl border border-line bg-[var(--input-bg)] p-3.5 font-sans text-legenda leading-[19px] break-words whitespace-pre-wrap text-ink-2">
             {texto || "Preencha os campos para gerar o prompt."}
@@ -232,7 +235,7 @@ export default function AgentPromptDrawer({
               </p>
             </div>
           )}
-        </div>
+        </AreaRolavel>
 
         <div className="flex items-center justify-between gap-2 border-t border-line p-4">
           {vendo ? (

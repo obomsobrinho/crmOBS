@@ -4,6 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { ChevronDown, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
 
 // "Assuntos em alta": o que mais perguntam para a IA, em acordeão.
 //
@@ -104,7 +108,10 @@ export default function PainelAssuntos({
            cartão para baixo e abria um vão entre a operação e o movimento na
            coluna ao lado. Com a rolagem, quem manda na altura é a grade da
            página, e a linha de base dos dois lados fecha. */
-        <div className="min-h-0 flex-1 divide-y divide-line-soft overflow-y-auto">
+        <AreaRolavel
+          tamanho={DISSOLVER_LISTA}
+          className="min-h-0 flex-1 divide-y divide-line-soft"
+        >
           {itens.map((it, i) => {
             const estaAberto = aberto === i;
             return (
@@ -198,9 +205,9 @@ export default function PainelAssuntos({
               </div>
             );
           })}
-        </div>
+        </AreaRolavel>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <AreaRolavel className="min-h-0 flex-1 px-6 py-4">
           {/* ⚠️ Número literalmente `XX`, rótulo POSICIONAL e barra CINZA. Um
               valor plausível, mesmo borrado, é indistinguível de medição num
               print ampliado, e "a IA não inventa" é o eixo do produto. */}
@@ -236,7 +243,7 @@ export default function PainelAssuntos({
             Ver os pedidos recentes
             <ArrowRight size={13} aria-hidden />
           </Link>
-        </div>
+        </AreaRolavel>
       )}
     </section>
   );

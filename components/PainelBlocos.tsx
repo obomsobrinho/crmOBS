@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, MessageSquareQuote, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
 
 // Blocos pequenos do painel, sem estado, juntos num arquivo só para a página não
@@ -234,13 +235,13 @@ export function PainelUltimaResposta({
       {/* Uma linha por mensagem, como saiu no WhatsApp: o agente responde em 1
           ou 2 mensagens, e juntar as duas num parágrafo só faria a citação
           parecer um texto corrido que ele nunca mandou. */}
-      <div className="mt-1.5 min-h-0 flex-1 space-y-1.5 overflow-y-auto border-l-2 border-brand-line pl-3">
+      <AreaRolavel className="mt-1.5 min-h-0 flex-1 space-y-1.5 border-l-2 border-brand-line pl-3">
         {mensagens.map((m, i) => (
           <p key={i} className="text-corpo italic text-ink-2">
             {m}
           </p>
         ))}
-      </div>
+      </AreaRolavel>
 
       {/* Rodapé de duas pontas: quando e para quem à esquerda, o caminho para a
           conversa à direita. */}

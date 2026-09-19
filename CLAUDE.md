@@ -536,6 +536,18 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
 - **Três mudanças de superfície em 19/09/2026 (ajustes do atendimento, `docs/design-system/
   fundamentos-superficie.md` tem o porquê inteiro):**
+  0. ⚠️ **REGRA DA CASA: TODA ÁREA QUE ROLA DISSOLVE NAS BORDAS** (`components/ui/dissolver-rolagem.tsx`),
+     e ela vale em toda tela, não só onde alguém lembrou (há `e2e/rolagem.design.spec.ts` varrendo as
+     telas e falhando em qualquer rolável sem máscara). Aplica-se com **`<AreaRolavel>`** no lugar do
+     `div` com `overflow-y-auto` (ele já embute o `overflow`) ou com a prop `fade` do `ScrollArea`;
+     o hook `useDissolverRolagem` é para quem precisa de outra tag (um `<pre>`) ou do `temMais`.
+     **Três degraus, escolhidos pela ALTURA DO ITEM medida no navegador:** `DISSOLVER_PADRAO` 32,
+     `DISSOLVER_LISTA` 72, `DISSOLVER_BALAO` 80.
+     **A seta `SetaMais`** ("tem mais coisa embaixo", clicar leva ao fim) fica **só onde rolar é a
+     navegação**: conversa e lista de conversas.
+     ⚠️ **EXCEÇÃO REAL: área rolável com filho `sticky` NÃO recebe a máscara**, porque ela dissolve
+     todo o conteúdo do contêiner e apagaria o elemento grudado na borda. É por isso que `/agente`
+     ficou de fora (rodapé `sticky bottom-0` com o Salvar).
   1. ⚠️ **A SOMBRA DE ROLAGEM NÃO EXISTE MAIS**, nem de cima nem de baixo. Foram três tentativas no
      mesmo dia: `box-shadow` no `<header>` (pintava para FORA e caía sobre a faixa "O cliente quer",
      opaca, lendo como faixa cinza), depois um elemento absoluto por borda dentro da área que rola

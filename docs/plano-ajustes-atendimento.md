@@ -302,3 +302,39 @@ conversa passa por baixo dissolvendo em 80px.
 O bloco de testes do item 1 foi reescrito inteiro: ele afirmava a existência e a forma das sombras, e
 agora afirma a ausência delas e a regra da dissolução (maior que o balão médio, igual nas duas
 bordas, e só do lado que tem conteúdo escondido). Nada foi apagado sem substituto.
+
+---
+
+## A regra virou regra, e a seta entrou (19/09/2026)
+
+"Pode aplicar isso em todos os lugares que temos scroll, coloque como regra, seria bom também ter
+aquela setinha falando que algo está abaixo."
+
+**A regra e o mecanismo agora moram em `components/ui/dissolver-rolagem.tsx`**, e não mais dentro do
+`ScrollArea`: metade das áreas roláveis da casa é um `div` com `overflow-y-auto`, não o componente.
+Quem aplica é `<AreaRolavel>`, que troca o `div` sem mexer em classe nem em layout e **funciona
+dentro de `map`**, onde um hook não funcionaria (a coluna do funil é uma por estágio).
+
+Aplicado em: conversa, lista de conversas, coluna do cliente, painel, perfil, pipeline (colunas e
+gestão de estágios), base de conhecimento (painel e lista), equipe, bancada de teste, assuntos do
+painel, citação do agente, prompt gerado e o rabo fixo da base.
+
+**Três degraus nomeados**, escolhidos pela altura do item MEDIDA no navegador: `DISSOLVER_PADRAO` 32,
+`DISSOLVER_LISTA` 72, `DISSOLVER_BALAO` 80.
+
+**A seta** (`SetaMais`) aparece quando sobrou conteúdo embaixo e, ao ser clicada, leva ao fim. Ela
+não fura a regra "um sinal por fato" porque também É um atalho. Fica só na conversa e na lista de
+conversas, que são os dois lugares onde rolar é a navegação.
+
+⚠️ **Uma exceção real, achada ao aplicar: área rolável com filho `sticky` não recebe a máscara.** A
+máscara dissolve todo o conteúdo do contêiner, inclusive o que está grudado na borda, então o rodapé
+`sticky bottom-0` do `/agente` apagaria junto com a rolagem. Aquela tela ficou de fora, e qualquer
+área nova com rodapé grudado fica também.
+
+⚠️ **CSS puro foi tentado e medido.** A técnica de `animation-timeline: scroll(self y)` (a mesma do
+utilitário `scroll-fade` do shadcn) resolveria tudo com uma classe, inclusive nas páginas: o
+`@supports` passa e as animações entram em `running`, mas a `ScrollTimeline` fica com `currentTime`
+nulo e não avança. Ficou o mecanismo por JS, que funciona e é um só.
+
+`e2e/rolagem.design.spec.ts` varre seis telas procurando qualquer elemento com rolagem real e sem
+máscara, e falha se aparecer um. É ele que faz "regra" significar regra, e não intenção.

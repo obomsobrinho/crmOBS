@@ -110,15 +110,38 @@ no mesmo dia, e a última é a conclusão, não mais uma variação.
    `ScrollArea`), que já só aparece do lado que tem conteúdo escondido. O que separa o cabeçalho da
    conversa é o `border-b` dele, que sempre esteve lá.
 
-**Duas regras saem daí, e valem para qualquer borda de área rolável:**
+## Área rolável
+
+**REGRA DA CASA, e ela vale em toda tela: toda área que rola dissolve nas bordas, e nunca corta o
+conteúdo numa linha reta.** Quem implementa é `components/ui/dissolver-rolagem.tsx`.
+
+Três coisas saem dela, e nenhuma é opcional:
 
 - **Um sinal por fato.** Se a dissolução já diz que há conteúdo escondido, uma sombra em cima dela é
-  ruído. Foi assim que ela foi parar em dois prints do dono.
-- **A dissolução tem que ser MAIOR que o item que ela dissolve.** O padrão do `ScrollArea` é 28px e
-  serve para lista de texto sobre superfície lisa; a conversa passa 80px porque o balão dela tem
-  65px em média. Em 28px o balão ainda está em quase metade da opacidade quando a borda chega: ele
-  não dissolve, ele é **fatiado**, com o corte reto no meio de uma linha de texto. Por isso `fade`
-  aceita um número, e quem tem item alto e opaco passa o seu.
+  ruído. Foi assim que a sombra de rolagem foi parar em dois prints do dono.
+- **A dissolução tem que ser MAIOR que o item que ela dissolve.** Em 28px um balão de 65px ainda
+  está em quase metade da opacidade quando a borda chega: ele não dissolve, é **fatiado**, com o
+  corte reto no meio de uma linha de texto. Daí os três degraus, escolhidos pela **altura do item
+  medida no navegador**, nunca por gosto: `DISSOLVER_PADRAO` 32 (texto corrido, formulário),
+  `DISSOLVER_LISTA` 72 (item de lista com mais de uma linha) e `DISSOLVER_BALAO` 80 (a conversa).
+  Teto implícito: uns 15% da altura da área, senão a dissolução deixa de ser borda e vira tarja.
+- **A seta (`SetaMais`) só onde ROLAR É A NAVEGAÇÃO**, hoje a conversa e a lista de conversas. Ela
+  não fura a regra "um sinal por fato" porque **também faz alguma coisa**: clicar leva ao fim. Num
+  bloco curto de formulário, um botão flutuante sobre o conteúdo é mais ruído do que ajuda.
+
+**Como aplicar:** `<AreaRolavel>` no lugar do `div` com `overflow-y-auto` (ele já embute o
+`overflow`), ou a prop `fade` do `ScrollArea`. O hook `useDissolverRolagem` fica para quem precisa do
+elemento ser outra tag (um `<pre>`) ou do `temMais` para outra coisa.
+
+⚠️ **A EXCEÇÃO, e ela é real: área rolável com filho `sticky` não recebe a máscara.** A máscara
+dissolve TODO o conteúdo do contêiner, inclusive o que está grudado na borda, então o rodapé
+`sticky bottom-0` do `/agente` apagaria junto. Por isso aquela tela ficou de fora, e qualquer área
+nova com rodapé grudado fica também.
+
+⚠️ **Não é CSS puro, e não por falta de tentativa.** A técnica de `animation-timeline: scroll(self y)`
+(a mesma do utilitário `scroll-fade` do shadcn) foi medida aqui em 19/09/2026: o `@supports` passa,
+as animações entram em `running` e a `ScrollTimeline` fica com `currentTime` nulo, ou seja, não
+avança. Medir e aplicar por JS funciona, está coberto por teste e é um mecanismo só.
 
 ## Tema
 

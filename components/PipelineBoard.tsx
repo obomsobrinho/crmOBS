@@ -45,6 +45,10 @@ import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
 import { Card } from "@/components/ui/card";
 import {
   Dialog,
@@ -583,7 +587,14 @@ export default function PipelineBoard({
                   ) : null;
                 })()}
               </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+              {/* Regra da casa: area rolavel dissolve nas bordas. Degrau de
+                  LISTA, porque o item aqui e um card de tres linhas.
+                  ⚠️ COMPONENTE e nao o hook: esta area e UMA POR ESTAGIO, e
+                  chamar o hook dentro do map seria hook em laco. */}
+              <AreaRolavel
+                tamanho={DISSOLVER_LISTA}
+                className="flex min-h-0 flex-1 flex-col gap-2 p-2"
+              >
                 {colCards.length === 0 && (
                   // "Nenhuma conversa aqui" e não "Vazio": vazio descreve a caixa,
                   // a frase descreve o funil, e é o funil que a pessoa está lendo.
@@ -601,7 +612,7 @@ export default function PipelineBoard({
                     }
                   />
                 ))}
-              </div>
+              </AreaRolavel>
             </div>
           );
         })}
@@ -799,7 +810,7 @@ function StageManager({
           </DialogClose>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        <AreaRolavel className="flex min-h-0 flex-1 flex-col gap-4 p-5">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -882,7 +893,7 @@ function StageManager({
             Os estágios Novo, Qualificado e Aguardando atendimento são usados pela
             IA para mover o card sozinha. Você pode renomeá-los e reordená-los.
           </DialogDescription>
-        </div>
+        </AreaRolavel>
       </DialogContent>
     </Dialog>
   );

@@ -23,6 +23,7 @@ import {
 import { AvisoCache, Banner, ConfirmModal } from "./agente/ui";
 import { useAgentConfig, type Mode } from "./agente/useAgentConfig";
 import { Button } from "@/components/ui/button";
+import { useDissolverRolagem } from "@/components/ui/dissolver-rolagem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -131,6 +132,15 @@ export default function AgentConfigForm({
 
   const [aba, setAba] = useState<Aba>("quem");
   const [bancadaAberta, setBancadaAberta] = useState(false);
+  // Regra da casa: área rolável dissolve nas bordas. Este é o bloco do rabo
+  // invariante da base, texto corrido, então o degrau é o padrão.
+  // ⚠️ Desestruturado: ler propriedade de um objeto que carrega ref durante o
+  // render é erro de `react-hooks/refs`. Ver a nota em `AreaRolavel`.
+  const {
+    ref: raboRef,
+    style: raboStyle,
+    onScroll: raboOnScroll,
+  } = useDissolverRolagem<HTMLPreElement>(undefined, [form.baseTail]);
 
   const comErro = abasComErro(form.fields);
   const semCacheAvancado =
@@ -371,7 +381,14 @@ export default function AgentConfigForm({
               <Lock size={13} />
               Fixo, sempre no fim do seu prompt
             </div>
-            <pre className="max-h-64 overflow-y-auto rounded-xl border border-line bg-[var(--input-bg)] p-3.5 font-sans text-legenda leading-[19px] break-words whitespace-pre-wrap text-ink-3">
+            {/* Hook e nao <AreaRolavel>: aquele renderiza <div>, e aqui o
+                elemento precisa ser <pre> para preservar o texto do prompt. */}
+            <pre
+              ref={raboRef}
+              style={raboStyle}
+              onScroll={raboOnScroll}
+              className="max-h-64 overflow-y-auto rounded-xl border border-line bg-[var(--input-bg)] p-3.5 font-sans text-legenda leading-[19px] break-words whitespace-pre-wrap text-ink-3"
+            >
               {form.baseTail}
             </pre>
           </div>

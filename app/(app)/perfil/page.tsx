@@ -2,6 +2,7 @@ import { User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
 import ChangePassword from "@/components/ChangePassword";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { statusLabel } from "@/lib/billing";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -43,7 +44,7 @@ export default async function PerfilPage() {
       </div>
       <p className="mb-5 text-apoio text-ink-2">Dados da sua conta.</p>
 
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto">
+      <AreaRolavel className="min-h-0 flex-1 space-y-5">
         <div className="max-w-xl rounded-xl border border-line bg-bloco">
           {rows.map((r, i) => (
             <div
@@ -59,7 +60,7 @@ export default async function PerfilPage() {
         </div>
 
         <ChangePassword email={user?.email ?? ""} />
-      </div>
+      </AreaRolavel>
     </div>
   );
 }

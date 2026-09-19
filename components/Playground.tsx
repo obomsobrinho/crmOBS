@@ -5,6 +5,10 @@ import { Send, Sparkles } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import { Button } from "@/components/ui/button";
+import {
+  AreaRolavel,
+  DISSOLVER_BALAO,
+} from "@/components/ui/dissolver-rolagem";
 import { Textarea } from "@/components/ui/textarea";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
@@ -196,7 +200,12 @@ export default function Playground({
         {/* ESQUERDA: Conversa. `bg-msg` é a superfície de área de mensagens, a
             mesma da tela de atendimento: aqui também é onde os balões moram. */}
         <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-msg">
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-4">
+          {/* A bancada tem os mesmos baloes da conversa, entao o mesmo degrau. */}
+          <AreaRolavel
+            ref={scrollRef}
+            tamanho={DISSOLVER_BALAO}
+            className="flex-1 space-y-3 p-4"
+          >
             {turns.length === 0 ? (
               <div className="flex h-full items-center justify-center px-6 text-center text-apoio text-ink-3">
                 Mande a primeira mensagem para testar o atendimento da IA.
@@ -235,7 +244,7 @@ export default function Playground({
                 );
               })
             )}
-          </div>
+          </AreaRolavel>
           <div className="border-t border-line p-3">
             <div className="flex items-end gap-2">
               <Textarea
@@ -270,7 +279,7 @@ export default function Playground({
         {/* DIREITA: Diagnóstico do turno, em coluna única. Eram duas colunas
             quando isto era tela cheia; dentro do painel lateral a largura é
             menor, e dois painéis lado a lado viravam duas colunas estreitas. */}
-        <div className="flex shrink-0 flex-col gap-3 overflow-y-auto lg:w-[380px]">
+        <AreaRolavel className="flex shrink-0 flex-col gap-3 lg:w-[380px]">
           <ClassificationPanel
             diag={lastDiag}
             simStage={simStage}
@@ -285,7 +294,7 @@ export default function Playground({
             sending={sending}
           />
           <SummaryPanel diag={lastDiag} />
-        </div>
+        </AreaRolavel>
       </div>
     </div>
   );

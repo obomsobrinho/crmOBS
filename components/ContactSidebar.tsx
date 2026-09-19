@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import {
   Tooltip,
   TooltipContent,
@@ -573,7 +574,12 @@ export default function ContactSidebar({
         </div>
       </div>
 
-      <ScrollArea fade className="min-h-0 flex-1">
+      <ScrollArea
+        fade={DISSOLVER_LISTA}
+        seta
+        setaRotulo="Ver as conversas de baixo"
+        className="min-h-0 flex-1"
+      >
         {results.length === 0 && (
           <div className="p-4 text-apoio text-ink-3">
             {query.trim()

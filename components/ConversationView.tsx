@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
 import ContextPanel from "./ContextPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { createClient } from "@/lib/supabase/client";
 import { anunciarIa } from "@/lib/ia-bus";
 import type { Member } from "@/lib/team";
@@ -329,7 +330,7 @@ export default function ConversationView({
       </div>
       {showContext && (
         <aside className="hidden w-[296px] shrink-0 border-l border-line bg-raised lg:block">
-          <ScrollArea fade className="h-full">
+          <ScrollArea fade={DISSOLVER_LISTA} className="h-full">
             <ContextPanel
               name={name}
               phone={phone}
