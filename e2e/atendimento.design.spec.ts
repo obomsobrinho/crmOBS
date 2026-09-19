@@ -197,6 +197,99 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// Item 3: a edição dos dados do contato não parecia editável
+//
+// "Custei perceber que podia digitar ali." Os campos usavam a variante `limpo`
+// do Input: texto puro até o clique. O ajuste é de AFFORDANCE, não de arranjo,
+// então a tabela de pares de 18/09 (rótulo à esquerda, valor à direita, fio por
+// linha) continua igual.
+// ─────────────────────────────────────────────────────────────────────
+test.describe("Item 3: os dados do contato parecem editáveis", () => {
+  test("o campo tem moldura e altura de controle ANTES de qualquer clique", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const linhas = page.locator('[data-slot="painel-dado"]');
+    await expect(linhas.first()).toBeVisible();
+
+    const campos = await linhas
+      .locator("input")
+      .evaluateAll((els) =>
+        els.map((e) => {
+          const c = getComputedStyle(e);
+          return {
+            rotulo: e.getAttribute("aria-label"),
+            altura: Math.round(e.getBoundingClientRect().height),
+            larguraDaBorda: c.borderTopWidth,
+            corDaBorda: c.borderTopColor,
+            cursor: c.cursor,
+            marcador: (e as HTMLInputElement).placeholder,
+          };
+        })
+      );
+    expect(campos.length).toBeGreaterThan(0);
+    for (const campo of campos) {
+      // ⚠️ Nada aqui foi tocado, nem focado. É esse o ponto: o defeito era o
+      // campo só existir DEPOIS do clique, então medir com foco provaria o
+      // contrário do que o teste diz.
+      expect(campo.larguraDaBorda, campo.rotulo!).toBe("1px");
+      // Borda transparente é o mesmo que borda nenhuma, e foi assim que a
+      // primeira tentativa deste ajuste passou sem resolver nada: no tema claro
+      // a coluna, `--input-bg` e `--s-campo` são todos brancos, então só a cor
+      // da borda distingue o campo do texto.
+      expect(campo.corDaBorda, campo.rotulo!).not.toMatch(/, 0\)$|transparent/);
+      // Altura de controle (32px), e não a linha de texto de antes.
+      expect(campo.altura, campo.rotulo!).toBe(32);
+      expect(campo.cursor, campo.rotulo!).toBe("text");
+      // E o marcador CONVIDA, em vez de descrever ("Não informado" era laudo).
+      expect(campo.marcador, campo.rotulo!).toMatch(/Adicionar|Nome do campo/);
+    }
+  });
+
+  test("criar campo é um controle, e não um texto de rodapé", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const botao = page.getByRole("button", { name: "+ Adicionar campo" });
+    await expect(botao).toBeVisible();
+    const medido = await botao.evaluate((e) => {
+      const c = getComputedStyle(e);
+      return {
+        altura: Math.round(e.getBoundingClientRect().height),
+        estilo: c.borderTopStyle,
+        largura: c.borderTopWidth,
+      };
+    });
+    // Tracejado porque a linha ainda NÃO existe, no mesmo vocabulário do chip
+    // "Ninguém assumiu ainda" do cabeçalho.
+    expect(medido.estilo).toBe("dashed");
+    expect(medido.largura).toBe("1px");
+    expect(medido.altura).toBe(32);
+
+    // E ele cria a linha de verdade, com os dois campos prontos para digitar.
+    const antes = await page.locator('[data-slot="painel-dado"]').count();
+    await botao.click();
+    await expect(page.locator('[data-slot="painel-dado"]')).toHaveCount(
+      antes + 1
+    );
+    await expect(
+      page.getByPlaceholder("Nome do campo").last()
+    ).toBeVisible();
+  });
+
+  test("a tabela de pares continua de pé", async ({ page }) => {
+    await page.goto("/design");
+    // ⚠️ O ajuste é de affordance e NÃO pode desfazer o desenho de 18/09: é o
+    // alinhamento à direita que faz os valores formarem uma segunda margem, e
+    // sem o fio por linha a coluna volta a ler como texto corrido.
+    const linha = page.locator('[data-slot="painel-dado"]').first();
+    await expect(linha).toHaveCSS("border-bottom-width", "1px");
+    await expect(linha.locator("input").last()).toHaveCSS("text-align", "right");
+    await expect(linha.locator("> span").first()).toHaveCSS("width", "86px");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Item 5: IA e humano não podem atender a mesma conversa
 //
 // A invariante "IA e pessoa nunca atendem a mesma conversa" já era a regra de

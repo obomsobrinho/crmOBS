@@ -69,9 +69,13 @@ test.describe("Inbox (/design)", () => {
     // com Cancelar e Salvar: eram três cliques para corrigir uma letra. Agora
     // cada linha é o próprio campo e grava ao perder o foco.
     await expect(page.getByRole("button", { name: "Editar" })).toHaveCount(0);
-    await expect(
-      page.getByPlaceholder("Como você chama este contato")
-    ).toBeVisible();
+    // ⚠️ ATUALIZADO EM 19/09/2026: o marcador do campo de nome era "Como você
+    // chama este contato". Ele descrevia em vez de convidar, e não cabia num
+    // campo de 145px. Virou "Adicionar nome", junto com a correção de
+    // affordance do item 3 (`e2e/atendimento.design.spec.ts`). O que este teste
+    // afirma continua sendo o mesmo: o campo já está na tela, sem passo de abrir
+    // formulário.
+    await expect(page.getByPlaceholder("Adicionar nome")).toBeVisible();
     // Sem Cancelar e Salvar: gravar ao perder o foco é o que tirou os cliques.
     await expect(page.getByRole("button", { name: "Salvar" })).toHaveCount(0);
   });

@@ -31,6 +31,13 @@ import {
 // O cabeçalho do bloco também mudou: o rótulo "DADOS" ganhou um FILETE que
 // ocupa o resto da linha, que é o que separa um bloco do outro agora que a
 // coluna não tem mais borda entre seções.
+//
+// ⚠️ AFFORDANCE CORRIGIDA EM 19/09/2026, e ela NÃO desfaz a tabela de pares: o
+// rótulo continua à esquerda, o valor à direita e o fio fecha cada linha. O que
+// mudou é que o valor virou um campo VISÍVEL antes do clique (variante `sutil`
+// do Input, moldura discreta na altura de controle), porque o dono disse
+// "custei perceber que podia digitar ali". Campo que só vira campo depois do
+// clique não convida ninguém a clicar, que é a definição do problema.
 export default function ContactFields({
   phone,
   initialDisplayName,
@@ -108,10 +115,14 @@ export default function ContactFields({
       </CabecalhoBloco>
 
       <div className="flex flex-col">
+        {/* ⚠️ O placeholder CONVIDA, e não descreve. Eram "Como você chama este
+            contato" e "Não informado": o primeiro é uma explicação longa demais
+            para caber num campo de 152px, e o segundo é um laudo, que é
+            exatamente o que faz a linha ler como texto e não como campo. */}
         <Linha
           rotulo="Nome"
           valor={name}
-          placeholder="Como você chama este contato"
+          placeholder="Adicionar nome"
           onChange={setName}
           onCommit={() => void salvar(name, fields)}
         />
@@ -123,7 +134,7 @@ export default function ContactFields({
             rotuloEditavel
             onRotulo={(v) => setField(i, { key: v })}
             valor={f.value}
-            placeholder="Não informado"
+            placeholder="Adicionar"
             onChange={(v) => setField(i, { value: v })}
             onCommit={() => void salvar(name, fields)}
             onRemover={() => remover(i)}
@@ -131,16 +142,18 @@ export default function ContactFields({
         ))}
       </div>
 
-      {/* "+ Adicionar campo": ação de TEXTO na tinta da marca, sem ícone e sem
-          moldura, como no desenho. Era um botão com moldura de 28px e um sinal
-          de mais desenhado, que num bloco de linhas sem moldura nenhuma lia como
-          o elemento mais pesado do bloco. O "+" agora é literal, dentro do
-          rótulo. */}
+      {/* "+ Adicionar campo": moldura TRACEJADA na largura da tabela.
+          ⚠️ ISTO VOLTOU ATRÁS DE PROPÓSITO (19/09/2026). Em 18/09 ele virou ação
+          de texto sem moldura, e o argumento era que num bloco de linhas sem
+          moldura nenhuma um botão emoldurado lia como o elemento mais pesado do
+          bloco. Esse argumento se inverteu quando as linhas ganharam moldura:
+          agora o texto solto é que lê como rodapé, e ele é o único jeito de
+          criar campo. Tracejado, e não cheio, porque a linha ainda não existe: é
+          o mesmo vocabulário do chip "Ninguém assumiu ainda" no cabeçalho. */}
       <Button
-        variant="brand-ghost"
-        size="none"
+        variant="outline"
         onClick={() => setFields((f) => [...f, { key: "", value: "" }])}
-        className="self-start rounded-sm text-apoio font-semibold hover:bg-transparent hover:opacity-80"
+        className="mt-1 w-full border-dashed text-apoio font-semibold text-ink-2 hover:border-line-strong hover:text-ink"
       >
         + Adicionar campo
       </Button>
@@ -206,17 +219,17 @@ function Linha({
   return (
     <div
       data-slot="painel-dado"
-      className="group flex items-baseline gap-2.5 border-b border-line-soft py-1.5"
+      className="group flex items-center gap-2.5 border-b border-line-soft py-1"
     >
       {rotuloEditavel ? (
         <Input
-          variant="limpo"
+          variant="sutil"
           value={rotulo}
           onChange={(e) => onRotulo?.(e.target.value)}
           onBlur={onCommit}
-          placeholder="Campo"
+          placeholder="Nome do campo"
           aria-label="Nome do campo"
-          className="w-[86px] shrink-0 rounded-sm text-legenda font-normal text-ink-3 focus:bg-[var(--active-bg)]"
+          className="w-[86px] shrink-0 text-legenda font-normal text-ink-3"
         />
       ) : (
         <span className="w-[86px] shrink-0 text-legenda font-normal text-ink-3">
@@ -224,7 +237,7 @@ function Linha({
         </span>
       )}
       <Input
-        variant="limpo"
+        variant="sutil"
         value={valor}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onCommit}
@@ -233,7 +246,7 @@ function Linha({
         }}
         placeholder={placeholder}
         aria-label={rotulo || "Valor do campo"}
-        className="w-auto flex-1 rounded-sm text-right text-apoio font-semibold text-ink placeholder:font-normal placeholder:text-ink-3 focus:bg-[var(--active-bg)]"
+        className="w-auto flex-1 text-right font-semibold text-ink placeholder:font-normal placeholder:text-ink-3"
       />
       {/* GUTTER FIXO de 12px, presente até na linha do Nome, que não tem o que
           remover. É ele que mantém TODOS os valores na mesma margem direita:
