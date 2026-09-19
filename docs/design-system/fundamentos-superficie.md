@@ -63,11 +63,19 @@ Três coisas saíram, e nenhuma mudou um pixel (o retrato numérico de 12 telas 
 **No escuro não existe sombra**: a separação vem de superfície e linha. No claro a sombra é
 obrigatória no balão, senão branco sobre a conversa dá 1,05:1 e some.
 
-**Sombra de rolagem** (`.sombra-rolagem` / `.sombra-rolagem-topo`) acende sob o cabeçalho quando a
-conversa passa por baixo, e acima da caixa de escrita enquanto sobra conversa embaixo. É o que
-diferencia "acabou" de "tem mais, continue rolando". É classe própria, e não `shadow-[var(--x)]`,
-porque o utilitário do Tailwind compõe a sombra a partir das partes dele e não aceita uma lista
-pronta vinda de variável: o valor chegava zerado.
+**Sombra de rolagem** (`.sombra-rolagem`, com `data-borda="topo|fundo"` e `data-visivel="sim|nao"`)
+acende na borda de cima da conversa quando ela passa por baixo do cabeçalho, e na de baixo enquanto
+sobra conversa atrás da caixa de escrita. É o que diferencia "acabou" de "tem mais, continue
+rolando".
+
+⚠️ **Não é `box-shadow`, e isso mudou em 19/09/2026 por causa de um defeito.** Eram duas sombras de
+caixa, uma no `<header>` da conversa e outra no bloco do composer. `box-shadow` pinta para FORA do
+elemento, então ela caía em cima de quem estivesse ao lado: com a faixa "O cliente quer" entrando
+entre o cabeçalho e a conversa (18/09), a sombra do cabeçalho, que tem `z-10`, era desenhada sobre
+uma superfície opaca com borda própria, e o resultado lia como uma faixa cinza com borda, não como
+sombra. Hoje é **um elemento absoluto por borda, DENTRO da própria área que rola**: 8px de degradê
+translúcido (`--sombra-rolagem-cor`, um valor por tema), que não tem como invadir o vizinho. Quem
+desenha a divisão continua sendo o `border-b` do cabeçalho.
 
 ## Tema
 

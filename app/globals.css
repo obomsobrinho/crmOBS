@@ -765,25 +765,60 @@ select:focus-visible,
    conversa com os detalhes do contato), e dentro de um cartão a separação é
    linha de 1px, nunca outro cartão. */
 
-/* Sombra de rolagem: acende sob o cabeçalho quando a conversa passa por baixo
-   dele, e acima da caixa de escrita enquanto sobra conversa embaixo. É o que
-   diferencia "acabou" de "tem mais, continue rolando". */
+/* Sombra de rolagem: acende na borda de cima da conversa quando ela passa por
+   baixo do cabeçalho, e na de baixo enquanto sobra conversa atrás da caixa de
+   escrita. É o que diferencia "acabou" de "tem mais, continue rolando".
+
+   ⚠️ REFEITA EM 19/09/2026, e o formato mudou por um defeito, não por gosto.
+   Eram DUAS `box-shadow`, uma no `<header>` e outra no bloco do composer. Duas
+   coisas quebraram junto:
+
+   1. O `<header>` tem `z-10` e a faixa "O cliente quer" (que entrou em 18/09,
+      entre ele e a conversa) é irmã ESTÁTICA, então a sombra do cabeçalho era
+      pintada POR CIMA dela. A faixa é opaca e tem borda própria, e o resultado
+      era um borrão cinza atravessando uma superfície inteira, com duas bordas
+      visíveis: a "faixa cinza clara com borda" do print do dono.
+   2. `box-shadow` sai do elemento para FORA, então ela some por cima de quem
+      estiver ao lado. Não existe onde pendurá-la sem invadir o vizinho.
+
+   Agora é UM elemento por borda, ABSOLUTO DENTRO da própria área que rola. Ele
+   não pode invadir cabeçalho, faixa nem composer por construção, e continua
+   sendo o mesmo sinal: 8px de degradê que dissolve, nunca uma caixa. A cor é
+   translúcida e única por tema (o dono confirmou que resolver no claro resolve
+   no escuro, então não é calibragem de token por tema). */
 :root {
-  --sombra-rolagem: 0 10px 16px -14px rgba(23, 17, 40, 0.65);
-  --sombra-rolagem-topo: 0 -10px 16px -14px rgba(23, 17, 40, 0.65);
+  --sombra-rolagem-cor: rgba(23, 17, 40, 0.16);
 }
 [data-theme="dark"] {
-  --sombra-rolagem: 0 10px 18px -14px rgba(0, 0, 0, 0.9);
-  --sombra-rolagem-topo: 0 -10px 18px -14px rgba(0, 0, 0, 0.9);
+  --sombra-rolagem-cor: rgba(0, 0, 0, 0.5);
 }
-/* Classe própria, e não `shadow-[var(--x)]`: o utilitário do Tailwind compõe a
-   sombra a partir das partes dele e não aceita uma lista pronta vinda de
-   variável, então o valor chegava zerado. */
 .sombra-rolagem {
-  box-shadow: var(--sombra-rolagem);
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 8px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-out);
 }
-.sombra-rolagem-topo {
-  box-shadow: var(--sombra-rolagem-topo);
+.sombra-rolagem[data-visivel="sim"] {
+  opacity: 1;
+}
+.sombra-rolagem[data-borda="topo"] {
+  top: 0;
+  background-image: linear-gradient(
+    to bottom,
+    var(--sombra-rolagem-cor),
+    transparent
+  );
+}
+.sombra-rolagem[data-borda="fundo"] {
+  bottom: 0;
+  background-image: linear-gradient(
+    to top,
+    var(--sombra-rolagem-cor),
+    transparent
+  );
 }
 
 @keyframes msg-in {

@@ -183,8 +183,9 @@ export default function Thread({
   const [pending, setPending] = useState<Pending[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   // Rolagem: `rolou` = há conversa passando por baixo do cabeçalho; `temMais` =
-  // ainda há conversa por baixo da caixa de escrita. Cada um acende uma sombra
-  // do lado certo, que é o jeito de a borda de 1px dizer "tem mais aqui".
+  // ainda há conversa por baixo da caixa de escrita. Cada um acende a sombra da
+  // borda correspondente DENTRO da área que rola, que é o jeito de dizer "tem
+  // mais aqui" sem a sombra invadir o vizinho.
   const [rolou, setRolou] = useState(false);
   const [temMais, setTemMais] = useState(false);
 
@@ -199,7 +200,7 @@ export default function Thread({
   );
   // O esmaecimento das pontas mora no ScrollArea (prop `fade`), porque as três
   // listas da tela precisam dele. Aqui ficam só `rolou` e `temMais`, que servem
-  // a outra coisa: acender a sombra no cabeçalho e na caixa de escrita.
+  // a outra coisa: acender a sombra de cada borda da conversa.
   const bottomRef = useRef<HTMLDivElement>(null);
   /** O elemento que rola de verdade, dentro do ScrollArea. */
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -430,10 +431,13 @@ export default function Thread({
           hora da última mensagem dividiam o mesmo bloco, e o resultado lia como
           um amontoado. Em cima fica quem é a pessoa e o que dá para fazer; a
           faixa de baixo é referência, num tom próprio e com tipo menor. */}
-      <header
-        className={`relative z-10 shrink-0 border-b border-line bg-raised transition-shadow ${rolou ? "sombra-rolagem" : ""
-          }`}
-      >
+      {/* ⚠️ A SOMBRA DE ROLAGEM SAIU DAQUI em 19/09/2026. Ela era um
+        `box-shadow` no cabeçalho, e `box-shadow` pinta para FORA do elemento:
+        com a faixa "O cliente quer" entre o cabeçalho e a conversa, a sombra
+        caía sobre uma superfície opaca e virava um borrão cinza com borda, que
+        foi o print do dono. Hoje ela mora dentro da própria área que rola, uma
+        por borda. Ver o bloco `.sombra-rolagem` no globals.css. */}
+      <header className="relative z-10 shrink-0 border-b border-line bg-raised">
         <div className="flex h-[62px] items-center gap-3.5 pl-[22px] pr-5">
           <Avatar size="lg" style={avatarPair(phone)}>
             {ini ?? <User size={16} />}
@@ -697,80 +701,98 @@ export default function Thread({
         <AiSummary phone={phone} clientId={clientId} variante="faixa" />
       )}
 
-      {/* ⚠️ Aqui a conversa GANHA largura, por decisão registrada: a barra
-          nativa reservava 10px de layout e a do Radix é sobreposta. É a única
-          mudança de pixel assumida nesta rodada. */}
-      <ScrollArea
-        className="min-h-0 flex-1 bg-msg"
-        viewportClassName="py-3"
-        viewportRef={viewportRef}
-        fade
-        onViewportScroll={onScroll}
-      >
-        {/* COLUNA DE LEITURA de 960px, centrada (medida do desenho). A conversa
-            ocupava a largura inteira do cartão, e em 1920 isso dá uma linha de
-            texto que atravessa meia tela: o olho perde o começo da linha
-            seguinte. Os 20px de respiro lateral ficam aqui dentro para que a
-            coluna encoste na moldura só quando a tela é estreita. */}
-        <div className="mx-auto w-full max-w-[960px] px-5">
-          {items.map((item) =>
-            item.kind === "day" ? (
-              <div
-                key={item.key}
-                className="flex justify-center pb-3 pt-1"
-                data-slot="conversa-dia"
-              >
-                {/* `bg-[var(--marcador-surface)]`, e não `bg-bloco`: no tema
-                    claro bloco e conversa são a MESMA cor, e esta pílula era
-                    desenhada invisível. Ver o token no globals.css. */}
-                <Badge
-                  variant="dia"
-                  className="inline-flex h-6 items-center rounded-md border border-line-soft bg-[var(--marcador-surface)] px-3 py-0"
+      {/* A moldura existe só para as duas sombras terem a que se ancorar: elas
+          são absolutas DENTRO da área que rola, e é isso que as impede de
+          invadir o cabeçalho, a faixa do entendimento ou a caixa de escrita.
+          Quem desenha a borda continua sendo o vizinho (`border-b` no
+          cabeçalho); a sombra só diz que há conversa escondida atrás dela. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {/* ⚠️ Aqui a conversa GANHA largura, por decisão registrada: a barra
+            nativa reservava 10px de layout e a do Radix é sobreposta. É a única
+            mudança de pixel assumida nesta rodada. */}
+        <ScrollArea
+          className="min-h-0 flex-1 bg-msg"
+          viewportClassName="py-3"
+          viewportRef={viewportRef}
+          fade
+          onViewportScroll={onScroll}
+        >
+          {/* COLUNA DE LEITURA de 960px, centrada (medida do desenho). A conversa
+              ocupava a largura inteira do cartão, e em 1920 isso dá uma linha de
+              texto que atravessa meia tela: o olho perde o começo da linha
+              seguinte. Os 20px de respiro lateral ficam aqui dentro para que a
+              coluna encoste na moldura só quando a tela é estreita. */}
+          <div className="mx-auto w-full max-w-[960px] px-5">
+            {items.map((item) =>
+              item.kind === "day" ? (
+                <div
+                  key={item.key}
+                  className="flex justify-center pb-3 pt-1"
+                  data-slot="conversa-dia"
                 >
-                  {item.label}
-                </Badge>
-              </div>
-            ) : item.kind === "marco" ? (
-              // MARCO: linha fina atravessando a conversa com um selo no meio.
-              // É o desenho da "passagem de bastão", e ela precisa cortar a
-              // coluna inteira: um chip solto no meio dos balões seria lido
-              // como mais uma mensagem.
-              <div
-                key={item.key}
-                className="flex items-center gap-3 pb-3.5 pt-1.5"
-                data-slot="conversa-marco"
-              >
-                <span className="h-px flex-1 bg-human-line" aria-hidden />
-                <span className="inline-flex h-[26px] shrink-0 items-center gap-2 rounded-md border border-human-line bg-human-surface px-2.5">
-                  <span
-                    className="h-1.5 w-1.5 rounded-full bg-human"
-                    aria-hidden
-                  />
-                  <span
-                    className="whitespace-nowrap text-rotulo uppercase text-human-ink"
-                    suppressHydrationWarning
+                  {/* `bg-[var(--marcador-surface)]`, e não `bg-bloco`: no tema
+                      claro bloco e conversa são a MESMA cor, e esta pílula era
+                      desenhada invisível. Ver o token no globals.css. */}
+                  <Badge
+                    variant="dia"
+                    className="inline-flex h-6 items-center rounded-md border border-line-soft bg-[var(--marcador-surface)] px-3 py-0"
                   >
                     {item.label}
+                  </Badge>
+                </div>
+              ) : item.kind === "marco" ? (
+                // MARCO: linha fina atravessando a conversa com um selo no meio.
+                // É o desenho da "passagem de bastão", e ela precisa cortar a
+                // coluna inteira: um chip solto no meio dos balões seria lido
+                // como mais uma mensagem.
+                <div
+                  key={item.key}
+                  className="flex items-center gap-3 pb-3.5 pt-1.5"
+                  data-slot="conversa-marco"
+                >
+                  <span className="h-px flex-1 bg-human-line" aria-hidden />
+                  <span className="inline-flex h-[26px] shrink-0 items-center gap-2 rounded-md border border-human-line bg-human-surface px-2.5">
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-human"
+                      aria-hidden
+                    />
+                    <span
+                      className="whitespace-nowrap text-rotulo uppercase text-human-ink"
+                      suppressHydrationWarning
+                    >
+                      {item.label}
+                    </span>
                   </span>
-                </span>
-                <span className="h-px flex-1 bg-human-line" aria-hidden />
-              </div>
-            ) : (
-              <BubbleView
-                key={item.bubble.key}
-                b={item.bubble}
-                showLabel={item.showLabel}
-              />
-            )
-          )}
-        </div>
-        <div ref={bottomRef} />
-      </ScrollArea>
+                  <span className="h-px flex-1 bg-human-line" aria-hidden />
+                </div>
+              ) : (
+                <BubbleView
+                  key={item.bubble.key}
+                  b={item.bubble}
+                  showLabel={item.showLabel}
+                />
+              )
+            )}
+          </div>
+          <div ref={bottomRef} />
+        </ScrollArea>
+        <span
+          aria-hidden
+          data-slot="sombra-rolagem"
+          data-borda="topo"
+          data-visivel={rolou ? "sim" : "nao"}
+          className="sombra-rolagem"
+        />
+        <span
+          aria-hidden
+          data-slot="sombra-rolagem"
+          data-borda="fundo"
+          data-visivel={temMais ? "sim" : "nao"}
+          className="sombra-rolagem"
+        />
+      </div>
 
-      <div
-        className={`relative z-10 shrink-0 transition-shadow ${temMais ? "sombra-rolagem-topo" : ""
-          }`}
-      >
+      <div className="relative z-10 shrink-0">
         <MessageComposer
           onSend={handleSend}
           onSendMedia={handleSendMedia}
