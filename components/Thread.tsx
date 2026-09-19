@@ -38,6 +38,18 @@ import type { Bubble, ChatRow } from "@/lib/types";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 import { memberName, memberInitials, type Member } from "@/lib/team";
 
+/**
+ * Em quantos pixels a conversa se dissolve nas bordas.
+ *
+ * ⚠️ 80 e não os 28px padrão do `ScrollArea`, e o número é MEDIDO: o balão desta
+ * tela tem 65px de altura em média e os mais longos passam de 77. Com 28px o
+ * balão ainda estava em quase metade da opacidade quando a borda chegava, então
+ * ele não dissolvia, ele era FATIADO, com o corte reto passando no meio de uma
+ * linha de texto. Foi o print que o dono mandou em 19/09. A dissolução precisa
+ * ser MAIOR que o item que ela dissolve; aqui ela cobre o balão inteiro.
+ */
+const ESMAECIMENTO_CONVERSA = 80;
+
 type Pending = {
   tempId: string;
   content: string;
@@ -183,25 +195,25 @@ export default function Thread({
   const [rowsProp, setRowsProp] = useState<ChatRow[]>(initialRows);
   const [pending, setPending] = useState<Pending[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
-  // Rolagem: `rolou` = há conversa passando por baixo do cabeçalho; `temMais` =
-  // ainda há conversa por baixo da caixa de escrita. Cada um acende a sombra da
-  // borda correspondente DENTRO da área que rola, que é o jeito de dizer "tem
-  // mais aqui" sem a sombra invadir o vizinho.
+  // `rolou` = há conversa passando por baixo do cabeçalho, e é o que acende a
+  // sombra de cima DENTRO da área que rola, sem invadir o vizinho.
+  //
+  // ⚠️ O par dele, `temMais`, SAIU em 19/09/2026 junto com a sombra de baixo:
+  // quem avisa que sobrou conversa embaixo é a dissolução do ScrollArea, que já
+  // depende do mesmo cálculo e não precisa de estado aqui.
   const [rolou, setRolou] = useState(false);
-  const [temMais, setTemMais] = useState(false);
 
   const medirRolagem = useCallback((el: HTMLElement | null) => {
     if (!el) return;
     setRolou(el.scrollTop > 4);
-    setTemMais(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
   }, []);
   const onScroll = useCallback(
     (e: React.UIEvent<HTMLDivElement>) => medirRolagem(e.currentTarget),
     [medirRolagem],
   );
   // O esmaecimento das pontas mora no ScrollArea (prop `fade`), porque as três
-  // listas da tela precisam dele. Aqui ficam só `rolou` e `temMais`, que servem
-  // a outra coisa: acender a sombra de cada borda da conversa.
+  // listas da tela precisam dele. Aqui fica só `rolou`, que serve a outra coisa:
+  // acender a sombra do cabeçalho.
   const bottomRef = useRef<HTMLDivElement>(null);
   /** O elemento que rola de verdade, dentro do ScrollArea. */
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -720,7 +732,7 @@ export default function Thread({
           className="min-h-0 flex-1"
           viewportClassName="py-3"
           viewportRef={viewportRef}
-          fade
+          fade={ESMAECIMENTO_CONVERSA}
           onViewportScroll={onScroll}
         >
           {/* COLUNA DE LEITURA de 960px, centrada (medida do desenho). A conversa
@@ -789,13 +801,13 @@ export default function Thread({
           data-visivel={rolou ? "sim" : "nao"}
           className="sombra-rolagem"
         />
-        <span
-          aria-hidden
-          data-slot="sombra-rolagem"
-          data-borda="fundo"
-          data-visivel={temMais ? "sim" : "nao"}
-          className="sombra-rolagem"
-        />
+        {/* ⚠️ NÃO EXISTE SOMBRA DE BAIXO, e ela saiu em 19/09/2026 depois do
+            segundo retorno do dono. Quem diz "tem mais conversa aqui embaixo" é
+            a DISSOLUÇÃO (`ESMAECIMENTO_CONVERSA`), que já só aparece quando há
+            conteúdo escondido. Empilhar uma sombra de 8px em cima de 80px de
+            degradê era o segundo sinal para a mesma coisa, no mesmo lugar, e o
+            que ele viu foi sujeira. A de CIMA fica, porque lá existe uma
+            mudança real de superfície: o cabeçalho é branco e a conversa não. */}
       </div>
 
       <div className="relative z-10 shrink-0">

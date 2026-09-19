@@ -82,7 +82,7 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
       el.scrollTop = Math.round((el.scrollHeight - el.clientHeight) / 2);
     });
     await expect(
-      page.locator('[data-slot="sombra-rolagem"][data-borda="fundo"]')
+      page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]')
     ).toHaveAttribute("data-visivel", "sim");
   }
 
@@ -103,7 +103,9 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
           };
         })
       );
-    expect(sombras).toHaveLength(2);
+    // ⚠️ UMA, e não duas. A de baixo saiu em 19/09/2026 (ver o teste próprio
+    // logo abaixo): quem avisa que sobrou conversa embaixo é a dissolução.
+    expect(sombras).toHaveLength(1);
     for (const s of sombras) {
       // Poucos pixels. A queixa era uma FAIXA: qualquer coisa alta o bastante
       // para ler como bloco já é o defeito de volta.
@@ -117,11 +119,49 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
     // ⚠️ `toHaveCSS` e não uma leitura direta: a sombra acende por `transition`
     // de opacidade, e a medida crua pegava o meio da interpolação (0.698…), que
     // não é nem a origem nem o destino. Mesmo cuidado dos gatilhos do composer.
-    for (const borda of ["topo", "fundo"]) {
-      await expect(
-        page.locator(`[data-slot="sombra-rolagem"][data-borda="${borda}"]`)
-      ).toHaveCSS("opacity", "1");
-    }
+    await expect(
+      page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]')
+    ).toHaveCSS("opacity", "1");
+  });
+
+  test("o fim da conversa DISSOLVE, e não é cortado por uma linha", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    await rolarAoMeio(page);
+
+    const medido = await page.evaluate(() => {
+      const vp = document.querySelector(
+        'main [data-slot="scroll-area-viewport"]'
+      ) as HTMLElement;
+      const baloes = [
+        ...document.querySelectorAll('[data-slot="conversa-balao"]'),
+      ].map((b) => b.getBoundingClientRect().height);
+      const casou = getComputedStyle(vp).maskImage.match(
+        /calc\(100% - (\d+)px\)/
+      );
+      return {
+        dissolucao: casou ? Number(casou[1]) : 0,
+        balaoMedio: Math.round(
+          baloes.reduce((a, b) => a + b, 0) / (baloes.length || 1)
+        ),
+        sombraDeBaixo: document.querySelectorAll(
+          '[data-slot="sombra-rolagem"][data-borda="fundo"]'
+        ).length,
+      };
+    });
+
+    // ⚠️ A REGRA QUE ESTE TESTE TRANCA: a dissolução tem que ser MAIOR que o item
+    // que ela dissolve. O balão desta tela tem 65px em média e o padrão do
+    // ScrollArea é 28px, que serve para lista de texto: nessa distância o balão
+    // ainda está em quase metade da opacidade quando a borda chega, então ele não
+    // dissolve, ele é FATIADO, com o corte reto no meio de uma linha de texto.
+    // Foi o print que o dono mandou.
+    expect(medido.balaoMedio).toBeGreaterThan(28);
+    expect(medido.dissolucao).toBeGreaterThan(medido.balaoMedio);
+    // E não existe sombra de baixo: duas marcas para o mesmo fato, no mesmo
+    // lugar, é o que ele leu como sujeira na borda da caixa de escrita.
+    expect(medido.sombraDeBaixo).toBe(0);
   });
 
   test("ninguém mais desenha sombra, e ela não sai da área que rola", async ({
@@ -177,13 +217,14 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
   }) => {
     await page.goto("/design");
     const topo = page.locator('[data-slot="sombra-rolagem"][data-borda="topo"]');
-    // A conversa abre na última mensagem, então em cima há conteúdo escondido e
-    // embaixo não. Sombra acesa sem nada atrás dela é decoração, e decoração que
-    // finge ser sinal é pior que nenhum sinal.
+    // A conversa abre na última mensagem, então em cima há conteúdo escondido.
+    // Sombra acesa sem nada atrás dela é decoração, e decoração que finge ser
+    // sinal é pior que nenhum sinal.
+    //
+    // ⚠️ ATUALIZADO EM 19/09/2026: a metade deste teste que afirmava a sombra de
+    // BAIXO apagada saiu porque a sombra de baixo saiu. O que ela dizia agora é
+    // dito pela dissolução, e o teste acima prova que ela existe.
     await expect(topo).toHaveAttribute("data-visivel", "sim");
-    await expect(
-      page.locator('[data-slot="sombra-rolagem"][data-borda="fundo"]')
-    ).toHaveAttribute("data-visivel", "nao");
 
     await page
       .locator('main [data-slot="scroll-area-viewport"]')
@@ -486,29 +527,32 @@ test.describe("Item 4: o fundo de rede fica só atrás das mensagens", () => {
     expect(Math.abs(medido.folgaEsquerda - medido.folgaDireita)).toBeLessThan(2);
   });
 
-  test("a sombra de baixo tem a largura de quem a projeta", async ({ page }) => {
+  test("a caixa de escrita não nasce colada na linha de corte", async ({
+    page,
+  }) => {
     await page.goto("/design");
-    // Quem projeta a sombra de baixo é a CAIXA DE ESCRITA, branca e centrada em
-    // 960px, e não o cartão. Na largura toda ela atravessava as laterais vazias,
-    // onde acima e abaixo existe a mesma superfície e nada que projete coisa
-    // nenhuma: lá ela lia como um risco solto. A de cima continua de ponta a
-    // ponta porque o cabeçalho também é.
+    // ⚠️ SUBSTITUI o teste "a sombra de baixo tem a largura de quem a projeta",
+    // de 19/09 de manhã: aquela sombra não existe mais. O que ficou no lugar
+    // dela é o respiro. Sem ele, a caixa branca começava no ponto exato em que a
+    // conversa termina, e as duas coisas viravam uma linha só; com superfície
+    // lisa entre elas, a mensagem acaba de se dissolver antes de a caixa
+    // começar, e a caixa lê como algo que FLUTUA sobre a conversa.
     const medido = await page.evaluate(() => {
-      const r = (s: string) =>
-        document.querySelector(s)!.getBoundingClientRect();
-      const fundo = r('[data-slot="sombra-rolagem"][data-borda="fundo"]');
-      const topo = r('[data-slot="sombra-rolagem"][data-borda="topo"]');
-      const form = r("main form");
-      const cabecalho = r("main header");
+      const form = document.querySelector("main form")!.getBoundingClientRect();
+      const bloco = document
+        .querySelector("main form")!
+        .closest("div")!
+        .getBoundingClientRect();
+      const area = document
+        .querySelector('main [data-slot="scroll-area"]')!
+        .getBoundingClientRect();
       return {
-        fundo: [Math.round(fundo.left), Math.round(fundo.width)],
-        form: [Math.round(form.left), Math.round(form.width)],
-        topo: Math.round(topo.width),
-        cabecalho: Math.round(cabecalho.width),
+        respiroAcimaDaCaixa: Math.round(form.top - bloco.top),
+        colaNaConversa: Math.round(form.top - area.bottom),
       };
     });
-    expect(medido.fundo).toEqual(medido.form);
-    expect(medido.topo).toBe(medido.cabecalho);
+    expect(medido.respiroAcimaDaCaixa).toBeGreaterThanOrEqual(8);
+    expect(medido.colaNaConversa).toBeGreaterThanOrEqual(8);
   });
 
   test("é discreto, e o balão continua vencendo o fundo", async ({ page }) => {

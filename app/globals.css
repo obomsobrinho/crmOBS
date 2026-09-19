@@ -854,25 +854,12 @@ select:focus-visible,
   mask-composite: intersect;
 }
 
-/* ⚠️ A DE BAIXO ACOMPANHA A COLUNA DE LEITURA, e não a largura do cartão
-   (19/09/2026, segunda rodada). Quem projeta esta sombra é a CAIXA DE ESCRITA,
-   que é branca, tem 960px e fica centrada. Na largura toda, a sombra atravessava
-   as laterais vazias, onde acima e abaixo dela existe a mesma superfície e nada
-   que projete coisa nenhuma: ali ela lia como um risco solto, que é a queixa das
-   "laterais". A de cima continua de ponta a ponta porque quem a projeta, o
-   cabeçalho, também é. A regra: a sombra tem a largura de quem a projeta. */
-.sombra-rolagem[data-borda="fundo"] {
-  bottom: 0;
-  left: 50%;
-  right: auto;
-  width: min(calc(100% - 40px), 960px);
-  transform: translateX(-50%);
-  background-image: linear-gradient(
-    to top,
-    var(--sombra-rolagem-cor),
-    transparent
-  );
-}
+/* ⚠️ NÃO EXISTE MAIS `[data-borda="fundo"]` (19/09/2026, terceira rodada). A
+   sombra de baixo saiu inteira: quem diz "tem mais conversa aqui embaixo" é a
+   dissolução do ScrollArea (80px na conversa), que já só aparece quando há
+   conteúdo escondido. Duas marcas para o mesmo fato, no mesmo lugar, é o que o
+   dono via como sujeira na borda da caixa de escrita. Sobrou só a de cima, onde
+   existe uma mudança real de superfície (cabeçalho branco, conversa não). */
 
 @keyframes msg-in {
   from {

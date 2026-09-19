@@ -252,3 +252,30 @@ sempre quis dizer é "cobre a conversa e nada além dela", agora medido como con
 três novos: a máscara existe nos dois eixos e cruza, em 1600 com a coluna do cliente fechada a
 textura fica em 960 centrados dentro de uma área maior, e a sombra de baixo tem exatamente o
 retângulo da caixa de escrita enquanto a de cima tem o do cabeçalho.
+
+---
+
+## Terceira rodada do item 1 (19/09/2026)
+
+"Está bem mais ou menos." O print mostrava o balão sendo **fatiado** por uma linha reta na borda da
+caixa de escrita.
+
+⚠️ **O esmaecimento estava ligado, só que curto demais.** Medido: `ESMAECIMENTO` do `ScrollArea` é
+28px e o balão desta tela tem **65px** em média (o do print tinha 77). Em 28px o balão ainda está em
+quase metade da opacidade quando a borda chega, então ele não dissolve, ele é cortado. **A regra que
+saiu disso: a dissolução tem que ser MAIOR que o item que ela dissolve.** 28px serve para lista de
+texto sobre superfície lisa, que é o resto da aplicação; não serve para um item alto, opaco, com cor
+e borda próprias.
+
+Três mudanças:
+
+1. **`fade` do `ScrollArea` aceita número.** A conversa passa 80px; todo o resto segue nos 28.
+2. **A sombra de baixo saiu inteira**, e `temMais` com ela. Quem avisa que sobrou conversa embaixo é
+   a dissolução, que já só aparece quando há conteúdo escondido. Duas marcas para o mesmo fato, no
+   mesmo lugar, era o que ele lia como sujeira. A de cima ficou, porque lá existe mudança real de
+   superfície (cabeçalho branco, conversa não) e ele já tinha dito que essa estava boa.
+3. **A caixa de escrita ganhou respiro no topo** (`pt-3`). Sem ele a caixa branca começava no ponto
+   exato em que a conversa termina, e as duas coisas viravam uma linha só.
+
+Testes: entrou um que mede a dissolução contra a altura média do balão (é a regra, não o número), e
+os que afirmavam a sombra de baixo foram atualizados ou substituídos, com o motivo escrito dentro.

@@ -5,7 +5,16 @@ import { ScrollArea as ScrollAreaPrimitive } from "radix-ui";
 
 import { cn } from "@/lib/utils";
 
-/** Quantos pixels a mensagem leva para se dissolver na borda. */
+/**
+ * Quantos pixels o conteúdo leva para se dissolver na borda, por padrão.
+ *
+ * ⚠️ 28px serve para LISTA (texto sobre superfície lisa) e NÃO serve para a
+ * conversa, onde cada item é um balão opaco de 65px em média, com cor de fundo e
+ * borda próprias. Em 28px o balão ainda está em quase metade da opacidade quando
+ * a borda chega: ele não dissolve, ele é FATIADO, e foi exatamente isso que o
+ * dono viu no print de 19/09. Por isso `fade` aceita um número, e a conversa
+ * passa o dela.
+ */
 const ESMAECIMENTO = 28;
 
 /** Junta o ref de quem usa com o ref interno, sem um perder o outro. */
@@ -30,9 +39,11 @@ function juntarRefs<T>(...refs: (React.Ref<T> | undefined)[]) {
  *    primeira mudança interna do Radix.
  *
  * 2. `fade`. Sem ele o conteúdo é fatiado numa linha reta contra o cabeçalho e
- *    contra a caixa de escrita. Com ele, dissolve nos últimos 28px e some ATRÁS
- *    da borda. Só desbota o lado que tem conteúdo escondido: no fim da lista o
- *    rodapé não desbota, senão o último item nasceria apagado sem motivo.
+ *    contra a caixa de escrita. Com ele, dissolve na borda e some ATRÁS dela.
+ *    Só desbota o lado que tem conteúdo escondido: no fim da lista o rodapé não
+ *    desbota, senão o último item nasceria apagado sem motivo. A distância é
+ *    28px por padrão e vem por número quando o conteúdo é alto (ver
+ *    `ESMAECIMENTO`).
  *
  * 3. A barra imita a nativa que o `globals.css` já estiliza: 8px de largura,
  *    polegar em --line-strong com raio total, --ink-faint no hover, sem setas e
@@ -63,11 +74,16 @@ function ScrollArea({
    * `onScroll` no Root, que nunca dispararia.
    */
   onViewportScroll?: React.UIEventHandler<HTMLDivElement>;
-  /** Dissolve o conteúdo nas bordas em vez de cortá-lo numa linha reta. */
-  fade?: boolean;
+  /**
+   * Dissolve o conteúdo nas bordas em vez de cortá-lo numa linha reta.
+   * `true` usa o padrão de 28px; um número diz em quantos pixels dissolver, e
+   * quem passa número é quem tem item alto e opaco (ver `ESMAECIMENTO`).
+   */
+  fade?: boolean | number;
 }) {
   const interno = React.useRef<HTMLDivElement>(null);
   const [bordas, setBordas] = React.useState({ topo: false, fundo: false });
+  const esmaecer = typeof fade === "number" ? fade : fade ? ESMAECIMENTO : 0;
 
   const medir = React.useCallback(() => {
     const el = interno.current;
@@ -82,7 +98,7 @@ function ScrollArea({
   // que acabou de receber um item, não há evento nenhum e a máscara nasceria
   // errada.
   React.useEffect(() => {
-    if (!fade) return;
+    if (!esmaecer) return;
     const el = interno.current;
     if (!el) return;
     medir();
@@ -91,19 +107,19 @@ function ScrollArea({
     const conteudo = el.firstElementChild;
     if (conteudo) observador.observe(conteudo);
     return () => observador.disconnect();
-  }, [fade, medir, children]);
+  }, [esmaecer, medir, children]);
 
   const mascara = React.useMemo<React.CSSProperties>(() => {
-    if (!fade || (!bordas.topo && !bordas.fundo)) return {};
+    if (!esmaecer || (!bordas.topo && !bordas.fundo)) return {};
     const paradas = [
       bordas.topo ? "transparent 0" : "#000 0",
-      bordas.topo ? `#000 ${ESMAECIMENTO}px` : null,
-      bordas.fundo ? `#000 calc(100% - ${ESMAECIMENTO}px)` : null,
+      bordas.topo ? `#000 ${esmaecer}px` : null,
+      bordas.fundo ? `#000 calc(100% - ${esmaecer}px)` : null,
       bordas.fundo ? "transparent 100%" : "#000 100%",
     ].filter(Boolean);
     const g = `linear-gradient(to bottom, ${paradas.join(", ")})`;
     return { maskImage: g, WebkitMaskImage: g };
-  }, [fade, bordas]);
+  }, [esmaecer, bordas]);
 
   return (
     <ScrollAreaPrimitive.Root
@@ -117,7 +133,7 @@ function ScrollArea({
         ref={juntarRefs(interno, viewportRef)}
         style={mascara}
         onScroll={(e) => {
-          if (fade) medir();
+          if (esmaecer) medir();
           onViewportScroll?.(e);
         }}
         // `[&>div]:!block`: o Radix envolve o conteúdo num filho `display:table`
