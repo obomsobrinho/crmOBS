@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Resolve o handoff de uma conversa: fecha a pendência E devolve o atendimento
-// para a IA. Um gesto, duas escritas, de propósito.
+// Resolve o handoff de uma conversa: fecha a pendência, LARGA O RESPONSÁVEL e
+// devolve o atendimento para a IA. Um gesto, três escritas, de propósito.
 //
 // POR QUE ESTA ROTA EXISTE: antes o handoff só era fechado como efeito colateral
 // do envio manual (`POST /api/send`). Isso deixava dois casos sem saída: quem
@@ -15,6 +15,12 @@ import { createServiceClient } from "@/lib/supabase/service";
 // IA pausada, a gente reconstruiria os 46 contatos travados da OBM, que é
 // exatamente o defeito que a pausa como porta de mão única já produziu uma vez.
 // Quem quer segurar a conversa não resolve, ou desliga a IA na chave.
+//
+// POR QUE LARGA O RESPONSÁVEL (19/09/2026): pela regra nova, IA e pessoa nunca
+// atendem a mesma conversa, e devolver o atendimento para a IA deixando a
+// conversa marcada como de alguém reporia o estado contraditório pela porta dos
+// fundos, exatamente como a chave da IA faria se não limpasse o responsável.
+// Quem quer continuar dono da conversa não resolve: desliga a IA na chave.
 //
 // POR QUE SERVICE_ROLE: `conversations.handoff_at` não tem grant de UPDATE para
 // `authenticated` (migration `mt_conversations_column_grants`), justamente para
@@ -50,7 +56,7 @@ export async function POST(req: Request) {
   // conversa de outro tenant mandando um phone qualquer.
   const { error: convErr } = await svc
     .from("conversations")
-    .update({ handoff_at: null })
+    .update({ handoff_at: null, assigned_user_id: null })
     .eq("client_id", client.id)
     .eq("phone", phone);
   if (convErr) {
@@ -69,5 +75,13 @@ export async function POST(req: Request) {
     .eq("telefone", phone);
   if (iaErr) console.error("falha ao devolver o atendimento à IA:", iaErr.message);
 
-  return NextResponse.json({ ok: true, iaReativada: !iaErr });
+  // `limpou` é CONTRATO, e não enfeite: é o único jeito de um teste com login
+  // afirmar que resolver larga o responsável junto. Provar o efeito no banco
+  // exigiria semear um handoff, e `handoff_at` não tem grant de UPDATE para o
+  // browser de propósito (ver `e2e/resolver.auth.spec.ts`).
+  return NextResponse.json({
+    ok: true,
+    limpou: ["handoff_at", "assigned_user_id"],
+    iaReativada: !iaErr,
+  });
 }

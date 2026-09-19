@@ -52,6 +52,12 @@ export function qualReasonLabel(action: QualAction): string {
  * nó "Pausar IA (Franck digitou)" do n8n, se a resposta saiu do WhatsApp, ou pelo
  * `POST /api/send`, se saiu do CRM).
  *
+ * ⚠️ Desde 19/09/2026 a invariante vale no BANCO nos DOIS sentidos, e não só no
+ * envio: **atribuir pausa a IA** e **religar a IA larga o responsável**
+ * (`components/ConversationView.tsx`, mais o `POST /api/conversations/resolve`).
+ * Antes disso, esta função era a única coisa impedindo a tela de mostrar as duas
+ * coisas ao mesmo tempo, e o banco guardava o estado contraditório assim mesmo.
+ *
  * ⚠️ Isto NÃO responde "precisa de você": essa é outra pergunta, e quem responde
  * é `handoff_at`. As duas coexistem de propósito, porque pausar não resolve a
  * pendência: dá para ter uma pessoa atendendo E um handoff em aberto.

@@ -107,6 +107,20 @@ export default function ConversationView({
 
   // Assumir / transferir / soltar a conversa. A RLS libera UPDATE de
   // conversations ao tenant, então filtrar por telefone atinge só a linha dele.
+  //
+  // ⚠️ ATRIBUIR PAUSA A IA (decisão do dono, 19/09/2026). A invariante "IA e
+  // pessoa nunca atendem a mesma conversa" já era a regra de EXIBIÇÃO
+  // (`quemAtende`, lib/crm.ts) e já valia no envio manual (`POST /api/send`
+  // pausa a IA ao responder). O que faltava era ela valer no BANCO quando o
+  // gesto é atribuir: dava para ter a conversa de alguém com a IA ligada, e a
+  // tela mostrava as duas coisas ao mesmo tempo.
+  //
+  // Vale também ao atribuir a um COLEGA, e não só a si mesmo: é o mesmo gesto,
+  // a conversa passou a ser de uma pessoa.
+  //
+  // ⚠️ SOLTAR (userId nulo) NÃO RELIGA A IA, de propósito: soltar sem religar é
+  // um estado legítimo ("ninguém atende"), e é justamente o estado que o produto
+  // já mostra como dívida visível na lista. Quem religa é a chave.
   const assign = useCallback(
     async (userId: string | null) => {
       const prev = assigned;
@@ -115,9 +129,24 @@ export default function ConversationView({
         .from("conversations")
         .update({ assigned_user_id: userId })
         .eq("phone", phone);
-      if (error) setAssigned(prev); // reverte
+      if (error) {
+        setAssigned(prev); // reverte
+        return;
+      }
+      if (userId == null || iaState === "pause") return;
+      const prevIa = iaState;
+      setIaState("pause"); // otimista
+      anunciarIa({ phone, estado: "pause" });
+      const { error: iaErr } = await supabase
+        .from("dados_cliente")
+        .update({ atendimento_ia: "pause" })
+        .eq("telefone", phone);
+      if (iaErr) {
+        setIaState(prevIa); // reverte
+        anunciarIa({ phone, estado: prevIa });
+      }
     },
-    [assigned, phone, supabase]
+    [assigned, iaState, phone, supabase]
   );
 
   // Abrir a conversa marca como lida (zera o contador). A RLS restringe o update
@@ -202,8 +231,21 @@ export default function ConversationView({
         .eq("telefone", phone);
       setInstruction(text);
       setIaState("reativada");
+      // ⚠️ Orientar TAMBÉM religa a IA, então limpa o responsável junto (mesma
+      // decisão de 19/09/2026). Este é o terceiro caminho que devolve a conversa
+      // à IA, além da chave e do botão Resolvido, e deixá-lo de fora reporia o
+      // estado contraditório pela porta dos fundos.
+      if (assigned == null) return;
+      const prevAssigned = assigned;
+      setAssigned(null); // otimista
+      const { error: assignErr } = await supabase
+        .from("conversations")
+        .update({ assigned_user_id: null })
+        .eq("client_id", clientId)
+        .eq("phone", phone);
+      if (assignErr) setAssigned(prevAssigned); // reverte
     },
-    [supabase, clientId, phone, myUserId]
+    [supabase, clientId, phone, myUserId, assigned]
   );
 
   const cancelInstruction = useCallback(async () => {
@@ -241,8 +283,22 @@ export default function ConversationView({
     if (error) {
       setIaState(prev); // reverte em caso de falha
       anunciarIa({ phone, estado: prev });
+      return;
     }
-  }, [iaState, phone, supabase, readOnly]);
+    // ⚠️ RELIGAR A IA LIMPA O RESPONSÁVEL (a outra metade da decisão de
+    // 19/09/2026). Sem isto, a conversa voltaria para a IA continuando marcada
+    // como de uma pessoa, que é o estado contraditório que este ajuste existe
+    // para acabar. Desligar a IA NÃO atribui ninguém: quem atribui é o menu de
+    // quem atende ou responder pelo CRM.
+    if (next === "pause" || assigned == null) return;
+    const prevAssigned = assigned;
+    setAssigned(null); // otimista
+    const { error: assignErr } = await supabase
+      .from("conversations")
+      .update({ assigned_user_id: null })
+      .eq("phone", phone);
+    if (assignErr) setAssigned(prevAssigned); // reverte
+  }, [assigned, iaState, phone, supabase, readOnly]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1">

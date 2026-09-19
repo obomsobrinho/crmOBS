@@ -59,7 +59,19 @@ test("a rota de resolver responde e é repetível", async ({ page }) => {
       data: { phone: FONE },
     });
     expect(res.status(), `chamada ${vez}`).toBe(200);
-    expect((await res.json()).ok).toBe(true);
+    const corpo = await res.json();
+    expect(corpo.ok).toBe(true);
+    // ⚠️ ATUALIZADO EM 19/09/2026: resolver passou a LARGAR O RESPONSÁVEL junto
+    // com o handoff. Pela regra nova, IA e pessoa não atendem a mesma conversa,
+    // e devolver o atendimento para a IA deixando a conversa marcada como de
+    // alguém reporia o estado contraditório pela porta dos fundos.
+    //
+    // O teste afirma o CONTRATO da rota e não a linha no banco, e isso é
+    // limitação assumida: provar o efeito exigiria semear um handoff, e
+    // `handoff_at` não tem grant de UPDATE para o browser de propósito (é o que
+    // impede esconder conversa da fila "Precisa de você"). O efeito no banco é a
+    // verificação manual descrita no teste pulado lá embaixo.
+    expect(corpo.limpou).toEqual(["handoff_at", "assigned_user_id"]);
   }
 });
 
@@ -71,7 +83,8 @@ test("resolver exige telefone", async ({ page }) => {
 // A jornada completa na interface (bloco "Esperando você há", clique em
 // Resolvido, pendência sai da tela) foi verificada uma vez com um handoff
 // semeado, e o efeito conferido no banco: `handoff_at` voltou a nulo e
-// `atendimento_ia` voltou a "ativa".
+// `atendimento_ia` voltou a "ativa". Desde 19/09/2026 a conferência à mão inclui
+// `assigned_user_id`, que também volta a nulo.
 //
 // Ela não fica no automático porque o CRM não tem como ABRIR um handoff: quem
 // abre é o `/api/agent`, e `conversations.handoff_at` não tem grant de UPDATE

@@ -88,7 +88,14 @@ export default function DesignPreview() {
             <ConversationView
               phone="553584774753@s.whatsapp.net"
               name="Franck Antonny"
-              atendimentoIa="ativa"
+              // ⚠️ "pause", e não "ativa". Esta conversa está atribuída (o mock
+              // manda `assignedUserId={ME}`), e desde 19/09/2026 IA e pessoa não
+              // coexistem: atribuir pausa a IA, religar a IA larga o
+              // responsável. Com "ativa" o preview mostrava um estado que o
+              // produto não produz mais, e ainda discordava da própria lista ao
+              // lado, que já pintava este contato como "Você assumiu · IA
+              // pausada" (ver `initialIa` acima).
+              atendimentoIa="pause"
               initialRows={OPEN}
               firstMessageAt={T(9, 0, 20)}
               messageCount={68}
