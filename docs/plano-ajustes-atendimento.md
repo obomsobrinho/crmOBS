@@ -174,3 +174,43 @@ são 12 chamadas pagas.
 
 **Commit por item fechado**, na linguagem do repositório (o porquê, o que mudou, como foi provado).
 **Não dar push sem o dono pedir**: push dispara deploy na Vercel.
+
+---
+
+## Execução (19/09/2026)
+
+Os cinco entraram, na ordem sugerida (5, 1, 3, 2, 4), um commit por item, sem push. Verificação a
+cada item: `npx tsc --noEmit`, `npx eslint .`, `npm run build` e as duas suítes. Fecharam em **160
+sem login** (eram 143, mais 17 novos em `e2e/atendimento.design.spec.ts`) e **26 com login, 1
+pulado**, igual à linha de base. `npm run test:e2e:ia` não entrou, como combinado.
+
+Testes antigos que afirmavam o comportamento anterior foram ATUALIZADOS com o motivo escrito
+dentro, nenhum apagado: o marcador do campo de nome (`telas.design.spec.ts`) e os dois que
+procuravam o texto "6h" (`handoff.design.spec.ts`, `ajustes.design.spec.ts`), que passaram a
+afirmar a FORMA do tempo no chip de espera. Dois testes com login (`resolver.auth.spec.ts`,
+`realtime.serial.spec.ts`) passaram a escolher "Tudo" antes de usar a lista: o tenant de teste é o
+número parado do dono, e num dia sem mensagem nova eles falhariam acusando defeitos que não existem.
+
+### O que foi além do que o plano pedia, e por quê
+
+- **Item 5 pegou um TERCEIRO caminho que o plano não lista: orientar a IA pelo coach.**
+  `instruct` grava `atendimento_ia = 'reativada'`, ou seja, religa a IA. Pelo mesmo argumento que o
+  plano usa para o botão Resolvido ("senão o estado contraditório volta pela porta dos fundos"), ele
+  larga o responsável junto. É a porta que ninguém lembra que religa.
+- **Item 5 mexeu no mock da `/design`.** Ele montava a conversa com `atendimentoIa="ativa"` E um
+  responsável, que é exatamente o estado que o produto não produz mais, e ainda discordava da
+  própria lista ao lado (que já pintava aquele contato como "Você assumiu · IA pausada").
+- **Item 3 devolveu a moldura ao "+ Adicionar campo"**, revertendo uma decisão de 18/09. O argumento
+  de então era que num bloco de linhas sem moldura nenhuma o botão emoldurado seria o elemento mais
+  pesado; com as linhas emolduradas o argumento se inverteu.
+- **Item 2 reescreveu as datas do mock da lista** para serem relativas a agora e ancoradas na
+  meia-noite de São Paulo. Com as datas fixas de julho, a lista abriria permanentemente vazia; com
+  "x horas atrás", cairia em ontem se o preview fosse aberto às 01h.
+
+### Uma pergunta para o dono, e ela não travou nada
+
+**O período escolhido não é lembrado entre sessões.** Quem abrir o CRM sempre começa em "Hoje", mesmo
+que tenha passado o dia inteiro em "Tudo". Isso é intencional por enquanto, porque o plano trava
+"Hoje é o padrão ao abrir" e guardar a escolha (em `localStorage`) contradiz isso na segunda visita.
+Se a intenção era "Hoje na primeira vez, depois o que eu deixei", é uma linha de código, mas é
+decisão de produto e não de aplicação: fica aqui em vez de eu resolver sozinho.

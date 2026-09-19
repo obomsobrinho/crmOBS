@@ -207,6 +207,19 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   ⚠️ **Teste de coisa AUSENTE conta requisição, não pixel.** O e2e que existia para "marcar como
   lida" só conferia que saiu um PATCH com status < 400: navegava por URL, nunca clicava na lista
   e nunca olhava a bolinha, então não pegava nada disso.
+- **A lista de conversas abre em HOJE (19/09/2026, decisão do dono).** Seletor de três posições na
+  linha do título (`Hoje` / `7 dias` / `Tudo`, `data-slot="inbox-periodo"`), com os chips de estado
+  seguindo iguais. Motivo: a lista dele abria com 48 conversas.
+  ⚠️ **QUEM ESPERA POR VOCÊ NUNCA SOME PELO FILTRO DE TEMPO.** Conversa com `handoff_at` aberto
+  aparece mesmo em "Hoje", senão o recorte esconde exatamente o que o produto existe para não deixar
+  esquecer. É uma linha só (`needsYou(it) ||`) na base da lista, em `components/ContactSidebar.tsx`.
+  A janela é ROLANTE em **dia civil de America/Sao_Paulo** (`dentroDaJanela`/`diaSP`, `lib/inbox.ts`):
+  "hoje" é o dia de hoje e não as últimas 24h (às 9h, 24 horas trariam metade de ontem). As
+  **contagens dos chips saem da janela**, não do total, e a **busca ignora a janela** (procurar
+  alguém e não achar por causa da data é a busca mentindo).
+  ⚠️ **Consequência para teste com login:** o tenant de teste é o número parado do dono, então num
+  dia sem mensagem nova "Hoje" fica vazio. Teste que precise da lista escolhe "Tudo" antes
+  (`resolver.auth.spec.ts` e `realtime.serial.spec.ts` já fazem).
 - **O app diz quando o WhatsApp caiu (11/09/2026, C3 do plano da demo).** `components/WhatsAppBanner.tsx`
   fica no `(app)/layout.tsx` logo abaixo do `BillingBanner`, mesmo lugar e peso, e aparece enquanto o
   estado da instância for diferente de `open` (`close` vermelho, `connecting` âmbar, `unknown` neutro,
@@ -341,7 +354,19 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   6h"), é limpo por **`POST /api/conversations/resolve`** (service_role, porque a coluna não tem
   grant de UPDATE para o browser) e é o que alimenta o filtro "Precisa de você". ⚠️ Este documento
   já disse que quem limpava era o `POST /api/send`; não é, e nunca foi. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
-  `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave. **Bancada de teste** (painel
+  `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave.
+  ⚠️ **E "um humano assumiu" ficou MAIOR em 19/09/2026 (decisão do dono): IA e pessoa não atendem
+  a mesma conversa, e isso passou a valer NO BANCO.** A invariante já era a regra de exibição
+  (`quemAtende`, `lib/crm.ts`) e já valia no envio manual; o que faltava era o gesto de ATRIBUIR.
+  Agora **atribuir pausa a IA** (inclusive ao transferir para um colega: é o mesmo gesto, a conversa
+  passou a ser de uma pessoa) e **religar a IA larga o responsável**, nos TRÊS caminhos que devolvem
+  a conversa a ela: a chave do cabeçalho, orientar a IA pelo coach (que reativa) e o
+  `POST /api/conversations/resolve`, que passou a limpar `assigned_user_id` junto com `handoff_at`.
+  Deixar qualquer um de fora repõe o estado contraditório pela porta dos fundos, e o coach é o que
+  ninguém lembra que religa. ⚠️ **SOLTAR a conversa NÃO religa a IA**, de propósito: "ninguém
+  atende" é um estado legítimo, e é o que a lista já mostra como dívida visível. Quem escreve é o
+  browser (`components/ConversationView.tsx`, grants de coluna que já existiam); não precisou de
+  rota nova. **Bancada de teste** (painel
   lateral dentro de `/agente`, dono-only) fala com o cérebro REAL via `POST /api/playground`
   (sessão do dono, força `dryRun`), sem WhatsApp.
 - **Bancada de teste dentro do `/agente` (22/08/2026):** `components/AgentTestDrawer.tsx` abre o
@@ -509,6 +534,20 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   e as classes `.btn-primary`, `.glass`, `.panel` e `--radius-2xl` já tinham saído em 17/08/2026.
   Avatar usa `avatarPair()` (`lib/inbox.ts`),
   que devolve par de fundo tingido + tinta via `--av-N-bg`/`--av-N-fg`, nunca branco sobre cor cheia.
+- **Três mudanças de superfície em 19/09/2026 (ajustes do atendimento, `docs/design-system/
+  fundamentos-superficie.md` tem o porquê inteiro):**
+  1. **A sombra de rolagem não é mais `box-shadow`.** É `.sombra-rolagem`, UM elemento absoluto por
+     borda DENTRO da área que rola (`data-borda="topo|fundo"`, `data-visivel="sim|nao"`), 8px de
+     degradê. Ela era `box-shadow` no `<header>`, e `box-shadow` pinta para FORA: com a faixa "O
+     cliente quer" entre o cabeçalho e a conversa, o borrão caía sobre uma superfície opaca e lia
+     como faixa cinza com borda. `.sombra-rolagem-topo` não existe mais.
+  2. **Variante `sutil` do `Input`**, para campo dentro de tabela de pares (a coluna do cliente):
+     moldura visível ANTES do clique, altura de controle. ⚠️ A borda é `line` (8%) e não
+     `line-soft`: no tema claro a coluna, `--input-bg` e `--s-campo` são todos `#fff`, então a cor
+     da borda é o único sinal que sobra.
+  3. **`.fundo-rede`** (`components/FundoRede.tsx`): a ÚNICA textura do sistema, só atrás da área de
+     mensagens, SVG em `currentColor` com `<pattern>`, força por tema (`--rede-forca`). Não rola com
+     a conversa e o balão sempre vence, porque todo balão é opaco.
 - **Camada base shadcn/ui (`components/ui/`, 17 arquivos):** `button`, `input`, `textarea`,
   `badge`, `avatar`, `separator`, `card`, `scroll-area`, `dropdown-menu`, `switch`, `tabs`,
   `tooltip`, `dialog`, `sheet`, `select`, `checkbox`, `stat`. O `stat` (cartão de indicador) entrou
@@ -845,8 +884,8 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **26 passando, 1 pulado** (17/09/2026, já com o projeto `atendente`); sem login
-  **116**; `ia` **12 de 12** (11/09/2026).
+  Total com login: **26 passando, 1 pulado**; sem login **160** (19/09/2026, já com
+  `atendimento.design.spec.ts`, os cinco ajustes do atendimento); `ia` **12 de 12** (11/09/2026).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
   projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca
