@@ -124,27 +124,51 @@ export default function AiSummary({
 
   if (variante === "faixa") {
     return (
+      // ⚠️ A FAIXA INTEIRA NÃO MUDA MAIS DE COR com o handoff aberto. Ela ficava
+      // âmbar de ponta a ponta, e o desenho aprovado mantém a superfície do
+      // cartão SEMPRE: quem muda de cor é o selo, o rótulo e o chip de espera.
+      // O motivo é hierarquia de alarme: pintar 1400px de largura de âmbar logo
+      // abaixo do nome do contato faz a faixa gritar mais alto que a própria
+      // conversa, e ela é uma LINHA DE CONTEXTO, não um alerta. O que precisa
+      // gritar é o chip "esperando há 6h", e ele grita melhor sobre superfície
+      // neutra do que sobre âmbar.
       <div
         data-slot="conversa-entendimento"
-        className={cn(
-          "flex shrink-0 items-center gap-2.5 border-b px-4 py-2",
-          handoffAt
-            ? "border-warn-line bg-warn-surface"
-            : "border-line bg-raised"
-        )}
+        className="flex shrink-0 items-center gap-3 border-b border-line bg-raised px-[22px] py-[11px]"
       >
+        {/* O SELO: quadrado de 26px na superfície tingida, com um bloco de 8px
+            dentro na tinta do tom. É o desenho, e ele serve de âncora de cor à
+            esquerda da faixa: roxo quando é a IA entendendo, âmbar quando a
+            conversa está esperando alguém. O ícone de faísca vinha antes do
+            rótulo, com 13px, e desaparecia contra o texto em caixa alta. */}
         <span
           className={cn(
-            "flex shrink-0 items-center gap-1.5 text-rotulo uppercase",
+            "flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md",
+            handoffAt ? "bg-warn-surface" : "bg-brand-surface"
+          )}
+          aria-hidden
+        >
+          <Sparkles
+            size={14}
+            className={cn(
+              "shrink-0",
+              handoffAt ? "text-warn-ink" : "text-brand-ink"
+            )}
+          />
+        </span>
+        <span
+          className={cn(
+            "shrink-0 text-rotulo uppercase",
             handoffAt ? "text-warn-ink" : "text-brand-ink"
           )}
         >
-          <Sparkles size={13} className="shrink-0" />
           O cliente quer
         </span>
         {/* Uma linha só e sem quebrar o layout: o resumo pode ser longo, e a
-            faixa não pode empurrar a conversa para baixo a cada turno da IA. */}
-        <span className="min-w-0 flex-1 truncate text-apoio text-ink">
+            faixa não pode empurrar a conversa para baixo a cada turno da IA.
+            15px em peso 600 (medida do desenho): esta frase é o resumo do
+            atendimento, e em 13px normal ela pesava menos que o telefone. */}
+        <span className="min-w-0 flex-1 truncate text-corpo font-semibold text-ink">
           {resumo || pedido || "Ainda não disse"}
         </span>
         {horario && (
@@ -155,8 +179,10 @@ export default function AiSummary({
         )}
         {handoffAt && (
           <>
+            {/* A espera virou CHIP (desenho): na faixa neutra, texto âmbar solto
+                se perdia entre o resumo e o botão. */}
             <span
-              className="shrink-0 text-legenda font-medium text-warn-ink"
+              className="inline-flex h-6 shrink-0 items-center rounded-[7px] border border-warn-line bg-warn-surface px-2.5 text-legenda font-semibold text-warn-ink"
               suppressHydrationWarning
             >
               esperando há {formatEspera(handoffAt)}

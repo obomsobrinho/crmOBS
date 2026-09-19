@@ -277,6 +277,19 @@
      como escolha aleatória, não como hierarquia. */
   --s-bloco: #f4f4f4;
 
+  /* ── Marcador no meio da conversa (separador de dia, marco neutro) ──
+     Nasceu em 18/09/2026, ao aplicar o desenho da conversa, e conserta um
+     defeito que a própria faxina acima introduziu sem perceber: o separador de
+     dia foi migrado para `bg-bloco`, e no tema CLARO `--s-bloco` e `--s-msg`
+     têm o MESMO valor (#f4f4f4). Ou seja, a pílula era desenhada com borda,
+     raio e respiro, e ficava invisível sobre a conversa: na tela sobrava o
+     texto solto "27 DE JULHO DE 2026" no meio do nada. O comentário da faxina
+     diz "nenhum pixel mudou", e era verdade, só que o pixel já estava errado.
+     Valor medido no desenho aprovado (`--sep-bg`). É PAPEL, não cor: quem
+     flutua sobre a área de mensagens usa este token; bloco dentro de cartão
+     continua em `--s-bloco`. */
+  --marcador-surface: #e9e7ee;
+
   /* Campo BRANCO sobre o bloco cinza, que é o que `--s-campo` já declarava logo
      acima. É o que devolve a escada de três degraus no claro: cartão branco,
      bloco cinza, campo branco com borda. Com bloco e campo em lavanda quase
@@ -368,14 +381,22 @@
   --bubble-shadow: 0 1px 1.5px rgba(11, 20, 26, 0.1);
 
   /* ── Balões: recebido branco, você verde claro, IA roxo claro ──
-     A tinta já é escura nos três, então os três passam AA. */
+     A tinta já é escura nos três, então os três passam AA.
+     ⚠️ Os dois FUNDOS foram trocados pelos valores medidos no desenho aprovado
+     (18/09/2026): `you` era #d9fdd3, o verde do WhatsApp, que puxa para o
+     amarelo e não é o verde deste produto; `ia` era #e6dcfd, meio tom mais
+     saturado que o roxo da marca diluído. Tinta e hora ficaram como estavam de
+     propósito: são os valores com contraste conferido contra a paleta NEUTRA
+     desta casa, e o desenho traz uma paleta levemente violeta (o `--ink` dele é
+     #17151c, o nosso é #171717). Trocar a tinta junto arrastaria a tela inteira
+     para outra família de cinza por causa de um balão. */
   --bubble-in-bg: #ffffff;
   --bubble-in-fg: #171717;
   --bubble-in-hora: #6e6e6e;
-  --bubble-you-bg: #d9fdd3;
+  --bubble-you-bg: #d7f6e2;
   --bubble-you-fg: #06251b;
   --bubble-you-hora: #2c6b4f;
-  --bubble-ia-bg: #e6dcfd;
+  --bubble-ia-bg: #ece3fd;
   --bubble-ia-fg: #4310a8;
   --bubble-ia-hora: #6236c0;
 
@@ -514,6 +535,11 @@
   --b-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --s-bloco: #1f1f1f;
 
+  /* O par do marcador no escuro. Aqui o defeito do claro não existia (bloco e
+     conversa têm valores diferentes), mas o token tem que existir nos dois
+     temas, senão a pílula some ao trocar de tema. Valor medido no desenho. */
+  --marcador-surface: #17171c;
+
   --input-bg: #1f1f1f;
 
   --ink: #f5f5f5; /* 15,0:1 */
@@ -581,13 +607,14 @@
   --panel-shadow: none;
   --bubble-shadow: none;
 
+  /* Mesma troca do claro, com os valores escuros do desenho aprovado. */
   --bubble-in-bg: #212530;
   --bubble-in-fg: #e7e8ee;
   --bubble-in-hora: #8b8ea6;
-  --bubble-you-bg: #123f2f;
+  --bubble-you-bg: #103a2a;
   --bubble-you-fg: #c9ffe6;
   --bubble-you-hora: #7fd4a8;
-  --bubble-ia-bg: #382a6e;
+  --bubble-ia-bg: #2e2258;
   --bubble-ia-fg: #e7ddff;
   --bubble-ia-hora: #c3a1ff;
 

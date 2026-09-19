@@ -154,8 +154,8 @@ export default function MessageComposer({
   // escrever e levar erro do servidor depois de ter escrito.
   if (readOnly) {
     return (
-      <div className="shrink-0 bg-msg px-3 pb-3 pt-2">
-        <div className="flex items-center gap-2 rounded-lg border-l-[3px] border-l-danger bg-danger-surface px-3 py-2.5 text-apoio text-ink">
+      <div className="shrink-0 bg-msg px-5 pb-[18px] pt-2">
+        <div className="mx-auto flex w-full max-w-[960px] items-center gap-2 rounded-lg border-l-[3px] border-l-danger bg-danger-surface px-3 py-2.5 text-apoio text-ink">
           <Lock size={14} className="shrink-0 text-danger-ink" />
           <span>
             Envio pausado enquanto a conta não está em dia. Você continua vendo
@@ -190,21 +190,27 @@ export default function MessageComposer({
   const ActionIcon = skin.Icon;
 
   return (
-    <div className="shrink-0 bg-msg px-3 pb-3 pt-0">
+    <div className="shrink-0 bg-msg px-5 pb-[18px] pt-0">
       {attachError && (
-        <div className="mb-2 rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
+        <div className="mx-auto mb-2 w-full max-w-[960px] rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
           {attachError}
         </div>
       )}
 
       {/* Bloco único: abas, aviso e campo dividem uma borda só. Antes o aviso
-          flutuava acima como faixa solta e parecia de outra tela. */}
+          flutuava acima como faixa solta e parecia de outra tela.
+          A casa de escrita tem a MESMA coluna de 960px da conversa logo acima
+          (medida do desenho): encostada nas duas bordas do cartão, ela ficava
+          com o dobro da largura da mensagem que a pessoa acabou de ler.
+          Raio de 16px e não os 14px do cartão da casa: é o raio medido no
+          desenho para as duas superfícies grandes da conversa, o balão e a casa
+          de escrita, e ele é o que faz as duas lerem como a mesma família. */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
-        className={`overflow-hidden rounded-xl bg-campo transition-colors ${skin.frame}`}
+        className={`mx-auto w-full max-w-[960px] overflow-hidden rounded-[16px] bg-raised shadow-[var(--panel-shadow)] transition-colors ${skin.frame}`}
       >
         {/* Orientação pendente colada no topo da casa. Ela vivia como cartão na
             coluna da direita, a duas colunas de distância do lugar onde a
@@ -260,31 +266,56 @@ export default function MessageComposer({
           onValueChange={(v) => setMode(v as Mode)}
           className="contents"
         >
-          <TabsList className="flex-wrap gap-1.5 px-2.5 pb-1 pt-2.5">
+          <TabsList className="flex-wrap gap-[7px] border-b border-line-soft px-3 py-2.5">
             <TabsTrigger value="responder" variant="acao" data-cor="human">
-              <Send size={14} />
+              <Send size={15} />
               Responder ao cliente
             </TabsTrigger>
             {onAddNote && (
               <TabsTrigger value="nota" variant="acao" data-cor="warn">
-                <StickyNote size={14} />
+                <StickyNote size={15} />
                 Nota interna
               </TabsTrigger>
             )}
             {onInstruct && (
               <TabsTrigger value="orientar" variant="acao" data-cor="brand">
-                <Sparkles size={14} />
+                <Sparkles size={15} />
                 Orientar a IA
               </TabsTrigger>
             )}
             {/* O destino, escrito. O desenho põe esta frase ao lado dos botões, e
                 ela é o que impede o erro caro da tela: mandar para o cliente o
-                que era para ser nota. */}
-            <span className={`ml-auto hidden shrink-0 pr-1 text-legenda lg:block ${skin.hint}`}>
+                que era para ser nota. O ponto na cor do modo veio do desenho, e
+                ele é o que amarra a frase ao botão aceso do outro lado da
+                faixa: são a mesma cor dizendo a mesma coisa. */}
+            <span
+              className={`ml-auto hidden shrink-0 items-center gap-1.5 pr-1 text-legenda font-semibold lg:flex ${skin.hint}`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${skin.ponto}`}
+                aria-hidden
+              />
               {skin.destino}
             </span>
           </TabsList>
         </Tabs>
+
+        {/* O AVISO subiu para debaixo dos modos, em faixa tingida de ponta a
+            ponta (desenho aprovado). Ele morava depois do campo, em letra de
+            12px com um ícone de 12px, ou seja, embaixo do texto que ele deveria
+            qualificar e mais fraco que ele. Aqui ele é a primeira coisa depois
+            do botão do modo, que é exatamente a ordem em que a decisão
+            acontece: escolho o destino, leio a consequência, escrevo. */}
+        {hint && (
+          <div
+            className={`flex items-center gap-2.5 border-b border-line-soft px-3.5 py-2 ${skin.aviso}`}
+          >
+            <HintIcon size={14} className={`shrink-0 ${skin.hint}`} />
+            <span className={`min-w-0 truncate text-apoio ${skin.hint}`}>
+              {hint}
+            </span>
+          </div>
+        )}
 
         {/* Área de escrita alta: é um lugar para escrever, não um campo de uma
             linha que cresce. Três linhas de partida cobrem a mensagem típica
@@ -302,21 +333,10 @@ export default function MessageComposer({
           rows={3}
           aria-label={skin.placeholder}
           placeholder={skin.placeholder}
-          className="block px-3 pt-2.5 text-corpo"
+          className="block px-4 pb-2.5 pt-[13px] text-corpo"
         />
 
-        {/* A dica mora dentro da casa, junto do texto, e não como faixa colada
-            por fora. É informação sobre o que você está escrevendo. */}
-        {hint && (
-          <div
-            className={`flex items-center gap-1.5 px-3 pt-1 text-legenda ${skin.hint}`}
-          >
-            <HintIcon size={12} className="shrink-0" />
-            <span className="min-w-0 truncate">{hint}</span>
-          </div>
-        )}
-
-        <div className="flex items-center gap-1 px-2 pb-2 pt-1.5">
+        <div className="flex items-center gap-2 px-3 pb-3">
           <input
             ref={fileRef}
             type="file"
@@ -329,13 +349,16 @@ export default function MessageComposer({
           {mode === "responder" && (
             <Tooltip>
               <TooltipTrigger asChild>
+                {/* Botão com MOLDURA, 32px (desenho). Como ghost, ele só existia
+                    quando o ponteiro passava por cima: o clipe cinza sobre o
+                    branco do bloco não lia como coisa clicável. */}
                 <Button
-                  variant="ghost"
-                  size="icon-chrome"
+                  variant="outline"
+                  size="icon-control"
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading || !onSendMedia}
                   aria-label="Anexar"
-                  className="text-ink-3"
+                  className="text-ink-2"
                 >
                   {uploading ? (
                     <Loader2 size={16} className="animate-spin" />
@@ -357,14 +380,17 @@ export default function MessageComposer({
               <Button
                 type="submit"
                 variant={skin.variant}
-                size="control"
+                // 36px, e não os 32px de um controle qualquer: no desenho a
+                // ação principal da tela é o único elemento desta faixa que
+                // sobe de degrau.
+                size="primary"
                 disabled={!canSend}
                 className={cn(
                   // `disabled:opacity-100` e não `opacity-100`: com modificador
                   // diferente o tailwind-merge não considera as duas classes
                   // conflitantes, e a da base venceria. Este botão desabilitado
                   // não desbota, ele troca de cor.
-                  "ml-auto px-3 transition",
+                  "ml-auto px-4 transition",
                   !canSend &&
                   "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3 disabled:opacity-100",
                 )}
@@ -399,7 +425,12 @@ const SKIN: Record<
   Mode,
   {
     frame: string;
+    /** Tinta do matiz: aviso, destino e ícones. Sempre `ink`, nunca `fill`. */
     hint: string;
+    /** O matiz como FUNDO do ponto ao lado do destino. Aqui sim é `fill`. */
+    ponto: string;
+    /** Fundo da faixa de aviso, logo abaixo dos modos. */
+    aviso: string;
     /** Para onde vai o que está sendo escrito. Aparece ao lado dos modos. */
     destino: string;
     variant: React.ComponentProps<typeof Button>["variant"];
@@ -411,6 +442,8 @@ const SKIN: Record<
   responder: {
     frame: "border border-[var(--human-line)]",
     hint: "text-human-ink",
+    ponto: "bg-human",
+    aviso: "bg-human-surface",
     variant: "send",
     placeholder: "Escreva uma mensagem",
     action: "Enviar mensagem",
@@ -420,6 +453,8 @@ const SKIN: Record<
   nota: {
     frame: "border border-[var(--warn-line)]",
     hint: "text-warn-ink",
+    ponto: "bg-warn",
+    aviso: "bg-warn-surface",
     variant: "warn",
     placeholder: "Anotar algo sobre este contato",
     action: "Salvar nota interna",
@@ -429,10 +464,15 @@ const SKIN: Record<
   orientar: {
     frame: "border border-[var(--brand-line)]",
     hint: "text-brand-ink",
+    ponto: "bg-brand",
+    aviso: "bg-brand-surface",
     variant: "brand",
     placeholder: "Diga o que a IA deve responder",
     action: "Orientar e reativar a IA",
-    destino: "fala com a IA, nao com o cliente",
+    // ⚠️ "não" com til. A linha dizia "nao com o cliente", sem acento, e é a
+    // única frase sem acento desta tela: o erro fica visível justamente onde o
+    // texto precisa ser levado a sério.
+    destino: "vai para a IA, não para o cliente",
     Icon: Sparkles,
   },
 };

@@ -112,14 +112,36 @@ const gatilhoVariants = cva(
          * são três modos com três cores de estado já nomeadas no sistema
          * (human, warn, brand), e escrever a tríade à mão em cada gatilho é como
          * a quarta nasce com a cor errada.
+         *
+         * ⚠️ SÃO DOIS DEGRAUS DE COR, e não um (corrigido em 18/09/2026 contra o
+         * desenho aprovado; foi o terceiro item da lista do dono, "as tabs estão
+         * diferentes"). O modo INATIVO já carrega o próprio matiz, na superfície
+         * tingida; o ATIVO vai para o fundo CHEIO, com a tinta `on` por cima.
+         * A versão anterior deixava os inativos cinzas e dava ao ativo a
+         * superfície tingida, o que produzia dois defeitos: o botão ativo ficava
+         * com o mesmo peso visual de um chip qualquer da tela (é por isso que
+         * "não dava para saber qual estava ativo"), e a cor de cada destino, que
+         * é o que ensina para onde o texto vai ANTES de a pessoa ler o rótulo,
+         * só aparecia depois de já ter clicado nele.
+         *
+         * ⚠️ O verde ATIVO usa `--send-fill`/`--send-on`, e não
+         * `--human-fill`/`--human-on`. Tinta branca sobre `--human-fill` dá
+         * 2,45:1 no claro; o par `send` existe exatamente para o caso de fundo
+         * verde cheio com rótulo em cima, e é o mesmo verde que o botão de
+         * enviar usa dois centímetros abaixo.
          */
         acao: [
-          "items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-apoio font-medium",
-          "text-ink-2 hover:bg-[var(--active-bg)] hover:text-ink",
-          "data-[state=active]:font-semibold",
-          "data-[cor=human]:data-[state=active]:border-[var(--human-line)] data-[cor=human]:data-[state=active]:bg-[var(--human-surface)] data-[cor=human]:data-[state=active]:text-human-ink",
-          "data-[cor=warn]:data-[state=active]:border-warn-line data-[cor=warn]:data-[state=active]:bg-warn-surface data-[cor=warn]:data-[state=active]:text-warn-ink",
-          "data-[cor=brand]:data-[state=active]:border-brand-line data-[cor=brand]:data-[state=active]:bg-brand-surface data-[cor=brand]:data-[state=active]:text-brand-ink",
+          // `brightness` no hover é o mesmo recurso que os botões de fundo
+          // cheio usam (components/ui/button.tsx): funciona sobre o fill e
+          // sobre a superfície tingida, nos dois temas, sem inventar uma quarta
+          // cor por matiz só para o ponteiro passar por cima.
+          "h-[34px] items-center gap-2 rounded-lg border px-3 text-apoio font-semibold hover:brightness-[1.06]",
+          "data-[cor=human]:border-[var(--human-line)] data-[cor=human]:bg-[var(--human-surface)] data-[cor=human]:text-human-ink",
+          "data-[cor=warn]:border-warn-line data-[cor=warn]:bg-warn-surface data-[cor=warn]:text-warn-ink",
+          "data-[cor=brand]:border-brand-line data-[cor=brand]:bg-brand-surface data-[cor=brand]:text-brand-ink",
+          "data-[cor=human]:data-[state=active]:border-[var(--send-fill)] data-[cor=human]:data-[state=active]:bg-[var(--send-fill)] data-[cor=human]:data-[state=active]:text-[var(--send-on)]",
+          "data-[cor=warn]:data-[state=active]:border-[var(--warn-fill)] data-[cor=warn]:data-[state=active]:bg-[var(--warn-fill)] data-[cor=warn]:data-[state=active]:text-[var(--warn-on)]",
+          "data-[cor=brand]:data-[state=active]:border-[var(--brand-fill)] data-[cor=brand]:data-[state=active]:bg-[var(--brand-fill)] data-[cor=brand]:data-[state=active]:text-[var(--brand-on)]",
         ],
       },
     },

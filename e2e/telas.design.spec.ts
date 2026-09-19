@@ -340,4 +340,171 @@ test.describe("Conversa redesenhada", () => {
     await page.getByRole("tab", { name: /Nota interna/ }).click();
     await expect(page.getByText("fica só entre vocês")).toBeVisible();
   });
+
+});
+
+// ── O que a fidelidade ao desenho travou na CONVERSA (18/09/2026) ──────
+// Estes nasceram da lista do dono olhando a tela aplicada ao lado da prancha:
+// "título do nome está diferente, telefone está diferente, chat de conversa as
+// tabs estão diferentes". Nenhum dos três checava nada antes, porque a estrutura
+// (existe nome, existe telefone, existem três abas) já passava com a tipografia
+// e a cor erradas.
+//
+// ⚠️ DESCRIBE PRÓPRIO COM JANELA PRÓPRIA, e isto não é conveniência: o desenho
+// foi aprovado em 1920 e comparado com a tela em 1600, e o cabeçalho da conversa
+// esconde por largura o que não cabe (a hora da última mensagem e os rótulos de
+// dois controles saem abaixo de 1536px, para o NOME nunca sair). Em 1280, que é
+// o `Desktop Chrome` padrão do Playwright, metade destas asserções estaria
+// medindo o modo estreito e chamando isso de desenho.
+test.describe("Conversa redesenhada: fidelidade ao desenho", () => {
+  test.use({ viewport: { width: 1600, height: 950 } });
+
+  test("o nome do contato é tinta principal, e não a cor do avatar", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const nome = page.locator('[data-slot="conversa-nome"]');
+    await expect(nome).toBeVisible();
+    const medido = await nome.evaluate((el) => {
+      const c = getComputedStyle(el);
+      // O avatar do cabeçalho é o vizinho anterior do bloco de texto: é dele que
+      // o nome herdava a cor.
+      const av = el
+        .closest("header")!
+        .querySelector('[data-slot="avatar"]') as HTMLElement;
+      return {
+        cor: c.color,
+        fonte: c.fontFamily,
+        tamanho: c.fontSize,
+        peso: c.fontWeight,
+        corDoAvatar: getComputedStyle(av).color,
+      };
+    });
+    // O defeito: o nome saía pintado com a cor do avatar daquele contato. Cor de
+    // avatar existe para diferenciar UMA linha das outras numa lista; aqui só há
+    // um nome, então ela não distingue nada e ainda tira do nome a autoridade de
+    // ser o texto mais forte da faixa.
+    expect(medido.cor).not.toBe(medido.corDoAvatar);
+    // Tipografia de título da casa, na família de display (medida no desenho).
+    expect(medido.fonte).toMatch(/Space Grotesk/);
+    expect(medido.tamanho).toBe("18px");
+    expect(medido.peso).toBe("600");
+  });
+
+  test("o telefone é o endereço de WhatsApp, e não uma nota de rodapé", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const tel = page.locator('[data-slot="conversa-telefone"]');
+    const ultima = page.locator('[data-slot="conversa-ultima"]');
+    await expect(tel).toBeVisible();
+    await expect(ultima).toBeVisible();
+    const corTel = await tel.evaluate((el) => getComputedStyle(el).color);
+    const corUltima = await ultima.evaluate((el) => getComputedStyle(el).color);
+    // Os dois eram a MESMA linha cinza de 12px, coladas por um ponto médio, e
+    // as duas liam como sobra. Agora o telefone tem tratamento próprio (tinta
+    // verde, o humano no WhatsApp) e a hora fica em tinta de apoio.
+    expect(corTel).not.toBe(corUltima);
+    // E o ponto ao lado dele, que é o que faz a cor significar "WhatsApp" em vez
+    // de "link".
+    await expect(tel.locator("span[aria-hidden]")).toHaveCount(1);
+  });
+
+  test("o modo ATIVO do composer é fundo cheio, e cada modo tem a sua cor", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const abas = page.locator('[data-slot="tabs-trigger"][data-cor]');
+    await expect(abas).toHaveCount(3);
+    const fundos = await abas.evaluateAll((els) =>
+      els.map((el) => ({
+        estado: el.getAttribute("data-state"),
+        bg: getComputedStyle(el).backgroundColor,
+      }))
+    );
+    // 1. Cada modo carrega o próprio matiz mesmo desligado: é isso que ensina
+    //    para onde o texto vai ANTES de a pessoa clicar. Antes os inativos eram
+    //    cinzas, todos iguais.
+    expect(new Set(fundos.map((f) => f.bg)).size).toBe(3);
+    // 2. O ativo é FUNDO CHEIO (cor opaca); os inativos são superfície tingida
+    //    (cor com alfa). Era o contrário: o ativo ficava na superfície tingida,
+    //    com o mesmo peso visual de um chip qualquer, e o dono não conseguia
+    //    dizer qual estava ligado.
+    const ativo = fundos.find((f) => f.estado === "active")!;
+    expect(ativo.bg).toMatch(/^rgb\(/);
+    for (const f of fundos.filter((x) => x.estado !== "active")) {
+      expect(f.bg).toMatch(/^rgba\(/);
+    }
+    // E a troca de modo leva o fundo cheio junto.
+    // ⚠️ `expect.poll` e não uma leitura direta: o gatilho tem `transition-colors`
+    // e a primeira medida pegava a cor NO MEIO da interpolação
+    // (`rgba(124, 54, 240, 0.75)`), que não é nem a de origem nem a de destino.
+    const corAtiva = page.getByRole("tab", { name: /Orientar a IA/ });
+    await corAtiva.click();
+    await expect
+      .poll(() => corAtiva.evaluate((el) => getComputedStyle(el).backgroundColor))
+      .toMatch(/^rgb\(/);
+    const bgOrientar = await corAtiva.evaluate(
+      (el) => getComputedStyle(el).backgroundColor
+    );
+    expect(bgOrientar).not.toBe(ativo.bg);
+  });
+
+  test("o separador de dia é VISÍVEL sobre a conversa", async ({ page }) => {
+    await page.goto("/design");
+    const dia = page.locator('[data-slot="conversa-dia"] [data-slot="badge"]');
+    await expect(dia.first()).toBeVisible();
+    // ⚠️ O defeito que este teste tranca: a pílula usava `bg-bloco`, e no tema
+    // claro `--s-bloco` e `--s-msg` têm o MESMO valor. A pílula era desenhada
+    // com borda, raio e respiro, e ficava invisível: na tela sobrava o texto
+    // solto "27 DE JULHO DE 2026" no meio do nada. Testar a existência do
+    // elemento nunca pegaria isso, porque ele sempre existiu.
+    const cores = await dia.first().evaluate((el) => {
+      const fundo = el.closest('[data-slot="scroll-area"]') ?? el.parentElement!;
+      return {
+        pilula: getComputedStyle(el).backgroundColor,
+        conversa: getComputedStyle(fundo as HTMLElement).backgroundColor,
+      };
+    });
+    expect(cores.pilula).not.toBe(cores.conversa);
+  });
+
+  test("o balão aponta para quem falou, e não cresce com a janela", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const recebido = page
+      .locator('[data-slot="conversa-balao"][data-autor="cliente"]')
+      .first();
+    const daIa = page
+      .locator('[data-slot="conversa-balao"][data-autor="ia"]')
+      .first();
+    await expect(recebido).toBeVisible();
+    await expect(daIa).toBeVisible();
+    // O canto recortado (4px) é do AUTOR: em cima à esquerda no recebido, em
+    // cima à direita no enviado. Era embaixo, e só no último balão de cada
+    // sequência, o que dava geometrias diferentes para balões que dizem a mesma
+    // coisa sobre quem falou.
+    await expect(recebido).toHaveCSS("border-top-left-radius", "4px");
+    await expect(daIa).toHaveCSS("border-top-right-radius", "4px");
+    // Largura ABSOLUTA, medida no desenho. Era `min(74%, 560px)`, ou seja, o
+    // balão encolhia justamente na tela estreita, onde ele precisa de mais
+    // espaço, e a linha de texto crescia sem limite útil na tela larga.
+    await expect(recebido).toHaveCSS("max-width", "620px");
+  });
+
+  test("a marca de que o time assumiu não inventa quem assumiu", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const marco = page.locator('[data-slot="conversa-marco"]').first();
+    await expect(marco).toBeVisible();
+    await expect(marco).toContainText(/O time assumiu a conversa · \d{2}:\d{2}/i);
+    // ⚠️ O desenho escreve "Bruna assumiu a conversa · 12:03", e o produto NÃO
+    // pode: `chat_messages` não tem coluna de autor, então quem mandou pelo CRM
+    // não fica gravado. Pôr aqui o responsável ATUAL da conversa (que o mock
+    // tem, e chama Ana) seria afirmar uma coisa que o banco não sabe.
+    const texto = await marco.innerText();
+    expect(texto).not.toMatch(/Ana|Carlos/);
+  });
 });
