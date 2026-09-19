@@ -31,7 +31,7 @@ WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste re
 O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
 desligada de propósito**.
 
-## 3. Estado em 17/09/2026 (sessão da noite)
+## 3. Estado em 18/09/2026
 
 - **Árvore limpa, tudo enviado.** Último commit no dia, ver `git log -1`.
 - **Banco com 30 migrations aplicadas.** Nenhuma pendente.
@@ -65,6 +65,46 @@ desligada de propósito**.
 - **Propagação da base: decidida, não implementada.** A persona passa a ser montada na LEITURA,
   dentro do `/api/agent`, com queda para `clients.persona` se a montagem falhar. O n8n não é
   tocado, porque quem lê a persona é o nosso código, não ele.
+
+### Design aplicado em 18/09/2026
+
+O passo 4 do MVP (design) começou, e o que entrou está em seis commits, **todos
+locais: nada foi enviado nem publicado**. Rode `git log --oneline -8` para ver.
+
+- **Kanban:** desenho "Kanban com chips e cards inteligentes" aplicado. Idade em
+  vez de hora, "Sua vez" com a espera real, subtítulo por coluna, origem no pé do
+  card, filtro "Esperando você".
+- **Atendimento, em três frentes** (uma por seção, cada uma com valores medidos no
+  desenho, não estimados): lista de conversas, conversa e coluna do cliente.
+- **`/agente`:** a aba ativa voltou a ser visível. A causa era a cor da barra ser
+  opcional na camada base; hoje ela cai na cor da marca quando ninguém passa.
+
+⚠️ **O que o desenho pede e NÃO foi feito, sempre por falta de dado**, com teste
+travando onde dava: frase por card dizendo o que fazer e o que a IA está fazendo;
+"Ana moveu" com nome (o banco só sabe humano ou IA); chip de "mensagem não
+enviada" (nada registra falha de entrega); prefixo "IA:" e "{colega}:" na prévia;
+nome de quem assumiu no marco da conversa; marca de lida por mensagem; "N novas
+desde sua última visita". **Escrever qualquer uma dessas seria inventar na tela em
+que o time decide o que fazer.**
+
+⚠️ **Respostas rápidas ficaram de fora e é o próximo item natural do atendimento:**
+a tabela `quick_replies` existe desde a Fase 1 e **nunca teve tela nenhuma**, então
+não há como criar uma. Construir só os chips entregaria uma faixa que nunca
+aparece. É tela nova com CRUD por tenant, não aplicação de desenho.
+
+⚠️ **Achado que o dono precisa saber:** a persona da OBS em modo avançado está a
+POUCAS DEZENAS de caracteres do teto de `LIMITS.persona` (o texto dele mais o rabo
+invariante da base). Qualquer parágrafo a mais e o próprio Salvar recusa com
+"prompt muito longo". Foi isso que derrubava a bancada de teste na suíte, e o 400
+era verdade do produto, não teste instável.
+
+**Instabilidade da suíte resolvida, e não era acaso:** além do limite acima, o
+teste que CRIA e ARQUIVA estágio contava colunas no tenant compartilhado enquanto
+outro worker mexia no mesmo funil. Foi para `pipeline.serial.spec.ts`. Depois
+disso, três execuções seguidas limpas.
+
+**Números:** 143 sem login, 26 com login (1 pulado), `tsc` 0, `eslint` 0, build
+limpo.
 
 ## 4. O que vem agora
 
