@@ -43,6 +43,14 @@ test("voltar para a aba re-busca a lista (recuperação do realtime)", async ({
   });
 
   await page.goto("/inbox");
+  // ⚠️ "Tudo" antes de esperar a lista (19/09/2026). A lista passou a abrir em
+  // "Hoje", e o tenant de teste é o número parado do dono: num dia em que
+  // ninguém escrever, "Hoje" fica vazio e este teste falha acusando um defeito
+  // de realtime que não existe. Trocar a janela é filtro de memória e não gera
+  // requisição nenhuma, então a contagem abaixo continua valendo.
+  await page
+    .locator('[data-slot="inbox-periodo-opcao"]', { hasText: "Tudo" })
+    .click();
   await page.waitForSelector('a[href^="/inbox/"]', { timeout: 20_000 });
   await page.waitForTimeout(3_000);
   expect(

@@ -1,3 +1,4 @@
+import { parteLocal } from "./valor";
 import type { ChatRow, InboxItem } from "./types";
 
 // "Você" vem do pushName de mensagens ENVIADAS (fromMe) — nunca é nome de
@@ -98,4 +99,82 @@ export function initials(name: string | null): string | null {
   const parts = n.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return n.slice(0, 2).toUpperCase();
+}
+
+// ---------------------------------------------------------------------------
+// Janela de tempo da lista (19/09/2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * O recorte de tempo da lista de conversas.
+ *
+ * POR QUE EXISTE: a lista abria com tudo (48 conversas no tenant do dono), e ele
+ * disse "não faz sentido eu querer ficar vendo todas as conversas". O padrão
+ * passou a ser HOJE, decisão dele.
+ *
+ * ⚠️ A REGRA PERIGOSA DESTE RECORTE, e ela não é opcional: **quem espera por
+ * você nunca some pelo filtro de tempo.** Uma conversa com handoff aberto desde
+ * ontem tem que aparecer mesmo em "Hoje", senão o recorte esconde exatamente o
+ * que o produto existe para não deixar esquecer. Quem aplica isso é a lista (o
+ * grupo "Esperando você" ignora a janela); aqui mora só a janela.
+ */
+export type JanelaKey = "hoje" | "7d" | "tudo";
+
+export interface Janela {
+  key: JanelaKey;
+  /** Rótulo do seletor. */
+  rotulo: string;
+  /**
+   * Quantos DIAS CIVIS a janela cobre, contando o de hoje. `null` = sem recorte.
+   * "hoje" é 1 (só o dia de hoje), "7d" é 7 (hoje mais os seis anteriores).
+   */
+  dias: number | null;
+}
+
+export const JANELAS: Record<JanelaKey, Janela> = {
+  hoje: { key: "hoje", rotulo: "Hoje", dias: 1 },
+  "7d": { key: "7d", rotulo: "7 dias", dias: 7 },
+  tudo: { key: "tudo", rotulo: "Tudo", dias: null },
+};
+
+/** Ordem do seletor, do recorte mais apertado ao mais largo. */
+export const ORDEM_JANELAS: JanelaKey[] = ["hoje", "7d", "tudo"];
+
+/** O recorte com que a lista abre. Decisão do dono em 19/09/2026. */
+export const JANELA_PADRAO: JanelaKey = "hoje";
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * O dia CIVIL de São Paulo de um instante, como número comparável (AAAAMMDD).
+ *
+ * ⚠️ Compara DIA, e não "as últimas 24 horas", porque "hoje" para quem usa o CRM
+ * é o dia de hoje: às 9h da manhã, uma janela de 24 horas traria metade de
+ * ontem e chamaria isso de hoje.
+ *
+ * ⚠️ E o dia é o de America/Sao_Paulo, nunca o do relógio de quem abriu o
+ * navegador nem UTC: em UTC a mensagem das 22h vira do dia seguinte, que é o
+ * mesmo erro que `lib/valor.ts` documenta na classificação de "fora do horário".
+ */
+export function diaSP(instante: number): number {
+  const p = parteLocal(new Date(instante).toISOString());
+  if (!p) return 0;
+  return p.ano * 10000 + p.mes * 100 + p.dia;
+}
+
+/**
+ * A conversa entra na janela?
+ *
+ * Janela ROLANTE em dias civis: `dias = 1` é hoje, `dias = 7` é hoje mais os
+ * seis dias anteriores. `dias = null` (o "Tudo") aceita qualquer coisa.
+ */
+export function dentroDaJanela(
+  lastMessageAt: string,
+  janela: Janela,
+  agora: number
+): boolean {
+  if (janela.dias == null) return true;
+  const t = Date.parse(lastMessageAt);
+  if (!Number.isFinite(t)) return true; // sem data confiável, não esconde nada
+  return diaSP(t) >= diaSP(agora - (janela.dias - 1) * DIA_MS);
 }

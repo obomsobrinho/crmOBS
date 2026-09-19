@@ -34,6 +34,13 @@ test("abrir a conversa marca como lida de verdade", async ({ page }) => {
   // nenhum PATCH saía e o teste acusava um bug que não existia. Clicar na lista
   // também é o caminho que a pessoa faz de verdade.
   await page.goto("/inbox");
+  // ⚠️ "Tudo" antes de clicar (19/09/2026). A lista passou a abrir em "Hoje", e
+  // o tenant de teste é o número parado do dono: num dia sem mensagem nova,
+  // "Hoje" fica vazio e este teste falharia acusando um defeito de mark-as-read
+  // que não existe. É o mesmo cuidado que `realtime.serial.spec.ts` tomou.
+  await page
+    .locator('[data-slot="inbox-periodo-opcao"]', { hasText: "Tudo" })
+    .click();
   const primeira = page.locator('a[href^="/inbox/"]').first();
   await expect(primeira).toBeVisible({ timeout: 15_000 });
   await primeira.click();

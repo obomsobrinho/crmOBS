@@ -22,9 +22,15 @@ import {
   buildInbox,
   initials,
   avatarPair,
+  dentroDaJanela,
+  JANELAS,
+  JANELA_PADRAO,
+  ORDEM_JANELAS,
   type ConvRow,
   type ContatoRow,
+  type JanelaKey,
 } from "@/lib/inbox";
+import { agoraMs } from "@/lib/periodo";
 import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { ouvirIa } from "@/lib/ia-bus";
@@ -171,6 +177,11 @@ export default function ContactSidebar({
   // "unanswered" = a última mensagem foi do contato, ou seja, a bola está com a
   // gente. É o corte que o operador realmente faz ao abrir a tela.
   const [filter, setFilter] = useState<FiltroKey>("all");
+  // Recorte de TEMPO, que é outra pergunta que a de estado: os chips dizem "o
+  // que está acontecendo", este diz "de quando". Abre em "Hoje" por decisão do
+  // dono em 19/09/2026: a lista dele abria com 48 conversas e ele disse "não faz
+  // sentido eu querer ficar vendo todas as conversas".
+  const [janela, setJanela] = useState<JanelaKey>(JANELA_PADRAO);
   // phone -> texto da mensagem que casou com a busca (conteúdo, não só nome).
   const [msgMatches, setMsgMatches] = useState<Record<string, string>>({});
   const pathname = usePathname();
@@ -340,23 +351,52 @@ export default function ContactSidebar({
     };
   }, [query, supabase]);
 
+  /**
+   * A BASE de tudo o que a faixa mostra: as conversas depois do recorte de
+   * tempo, antes dos chips de estado e da busca.
+   *
+   * ⚠️ DUAS REGRAS MORAM AQUI, e nenhuma é detalhe.
+   *
+   * 1. **Quem espera por você nunca some pelo filtro de tempo.** Um handoff
+   *    aberto ontem continua na lista em "Hoje", senão o recorte esconde
+   *    justamente o que o produto existe para não deixar esquecer. Por isso o
+   *    `needsYou(it) ||`, e é ele que faz o grupo "Esperando você" ignorar a
+   *    janela enquanto os outros dois a respeitam.
+   * 2. **A busca ignora a janela.** Quem digita um nome quer achar a pessoa, não
+   *    filtrar por data: procurar alguém e não encontrar porque a conversa é de
+   *    três semanas atrás é a busca mentindo.
+   *
+   * As CONTAGENS dos chips saem daqui também, e não de `items`: chip dizendo 12
+   * com três linhas na tela é a lista e o contador discordando, que é o defeito
+   * que o agrupamento desta tela já nasceu para não ter.
+   */
+  const base = useMemo(() => {
+    if (query.trim()) return items;
+    const j = JANELAS[janela];
+    if (j.dias == null) return items;
+    const agora = agoraMs();
+    return items.filter(
+      (it) => needsYou(it) || dentroDaJanela(it.lastMessageAt, j, agora)
+    );
+  }, [items, janela, query]);
+
   // Sem `iaByPhone` nas dependências: a fila deixou de depender do estado da IA
   // quando "precisa de você" passou a ser só handoff em aberto.
   const needsCount = useMemo(
-    () => items.filter((it) => needsYou(it)).length,
-    [items]
+    () => base.filter((it) => needsYou(it)).length,
+    [base]
   );
   const unansweredCount = useMemo(
-    () => items.filter((it) => it.lastFrom === "in").length,
-    [items]
+    () => base.filter((it) => it.lastFrom === "in").length,
+    [base]
   );
   const mineCount = useMemo(
-    () => (myUserId ? items.filter((it) => it.assignedUserId === myUserId).length : 0),
-    [items, myUserId]
+    () => (myUserId ? base.filter((it) => it.assignedUserId === myUserId).length : 0),
+    [base, myUserId]
   );
 
   const contagem: Record<FiltroKey, number> = {
-    all: items.length,
+    all: base.length,
     unanswered: unansweredCount,
     mine: mineCount,
     needs: needsCount,
@@ -364,7 +404,7 @@ export default function ContactSidebar({
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items
+    return base
       .filter((it) => {
         if (filter === "needs" && !needsYou(it)) return false;
         if (filter === "unanswered" && it.lastFrom !== "in") return false;
@@ -393,7 +433,7 @@ export default function ContactSidebar({
           ? GRUPO_ORDEM.indexOf(grupoDe(a.it)) - GRUPO_ORDEM.indexOf(grupoDe(b.it))
           : 0
       );
-  }, [items, query, filter, msgMatches, myUserId]);
+  }, [base, query, filter, msgMatches, myUserId]);
 
   // Quantas conversas em cada grupo, para o cabeçalho de seção.
   const porGrupo = useMemo(() => {
@@ -412,16 +452,43 @@ export default function ContactSidebar({
       {/* Respiro de 16px nas laterais e no topo, como a prancha: era 12px, e a
           lista ficava colada na borda do cartão. */}
       <div className="relative border-b border-line px-4 pb-2.5 pt-4">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-titulo">Conversas</h2>
-          {/* A contagem perdeu a pílula e foi para a DIREITA (prancha de
-              18/09/2026). Pílula é chip, e chip aqui embaixo significa "clique
-              em mim para filtrar": ter uma logo acima da faixa de filtros, que
-              não filtra nada, era o começo da confusão que o dono chamou de
-              "filtros errados". Número solo alinhado à direita é rótulo, e lê
-              como rótulo. */}
-          <span className="shrink-0 text-legenda font-semibold tabular-nums text-ink-3">
-            {items.length}
+          {/* SELETOR DE PERÍODO, na linha do título (19/09/2026).
+              ⚠️ Ele tinha que caber SEM criar uma segunda fileira de controles:
+              a busca já subiu uma vez por causa disso (os chips reenvolvem e
+              faziam o cabeçalho pular de altura). A linha do título era a única
+              com folga, e o que estava nela, o total de conversas, saiu: com
+              recorte de tempo um total solto é ambíguo ("5 de quando?"), e o
+              chip "Todas" logo abaixo já mostra o número da janela. */}
+          <span
+            data-slot="inbox-periodo"
+            role="group"
+            aria-label="Período das conversas"
+            className="flex shrink-0 items-center gap-px rounded-md border border-line bg-[var(--chip-bg)] p-px"
+          >
+            {ORDEM_JANELAS.map((k) => {
+              const ativa = janela === k;
+              return (
+                <Button
+                  key={k}
+                  variant="ghost"
+                  size="none"
+                  data-slot="inbox-periodo-opcao"
+                  data-ativo={ativa ? "sim" : undefined}
+                  aria-pressed={ativa}
+                  onClick={() => setJanela(k)}
+                  className={cn(
+                    "h-6 rounded-[5px] px-2 text-legenda font-semibold transition-colors",
+                    ativa
+                      ? "bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)] hover:bg-[var(--chip-ativo-bg)]"
+                      : "text-ink-3 hover:bg-transparent hover:text-ink"
+                  )}
+                >
+                  {JANELAS[k].rotulo}
+                </Button>
+              );
+            })}
           </span>
         </div>
 
@@ -517,7 +584,13 @@ export default function ContactSidebar({
                   ? "Nenhuma conversa esperando resposta."
                   : filter === "mine"
                     ? "Nenhuma conversa atribuída a você."
-                    : "Nenhuma conversa ainda."}
+                    : // ⚠️ Com recorte de tempo ligado, "Nenhuma conversa ainda"
+                      // seria mentira: numa conta com 48 conversas, o vazio é do
+                      // RECORTE, não da conta. E a frase diz onde está o resto,
+                      // senão a pessoa conclui que perdeu o histórico.
+                      janela !== "tudo" && items.length > 0
+                      ? `Nada em ${JANELAS[janela].rotulo.toLowerCase()}. Veja em Tudo.`
+                      : "Nenhuma conversa ainda."}
           </div>
         )}
         <ul>

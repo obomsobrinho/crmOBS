@@ -618,8 +618,15 @@ test.describe("Item 7: quem está atendendo, no avatar", () => {
 
   test("âmbar na lista passou a ser handoff, e não pausa", async ({ page }) => {
     await page.goto("/design");
-    // O mock tem uma conversa com handoff de 6h: é ela que fala em espera.
-    await expect(page.getByText("6h").first()).toBeVisible();
+    // ⚠️ ATUALIZADO EM 19/09/2026: o mock tinha um handoff de 6h e este teste
+    // procurava o texto "6h". A conversa com handoff passou a ser de ONTEM, para
+    // provar que o recorte de tempo novo da lista (padrão "Hoje") não esconde
+    // quem espera por você. A espera agora varia com a hora em que o teste roda,
+    // então a asserção é a do CHIP de espera, que é o que este teste sempre quis
+    // dizer: o âmbar da lista fala de handoff, não de pausa.
+    await expect(
+      page.locator('[data-slot="inbox-estado"]').first()
+    ).toContainText(/esperando/);
   });
 });
 

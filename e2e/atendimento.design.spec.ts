@@ -197,6 +197,109 @@ test.describe("Item 1: a sombra de rolagem é sombra, não uma faixa", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────
+// Item 2: filtro por período na lista de conversas
+//
+// "Não faz sentido eu querer ficar vendo todas as conversas." A lista abria com
+// 48. O padrão passou a ser HOJE, com Hoje / 7 dias / Tudo.
+//
+// O mock de /design foi montado para este item: três conversas de hoje, uma
+// esperando desde ontem, uma de 3 dias atrás e uma de 20.
+// ─────────────────────────────────────────────────────────────────────
+test.describe("Item 2: a lista abre em Hoje", () => {
+  const periodo = (page: import("@playwright/test").Page, rotulo: string) =>
+    page.locator('[data-slot="inbox-periodo-opcao"]', { hasText: rotulo });
+  const itens = (page: import("@playwright/test").Page) =>
+    page.locator('[data-slot="inbox-item"]');
+
+  test("o padrão é Hoje, e trocar de janela muda o que a lista traz", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    await expect(periodo(page, "Hoje")).toHaveAttribute("data-ativo", "sim");
+    // 3 de hoje mais a que espera desde ontem (ver o teste seguinte).
+    await expect(itens(page)).toHaveCount(4);
+
+    await periodo(page, "7 dias").click();
+    await expect(itens(page)).toHaveCount(5);
+
+    await periodo(page, "Tudo").click();
+    await expect(itens(page)).toHaveCount(6);
+  });
+
+  test("quem espera por você NÃO some pelo filtro de tempo", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    // ⚠️ ESTA É A PARTE PERIGOSA DO ITEM, e o motivo de ela ter teste próprio.
+    // A conversa com handoff aberto é de ONTEM, ou seja, está fora da janela
+    // "Hoje". Ela aparece assim mesmo, senão o recorte esconde exatamente o que
+    // o produto existe para não deixar esquecer.
+    await expect(periodo(page, "Hoje")).toHaveAttribute("data-ativo", "sim");
+    const espera = page.locator('[data-slot="inbox-estado"]').first();
+    await expect(espera).toContainText(/esperando/);
+    // E o grupo dela continua na tela, com a contagem.
+    await expect(
+      page.locator('[data-slot="inbox-grupo"]').first()
+    ).toContainText(/Esperando você/i);
+  });
+
+  test("a contagem do chip bate com o que a lista mostra", async ({ page }) => {
+    await page.goto("/design");
+    // Chip dizendo 12 com três linhas na tela é a lista e o contador
+    // discordando. A contagem passou a sair da janela, e não do total.
+    for (const janela of ["Hoje", "7 dias", "Tudo"]) {
+      await periodo(page, janela).click();
+      const todas = page
+        .locator('[data-slot="inbox-chip"]')
+        .filter({ hasText: "Todas" });
+      const texto = (await todas.innerText()).replace(/\s+/g, " ");
+      const n = Number(texto.match(/(\d+)/)![1]);
+      await expect(itens(page), janela).toHaveCount(n);
+    }
+  });
+
+  test("a busca ignora a janela", async ({ page }) => {
+    await page.goto("/design");
+    // Quem digita um nome quer achar a pessoa, não filtrar por data: procurar
+    // alguém e não encontrar porque a conversa é de três semanas atrás é a busca
+    // mentindo. O 9412 é da conversa de 20 dias atrás, que "Hoje" esconde.
+    await expect(periodo(page, "Hoje")).toHaveAttribute("data-ativo", "sim");
+    await expect(page.getByText("Obrigado, era só isso mesmo")).toHaveCount(0);
+    await page.getByPlaceholder("Buscar nome ou mensagem").fill("9412");
+    await expect(page.getByText("Obrigado, era só isso mesmo")).toBeVisible();
+  });
+
+  test("o seletor não cria uma segunda fileira de controles", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    // ⚠️ A busca já subiu de lugar uma vez por causa disto: com controles que
+    // reenvolvem acima dela, o cabeçalho pulava de altura conforme a fila
+    // enchia. O seletor foi para a linha do TÍTULO, que era a única com folga.
+    const mesmaLinha = await page.evaluate(() => {
+      const sel = document
+        .querySelector('[data-slot="inbox-periodo"]')!
+        .getBoundingClientRect();
+      const titulo = document
+        .querySelector("aside h2")!
+        .getBoundingClientRect();
+      const busca = document
+        .querySelector('input[aria-label="Buscar conversas e mensagens"]')!
+        .getBoundingClientRect();
+      return {
+        cruzaOTitulo: sel.top < titulo.bottom && sel.bottom > titulo.top,
+        acimaDaBusca: sel.bottom <= busca.top,
+        larguraDoSeletor: sel.width,
+      };
+    });
+    expect(mesmaLinha.cruzaOTitulo).toBe(true);
+    expect(mesmaLinha.acimaDaBusca).toBe(true);
+    // E cabe na coluna de 296px sem espremer o título.
+    expect(mesmaLinha.larguraDoSeletor).toBeLessThan(160);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Item 3: a edição dos dados do contato não parecia editável
 //
 // "Custei perceber que podia digitar ali." Os campos usavam a variante `limpo`

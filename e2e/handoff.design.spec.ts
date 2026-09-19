@@ -12,9 +12,17 @@ import { test, expect } from "@playwright/test";
 test.describe("Handoff na lista de conversas (/design)", () => {
   test("mostra o tempo de espera do handoff em aberto", async ({ page }) => {
     await page.goto("/design");
-    // O mock tem um handoff aberto há 6 horas. A espera vem do PRIMEIRO handoff
-    // em aberto, que é a espera de verdade da pessoa.
-    await expect(page.getByText("6h", { exact: true })).toBeVisible();
+    // ⚠️ ATUALIZADO EM 19/09/2026. O mock tinha um handoff aberto há 6 horas e
+    // este teste exigia o texto "6h". A lista ganhou recorte de tempo (padrão
+    // Hoje), e provar a regra mais perigosa dele, "quem espera por você nunca
+    // some pelo filtro de tempo", exige que essa conversa seja de ONTEM. Com
+    // handoff de ontem a espera vira "13h" de manhã e "1 d" de madrugada, então
+    // a asserção passou a ser a FORMA do tempo, que é o que o teste sempre quis
+    // dizer: a lista mostra há quanto tempo aquilo espera.
+    // A espera vem do PRIMEIRO handoff em aberto, que é a espera de verdade.
+    await expect(
+      page.locator('[data-slot="inbox-estado"]').first()
+    ).toContainText(/^(agora|\d+ ?(min|h|d)) esperando/);
     // ⚠️ A FRASE ENCURTOU em 18/09/2026, ao aplicar o desenho do atendimento: a
     // espera saiu da linha da prévia (onde escrevia "6h · esperando você" NO
     // LUGAR da última mensagem) e virou um chip próprio embaixo, com "6h

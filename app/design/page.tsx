@@ -43,18 +43,56 @@ const MEMBERS: Member[] = [
   { userId: "u2", email: "carlos@obm.com", role: "atendente" },
 ];
 
-// Handoff em aberto. Relativo a agora, e não uma data fixa como o resto do mock,
-// porque o que a lista mostra é o TEMPO DE ESPERA: com data fixa o preview diria
-// "23 d" e cresceria todo dia.
-const ESPERANDO_6H = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+// ⚠️ AS DATAS DA LISTA SÃO RELATIVAS A AGORA desde 19/09/2026, e as da CONVERSA
+// continuam fixas em julho. Não é inconsistência: a lista passou a ter recorte de
+// tempo (Hoje / 7 dias / Tudo, padrão Hoje), e com data fixa o preview abriria
+// permanentemente vazio, que é o oposto de um preview. A conversa aberta não tem
+// recorte nenhum, então as marcações de dia dela podem continuar fixas.
+const AGORA = Date.now();
+const HORA = 60 * 60 * 1000;
+const DIA = 24 * HORA;
+
+/**
+ * Meia-noite de HOJE em America/Sao_Paulo.
+ *
+ * ⚠️ Ancorar no DIA CIVIL, e não em "x horas atrás", não é preciosismo: a janela
+ * da lista compara dia civil de São Paulo, então "duas horas atrás" cai em ONTEM
+ * se o preview for aberto (ou o teste rodar) às 01h. O fuso é fixo em -03:00
+ * desde que o Brasil acabou com o horário de verão, em 2019.
+ */
+const MEIA_NOITE = Date.parse(
+  `${new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(AGORA))}T00:00:00-03:00`
+);
+/**
+ * Hoje, às `h` horas de São Paulo, nunca depois de agora: o `Math.min` evita o
+ * preview aberto de manhã mostrar mensagem das 21h, que ainda não aconteceu.
+ */
+const HOJE = (h: number) =>
+  new Date(Math.min(MEIA_NOITE + h * HORA, AGORA)).toISOString();
+/** `d` dias atrás, ao meio-dia de São Paulo. */
+const DIAS_ATRAS = (d: number) =>
+  new Date(MEIA_NOITE - d * DIA + 12 * HORA).toISOString();
+
+// Handoff em aberto, e ele é de ONTEM de propósito: é o único jeito de o preview
+// mostrar a regra que mais importa do recorte de tempo, que é "quem espera por
+// você nunca some pelo filtro". Esta conversa aparece mesmo em "Hoje".
+const ESPERANDO_DESDE_ONTEM = DIAS_ATRAS(1);
 
 const LIST: InboxItem[] = [
-  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: T(11, 55), unread: 0, assignedUserId: ME, stage: null, handoffAt: null },
+  { phone: "553584774753@s.whatsapp.net", name: "Franck Antonny", lastPreview: "Não consegui entender direito…", lastFrom: "out", lastMessageAt: HOJE(11.9), unread: 0, assignedUserId: ME, stage: null, handoffAt: null },
   // Handoff aberto e ninguém respondeu ainda: é o caso de "Precisa de você".
-  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: T(11, 58), unread: 2, assignedUserId: null, stage: null, handoffAt: ESPERANDO_6H },
-  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: T(21, 28, 27), unread: 0, assignedUserId: "u2", stage: null, handoffAt: null },
-  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: T(17, 18, 27), unread: 1, assignedUserId: null, stage: null, handoffAt: null },
-  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: T(9, 20, 27), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
+  { phone: "553384266039@s.whatsapp.net", name: null, lastPreview: "Blz", lastFrom: "in", lastMessageAt: ESPERANDO_DESDE_ONTEM, unread: 2, assignedUserId: null, stage: null, handoffAt: ESPERANDO_DESDE_ONTEM },
+  { phone: "553391589932@s.whatsapp.net", name: null, lastPreview: "ou usa esse sistema na sua…", lastFrom: "out", lastMessageAt: HOJE(21.5), unread: 0, assignedUserId: "u2", stage: null, handoffAt: null },
+  { phone: "553384339086@s.whatsapp.net", name: null, lastPreview: "Olá, vim pelo qr code!", lastFrom: "in", lastMessageAt: HOJE(17.3), unread: 1, assignedUserId: null, stage: null, handoffAt: null },
+  // Fora de "Hoje" e dentro de "7 dias": é ela que prova que o recorte recorta.
+  { phone: "553384486180@s.whatsapp.net", name: null, lastPreview: "Por exemplo: advocacia, sa…", lastFrom: "out", lastMessageAt: DIAS_ATRAS(3), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
+  // Fora dos dois: só aparece em "Tudo".
+  { phone: "553399412233@s.whatsapp.net", name: null, lastPreview: "Obrigado, era só isso mesmo", lastFrom: "in", lastMessageAt: DIAS_ATRAS(20), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
 ];
 
 export default function DesignPreview() {
