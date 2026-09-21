@@ -322,35 +322,16 @@ export default function MessageComposer({
           </div>
         )}
 
-        {/* ⚠️ DUAS LINHAS QUE CRESCEM, e não três fixas (21/09/2026, pedido do
-            dono: a conversa estava com pouca altura). A caixa de escrita ocupava
-            259px de 950, ou seja, 27% da coluna, o tempo inteiro, para uma
-            mensagem de WhatsApp que quase sempre cabe em uma linha. O argumento
-            antigo ("é um lugar para escrever, não um campo de uma linha que
-            cresce") continua valendo: ela segue sendo uma caixa, só que parte
-            menor e cresce conforme se digita, em vez de reservar o pior caso.
 
-            `field-sizing: content` faz o crescimento sem JS. Onde ele não existe
-            (Firefox hoje), o `rows` manda e a caixa fica com duas linhas fixas,
-            rolando dentro: degrada para o comportamento de antes, menor. O teto
-            existe para o composer não engolir a conversa num texto longo. */}
-        <Textarea
-          variant="limpo"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          rows={2}
-          aria-label={skin.placeholder}
-          placeholder={skin.placeholder}
-          className="block max-h-[180px] min-h-[67px] px-4 pb-2.5 pt-[13px] text-corpo [field-sizing:content]"
-        />
+        {/* UMA LINHA: anexo, campo e enviar (pedido do dono, 21/09/2026).
+            Eram duas faixas, o campo em cima e os botoes embaixo, e a de baixo
+            custava 46px de altura fixa para carregar dois controles. Nesta
+            forma, que e a do proprio WhatsApp, a altura da faixa e a do campo.
 
-        <div className="flex items-center gap-2 px-3 pb-2.5">
+            ⚠️ `items-end` é o que faz os botões ficarem ANCORADOS EMBAIXO
+            quando o texto cresce. Com `items-center` eles sobem junto e o
+            enviar passa a flutuar no meio de um parágrafo. */}
+        <div className="flex items-end gap-2 px-3 pb-2.5 pt-2">
           <input
             ref={fileRef}
             type="file"
@@ -386,41 +367,69 @@ export default function MessageComposer({
               </TooltipContent>
             </Tooltip>
           )}
-          {/* Ação principal à direita, com rótulo e o atalho no próprio botão.
-              A dica de teclado vivia solta embaixo do campo, aparecendo e
-              sumindo no foco; no rótulo ela está onde é usada. */}
+          {/* ⚠️ UMA LINHA QUE CRESCE, e nao mais duas fixas. A caixa partia de
+              tres linhas reservando o pior caso, e ocupava 27% da coluna o tempo
+              inteiro para uma mensagem que quase sempre cabe em uma linha.
+              `field-sizing: content` faz o crescimento sem JS; onde ele não
+              existe (Firefox hoje) o `rows` manda e a caixa fica de uma linha,
+              rolando dentro. O piso acompanha a altura do botão ao lado, para a
+              linha nascer alinhada, e o teto impede o composer de engolir a
+              conversa num texto longo. */}
+          <Textarea
+            variant="limpo"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            rows={1}
+            aria-label={skin.placeholder}
+            placeholder={skin.placeholder}
+            className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 flex-1 px-1 py-2 text-corpo [field-sizing:content]"
+          />
+
+          {/* A ação principal SEM RÓTULO (pedido do dono, 21/09/2026): o ícone
+              mais a cor ja dizem o que ela faz, e o rotulo custava largura numa
+              linha que agora divide espaco com o campo. O atalho, que morava no
+              proprio botao, foi para o tooltip junto do nome. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 type="submit"
                 variant={skin.variant}
-                // 36px, e não os 32px de um controle qualquer: no desenho a
-                // ação principal da tela é o único elemento desta faixa que
-                // sobe de degrau.
-                size="primary"
+                // 36px quadrado, e não os 32px do clipe ao lado: a ação
+                // principal da tela continua sendo o único elemento desta faixa
+                // que sobe de degrau, e sem rótulo é o TAMANHO que carrega essa
+                // hierarquia sozinho.
+                size="icon-primary"
                 disabled={!canSend}
+                // ⚠️ O nome acessível vem do `aria-label`, e não mais do texto
+                // visível: sem ele o botão ficaria sem nome nenhum para leitor
+                // de tela e para teste, que é o preço de tirar o rótulo.
+                aria-label={skin.action}
                 className={cn(
                   // `disabled:opacity-100` e não `opacity-100`: com modificador
                   // diferente o tailwind-merge não considera as duas classes
                   // conflitantes, e a da base venceria. Este botão desabilitado
                   // não desbota, ele troca de cor.
-                  "ml-auto px-4 transition",
+                  "shrink-0 transition",
                   !canSend &&
                   "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3 disabled:opacity-100",
                 )}
               >
                 {saving ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <ActionIcon size={15} />
+                  <ActionIcon size={16} />
                 )}
-                {skin.action}
-                <span aria-hidden className="opacity-70">
-                  ⏎
-                </span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">{skin.action}</TooltipContent>
+            {/* O atalho vem junto do nome: ele morava no rótulo do botão, e sem
+                rótulo o tooltip é o único lugar que sobra para ele. */}
+            <TooltipContent side="top">{skin.action} (Enter)</TooltipContent>
           </Tooltip>
         </div>
       </form>

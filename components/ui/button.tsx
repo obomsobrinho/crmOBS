@@ -88,6 +88,17 @@ const buttonVariants = cva(
         /** 28px. Moldura. */
         chrome:
           "h-[var(--h-chrome)] gap-2 rounded-lg px-2 text-legenda font-semibold",
+        /**
+         * 36px quadrado: a AÇÃO PRINCIPAL quando ela é só ícone.
+         *
+         * Entrou em 21/09/2026, quando o botão de enviar perdeu o rótulo a
+         * pedido do dono. A escala de ícone tinha `control` e `chrome`, e faltava
+         * o degrau de `primary`: sem ele o enviar cairia para 32px e ficaria do
+         * mesmo tamanho do clipe ao lado, perdendo a hierarquia que o desenho
+         * dá à única ação verde do produto.
+         */
+        "icon-primary":
+          "h-[var(--h-primary)] w-[var(--h-primary)] justify-center rounded-lg",
         /** 32px quadrado. */
         "icon-control":
           "h-[var(--h-control)] w-[var(--h-control)] justify-center rounded-lg",

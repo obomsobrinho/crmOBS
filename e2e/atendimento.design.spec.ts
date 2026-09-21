@@ -678,20 +678,25 @@ test.describe("21/09: a conversa ganhou altura", () => {
     await expect(frase).toHaveCSS("font-weight", "600");
   });
 
-  test("a caixa de escrita parte de duas linhas e CRESCE com o texto", async ({
+  test("a caixa de escrita parte de UMA linha e CRESCE com o texto", async ({
     page,
   }) => {
     await page.goto("/design");
     const campo = page.locator("main form textarea");
     await expect(campo).toBeVisible();
 
+    // ⚠️ ATUALIZADO NO MESMO DIA: partia de duas linhas, e passou a partir de
+    // UMA quando o campo entrou na mesma linha do clipe e do enviar (segundo
+    // pedido do dono). Com os botões ao lado, o alvo de clique da linha já é
+    // grande, e duas linhas vazias viraram altura reservada sem motivo.
+    //
     // ⚠️ O teste mede a ALTURA, e não o atributo `rows`: quem manda no tamanho é
     // `field-sizing: content`, e `rows` sozinho passaria mesmo com a caixa presa
     // no pior caso, que é o defeito que este ajuste corrigiu.
     const vazio = await campo.evaluate((e) =>
       Math.round(e.getBoundingClientRect().height)
     );
-    expect(vazio).toBeLessThan(80);
+    expect(vazio).toBeLessThan(48);
 
     await campo.fill("uma\nduas\ntrês\nquatro\ncinco");
     await expect
@@ -728,5 +733,55 @@ test.describe("21/09: a conversa ganhou altura", () => {
     // mensagem de WhatsApp que quase sempre cabe em uma linha.
     expect(medido.composer / medido.janela).toBeLessThan(0.25);
     expect(medido.area).toBeGreaterThan(medido.composer * 2.5);
+  });
+});
+
+test.describe("21/09: a caixa de escrita é uma linha só", () => {
+  test.use({ viewport: { width: 1600, height: 950 } });
+
+  test("clipe, campo e enviar dividem a MESMA linha", async ({ page }) => {
+    await page.goto("/design");
+    // Eram duas faixas, o campo em cima e os botões embaixo, e a de baixo
+    // custava 46px de altura fixa para carregar dois controles. É a forma do
+    // próprio WhatsApp, e nela a altura da faixa é a altura do campo.
+    const mesmaLinha = await page.evaluate(() => {
+      const form = document.querySelector("main form")!;
+      const r = (el: Element) => el.getBoundingClientRect();
+      const campo = r(form.querySelector("textarea")!);
+      const botoes = [...form.querySelectorAll("button")]
+        .filter((b) => /Anexar|Enviar/.test(b.getAttribute("aria-label") ?? ""))
+        .map((b) => r(b));
+      return botoes.map((b) => ({
+        cruza: b.top < campo.bottom && b.bottom > campo.top,
+        // `items-end`: os botões ficam ancorados embaixo, para não flutuarem no
+        // meio do parágrafo quando o texto cresce.
+        alinhadoEmbaixo: Math.abs(b.bottom - campo.bottom) < 2,
+      }));
+    });
+    expect(mesmaLinha.length).toBe(2);
+    for (const b of mesmaLinha) {
+      expect(b.cruza).toBe(true);
+      expect(b.alinhadoEmbaixo).toBe(true);
+    }
+  });
+
+  test("o botão de enviar é só ícone, mas continua tendo nome", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const enviar = page.getByRole("button", { name: "Enviar mensagem" });
+    await expect(enviar).toBeVisible();
+
+    // ⚠️ Sem rótulo, o nome acessível passa a vir do `aria-label`. Se ele cair,
+    // o botão fica sem nome para leitor de tela E o próprio `getByRole` acima
+    // para de encontrá-lo, que é o teste se protegendo sozinho.
+    await expect(enviar).toHaveText("");
+    const medido = await enviar.evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return { l: Math.round(r.width), a: Math.round(r.height) };
+    });
+    // Quadrado de 36px: um degrau acima do clipe de 32, porque sem rótulo é o
+    // TAMANHO que carrega sozinho a hierarquia da ação principal.
+    expect(medido).toEqual({ l: 36, a: 36 });
   });
 });
