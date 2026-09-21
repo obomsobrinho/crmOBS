@@ -296,8 +296,13 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
 
     // Upload não passa pelo Salvar, e isso tem que estar ESCRITO: as 3 chamadas
     // do envio gravam na hora, enquanto o Salvar desta tela publica o prompt.
+    // ⚠️ ATUALIZADO EM 21/09/2026: a frase perdeu a metade "sem precisar
+    // salvar" quando o bloco de documentos encolheu, a pedido do dono. O que o
+    // teste afirma continua sendo o mesmo: a tela DIZ que o upload nao passa
+    // pelo Salvar, porque as tres chamadas do envio gravam na hora enquanto o
+    // Salvar desta tela publica o prompt.
     await expect(
-      grupo.getByText(/entra no ar quando termina de processar, sem precisar salvar/)
+      grupo.getByText(/[Ee]ntra no ar quando termina de processar/)
     ).toBeVisible();
   });
 
@@ -328,6 +333,18 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     const horario = page.getByRole("button", {
       name: /Horário de atendimento/,
     });
+    // ⚠️ ATUALIZADO EM 21/09/2026: o horario passou a ABRIR DE CARA, a pedido do
+    // dono ("e algo importante"). Ele abria so quando estava vazio, e o efeito
+    // era o contrario do pretendido: quem ja preencheu uma vez nunca mais via o
+    // campo que alimenta a frase mais forte do painel. O que este teste continua
+    // provando, e era o ponto original, e que a linha do titulo carrega o VALOR:
+    // recolher so vale a pena se, fechado, da para ler sem abrir.
+    await expect(horario).toHaveAttribute("aria-expanded", "true");
+    // ⚠️ O RESUMO SÓ APARECE FECHADO, e é por isso que o teste fecha antes de
+    // procurá-lo: aberto, a linha mostra "fechar", porque o valor já está na
+    // tela logo abaixo. Repetir ali seria o mesmo dado duas vezes em dois
+    // centímetros.
+    await horario.click();
     await expect(horario).toHaveAttribute("aria-expanded", "false");
     await expect(horario).toContainText("Segunda a sexta: 08:00 às 18:00");
 
@@ -338,7 +355,7 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await expect(limites).toHaveAttribute("aria-expanded", "false");
     await expect(limites).toContainText("2 limites, 1 caso de chamar o time");
 
-    // Abrir mostra os campos.
+    // E abrir de novo traz os campos de volta.
     await page.getByRole("tab", { name: "O que ele sabe" }).click();
     await horario.click();
     await expect(horario).toHaveAttribute("aria-expanded", "true");

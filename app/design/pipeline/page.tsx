@@ -30,6 +30,10 @@ const STAGES: Stage[] = [
   { id: 2, key: "qualificado", name: "Qualificado", position: 1, isCanonical: true, isDefault: false, archived: false, color: "violet" },
   { id: 3, key: "aguardando_humano", name: "Aguardando atendimento", position: 2, isCanonical: true, isDefault: false, archived: false, color: "amber" },
   { id: 4, key: "fechado", name: "Fechado", position: 3, isCanonical: false, isDefault: false, archived: false, color: "green" },
+  // ⚠️ UM ARQUIVADO no mock (21/09/2026): a lista de arquivados so existe
+  // quando ha um, e e la que vivem Restaurar e Apagar. Sem isto o preview nao
+  // mostra o estado, e o teste do apagar nao tem o que clicar.
+  { id: 5, key: "perdido", name: "Perdido", position: 4, isCanonical: false, isDefault: false, archived: true, color: "gray" },
 ];
 
 function card(p: Partial<PipelineCard> & { phone: string }): PipelineCard {

@@ -12,7 +12,11 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatBytes, type KnowledgeDoc } from "@/lib/crm";
+import {
+  formatBytes,
+  KNOWLEDGE_MAX_LABEL,
+  type KnowledgeDoc,
+} from "@/lib/crm";
 import { Button } from "@/components/ui/button";
 import {
   AreaRolavel,
@@ -225,7 +229,7 @@ export default function KnowledgeManager({
             Arraste um arquivo ou clique para enviar
           </span>
           <span className="text-legenda text-ink-3">
-            PDF, DOCX, XLSX, CSV, TXT ou MD, até 8 MB.
+            PDF, DOCX, XLSX, CSV, TXT ou MD, até {KNOWLEDGE_MAX_LABEL}.
           </span>
         </>
       )}
@@ -329,16 +333,20 @@ export default function KnowledgeManager({
             trechos entram no prompt em TODO turno, relevantes ou não. O que é
             verdade e importa para a escolha é outra coisa: aqui não tem teto de
             tamanho, e não gasta o orçamento de 2.000 caracteres do campo acima. */}
+        {/* ⚠️ ENCOLHEU E PASSOU A DIZER O TETO (21/09/2026, pedido do dono: "a
+            parte do documento pode ser bem menor, é um anexo e precisa de um
+            limite de tamanho"). Aqui documento é anexo, não é a seção principal
+            da aba: quem carrega o conteúdo do agente é o campo de cima. */}
         <p className="text-legenda text-ink-3">
-          O agente consulta estes arquivos para responder. Use aqui o que é longo
-          ou muda sozinho: tabela de preço, catálogo, contrato.
+          Para o que é longo ou muda sozinho: tabela de preço, catálogo,
+          contrato. Até {KNOWLEDGE_MAX_LABEL} por arquivo.
         </p>
         {avisoChave}
         {avisoErro}
         {lista(RESUMO)}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-legenda text-ink-3">
-            Documento entra no ar quando termina de processar, sem precisar salvar.
+            Entra no ar quando termina de processar.
           </p>
           {docs.length > 0 && (
             <Button variant="ghost" onClick={() => setPainelAberto(true)}>

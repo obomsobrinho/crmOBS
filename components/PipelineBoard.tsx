@@ -12,6 +12,7 @@ import {
   GripVertical,
   Archive,
   ArchiveRestore,
+  Trash2,
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -308,6 +309,40 @@ export default function PipelineBoard({
       else await refetchStages();
     },
     [stages, takenKeys, supabase, clientId, refetchStages]
+  );
+
+  /**
+   * Apaga um estágio ARQUIVADO de vez.
+   *
+   * ⚠️ QUEM PROTEGE É O BANCO, e não uma checagem daqui: a FK
+   * `conversations_stage_fkey` não tem `ON DELETE`, então apagar um estágio que
+   * ainda tem card no funil é recusado pelo Postgres. Não há como perder
+   * conversa por acidente, e por isso o erro vira frase em vez de guarda
+   * duplicada, que é o tipo de regra que diverge do banco na primeira mudança.
+   *
+   * ⚠️ Só no ARQUIVADO. Apagar direto da coluna viva seria um clique entre a
+   * pessoa e um estágio que some sem volta; arquivar primeiro é o passo que
+   * torna a decisão deliberada, e o botão de restaurar fica ali do lado.
+   */
+  const deleteStage = useCallback(
+    async (id: number) => {
+      if (!supabase) {
+        setStages((s) => s.filter((st) => st.id !== id));
+        return;
+      }
+      const { error: err } = await supabase
+        .from("pipeline_stages")
+        .delete()
+        .eq("id", id);
+      if (err) {
+        setError(
+          "não foi possível apagar: o estágio ainda tem conversa nele. Mova os cards e tente de novo."
+        );
+        return;
+      }
+      await refetchStages();
+    },
+    [supabase, refetchStages]
   );
 
   const patchStage = useCallback(
@@ -624,6 +659,7 @@ export default function PipelineBoard({
         onClose={() => setManaging(false)}
         onAdd={addStage}
         onPatch={patchStage}
+        onDelete={deleteStage}
         onMove={moveStage}
         onReorder={reorderStages}
       />
@@ -767,6 +803,7 @@ function StageManager({
   onClose,
   onAdd,
   onPatch,
+  onDelete,
   onMove,
   onReorder,
 }: {
@@ -775,6 +812,7 @@ function StageManager({
   onClose: () => void;
   onAdd: (name: string) => void;
   onPatch: (id: number, patch: Partial<StageRow>) => void;
+  onDelete: (id: number) => void;
   /** Caminho de teclado: sobe ou desce um lugar. */
   onMove: (id: number, dir: -1 | 1) => void;
   /** Caminho de mouse: solta o arrastado na posição do alvo. */
@@ -882,6 +920,21 @@ function StageManager({
                       onClick={() => onPatch(s.id, { archived: false })}
                     >
                       <ArchiveRestore size={13} /> Restaurar
+                    </Button>
+                    {/* ⚠️ APAGAR DE VEZ (21/09/2026, pedido do dono: o funil
+                        dele estava com dezenas de "Teste e2e ... renomeado"
+                        arquivados e sem como sumir). Arquivar tirava da tela e
+                        deixava para sempre nesta lista, que virou depósito.
+                        Só aqui, no arquivado, e nunca na coluna viva: arquivar
+                        primeiro é o que torna a decisão deliberada. */}
+                    <Button
+                      variant="danger-ghost"
+                      size="icon-chrome"
+                      aria-label={`Apagar ${s.name}`}
+                      title="Apagar de vez"
+                      onClick={() => onDelete(s.id)}
+                    >
+                      <Trash2 size={13} />
                     </Button>
                   </li>
                 ))}

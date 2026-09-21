@@ -175,10 +175,14 @@ export default function ValorResumo({
             <p className="text-apoio font-medium text-warn-ink">
               Falta o horário de atendimento
             </p>
+            {/* ⚠️ TRÊS FRASES VIRARAM UMA (21/09/2026, pedido do dono: "acho que
+                pode ser bem resumido"). O que não pode cair é o "não estimamos":
+                é ele que explica por que o número some em vez de aparecer
+                aproximado, e essa é a regra que sustenta o resumo inteiro. O
+                resto era contexto que o próprio título já dá. */}
             <p className="text-apoio text-ink-2">
-              Sem ele não dá para dizer quantas mensagens a IA respondeu fora do
-              horário, que é o número mais forte deste resumo. Nós não estimamos
-              esse dado.
+              Sem ele não contamos o que a IA respondeu fora do horário, e não
+              estimamos.
             </p>
           </div>
           <Link

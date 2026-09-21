@@ -66,7 +66,11 @@ test.describe("Valor percebido (/design/valor)", () => {
   }) => {
     await page.goto("/design/valor");
     await expect(page.getByText("Falta o horário de atendimento")).toBeVisible();
-    await expect(page.getByText(/Nós não estimamos esse dado/)).toBeVisible();
+    // ⚠️ ATUALIZADO EM 21/09/2026: o aviso foi resumido de tres frases para uma,
+    // a pedido do dono. O que o teste afirma continua sendo o mesmo e e o que
+    // importa: a tela declara que NAO ESTIMA, em vez de mostrar numero
+    // aproximado. Se essa promessa cair, o resumo inteiro perde o eixo.
+    await expect(page.getByText(/não estimamos/)).toBeVisible();
     // A regra que não se negocia: inventar número quebra a confiança, que é o
     // eixo de competição do produto. Só a seção com horário tem o 213.
     await expect(page.getByText("213", { exact: true })).toHaveCount(1);

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { KNOWLEDGE_MAX_BYTES, KNOWLEDGE_MAX_LABEL } from "@/lib/crm";
 import { EMBEDDING_MODEL } from "@/lib/rag";
 
 // Passo 1 do upload da base de conhecimento (padrão gatekeeper). Cria o registro
@@ -9,7 +10,8 @@ import { EMBEDDING_MODEL } from "@/lib/rag";
 // corpo da Vercel). Depois o navegador chama /process. Só o dono.
 
 const BUCKET = "knowledge";
-const MAX_BYTES = 20 * 1024 * 1024; // teto no app; o hard limit é do bucket
+// ⚠️ O teto mora em lib/crm.ts, com a tela: aqui ele era 20 MB e a area de
+// envio prometia 8, ou seja, duas verdades sobre o mesmo limite.
 
 function safeName(name: string): string {
   return name.replace(/[^\w.\-]+/g, "_").slice(0, 120) || "arquivo";
@@ -50,9 +52,9 @@ export async function POST(
   if (!filename) {
     return NextResponse.json({ error: "nome de arquivo inválido" }, { status: 400 });
   }
-  if (size > MAX_BYTES) {
+  if (size > KNOWLEDGE_MAX_BYTES) {
     return NextResponse.json(
-      { error: "arquivo muito grande (máximo 20 MB)" },
+      { error: `arquivo muito grande (máximo ${KNOWLEDGE_MAX_LABEL})` },
       { status: 413 }
     );
   }

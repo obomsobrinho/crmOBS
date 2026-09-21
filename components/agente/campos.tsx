@@ -263,9 +263,12 @@ export function CamposOQueSabe({
   knowledgeKeyConfigured: boolean;
   preview?: boolean;
 }) {
-  const [horarioAberto, setHorarioAberto] = useState(
-    () => renderHours(cfg.hours) === ""
-  );
+  // ⚠️ ABERTO DE CARA, sempre (pedido do dono, 21/09/2026: "horario deveria
+  // estar aberto de cara, e algo importante"). Ele abria SO quando estava
+  // vazio, e o efeito era o contrario do pretendido: quem ja preencheu uma vez
+  // nunca mais via o horario, que e o campo que alimenta a frase mais forte do
+  // painel e o unico que o agente repete para o cliente palavra por palavra.
+  const [horarioAberto, setHorarioAberto] = useState(true);
 
   // Persona curta demais para o cache de prompt da OpenAI pegar. Interessa ao
   // dono porque é custo: a persona vai inteira em TODA mensagem, e sem cache
@@ -294,8 +297,8 @@ export function CamposOQueSabe({
           onChange={(e) =>
             patch({ details: e.target.value.slice(0, LIMITS.details) })
           }
-          rows={8}
-          className="resize-none"
+          rows={4}
+          className="max-h-[320px] resize-none [field-sizing:content]"
         />
         <div className="text-right text-legenda tabular-nums text-ink-3">
           {cfg.details.length}/{LIMITS.details}

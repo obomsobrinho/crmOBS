@@ -136,3 +136,19 @@ export function listToCustomFields(list: CustomField[]): Record<string, string> 
   }
   return out;
 }
+
+/**
+ * Teto de tamanho do documento da base de conhecimento.
+ *
+ * ⚠️ MORA AQUI porque a tela e o servidor discordavam (achado de 21/09/2026): a
+ * área de envio prometia "até 8 MB" e a rota recusava só acima de 20 MB, com a
+ * mensagem de erro citando 20. Duas verdades sobre o mesmo limite é como alguém
+ * sobe um arquivo de 15 MB depois de ler que o teto era 8.
+ *
+ * Ficou no MENOR dos dois, e não no maior: 8 MB é o número que a tela promete há
+ * tempo, e alinhar por cima aumentaria em silêncio um limite que ninguém pediu
+ * para aumentar. Documento grande vira muitos trechos, e todo trecho é
+ * embedding pago no processamento.
+ */
+export const KNOWLEDGE_MAX_BYTES = 8 * 1024 * 1024;
+export const KNOWLEDGE_MAX_LABEL = "8 MB";

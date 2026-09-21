@@ -43,12 +43,26 @@ test.describe("Pipeline (escreve estágio)", () => {
     await linha.getByRole("textbox").blur();
     await expect(page.locator(COLUNA, { hasText: renomeado })).toBeVisible();
 
-    // Arquivar: some do board. É o único jeito de tirar um estágio da tela, e é
-    // por isso que este teste se limpa arquivando em vez de apagando.
+    // Arquivar: some do board.
     await linhaDe(renomeado)
       .getByRole("button", { name: "Arquivar estágio" })
       .click();
     await expect.poll(() => page.locator(COLUNA).count()).toBe(antes);
-  });
 
+    // ⚠️ E APAGA, que é a parte que faltava. O comentário antigo aqui dizia que
+    // "este teste se limpa arquivando em vez de apagando", e isso nunca foi
+    // limpar: arquivar só tira da tela. Em 21/09/2026 o dono abriu o funil dele
+    // e encontrou 63 estágios "Teste e2e … renomeado" empilhados na lista de
+    // arquivados, em DOIS tenants, um por execução desta suíte. O teste estava
+    // enchendo o banco do cliente de lixo, e ainda por cima era o próprio teste
+    // que pedia a funcionalidade que faltava para limpar.
+    // ⚠️ E AQUI `linhaDe` NÃO SERVE, que é a segunda armadilha de localizador
+    // deste arquivo. Ela acha a linha pelo punho de arraste, e o punho só existe
+    // na lista dos ATIVOS: o estágio arquivado vira outra linha, sem punho e com
+    // o nome em texto, não em campo. Quem identifica a linha arquivada é o
+    // `aria-label` do próprio botão de apagar, que já carrega o nome.
+    const apagar = page.getByRole("button", { name: `Apagar ${renomeado}` });
+    await apagar.click();
+    await expect(apagar).toHaveCount(0);
+  });
 });

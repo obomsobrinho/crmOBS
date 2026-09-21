@@ -785,3 +785,44 @@ test.describe("21/09: a caixa de escrita é uma linha só", () => {
     expect(medido).toEqual({ l: 36, a: 36 });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// 21/09: apagar estágio arquivado
+//
+// "Na pipeline temos as colunas 'Teste e2e … renomeado', arquivadas, deveria
+// poder apagar." Arquivar tirava da tela e deixava para sempre na lista de
+// arquivados, que virou depósito: 63 estágios de teste em dois tenants, um por
+// execução da suíte, porque nem o produto nem o teste tinham como apagar.
+// ─────────────────────────────────────────────────────────────────────
+test.describe("21/09: estágio arquivado pode ser apagado", () => {
+  test("o apagar mora na lista de arquivados, e não na coluna viva", async ({
+    page,
+  }) => {
+    await page.goto("/design/pipeline");
+    await page.getByRole("button", { name: "Gerenciar estágios" }).click();
+    await expect(page.getByText("Estágios do pipeline")).toBeVisible();
+
+    // ⚠️ Só no arquivado. Apagar direto da coluna viva seria um clique entre a
+    // pessoa e um estágio que some sem volta; arquivar primeiro é o passo que
+    // torna a decisão deliberada, e o Restaurar fica ali do lado.
+    await expect(page.getByRole("button", { name: "Apagar Perdido" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Apagar Fechado" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Apagar Novo" })
+    ).toHaveCount(0);
+  });
+
+  test("apagar tira o estágio da lista", async ({ page }) => {
+    await page.goto("/design/pipeline");
+    await page.getByRole("button", { name: "Gerenciar estágios" }).click();
+    await page.getByRole("button", { name: "Apagar Perdido" }).click();
+    await expect(page.getByRole("button", { name: "Apagar Perdido" })).toHaveCount(
+      0
+    );
+    // A seção inteira some junto: lista de arquivados vazia é seção sem
+    // conteúdo, e o produto não desenha caixa vazia.
+    await expect(page.getByText("Arquivados")).toHaveCount(0);
+  });
+});
