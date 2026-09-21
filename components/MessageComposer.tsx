@@ -271,7 +271,7 @@ export default function MessageComposer({
           onValueChange={(v) => setMode(v as Mode)}
           className="contents"
         >
-          <TabsList className="flex-wrap gap-[7px] border-b border-line-soft px-3 py-2.5">
+          <TabsList className="flex-wrap gap-[7px] border-b border-line-soft px-3 py-2">
             <TabsTrigger value="responder" variant="acao" data-cor="human">
               <Send size={15} />
               Responder ao cliente
@@ -322,9 +322,18 @@ export default function MessageComposer({
           </div>
         )}
 
-        {/* Área de escrita alta: é um lugar para escrever, não um campo de uma
-            linha que cresce. Três linhas de partida cobrem a mensagem típica
-            sem obrigar a pessoa a redimensionar nada. */}
+        {/* ⚠️ DUAS LINHAS QUE CRESCEM, e não três fixas (21/09/2026, pedido do
+            dono: a conversa estava com pouca altura). A caixa de escrita ocupava
+            259px de 950, ou seja, 27% da coluna, o tempo inteiro, para uma
+            mensagem de WhatsApp que quase sempre cabe em uma linha. O argumento
+            antigo ("é um lugar para escrever, não um campo de uma linha que
+            cresce") continua valendo: ela segue sendo uma caixa, só que parte
+            menor e cresce conforme se digita, em vez de reservar o pior caso.
+
+            `field-sizing: content` faz o crescimento sem JS. Onde ele não existe
+            (Firefox hoje), o `rows` manda e a caixa fica com duas linhas fixas,
+            rolando dentro: degrada para o comportamento de antes, menor. O teto
+            existe para o composer não engolir a conversa num texto longo. */}
         <Textarea
           variant="limpo"
           value={text}
@@ -335,13 +344,13 @@ export default function MessageComposer({
               submit();
             }
           }}
-          rows={3}
+          rows={2}
           aria-label={skin.placeholder}
           placeholder={skin.placeholder}
-          className="block px-4 pb-2.5 pt-[13px] text-corpo"
+          className="block max-h-[180px] min-h-[67px] px-4 pb-2.5 pt-[13px] text-corpo [field-sizing:content]"
         />
 
-        <div className="flex items-center gap-2 px-3 pb-3">
+        <div className="flex items-center gap-2 px-3 pb-2.5">
           <input
             ref={fileRef}
             type="file"

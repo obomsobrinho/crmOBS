@@ -20,9 +20,21 @@ export default function AiSummary({
   clientId,
   variante = "painel",
   direita,
+  qualificacaoForcada,
 }: {
   phone: string;
   clientId: string;
+  /**
+   * Só para o preview `/design` e para o teste: injeta a qualificação em vez de
+   * ler o banco.
+   *
+   * ⚠️ Existe porque a faixa passou a SUMIR quando não há entendimento
+   * (21/09/2026), e no preview não há banco: sem isto, a tela de design não teria
+   * como mostrar o estado com conteúdo, que é justamente o que precisa ser
+   * conferido. Mesmo precedente do `estadoForcado` do `WhatsAppBanner`: a tela
+   * real nunca passa esta prop.
+   */
+  qualificacaoForcada?: Qualification;
   /**
    * `painel` é o bloco da coluna da direita. `faixa` é a linha larga que fica
    * logo abaixo do cabeçalho da conversa (desenho de 18/09/2026): "O CLIENTE
@@ -34,7 +46,9 @@ export default function AiSummary({
   direita?: ReactNode;
 }) {
   const supabase = createClient();
-  const [qual, setQual] = useState<Qualification | null>(null);
+  const [qual, setQual] = useState<Qualification | null>(
+    qualificacaoForcada ?? null
+  );
   // Handoff em aberto desta conversa. Vem junto porque é aqui que o pedido
   // pendente está descrito, e é aqui que faz sentido declarar que acabou.
   const [handoffAt, setHandoffAt] = useState<string | null>(null);
@@ -92,6 +106,9 @@ export default function AiSummary({
   }, [phone, handoffAt]);
 
   useEffect(() => {
+    // Com qualificacao injetada nao ha o que buscar nem o que escutar: o
+    // preview roda sem banco, e assinar realtime ali so geraria canal morto.
+    if (qualificacaoForcada) return;
     void (async () => {
       await load();
     })();
@@ -114,15 +131,26 @@ export default function AiSummary({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [load, supabase, phone]);
+  }, [load, supabase, phone, qualificacaoForcada]);
 
-  // O pedido é a linha grande. Sem qualificação, ou com action "none", a IA
-  // ainda não concluiu nada: dizer isso é mais útil que esconder o bloco.
   const pedido = qual ? qualReasonLabel(qual.action) : "";
   const horario = qual?.preferenciaHorario ?? "";
   const resumo = qual?.summary ?? "";
 
   if (variante === "faixa") {
+    // ⚠️ SEM NADA A DIZER, A FAIXA NÃO EXISTE (decisão do dono, 21/09/2026).
+    // Ela mostrava "Ainda não disse", e o argumento anterior escrito aqui era
+    // que dizer isso seria mais útil que esconder o bloco. O dono olhou a tela
+    // pronta e discordou: "se ele ainda não disse, talvez nem faça sentido
+    // aparecer". Ele tem razão, e o custo era alto: são 49px de faixa, mais uma
+    // borda, gastos para informar que não há informação, no topo de toda
+    // conversa nova, que é justamente quando a conversa é curta e cada pixel de
+    // altura conta.
+    //
+    // ⚠️ `handoffAt` NÃO pode sair desta condição: com handoff aberto, é esta
+    // faixa que carrega o chip "esperando há 6h" e o botão Resolvido. Esconder
+    // por falta de resumo tiraria da tela o único jeito de fechar a pendência.
+    if (!resumo && !pedido && !handoffAt) return null;
     return (
       // ⚠️ A FAIXA INTEIRA NÃO MUDA MAIS DE COR com o handoff aberto. Ela ficava
       // âmbar de ponta a ponta, e o desenho aprovado mantém a superfície do
@@ -166,10 +194,13 @@ export default function AiSummary({
         </span>
         {/* Uma linha só e sem quebrar o layout: o resumo pode ser longo, e a
             faixa não pode empurrar a conversa para baixo a cada turno da IA.
-            15px em peso 600 (medida do desenho): esta frase é o resumo do
-            atendimento, e em 13px normal ela pesava menos que o telefone. */}
-        <span className="min-w-0 flex-1 truncate text-corpo font-semibold text-ink">
-          {resumo || pedido || "Ainda não disse"}
+            ⚠️ 13px em peso 600, e não os 15px do desenho (pedido do dono em
+            21/09/2026: "pode ter uma fonte menor um pouco"). O argumento antigo
+            para os 15 era que em 13 NORMAL a frase pesava menos que o telefone
+            do cabeçalho; o peso 600 resolve isso sem gastar altura, e esta faixa
+            é linha de CONTEXTO, não o conteúdo da tela. */}
+        <span className="min-w-0 flex-1 truncate text-apoio font-semibold text-ink">
+          {resumo || pedido}
         </span>
         {horario && (
           <span className="hidden shrink-0 items-center gap-1 text-legenda text-ink-2 lg:flex">

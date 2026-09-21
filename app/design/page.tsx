@@ -95,7 +95,18 @@ const LIST: InboxItem[] = [
   { phone: "553399412233@s.whatsapp.net", name: null, lastPreview: "Obrigado, era só isso mesmo", lastFrom: "in", lastMessageAt: DIAS_ATRAS(20), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
 ];
 
-export default function DesignPreview() {
+export default async function DesignPreview({
+  searchParams,
+}: {
+  searchParams: Promise<{ entendimento?: string }>;
+}) {
+  // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
+  // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
+  // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
+  // para ele não há como conferir nenhum dos dois: o preview não tem banco.
+  // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
+  const { entendimento } = await searchParams;
+  const semEntendimento = entendimento === "nao";
   const items = LIST;
   // Os TRÊS estados de "quem atende" (`quemAtende`, lib/crm), porque o indicador
   // no avatar depende deles e um mock com um estado só não prova nada:
@@ -146,6 +157,21 @@ export default function DesignPreview() {
               displayName={null}
               customFields={{ Origem: "QR Code", Interesse: "Plano anual" }}
                 contactExists
+                // ⚠️ Desde 21/09/2026 a faixa "O cliente quer" SOME quando não há
+                // entendimento, e o preview não tem banco: sem isto ele mostraria
+                // só o estado vazio, que é justamente o menos interessante de
+                // conferir. O texto imita o que a IA grava de verdade em
+                // `conversation_qualifications.summary`.
+                qualificacaoPreview={
+                  semEntendimento
+                    ? undefined
+                    : {
+                        action: "agendar",
+                        summary: "Remarcar de quinta para sexta à tarde",
+                        preferenciaHorario: "sexta à tarde",
+                        createdAt: HOJE(11.9),
+                      }
+                }
               />
             </main>
           </Card>

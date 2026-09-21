@@ -8,6 +8,7 @@ import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { createClient } from "@/lib/supabase/client";
 import { anunciarIa } from "@/lib/ia-bus";
 import type { Member } from "@/lib/team";
+import type { Qualification } from "@/lib/crm";
 import type { ChatRow } from "@/lib/types";
 
 // Compõe a thread + o painel de contexto. Dono do estado da IA
@@ -30,6 +31,7 @@ export default function ConversationView({
   customFields,
   contactExists,
   readOnly,
+  qualificacaoPreview,
 }: {
   phone: string;
   name: string | null;
@@ -48,6 +50,8 @@ export default function ConversationView({
   contactExists: boolean;
   /** Conta bloqueada por assinatura: a conversa é visível, mas não se trabalha. */
   readOnly?: boolean;
+  /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
+  qualificacaoPreview?: Qualification;
 }) {
   const supabase = createClient();
   const [showContext, setShowContext] = useState(true);
@@ -326,6 +330,7 @@ export default function ConversationView({
           myUserId={myUserId}
           onAssign={assign}
           conversationId={conversationId}
+          qualificacaoPreview={qualificacaoPreview}
         />
       </div>
       {showContext && (

@@ -633,3 +633,100 @@ test.describe("Item 5: IA e pessoa não atendem a mesma conversa", () => {
     expect(escritas.map((e) => e.tabela)).toEqual(["conversations"]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Ajustes de 21/09/2026: a conversa estava com pouca altura
+//
+// Dois pedidos do dono depois de validar a tela: "chat de conversa dá para
+// diminuir um pouco o height, está bem grande" e "o header com a escrita 'o
+// cliente quer' pode ter uma fonte menor um pouco, se ele ainda não disse talvez
+// nem faça sentido aparecer".
+//
+// Medido antes: numa janela de 950, a caixa de escrita ocupava 259px (27% da
+// coluna) e a faixa do entendimento gastava 49px para dizer "Ainda não disse".
+// ─────────────────────────────────────────────────────────────────────
+test.describe("21/09: a conversa ganhou altura", () => {
+  test.use({ viewport: { width: 1600, height: 950 } });
+
+  test("a faixa do entendimento NÃO existe quando a IA não entendeu nada", async ({
+    page,
+  }) => {
+    await page.goto("/design?entendimento=nao");
+    // ⚠️ O argumento que caiu: "dizer que ainda não concluiu nada é mais útil
+    // que esconder o bloco". São 49px mais uma borda gastos para informar que
+    // não há informação, no topo de toda conversa nova, que é justamente quando
+    // a conversa é curta e a altura importa.
+    await expect(
+      page.locator('[data-slot="conversa-entendimento"]')
+    ).toHaveCount(0);
+    await expect(page.getByText("Ainda não disse")).toHaveCount(0);
+  });
+
+  test("com entendimento ela aparece, e a frase é um degrau menor", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const faixa = page.locator('[data-slot="conversa-entendimento"]');
+    await expect(faixa).toBeVisible();
+    await expect(faixa).toContainText(/O cliente quer/i);
+
+    // 13px (papel `apoio`) e não os 15 do desenho: pedido do dono. O peso 600
+    // continua, que é o que impede a frase de pesar menos que o telefone do
+    // cabeçalho, que era o motivo original dos 15.
+    const frase = faixa.getByText("Remarcar de quinta para sexta à tarde");
+    await expect(frase).toHaveCSS("font-size", "13px");
+    await expect(frase).toHaveCSS("font-weight", "600");
+  });
+
+  test("a caixa de escrita parte de duas linhas e CRESCE com o texto", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const campo = page.locator("main form textarea");
+    await expect(campo).toBeVisible();
+
+    // ⚠️ O teste mede a ALTURA, e não o atributo `rows`: quem manda no tamanho é
+    // `field-sizing: content`, e `rows` sozinho passaria mesmo com a caixa presa
+    // no pior caso, que é o defeito que este ajuste corrigiu.
+    const vazio = await campo.evaluate((e) =>
+      Math.round(e.getBoundingClientRect().height)
+    );
+    expect(vazio).toBeLessThan(80);
+
+    await campo.fill("uma\nduas\ntrês\nquatro\ncinco");
+    await expect
+      .poll(() =>
+        campo.evaluate((e) => Math.round(e.getBoundingClientRect().height))
+      )
+      .toBeGreaterThan(vazio);
+
+    // E volta: a caixa não fica esticada depois de a mensagem sair.
+    await campo.fill("");
+    await expect
+      .poll(() =>
+        campo.evaluate((e) => Math.round(e.getBoundingClientRect().height))
+      )
+      .toBe(vazio);
+  });
+
+  test("a conversa fica com mais altura que a caixa de escrita, com folga", async ({
+    page,
+  }) => {
+    await page.goto("/design?entendimento=nao");
+    const medido = await page.evaluate(() => {
+      const area = document
+        .querySelector('main [data-slot="scroll-area"]')!
+        .getBoundingClientRect().height;
+      const composer = document
+        .querySelector("main form")!
+        .closest("div")!
+        .getBoundingClientRect().height;
+      return { area: Math.round(area), composer: Math.round(composer), janela: window.innerHeight };
+    });
+    // A conversa é o conteúdo; a caixa de escrita é ferramenta. Antes deste
+    // ajuste a ferramenta levava 27% da coluna o tempo inteiro, para uma
+    // mensagem de WhatsApp que quase sempre cabe em uma linha.
+    expect(medido.composer / medido.janela).toBeLessThan(0.25);
+    expect(medido.area).toBeGreaterThan(medido.composer * 2.5);
+  });
+});

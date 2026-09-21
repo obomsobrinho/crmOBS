@@ -33,6 +33,7 @@ import { createClient } from "@/lib/supabase/client";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
+import type { Qualification } from "@/lib/crm";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
@@ -153,6 +154,7 @@ export default function Thread({
   conversationId,
   pendingInstruction,
   onCancelInstruction,
+  qualificacaoPreview,
 }: {
   phone: string;
   name: string | null;
@@ -178,6 +180,8 @@ export default function Thread({
   /** Orientação pendente da IA, mostrada colada na caixa de escrita. */
   pendingInstruction?: string | null;
   onCancelInstruction?: () => void | Promise<void>;
+  /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
+  qualificacaoPreview?: Qualification;
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
@@ -691,7 +695,12 @@ export default function Thread({
           alguém clicava em "Ocultar cliente". É a primeira pergunta que quem abre
           a conversa faz, então é a primeira linha que ele lê. */}
       {conversationId != null && (
-        <AiSummary phone={phone} clientId={clientId} variante="faixa" />
+        <AiSummary
+          phone={phone}
+          clientId={clientId}
+          variante="faixa"
+          qualificacaoForcada={qualificacaoPreview}
+        />
       )}
 
       {/* A moldura existe só para as duas sombras terem a que se ancorar: elas
