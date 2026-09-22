@@ -271,20 +271,20 @@ export default function MessageComposer({
           onValueChange={(v) => setMode(v as Mode)}
           className="contents"
         >
-          <TabsList className="flex-wrap gap-[7px] border-b border-line-soft px-3 py-2">
+          <TabsList className="flex-wrap gap-1.5 border-b border-line-soft px-3 py-1.5">
             <TabsTrigger value="responder" variant="acao" data-cor="human">
-              <Send size={15} />
+              <Send size={13} />
               Responder ao cliente
             </TabsTrigger>
             {onAddNote && (
               <TabsTrigger value="nota" variant="acao" data-cor="warn">
-                <StickyNote size={15} />
+                <StickyNote size={13} />
                 Nota interna
               </TabsTrigger>
             )}
             {onInstruct && (
               <TabsTrigger value="orientar" variant="acao" data-cor="brand">
-                <Sparkles size={15} />
+                <Sparkles size={13} />
                 Orientar a IA
               </TabsTrigger>
             )}

@@ -618,6 +618,38 @@ test.describe("Conversa redesenhada: fidelidade ao desenho", () => {
     expect(bgOrientar).not.toBe(ativo.bg);
   });
 
+  test("os modos do composer são botões de 28px, não faixa de menu", async ({
+    page,
+  }) => {
+    await page.goto("/design");
+    const abas = page.locator('[data-slot="tabs-trigger"][data-cor]');
+    // 22/09/2026: eram 34px de altura com ícone de 15, numa faixa de 51px, e o
+    // dono leu isso como exagero ("dá para diminuir esse tamanho das tabs do
+    // chat"). O que encolheu foi altura, respiro e ícone; a cor NÃO entra aqui
+    // (o teste de cima é quem cuida dela, e a decisão é de 18/09).
+    for (const h of await abas.evaluateAll((els) =>
+      els.map((el) => el.getBoundingClientRect().height)
+    )) {
+      expect(h).toBeLessThanOrEqual(30);
+    }
+    // ⚠️ O ícone se mede pelo atributo do lucide, não por `size-4`: `size-4` é
+    // CSS e venceria o `width` do svg, engordando de volta o que acabou de
+    // encolher (regra 2 da camada base).
+    const icone = await abas
+      .first()
+      .locator("svg")
+      .evaluate((el) => el.getBoundingClientRect().width);
+    expect(icone).toBeLessThanOrEqual(13);
+    // E a faixa inteira acompanha: sem apertar o `py` da lista, encolher o
+    // botão não devolve altura nenhuma para a conversa, que é o motivo do
+    // pedido.
+    const faixa = await page
+      .locator('[data-slot="tabs-list"]')
+      .first()
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(faixa).toBeLessThanOrEqual(44);
+  });
+
   test("o separador de dia é VISÍVEL sobre a conversa", async ({ page }) => {
     await page.goto("/design");
     const dia = page.locator('[data-slot="conversa-dia"] [data-slot="badge"]');

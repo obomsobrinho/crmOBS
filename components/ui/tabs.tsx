@@ -135,7 +135,13 @@ const gatilhoVariants = cva(
           // cheio usam (components/ui/button.tsx): funciona sobre o fill e
           // sobre a superfície tingida, nos dois temas, sem inventar uma quarta
           // cor por matiz só para o ponteiro passar por cima.
-          "h-[34px] items-center gap-2 rounded-lg border px-3 text-apoio font-semibold hover:brightness-[1.06]",
+          // ⚠️ 28px de altura, e não 34 (22/09/2026, pedido do dono: "as tabs do
+          // chat estão meio exageradas"). O degrau mexe em ALTURA, RESPIRO e
+          // TAMANHO DO ÍCONE, nunca na cor: os dois degraus de cor descritos
+          // acima são decisão de 18/09 com teste próprio. O rótulo fica nos
+          // 13px de `text-apoio` porque 12 é o piso do sistema e estes são
+          // botões de ação, não legenda.
+          "h-[28px] items-center gap-1.5 rounded-lg border px-2.5 text-apoio font-semibold hover:brightness-[1.06]",
           "data-[cor=human]:border-[var(--human-line)] data-[cor=human]:bg-[var(--human-surface)] data-[cor=human]:text-human-ink",
           "data-[cor=warn]:border-warn-line data-[cor=warn]:bg-warn-surface data-[cor=warn]:text-warn-ink",
           "data-[cor=brand]:border-brand-line data-[cor=brand]:bg-brand-surface data-[cor=brand]:text-brand-ink",
