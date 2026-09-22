@@ -55,6 +55,15 @@ const buttonVariants = cva(
         /** Ação secundária com moldura. */
         outline: "border border-line text-ink hover:bg-[var(--active-bg)]",
         /**
+         * O `outline` que LIGA E DESLIGA: pílula de escolha (tom de voz, dia
+         * da semana, modelo). O estado aceso sai do `aria-pressed`, e não de
+         * uma classe condicional na tela, então quem usa só passa o
+         * `aria-pressed` que o leitor de tela já precisava. Eram três cópias da
+         * mesma sopa de classe (22/09/2026).
+         */
+        alternavel:
+          "border border-line text-ink hover:bg-[var(--active-bg)] aria-pressed:border-brand-line aria-pressed:bg-brand-surface aria-pressed:text-brand-ink",
+        /**
          * Sem moldura, com realce de fundo no hover. É o ghost da ÁREA DE
          * CONTEÚDO (conversa, painel do contato).
          */

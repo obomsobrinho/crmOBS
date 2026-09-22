@@ -176,7 +176,7 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     }
   });
 
-  test("a aba 'O que ele sabe' abre pelo horário, e os detalhes vêm antes dos documentos", async ({
+  test("a aba 'O que ele sabe' abre pelo horário, e os documentos ficam ao lado dele", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 1200 });
@@ -188,8 +188,11 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     // ser o primeiro dessa sessão"). O argumento é o mesmo que um dia pôs os
     // Detalhes na frente: quem abre esta aba quer o dado que o agente REPETE
     // para o cliente, e o horário é o único que ele repete palavra por palavra.
-    // O que não mudou: Detalhes continua antes de Documentos, porque documento
-    // entra por consulta, depois do prompt.
+    // ⚠️ E MUDOU DE NOVO no mesmo dia: Documentos subiu para o LADO do horário,
+    // e Detalhes desceu para a largura inteira (pedido do dono: "o documentos
+    // pode ficar lado a lado com a sessão de horário e deixa por baixo o
+    // detalhes do negócio"). A geometria é conferida no teste do arranjo; aqui
+    // fica a ordem de leitura que sai disso.
     const pos = await page.evaluate(() => {
       const grupo = document.getElementById("grupo-sabe")!;
       const antes = (a: Element, b: Element) =>
@@ -202,14 +205,14 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
       const abas = [...document.querySelectorAll('[data-slot="tabs-content"]')];
       return {
         horarioPrimeiro: !!horario && antes(horario, ta),
-        detalhesAntesDosDocs: !!docs && antes(ta, docs),
+        docsAntesDosDetalhes: !!docs && antes(docs, ta),
         // Segunda aba das três, e não a última.
         indice: abas.indexOf(grupo),
         total: abas.length,
       };
     });
     expect(pos.horarioPrimeiro).toBe(true);
-    expect(pos.detalhesAntesDosDocs).toBe(true);
+    expect(pos.docsAntesDosDetalhes).toBe(true);
     expect(pos.indice).toBe(1);
     expect(pos.total).toBe(3);
   });
@@ -293,7 +296,8 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
 
     // Inventário curto: 3 documentos mais o "Ver todos", e não a lista inteira.
     // A área de arraste grande (py-8) vive no painel, senão somaria uns 400px.
-    const itens = grupo.locator("ul > li");
+    // Só os `li` fora do horário: o resumo do horário também é uma lista.
+    const itens = grupo.locator("ul:not([data-slot=horario] ul) > li");
     await expect(itens).toHaveCount(3);
     await expect(grupo.getByRole("button", { name: "Ver todos (4)" })).toBeVisible();
 
@@ -344,7 +348,9 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await expect(
       page.getByRole("heading", { name: "Horário de atendimento", level: 3 })
     ).toBeVisible();
-    await expect(page.getByPlaceholder("Ex.: fechado em feriados")).toBeVisible();
+    // A prova era a observação de horário, que saiu da tela em 22/09/2026
+    // (pedido do dono). O que continua na tela sem clique é a chave do sábado.
+    await expect(page.getByRole("switch", { name: "Sábado aberto" })).toBeVisible();
     // E não sobrou gatilho de recolher em nenhum dos dois títulos.
     await expect(
       page.getByRole("button", { name: /Horário de atendimento/ })
@@ -409,34 +415,106 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     }
   });
 
-  test("o horário abre no simples, e o dia a dia fica atrás de um botão", async ({
+  test("horário: dias úteis num grupo só, sábado e domingo com hora e chave à vista", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/design/agente");
     await page.getByRole("tab", { name: "O que ele sabe" }).click();
 
-    // 22/09/2026: "poderia ter algo assim, seg a sexta e coloca o horário, se eu
-    // quiser personalizar clico em outro botão e aí sim eu ajusto dia por dia".
-    // Antes era sempre a parede de 7 linhas, para uma configuração que na
-    // esmagadora maioria dos casos é uma faixa só.
-    const grupo = page.locator("#grupo-sabe");
-    await expect(grupo.getByText("Segunda a sexta, das")).toBeVisible();
-    // Uma linha significa DOIS campos de hora, não catorze.
-    await expect(grupo.locator('input[type="time"]')).toHaveCount(2);
+    // 22/09/2026, segunda rodada do dono: "segunda a sexta deve ser um único
+    // grupo", "sábado e domingo devem aparecer separadamente", e sem o botão
+    // "Personalizar por dia", sem a observação de horário e sem a lista de sete
+    // dias. Substitui o teste do modo simples/dia a dia da primeira rodada.
+    const h = page.locator('[data-slot="horario"]');
+    const semana = h.locator('[data-slot="horario-semana"]');
+    await expect(semana.getByText("Segunda a sexta")).toBeVisible();
+    await expect(semana.getByText("Seg • Ter • Qua • Qui • Sex")).toBeVisible();
+    await expect(semana.getByText("08:00 às 18:00")).toBeVisible();
+    await expect(page.getByText("Observação de horário")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Personalizar por dia" })).toHaveCount(0);
 
-    await grupo.getByRole("button", { name: "Personalizar por dia" }).click();
-    // No dia a dia voltam os 7 dias. São 10 campos e não 14 porque sábado e
-    // domingo estão fechados, e dia fechado não mostra hora nenhuma.
-    await expect(grupo.getByText("Sábado")).toBeVisible();
-    await expect(grupo.locator('input[type="time"]')).toHaveCount(10);
+    // Fechado não esconde a hora: os campos ficam lá, desligados. São 4 campos
+    // no total (2 do sábado, 2 do domingo); o grupo só mostra os dele ao editar.
+    const sab = h.locator('[data-slot="horario-sab"]');
+    await expect(h.locator('input[type="time"]')).toHaveCount(4);
+    await expect(sab.locator('input[type="time"]').first()).toBeDisabled();
+    await sab.getByRole("switch", { name: "Sábado aberto" }).click();
+    await expect(sab.getByText("Aberto")).toBeVisible();
+    await expect(sab.locator('input[type="time"]').first()).toBeEnabled();
 
-    // E dá para voltar. ⚠️ Voltar ACHATA (fecha o fim de semana e iguala os
-    // dias úteis), e é por isso que o rótulo diz "segunda a sexta": quem
-    // clica está pedindo isso. O que não pode existir é o achatamento
-    // silencioso, e por isso o modo nunca NASCE simples com horário irregular.
-    await grupo.getByRole("button", { name: "Voltar para segunda a sexta" }).click();
-    await expect(grupo.locator('input[type="time"]')).toHaveCount(2);
+    // Exceção dentro do grupo: "na sexta vou editar somente ela, pois na sexta
+    // saio mais cedo". A sexta ganha linha própria, e mudar o padrão DEPOIS
+    // não passa por cima dela.
+    await semana.getByRole("button", { name: "Editar" }).click();
+    await semana.getByRole("button", { name: "Horário diferente em um dia" }).click();
+    await semana.getByRole("button", { name: "Sex" }).last().click();
+    await semana.getByLabel("Fecha às (sexta)").fill("17:00");
+    await semana.getByLabel("Fecha às (dias úteis)").fill("19:00");
+    await semana.getByRole("button", { name: "Concluir" }).click();
+    await expect(semana.getByText("Seg • Ter • Qua • Qui", { exact: true })).toBeVisible();
+    await expect(semana.getByText("08:00 às 19:00")).toBeVisible();
+    await expect(semana.getByText("Sexta", { exact: true })).toBeVisible();
+    await expect(semana.getByText("08:00 às 17:00")).toBeVisible();
+
+    // Desmarcar um dia o tira do resumo.
+    await semana.getByRole("button", { name: "Editar" }).click();
+    await semana.getByRole("button", { name: "Qui" }).click();
+    await semana.getByRole("button", { name: "Concluir" }).click();
+    await expect(semana.getByText("Seg • Ter • Qua", { exact: true })).toBeVisible();
+  });
+
+  test("horário e documentos lado a lado, detalhes do negócio embaixo", async ({
+    page,
+  }) => {
+    // 22/09/2026, pedido do dono. Mede a geometria em vez de confiar na ordem
+    // do DOM: o arranjo é o que ele pediu, não a sequência.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/design/agente");
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
+    const caixa = (nome: string) =>
+      page
+        .locator("#grupo-sabe")
+        .getByRole("heading", { name: nome, level: 3 })
+        .boundingBox();
+    const [h, d, n] = await Promise.all([
+      caixa("Horário de atendimento"),
+      caixa("Documentos"),
+      caixa("Detalhes do negócio"),
+    ]);
+    expect(Math.abs(h!.y - d!.y)).toBeLessThan(4);
+    expect(d!.x).toBeGreaterThan(h!.x + 300);
+    expect(n!.y).toBeGreaterThan(h!.y + 100);
+
+    // "Está tudo torto": os dois CARTÕES da linha começam e terminam juntos.
+    const moldura = (sel: string) =>
+      page.locator(sel).evaluate((e) => {
+        const b = e.getBoundingClientRect();
+        return { topo: Math.round(b.top), fim: Math.round(b.bottom) };
+      });
+    const [mh, md] = await Promise.all([
+      moldura('[data-slot="horario"]'),
+      moldura('[data-slot="docs-lista"]'),
+    ]);
+    expect(md).toEqual(mh);
+  });
+
+  test("todo bloco do construtor tem ícone, nas três abas", async ({ page }) => {
+    // "dentro de quem atende faltou os ícones": o teste varre as TRÊS abas,
+    // porque o defeito foi exatamente uma aba ficar de fora.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/design/agente");
+    for (const [aba, grupo] of [
+      ["Quem atende", "#grupo-quem"],
+      ["O que ele sabe", "#grupo-sabe"],
+      ["O que ele pode fazer", "#grupo-pode"],
+    ] as const) {
+      await page.getByRole("tab", { name: aba }).click();
+      const titulos = page.locator(`${grupo} h3`);
+      const icones = page.locator(`${grupo} [data-slot="bloco-icone"]`);
+      expect(await titulos.count(), aba).toBeGreaterThan(1);
+      expect(await icones.count(), aba).toBe(await titulos.count());
+    }
   });
 
   test("o aviso de cache existe nos DOIS modos, junto do campo que o resolve", async ({
@@ -533,28 +611,26 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
 
   test("os presets trocam de lugar, não de existência", async ({ page }) => {
     // No assistente são convite e abrem o passo; na tela permanente são ação
-    // destrutiva e ficam no pé da aba 1, onde foram parar em 26/08.
-    const chip = () =>
-      page.evaluate(() => {
-        const achar = (raiz: Element | null) =>
-          raiz
-            ? [...raiz.querySelectorAll("button")].some(
-                (b) =>
-                  /Clínica odontológica/.test(b.textContent ?? "") &&
-                  b.getBoundingClientRect().height > 0
-              )
-            : false;
-        return {
-          convite: achar(document.querySelector('[data-slot="preset-convite"]')),
-          rodape: achar(document.querySelector('[data-slot="preset-rodape"]')),
-        };
-      });
-
+    // destrutiva. ⚠️ Desde 22/09/2026 a ação é um MENU na linha das abas, e não
+    // mais pílulas no pé de "Quem atende" (decisão do dono): o modelo mexe nas
+    // três abas, e no pé de uma delas parecia valer só para ela.
     await page.goto("/design/montagem?passo=quem");
-    expect(await chip()).toEqual({ convite: true, rodape: false });
+    await expect(
+      page
+        .locator('[data-slot="preset-convite"]')
+        .getByRole("button", { name: "Clínica odontológica" })
+    ).toBeVisible();
+    await expect(page.locator("[data-preset-menu]")).toHaveCount(0);
 
     await page.goto("/design/agente");
-    expect(await chip()).toEqual({ convite: false, rodape: true });
+    await expect(page.locator('[data-slot="preset-convite"]')).toHaveCount(0);
+    await expect(page.getByText("Não sabe o que escrever?")).toHaveCount(0);
+    // Fora de qualquer aba: aparece igual nas três.
+    await expect(page.locator("[role=tabpanel] [data-preset-menu]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Usar um modelo" }).click();
+    await expect(
+      page.getByRole("menuitem", { name: "Clínica odontológica" })
+    ).toBeVisible();
   });
 
   test("não tem índice de âncoras no topo", async ({ page }) => {
@@ -583,7 +659,9 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
       hora: document.querySelector<HTMLInputElement>("input[type=time]")?.value,
     }));
 
-    await page.getByRole("button", { name: "Clínica odontológica" }).click();
+    // O modelo mora no menu da linha das abas desde 22/09/2026.
+    await page.getByRole("button", { name: "Usar um modelo" }).click();
+    await page.getByRole("menuitem", { name: "Clínica odontológica" }).click();
     const dialogo = page.locator('[data-slot="dialog-content"]');
     await expect(dialogo).toBeVisible();
     await dialogo.getByRole("button", { name: "Aplicar modelo" }).click();

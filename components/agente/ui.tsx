@@ -1,6 +1,12 @@
 "use client";
 
-import { AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -74,19 +80,29 @@ export function Secao({
  * VALOR ou de um sub-bloco RECOLHÍVEL. Sem o recolher, estes blocos são do
  * primeiro tipo, e é por isso que "Documentos" sempre foi assim.
  *
- * `titulo` é opcional porque o bloco de documentos traz o próprio `h3` com um
- * botão na mesma linha; o que ele precisa daqui é só o filete e o respiro.
+ * `titulo` é opcional porque o bloco de documentos monta o próprio cabeçalho
+ * (com o MESMO `CabecalhoBloco`) dentro do `KnowledgeManager`; o que ele
+ * precisa daqui é só o filete e o respiro.
  * `primeiro` tira o filete de quem abre a aba, que não tem nada acima para se
  * separar.
  */
 export function SubBloco({
   titulo,
+  icone,
+  descricao,
   primeiro = false,
   required,
   error,
+  className,
   children,
 }: {
+  /** Para o bloco que precisa esticar numa grade (`flex h-full flex-col`). */
+  className?: string;
   titulo?: string;
+  /** Ícone do cabeçalho. Ver `CabecalhoBloco`. */
+  icone?: LucideIcon;
+  /** Uma frase curta: o que se configura aqui. */
+  descricao?: string;
   primeiro?: boolean;
   /** Mesma marca do `Field`: o bloco inteiro é obrigatório (Objetivos). */
   required?: boolean;
@@ -95,15 +111,73 @@ export function SubBloco({
   children: React.ReactNode;
 }) {
   return (
-    <div className={primeiro ? "" : "border-t border-line pt-4"}>
+    <div className={cn(!primeiro && "border-t border-line pt-4", className)}>
       {titulo && (
-        <h3 className="mb-3 flex items-center gap-1 font-display text-cartao text-ink">
-          {titulo}
-          {required && <span className="text-danger-ink">*</span>}
-        </h3>
+        <CabecalhoBloco
+          icone={icone}
+          titulo={titulo}
+          descricao={descricao}
+          required={required}
+          className="mb-4"
+        />
       )}
       {children}
       {error && <p className="mt-1.5 text-legenda text-danger-ink">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Moldura de cartão-lista (linhas separadas por filete): horário e documentos,
+ * lado a lado na mesma aba, com a MESMA moldura.
+ */
+export const MOLDURA_LISTA = "divide-y divide-line rounded-xl border border-line";
+
+/**
+ * Cabeçalho de bloco do construtor: ícone num quadrado tingido, o título e uma
+ * frase curta dizendo o que se configura ali (22/09/2026, pedido do dono).
+ *
+ * Exportado à parte porque o bloco de documentos mora em outro componente
+ * (`KnowledgeManager`) e precisa do MESMO desenho: dois jeitos
+ * de encabeçar bloco na mesma aba foi exatamente o erro de ff00ffc.
+ *
+ * O quadrado usa o par `brand-surface`/`brand-ink` (ícone é `ink`, nunca
+ * `fill`). O título continua `h3` em `text-cartao`, que é o que o teste de
+ * vocabulário único confere.
+ */
+export function CabecalhoBloco({
+  icone: Icone,
+  titulo,
+  descricao,
+  required,
+  className,
+}: {
+  /** Todo bloco do construtor tem; opcional só para não haver um segundo `h3`. */
+  icone?: LucideIcon;
+  titulo: string;
+  descricao?: string;
+  required?: boolean;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-start gap-3", className)}>
+      {Icone && (
+        <span
+          data-slot="bloco-icone"
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-surface text-brand-ink"
+        >
+          <Icone size={18} />
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <h3 className="flex items-center gap-1 font-display text-cartao text-ink">
+          {titulo}
+          {required && <span className="text-danger-ink">*</span>}
+        </h3>
+        {descricao && (
+          <p className="mt-0.5 text-apoio text-ink-3">{descricao}</p>
+        )}
+      </div>
     </div>
   );
 }

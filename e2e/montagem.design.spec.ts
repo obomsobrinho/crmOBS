@@ -74,9 +74,9 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     await page.goto("/design/montagem?passo=quem");
     const convite = page.locator('[data-slot="preset-convite"]');
     await expect(convite).toBeVisible();
-    // Na tela permanente ele é ação destrutiva e mora no pé da aba; aqui é
-    // convite e abre o passo.
-    await expect(page.locator('[data-slot="preset-rodape"]')).toHaveCount(0);
+    // Na tela permanente ele é ação destrutiva e mora num menu na linha das
+    // abas (22/09/2026); aqui é convite e abre o passo.
+    await expect(page.locator("[data-preset-menu]")).toHaveCount(0);
 
     const antes = await page.evaluate(() => {
       const c = document.querySelector('[data-slot="preset-convite"]')!;

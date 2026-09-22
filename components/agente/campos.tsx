@@ -1,11 +1,28 @@
 "use client";
 
-import { AlertTriangle, Bell, LayoutTemplate } from "lucide-react";
+import {
+  AlertTriangle,
+  Bell,
+  Bot,
+  Building2,
+  CalendarClock,
+  LayoutTemplate,
+  ShieldCheck,
+  Store,
+  Target,
+} from "lucide-react";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
 import AgentBulletList from "@/components/AgentBulletList";
 import KnowledgeManager from "@/components/KnowledgeManager";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -57,79 +74,100 @@ export function CamposQuemAtende({
   fields,
   mostrarOpcionais = true,
 }: CamposComuns) {
+  // Dois blocos com o cabeçalho do construtor (22/09/2026, pedido do dono:
+  // "dentro de quem atende faltou os ícones"). Os campos são os mesmos e na
+  // mesma ordem; o que entrou foi só a divisão entre empresa e agente, que é a
+  // fronteira que o próprio prompt já faz (A EMPRESA e IDENTIDADE).
   return (
     <>
-      {mostrarOpcionais ? (
-        <Trio>
-          <CampoNomeEmpresa cfg={cfg} patch={patch} fields={fields} />
-          <Field label="Site">
-            <Input
-              value={cfg.companySite}
-              onChange={(e) => patch({ companySite: e.target.value })}
-              placeholder="https://…"
+      <SubBloco
+        titulo="A empresa"
+        icone={Building2}
+        descricao="Como o agente apresenta o seu negócio nas conversas."
+        primeiro
+      >
+        <div className="space-y-4">
+          {mostrarOpcionais ? (
+            <Trio>
+              <CampoNomeEmpresa cfg={cfg} patch={patch} fields={fields} />
+              <Field label="Site">
+                <Input
+                  value={cfg.companySite}
+                  onChange={(e) => patch({ companySite: e.target.value })}
+                  placeholder="https://…"
+                />
+              </Field>
+              <Field label="Endereço">
+                <Input
+                  value={cfg.companyAddress}
+                  onChange={(e) => patch({ companyAddress: e.target.value })}
+                />
+              </Field>
+            </Trio>
+          ) : (
+            <CampoNomeEmpresa cfg={cfg} patch={patch} fields={fields} />
+          )}
+
+          <Field
+            label="O que a empresa faz"
+            error={fields.companyWhat}
+            required
+          >
+            <Textarea
+              value={cfg.companyWhat}
+              onChange={(e) => patch({ companyWhat: e.target.value })}
+              rows={2}
+              // ⚠️ O placeholder NÃO nomeia um segmento. A versão anterior dizia
+              // "Ex.: é uma clínica odontológica no centro de...", e o beta é misto
+              // (advogado, pediatra, barbeiro, engenheiro, clínica, loja): texto
+              // fixo de tela que assume uma vertical faz o resto parecer não ser
+              // para você. Quem dá exemplo de segmento é o modelo escolhido, que
+              // preenche o campo de verdade.
+              placeholder="Uma ou duas frases, do jeito que você explicaria para alguém que nunca ouviu falar."
+              className="resize-none"
             />
           </Field>
-          <Field label="Endereço">
-            <Input
-              value={cfg.companyAddress}
-              onChange={(e) => patch({ companyAddress: e.target.value })}
-            />
-          </Field>
-        </Trio>
-      ) : (
-        <CampoNomeEmpresa cfg={cfg} patch={patch} fields={fields} />
-      )}
-
-      <Field label="O que a empresa faz" error={fields.companyWhat} required>
-        <Textarea
-          value={cfg.companyWhat}
-          onChange={(e) => patch({ companyWhat: e.target.value })}
-          rows={2}
-          // ⚠️ O placeholder NÃO nomeia um segmento. A versão anterior dizia
-          // "Ex.: é uma clínica odontológica no centro de...", e o beta é misto
-          // (advogado, pediatra, barbeiro, engenheiro, clínica, loja): texto
-          // fixo de tela que assume uma vertical faz o resto parecer não ser
-          // para você. Quem dá exemplo de segmento é o modelo escolhido, que
-          // preenche o campo de verdade.
-          placeholder="Uma ou duas frases, do jeito que você explicaria para alguém que nunca ouviu falar."
-          className="resize-none"
-        />
-      </Field>
-
-      {mostrarOpcionais ? (
-        <Par>
-          <CampoNomeAgente cfg={cfg} patch={patch} fields={fields} />
-          <Field label="Função (opcional)">
-            <Input
-              value={cfg.agentRole}
-              onChange={(e) => patch({ agentRole: e.target.value })}
-              placeholder="Ex.: atendente, consultora"
-            />
-          </Field>
-        </Par>
-      ) : (
-        <CampoNomeAgente cfg={cfg} patch={patch} fields={fields} />
-      )}
-
-      <Field label="Tom de voz">
-        <div className="flex flex-wrap gap-2">
-          {TONES.map((t) => (
-            <Button
-              key={t.value}
-              variant="outline"
-              onClick={() => patch({ tone: t.value as Tone })}
-              aria-pressed={cfg.tone === t.value}
-              className={`rounded-full ${
-                cfg.tone === t.value
-                  ? "border-brand-line bg-brand-surface text-brand-ink"
-                  : ""
-              }`}
-            >
-              {t.label}
-            </Button>
-          ))}
         </div>
-      </Field>
+      </SubBloco>
+
+      <SubBloco
+        titulo="O agente"
+        icone={Bot}
+        descricao="Quem responde no WhatsApp e o jeito de falar."
+      >
+        <div className="space-y-4">
+          {mostrarOpcionais ? (
+            <Par>
+              <CampoNomeAgente cfg={cfg} patch={patch} fields={fields} />
+              <Field label="Função (opcional)">
+                <Input
+                  value={cfg.agentRole}
+                  onChange={(e) => patch({ agentRole: e.target.value })}
+                  placeholder="Ex.: atendente, consultora"
+                />
+              </Field>
+            </Par>
+          ) : (
+            <CampoNomeAgente cfg={cfg} patch={patch} fields={fields} />
+          )}
+
+          <Field label="Tom de voz">
+            <div className="flex flex-wrap gap-2">
+              {TONES.map((t) => (
+                <Button
+                  key={t.value}
+                  variant="alternavel"
+                  onClick={() => patch({ tone: t.value as Tone })}
+                  aria-pressed={cfg.tone === t.value}
+                  className="rounded-full"
+                >
+                  {t.label}
+                </Button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      </SubBloco>
     </>
   );
 }
@@ -175,9 +213,14 @@ function CampoNomeAgente({
  * As duas apresentações existem porque o mesmo controle muda de natureza com o
  * contexto: na montagem ele é CONVITE (a pessoa não tem nada a perder e o modelo
  * é a forma mais rápida de sair do zero), na edição ele é AÇÃO DESTRUTIVA
- * (substitui tom, objetivos, regras e detalhes de quem já configurou). Por isso
- * na edição ele fica no pé do grupo, depois de uma linha, e não no lugar mais
- * clicável da tela.
+ * (substitui tom, objetivos, regras e detalhes de quem já configurou).
+ *
+ * ⚠️ NA EDIÇÃO ELE É UM MENU NA LINHA DAS ABAS desde 22/09/2026 (decisão do
+ * dono). Morava no pé de "Quem atende", e ali parecia valer só para os campos
+ * daquela aba, quando reescreve as três: só o tom mora em "Quem atende". A linha
+ * das abas é o lugar das ações sobre o agente inteiro, ao lado de "Escrever o
+ * prompt à mão". Continua passando pela confirmação de `choosePreset` quando o
+ * formulário já tem conteúdo.
  */
 export function SeletorDePreset({
   onEscolher,
@@ -187,57 +230,62 @@ export function SeletorDePreset({
   onEscolher: (p: AgentPreset) => void;
   /** id do modelo aplicado agora, para marcar a pílula. Só no convite. */
   escolhido?: string | null;
-  apresentacao: "convite" | "rodape";
+  apresentacao: "convite" | "menu";
 }) {
-  const pilulas = (
-    <div className="flex flex-wrap gap-2">
-      {AGENT_PRESETS.map((p) => (
-        <Button
-          key={p.id}
-          variant="outline"
-          title={p.description}
-          aria-pressed={apresentacao === "convite" ? escolhido === p.id : undefined}
-          onClick={() => onEscolher(p)}
-          className={`rounded-full ${
-            apresentacao === "convite" && escolhido === p.id
-              ? "border-brand-line bg-brand-surface text-brand-ink"
-              : ""
-          }`}
-        >
-          {p.label}
-        </Button>
-      ))}
-    </div>
-  );
-
-  if (apresentacao === "convite") {
+  if (apresentacao === "menu") {
     return (
-      <div data-slot="preset-convite" className="space-y-2">
-        <p className="flex items-center gap-2 text-apoio font-medium">
-          <LayoutTemplate size={15} className="shrink-0 text-brand-ink" />
-          Comece de um modelo do seu segmento
-        </p>
-        <Hint>
-          Ele preenche tom, objetivos e limites. Você ajusta tudo depois.
-        </Hint>
-        {pilulas}
-      </div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="chrome"
+            data-preset-menu
+          >
+            <LayoutTemplate size={14} />
+            Usar um modelo
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuLabel>
+            Substitui tom, objetivos, limites e detalhes
+          </DropdownMenuLabel>
+          {AGENT_PRESETS.map((p) => (
+            <DropdownMenuItem
+              key={p.id}
+              title={p.description}
+              onSelect={() => onEscolher(p)}
+            >
+              {p.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   }
 
   return (
-    <div
-      data-slot="preset-rodape"
-      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line pt-3"
-    >
-      <div className="flex items-center gap-2 text-legenda text-ink-3">
+    <div data-slot="preset-convite" className="space-y-2">
+      <p className="flex items-center gap-2 text-apoio font-medium">
         <LayoutTemplate size={15} className="shrink-0 text-brand-ink" />
-        <span>
-          Não sabe o que escrever? Comece de um modelo do seu segmento e ajuste
-          depois.
-        </span>
+        Comece de um modelo do seu segmento
+      </p>
+      <Hint>
+        Ele preenche tom, objetivos e limites. Você ajusta tudo depois.
+      </Hint>
+      <div className="flex flex-wrap gap-2">
+        {AGENT_PRESETS.map((p) => (
+          <Button
+            key={p.id}
+            variant="alternavel"
+            title={p.description}
+            aria-pressed={escolhido === p.id}
+            onClick={() => onEscolher(p)}
+            className="rounded-full"
+          >
+            {p.label}
+          </Button>
+        ))}
       </div>
-      {pilulas}
     </div>
   );
 }
@@ -266,88 +314,103 @@ export function CamposOQueSabe({
   // cada turno paga o preço cheio de entrada. Só aparece quando o risco existe.
   const semCache = foraDoCache(personaPreview);
 
+  // ⚠️ A OBSERVAÇÃO DE HORÁRIO SAIU DA TELA em 22/09/2026 (pedido do dono), mas
+  // `hoursNote` segue no `agent_config` e no prompt: tirar o campo do tipo
+  // mexeria na base do prompt. Conferido no banco no mesmo dia: nenhum tenant
+  // tinha valor nela, então nada ficou invisível continuando a valer.
+  const horario = (
+    <SubBloco
+      titulo="Horário de atendimento"
+      icone={CalendarClock}
+      descricao="Quando sua empresa atende. O agente informa esses horários aos clientes."
+      primeiro
+      className="flex h-full flex-col"
+    >
+      <AgentHoursEditor
+        value={cfg.hours}
+        onChange={(v) => patch({ hours: v })}
+        className="flex-1"
+      />
+    </SubBloco>
+  );
+
+  // A base de conhecimento mora nesta aba desde 26/08/2026, e o argumento é o
+  // código, não navegação: a seção FONTES E HONESTIDADE do prompt lista
+  // "detalhes do negócio" e os trechos da base na MESMA frase, como o que o
+  // agente pode afirmar.
+  // ⚠️ UMA instância só. Duas divergiriam no primeiro upload.
+  const documentos = (className?: string) => (
+    <SubBloco className={className}>
+      <KnowledgeManager
+        clientId={clientId}
+        initialDocs={knowledgeDocs}
+        keyConfigured={knowledgeKeyConfigured}
+        apresentacao="bloco"
+        preview={preview}
+      />
+    </SubBloco>
+  );
+
+  // É o campo que mais muda a qualidade da resposta e o único que resolve o
+  // aviso de cache de prompt.
+  const detalhes = (primeiro: boolean) => (
+    <SubBloco
+      titulo="Detalhes do negócio"
+      icone={Store}
+      descricao="O que o agente sabe de cor em toda conversa: produtos, serviços, perguntas frequentes, promoções."
+      primeiro={primeiro}
+    >
+      <div className="space-y-1.5">
+        <Textarea
+          value={cfg.details}
+          onChange={(e) =>
+            patch({ details: e.target.value.slice(0, LIMITS.details) })
+          }
+          rows={8}
+          className="min-h-[200px] max-h-[420px] resize-none [field-sizing:content]"
+        />
+        <div className="text-right text-legenda tabular-nums text-ink-3">
+          {cfg.details.length}/{LIMITS.details}
+        </div>
+        {semCache && (
+          <AvisoCache tokens={estimarTokens(personaPreview)}>
+            Detalhar mais aqui deixa o agente melhor e mais barato ao mesmo
+            tempo. Documento enviado não resolve isto: ele entra por consulta,
+            depois do prompt.
+          </AvisoCache>
+        )}
+      </div>
+    </SubBloco>
+  );
+
+  // No assistente o horário não aparece (`mostrarOpcionais`, a única bifurcação
+  // permitida), e aí a ordem continua a de antes: detalhes, depois documentos.
+  if (!mostrarOpcionais) {
+    return (
+      <>
+        {detalhes(true)}
+        {documentos()}
+      </>
+    );
+  }
+
+  // ⚠️ HORÁRIO E DOCUMENTOS LADO A LADO, DETALHES EMBAIXO NA LARGURA INTEIRA
+  // (22/09/2026, pedido do dono). Os dois de cima são blocos curtos, e o de
+  // baixo é o texto longo: na largura inteira ele ganha linha para escrever. O
+  // horário continua o primeiro da aba (à esquerda), que foi o pedido anterior.
+  // ⚠️ Os dois CARTÕES têm a mesma altura (a grade estica, e cada bloco passa a
+  // altura adiante até a moldura), e os dois cabeçalhos têm o mesmo respiro até
+  // ela, pedido do dono: "está tudo torto". Por isso a frase "Entra no ar..." dos
+  // documentos mora DENTRO do cartão: embaixo dele, os fundos nunca alinhariam.
   return (
     <>
-      {/* ⚠️ O HORÁRIO É O PRIMEIRO BLOCO DA ABA desde 22/09/2026 (pedido do
-          dono: "deveria ser o primeiro dessa sessão"), e não o último atrás de
-          um recolher. Ele é o único dado desta aba que o agente repete para o
-          cliente palavra por palavra, e é o que alimenta a frase mais forte do
-          painel; estava no fim porque um dia esta aba foi uma página de
-          rolagem única, e ninguém mexeu na ordem quando ela virou aba.
-          ⚠️ Segue FORA do assistente (`mostrarOpcionais`): ele não muda a
-          primeira resposta do agente, e `mostrarOpcionais` é a única
-          bifurcação permitida entre as duas superfícies. */}
-      {mostrarOpcionais && (
-        <SubBloco titulo="Horário de atendimento" primeiro>
-          <div className="space-y-3">
-            <Hint>
-              O agente informa esse horário, mas não sabe a data e a hora atual,
-              então ele nunca diz se está aberto ou fechado agora.
-            </Hint>
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
-              <AgentHoursEditor
-                value={cfg.hours}
-                onChange={(v) => patch({ hours: v })}
-              />
-              <Field label="Observação de horário">
-                <Input
-                  value={cfg.hoursNote}
-                  onChange={(e) => patch({ hoursNote: e.target.value })}
-                  placeholder="Ex.: fechado em feriados"
-                />
-              </Field>
-            </div>
-          </div>
-        </SubBloco>
-      )}
-
-      {/* É o campo que mais muda a qualidade da resposta e o único que resolve o
-          aviso de cache de prompt.
-          ⚠️ BLOCO, e não `Field`: os três desta aba (horário, detalhes,
-          documentos) são assuntos diferentes, e o dono leu a mistura de níveis
-          como falta de padrão. O rótulo de campo fica para campo que mora
-          DENTRO de um bloco, como a observação de horário ali em cima. */}
-      <SubBloco titulo="Detalhes do negócio">
-        <div className="space-y-1.5">
-          <Hint>
-            O agente sabe isto de cor, e vale em toda conversa. Produtos,
-            serviços, perguntas frequentes, promoções: escreva livremente.
-          </Hint>
-          <Textarea
-            value={cfg.details}
-            onChange={(e) =>
-              patch({ details: e.target.value.slice(0, LIMITS.details) })
-            }
-            rows={4}
-            className="max-h-[320px] resize-none [field-sizing:content]"
-          />
-          <div className="text-right text-legenda tabular-nums text-ink-3">
-            {cfg.details.length}/{LIMITS.details}
-          </div>
-          {semCache && (
-            <AvisoCache tokens={estimarTokens(personaPreview)}>
-              Detalhar mais aqui deixa o agente melhor e mais barato ao mesmo
-              tempo. Documento enviado abaixo não resolve isto: ele entra por
-              consulta, depois do prompt.
-            </AvisoCache>
-          )}
-        </div>
-      </SubBloco>
-
-      {/* A base de conhecimento mora AQUI desde 26/08/2026, e o argumento é o
-          código, não navegação: a seção FONTES E HONESTIDADE do prompt lista
-          "detalhes do negócio" e os trechos da base na MESMA frase, como o que o
-          agente pode afirmar.
-          ⚠️ UMA instância só. Duas divergiriam no primeiro upload. */}
-      <SubBloco>
-        <KnowledgeManager
-          clientId={clientId}
-          initialDocs={knowledgeDocs}
-          keyConfigured={knowledgeKeyConfigured}
-          apresentacao="bloco"
-          preview={preview}
-        />
-      </SubBloco>
+      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-2">
+        {horario}
+        {/* Em tela estreita os dois empilham e o filete do `SubBloco` separa;
+            lado a lado, o filete sai e o bloco estica até a altura do vizinho. */}
+        {documentos("lg:h-full lg:border-t-0 lg:pt-0")}
+      </div>
+      {detalhes(false)}
     </>
   );
 }
@@ -375,7 +438,14 @@ export function CamposOQuePodeFazer({
       {/* Objetivos SEM pintura. Eram três cartões em `bg-brand-surface`, o
           elemento de maior contraste do corpo da tela, para a escolha menos
           disputada do formulário: ela já vem com default e quase ninguém mexe. */}
-      <SubBloco titulo="Objetivos" error={fields.goals} required primeiro>
+      <SubBloco
+        titulo="Objetivos"
+        icone={Target}
+        descricao="O que o agente busca em cada conversa."
+        error={fields.goals}
+        required
+        primeiro
+      >
         <div className="grid gap-1 sm:grid-cols-3">
           {GOALS.map((g) => {
             const active = cfg.goals.includes(g.value as Goal);
@@ -400,8 +470,12 @@ export function CamposOQuePodeFazer({
                   className="mt-0.5"
                 />
                 <span>
-                  <span className="block text-apoio font-medium">{g.label}</span>
-                  <span className="block text-legenda text-ink-3">{g.hint}</span>
+                  <span className="block text-apoio font-medium">
+                    {g.label}
+                  </span>
+                  <span className="block text-legenda text-ink-3">
+                    {g.hint}
+                  </span>
                 </span>
               </label>
             );
@@ -414,31 +488,31 @@ export function CamposOQuePodeFazer({
           motivo. E o aviso de que ele está vazio mora AQUI, embaixo do campo que
           resolve, em vez de no topo da tela. */}
       {cfg.goals.includes("agendar") && (
-        <SubBloco titulo="Grupo de WhatsApp para avisar">
-          <div className="flex items-center gap-2">
-            <Bell size={15} className="shrink-0 text-brand-ink" />
+        <SubBloco
+          titulo="Grupo de WhatsApp para avisar"
+          icone={Bell}
+          descricao="Onde o agente avisa o time quando marca uma conversa."
+        >
+          {/* A dica de antes ("quando o agente marca uma conversa, ele avisa
+              neste grupo") virou o subtítulo; repetir embaixo seria ruído. */}
+          <div className="space-y-1.5">
             <Input
               value={notifyJid}
               onChange={(e) => setNotifyJid(e.target.value)}
               placeholder="120363000000000000@g.us"
-              className="flex-1 font-mono"
+              className="font-mono"
             />
+            {agendarSemGrupo && (
+              <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
+                <AlertTriangle size={14} className="mt-px shrink-0" />
+                <span>
+                  Sem este grupo o agente não consegue avisar o time, e marcar
+                  uma conversa não vai funcionar. Peça o JID do grupo a quem
+                  cuida da automação.
+                </span>
+              </p>
+            )}
           </div>
-          {agendarSemGrupo ? (
-            <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
-              <AlertTriangle size={14} className="mt-px shrink-0" />
-              <span>
-                Sem este grupo o agente não consegue avisar o time, e marcar uma
-                conversa não vai funcionar. Peça o JID do grupo a quem cuida da
-                automação.
-              </span>
-            </p>
-          ) : (
-            <Hint>
-              Quando o agente marca uma conversa com o time, ele avisa neste
-              grupo.
-            </Hint>
-          )}
         </SubBloco>
       )}
 
@@ -451,7 +525,11 @@ export function CamposOQuePodeFazer({
           salvo. Sem recolher, não há o que desmontar, e a armadilha deixa de
           existir para este bloco. Ela volta no minuto em que alguém puser
           `AgentBulletList` dentro de algo que desmonte. */}
-      <SubBloco titulo="Limites e quando chamar o time">
+      <SubBloco
+        titulo="Limites e quando chamar o time"
+        icone={ShieldCheck}
+        descricao="O que o agente nunca faz e quando ele passa a conversa para você."
+      >
         <div className="space-y-4">
           <Field label="O que o agente NÃO deve fazer">
             <AgentBulletList

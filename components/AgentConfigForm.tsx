@@ -256,10 +256,15 @@ export default function AgentConfigForm({
           </p>
         )}
 
+        <div className="mb-1 flex shrink-0 items-center gap-1">
+          {/* O modelo mexe nas três abas, então mora aqui e não dentro de uma
+              delas. Só no guiado: o avançado não tem campo para ele preencher. */}
+          {form.mode === "guiado" && (
+            <SeletorDePreset apresentacao="menu" onEscolher={form.choosePreset} />
+          )}
         <Button
           variant="ghost"
           size="chrome"
-          className="mb-1 shrink-0"
           onClick={() =>
             form.switchMode(form.mode === "guiado" ? "avancado" : "guiado")
           }
@@ -276,6 +281,7 @@ export default function AgentConfigForm({
             </>
           )}
         </Button>
+        </div>
       </div>
 
       {form.mode === "guiado" ? (
@@ -290,12 +296,6 @@ export default function AgentConfigForm({
               cfg={form.cfg}
               patch={form.patch}
               fields={form.fields}
-            />
-            {/* Na edição o modelo é ação DESTRUTIVA, não convite: fica no pé do
-                grupo, depois de uma linha, e não no lugar mais clicável da tela. */}
-            <SeletorDePreset
-              apresentacao="rodape"
-              onEscolher={form.choosePreset}
             />
           </TabsContent>
 

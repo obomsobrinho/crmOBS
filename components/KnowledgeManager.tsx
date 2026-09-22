@@ -29,6 +29,8 @@ import {
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
+import { CabecalhoBloco, MOLDURA_LISTA } from "@/components/agente/ui";
+import { cn } from "@/lib/utils";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.txt,.md";
 
@@ -236,7 +238,45 @@ export default function KnowledgeManager({
     </button>
   );
 
-  function lista(limite?: number) {
+  // A linha de UM documento, em duas densidades: `cartao` é a lista do painel e
+  // da tela `/conhecimento` (cada documento numa caixa), `linha` é o cartão-lista
+  // do `/agente`, onde a moldura é do cartão e o documento é só uma linha dele.
+  // Uma marcação só, para as duas não divergirem na próxima ação ou estado.
+  function linhaDoc(doc: KnowledgeDoc, densidade: "cartao" | "linha") {
+    return (
+      <li
+        key={doc.id}
+        className={
+          densidade === "cartao"
+            ? "flex items-center gap-3 rounded-xl border border-line bg-bloco p-3"
+            : "flex items-center gap-3 px-4 py-2.5"
+        }
+      >
+        <FileText
+          size={densidade === "cartao" ? 18 : 16}
+          className="shrink-0 text-ink-faint"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-apoio font-medium">{doc.title}</div>
+          <div className="mt-0.5 flex items-center gap-2 text-legenda text-ink-3">
+            <StatusPill doc={doc} />
+            {doc.byteSize ? <span>{formatBytes(doc.byteSize)}</span> : null}
+          </div>
+        </div>
+        <Button
+          variant="danger-ghost"
+          size="icon-control"
+          onClick={() => remove(doc.id)}
+          title="Remover"
+          aria-label={`Remover ${doc.title}`}
+        >
+          <Trash2 size={16} />
+        </Button>
+      </li>
+    );
+  }
+
+  function lista() {
     if (docs.length === 0) {
       return (
         <p className="py-4 text-center text-apoio text-ink-3">
@@ -244,34 +284,8 @@ export default function KnowledgeManager({
         </p>
       );
     }
-    const mostrar = limite ? docs.slice(0, limite) : docs;
     return (
-      <ul className="space-y-2">
-        {mostrar.map((doc) => (
-          <li
-            key={doc.id}
-            className="flex items-center gap-3 rounded-xl border border-line bg-bloco p-3"
-          >
-            <FileText size={18} className="shrink-0 text-ink-faint" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-apoio font-medium">{doc.title}</div>
-              <div className="mt-0.5 flex items-center gap-2 text-legenda text-ink-3">
-                <StatusPill doc={doc} />
-                {doc.byteSize ? <span>{formatBytes(doc.byteSize)}</span> : null}
-              </div>
-            </div>
-            <Button
-              variant="danger-ghost"
-              size="icon-control"
-              onClick={() => remove(doc.id)}
-              title="Remover"
-              aria-label={`Remover ${doc.title}`}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </li>
-        ))}
-      </ul>
+      <ul className="space-y-2">{docs.map((d) => linhaDoc(d, "cartao"))}</ul>
     );
   }
 
@@ -311,50 +325,64 @@ export default function KnowledgeManager({
   // valeu. É a mesma honestidade do "Salvar já publica no WhatsApp" do rodapé.
   if (apresentacao === "bloco") {
     return (
-      <div className="space-y-2">
+      <div className="flex h-full flex-col gap-4">
         {campoArquivo}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {/* Título de nível 2 (`text-cartao`), e não rótulo: ele encabeça um
-              bloco COM ESTRUTURA PRÓPRIA, a lista de arquivos com ações. Rótulo
-              em caixa alta é para o VALOR de um indicador ou para um sub-bloco
-              recolhível. Ver docs/design-system/fundamentos-tipografia.md. */}
-          <h3 className="font-display text-cartao text-ink">Documentos</h3>
-          <Button variant="outline" onClick={escolherArquivo} disabled={uploading}>
-            {uploading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Upload size={14} />
-            )}
-            {uploading ? "Processando…" : "Enviar documento"}
-          </Button>
-        </div>
-        {/* NÃO promete "custa menos token": `match_knowledge_chunks` não tem
-            limiar de similaridade, então com um documento no tenant os 5 melhores
-            trechos entram no prompt em TODO turno, relevantes ou não. O que é
-            verdade e importa para a escolha é outra coisa: aqui não tem teto de
-            tamanho, e não gasta o orçamento de 2.000 caracteres do campo acima. */}
-        {/* ⚠️ ENCOLHEU E PASSOU A DIZER O TETO (21/09/2026, pedido do dono: "a
-            parte do documento pode ser bem menor, é um anexo e precisa de um
-            limite de tamanho"). Aqui documento é anexo, não é a seção principal
-            da aba: quem carrega o conteúdo do agente é o campo de cima. */}
-        <p className="text-legenda text-ink-3">
-          Para o que é longo ou muda sozinho: tabela de preço, catálogo,
-          contrato. Até {KNOWLEDGE_MAX_LABEL} por arquivo.
-        </p>
+        {/* O MESMO cabeçalho dos outros blocos do construtor (ícone, título
+            `text-cartao`, subtítulo). Título de nível 2 e não rótulo: ele
+            encabeça um bloco COM ESTRUTURA PRÓPRIA. Ver
+            docs/design-system/fundamentos-tipografia.md.
+            ⚠️ O "Enviar documento" SAIU DA LINHA DO TÍTULO (22/09/2026, pedido
+            do dono: "estamos quebrando a linha sem necessidade"): ele espremia o
+            subtítulo para duas linhas numa coluna que é metade da tela. Foi para
+            o pé da lista, que é onde se acrescenta item numa lista.
+            O subtítulo diz o TETO (21/09/2026: "é um anexo e precisa de um
+            limite de tamanho") e NÃO promete "custa menos token":
+            `match_knowledge_chunks` não tem limiar de similaridade, então com
+            um documento no tenant os 5 melhores trechos entram no prompt em
+            TODO turno, relevantes ou não. */}
+        <CabecalhoBloco
+          icone={FileText}
+          titulo="Documentos"
+          descricao={`Tabela de preço, catálogo, contrato. Até ${KNOWLEDGE_MAX_LABEL} por arquivo.`}
+        />
         {avisoChave}
         {avisoErro}
-        {lista(RESUMO)}
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-legenda text-ink-3">
-            Entra no ar quando termina de processar.
-          </p>
-          {docs.length > 0 && (
-            <Button variant="ghost" onClick={() => setPainelAberto(true)}>
-              {docs.length > RESUMO
-                ? `Ver todos (${docs.length})`
-                : "Gerenciar documentos"}
-            </Button>
+        {/* UM cartão de lista, com a mesma moldura do horário ao lado: os dois
+            blocos da linha falam a mesma língua. Documento é linha, e não
+            cartão dentro de cartão; o pé é a linha de acrescentar. */}
+        <div
+          data-slot="docs-lista"
+          className={cn(MOLDURA_LISTA, "flex flex-1 flex-col")}
+        >
+          {docs.length === 0 ? (
+            <p className="flex flex-1 items-center justify-center px-4 py-6 text-center text-apoio text-ink-3">
+              Nenhum documento ainda.
+            </p>
+          ) : (
+            <ul className="flex-1 divide-y divide-line">
+              {docs.slice(0, RESUMO).map((d) => linhaDoc(d, "linha"))}
+            </ul>
           )}
+          <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
+            <Button variant="ghost" onClick={escolherArquivo} disabled={uploading}>
+              {uploading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Upload size={14} />
+              )}
+              {uploading ? "Processando…" : "Enviar documento"}
+            </Button>
+            <p className="ml-auto px-2 text-legenda text-ink-3">
+              Entra no ar quando termina de processar.
+            </p>
+            {docs.length > 0 && (
+              <Button variant="ghost" onClick={() => setPainelAberto(true)}>
+                {docs.length > RESUMO
+                  ? `Ver todos (${docs.length})`
+                  : "Gerenciar documentos"}
+              </Button>
+            )}
+          </div>
         </div>
         {painel}
       </div>
