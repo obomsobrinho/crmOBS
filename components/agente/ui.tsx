@@ -55,26 +55,55 @@ export function Secao({
 }
 
 /**
- * Sub-bloco que NÃO recolhe: só o filete de cima e o título, na mesma métrica
- * do `Recolhivel`, para os dois conviverem na mesma aba sem um degrau visível.
+ * Sub-bloco que NÃO recolhe: um filete de cima separando do anterior, o título
+ * e o conteúdo. É o vocabulário de bloco DENTRO de uma aba do formulário, e
+ * existe para que não haja três jeitos de encabeçar a mesma coisa.
  *
  * Existe desde 22/09/2026, quando o dono tirou o recolher de "Horário de
  * atendimento" e de "Limites e quando chamar o time" ("não faz sentido deixar
  * colapsado, tem espaço abaixo"). Recolher paga por si quando a aba não cabe na
  * tela; depois que o formulário virou três abas, o espaço existe, e o que
  * sobrava era um clique entre a pessoa e o campo.
+ *
+ * ⚠️ O TÍTULO É `text-cartao` EM CAIXA NORMAL, e não `text-rotulo` em caixa
+ * alta. A primeira versão disto copiou o cabeçalho do `Recolhivel`, e o dono
+ * pegou na hora: "título do horário de atendimento tá diferente dos outros,
+ * título de documento por exemplo". A regra é a da hierarquia de três níveis
+ * (docs/design-system/fundamentos-tipografia.md): `text-cartao` encabeça um
+ * bloco COM ESTRUTURA PRÓPRIA, e `text-rotulo` em caixa alta é o rótulo de um
+ * VALOR ou de um sub-bloco RECOLHÍVEL. Sem o recolher, estes blocos são do
+ * primeiro tipo, e é por isso que "Documentos" sempre foi assim.
+ *
+ * `titulo` é opcional porque o bloco de documentos traz o próprio `h3` com um
+ * botão na mesma linha; o que ele precisa daqui é só o filete e o respiro.
+ * `primeiro` tira o filete de quem abre a aba, que não tem nada acima para se
+ * separar.
  */
 export function SubBloco({
   titulo,
+  primeiro = false,
+  required,
+  error,
   children,
 }: {
-  titulo: string;
+  titulo?: string;
+  primeiro?: boolean;
+  /** Mesma marca do `Field`: o bloco inteiro é obrigatório (Objetivos). */
+  required?: boolean;
+  /** Erro por campo, como o `PUT /agent-config` devolve em `fields`. */
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-t border-line pt-4">
-      <h3 className="text-rotulo uppercase text-ink-3">{titulo}</h3>
-      <div className="mt-3">{children}</div>
+    <div className={primeiro ? "" : "border-t border-line pt-4"}>
+      {titulo && (
+        <h3 className="mb-3 flex items-center gap-1 font-display text-cartao text-ink">
+          {titulo}
+          {required && <span className="text-danger-ink">*</span>}
+        </h3>
+      )}
+      {children}
+      {error && <p className="mt-1.5 text-legenda text-danger-ink">{error}</p>}
     </div>
   );
 }

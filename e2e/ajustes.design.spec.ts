@@ -365,6 +365,50 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     ).toHaveCount(0);
   });
 
+  test("todo bloco do construtor tem o MESMO título, em todas as abas", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.goto("/design/agente");
+
+    // ⚠️ O defeito que este teste tranca (22/09/2026): ao tirar o recolher de
+    // "Horário de atendimento" e de "Limites e quando chamar o time" eu copiei
+    // o cabeçalho do `Recolhivel`, que é `text-rotulo` em CAIXA ALTA, e os dois
+    // nasceram diferentes de "Documentos", que é `text-cartao` em caixa normal.
+    // O dono viu na primeira olhada: "título do horário de atendimento tá
+    // diferente dos outros, título de documento por exemplo".
+    //
+    // A regra é a hierarquia de três níveis (fundamentos-tipografia.md):
+    // `text-cartao` encabeça um bloco COM ESTRUTURA PRÓPRIA, e caixa alta é
+    // para o rótulo de um VALOR ou de um sub-bloco RECOLHÍVEL. Sem o recolher,
+    // estes blocos são do primeiro tipo. Por isso o teste varre as abas em vez
+    // de conferir um título: o que estava errado não era um bloco, era haver
+    // dois vocabulários para a mesma coisa.
+    for (const [aba, grupo] of [
+      ["O que ele sabe", "#grupo-sabe"],
+      ["O que ele pode fazer", "#grupo-pode"],
+    ] as const) {
+      await page.getByRole("tab", { name: aba }).click();
+      const estilos = await page.locator(`${grupo} h3`).evaluateAll((els) =>
+        els.map((el) => {
+          const s = getComputedStyle(el);
+          return {
+            txt: (el.textContent ?? "").trim(),
+            fs: s.fontSize,
+            caixa: s.textTransform,
+            peso: s.fontWeight,
+          };
+        })
+      );
+      expect(estilos.length, aba).toBeGreaterThan(1);
+      for (const e of estilos) {
+        expect(e.caixa, `${aba}: ${e.txt}`).toBe("none");
+        expect(e.fs, `${aba}: ${e.txt}`).toBe("16px");
+        expect(e.peso, `${aba}: ${e.txt}`).toBe("600");
+      }
+    }
+  });
+
   test("o horário abre no simples, e o dia a dia fica atrás de um botão", async ({
     page,
   }) => {

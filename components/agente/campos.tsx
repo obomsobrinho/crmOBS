@@ -278,63 +278,68 @@ export function CamposOQueSabe({
           primeira resposta do agente, e `mostrarOpcionais` é a única
           bifurcação permitida entre as duas superfícies. */}
       {mostrarOpcionais && (
-        <div className="space-y-3">
-          <h3 className="text-rotulo uppercase text-ink-3">
-            Horário de atendimento
-          </h3>
-          <p className="text-legenda text-ink-3">
-            O agente informa esse horário, mas não sabe a data e a hora atual,
-            então ele nunca diz se está aberto ou fechado agora.
-          </p>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
-            <AgentHoursEditor
-              value={cfg.hours}
-              onChange={(v) => patch({ hours: v })}
-            />
-            <Field label="Observação de horário">
-              <Input
-                value={cfg.hoursNote}
-                onChange={(e) => patch({ hoursNote: e.target.value })}
-                placeholder="Ex.: fechado em feriados"
+        <SubBloco titulo="Horário de atendimento" primeiro>
+          <div className="space-y-3">
+            <Hint>
+              O agente informa esse horário, mas não sabe a data e a hora atual,
+              então ele nunca diz se está aberto ou fechado agora.
+            </Hint>
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+              <AgentHoursEditor
+                value={cfg.hours}
+                onChange={(v) => patch({ hours: v })}
               />
-            </Field>
+              <Field label="Observação de horário">
+                <Input
+                  value={cfg.hoursNote}
+                  onChange={(e) => patch({ hoursNote: e.target.value })}
+                  placeholder="Ex.: fechado em feriados"
+                />
+              </Field>
+            </div>
           </div>
-        </div>
+        </SubBloco>
       )}
 
       {/* É o campo que mais muda a qualidade da resposta e o único que resolve o
-          aviso de cache de prompt. */}
-      <Field label="Detalhes do negócio">
-        <Hint>
-          O agente sabe isto de cor, e vale em toda conversa. Produtos, serviços,
-          perguntas frequentes, promoções: escreva livremente.
-        </Hint>
-        <Textarea
-          value={cfg.details}
-          onChange={(e) =>
-            patch({ details: e.target.value.slice(0, LIMITS.details) })
-          }
-          rows={4}
-          className="max-h-[320px] resize-none [field-sizing:content]"
-        />
-        <div className="text-right text-legenda tabular-nums text-ink-3">
-          {cfg.details.length}/{LIMITS.details}
+          aviso de cache de prompt.
+          ⚠️ BLOCO, e não `Field`: os três desta aba (horário, detalhes,
+          documentos) são assuntos diferentes, e o dono leu a mistura de níveis
+          como falta de padrão. O rótulo de campo fica para campo que mora
+          DENTRO de um bloco, como a observação de horário ali em cima. */}
+      <SubBloco titulo="Detalhes do negócio">
+        <div className="space-y-1.5">
+          <Hint>
+            O agente sabe isto de cor, e vale em toda conversa. Produtos,
+            serviços, perguntas frequentes, promoções: escreva livremente.
+          </Hint>
+          <Textarea
+            value={cfg.details}
+            onChange={(e) =>
+              patch({ details: e.target.value.slice(0, LIMITS.details) })
+            }
+            rows={4}
+            className="max-h-[320px] resize-none [field-sizing:content]"
+          />
+          <div className="text-right text-legenda tabular-nums text-ink-3">
+            {cfg.details.length}/{LIMITS.details}
+          </div>
+          {semCache && (
+            <AvisoCache tokens={estimarTokens(personaPreview)}>
+              Detalhar mais aqui deixa o agente melhor e mais barato ao mesmo
+              tempo. Documento enviado abaixo não resolve isto: ele entra por
+              consulta, depois do prompt.
+            </AvisoCache>
+          )}
         </div>
-        {semCache && (
-          <AvisoCache tokens={estimarTokens(personaPreview)}>
-            Detalhar mais aqui deixa o agente melhor e mais barato ao mesmo
-            tempo. Documento enviado abaixo não resolve isto: ele entra por
-            consulta, depois do prompt.
-          </AvisoCache>
-        )}
-      </Field>
+      </SubBloco>
 
       {/* A base de conhecimento mora AQUI desde 26/08/2026, e o argumento é o
           código, não navegação: a seção FONTES E HONESTIDADE do prompt lista
           "detalhes do negócio" e os trechos da base na MESMA frase, como o que o
           agente pode afirmar.
           ⚠️ UMA instância só. Duas divergiriam no primeiro upload. */}
-      <div className="border-t border-line pt-4">
+      <SubBloco>
         <KnowledgeManager
           clientId={clientId}
           initialDocs={knowledgeDocs}
@@ -342,8 +347,7 @@ export function CamposOQueSabe({
           apresentacao="bloco"
           preview={preview}
         />
-      </div>
-
+      </SubBloco>
     </>
   );
 }
@@ -371,7 +375,7 @@ export function CamposOQuePodeFazer({
       {/* Objetivos SEM pintura. Eram três cartões em `bg-brand-surface`, o
           elemento de maior contraste do corpo da tela, para a escolha menos
           disputada do formulário: ela já vem com default e quase ninguém mexe. */}
-      <Field label="Objetivos" error={fields.goals} required>
+      <SubBloco titulo="Objetivos" error={fields.goals} required primeiro>
         <div className="grid gap-1 sm:grid-cols-3">
           {GOALS.map((g) => {
             const active = cfg.goals.includes(g.value as Goal);
@@ -403,14 +407,14 @@ export function CamposOQuePodeFazer({
             );
           })}
         </div>
-      </Field>
+      </SubBloco>
 
       {/* O grupo de avisos aparece só com "Agendar" marcado: é o único objetivo
           que depende dele. Fora daí seria um campo técnico (um JID) pedido sem
           motivo. E o aviso de que ele está vazio mora AQUI, embaixo do campo que
           resolve, em vez de no topo da tela. */}
       {cfg.goals.includes("agendar") && (
-        <Field label="Grupo de WhatsApp para avisar">
+        <SubBloco titulo="Grupo de WhatsApp para avisar">
           <div className="flex items-center gap-2">
             <Bell size={15} className="shrink-0 text-brand-ink" />
             <Input
@@ -435,7 +439,7 @@ export function CamposOQuePodeFazer({
               grupo.
             </Hint>
           )}
-        </Field>
+        </SubBloco>
       )}
 
       {/* ⚠️ DEIXOU DE RECOLHER em 22/09/2026 (pedido do dono: "não precisa ser
