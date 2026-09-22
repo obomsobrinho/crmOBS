@@ -55,6 +55,31 @@ export function Secao({
 }
 
 /**
+ * Sub-bloco que NÃO recolhe: só o filete de cima e o título, na mesma métrica
+ * do `Recolhivel`, para os dois conviverem na mesma aba sem um degrau visível.
+ *
+ * Existe desde 22/09/2026, quando o dono tirou o recolher de "Horário de
+ * atendimento" e de "Limites e quando chamar o time" ("não faz sentido deixar
+ * colapsado, tem espaço abaixo"). Recolher paga por si quando a aba não cabe na
+ * tela; depois que o formulário virou três abas, o espaço existe, e o que
+ * sobrava era um clique entre a pessoa e o campo.
+ */
+export function SubBloco({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-t border-line pt-4">
+      <h3 className="text-rotulo uppercase text-ink-3">{titulo}</h3>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+/**
  * Sub-bloco que recolhe, mostrando o VALOR na linha do cabeçalho quando fechado.
  * É a regra que torna o recolhimento um ganho e não uma escondida: quem volta
  * para conferir o horário lê "Segunda a sexta: 08:00 às 18:00" sem abrir nada.

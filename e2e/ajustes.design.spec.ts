@@ -176,37 +176,40 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     }
   });
 
-  test("Detalhes do negócio é o primeiro campo da aba 'O que ele sabe'", async ({
+  test("a aba 'O que ele sabe' abre pelo horário, e os detalhes vêm antes dos documentos", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await page.goto("/design/agente");
     await page.getByRole("tab", { name: "O que ele sabe" }).click();
 
-    // Antes era o ÚLTIMO bloco de uma página de 2,6 telas. É o campo que mais
-    // muda a qualidade da resposta e o único que resolve o aviso de cache de
-    // prompt, então abre a aba.
+    // ⚠️ A ORDEM MUDOU EM 22/09/2026. Era Detalhes → Documentos → Horário (este
+    // último atrás de um recolher), e o dono pediu o horário primeiro ("deveria
+    // ser o primeiro dessa sessão"). O argumento é o mesmo que um dia pôs os
+    // Detalhes na frente: quem abre esta aba quer o dado que o agente REPETE
+    // para o cliente, e o horário é o único que ele repete palavra por palavra.
+    // O que não mudou: Detalhes continua antes de Documentos, porque documento
+    // entra por consulta, depois do prompt.
     const pos = await page.evaluate(() => {
       const grupo = document.getElementById("grupo-sabe")!;
+      const antes = (a: Element, b: Element) =>
+        (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const h3 = (re: RegExp) =>
+        [...grupo.querySelectorAll("h3")].find((h) => re.test(h.textContent ?? ""))!;
+      const horario = h3(/Horário de atendimento/);
+      const docs = h3(/Documentos/i);
       const ta = grupo.querySelector("textarea")!;
-      const docs = [...grupo.querySelectorAll("h3")].find((h) =>
-        /Documentos/i.test(h.textContent ?? "")
-      )!;
       const abas = [...document.querySelectorAll('[data-slot="tabs-content"]')];
       return {
-        // Vem ANTES do bloco de documentos e do horário, ou seja, é o primeiro
-        // campo da aba.
-        ehPrimeiroDoGrupo:
-          !!docs &&
-          (ta.compareDocumentPosition(docs) &
-            Node.DOCUMENT_POSITION_FOLLOWING) !==
-            0,
+        horarioPrimeiro: !!horario && antes(horario, ta),
+        detalhesAntesDosDocs: !!docs && antes(ta, docs),
         // Segunda aba das três, e não a última.
         indice: abas.indexOf(grupo),
         total: abas.length,
       };
     });
-    expect(pos.ehPrimeiroDoGrupo).toBe(true);
+    expect(pos.horarioPrimeiro).toBe(true);
+    expect(pos.detalhesAntesDosDocs).toBe(true);
     expect(pos.indice).toBe(1);
     expect(pos.total).toBe(3);
   });
@@ -320,52 +323,76 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     await expect(painel.getByText(/Arraste um arquivo ou clique/)).toBeVisible();
   });
 
-  test("horário e limites recolhem mostrando o valor na linha", async ({
+  test("horário e limites não recolhem: os campos estão na tela", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/design/agente");
 
-    // A regra que torna recolher um ganho: fechado, a linha mostra o VALOR, então
-    // quem volta para conferir lê sem abrir. Os dois blocos ficam em abas
-    // diferentes desde 28/08/2026, cada um dentro do grupo a que pertence.
+    // ⚠️ ATUALIZADO EM 22/09/2026, e o teste mudou de afirmação. Ele provava a
+    // regra do recolher (fechado, a linha do título mostra o VALOR, então quem
+    // volta para conferir lê sem abrir), e essa regra continua válida para
+    // quem usar `Recolhivel`. O que mudou é que estes DOIS blocos deixaram de
+    // recolher, a pedido do dono: "horário de atendimento não deveria ficar
+    // colapsado" e "limites e quando chamar o time não precisa ser colapsado
+    // também, tem espaço abaixo". Recolher pagava por si quando isto era uma
+    // página de rolagem única; com três abas, o espaço existe e o que sobrava
+    // era um clique entre a pessoa e o campo.
+    //
+    // A afirmação nova é a que o dono quis: o campo está na tela, sem clique.
     await page.getByRole("tab", { name: "O que ele sabe" }).click();
-    const horario = page.getByRole("button", {
-      name: /Horário de atendimento/,
-    });
-    // ⚠️ ATUALIZADO EM 21/09/2026: o horario passou a ABRIR DE CARA, a pedido do
-    // dono ("e algo importante"). Ele abria so quando estava vazio, e o efeito
-    // era o contrario do pretendido: quem ja preencheu uma vez nunca mais via o
-    // campo que alimenta a frase mais forte do painel. O que este teste continua
-    // provando, e era o ponto original, e que a linha do titulo carrega o VALOR:
-    // recolher so vale a pena se, fechado, da para ler sem abrir.
-    await expect(horario).toHaveAttribute("aria-expanded", "true");
-    // ⚠️ O RESUMO SÓ APARECE FECHADO, e é por isso que o teste fecha antes de
-    // procurá-lo: aberto, a linha mostra "fechar", porque o valor já está na
-    // tela logo abaixo. Repetir ali seria o mesmo dado duas vezes em dois
-    // centímetros.
-    await horario.click();
-    await expect(horario).toHaveAttribute("aria-expanded", "false");
-    await expect(horario).toContainText("Segunda a sexta: 08:00 às 18:00");
-
-    await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
-    const limites = page.getByRole("button", {
-      name: /Limites e quando chamar o time/,
-    });
-    await expect(limites).toHaveAttribute("aria-expanded", "false");
-    await expect(limites).toContainText("2 limites, 1 caso de chamar o time");
-
-    // E abrir de novo traz os campos de volta.
-    await page.getByRole("tab", { name: "O que ele sabe" }).click();
-    await horario.click();
-    await expect(horario).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      page.getByRole("heading", { name: "Horário de atendimento", level: 3 })
+    ).toBeVisible();
     await expect(page.getByPlaceholder("Ex.: fechado em feriados")).toBeVisible();
+    // E não sobrou gatilho de recolher em nenhum dos dois títulos.
+    await expect(
+      page.getByRole("button", { name: /Horário de atendimento/ })
+    ).toHaveCount(0);
 
     await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
-    await limites.click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Limites e quando chamar o time",
+        level: 3,
+      })
+    ).toBeVisible();
     await expect(
       page.getByPlaceholder("Ex.: nunca dar desconto por conta própria")
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Limites e quando chamar o time/ })
+    ).toHaveCount(0);
+  });
+
+  test("o horário abre no simples, e o dia a dia fica atrás de um botão", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/design/agente");
+    await page.getByRole("tab", { name: "O que ele sabe" }).click();
+
+    // 22/09/2026: "poderia ter algo assim, seg a sexta e coloca o horário, se eu
+    // quiser personalizar clico em outro botão e aí sim eu ajusto dia por dia".
+    // Antes era sempre a parede de 7 linhas, para uma configuração que na
+    // esmagadora maioria dos casos é uma faixa só.
+    const grupo = page.locator("#grupo-sabe");
+    await expect(grupo.getByText("Segunda a sexta, das")).toBeVisible();
+    // Uma linha significa DOIS campos de hora, não catorze.
+    await expect(grupo.locator('input[type="time"]')).toHaveCount(2);
+
+    await grupo.getByRole("button", { name: "Personalizar por dia" }).click();
+    // No dia a dia voltam os 7 dias. São 10 campos e não 14 porque sábado e
+    // domingo estão fechados, e dia fechado não mostra hora nenhuma.
+    await expect(grupo.getByText("Sábado")).toBeVisible();
+    await expect(grupo.locator('input[type="time"]')).toHaveCount(10);
+
+    // E dá para voltar. ⚠️ Voltar ACHATA (fecha o fim de semana e iguala os
+    // dias úteis), e é por isso que o rótulo diz "segunda a sexta": quem
+    // clica está pedindo isso. O que não pode existir é o achatamento
+    // silencioso, e por isso o modo nunca NASCE simples com horário irregular.
+    await grupo.getByRole("button", { name: "Voltar para segunda a sexta" }).click();
+    await expect(grupo.locator('input[type="time"]')).toHaveCount(2);
   });
 
   test("o aviso de cache existe nos DOIS modos, junto do campo que o resolve", async ({

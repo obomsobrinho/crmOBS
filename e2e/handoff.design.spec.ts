@@ -58,14 +58,12 @@ test.describe("Handoff na lista de conversas (/design)", () => {
 
   test("aviso de handoff é um campo do construtor", async ({ page }) => {
     await page.goto("/design/agente");
-    // O campo passou a morar no bloco recolhível "Limites e quando chamar o
-    // time" (26/08/2026), dentro da aba "O que ele pode fazer" (28/08/2026).
-    // Fica a dois cliques, e não escondido: a aba tem nome e a linha do bloco
-    // fechado já mostra quantos limites existem.
+    // O campo mora no bloco "Limites e quando chamar o time" (26/08/2026),
+    // dentro da aba "O que ele pode fazer" (28/08/2026).
+    // ⚠️ ATUALIZADO EM 22/09/2026: o bloco deixou de recolher (pedido do dono,
+    // "tem espaço abaixo, não faz sentido deixar colapsado"), então o segundo
+    // clique não existe mais. Ficou a UM clique, o da aba.
     await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
-    await page
-      .getByRole("button", { name: /Limites e quando chamar o time/ })
-      .click();
     await expect(
       page.getByText("O que avisar ao passar para o time")
     ).toBeVisible();

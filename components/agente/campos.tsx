@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { AlertTriangle, Bell, LayoutTemplate } from "lucide-react";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
 import AgentBulletList from "@/components/AgentBulletList";
@@ -12,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   estimarTokens,
   foraDoCache,
-  renderHours,
   DEFAULT_HANDOFF_NOTICE,
   GOALS,
   LIMITS,
@@ -23,7 +21,7 @@ import {
 } from "@/lib/agent-prompt";
 import { AGENT_PRESETS, type AgentPreset } from "@/lib/agent-presets";
 import type { KnowledgeDoc } from "@/lib/crm";
-import { AvisoCache, Field, Hint, Par, Recolhivel, Trio } from "./ui";
+import { AvisoCache, Field, Hint, Par, SubBloco, Trio } from "./ui";
 
 // Os campos do agente, em três grupos, na ordem em que se pensa sobre um
 // funcionário novo: quem é você, o que você sabe, o que você pode fazer.
@@ -263,30 +261,49 @@ export function CamposOQueSabe({
   knowledgeKeyConfigured: boolean;
   preview?: boolean;
 }) {
-  // ⚠️ ABERTO DE CARA, sempre (pedido do dono, 21/09/2026: "horario deveria
-  // estar aberto de cara, e algo importante"). Ele abria SO quando estava
-  // vazio, e o efeito era o contrario do pretendido: quem ja preencheu uma vez
-  // nunca mais via o horario, que e o campo que alimenta a frase mais forte do
-  // painel e o unico que o agente repete para o cliente palavra por palavra.
-  const [horarioAberto, setHorarioAberto] = useState(true);
-
   // Persona curta demais para o cache de prompt da OpenAI pegar. Interessa ao
   // dono porque é custo: a persona vai inteira em TODA mensagem, e sem cache
   // cada turno paga o preço cheio de entrada. Só aparece quando o risco existe.
   const semCache = foraDoCache(personaPreview);
 
-  const resumoHorario = useMemo(() => {
-    const linhas = renderHours(cfg.hours)
-      .split("\n")
-      .filter((l) => l !== "" && !l.startsWith("- Não atende"));
-    if (linhas.length === 0) return "Nenhum horário definido";
-    return linhas.map((l) => l.replace(/^- /, "")).join("; ");
-  }, [cfg.hours]);
-
   return (
     <>
+      {/* ⚠️ O HORÁRIO É O PRIMEIRO BLOCO DA ABA desde 22/09/2026 (pedido do
+          dono: "deveria ser o primeiro dessa sessão"), e não o último atrás de
+          um recolher. Ele é o único dado desta aba que o agente repete para o
+          cliente palavra por palavra, e é o que alimenta a frase mais forte do
+          painel; estava no fim porque um dia esta aba foi uma página de
+          rolagem única, e ninguém mexeu na ordem quando ela virou aba.
+          ⚠️ Segue FORA do assistente (`mostrarOpcionais`): ele não muda a
+          primeira resposta do agente, e `mostrarOpcionais` é a única
+          bifurcação permitida entre as duas superfícies. */}
+      {mostrarOpcionais && (
+        <div className="space-y-3">
+          <h3 className="text-rotulo uppercase text-ink-3">
+            Horário de atendimento
+          </h3>
+          <p className="text-legenda text-ink-3">
+            O agente informa esse horário, mas não sabe a data e a hora atual,
+            então ele nunca diz se está aberto ou fechado agora.
+          </p>
+          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
+            <AgentHoursEditor
+              value={cfg.hours}
+              onChange={(v) => patch({ hours: v })}
+            />
+            <Field label="Observação de horário">
+              <Input
+                value={cfg.hoursNote}
+                onChange={(e) => patch({ hoursNote: e.target.value })}
+                placeholder="Ex.: fechado em feriados"
+              />
+            </Field>
+          </div>
+        </div>
+      )}
+
       {/* É o campo que mais muda a qualidade da resposta e o único que resolve o
-          aviso de cache de prompt, então vem primeiro. */}
+          aviso de cache de prompt. */}
       <Field label="Detalhes do negócio">
         <Hint>
           O agente sabe isto de cor, e vale em toda conversa. Produtos, serviços,
@@ -327,34 +344,6 @@ export function CamposOQueSabe({
         />
       </div>
 
-      {/* Horário não entra no assistente: ele alimenta a frase de valor do
-          painel, não a primeira resposta do agente. */}
-      {mostrarOpcionais && (
-        <Recolhivel
-          titulo="Horário de atendimento"
-          resumo={resumoHorario}
-          aberto={horarioAberto}
-          onToggle={() => setHorarioAberto((v) => !v)}
-        >
-          <p className="mb-3 text-legenda text-ink-3">
-            O agente informa esse horário, mas não sabe a data e a hora atual,
-            então ele nunca diz se está aberto ou fechado agora.
-          </p>
-          <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
-            <AgentHoursEditor
-              value={cfg.hours}
-              onChange={(v) => patch({ hours: v })}
-            />
-            <Field label="Observação de horário">
-              <Input
-                value={cfg.hoursNote}
-                onChange={(e) => patch({ hoursNote: e.target.value })}
-                placeholder="Ex.: fechado em feriados"
-              />
-            </Field>
-          </div>
-        </Recolhivel>
-      )}
     </>
   );
 }
@@ -374,21 +363,8 @@ export function CamposOQuePodeFazer({
   /** Rascunho ainda não adicionado numa lista, guardado pelo pai. */
   onDraft: (campo: "dontDo" | "escalateWhen", v: string) => void;
 }) {
-  const [limitesAberto, setLimitesAberto] = useState(
-    () => cfg.dontDo.length === 0 && cfg.escalateWhen.length === 0
-  );
   const agendarSemGrupo =
     cfg.goals.includes("agendar") && notifyJid.trim() === "";
-
-  const resumoLimites = useMemo(() => {
-    const a = cfg.dontDo.length;
-    const b = cfg.escalateWhen.length;
-    if (a === 0 && b === 0) return "Nada definido";
-    const partes: string[] = [];
-    if (a > 0) partes.push(`${a} limite${a === 1 ? "" : "s"}`);
-    if (b > 0) partes.push(`${b} caso${b === 1 ? "" : "s"} de chamar o time`);
-    return partes.join(", ");
-  }, [cfg.dontDo.length, cfg.escalateWhen.length]);
 
   return (
     <>
@@ -462,17 +438,16 @@ export function CamposOQuePodeFazer({
         </Field>
       )}
 
-      {/* ⚠️ `manterMontado` NÃO é preferência: `AgentBulletList` guarda o
-          rascunho não adicionado num ref do pai, e o save o incorpora. Se o
-          bloco desmontasse ao recolher, o texto visível sumiria da tela mas
-          continuaria sendo salvo, que é pior que perder. */}
-      <Recolhivel
-        titulo="Limites e quando chamar o time"
-        resumo={resumoLimites}
-        aberto={limitesAberto}
-        onToggle={() => setLimitesAberto((v) => !v)}
-        manterMontado
-      >
+      {/* ⚠️ DEIXOU DE RECOLHER em 22/09/2026 (pedido do dono: "não precisa ser
+          colapsado também, tem espaço abaixo, não faz sentido deixar
+          colapsado"). Junto foi embora o `manterMontado`, e vale registrar por
+          que ele existia: `AgentBulletList` guarda o rascunho ainda não
+          adicionado num estado do pai, e o save o incorpora, então desmontar o
+          bloco ao recolher faria o texto sumir da tela CONTINUANDO a ser
+          salvo. Sem recolher, não há o que desmontar, e a armadilha deixa de
+          existir para este bloco. Ela volta no minuto em que alguém puser
+          `AgentBulletList` dentro de algo que desmonte. */}
+      <SubBloco titulo="Limites e quando chamar o time">
         <div className="space-y-4">
           <Field label="O que o agente NÃO deve fazer">
             <AgentBulletList
@@ -516,7 +491,7 @@ export function CamposOQuePodeFazer({
             Nunca admitir que é uma IA
           </label>
         </div>
-      </Recolhivel>
+      </SubBloco>
     </>
   );
 }
