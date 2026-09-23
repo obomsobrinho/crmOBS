@@ -47,27 +47,49 @@ function SheetTrigger({
  * mesma sopa de classe com um número trocado, e sopa repetida é variante.
  */
 const conteudoVariants = cva(
-  "anim-lateral fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l border-line bg-raised shadow-[var(--panel-shadow)]",
+  "fixed z-50 flex w-full flex-col bg-raised shadow-[var(--panel-shadow)]",
   {
     variants: {
+      /**
+       * `direita` é o painel de sempre, encostado na borda. `baixo` é a folha
+       * do celular (23/09/2026, plano do mobile): sobe da borda de baixo, com
+       * topo arredondado, altura pelo conteúdo até 92% da tela, e respeita a
+       * área segura do aparelho. Duas geometrias, duas animações próprias no
+       * globals.css (`.anim-lateral`, `.anim-baixo`), pelo mesmo motivo de este
+       * arquivo existir separado do `dialog`: translate de posição e translate
+       * de animação não podem brigar.
+       */
+      lado: {
+        direita: "anim-lateral inset-y-0 right-0 border-l border-line",
+        baixo:
+          "anim-baixo inset-x-0 bottom-0 max-h-[92dvh] rounded-t-2xl border-t border-line pb-[env(safe-area-inset-bottom)]",
+      },
       tamanho: {
         /** Leitura: 520px é onde um prompt de ~9 KB não vira coluna de 40 caracteres. */
-        padrao: "sm:max-w-[520px]",
+        padrao: "",
         /**
          * Trabalho: a bancada de teste tem conversa E diagnóstico lado a lado, e
          * em 520px as duas colunas ficariam estreitas demais para as duas
          * servirem. Em tela pequena os dois valores caem para a largura toda.
          */
-        largo: "sm:max-w-[1040px]",
+        largo: "",
+        /** Folha que ocupa a tela inteira do celular (bancada, prompt, listas). */
+        cheia: "",
       },
     },
-    defaultVariants: { tamanho: "padrao" },
+    compoundVariants: [
+      { lado: "direita", tamanho: "padrao", className: "sm:max-w-[520px]" },
+      { lado: "direita", tamanho: "largo", className: "sm:max-w-[1040px]" },
+      { lado: "baixo", tamanho: "cheia", className: "h-[92dvh]" },
+    ],
+    defaultVariants: { lado: "direita", tamanho: "padrao" },
   },
 );
 
 function SheetContent({
   className,
   tamanho,
+  lado,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof conteudoVariants>) {
@@ -79,7 +101,7 @@ function SheetContent({
       />
       <DialogPrimitive.Content
         data-slot="sheet-content"
-        className={cn(conteudoVariants({ tamanho, className }))}
+        className={cn(conteudoVariants({ lado, tamanho, className }))}
         {...props}
       />
     </DialogPrimitive.Portal>

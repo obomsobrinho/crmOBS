@@ -90,7 +90,7 @@ export default function WhatsAppBanner({
         role="status"
         data-slot="whatsapp-banner"
         data-estado="close"
-        className="flex shrink-0 items-center gap-2.5 rounded-xl border border-danger-line bg-danger-surface px-4 py-2.5"
+        className="flex shrink-0 items-center gap-2.5 rounded-xl border border-danger-line bg-danger-surface px-4 py-2.5 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2"
       >
         <WifiOff size={16} className="shrink-0 text-danger-ink" aria-hidden />
         <p className="min-w-0 flex-1 text-apoio text-danger-ink">
@@ -113,7 +113,7 @@ export default function WhatsAppBanner({
         role="status"
         data-slot="whatsapp-banner"
         data-estado="connecting"
-        className="flex shrink-0 items-center gap-2.5 rounded-xl border border-warn-line bg-warn-surface px-4 py-2.5"
+        className="flex shrink-0 items-center gap-2.5 rounded-xl border border-warn-line bg-warn-surface px-4 py-2.5 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2"
       >
         <RefreshCw size={16} className="shrink-0 text-warn-ink" aria-hidden />
         <p className="min-w-0 flex-1 text-apoio text-warn-ink">
@@ -137,7 +137,7 @@ export default function WhatsAppBanner({
       role="status"
       data-slot="whatsapp-banner"
       data-estado="unknown"
-      className="flex shrink-0 items-center gap-2.5 rounded-xl border border-line bg-raised px-4 py-2.5"
+      className="flex shrink-0 items-center gap-2.5 rounded-xl border border-line bg-raised px-4 py-2.5 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2"
     >
       <CircleHelp size={16} className="shrink-0 text-ink-3" aria-hidden />
       <p className="min-w-0 flex-1 text-apoio text-ink-2">

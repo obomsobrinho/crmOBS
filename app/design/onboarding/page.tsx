@@ -29,9 +29,9 @@ const INPUT = {
 
 export default function DesignOnboardingPage() {
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/painel" role="dono" />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
         <AvisoMontagem />
         <div
           className={cn(

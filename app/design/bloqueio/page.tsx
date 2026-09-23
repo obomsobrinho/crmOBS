@@ -21,9 +21,9 @@ const BLOQUEADA = accessState({
 
 export default function DesignBloqueioPage() {
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/inbox" role="dono" />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
         <BillingBanner access={BLOQUEADA} isOwner />
         <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="flex-1 p-4 text-apoio text-ink-2">

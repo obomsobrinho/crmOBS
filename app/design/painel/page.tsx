@@ -320,7 +320,7 @@ const ASSUNTOS: AssuntoEmAlta[] = [
 
 export default function DesignPainelPage() {
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/painel" role="dono" />
       {/* Sem cartão de página, igual à tela real: os cartões flutuam sobre o
           canvas (`Stat variant="elevado"`). */}

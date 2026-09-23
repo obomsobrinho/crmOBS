@@ -36,13 +36,17 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    // `h-dvh` e não `h-screen`: no celular a barra do navegador entra e sai, e
+    // `100vh` conta com ela escondida, cortando o rodapé. Abaixo de `md` a casca
+    // vira coluna sem respiro (o conteúdo encosta nas bordas) e o `NavRail` põe a
+    // barra de abas embaixo (plano do mobile, fase 0).
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail
         clientName={client.name}
         clientId={client.id}
         role={client.role ?? undefined}
       />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
         {/* Estado da conta: bloqueio (leitura só) ou aviso (trial acabando,
             pagamento em carência). Vem antes do trilho porque é mais urgente. */}
         <BillingBanner access={client.access} isOwner={client.role === "dono"} />

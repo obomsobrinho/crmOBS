@@ -72,7 +72,7 @@ const CARDS: PipelineCard[] = [
 
 export default function DesignPipelinePage() {
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pipeline" role="dono" />
       <div className="flex min-w-0 flex-1 flex-col">
         <PipelineBoard

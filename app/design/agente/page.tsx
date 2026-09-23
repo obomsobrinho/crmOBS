@@ -84,7 +84,7 @@ export default async function DesignAgentePage({
   const jaPublicou = estado !== "montagem";
 
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/agente" />
       {/* overflow-y-auto como na tela real: a rolagem é do cartão, uma só. E
           `px-6 pt-6` como lá, pelo mesmo motivo: o rodapé é sticky e `bottom: 0`

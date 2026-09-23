@@ -33,12 +33,15 @@ import {
   Repeat2,
   LogOut,
   ChevronUp,
+  ChevronRight,
   MessageSquarePlus,
+  Ellipsis,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import FeedbackDialog from "./FeedbackDialog";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const NAV: {
   href: string;
@@ -183,10 +186,11 @@ export default function NavRail({
   const perfilActive = pathname.startsWith("/perfil");
 
   return (
+    <>
     <Card asChild variant="menu">
       <nav
         className={cn(
-          "flex shrink-0 flex-col gap-1 p-2 transition-[width] duration-200 ease-[var(--ease-out)]",
+          "flex shrink-0 flex-col gap-1 p-2 transition-[width] duration-200 ease-[var(--ease-out)] max-md:hidden",
           collapsed ? "w-16 items-center" : "w-[212px]",
         )}
       >
@@ -425,6 +429,17 @@ export default function NavRail({
         />
       </nav>
     </Card>
+    <BarraAbas
+      pathname={activeHref ?? pathname}
+      role={role}
+      clientName={clientName}
+      unread={unreadConvos}
+      estadoCanal={estadoCanal}
+      whatsappConnected={whatsappConnected}
+      onFeedback={() => setFeedbackAberto(true)}
+      onLogout={logout}
+    />
+    </>
   );
 }
 
@@ -449,5 +464,177 @@ function MarkOnly() {
         className="mark-dark h-full w-full object-contain"
       />
     </span>
+  );
+}
+
+/**
+ * A navegação do CELULAR (abaixo de `md`, 23/09/2026, rodada 1 do mobile):
+ * barra de abas embaixo com Painel, Conversas, Pipeline e Mais. Mora DENTRO do
+ * `NavRail` de propósito, e não num componente irmão no layout: a contagem de
+ * não lidas, o tema, o feedback e o sair são os mesmos do trilho, e dois
+ * componentes montados ao mesmo tempo abririam duas assinaturas de realtime
+ * para o mesmo número.
+ *
+ * ⚠️ SOME dentro da conversa e dentro do Agente. Nos dois a tela é de trabalho
+ * (caixa de escrita presa em cima do teclado, barra de salvar), e a barra de
+ * abas ocuparia justamente o lugar delas. Voltar é pela seta do cabeçalho.
+ */
+function BarraAbas({
+  pathname,
+  role,
+  clientName,
+  unread,
+  estadoCanal,
+  whatsappConnected,
+  onFeedback,
+  onLogout,
+}: {
+  pathname: string;
+  role?: string;
+  clientName: string;
+  unread: number;
+  estadoCanal: string;
+  whatsappConnected: boolean;
+  onFeedback: () => void;
+  onLogout: () => void;
+}) {
+  const [maisAberto, setMaisAberto] = useState(false);
+  const escondida =
+    /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/agente");
+  if (escondida) return null;
+
+  const emMais = ["/agente", "/equipe", "/perfil"].some((p) =>
+    pathname.startsWith(p),
+  );
+  const abas: { href?: string; label: string; icon: LucideIcon; ativa: boolean; badge?: number }[] = [
+    { href: "/painel", label: "Painel", icon: LayoutDashboard, ativa: pathname.startsWith("/painel") },
+    { href: "/inbox", label: "Conversas", icon: MessagesSquare, ativa: pathname.startsWith("/inbox"), badge: unread },
+    { href: "/pipeline", label: "Pipeline", icon: KanbanSquare, ativa: pathname.startsWith("/pipeline") },
+    { label: "Mais", icon: Ellipsis, ativa: emMais || maisAberto },
+  ];
+  const itensMais = NAV.filter(
+    (n) =>
+      !["/painel", "/inbox", "/pipeline"].includes(n.href) &&
+      (!n.donoOnly || role === "dono"),
+  );
+
+  return (
+    <nav
+      data-slot="barra-abas"
+      aria-label="Navegação"
+      className="order-last grid shrink-0 grid-cols-4 border-t border-line bg-menu pb-[env(safe-area-inset-bottom)] md:hidden"
+    >
+      {abas.map((a) => {
+        const Icone = a.icon;
+        const corpo = (
+          <>
+            <span className="relative">
+              <Icone size={22} strokeWidth={1.8} />
+              {!!a.badge && (
+                <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-legenda font-semibold leading-none text-white tabular-nums">
+                  {a.badge > 99 ? "99+" : a.badge}
+                </span>
+              )}
+            </span>
+            <span className="text-legenda">{a.label}</span>
+          </>
+        );
+        const cls = cn(
+          "flex h-14 flex-col items-center justify-center gap-1",
+          a.ativa ? "font-semibold text-brand-ink" : "text-ink-2",
+        );
+        return a.href ? (
+          <Link key={a.label} href={a.href} className={cls} aria-current={a.ativa ? "page" : undefined}>
+            {corpo}
+          </Link>
+        ) : (
+          <button key={a.label} type="button" className={cls} onClick={() => setMaisAberto(true)}>
+            {corpo}
+          </button>
+        );
+      })}
+
+      <Sheet open={maisAberto} onOpenChange={setMaisAberto}>
+        <SheetContent lado="baixo" aria-describedby={undefined}>
+          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
+          <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+            <Avatar size="sm" className="bg-bloco text-ink-2 ring-1 ring-line">
+              {clientName.slice(0, 2).toUpperCase()}
+            </Avatar>
+            <div className="min-w-0">
+              <SheetTitle className="truncate text-cartao">{clientName}</SheetTitle>
+              <p className="text-legenda text-ink-3">
+                {role === "dono" ? "Dono" : "Atendente"} ·{" "}
+                <span className={whatsappConnected ? "text-human-ink" : "text-danger-ink"}>
+                  {estadoCanal}
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col p-2">
+            {itensMais.map((n) => {
+              const Icone = n.icon;
+              return (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  onClick={() => setMaisAberto(false)}
+                  className="flex h-12 items-center gap-3 rounded-lg px-3 text-corpo text-ink hover:bg-[var(--active-bg)]"
+                >
+                  <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
+                  <span className="flex-1">{n.label}</span>
+                  <ChevronRight size={18} className="text-ink-3" />
+                </Link>
+              );
+            })}
+            <Link
+              href="/perfil"
+              onClick={() => setMaisAberto(false)}
+              className="flex h-12 items-center gap-3 rounded-lg px-3 text-corpo text-ink hover:bg-[var(--active-bg)]"
+            >
+              <User size={20} strokeWidth={1.8} className="text-ink-2" />
+              <span className="flex-1">Perfil</span>
+              <ChevronRight size={18} className="text-ink-3" />
+            </Link>
+            <ThemeToggle linha />
+            <button
+              type="button"
+              onClick={() => {
+                setMaisAberto(false);
+                onFeedback();
+              }}
+              className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-[var(--active-bg)]"
+            >
+              <MessageSquarePlus size={20} strokeWidth={1.8} className="text-ink-2" />
+              Enviar feedback
+            </button>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-danger-surface hover:text-danger-ink"
+            >
+              <LogOut size={20} strokeWidth={1.8} className="text-ink-2" />
+              Sair
+            </button>
+            <p className="mt-2 border-t border-line px-3 pb-1 pt-3 text-rotulo uppercase text-ink-3">
+              Em breve
+            </p>
+            {SOON.map((n) => {
+              const Icone = n.icon;
+              return (
+                <span
+                  key={n.label}
+                  aria-disabled
+                  className="flex h-11 items-center gap-3 px-3 text-corpo text-ink-3 opacity-60"
+                >
+                  <Icone size={20} strokeWidth={1.8} />
+                  {n.label}
+                </span>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
+    </nav>
   );
 }

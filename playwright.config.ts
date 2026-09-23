@@ -64,6 +64,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
     {
+      // Celular (plano do mobile, 23/09/2026): as telas /design em 375x812, com
+      // toque. Pixel 5 porque é Chromium (o único navegador instalado aqui); o
+      // tamanho é o do desenho, não o do aparelho.
+      name: "mobile",
+      testMatch: /.*.mobile.spec.ts/,
+      use: { ...devices["Pixel 5"], viewport: { width: 375, height: 812 } },
+    },
+    {
       name: "logado",
       testMatch: /.*\.auth\.spec\.ts/,
       use: {

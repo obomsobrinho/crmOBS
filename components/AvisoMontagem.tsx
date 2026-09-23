@@ -23,7 +23,7 @@ export default function AvisoMontagem() {
       data-slot="aviso-montagem"
       className={cn(
         cardVariants(),
-        "flex shrink-0 flex-wrap items-center gap-3 px-4 py-3"
+        "flex shrink-0 flex-wrap items-center gap-3 px-4 py-3 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2"
       )}
     >
       <Rocket size={17} className="shrink-0 text-brand-ink" aria-hidden />

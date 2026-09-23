@@ -122,7 +122,7 @@ export default async function DesignPreview({
   };
 
   return (
-    <div className="flex h-screen gap-3 bg-canvas p-3">
+    <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="O Bom Sobrinho" activeHref="/inbox" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 gap-3">

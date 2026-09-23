@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import { BRAND } from "@/lib/brand";
@@ -19,6 +19,19 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: BRAND.name,
   description: BRAND.tagline,
+};
+
+/**
+ * `viewportFit: cover` deixa a página chegar até as bordas do celular (a área
+ * segura é respeitada por `env(safe-area-inset-*)` onde precisa), e
+ * `resizes-content` faz o teclado ENCOLHER a área visível, em vez de cobrir a
+ * caixa de escrita presa embaixo. Plano do mobile, fase 0.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
 };
 
 export default async function RootLayout({

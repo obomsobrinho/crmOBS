@@ -908,6 +908,26 @@ select:focus-visible,
    PODE mexer em `translate`: diferente do modal centrado, este painel não usa
    `-translate-x-1/2` do Tailwind para se posicionar (ele encosta em `right-0`),
    logo não existe propriedade `translate` para somar e deslocar. */
+@keyframes baixo-entra {
+  from {
+    opacity: 0;
+    translate: 0 100%;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@keyframes baixo-sai {
+  from {
+    opacity: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    translate: 0 100%;
+  }
+}
 @keyframes lateral-entra {
   from {
     opacity: 0;
@@ -934,6 +954,15 @@ select:focus-visible,
 }
 .anim-lateral[data-state="closed"] {
   animation: lateral-sai var(--dur-fast) var(--ease-out);
+}
+
+/* Folha do celular (sheet lado="baixo"). Mesma regra do painel lateral: a
+   posição vem de bottom-0, então a animação pode usar translate à vontade. */
+.anim-baixo[data-state="open"] {
+  animation: baixo-entra var(--dur-fast) var(--ease-out);
+}
+.anim-baixo[data-state="closed"] {
+  animation: baixo-sai var(--dur-fast) var(--ease-out);
 }
 
 .anim-flutuante[data-state="open"] {
@@ -1069,6 +1098,7 @@ select:focus-visible,
   .msg-in,
   .anim-flutuante,
   .anim-lateral,
+  .anim-baixo,
   .anim-fundo,
   .painel-cartao,
   .painel-barra,
