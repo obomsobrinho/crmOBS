@@ -135,7 +135,7 @@ export default function PainelMovimento({
           O seletor já flutuou no canto, por cima da área, e estava errado: na
           prancha ele mora nesta faixa, ao lado do título, e a faixa termina num
           divisor de borda-suave (a `--line2` dela) de ponta a ponta. */}
-      <div className="flex items-start justify-between gap-5 border-b border-line-soft px-6 py-[18px]">
+      <div className="flex items-start justify-between gap-5 border-b border-line-soft px-6 py-[18px] max-md:gap-3 max-md:px-4">
         <div className="min-w-0">
           {/* Título de BLOCO (16/22, caixa normal) em Space Grotesk, e não
               rótulo de seção em caixa alta: é assim na prancha, e é o que
@@ -161,7 +161,7 @@ export default function PainelMovimento({
                 key={k}
                 value={k}
                 variant="painel"
-                className="py-1 text-legenda"
+                className="whitespace-nowrap py-1 text-legenda"
               >
                 {k} dias
               </TabsTrigger>

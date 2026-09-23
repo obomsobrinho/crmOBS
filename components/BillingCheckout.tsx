@@ -278,18 +278,23 @@ export default function BillingCheckout({
 
       {error && <p className="text-apoio text-danger-ink">{error}</p>}
 
-      <Button
-        size="field"
-        onClick={assinar}
-        disabled={loading || !podeEnviar}
-        className="w-full justify-center"
-      >
-        {loading
-          ? "Aguarde…"
-          : temAssinatura
-            ? "Trocar para este plano"
-            : "Ir para o pagamento"}
-      </Button>
+      {/* CELULAR (plano do mobile, fase 2): o botão de pagar fica PRESO
+          embaixo, acima da área segura do aparelho, enquanto a pessoa rola a
+          lista de planos e os campos. No desktop é o botão de sempre. */}
+      <div className="max-md:sticky max-md:bottom-0 max-md:z-10 max-md:-mx-4 max-md:border-t max-md:border-line max-md:bg-raised max-md:px-4 max-md:pb-[max(12px,env(safe-area-inset-bottom))] max-md:pt-3">
+        <Button
+          size="field"
+          onClick={assinar}
+          disabled={loading || !podeEnviar}
+          className="w-full justify-center max-md:h-11"
+        >
+          {loading
+            ? "Aguarde…"
+            : temAssinatura
+              ? "Trocar para este plano"
+              : "Ir para o pagamento"}
+        </Button>
+      </div>
 
       <p className="text-center text-legenda text-ink-2">
         Pix, boleto ou cartão. Você escolhe na próxima tela.

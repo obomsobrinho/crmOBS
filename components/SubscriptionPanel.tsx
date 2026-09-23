@@ -91,8 +91,11 @@ export default function SubscriptionPanel({
   rows.push({ label: "Conta", value: email });
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <Card className="w-full max-w-lg space-y-5 p-7">
+    <div className="flex min-h-dvh items-center justify-center bg-canvas p-4 max-md:items-start max-md:p-0">
+      <Card
+        variant="pagina"
+        className="w-full max-w-lg space-y-5 p-7 max-md:min-h-dvh max-md:p-4"
+      >
         <BrandMark />
 
         <div className="flex items-start gap-2">

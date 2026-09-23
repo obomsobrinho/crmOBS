@@ -291,7 +291,7 @@ export default async function PainelPage() {
   return (
     <AreaRolavel
       tamanho={DISSOLVER_LISTA}
-      className="flex min-h-0 flex-1 flex-col gap-5 pr-1"
+      className="flex min-h-0 flex-1 flex-col gap-5 pr-1 max-md:px-4 max-md:pb-6 max-md:pt-4"
     >
       {/* Cabeçalho: título à esquerda, fila à direita, na MESMA linha. A fila
           saiu da trilha porque `/painel` é onde o dono cai ao entrar, e o que
@@ -324,8 +324,12 @@ export default async function PainelPage() {
           navegador com barra de favoritos perde ~100px e ganhava um resto de
           rolagem. Com o piso explícito a linha cede até 220px e a tela fecha;
           abaixo disso a rolagem volta, que é o certo em monitor pequeno. */}
+      {/* CELULAR (plano do mobile, fase 2): uma coluna na ordem do desenho,
+          manchete, "precisa de você", operação, movimento, assuntos, última
+          resposta. A trilha vira `contents` para a fila e os assuntos entrarem
+          na ordem da coluna, e a ordem sai por `order`, sem duplicar bloco. */}
       <div className="grid min-w-0 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_auto_minmax(220px,1fr)]">
-        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+        <div className="min-w-0 max-md:order-1 xl:col-start-1 xl:row-start-1">
           <ValorResumo
             resumo={resumo}
             frases={frases}
@@ -339,7 +343,7 @@ export default async function PainelPage() {
 
         </div>
 
-        <div className="min-w-0 xl:col-start-1 xl:row-start-2">
+        <div className="min-w-0 max-md:order-3 xl:col-start-1 xl:row-start-2">
           <PainelOperacaoBloco janelas={janelas} />
         </div>
 
@@ -348,7 +352,7 @@ export default async function PainelPage() {
               valor continuam existindo em `frasesDeValor` e aparecem no
               `/design/valor` e no passo de cancelar; o que saiu foi a seção no
               painel, que o desenho não tem. */}
-        <div className="min-w-0 [&>section]:h-full xl:col-start-1 xl:row-start-3">
+        <div className="min-w-0 [&>section]:h-full max-md:order-4 xl:col-start-1 xl:row-start-3">
           <PainelMovimento janelas={movimento} desdeMs={desdeMs} />
         </div>
 
@@ -359,7 +363,7 @@ export default async function PainelPage() {
             outro embaixo da operação. Com `h-0` a contribuição intrínseca vira
             zero, quem dimensiona as linhas passa a ser só a coluna principal, e
             `min-h-full` devolve a altura das duas linhas para ele preencher. */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:h-0 xl:min-h-full">
+        <div className="flex min-h-0 min-w-0 flex-col gap-5 max-md:contents max-md:[&>:first-child]:order-2 max-md:[&>:last-child]:order-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:h-0 xl:min-h-full">
           <PainelFilaCartao
             quantas={esperando}
             esperaMs={esperaMs}
@@ -371,7 +375,7 @@ export default async function PainelPage() {
           <PainelAssuntos />
         </div>
 
-        <div className="min-w-0 [&>section]:h-full xl:col-start-2 xl:row-start-3">
+        <div className="min-w-0 [&>section]:h-full max-md:order-6 xl:col-start-2 xl:row-start-3">
 
           {verbatim && (
             <PainelUltimaResposta

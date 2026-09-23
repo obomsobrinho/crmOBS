@@ -40,7 +40,7 @@ export default async function ConhecimentoPage() {
   }));
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
+    <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4">
       <KnowledgeManager
         clientId={client.id}
         initialDocs={docs}

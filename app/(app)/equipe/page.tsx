@@ -14,7 +14,7 @@ export default async function EquipePage() {
   const members = await fetchMembers(supabase);
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden p-6">
+    <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4">
       <div className="mb-1 flex items-center gap-2">
         <Users size={20} className="text-brand-ink" />
         <h1 className="text-titulo">Equipe</h1>

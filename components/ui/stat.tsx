@@ -62,7 +62,10 @@ const statVariants = cva("flex flex-col rounded-xl border", {
      */
     tamanho: {
       manchete: "gap-3 px-8 py-7",
-      padrao: "gap-1.5 p-6",
+      // Celular: 16px. Em 375px o cartão da operação tem ~170px de largura, e
+      // com 24 de cada lado sobram 120 para rótulo, selo e numeral (plano do
+      // mobile, fase 2). A regra dos 24 continua valendo de `md` para cima.
+      padrao: "gap-1.5 p-6 max-md:p-4",
       compacto: "gap-1 p-4",
     },
   },
@@ -87,7 +90,9 @@ function Stat({
   );
 }
 
-const topoVariants = cva("flex items-start justify-between gap-2", {
+// `max-md:flex-wrap`: no celular o selo desce para baixo do rótulo quando não
+// cabe ao lado, em vez de vazar pela borda do cartão.
+const topoVariants = cva("flex items-start justify-between gap-2 max-md:flex-wrap max-md:gap-1.5", {
   variants: {
     /**
      * Altura mínima do cabeçalho do cartão. Geometria mora no `tamanho`, como no

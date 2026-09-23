@@ -63,7 +63,8 @@ export default async function InboxLayout({
         />
         <Card
           asChild
-          className="flex min-w-0 flex-1 overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none max-md:has-[[data-inbox-vazio]]:hidden"
+          variant="pagina"
+          className="flex min-w-0 flex-1 overflow-hidden max-md:has-[[data-inbox-vazio]]:hidden"
         >
           <main>{children}</main>
         </Card>

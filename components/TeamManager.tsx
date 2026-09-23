@@ -8,7 +8,14 @@ import {
   ShieldCheck,
   User,
   AlertTriangle,
+  EllipsisVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchMembers,
@@ -149,7 +156,10 @@ export default function TeamManager({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="pessoa@empresa.com"
               aria-label="E-mail do convidado"
-              className="flex-1"
+              // `sm:` porque abaixo dele a linha vira COLUNA, e `flex-1` numa
+              // coluna zera a base da altura: o campo nascia mais baixo que o
+              // seletor ao lado.
+              className="sm:flex-1"
             />
             <Select
               value={role}
@@ -244,9 +254,36 @@ export default function TeamManager({
                     onClick={() => setToRemove(m)}
                     aria-label={`Remover ${memberName(m.email)}`}
                     title="Remover do time"
+                    className="max-md:hidden"
                   >
                     <Trash2 size={15} />
                   </Button>
+                )}
+                {/* Celular: remover mora num menu da linha (desenho do mobile),
+                    para a lixeira não ficar a um toque torto do dedo. Abre a
+                    MESMA confirmação do desktop. */}
+                {isOwner && !isSelf && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="none"
+                        aria-label={`Ações para ${memberName(m.email)}`}
+                        className="-mr-2 size-11 shrink-0 rounded-lg text-ink-2 md:hidden"
+                      >
+                        <EllipsisVertical size={18} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                      <DropdownMenuItem
+                        onSelect={() => setToRemove(m)}
+                        className="min-h-11 text-danger-ink focus:text-danger-ink"
+                      >
+                        <Trash2 size={15} />
+                        Remover do time
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </li>
             );

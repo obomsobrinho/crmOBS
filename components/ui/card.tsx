@@ -21,6 +21,14 @@ const cardVariants = cva("border border-line shadow-[var(--panel-shadow)]", {
       conteudo: "rounded-xl bg-raised",
       /** A coluna de navegação, que tem superfície própria. */
       menu: "rounded-xl bg-menu",
+      /**
+       * O cartão que É a tela (Equipe, Perfil, Agente, a lista de conversas, a
+       * entrada). No CELULAR ele perde a moldura (plano do mobile, 23/09/2026):
+       * a tela já encosta nas bordas do aparelho, e uma borda com raio a 0px
+       * da borda física só desenha um contorno sem função.
+       */
+      pagina:
+        "rounded-xl bg-raised max-md:rounded-none max-md:border-0 max-md:shadow-none",
     },
   },
   defaultVariants: { variant: "conteudo" },

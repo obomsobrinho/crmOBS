@@ -326,7 +326,7 @@ export default function DesignPainelPage() {
           canvas (`Stat variant="elevado"`). */}
       <AreaRolavel
         tamanho={DISSOLVER_LISTA}
-        className="flex min-w-0 flex-1 flex-col gap-5 pr-1"
+        className="flex min-h-0 flex-1 flex-col gap-5 pr-1 max-md:px-4 max-md:pb-6 max-md:pt-4"
       >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="min-w-0">
@@ -364,7 +364,7 @@ export default function DesignPainelPage() {
             pequeno. Os cartões da linha 3 encolhem por dentro (a área do
             gráfico escala, a citação rola). */}
         <div className="grid min-w-0 gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-rows-[auto_auto_minmax(220px,1fr)]">
-          <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+          <div className="min-w-0 max-md:order-1 xl:col-start-1 xl:row-start-1">
             <ValorResumo
               resumo={MES}
               frases={frasesDeValor(MES, PERIODO)}
@@ -377,14 +377,14 @@ export default function DesignPainelPage() {
             />
           </div>
 
-          <div className="min-w-0 xl:col-start-1 xl:row-start-2">
+          <div className="min-w-0 max-md:order-3 xl:col-start-1 xl:row-start-2">
             <PainelOperacaoBloco janelas={JANELAS} />
           </div>
 
           {/* ⚠️ NÃO EXISTE "o que mais ela fez" AQUI. A prancha da rodada 3
               termina a coluna no movimento, e as frases secundárias de valor não
               aparecem em lugar nenhum dela. */}
-          <div className="min-w-0 [&>section]:h-full xl:col-start-1 xl:row-start-3">
+          <div className="min-w-0 [&>section]:h-full max-md:order-4 xl:col-start-1 xl:row-start-3">
             <PainelMovimento janelas={MOVIMENTO} />
           </div>
 
@@ -398,7 +398,7 @@ export default function DesignPainelPage() {
               operação. Com `h-0` a contribuição intrínseca dele vira zero, quem
               dimensiona as linhas passa a ser só a coluna principal, e
               `min-h-full` devolve a altura das duas linhas para ele preencher. */}
-          <div className="flex min-h-0 min-w-0 flex-col gap-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:h-0 xl:min-h-full">
+          <div className="flex min-h-0 min-w-0 flex-col gap-5 max-md:contents max-md:[&>:first-child]:order-2 max-md:[&>:last-child]:order-5 xl:col-start-2 xl:row-start-1 xl:row-span-2 xl:h-0 xl:min-h-full">
             {/* Abaixo do limiar de aviso: o cartão neutro, como na prancha. */}
             <PainelFilaCartao
               quantas={3}
@@ -412,7 +412,7 @@ export default function DesignPainelPage() {
             />
           </div>
 
-          <div className="min-w-0 [&>section]:h-full xl:col-start-2 xl:row-start-3">
+          <div className="min-w-0 [&>section]:h-full max-md:order-6 xl:col-start-2 xl:row-start-3">
             <PainelUltimaResposta
               pergunta="Boa noite! Vocês cobram pela avaliação? E quanto tempo demora?"
               perguntaHora="21h34"

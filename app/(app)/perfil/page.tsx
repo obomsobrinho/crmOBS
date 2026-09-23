@@ -37,7 +37,7 @@ export default async function PerfilPage() {
   ];
 
   return (
-    <div className={cn(cardVariants(), "flex min-h-0 flex-1 flex-col overflow-hidden p-6")}>
+    <div className={cn(cardVariants({ variant: "pagina" }), "flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4")}>
       <div className="mb-1 flex items-center gap-2">
         <User size={20} className="text-brand-ink" />
         <h1 className="text-titulo">Perfil</h1>

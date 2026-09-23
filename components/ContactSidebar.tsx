@@ -463,10 +463,11 @@ export default function ContactSidebar({
   return (
     <Card
       asChild
+      variant="pagina"
       className={cn(
         "flex w-[296px] shrink-0 flex-col overflow-hidden",
         // Celular: a lista é a tela inteira, sem moldura de cartão.
-        "max-md:w-full max-md:flex-1 max-md:rounded-none max-md:border-0 max-md:shadow-none",
+        "max-md:w-full max-md:flex-1",
         conversaAberta && "max-md:hidden",
       )}
     >

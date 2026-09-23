@@ -5,6 +5,8 @@ import { KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useCelular } from "@/lib/useCelular";
 
 // Troca de senha de quem já está logado. Fala com o Supabase Auth direto do
 // browser: nenhuma senha passa pelo nosso servidor nem é gravada por nós.
@@ -22,6 +24,7 @@ export default function ChangePassword({ email }: { email: string }) {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [loading, setLoading] = useState(false);
+  const celular = useCelular();
 
   function limpar() {
     setAtual("");
@@ -73,8 +76,34 @@ export default function ChangePassword({ email }: { email: string }) {
     setLoading(false);
   }
 
-  if (!aberto) {
+  function fechar() {
+    setAberto(false);
+    setError(null);
+    limpar();
+  }
+
+  const formulario = (
+    <FormularioSenha
+      onSubmit={handleSubmit}
+      atual={atual}
+      setAtual={setAtual}
+      nova={nova}
+      setNova={setNova}
+      nova2={nova2}
+      setNova2={setNova2}
+      error={error}
+      loading={loading}
+      onCancelar={fechar}
+      naFolha={celular}
+    />
+  );
+
+  // CELULAR (plano do mobile, fase 2): o formulário abre numa FOLHA de baixo, e
+  // não no lugar do botão. Três campos de senha no meio de uma página rolável
+  // somem atrás do teclado; na folha eles ficam juntos, acima dele.
+  if (!aberto || celular) {
     return (
+      <>
       <div className="max-w-xl">
         <Button
           variant="outline"
@@ -94,13 +123,56 @@ export default function ChangePassword({ email }: { email: string }) {
           </p>
         )}
       </div>
+      {celular && (
+        <Sheet open={aberto} onOpenChange={(v) => (v ? setAberto(true) : fechar())}>
+          <SheetContent lado="baixo" aria-describedby={undefined}>
+            <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+            <SheetTitle className="sr-only">Trocar minha senha</SheetTitle>
+            <div className="overflow-y-auto p-4">{formulario}</div>
+          </SheetContent>
+        </Sheet>
+      )}
+      </>
     );
   }
 
+  return formulario;
+}
+
+function FormularioSenha({
+  onSubmit,
+  atual,
+  setAtual,
+  nova,
+  setNova,
+  nova2,
+  setNova2,
+  error,
+  loading,
+  onCancelar,
+  naFolha,
+}: {
+  onSubmit: (e: React.FormEvent) => void;
+  atual: string;
+  setAtual: (v: string) => void;
+  nova: string;
+  setNova: (v: string) => void;
+  nova2: string;
+  setNova2: (v: string) => void;
+  error: string | null;
+  loading: boolean;
+  onCancelar: () => void;
+  /** Dentro da folha do celular: sem moldura própria, a folha já é a moldura. */
+  naFolha: boolean;
+}) {
   return (
     <form
-      onSubmit={handleSubmit}
-      className="max-w-xl space-y-4 rounded-xl border border-line bg-bloco p-4"
+      onSubmit={onSubmit}
+      className={
+        naFolha
+          ? "space-y-4"
+          : "max-w-xl space-y-4 rounded-xl border border-line bg-bloco p-4"
+      }
     >
       <div className="flex items-center gap-2">
         <KeyRound size={15} className="text-brand-ink" />
@@ -164,11 +236,7 @@ export default function ChangePassword({ email }: { email: string }) {
           variant="outline"
           size="field"
           type="button"
-          onClick={() => {
-            setAberto(false);
-            setError(null);
-            limpar();
-          }}
+          onClick={onCancelar}
         >
           Cancelar
         </Button>
