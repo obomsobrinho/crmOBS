@@ -782,6 +782,27 @@ comprar. É a única coisa desta seção que seria diferencial de verdade, em ve
 no segmento dele, cruzando a base). Difícil e depende de volume, mas é a evolução natural do bloco
 "assuntos em alta".
 
+### Cobrança por dentro e pagamento no Perfil (anotado em 23/09/2026, DEPOIS do beta)
+
+Pontos do dono ao testar a tela de bloqueio (`/assinatura`) com a conta "testesnovo". Nada disto é
+para agora: a cobrança segue parada até o beta acabar. É a lista para atacar quando ela voltar.
+
+1. **O pagamento sai do produto, e isso confunde.** "Ir para o pagamento" leva direto para a página
+   do Asaas (`sandbox.asaas.com/i/...`), sem aviso. A intenção do dono é pagar **dentro** do
+   produto. Caminhos a pesquisar antes de decidir: checkout transparente do Asaas (Pix e cartão pela
+   API, com o QR do Pix e o formulário de cartão na nossa tela) contra manter a página do Asaas com
+   aviso claro antes e retorno automático depois. O cartão por dentro traz PCI para a conversa
+   (tokenização do lado do gateway); Pix por dentro é o caso mais simples.
+2. **Pagamento visível no Perfil.** O dono quer ver plano, status, próxima cobrança e histórico de
+   pagamentos no `/perfil`, e não só no `/assinatura` (que hoje é caixa e destino do bloqueio).
+   Ligado ao PENDENTE 7 do plano do mobile ("entrada para Assinatura dentro de Perfil").
+3. **Revisar a tela de bloqueio.** O dono questionou se o primeiro bloco faz sentido. Hoje ela tem o
+   título "Acesso pausado" com a frase do motivo, uma faixa vermelha que repete o motivo com outras
+   palavras, e a tabela Empresa / Estado / Plano / Teste termina em / Atendentes / Conta. Leitura
+   inicial: a faixa vermelha repete o título, e metade da tabela não ajuda quem só quer voltar a
+   atender (Empresa e Conta a pessoa já sabe; "nenhum plano escolhido" é o que ela veio resolver).
+   Decidir junto com o item 1, porque o desenho da caixa muda se o pagamento for por dentro.
+
 ### Tela de Clientes (levantado pelo dono em 31/08, provável entrar ANTES do beta)
 
 **A lacuna:** o sistema tem **conversas**, não **clientes**. `dados_cliente` já guarda todo mundo que
