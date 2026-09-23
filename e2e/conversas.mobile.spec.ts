@@ -10,6 +10,7 @@ import { test, expect } from "@playwright/test";
 
 test("em /inbox só a lista aparece, com a barra de abas", async ({ page }) => {
   await page.goto("/design?lista=1");
+  await page.waitForLoadState("networkidle");
   await expect(page.getByRole("heading", { name: "Conversas" })).toBeVisible();
   await expect(page.locator("[data-inbox-vazio]")).toBeHidden();
   await expect(page.locator('[data-slot="barra-abas"]')).toBeVisible();
@@ -22,6 +23,7 @@ test("em /inbox só a lista aparece, com a barra de abas", async ({ page }) => {
 
 test("com a conversa aberta a lista some e o voltar leva a /inbox", async ({ page }) => {
   await page.goto("/design");
+  await page.waitForLoadState("networkidle");
   await expect(page.getByRole("heading", { name: "Conversas" })).toBeHidden();
   await expect(page.locator('[data-slot="barra-abas"]')).toHaveCount(0);
   await expect(page.locator('[data-slot="conversa-voltar"]')).toHaveAttribute("href", "/inbox");
@@ -35,6 +37,7 @@ test("com a conversa aberta a lista some e o voltar leva a /inbox", async ({ pag
 
 test("os três pontos trazem quem atende, a IA e os dados do contato", async ({ page }) => {
   await page.goto("/design");
+  await page.waitForLoadState("networkidle");
   await page.locator('[data-slot="conversa-mais"]').click();
   const menu = page.getByRole("menu");
   await expect(menu.getByText("Quem atende")).toBeVisible();
@@ -47,6 +50,7 @@ test("os três pontos trazem quem atende, a IA e os dados do contato", async ({ 
 
 test("a pílula do modo troca o destino e a frase de contexto", async ({ page }) => {
   await page.goto("/design");
+  await page.waitForLoadState("networkidle");
   const contexto = page.locator('[data-slot="composer-contexto"]');
   await expect(contexto).toHaveText(/Vai para o WhatsApp do cliente/);
   await page.locator('[data-slot="composer-modo"]').click();

@@ -10,6 +10,7 @@ const barra = (page: Page) => page.locator('[data-slot="barra-abas"]');
 
 test("o trilho some e a barra de abas aparece embaixo", async ({ page }) => {
   await page.goto("/design/painel");
+  await page.waitForLoadState("networkidle");
   await expect(barra(page)).toBeVisible();
   // O trilho do desktop continua no DOM (é o mesmo componente), mas escondido.
   await expect(page.getByRole("link", { name: "Equipe" })).toBeHidden();
@@ -33,6 +34,7 @@ test("o trilho some e a barra de abas aparece embaixo", async ({ page }) => {
 
 test("a folha Mais leva a Equipe, Perfil, tema, feedback e sair", async ({ page }) => {
   await page.goto("/design/painel");
+  await page.waitForLoadState("networkidle");
   await barra(page).getByRole("button", { name: /Mais/ }).click();
   const folha = page.locator('[data-slot="sheet-content"]');
   await expect(folha).toBeVisible();
@@ -59,5 +61,6 @@ test("a folha Mais leva a Equipe, Perfil, tema, feedback e sair", async ({ page 
 test("dentro do Agente a barra de abas some", async ({ page }) => {
   // Tela de trabalho: a barra de salvar mora onde a barra de abas moraria.
   await page.goto("/design/agente");
+  await page.waitForLoadState("networkidle");
   await expect(barra(page)).toHaveCount(0);
 });

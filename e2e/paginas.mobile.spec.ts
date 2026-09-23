@@ -5,6 +5,7 @@ import { test, expect } from "@playwright/test";
 
 test("painel em uma coluna: 'precisa de você' logo depois da manchete", async ({ page }) => {
   await page.goto("/design/painel");
+  await page.waitForLoadState("networkidle");
   const manchete = await page.getByText("O que a IA fez por você", { exact: false }).first().boundingBox();
   const fila = await page.getByText("Precisa de você", { exact: false }).first().boundingBox();
   const operacao = await page.getByRole("heading", { name: "A operação" }).boundingBox();
@@ -20,6 +21,7 @@ test("painel em uma coluna: 'precisa de você' logo depois da manchete", async (
 
 test("equipe: remover mora no menu da linha e abre a confirmação", async ({ page }) => {
   await page.goto("/design/equipe");
+  await page.waitForLoadState("networkidle");
   await expect(page.getByRole("button", { name: /^Remover / })).toHaveCount(0);
   await page.getByRole("button", { name: /Ações para/ }).first().click();
   await page.getByRole("menuitem", { name: "Remover do time" }).click();
@@ -28,6 +30,7 @@ test("equipe: remover mora no menu da linha e abre a confirmação", async ({ pa
 
 test("assinatura: o botão de pagar fica preso embaixo da tela", async ({ page }) => {
   await page.goto("/design/assinatura");
+  await page.waitForLoadState("networkidle");
   const botao = page.getByRole("button", { name: /Ir para o pagamento|Trocar para este plano/ });
   await expect(botao).toBeInViewport();
   const caixa = await botao.boundingBox();

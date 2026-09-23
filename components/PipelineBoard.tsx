@@ -14,6 +14,8 @@ import {
   ArchiveRestore,
   Trash2,
   X,
+  ArrowRightLeft,
+  Check,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatEspera, prettyPhone } from "@/lib/format";
@@ -66,6 +68,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const STAGE_SELECT =
   "id, key, name, position, is_canonical, is_default, archived, color";
@@ -105,6 +108,11 @@ export default function PipelineBoard({
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // CELULAR (plano do mobile, fase 3): um estágio por vez, escolhido na faixa
+  // de cima, e mover o card por uma folha em vez de arrastar.
+  const [estagioCel, setEstagioCel] = useState<string | null>(null);
+  const [movendo, setMovendo] = useState<PipelineCard | null>(null);
+  const [buscaAberta, setBuscaAberta] = useState(false);
 
   // Recarrega os cards a partir das mesmas 3 tabelas do inbox.
   const refetchCards = useCallback(async () => {
@@ -232,6 +240,26 @@ export default function PipelineBoard({
       ? cols
       : cols.filter((c) => c.stage.key === stageFilter);
   }, [stages, filteredCards, stageFilter]);
+
+  // O estágio que o celular mostra: o escolhido, se ainda existir, senão o
+  // primeiro. Derivado, e não sincronizado por efeito, para arquivar um
+  // estágio não deixar a tela apontando para o nada.
+  const estagioVisivel =
+    columns.find((c) => c.stage.key === estagioCel)?.stage.key ??
+    columns[0]?.stage.key ??
+    null;
+
+  // Estágio em que o card está AGORA, com a mesma regra do `moveCard` (sem
+  // estágio, ou estágio arquivado, conta como o padrão).
+  const estagioDoCard = useCallback(
+    (card: PipelineCard) => {
+      const defaultKey = activeStages.find((s) => s.isDefault)?.key ?? null;
+      return card.stage && activeStages.some((s) => s.key === card.stage)
+        ? card.stage
+        : defaultKey;
+    },
+    [activeStages]
+  );
 
   const shownCount = useMemo(
     () => columns.reduce((n, c) => n + c.cards.length, 0),
@@ -449,18 +477,49 @@ export default function PipelineBoard({
   );
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Cabeçalho + filtros */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
-        <div className="mr-1 flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3 border-b border-line p-4 max-md:gap-2 max-md:px-4 max-md:py-3">
+        <div className="mr-1 flex items-center gap-2 max-md:mr-auto">
           <KanbanSquare size={20} className="text-brand-ink" />
           <h1 className="text-titulo">Pipeline</h1>
           <span className="text-legenda tabular-nums text-ink-3">{shownCount}</span>
         </div>
 
+        {/* Celular: busca e gestão viram ÍCONES na linha do título (desenho
+            do mobile); a busca abre o campo embaixo. */}
+        <Button
+          variant="ghost"
+          size="none"
+          onClick={() => setBuscaAberta((v) => !v)}
+          // Nome diferente do campo de propósito: o campo já se chama "Buscar
+          // cards", e dois alvos com o mesmo nome confundem leitor de tela e teste.
+          aria-label="Abrir a busca"
+          aria-pressed={buscaAberta}
+          className="size-11 rounded-lg text-ink-2 md:hidden"
+        >
+          <Search size={19} />
+        </Button>
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="none"
+            onClick={() => setManaging(true)}
+            aria-label="Gerenciar estágios"
+            className="size-11 rounded-lg text-ink-2 md:hidden"
+          >
+            <Settings2 size={19} />
+          </Button>
+        )}
+
         {/* Mesmo campo com lupa da lista de conversas: moldura no degrau de
             controle, ícone em tinta fraca e o Input sem moldura própria. */}
-        <div className="flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line">
+        <div
+          className={cn(
+            "flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line max-md:order-last max-md:h-11 max-md:w-full",
+            !buscaAberta && !search && "max-md:hidden"
+          )}
+        >
           <Search size={15} className="shrink-0 text-ink-faint" />
           <Input
             variant="limpo"
@@ -468,12 +527,16 @@ export default function PipelineBoard({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar nome ou telefone"
             aria-label="Buscar cards"
-            className="w-44 text-apoio"
+            className="w-44 text-apoio max-md:w-full"
           />
         </div>
 
         <Select value={attFilter} onValueChange={setAttFilter}>
-          <SelectTrigger aria-label="Filtrar por atendente">
+          <SelectTrigger
+            aria-label="Filtrar por atendente"
+            // Pílula no celular (desenho do mobile).
+            className="max-md:h-9 max-md:rounded-full"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -488,7 +551,8 @@ export default function PipelineBoard({
         </Select>
 
         <Select value={stageFilter} onValueChange={setStageFilter}>
-          <SelectTrigger aria-label="Filtrar por estágio">
+          {/* Some no celular: lá a faixa de estágios JÁ é o filtro. */}
+          <SelectTrigger aria-label="Filtrar por estágio" className="max-md:hidden">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -510,7 +574,7 @@ export default function PipelineBoard({
             onClick={() => setSoEsperando((v) => !v)}
             aria-pressed={soEsperando}
             className={cn(
-              "gap-1.5 text-warn-ink",
+              "gap-1.5 text-warn-ink max-md:h-9 max-md:rounded-full",
               soEsperando
                 ? "border-warn-line bg-warn-surface"
                 : "hover:bg-warn-surface"
@@ -525,7 +589,7 @@ export default function PipelineBoard({
           <Button
             variant="outline"
             onClick={() => setManaging(true)}
-            className="ml-auto"
+            className="ml-auto max-md:hidden"
           >
             <Settings2 size={15} /> Gerenciar estágios
           </Button>
@@ -547,8 +611,46 @@ export default function PipelineBoard({
         </div>
       )}
 
+      {/* CELULAR: a faixa de estágios (bolinha da cor, nome, contagem), um
+          por vez. Tocar escolhe qual coluna aparece embaixo. */}
+      {columns.length > 0 && (
+        <div
+          role="tablist"
+          aria-label="Estágios"
+          data-slot="pipeline-faixa"
+          className="flex shrink-0 gap-2 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none] md:hidden"
+        >
+          {columns.map(({ stage, cards: cc }) => {
+            const ativo = stage.key === estagioVisivel;
+            return (
+              <button
+                key={stage.key}
+                type="button"
+                role="tab"
+                aria-selected={ativo}
+                onClick={() => setEstagioCel(stage.key)}
+                className={cn(
+                  "flex h-10 shrink-0 items-center gap-2 rounded-full border px-3.5 text-apoio transition-colors",
+                  ativo
+                    ? "border-[var(--chip-ativo-bg)] bg-[var(--chip-ativo-bg)] font-semibold text-[var(--chip-ativo-fg)]"
+                    : "border-line bg-[var(--chip-bg)] text-ink-2"
+                )}
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: stageColor(stage.color) }}
+                  aria-hidden
+                />
+                {stage.name}
+                <span className="tabular-nums opacity-75">{cc.length}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Colunas */}
-      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4">
+      <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto p-4 max-md:overflow-x-visible max-md:p-0">
         {columns.length === 0 && (
           <div className="m-auto text-apoio text-ink-3">
             Nenhum estágio ativo. {isOwner ? "Crie um em Gerenciar estágios." : ""}
@@ -584,14 +686,21 @@ export default function PipelineBoard({
                 setDragOverKey(null);
                 if (phone) void moveCard(phone, stage.key);
               }}
-              className={`flex w-72 shrink-0 flex-col rounded-xl border bg-msg transition-colors ${
-                over
-                  ? "border-brand-ink ring-1 ring-[var(--brand-ink)]"
-                  : "border-line"
-              }`}
+              className={cn(
+                `flex w-72 shrink-0 flex-col rounded-xl border bg-msg transition-colors ${
+                  over
+                    ? "border-brand-ink ring-1 ring-[var(--brand-ink)]"
+                    : "border-line"
+                }`,
+                // Celular: só a coluna escolhida na faixa, na largura toda.
+                "max-md:w-full max-md:flex-1 max-md:rounded-none max-md:border-0",
+                stage.key !== estagioVisivel && "max-md:hidden"
+              )}
             >
-              <div className="border-b border-line px-3 py-2.5">
-                <div className="flex items-center gap-2">
+              <div className="border-b border-line px-3 py-2.5 max-md:px-4">
+                {/* O nome já está na faixa de cima; no celular fica só o
+                    resumo do estágio. */}
+                <div className="flex items-center gap-2 max-md:hidden">
                   <span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{ background: stageColor(stage.color) }}
@@ -645,6 +754,7 @@ export default function PipelineBoard({
                     onOpen={() =>
                       router.push(`/inbox/${encodeURIComponent(c.phone)}`)
                     }
+                    onMover={() => setMovendo(c)}
                   />
                 ))}
               </AreaRolavel>
@@ -663,6 +773,57 @@ export default function PipelineBoard({
         onMove={moveStage}
         onReorder={reorderStages}
       />
+
+      {/* A FOLHA DE MOVER (celular). Chama o MESMO `moveCard` do arrastar:
+          mesma escrita de `stage` e `stage_source='human'`, então a IA
+          continua sem desfazer. Arrastar segue só no desktop.
+          ⚠️ O desenho tem "Desfazer" aqui e ele NÃO entrou: é decisão pendente
+          do dono (PENDENTE 3 do plano do mobile). */}
+      <Sheet open={movendo !== null} onOpenChange={(v) => !v && setMovendo(null)}>
+        <SheetContent lado="baixo" aria-describedby="mover-sub">
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+          <div className="border-b border-line px-4 pb-3 pt-3">
+            <SheetTitle className="text-cartao">
+              Mover {movendo ? movendo.name || prettyPhone(movendo.phone) : ""}
+            </SheetTitle>
+            <p id="mover-sub" className="text-legenda text-ink-3">
+              Vira &quot;Movido pelo time&quot;, e a IA não desfaz.
+            </p>
+          </div>
+          <div className="flex flex-col overflow-y-auto p-2">
+            {movendo &&
+              activeStages.map((s) => {
+                const atual = estagioDoCard(movendo) === s.key;
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    data-slot="mover-estagio"
+                    disabled={atual}
+                    onClick={() => {
+                      const phone = movendo.phone;
+                      setMovendo(null);
+                      void moveCard(phone, s.key);
+                    }}
+                    className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-[var(--active-bg)] disabled:cursor-default disabled:hover:bg-transparent"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: stageColor(s.color) }}
+                      aria-hidden
+                    />
+                    <span className="flex-1 truncate">{s.name}</span>
+                    {atual && (
+                      <span className="flex items-center gap-1 text-legenda text-ink-3">
+                        <Check size={13} /> atual
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        </SheetContent>
+      </Sheet>
     </Card>
   );
 }
@@ -671,10 +832,13 @@ function CardItem({
   card,
   member,
   onOpen,
+  onMover,
 }: {
   card: PipelineCard;
   member: Member | null | undefined;
   onOpen: () => void;
+  /** Celular: abre a folha de estágios (o arrastar é só do desktop). */
+  onMover?: () => void;
 }) {
   const label = card.name || prettyPhone(card.phone);
   const ini = initials(card.name);
@@ -793,6 +957,25 @@ function CardItem({
           </span>
         )}
       </div>
+
+      {onMover && (
+        <div className="mt-2 flex justify-end border-t border-line-soft pt-2 md:hidden">
+          <Button
+            variant="outline"
+            size="none"
+            data-slot="pipeline-mover"
+            onClick={(e) => {
+              // O card inteiro abre a conversa; o botão não pode abrir junto.
+              e.stopPropagation();
+              onMover();
+            }}
+            className="h-9 gap-1.5 rounded-lg px-3 text-apoio"
+          >
+            <ArrowRightLeft size={14} />
+            Mover
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

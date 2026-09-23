@@ -53,8 +53,17 @@ const conteudoVariants = cva(
       tamanho: {
         /** Uma pergunta e dois botões. */
         confirmacao: "max-w-sm p-5",
-        /** Cabeçalho fixo, corpo que rola, até 85% da altura da janela. */
-        gestao: "flex max-h-[85vh] max-w-lg flex-col overflow-hidden",
+        /**
+         * Cabeçalho fixo, corpo que rola, até 85% da altura da janela.
+         *
+         * No CELULAR vira folha de tela cheia (plano do mobile, 23/09/2026):
+         * uma lista de estágios com campos e punhos de arraste, num modal
+         * flutuante de 343px, deixava meio centímetro para cada linha. O
+         * translate do centramento é zerado junto com a posição, porque os dois
+         * são a MESMA propriedade `translate` no Tailwind v4.
+         */
+        gestao:
+          "flex max-h-[85vh] max-w-lg flex-col overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-none max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]",
       },
     },
     defaultVariants: { tamanho: "confirmacao" },
