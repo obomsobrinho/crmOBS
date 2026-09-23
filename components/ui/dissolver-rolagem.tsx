@@ -123,6 +123,46 @@ export function useDissolverRolagem<T extends HTMLElement = HTMLDivElement>(
 }
 
 /**
+ * A mesma regra no eixo HORIZONTAL (23/09/2026, plano do mobile): faixa de chips
+ * ou de estágios que rola para o lado no celular. Separado do hook vertical
+ * porque as medidas são outras (`scrollLeft`/`scrollWidth`) e nenhuma área da
+ * casa rola nos dois eixos ao mesmo tempo.
+ */
+export function useDissolverLateral<T extends HTMLElement = HTMLDivElement>(
+  px = DISSOLVER_PADRAO
+) {
+  const ref = React.useRef<T>(null);
+  const [bordas, setBordas] = React.useState({ ini: false, fim: false });
+
+  const medir = React.useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ini = el.scrollLeft > 4;
+    const fim = el.scrollWidth - el.scrollLeft - el.clientWidth > 4;
+    setBordas((b) => (b.ini === ini && b.fim === fim ? b : { ini, fim }));
+  }, []);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    medir();
+    const observador = new ResizeObserver(medir);
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, [medir]);
+
+  const style = React.useMemo<React.CSSProperties>(() => {
+    if (!bordas.ini && !bordas.fim) return {};
+    const g = `linear-gradient(to right, ${bordas.ini ? `transparent 0, #000 ${px}px` : "#000 0"}, ${
+      bordas.fim ? `#000 calc(100% - ${px}px), transparent 100%` : "#000 100%"
+    })`;
+    return { maskImage: g, WebkitMaskImage: g };
+  }, [px, bordas]);
+
+  return { ref, style, onScroll: medir as React.UIEventHandler<T> };
+}
+
+/**
  * A SETA de "tem mais coisa aqui embaixo".
  *
  * A dissolução diz que há conteúdo escondido, mas ela é discreta de propósito, e

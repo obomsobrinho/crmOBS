@@ -504,7 +504,12 @@ test.describe("Conversa redesenhada", () => {
     // (mandar para o cliente o que era nota).
     await expect(page.getByRole("tab", { name: /Responder ao cliente/ })).toBeVisible();
     await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
-    await expect(page.getByText("vai para o WhatsApp do cliente")).toBeVisible();
+    // `exact` desde 23/09/2026: a frase de contexto do CELULAR ("Vai para o
+    // WhatsApp do cliente.") mora escondida no mesmo composer, e sem `exact` o
+    // localizador casava as duas. A asserção continua sendo a do desktop.
+    await expect(
+      page.getByText("vai para o WhatsApp do cliente", { exact: true })
+    ).toBeVisible();
     await page.getByRole("tab", { name: /Nota interna/ }).click();
     await expect(page.getByText("fica só entre vocês")).toBeVisible();
   });

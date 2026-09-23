@@ -11,9 +11,19 @@ import {
   StickyNote,
   Sparkles,
   X,
+  Plus,
+  ChevronUp,
+  ArrowUp,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -54,6 +64,7 @@ export default function MessageComposer({
   contactName,
   clientId,
   readOnly,
+  atende,
 }: {
   onSend: (text: string) => void | Promise<void>;
   onSendMedia?: (media: OutgoingMedia) => void | Promise<void>;
@@ -70,6 +81,11 @@ export default function MessageComposer({
   clientId: string;
   /** Conta bloqueada por assinatura: some com a caixa de texto. */
   readOnly?: boolean;
+  /**
+   * Quem atende agora, só para a frase de contexto do CELULAR ("Você assume no
+   * lugar de Ana"). O desktop segue com o aviso de sempre.
+   */
+  atende?: { quem: "ia" | "ninguem" | "voce" | "outro"; nome?: string };
 }) {
   const supabase = createClient();
   const [mode, setMode] = useState<Mode>("responder");
@@ -94,7 +110,15 @@ export default function MessageComposer({
     // pessoa escreveu continua no campo em vez de sumir sem aviso.
     setSaving(true);
     void Promise.resolve(action(t))
-      .then(() => setText(""))
+      .then(() => {
+        setText("");
+        // Celular: depois de uma nota ou orientação o modo VOLTA para
+        // Responder (desenho do mobile). Lá o modo mora escondido numa pílula,
+        // e a próxima coisa escrita quase sempre é para o cliente. O desktop,
+        // com os três modos à vista, mantém o que a pessoa escolheu.
+        if (window.matchMedia("(max-width: 767px)").matches)
+          setMode("responder");
+      })
       .finally(() => setSaving(false));
   };
 
@@ -188,6 +212,26 @@ export default function MessageComposer({
           ? Hand
           : Bot;
   const ActionIcon = skin.Icon;
+  // A frase de contexto do CELULAR (AJUSTES-2 do desenho do mobile): diz a
+  // consequência de enviar, e muda com o modo e com quem atende.
+  const contextoMobile =
+    mode === "nota"
+      ? "Só o time vê. O cliente não recebe."
+      : mode === "orientar"
+        ? "Instrução para a IA. O cliente não vê."
+        : atende?.quem === "voce"
+          ? "Vai para o WhatsApp do cliente."
+          : atende?.quem === "outro" && atende.nome
+            ? `Vai para o WhatsApp do cliente. Você assume no lugar de ${atende.nome}.`
+            : atende?.quem === "ia" || (!atende && iaAtiva)
+              ? "Vai para o WhatsApp do cliente. A IA pausa e você assume."
+              : "Vai para o WhatsApp do cliente. Ao responder, você assume a conversa.";
+  const modosDisponiveis = (["responder", "nota", "orientar"] as Mode[]).filter(
+    (m) =>
+      m === "responder" ||
+      (m === "nota" && !!onAddNote) ||
+      (m === "orientar" && !!onInstruct),
+  );
 
   return (
     // ⚠️ `pt-3` e não `pt-0` (19/09/2026). Sem respiro, a caixa branca nascia
@@ -195,7 +239,7 @@ export default function MessageComposer({
     // viravam uma linha só. Com 12px de superfície lisa entre elas, a mensagem
     // termina de se dissolver antes de a caixa começar, e a caixa passa a ler
     // como algo que FLUTUA sobre a conversa, que é o que ela é.
-    <div className="shrink-0 bg-msg px-5 pb-[18px] pt-3">
+    <div className="shrink-0 bg-msg px-5 pb-[18px] pt-3 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))] max-md:pt-2">
       {attachError && (
         <div className="mx-auto mb-2 w-full max-w-[960px] rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
           {attachError}
@@ -271,7 +315,9 @@ export default function MessageComposer({
           onValueChange={(v) => setMode(v as Mode)}
           className="contents"
         >
-          <TabsList className="flex-wrap gap-1.5 border-b border-line-soft px-3 py-1.5">
+          {/* No celular os três modos saem daqui e moram na pílula da linha de
+              baixo (desenho do mobile, no estilo da caixa do Claude). */}
+          <TabsList className="flex-wrap gap-1.5 border-b border-line-soft px-3 py-1.5 max-md:hidden">
             <TabsTrigger value="responder" variant="acao" data-cor="human">
               <Send size={13} />
               Responder ao cliente
@@ -311,9 +357,17 @@ export default function MessageComposer({
             qualificar e mais fraco que ele. Aqui ele é a primeira coisa depois
             do botão do modo, que é exatamente a ordem em que a decisão
             acontece: escolho o destino, leio a consequência, escrevo. */}
+        {/* Celular: a linha de contexto, numa faixa interna arredondada e SEM
+            cor de estado no fundo (desenho do mobile). */}
+        <p
+          data-slot="composer-contexto"
+          className="mx-2 mt-2 rounded-[10px] bg-bloco px-3 py-2 text-apoio text-ink-2 md:hidden"
+        >
+          {contextoMobile}
+        </p>
         {hint && (
           <div
-            className={`flex items-center gap-2.5 border-b border-line-soft px-3.5 py-2 ${skin.aviso}`}
+            className={`flex items-center gap-2.5 border-b border-line-soft px-3.5 py-2 max-md:hidden ${skin.aviso}`}
           >
             <HintIcon size={14} className={`shrink-0 ${skin.hint}`} />
             <span className={`min-w-0 truncate text-apoio ${skin.hint}`}>
@@ -331,7 +385,11 @@ export default function MessageComposer({
             ⚠️ `items-end` é o que faz os botões ficarem ANCORADOS EMBAIXO
             quando o texto cresce. Com `items-center` eles sobem junto e o
             enviar passa a flutuar no meio de um parágrafo. */}
-        <div className="flex items-end gap-2 px-3 pb-2.5 pt-2">
+        {/* No CELULAR a mesma linha quebra em duas: o campo sobe para a largura
+            inteira (`order-first`) e embaixo ficam "+", a pílula do modo e o
+            enviar. É o MESMO campo nos dois arranjos, por CSS, para o texto
+            digitado nunca se perder ao girar a tela. */}
+        <div className="flex items-end gap-2 px-3 pb-2.5 pt-2 max-md:flex-wrap max-md:items-center max-md:px-2 max-md:pb-2">
           <input
             ref={fileRef}
             type="file"
@@ -353,12 +411,15 @@ export default function MessageComposer({
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading || !onSendMedia}
                   aria-label="Anexar"
-                  className="text-ink-2"
+                  className="text-ink-2 max-md:size-10 max-md:rounded-full"
                 >
                   {uploading ? (
                     <Loader2 size={16} className="animate-spin" />
                   ) : (
-                    <Paperclip size={16} />
+                    <>
+                      <Paperclip size={16} className="max-md:hidden" />
+                      <Plus size={18} className="md:hidden" />
+                    </>
                   )}
                 </Button>
               </TooltipTrigger>
@@ -388,8 +449,53 @@ export default function MessageComposer({
             rows={1}
             aria-label={skin.placeholder}
             placeholder={skin.placeholder}
-            className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 flex-1 px-1 py-2 text-corpo [field-sizing:content]"
+            className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 flex-1 px-1 py-2 text-corpo [field-sizing:content] max-md:order-first max-md:max-h-[132px] max-md:basis-full"
           />
+
+          {/* A PÍLULA DO MODO, só no celular: tocar abre, para cima, os três
+              modos com a descrição de uma linha. Troca o MESMO estado `mode`
+              que as abas do desktop trocam. */}
+          {modosDisponiveis.length > 1 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="none"
+                  data-slot="composer-modo"
+                  className={cn(
+                    "h-10 gap-1.5 rounded-full px-3 text-apoio font-semibold md:hidden",
+                    skin.hint,
+                    SKIN[mode].frame,
+                    skin.aviso,
+                  )}
+                >
+                  <ActionIcon size={15} />
+                  {MODO_ROTULO[mode]}
+                  <ChevronUp size={14} className="opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" sideOffset={6} className="w-72">
+                {modosDisponiveis.map((m) => {
+                  const Icone = SKIN[m].Icon;
+                  return (
+                    <DropdownMenuItem
+                      key={m}
+                      onSelect={() => setMode(m)}
+                      className="min-h-12 items-start py-2"
+                    >
+                      <Icone size={16} className={cn("mt-0.5 shrink-0", SKIN[m].hint)} />
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="font-semibold text-ink">{MODO_ROTULO[m]}</span>
+                        <span className="text-legenda text-ink-3">{SKIN[m].destino}</span>
+                      </span>
+                      {m === mode && <Check size={14} className="mt-0.5 shrink-0 text-brand-ink" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          <span className="flex-1 md:hidden" aria-hidden />
 
           {/* A ação principal SEM RÓTULO (pedido do dono, 21/09/2026): o ícone
               mais a cor ja dizem o que ela faz, e o rotulo custava largura numa
@@ -415,7 +521,7 @@ export default function MessageComposer({
                   // diferente o tailwind-merge não considera as duas classes
                   // conflitantes, e a da base venceria. Este botão desabilitado
                   // não desbota, ele troca de cor.
-                  "shrink-0 transition",
+                  "shrink-0 transition max-md:size-10 max-md:rounded-full",
                   !canSend &&
                   "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3 disabled:opacity-100",
                 )}
@@ -423,7 +529,12 @@ export default function MessageComposer({
                 {saving ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <ActionIcon size={16} />
+                  <>
+                    <ActionIcon size={16} className="max-md:hidden" />
+                    {/* Celular: seta para cima, como a caixa do Claude; a cor
+                        do modo continua sendo quem diz para onde vai. */}
+                    <ArrowUp size={18} className="md:hidden" />
+                  </>
                 )}
               </Button>
             </TooltipTrigger>
@@ -498,6 +609,13 @@ const SKIN: Record<
     destino: "vai para a IA, não para o cliente",
     Icon: Sparkles,
   },
+};
+
+/** Rótulo curto da pílula do modo, no celular. */
+const MODO_ROTULO: Record<Mode, string> = {
+  responder: "Responder",
+  nota: "Nota interna",
+  orientar: "Orientar a IA",
 };
 
 // O componente `Tab` local morava aqui. Ele virou `TabsTrigger`

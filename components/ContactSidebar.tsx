@@ -10,7 +10,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
+import {
+  DISSOLVER_LISTA,
+  useDissolverLateral,
+} from "@/components/ui/dissolver-rolagem";
 import {
   Tooltip,
   TooltipContent,
@@ -186,6 +189,16 @@ export default function ContactSidebar({
   // phone -> texto da mensagem que casou com a busca (conteúdo, não só nome).
   const [msgMatches, setMsgMatches] = useState<Record<string, string>>({});
   const pathname = usePathname();
+  // No CELULAR a lista e a conversa não dividem a tela (plano do mobile, fase
+  // 1): com uma conversa aberta a lista some, e quem volta é a seta do
+  // cabeçalho da conversa. Por CSS (`max-md:hidden`) e não desmontando: o
+  // desktop continua com a MESMA árvore, e a assinatura de realtime não reabre.
+  const conversaAberta = !!activePhone || /^\/inbox\/[^/]+/.test(pathname);
+  const {
+    ref: chipsRef,
+    style: chipsStyle,
+    onScroll: chipsOnScroll,
+  } = useDissolverLateral<HTMLDivElement>();
 
   const refetch = useCallback(async () => {
     const [{ data: convs }, { data: contatos }, { data: quals }] =
@@ -448,7 +461,15 @@ export default function ContactSidebar({
   const agrupar = filter === "all" && !query.trim();
 
   return (
-    <Card asChild className="flex w-[296px] shrink-0 flex-col overflow-hidden">
+    <Card
+      asChild
+      className={cn(
+        "flex w-[296px] shrink-0 flex-col overflow-hidden",
+        // Celular: a lista é a tela inteira, sem moldura de cartão.
+        "max-md:w-full max-md:flex-1 max-md:rounded-none max-md:border-0 max-md:shadow-none",
+        conversaAberta && "max-md:hidden",
+      )}
+    >
       <aside>
       {/* Respiro de 16px nas laterais e no topo, como a prancha: era 12px, e a
           lista ficava colada na borda do cartão. */}
@@ -522,7 +543,14 @@ export default function ContactSidebar({
             produto e some se eu copiar o desenho ao pé da letra. Apagar um
             recorte porque ele não coube numa prancha é decisão de produto, e não
             de aplicação de desenho; eles envolvem com `flex-wrap`. */}
-        <div className="mt-[11px] flex flex-wrap items-center gap-1.5">
+        {/* No celular os chips NÃO reenvolvem: rolam para o lado, dissolvendo
+            na borda (desenho do mobile), para a lista começar mais alto. */}
+        <div
+          ref={chipsRef}
+          style={chipsStyle}
+          onScroll={chipsOnScroll}
+          className="mt-[11px] flex flex-wrap items-center gap-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4 max-md:[scrollbar-width:none]"
+        >
           {(["all", "needs", "unanswered", "mine"] as FiltroKey[])
             .filter((k) => k !== "mine" || myUserId)
             // Chip com zero não entra, EXCETO "Todas": um filtro que não recorta
@@ -542,7 +570,7 @@ export default function ContactSidebar({
                   onClick={() => setFilter(k)}
                   className={cn(
                     // 8px de raio e 10px de respiro lateral, medidos na prancha.
-                    "gap-1.5 rounded-md px-2.5",
+                    "shrink-0 gap-1.5 rounded-md px-2.5",
                     ativo
                       ? // ⚠️ O ATIVO SE DISTINGUE POR COR, NÃO POR PESO. Antes
                         // era `font-semibold` mais uma borda um degrau mais

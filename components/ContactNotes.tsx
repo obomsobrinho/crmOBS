@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -41,6 +41,11 @@ export default function ContactNotes({
   members: Member[];
 }) {
   const supabase = createClient();
+  // Sufixo por instância no nome do canal: no celular o painel do contato
+  // monta DUAS vezes (a coluna escondida por CSS e a folha de baixo), e o
+  // Supabase devolve o MESMO canal para o mesmo nome, que já está inscrito e
+  // derruba a página ao receber outro `.on()`.
+  const instancia = useId();
   const [notes, setNotes] = useState<ConversationNote[]>([]);
   const [todas, setTodas] = useState(false);
 
@@ -86,7 +91,7 @@ export default function ContactNotes({
   useEffect(() => {
     if (conversationId == null) return;
     const channel = supabase
-      .channel(`notes-${conversationId}`)
+      .channel(`notes-${conversationId}-${instancia}`)
       .on(
         "postgres_changes",
         {
@@ -101,7 +106,7 @@ export default function ContactNotes({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [supabase, conversationId, load]);
+  }, [supabase, conversationId, load, instancia]);
 
   async function remove(id: number) {
     setNotes((n) => n.filter((x) => x.id !== id));

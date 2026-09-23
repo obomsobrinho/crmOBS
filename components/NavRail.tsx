@@ -226,9 +226,8 @@ export default function NavRail({
       {NAV.map(({ href, label, icon: Icon, donoOnly }) => {
         // Item só-do-dono some para atendente (role definido e diferente de dono).
         if (donoOnly && role && role !== "dono") return null;
-        const active = activeHref
-          ? activeHref === href
-          : pathname === href || pathname.startsWith(href + "/");
+        const atual = activeHref ?? pathname;
+        const active = atual === href || atual.startsWith(href + "/");
         const unread = href === "/inbox" && unreadConvos > 0;
         const item = (
           <Button

@@ -8,9 +8,12 @@ import {
   Check,
   CheckCheck,
   ChevronDown,
+  ChevronLeft,
+  EllipsisVertical,
   PanelRight,
   FileText,
 } from "lucide-react";
+import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +21,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,7 +38,7 @@ import { createClient } from "@/lib/supabase/client";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
-import type { Qualification } from "@/lib/crm";
+import { quemAtende, type Qualification } from "@/lib/crm";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
@@ -155,6 +160,7 @@ export default function Thread({
   pendingInstruction,
   onCancelInstruction,
   qualificacaoPreview,
+  onOpenContato,
 }: {
   phone: string;
   name: string | null;
@@ -162,6 +168,8 @@ export default function Thread({
   onToggleIa: () => void;
   initialRows: ChatRow[];
   onToggleContext?: () => void;
+  /** Celular: "Dados do contato" nos três pontos abre a folha do contato. */
+  onOpenContato?: () => void;
   contextOpen?: boolean;
   clientId: string;
   /** Conta bloqueada por assinatura: só leitura (sem envio, sem ligar a IA). */
@@ -420,6 +428,21 @@ export default function Thread({
     assignedUserId && members
       ? (members.find((m) => m.userId === assignedUserId) ?? null)
       : null;
+  // A LINHA DE ESTADO do celular (plano do mobile, fase 1): no lugar do
+  // telefone, embaixo do nome, diz quem responde esta conversa agora. Sai de
+  // `quemAtende`, a MESMA regra da lista, para as duas telas nunca discordarem.
+  const quem = quemAtende({
+    pausada: iaState === "pause",
+    temAtendente: !!assignedUserId,
+  });
+  const estadoLinha =
+    quem === "ia"
+      ? "IA atendendo"
+      : quem === "ninguem"
+        ? "IA pausada · ninguém atende"
+        : attendant && attendant.userId !== myUserId
+          ? `${memberName(attendant.email)} está atendendo`
+          : "Você está atendendo";
 
   return (
     <>
@@ -435,7 +458,17 @@ export default function Thread({
         como risco. No fim saiu: quem diz que há conversa passando por baixo é a
         DISSOLUÇÃO, e o que separa as superfícies é o `border-b` desta faixa. */}
       <header className="relative z-10 shrink-0 border-b border-line bg-raised">
-        <div className="flex h-[62px] items-center gap-3.5 pl-[22px] pr-5">
+        <div className="flex h-[62px] items-center gap-3.5 pl-[22px] pr-5 max-md:gap-2 max-md:pl-1 max-md:pr-1">
+          {/* Celular: a conversa é uma tela só, e voltar para a lista é esta
+              seta (a barra de abas some aqui dentro). */}
+          <Link
+            href="/inbox"
+            aria-label="Voltar para as conversas"
+            data-slot="conversa-voltar"
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-ink-2 md:hidden"
+          >
+            <ChevronLeft size={22} />
+          </Link>
           <Avatar size="lg" style={avatarPair(phone)}>
             {ini ?? <User size={16} />}
           </Avatar>
@@ -462,7 +495,31 @@ export default function Thread({
               ela merece.
               ⚠️ Não é link: não existe ação por trás dele neste produto, e um
               texto sublinhável que não leva a lugar nenhum é promessa falsa. */}
-            <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              data-slot="conversa-estado"
+              className={cn(
+                "flex min-w-0 items-center gap-1.5 text-legenda font-semibold md:hidden",
+                quem === "ia"
+                  ? "text-brand-ink"
+                  : quem === "ninguem"
+                    ? "text-warn-ink"
+                    : "text-human-ink",
+              )}
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  quem === "ia"
+                    ? "bg-brand"
+                    : quem === "ninguem"
+                      ? "bg-warn"
+                      : "bg-human",
+                )}
+                aria-hidden
+              />
+              <span className="truncate">{estadoLinha}</span>
+            </span>
+            <span className="flex min-w-0 items-center gap-1.5 max-md:hidden">
               <span
                 data-slot="conversa-telefone"
                 className="flex min-w-0 items-center gap-1 text-legenda font-semibold text-human-ink"
@@ -497,7 +554,92 @@ export default function Thread({
             </span>
           </span>
 
-          <span className="flex shrink-0 items-center gap-2">
+          {/* CELULAR: os três controles da direita viram UM menu de três pontos
+              (desenho do mobile). Ele chama os MESMOS handlers do
+              `ConversationView` (`onAssign`, `onToggleIa`), então atribuir
+              continua pausando a IA e religar continua largando o responsável:
+              nenhuma regra nova, só outro arranjo. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="none"
+                aria-label="Mais ações da conversa"
+                data-slot="conversa-mais"
+                className="size-11 shrink-0 rounded-lg text-ink-2 md:hidden"
+              >
+                <EllipsisVertical size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={4} className="w-64">
+              {onAssign && myUserId && (
+                <>
+                  <DropdownMenuLabel>Quem atende</DropdownMenuLabel>
+                  {(members ?? []).map((m) => (
+                    <DropdownMenuItem
+                      key={m.userId}
+                      disabled={readOnly}
+                      onSelect={() => onAssign(m.userId)}
+                      className="min-h-11"
+                    >
+                      <Avatar size="2xs" style={avatarPair(m.email)}>
+                        {memberInitials(m.email).slice(0, 1)}
+                      </Avatar>
+                      <span className="min-w-0 flex-1 truncate">
+                        {m.userId === myUserId ? "Você" : memberName(m.email)}
+                      </span>
+                      {m.userId === assignedUserId && (
+                        <Check size={13} className="shrink-0 text-brand-ink" />
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                  {attendant && (
+                    <DropdownMenuItem
+                      disabled={readOnly}
+                      onSelect={() => onAssign(null)}
+                      className="min-h-11 text-ink-3"
+                    >
+                      Soltar a conversa
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {iaState !== null && (
+                <DropdownMenuItem
+                  disabled={readOnly}
+                  // `preventDefault` mantém o menu aberto: a pessoa vê a chave
+                  // virar, que é a confirmação do gesto.
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    onToggleIa();
+                  }}
+                  className="min-h-11"
+                  data-slot="conversa-mais-ia"
+                >
+                  <Bot size={15} className="shrink-0" />
+                  <span className="flex-1">IA nesta conversa</span>
+                  <SwitchTrack checked={!iaPausada}>
+                    {/* Polegar desenhado à mão: o `SwitchThumb` do Radix exige
+                        o Root do Switch em volta, e aqui o alvo é o item do
+                        menu (foi esse o erro que derrubava a folha Mais). */}
+                    <span
+                      data-state={iaPausada ? "unchecked" : "checked"}
+                      className="pointer-events-none block h-3 w-3 rounded-full transition-transform data-[state=checked]:translate-x-[13px] data-[state=checked]:bg-white data-[state=unchecked]:translate-x-[1px] data-[state=unchecked]:bg-[var(--ink-3)]"
+                    />
+                  </SwitchTrack>
+                </DropdownMenuItem>
+              )}
+              {onOpenContato && (
+                <DropdownMenuItem onSelect={onOpenContato} className="min-h-11">
+                  <User size={15} className="shrink-0" />
+                  Dados do contato
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <span className="flex shrink-0 items-center gap-2 max-md:hidden">
             {/* QUEM ATENDE subiu para a mesma linha do nome (desenho aprovado).
               Morava numa segunda faixa do cabeçalho, sozinho num chip de 28px
               com meia tela vazia ao lado. Aqui ele fica encostado na chave da
@@ -730,7 +872,7 @@ export default function Thread({
               texto que atravessa meia tela: o olho perde o começo da linha
               seguinte. Os 20px de respiro lateral ficam aqui dentro para que a
               coluna encoste na moldura só quando a tela é estreita. */}
-          <div className="mx-auto w-full max-w-[960px] px-5">
+          <div className="mx-auto w-full max-w-[960px] px-5 max-md:px-3">
             {items.map((item) =>
               item.kind === "day" ? (
                 <div
@@ -807,6 +949,13 @@ export default function Thread({
           contactName={displayName}
           clientId={clientId}
           readOnly={readOnly}
+          atende={
+            quem === "pessoa"
+              ? attendant && attendant.userId !== myUserId
+                ? { quem: "outro", nome: memberName(attendant.email) }
+                : { quem: "voce" }
+              : { quem }
+          }
         />
       </div>
     </>

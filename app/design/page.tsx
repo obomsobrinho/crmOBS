@@ -98,14 +98,17 @@ const LIST: InboxItem[] = [
 export default async function DesignPreview({
   searchParams,
 }: {
-  searchParams: Promise<{ entendimento?: string }>;
+  searchParams: Promise<{ entendimento?: string; lista?: string }>;
 }) {
   // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
   // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
   // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
-  const { entendimento } = await searchParams;
+  const { entendimento, lista } = await searchParams;
+  // `?lista=1` abre SEM conversa (a tela de /inbox), que no celular é outra
+  // tela: só a lista (plano do mobile, fase 1).
+  const soLista = lista === "1";
   const semEntendimento = entendimento === "nao";
   const items = LIST;
   // Os TRÊS estados de "quem atende" (`quemAtende`, lib/crm), porque o indicador
@@ -123,17 +126,30 @@ export default async function DesignPreview({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
-      <NavRail clientName="O Bom Sobrinho" activeHref="/inbox" />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 gap-3">
+      {/* Com conversa aberta o preview finge estar em /inbox/[id]: é o que
+          esconde a barra de abas no celular, como na rota real. */}
+      <NavRail
+        clientName="O Bom Sobrinho"
+        activeHref={soLista ? "/inbox" : "/inbox/preview"}
+      />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 md:gap-3">
           <ContactSidebar
             initial={items}
             initialIa={initialIa}
-            activePhone="553584774753@s.whatsapp.net"
+            activePhone={soLista ? undefined : "553584774753@s.whatsapp.net"}
             myUserId={ME}
           />
-          <Card asChild className="flex min-w-0 flex-1 overflow-hidden">
+          <Card
+            asChild
+            className="flex min-w-0 flex-1 overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none max-md:has-[[data-inbox-vazio]]:hidden"
+          >
             <main>
+            {soLista ? (
+              <div data-inbox-vazio className="flex flex-1 items-center justify-center text-apoio text-ink-3">
+                Selecione uma conversa
+              </div>
+            ) : (
             <ConversationView
               phone="553584774753@s.whatsapp.net"
               name="Franck Antonny"
@@ -173,6 +189,7 @@ export default async function DesignPreview({
                       }
                 }
               />
+            )}
             </main>
           </Card>
         </div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
 import ContextPanel from "./ContextPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { createClient } from "@/lib/supabase/client";
 import { anunciarIa } from "@/lib/ia-bus";
@@ -55,6 +56,9 @@ export default function ConversationView({
 }) {
   const supabase = createClient();
   const [showContext, setShowContext] = useState(true);
+  // Celular: o painel do contato não cabe ao lado da conversa e vira folha de
+  // baixo, aberta pelos três pontos do cabeçalho (plano do mobile, fase 1).
+  const [contatoFolha, setContatoFolha] = useState(false);
   const [iaState, setIaState] = useState<string | null>(atendimentoIa);
   const [iaProp, setIaProp] = useState<string | null>(atendimentoIa);
   const [assigned, setAssigned] = useState<string | null>(assignedUserId);
@@ -305,8 +309,41 @@ export default function ConversationView({
     if (assignErr) setAssigned(prevAssigned); // reverte
   }, [assigned, iaState, phone, supabase, readOnly]);
 
+  const painelContato = (
+    <ContextPanel
+      name={name}
+      phone={phone}
+      firstMessageAt={firstMessageAt}
+      messageCount={messageCount}
+      members={members}
+      myUserId={myUserId}
+      conversationId={conversationId}
+      // As tags entraram na coluna do cliente (desenho de 18/09/2026), e
+      // criar ou aplicar rótulo é escrita por tenant.
+      clientId={clientId}
+      editableName={displayName}
+      customFields={customFields}
+      contactExists={contactExists}
+    />
+  );
+
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
+      <Sheet open={contatoFolha} onOpenChange={setContatoFolha}>
+        <SheetContent
+          lado="baixo"
+          aria-describedby={undefined}
+          // Sem foco automático: no celular focar um campo sobe o teclado por
+          // cima da folha que a pessoa só queria LER.
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+          <SheetTitle className="sr-only">Dados do contato</SheetTitle>
+          <ScrollArea fade={DISSOLVER_LISTA} className="min-h-0 flex-1">
+            {painelContato}
+          </ScrollArea>
+        </SheetContent>
+      </Sheet>
       {/* Conversa e contato dividem o cartão com a lista. Cartão dentro de
           cartão não é hierarquia, é sujeira: o que separa as colunas é uma
           linha de 1px, e só a área de mensagens tem superfície própria. */}
@@ -318,6 +355,7 @@ export default function ConversationView({
           onToggleIa={toggleIa}
           initialRows={initialRows}
           onToggleContext={() => setShowContext((v) => !v)}
+          onOpenContato={() => setContatoFolha(true)}
           contextOpen={showContext}
           clientId={clientId}
           readOnly={readOnly}
@@ -336,21 +374,7 @@ export default function ConversationView({
       {showContext && (
         <aside className="hidden w-[296px] shrink-0 border-l border-line bg-raised lg:block">
           <ScrollArea fade={DISSOLVER_LISTA} className="h-full">
-            <ContextPanel
-              name={name}
-              phone={phone}
-              firstMessageAt={firstMessageAt}
-              messageCount={messageCount}
-              members={members}
-              myUserId={myUserId}
-              conversationId={conversationId}
-              // As tags entraram na coluna do cliente (desenho de 18/09/2026), e
-              // criar ou aplicar rótulo é escrita por tenant.
-              clientId={clientId}
-              editableName={displayName}
-              customFields={customFields}
-              contactExists={contactExists}
-            />
+            {painelContato}
           </ScrollArea>
         </aside>
       )}

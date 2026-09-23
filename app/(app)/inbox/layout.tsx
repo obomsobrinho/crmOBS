@@ -44,19 +44,27 @@ export default async function InboxLayout({
   const needsImport = !!client?.evolution_instance && !client.imported_at;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3">
+    <div className="flex min-h-0 flex-1 flex-col md:gap-3">
       {needsImport && client && <AutoImport clientId={client.id} />}
       {/* TRÊS seções: o menu, a lista de conversas e a conversa com os detalhes
           do contato. Cada uma é um cartão, separada por espaço de verdade. A
           conversa e os detalhes dividem o mesmo cartão de propósito: quem está
           respondendo olha para os dois ao mesmo tempo. */}
-      <div className="flex min-h-0 flex-1 gap-3">
+      {/* No CELULAR (abaixo de `md`) é uma tela por vez: em /inbox só a lista,
+          em /inbox/[id] só a conversa. A lista se esconde sozinha quando há
+          conversa aberta; a conversa se esconde aqui quando a página é o vazio
+          "Selecione uma conversa" (`data-inbox-vazio`), por `:has`, porque o
+          layout é Server Component e não sabe a rota. */}
+      <div className="flex min-h-0 flex-1 md:gap-3">
         <ContactSidebar
           initial={initial}
           initialIa={initialIa}
           myUserId={client?.userId}
         />
-        <Card asChild className="flex min-w-0 flex-1 overflow-hidden">
+        <Card
+          asChild
+          className="flex min-w-0 flex-1 overflow-hidden max-md:rounded-none max-md:border-0 max-md:shadow-none max-md:has-[[data-inbox-vazio]]:hidden"
+        >
           <main>{children}</main>
         </Card>
       </div>
