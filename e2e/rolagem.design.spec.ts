@@ -17,10 +17,22 @@ const TELAS = [
   { rota: "/design/playground", nome: "bancada de teste" },
 ];
 
+// O CELULAR (plano do mobile, fase 6, 23/09/2026): a mesma regra em 375px, com a
+// lista de conversas sozinha (`?lista=1`), que no celular é outra tela.
+const JANELAS = [
+  { largura: 1280, altura: 720, telas: TELAS },
+  {
+    largura: 375,
+    altura: 812,
+    telas: [...TELAS, { rota: "/design?lista=1", nome: "lista de conversas" }],
+  },
+];
+
 test.describe("Regra: toda área rolável dissolve nas bordas", () => {
-  for (const tela of TELAS) {
-    test(`${tela.nome}: nada rola sem dissolver`, async ({ page }) => {
-      await page.setViewportSize({ width: 1280, height: 720 });
+  for (const { largura, altura, telas } of JANELAS)
+  for (const tela of telas) {
+    test(`${tela.nome} em ${largura}px: nada rola sem dissolver`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
       await page.goto(tela.rota);
       // Espera a tela assentar: a máscara nasce de uma medida, e medir antes de
       // o layout existir daria falso negativo.

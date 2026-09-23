@@ -31,8 +31,12 @@ const TELAS = [
   "/cadastro",
 ];
 
-for (const url of TELAS) {
-  test(`${url}: sem rolagem lateral e sem texto abaixo de 12px`, async ({ page }) => {
+// 375 é o tamanho do desenho; 360 é o Android pequeno mais comum, e é onde
+// linha que "quase cabe" começa a vazar (plano do mobile, fase 6).
+for (const largura of [375, 360])
+for (const url of [...TELAS, "/design?lista=1"]) {
+  test(`${url} em ${largura}px: sem rolagem lateral e sem texto abaixo de 12px`, async ({ page }) => {
+    await page.setViewportSize({ width: largura, height: 800 });
     await page.goto(url);
     await page.waitForLoadState("networkidle");
     const r = await page.evaluate(() => {

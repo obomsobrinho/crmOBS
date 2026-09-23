@@ -390,7 +390,7 @@ export default function MontagemWizard({
 
       {/* Rodapé grudado: no celular o conteúdo rola e o par voltar/continuar
           precisa continuar alcançável com o polegar. */}
-      <footer className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-line bg-raised px-4 py-3 sm:px-6">
+      <footer className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-line bg-raised px-4 py-3 pb-[max(12px,env(safe-area-inset-bottom))] max-sm:gap-1.5 max-sm:px-3 sm:px-6">
         <Button
           variant="outline"
           size="field"
@@ -411,6 +411,8 @@ export default function MontagemWizard({
               size="field"
               disabled={form.saving}
               onClick={() => avancar()}
+              // Celular: respiro menor, senão os três botões vazam em 360px.
+              className="max-sm:px-2"
             >
               Deixar para depois
             </Button>
