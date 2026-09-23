@@ -52,6 +52,8 @@ function quando(iso: string): string {
 export default function AgentPromptDrawer({
   persona,
   onRestore,
+  aberto: abertoExterno,
+  onAbertoChange,
 }: {
   /** Prompt compilado do estado ATUAL do formulário (pode não estar salvo). */
   persona: string;
@@ -64,9 +66,20 @@ export default function AgentPromptDrawer({
     persona: string;
     mode: "guiado" | "avancado";
   }) => void;
+  /**
+   * Controle externo da abertura, para o menu de três pontos do CELULAR abrir
+   * este mesmo painel (lá o botão "Ver prompt" não aparece).
+   */
+  aberto?: boolean;
+  onAbertoChange?: (aberto: boolean) => void;
 }) {
   const supabase = createClient();
-  const [aberto, setAberto] = useState(false);
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const aberto = abertoExterno ?? abertoLocal;
+  const setAberto = (v: boolean) => {
+    setAbertoLocal(v);
+    onAbertoChange?.(v);
+  };
   const [copied, setCopied] = useState(false);
   const [versoes, setVersoes] = useState<Versao[] | null>(null);
   const [membros, setMembros] = useState<Record<string, Member>>({});
@@ -119,7 +132,8 @@ export default function AgentPromptDrawer({
       }}
     >
       <SheetTrigger asChild>
-        <Button variant="outline" size="field">
+        {/* No celular o botão sai: "Ver prompt" mora nos três pontos. */}
+        <Button variant="outline" size="field" className="max-md:hidden">
           <FileText size={15} />
           Ver prompt
         </Button>

@@ -1,9 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
+  ChevronLeft,
   Code2,
+  EllipsisVertical,
+  FileText,
   FlaskConical,
+  LayoutTemplate,
   Lock,
   Save,
   Sparkles,
@@ -23,6 +28,14 @@ import {
 import { AvisoCache, Banner, ConfirmModal } from "./agente/ui";
 import { useAgentConfig, type Mode } from "./agente/useAgentConfig";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useDissolverRolagem } from "@/components/ui/dissolver-rolagem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -132,6 +145,11 @@ export default function AgentConfigForm({
 
   const [aba, setAba] = useState<Aba>("quem");
   const [bancadaAberta, setBancadaAberta] = useState(false);
+  // CELULAR (plano do mobile, fase 4): Testar, Ver prompt, Usar um modelo e o
+  // modo avançado moram nos três pontos do cabeçalho, e abrem os MESMOS
+  // painéis do desktop por estes estados.
+  const [promptAberto, setPromptAberto] = useState(false);
+  const [modelosAbertos, setModelosAbertos] = useState(false);
   // Regra da casa: área rolável dissolve nas bordas. Este é o bloco do rabo
   // invariante da base, texto corrido, então o degrau é o padrão.
   // ⚠️ Desestruturado: ler propriedade de um objeto que carrega ref durante o
@@ -163,13 +181,22 @@ export default function AgentConfigForm({
     // fim, com faixa branca embaixo.
     <div className="flex min-h-full flex-col gap-4">
       {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 max-md:flex-nowrap max-md:gap-1">
+        {/* Celular: a barra de abas do app some aqui dentro, e voltar é esta
+            seta (para o Painel, a tela inicial do dono). */}
+        <Link
+          href="/painel"
+          aria-label="Voltar"
+          className="-ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg text-ink-2 md:hidden"
+        >
+          <ChevronLeft size={22} />
+        </Link>
+        <div className="min-w-0 max-md:flex-1">
           <div className="flex items-center gap-2">
-            <Sparkles size={20} className="text-brand-ink" />
-            <h1 className="text-titulo">Agente de IA</h1>
+            <Sparkles size={20} className="text-brand-ink max-md:hidden" />
+            <h1 className="text-titulo max-md:truncate">Agente de IA</h1>
           </div>
-          <p className="text-apoio text-ink-2">
+          <p className="text-apoio text-ink-2 max-md:hidden">
             Configure como o agente atende no WhatsApp.
           </p>
         </div>
@@ -184,18 +211,80 @@ export default function AgentConfigForm({
             stageNames={stageNames}
             aberto={bancadaAberta}
             onAbertoChange={setBancadaAberta}
+            gatilhoNoCelular={false}
           />
           <AgentPromptDrawer
             persona={form.previewPersona}
             onRestore={form.restaurar}
+            aberto={promptAberto}
+            onAbertoChange={setPromptAberto}
           />
           <AgentPowerToggle
             clientId={clientId}
             enabled={agentEnabled}
             blocked={blockers.length > 0}
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="none"
+                aria-label="Mais ações do agente"
+                data-slot="agente-mais"
+                className="-mr-2 size-11 shrink-0 rounded-lg text-ink-2 md:hidden"
+              >
+                <EllipsisVertical size={20} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onSelect={() => setBancadaAberta(true)} className="min-h-11">
+                <FlaskConical size={15} /> Testar o agente
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setPromptAberto(true)} className="min-h-11">
+                <FileText size={15} /> Ver prompt
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {form.mode === "guiado" && (
+                <DropdownMenuItem onSelect={() => setModelosAbertos(true)} className="min-h-11">
+                  <LayoutTemplate size={15} /> Usar um modelo
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onSelect={() =>
+                  form.switchMode(form.mode === "guiado" ? "avancado" : "guiado")
+                }
+                className="min-h-11"
+              >
+                {form.mode === "guiado" ? (
+                  <>
+                    <Code2 size={15} /> Escrever o prompt à mão
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={15} /> Voltar ao formulário guiado
+                  </>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
+
+      <Sheet open={modelosAbertos} onOpenChange={setModelosAbertos}>
+        <SheetContent lado="baixo" aria-describedby={undefined}>
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
+          <SheetTitle className="px-5 pb-1 pt-3 text-cartao">Usar um modelo</SheetTitle>
+          <div className="overflow-y-auto p-2">
+            <SeletorDePreset
+              apresentacao="lista"
+              onEscolher={(p) => {
+                setModelosAbertos(false);
+                form.choosePreset(p);
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {blockers.length > 0 && !agentEnabled && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
@@ -226,10 +315,12 @@ export default function AgentConfigForm({
           formulário. Misturar os dois sentidos numa faixa só faria "prompt à mão"
           parecer mais uma seção da configuração guiada. Ele também não é uma
           segunda faixa de abas empilhada, que era o desenho anterior. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line">
+      {/* Celular: a faixa das abas fica PRESA no topo enquanto o formulário
+          rola, e os botões de modo saem dela (moram nos três pontos). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line max-md:sticky max-md:top-0 max-md:z-10 max-md:-mx-4 max-md:bg-raised max-md:px-4">
         {form.mode === "guiado" ? (
-          <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)}>
-            <TabsList>
+          <Tabs value={aba} onValueChange={(v) => setAba(v as Aba)} className="max-md:min-w-0 max-md:flex-1">
+            <TabsList className="max-md:overflow-x-auto max-md:[scrollbar-width:none]">
               {ABAS.map((a) => (
                 <TabsTrigger key={a.key} value={a.key}>
                   {a.label}
@@ -256,7 +347,7 @@ export default function AgentConfigForm({
           </p>
         )}
 
-        <div className="mb-1 flex shrink-0 items-center gap-1">
+        <div className="mb-1 flex shrink-0 items-center gap-1 max-md:hidden">
           {/* O modelo mexe nas três abas, então mora aqui e não dentro de uma
               delas. Só no guiado: o avançado não tem campo para ele preencher. */}
           {form.mode === "guiado" && (
@@ -406,7 +497,7 @@ export default function AgentConfigForm({
           da CONTENT BOX do container de rolagem, então com `pb-6` no cartão a
           faixa parava 24px acima do fim e dava para ver conteúdo passando por
           baixo dela. Quem dá o respiro de baixo é o `py-3` daqui. */}
-      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-line bg-raised px-6 py-3">
+      <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t border-line bg-raised px-6 py-3 max-md:-mx-4 max-md:gap-x-3 max-md:px-4 max-md:pb-[max(12px,env(safe-area-inset-bottom))]">
         {/* ⚠️ A frase depende de `jaPublicou`, e isso é CORREÇÃO, não estilo.
             "Salvar já publica no WhatsApp" era dito a todo mundo, mas
             `lib/agent-turn.ts` devolve turno silencioso quando

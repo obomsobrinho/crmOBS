@@ -90,7 +90,10 @@ export default async function AgentePage() {
   // embaixo, a faixa parava 24px acima do fim e dava para ver conteúdo passando
   // por baixo dela. O respiro de baixo vem do `py-3` do próprio rodapé.
   return (
-    <Card className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6">
+    <Card
+      variant="pagina"
+      className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 max-md:px-4 max-md:pt-2"
+    >
       <AgentConfigForm
         clientId={client!.id}
         initialMode={promptMode}

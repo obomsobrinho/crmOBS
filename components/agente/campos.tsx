@@ -230,8 +230,35 @@ export function SeletorDePreset({
   onEscolher: (p: AgentPreset) => void;
   /** id do modelo aplicado agora, para marcar a pílula. Só no convite. */
   escolhido?: string | null;
-  apresentacao: "convite" | "menu";
+  /**
+   * `lista` é a do CELULAR (plano do mobile, fase 4): linhas de toque com a
+   * descrição de cada modelo, dentro de uma folha de baixo. O menu suspenso
+   * de 240px não serve para dedo, e o título do item (`title`) não aparece
+   * sem ponteiro.
+   */
+  apresentacao: "convite" | "menu" | "lista";
 }) {
+  if (apresentacao === "lista") {
+    return (
+      <div data-slot="preset-lista" className="flex flex-col">
+        <p className="px-3 pb-2 text-legenda text-ink-3">
+          Substitui tom, objetivos, limites e detalhes
+        </p>
+        {AGENT_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onEscolher(p)}
+            className="flex min-h-12 flex-col justify-center rounded-lg px-3 py-2 text-left hover:bg-[var(--active-bg)]"
+          >
+            <span className="text-corpo text-ink">{p.label}</span>
+            <span className="text-legenda text-ink-3">{p.description}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   if (apresentacao === "menu") {
     return (
       <DropdownMenu>

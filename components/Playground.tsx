@@ -10,6 +10,7 @@ import {
   DISSOLVER_BALAO,
 } from "@/components/ui/dissolver-rolagem";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
 // /api/playground (dryRun): nada é enviado no WhatsApp, nada é gravado, o card
@@ -68,6 +69,7 @@ export default function Playground({
   const [coachDraft, setCoachDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [abaCel, setAbaCel] = useState<"conversa" | "diagnostico">("conversa");
   const [simStage, setSimStage] = useState<string | null>(initialStage);
   const [simStageSource, setSimStageSource] = useState<string | null>(
     initialStage ? "ia" : null
@@ -191,6 +193,35 @@ export default function Playground({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* CELULAR (plano do mobile, fase 4): conversa e diagnóstico não cabem
+          lado a lado nem empilhados (a conversa ficaria com dois dedos de
+          altura), então viram duas ABAS. No desktop continuam lado a lado. */}
+      <div
+        role="tablist"
+        aria-label="Bancada"
+        className="mb-3 grid shrink-0 grid-cols-2 gap-1 rounded-lg border border-line bg-[var(--chip-bg)] p-1 md:hidden"
+      >
+        {([
+          ["conversa", "Conversa"],
+          ["diagnostico", "Diagnóstico"],
+        ] as const).map(([k, rotulo]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            aria-selected={abaCel === k}
+            onClick={() => setAbaCel(k)}
+            className={cn(
+              "h-10 rounded-md text-apoio font-semibold transition-colors",
+              abaCel === k
+                ? "bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)]"
+                : "text-ink-2"
+            )}
+          >
+            {rotulo}
+          </button>
+        ))}
+      </div>
       {/* O botão Resetar ficava aqui, numa linha própria acima da conversa, e era
           ele que abria o vão grande embaixo do cabeçalho do painel. Subiu para o
           cabeçalho do `AgentTestDrawer`, que reseta remontando este componente
@@ -199,7 +230,12 @@ export default function Playground({
       <div className="flex min-h-0 flex-1 flex-col gap-4 lg:flex-row">
         {/* ESQUERDA: Conversa. `bg-msg` é a superfície de área de mensagens, a
             mesma da tela de atendimento: aqui também é onde os balões moram. */}
-        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-msg">
+        <div
+          className={cn(
+            "flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-msg",
+            abaCel !== "conversa" && "max-md:hidden"
+          )}
+        >
           {/* A bancada tem os mesmos baloes da conversa, entao o mesmo degrau. */}
           <AreaRolavel
             ref={scrollRef}
@@ -279,7 +315,12 @@ export default function Playground({
         {/* DIREITA: Diagnóstico do turno, em coluna única. Eram duas colunas
             quando isto era tela cheia; dentro do painel lateral a largura é
             menor, e dois painéis lado a lado viravam duas colunas estreitas. */}
-        <AreaRolavel className="flex shrink-0 flex-col gap-3 lg:w-[380px]">
+        <AreaRolavel
+          className={cn(
+            "flex shrink-0 flex-col gap-3 lg:w-[380px] max-md:min-h-0 max-md:flex-1",
+            abaCel !== "diagnostico" && "max-md:hidden"
+          )}
+        >
           <ClassificationPanel
             diag={lastDiag}
             simStage={simStage}

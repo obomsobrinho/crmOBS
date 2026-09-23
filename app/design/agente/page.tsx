@@ -90,7 +90,10 @@ export default async function DesignAgentePage({
           `px-6 pt-6` como lá, pelo mesmo motivo: o rodapé é sticky e `bottom: 0`
           cola no fim da content box, então padding embaixo deixa conteúdo
           aparecendo por baixo da faixa. */}
-      <Card className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6">
+      <Card
+        variant="pagina"
+        className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 max-md:px-4 max-md:pt-2"
+      >
         <AgentConfigForm
           clientId="preview"
           initialMode="guiado"

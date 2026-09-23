@@ -41,6 +41,7 @@ export default function AgentTestDrawer({
   initialTurns,
   aberto: abertoExterno,
   onAbertoChange,
+  gatilhoNoCelular = true,
 }: {
   /**
    * O que está no formulário AGORA. Passado direto para a bancada, que lê no
@@ -56,6 +57,11 @@ export default function AgentTestDrawer({
   /** Abertura controlada de fora. Sem ela, o painel gerencia o próprio estado. */
   aberto?: boolean;
   onAbertoChange?: (aberto: boolean) => void;
+  /**
+   * `false` no `/agente`: lá, no celular, "Testar" mora nos três pontos do
+   * cabeçalho. A montagem mantém o botão, porque não tem esse menu.
+   */
+  gatilhoNoCelular?: boolean;
 }) {
   // Estado interno com escape para CONTROLE externo. Existe porque o modo
   // montagem oferece a bancada uma segunda vez, no rodapé, depois do primeiro
@@ -75,7 +81,11 @@ export default function AgentTestDrawer({
   return (
     <Sheet open={aberto} onOpenChange={setAberto}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="field">
+        <Button
+          variant="outline"
+          size="field"
+          className={gatilhoNoCelular ? undefined : "max-md:hidden"}
+        >
           <FlaskConical size={15} />
           Testar o agente
         </Button>
