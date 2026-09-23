@@ -22,7 +22,9 @@ const inputVariants = cva(
       variant: {
         /** Moldura própria, no degrau `field`. */
         caixa:
-          "h-[var(--h-field)] rounded-lg border border-line bg-[var(--input-bg)] px-3 text-apoio transition-colors",
+          // `max-md:h-11`: no celular todo campo tem 44px, o alvo mínimo de toque
+          // (plano do mobile, fase 5).
+          "h-[var(--h-field)] rounded-lg border border-line bg-[var(--input-bg)] px-3 text-apoio transition-colors max-md:h-11",
         /** Sem moldura e sem fundo: mora dentro de um bloco que já tem os dois. */
         limpo: "bg-transparent",
         /**

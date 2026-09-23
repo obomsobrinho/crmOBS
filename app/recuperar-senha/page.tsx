@@ -33,10 +33,10 @@ export default function RecuperarSenhaPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-canvas p-4 max-md:items-stretch max-md:p-0">
       <form
         onSubmit={handleSubmit}
-        className={cn(cardVariants(), "w-full max-w-sm space-y-5 p-7")}
+        className={cn(cardVariants({ variant: "pagina" }), "w-full max-w-sm space-y-5 p-7 max-md:max-w-none max-md:px-5 max-md:pb-8 max-md:pt-12")}
       >
         <BrandMark />
 
@@ -81,7 +81,7 @@ export default function RecuperarSenhaPage() {
               type="submit"
               size="field"
               disabled={loading}
-              className="w-full justify-center"
+              className="w-full justify-center max-md:h-11"
             >
               {loading ? "Enviando…" : "Enviar link"}
             </Button>

@@ -178,10 +178,22 @@ export default function ConnectWhatsApp({
                 este projeto NÃO tem conexão por código de telefone. Dizer isso é
                 a única saída honesta; inventar um pareamento que não existe
                 seria pior. */}
-            <p className="text-legenda text-ink-3 sm:hidden">
-              Você vai precisar de um segundo aparelho para ler o código, ou pode
-              abrir esta página no computador.
-            </p>
+            {/* Cartão da marca, e ANTES do código (desenho do mobile, 23/09/2026):
+                era uma linha cinza de 12px, e quem está no celular precisa ler
+                isto antes de gastar tempo tentando escanear a própria tela. */}
+            <div
+              data-slot="aviso-celular"
+              className="rounded-xl border border-brand-line bg-brand-surface px-4 py-3 text-left md:hidden"
+            >
+              <p className="text-apoio font-semibold text-brand-ink">
+                Está neste celular?
+              </p>
+              <p className="mt-0.5 text-apoio text-ink-2">
+                O código precisa ser lido por outro aparelho. Abra esta tela no
+                computador ou em outro aparelho e escaneie com o celular do
+                WhatsApp.
+              </p>
+            </div>
 
             <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-bloco p-4">
               {qr ? (
