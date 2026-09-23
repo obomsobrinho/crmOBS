@@ -112,7 +112,7 @@ export default async function PainelPage() {
       // "fora do horário" em vez de estimar, e o gráfico de hora some junto.
       supabase
         .from("clients")
-        .select("agent_config")
+        .select("agent_config, prompt_mode")
         .eq("id", client.id)
         .maybeSingle(),
       // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
@@ -339,6 +339,7 @@ export default async function PainelPage() {
             parte="manchete"
             horas={horas}
             rotuloHorario={rotuloHorario(hours)}
+            avisoHorario={cfg?.prompt_mode !== "avancado"}
           />
 
         </div>

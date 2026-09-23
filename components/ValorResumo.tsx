@@ -83,6 +83,7 @@ export default function ValorResumo({
   acumulado,
   frasesAcumuladas,
   hrefConfigurar = "/agente",
+  avisoHorario = true,
   parte = "tudo",
   horas,
   rotuloHorario = "",
@@ -97,6 +98,13 @@ export default function ValorResumo({
   frasesAcumuladas?: FraseValor[];
   /** Link para configurar o horário, quando falta. */
   hrefConfigurar?: string;
+  /**
+   * `false` quando a conta NÃO tem onde configurar o horário: no modo
+   * avançado o `/agente` não mostra o campo (saiu em 22/08/2026), e um aviso
+   * com "Configurar" levando a uma tela sem o campo é um beco sem saída
+   * (pedido do dono, 23/09/2026). O número continua omitido, sem estimar.
+   */
+  avisoHorario?: boolean;
   parte?: ParteDoResumo;
   /**
    * As 24 colunas do gráfico de hora, JÁ calculadas por `barrasDeHora` sobre a
@@ -168,7 +176,7 @@ export default function ValorResumo({
       {/* Sem horário configurado, o número mais forte do resumo (fora do
           horário) não existe. Dizer isso é melhor que estimar: o cliente
           confere no WhatsApp dele. */}
-      {!resumo.temHorario && (
+      {!resumo.temHorario && avisoHorario && (
         <div className="flex items-start gap-2.5 rounded-xl border border-warn-line bg-warn-surface px-4 py-3">
           <Settings2 size={16} className="mt-0.5 shrink-0 text-warn-ink" />
           <div className="min-w-0 flex-1">
