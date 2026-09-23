@@ -9,9 +9,9 @@ que fazer quando travar. Quem retomar lê este arquivo mais o `CLAUDE.md`.
 ## 0. Antes de tudo: o desenho final
 
 - **Fonte:** o export FINAL do projeto do Claude Design (as 5 rodadas mais os ajustes), em
-  `C:\Users\franck\Desktop\mobile-rodada-1\desing\` (arquivo `Conversas Prototipo.dc.html` mais o
-  `support.js`). ⚠️ O export que está lá hoje é da rodada 1, ANTES dos ajustes: não serve de base.
-  Conferir a data dos arquivos antes de começar; se não houver export novo, **não começar**.
+  `C:\Users\franck\Desktop\Desk\projetos\desing mobile\` (arquivo `Conversas Prototipo.dc.html`, o
+  `support.js` e a pasta `screenshots/`), exportado em 23/09/2026 01:35. ⚠️ O export antigo em
+  `Desktop\mobile-rodada-1\desing\` é da rodada 1, ANTES dos ajustes: não serve de base.
 - **Apoio:** os briefings `C:\Users\franck\Desktop\mobile-rodada-{1..5}\BRIEFING.md` e
   `mobile-rodada-1\AJUSTES-{1,2}.md` dizem o que foi PEDIDO; o protótipo diz o que foi DESENHADO.
   Em conflito de arranjo, vale o protótipo. Em conflito de regra da casa (cor de estado, travessão,
@@ -195,4 +195,21 @@ E2E_PORT=3001 npx playwright test --project=setup --project=logado --project=ate
 
 ## Divergências do desenho final
 
-(Preencher na primeira tarefa da execução, depois de ler o export final.)
+Lido em 23/09/2026 às 01:40, navegando o protótipo por Playwright (capturas no scratchpad da
+sessão). No geral o desenho bate com este plano; o que muda ou acrescenta:
+
+- **Folha "Mais":** cabeçalho com avatar, nome e "Dono · <empresa>"; a linha Agente mostra o estado
+  ("Agente ativo" em verde) e todas as linhas de navegação têm seta à direita; o tema é uma CHAVE
+  ("Tema escuro" ligada no escuro), não um botão de texto. Seguir.
+- **Barra de abas:** o contador em Conversas é âmbar no desenho (conversas esperando). No código
+  fica a contagem que o trilho já tem (não lidas), pela regra 1: trocar o que o número conta é
+  decisão de produto. Vai para o relatório.
+- **Pipeline:** busca e "Gerenciar estágios" viram ÍCONES no cabeçalho; atendente é uma pílula;
+  o card tem o botão "Mover" no rodapé; a folha de mover tem o subtítulo "Vira 'Movido pelo time',
+  e a IA não desfaz." e marca o estágio "atual". O desenho tem "Desfazer" (3 ocorrências): fica
+  FORA (PENDENTE 3).
+- **Montagem:** topo com "Sair" e, embaixo, "o progresso fica salvo"; o aviso do celular é um
+  cartão roxo "Está neste celular?". Seguir.
+- **Entrada:** sem moldura de cartão, como o plano diz.
+- **Seletor lateral do protótipo** tem estados que não viram código: "Conta: Leitura", "Agente:
+  Novo", "Conexão: Falha". São só para revisar o desenho.
