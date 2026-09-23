@@ -91,7 +91,18 @@ test.describe("Regra: a seta diz que tem mais coisa embaixo", () => {
     const seta = page.locator('main [data-slot="seta-mais"]');
 
     // No fim da conversa ela não existe: sinal sem fato é decoração.
+    // ⚠️ Espera a conversa ASSENTAR no fim antes de subir (23/09/2026): desde
+    // que a conversa gruda no fim enquanto carrega, subir antes disso era correr
+    // contra a rolagem inicial, e ela vencia.
+    await expect
+      .poll(() =>
+        viewport.evaluate(
+          (el) => el.scrollHeight - el.scrollTop - el.clientHeight
+        )
+      )
+      .toBeLessThan(12);
     await expect(seta).toHaveAttribute("data-visivel", "nao");
+    await page.waitForTimeout(500);
 
     await viewport.evaluate((el) => {
       el.scrollTop = 0;

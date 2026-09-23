@@ -736,33 +736,25 @@ test.describe("21/09: a conversa ganhou altura", () => {
   });
 });
 
-test.describe("21/09: a caixa de escrita é uma linha só", () => {
+test.describe("23/09: a caixa de escrita no estilo da do Claude", () => {
   test.use({ viewport: { width: 1600, height: 950 } });
 
-  test("clipe, campo e enviar dividem a MESMA linha", async ({ page }) => {
+  test("campo em cima, e \"+\", modo e enviar na linha de baixo", async ({ page }) => {
     await page.goto("/design");
-    // Eram duas faixas, o campo em cima e os botões embaixo, e a de baixo
-    // custava 46px de altura fixa para carregar dois controles. É a forma do
-    // próprio WhatsApp, e nela a altura da faixa é a altura do campo.
-    const mesmaLinha = await page.evaluate(() => {
+    // ⚠️ REESCRITO EM 23/09/2026. Em 21/09 a caixa era UMA linha (clipe, campo e
+    // enviar lado a lado); o dono pediu a caixa do celular também no desktop, e
+    // nela o campo ocupa a largura toda e os botões ficam numa linha embaixo.
+    const medido = await page.evaluate(() => {
       const form = document.querySelector("main form")!;
       const r = (el: Element) => el.getBoundingClientRect();
       const campo = r(form.querySelector("textarea")!);
       const botoes = [...form.querySelectorAll("button")]
         .filter((b) => /Anexar|Enviar/.test(b.getAttribute("aria-label") ?? ""))
         .map((b) => r(b));
-      return botoes.map((b) => ({
-        cruza: b.top < campo.bottom && b.bottom > campo.top,
-        // `items-end`: os botões ficam ancorados embaixo, para não flutuarem no
-        // meio do parágrafo quando o texto cresce.
-        alinhadoEmbaixo: Math.abs(b.bottom - campo.bottom) < 2,
-      }));
+      return { campoBaixo: campo.bottom, topos: botoes.map((b) => b.top) };
     });
-    expect(mesmaLinha.length).toBe(2);
-    for (const b of mesmaLinha) {
-      expect(b.cruza).toBe(true);
-      expect(b.alinhadoEmbaixo).toBe(true);
-    }
+    expect(medido.topos.length).toBe(2);
+    for (const t of medido.topos) expect(t).toBeGreaterThanOrEqual(medido.campoBaixo - 1);
   });
 
   test("o botão de enviar é só ícone, mas continua tendo nome", async ({

@@ -41,7 +41,8 @@ test.describe("Inbox (/design)", () => {
     // "Notas internas" virou só "Notas" no painel, e escrever nota passou a ser
     // uma aba do campo de escrita, em vez de um formulário próprio.
     await expect(page.getByText("Notas", { exact: true })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
+    // Desde 23/09/2026 o modo "Nota interna" mora na pílula do modo, e não numa aba.
+    await expect(page.locator('[data-slot="composer-modo"]')).toBeVisible();
     // Os filtros viraram CHIPS em 18/09/2026, no lugar do menu suspenso: o menu
     // escondia a contagem, e dava para ter três conversas esperando por você sem
     // nada na tela dizendo isso. "Precisa de você" virou "Esperando", o mesmo
@@ -497,21 +498,19 @@ test.describe("Conversa redesenhada", () => {
     await expect(page.getByText("Entendimento", { exact: true })).toHaveCount(0);
   });
 
-  test("os modos do composer dizem PARA ONDE o texto vai", async ({ page }) => {
+  test("a caixa de escrita diz PARA ONDE o texto vai, numa frase só", async ({ page }) => {
     await page.goto("/design");
-    // Eram abas sublinhadas. Viraram botões porque trocar de modo aqui não troca
-    // a vista do mesmo conteúdo: troca o destino, que é o erro caro desta tela
-    // (mandar para o cliente o que era nota).
-    await expect(page.getByRole("tab", { name: /Responder ao cliente/ })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeVisible();
-    // `exact` desde 23/09/2026: a frase de contexto do CELULAR ("Vai para o
-    // WhatsApp do cliente.") mora escondida no mesmo composer, e sem `exact` o
-    // localizador casava as duas. A asserção continua sendo a do desktop.
-    await expect(
-      page.getByText("vai para o WhatsApp do cliente", { exact: true })
-    ).toBeVisible();
-    await page.getByRole("tab", { name: /Nota interna/ }).click();
-    await expect(page.getByText("fica só entre vocês")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    // ⚠️ REESCRITO EM 23/09/2026. Eram três abas de modo com o destino escrito
+    // ao lado e uma faixa de aviso embaixo, e o dono pediu a caixa do celular
+    // também no desktop ("acho desnecessário ter dois textos"). O modo mora
+    // numa pílula, e o que diz a consequência de enviar é UMA frase.
+    const contexto = page.locator('[data-slot="composer-contexto"]');
+    await expect(contexto).toHaveText(/Vai para o WhatsApp do cliente/);
+    await expect(page.locator("main form").getByRole("tab")).toHaveCount(0);
+    await page.locator('[data-slot="composer-modo"]').click();
+    await page.getByRole("menuitem", { name: /Nota interna/ }).click();
+    await expect(contexto).toHaveText("Só o time vê. O cliente não recebe.");
   });
 
 });
@@ -583,76 +582,41 @@ test.describe("Conversa redesenhada: fidelidade ao desenho", () => {
     await expect(tel.locator("span[aria-hidden]")).toHaveCount(1);
   });
 
-  test("o modo ATIVO do composer é fundo cheio, e cada modo tem a sua cor", async ({
-    page,
-  }) => {
+  test("cada modo tem a sua cor na pílula e no enviar", async ({ page }) => {
     await page.goto("/design");
-    const abas = page.locator('[data-slot="tabs-trigger"][data-cor]');
-    await expect(abas).toHaveCount(3);
-    const fundos = await abas.evaluateAll((els) =>
-      els.map((el) => ({
-        estado: el.getAttribute("data-state"),
-        bg: getComputedStyle(el).backgroundColor,
-      }))
-    );
-    // 1. Cada modo carrega o próprio matiz mesmo desligado: é isso que ensina
-    //    para onde o texto vai ANTES de a pessoa clicar. Antes os inativos eram
-    //    cinzas, todos iguais.
-    expect(new Set(fundos.map((f) => f.bg)).size).toBe(3);
-    // 2. O ativo é FUNDO CHEIO (cor opaca); os inativos são superfície tingida
-    //    (cor com alfa). Era o contrário: o ativo ficava na superfície tingida,
-    //    com o mesmo peso visual de um chip qualquer, e o dono não conseguia
-    //    dizer qual estava ligado.
-    const ativo = fundos.find((f) => f.estado === "active")!;
-    expect(ativo.bg).toMatch(/^rgb\(/);
-    for (const f of fundos.filter((x) => x.estado !== "active")) {
-      expect(f.bg).toMatch(/^rgba\(/);
+    await page.waitForLoadState("networkidle");
+    // ⚠️ REESCRITO EM 23/09/2026 (a caixa do celular foi para o desktop). Antes
+    // media três abas; agora a cor do modo mora na pílula, e é ela, junto da
+    // moldura, que impede escrever nota achando que é resposta ao cliente.
+    const pilula = page.locator('[data-slot="composer-modo"]');
+    const cor = () => pilula.evaluate((el) => getComputedStyle(el).color);
+    const cores = [await cor()];
+    for (const nome of [/Nota interna/, /Orientar a IA/]) {
+      // Espera o menu anterior terminar de fechar: tocar na pílula durante a
+      // animação de saída não abre de novo.
+      await expect(page.getByRole("menu")).toHaveCount(0);
+      await expect(async () => {
+        await pilula.click();
+        await expect(page.getByRole("menuitem", { name: nome })).toBeVisible({ timeout: 1500 });
+      }).toPass();
+      await page.getByRole("menuitem", { name: nome }).click();
+      const antes = cores[cores.length - 1];
+      await expect.poll(cor).not.toBe(antes);
+      cores.push(await cor());
     }
-    // E a troca de modo leva o fundo cheio junto.
-    // ⚠️ `expect.poll` e não uma leitura direta: o gatilho tem `transition-colors`
-    // e a primeira medida pegava a cor NO MEIO da interpolação
-    // (`rgba(124, 54, 240, 0.75)`), que não é nem a de origem nem a de destino.
-    const corAtiva = page.getByRole("tab", { name: /Orientar a IA/ });
-    await corAtiva.click();
-    await expect
-      .poll(() => corAtiva.evaluate((el) => getComputedStyle(el).backgroundColor))
-      .toMatch(/^rgb\(/);
-    const bgOrientar = await corAtiva.evaluate(
-      (el) => getComputedStyle(el).backgroundColor
-    );
-    expect(bgOrientar).not.toBe(ativo.bg);
+    expect(new Set(cores).size).toBe(3);
   });
 
-  test("os modos do composer são botões de 28px, não faixa de menu", async ({
-    page,
-  }) => {
+  test("o modo mora numa pílula, e não em três botões", async ({ page }) => {
     await page.goto("/design");
-    const abas = page.locator('[data-slot="tabs-trigger"][data-cor]');
-    // 22/09/2026: eram 34px de altura com ícone de 15, numa faixa de 51px, e o
-    // dono leu isso como exagero ("dá para diminuir esse tamanho das tabs do
-    // chat"). O que encolheu foi altura, respiro e ícone; a cor NÃO entra aqui
-    // (o teste de cima é quem cuida dela, e a decisão é de 18/09).
-    for (const h of await abas.evaluateAll((els) =>
-      els.map((el) => el.getBoundingClientRect().height)
-    )) {
-      expect(h).toBeLessThanOrEqual(30);
-    }
-    // ⚠️ O ícone se mede pelo atributo do lucide, não por `size-4`: `size-4` é
-    // CSS e venceria o `width` do svg, engordando de volta o que acabou de
-    // encolher (regra 2 da camada base).
-    const icone = await abas
-      .first()
-      .locator("svg")
-      .evaluate((el) => el.getBoundingClientRect().width);
-    expect(icone).toBeLessThanOrEqual(13);
-    // E a faixa inteira acompanha: sem apertar o `py` da lista, encolher o
-    // botão não devolve altura nenhuma para a conversa, que é o motivo do
-    // pedido.
-    const faixa = await page
-      .locator('[data-slot="tabs-list"]')
-      .first()
+    // ⚠️ REESCRITO EM 23/09/2026. Este teste media os três botões de modo (28px,
+    // pedido de 22/09); eles saíram com a caixa nova. Fica a garantia de que o
+    // controle do modo é um só e cabe na linha dos botões.
+    await expect(page.locator('[data-slot="composer-modo"]')).toHaveCount(1);
+    const h = await page
+      .locator('[data-slot="composer-modo"]')
       .evaluate((el) => el.getBoundingClientRect().height);
-    expect(faixa).toBeLessThanOrEqual(44);
+    expect(h).toBeLessThanOrEqual(40);
   });
 
   test("o separador de dia é VISÍVEL sobre a conversa", async ({ page }) => {

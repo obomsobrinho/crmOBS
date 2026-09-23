@@ -3,9 +3,6 @@
 import { useRef, useState } from "react";
 import {
   Send,
-  Paperclip,
-  Bot,
-  Hand,
   Loader2,
   Lock,
   StickyNote,
@@ -24,7 +21,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
@@ -61,7 +57,6 @@ export default function MessageComposer({
   pendingInstruction,
   onCancelInstruction,
   iaAtiva,
-  contactName,
   clientId,
   readOnly,
   atende,
@@ -76,8 +71,6 @@ export default function MessageComposer({
   pendingInstruction?: string | null;
   onCancelInstruction?: () => void | Promise<void>;
   iaAtiva?: boolean;
-  /** Nome já resolvido do contato, só para o aviso dizer para onde o texto vai. */
-  contactName?: string;
   clientId: string;
   /** Conta bloqueada por assinatura: some com a caixa de texto. */
   readOnly?: boolean;
@@ -112,12 +105,10 @@ export default function MessageComposer({
     void Promise.resolve(action(t))
       .then(() => {
         setText("");
-        // Celular: depois de uma nota ou orientação o modo VOLTA para
-        // Responder (desenho do mobile). Lá o modo mora escondido numa pílula,
-        // e a próxima coisa escrita quase sempre é para o cliente. O desktop,
-        // com os três modos à vista, mantém o que a pessoa escolheu.
-        if (window.matchMedia("(max-width: 767px)").matches)
-          setMode("responder");
+        // Depois de uma nota ou orientação o modo VOLTA para Responder (desenho
+        // do mobile, e desde 23/09/2026 também no desktop): o modo mora numa
+        // pílula, e a próxima coisa escrita quase sempre é para o cliente.
+        setMode("responder");
       })
       .finally(() => setSaving(false));
   };
@@ -191,30 +182,14 @@ export default function MessageComposer({
   }
 
   const skin = SKIN[mode];
-  const hint =
-    mode === "nota"
-      ? "Só o time vê. Nunca vai para o WhatsApp."
-      : mode === "orientar"
-        ? "A IA reativa e usa sua orientação na próxima mensagem do cliente."
-        : iaAtiva === true
-          ? "A IA está atendendo. Ao enviar, você assume a conversa."
-          : iaAtiva === false
-            ? contactName
-              ? `Você está atendendo. Vai para o WhatsApp de ${contactName}.`
-              : "Você está atendendo. A IA não responde nesta conversa."
-            : null;
-  const HintIcon: LucideIcon =
-    mode === "nota"
-      ? StickyNote
-      : mode === "orientar"
-        ? Sparkles
-        : iaAtiva === false
-          ? Hand
-          : Bot;
   const ActionIcon = skin.Icon;
-  // A frase de contexto do CELULAR (AJUSTES-2 do desenho do mobile): diz a
-  // consequência de enviar, e muda com o modo e com quem atende.
-  const contextoMobile =
+  // A FRASE DE CONTEXTO (AJUSTES-2 do desenho do mobile, e desde 23/09/2026
+  // também no desktop, a pedido do dono): UMA frase dizendo a consequência de
+  // enviar, que muda com o modo e com quem atende. Substituiu duas coisas que
+  // diziam quase o mesmo em dois lugares: a faixa tingida de aviso ("A IA
+  // reativa e usa sua orientação...") e o destino escrito ao lado dos modos
+  // ("vai para a IA, não para o cliente"). O dono leu as duas como excesso.
+  const contexto =
     mode === "nota"
       ? "Só o time vê. O cliente não recebe."
       : mode === "orientar"
@@ -246,14 +221,16 @@ export default function MessageComposer({
         </div>
       )}
 
-      {/* Bloco único: abas, aviso e campo dividem uma borda só. Antes o aviso
-          flutuava acima como faixa solta e parecia de outra tela.
-          A casa de escrita tem a MESMA coluna de 960px da conversa logo acima
-          (medida do desenho): encostada nas duas bordas do cartão, ela ficava
-          com o dobro da largura da mensagem que a pessoa acabou de ler.
-          Raio de 16px e não os 14px do cartão da casa: é o raio medido no
-          desenho para as duas superfícies grandes da conversa, o balão e a casa
-          de escrita, e ele é o que faz as duas lerem como a mesma família. */}
+      {/* A CAIXA NO ESTILO DA DO CLAUDE, nos dois tamanhos de tela (23/09/2026:
+          nasceu no celular, e o dono pediu no desktop também, "fica bem mais
+          clean"). Um bloco só, em três partes: a frase de contexto em cima, o
+          campo no meio e, embaixo, "+", a pílula do modo e o enviar.
+          ⚠️ Os três modos como botões lado a lado SAÍRAM (eram as abas de
+          18/09): o modo agora mora na pílula, com a cor dele na moldura, na
+          pílula e no enviar, que é o que impede escrever nota achando que é
+          resposta ao cliente.
+          A coluna continua a de 960px da conversa, e o raio de 16px é o do
+          balão: as duas superfícies grandes da conversa são da mesma família. */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -300,96 +277,19 @@ export default function MessageComposer({
           </div>
         )}
 
-        {/* MODOS COMO BOTÕES, no topo da casa (desenho de 18/09/2026). Eram abas
-            sublinhadas, e aba comunica "vista do mesmo conteúdo": aqui trocar de
-            modo troca PARA ONDE o texto vai, que é a decisão mais consequente
-            desta tela. Responder sai no WhatsApp do cliente; nota fica entre
-            vocês; orientar fala com a IA. O botão do modo ativo carrega a cor do
-            modo, que é a mesma que colore a moldura e o botão de ação.
-
-            ⚠️ Segue sendo `role="tablist"` do Radix por baixo, e não três botões
-            soltos: o que muda é a pele. Com botões soltos some a navegação por
-            seta e o foco itinerante, que é acessibilidade que já estava paga. */}
-        <Tabs
-          value={mode}
-          onValueChange={(v) => setMode(v as Mode)}
-          className="contents"
-        >
-          {/* No celular os três modos saem daqui e moram na pílula da linha de
-              baixo (desenho do mobile, no estilo da caixa do Claude). */}
-          <TabsList className="flex-wrap gap-1.5 border-b border-line-soft px-3 py-1.5 max-md:hidden">
-            <TabsTrigger value="responder" variant="acao" data-cor="human">
-              <Send size={13} />
-              Responder ao cliente
-            </TabsTrigger>
-            {onAddNote && (
-              <TabsTrigger value="nota" variant="acao" data-cor="warn">
-                <StickyNote size={13} />
-                Nota interna
-              </TabsTrigger>
-            )}
-            {onInstruct && (
-              <TabsTrigger value="orientar" variant="acao" data-cor="brand">
-                <Sparkles size={13} />
-                Orientar a IA
-              </TabsTrigger>
-            )}
-            {/* O destino, escrito. O desenho põe esta frase ao lado dos botões, e
-                ela é o que impede o erro caro da tela: mandar para o cliente o
-                que era para ser nota. O ponto na cor do modo veio do desenho, e
-                ele é o que amarra a frase ao botão aceso do outro lado da
-                faixa: são a mesma cor dizendo a mesma coisa. */}
-            <span
-              className={`ml-auto hidden shrink-0 items-center gap-1.5 pr-1 text-legenda font-semibold lg:flex ${skin.hint}`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${skin.ponto}`}
-                aria-hidden
-              />
-              {skin.destino}
-            </span>
-          </TabsList>
-        </Tabs>
-
-        {/* O AVISO subiu para debaixo dos modos, em faixa tingida de ponta a
-            ponta (desenho aprovado). Ele morava depois do campo, em letra de
-            12px com um ícone de 12px, ou seja, embaixo do texto que ele deveria
-            qualificar e mais fraco que ele. Aqui ele é a primeira coisa depois
-            do botão do modo, que é exatamente a ordem em que a decisão
-            acontece: escolho o destino, leio a consequência, escrevo. */}
-        {/* Celular: a linha de contexto, numa faixa interna arredondada e SEM
-            cor de estado no fundo (desenho do mobile). */}
+        {/* A frase de contexto, numa faixa interna arredondada e SEM cor de
+            estado no fundo: quem carrega a cor do modo é a moldura e a pílula. */}
         <p
           data-slot="composer-contexto"
-          className="mx-2 mt-2 rounded-[10px] bg-bloco px-3 py-2 text-apoio text-ink-2 md:hidden"
+          className="mx-2 mt-2 rounded-[10px] bg-bloco px-3 py-2 text-apoio text-ink-2"
         >
-          {contextoMobile}
+          {contexto}
         </p>
-        {hint && (
-          <div
-            className={`flex items-center gap-2.5 border-b border-line-soft px-3.5 py-2 max-md:hidden ${skin.aviso}`}
-          >
-            <HintIcon size={14} className={`shrink-0 ${skin.hint}`} />
-            <span className={`min-w-0 truncate text-apoio ${skin.hint}`}>
-              {hint}
-            </span>
-          </div>
-        )}
 
-
-        {/* UMA LINHA: anexo, campo e enviar (pedido do dono, 21/09/2026).
-            Eram duas faixas, o campo em cima e os botoes embaixo, e a de baixo
-            custava 46px de altura fixa para carregar dois controles. Nesta
-            forma, que e a do proprio WhatsApp, a altura da faixa e a do campo.
-
-            ⚠️ `items-end` é o que faz os botões ficarem ANCORADOS EMBAIXO
-            quando o texto cresce. Com `items-center` eles sobem junto e o
-            enviar passa a flutuar no meio de um parágrafo. */}
-        {/* No CELULAR a mesma linha quebra em duas: o campo sobe para a largura
-            inteira (`order-first`) e embaixo ficam "+", a pílula do modo e o
-            enviar. É o MESMO campo nos dois arranjos, por CSS, para o texto
-            digitado nunca se perder ao girar a tela. */}
-        <div className="flex items-end gap-2 px-3 pb-2.5 pt-2 max-md:flex-wrap max-md:items-center max-md:px-2 max-md:pb-2">
+        {/* Campo na largura toda e, embaixo, a linha de botões. O campo cresce
+            com o texto (`field-sizing: content`) até o teto, e rola a partir
+            dali; onde a propriedade não existe (Firefox hoje) o `rows` manda. */}
+        <div className="flex flex-wrap items-center gap-2 px-2 pb-2 pt-1">
           <input
             ref={fileRef}
             type="file"
@@ -397,45 +297,6 @@ export default function MessageComposer({
             className="hidden"
             aria-hidden
           />
-          {/* Anexo só existe no modo Responder: nota e orientação não vão ao
-              WhatsApp, então não há o que anexar. */}
-          {mode === "responder" && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                {/* Botão com MOLDURA, 32px (desenho). Como ghost, ele só existia
-                    quando o ponteiro passava por cima: o clipe cinza sobre o
-                    branco do bloco não lia como coisa clicável. */}
-                <Button
-                  variant="outline"
-                  size="icon-control"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={uploading || !onSendMedia}
-                  aria-label="Anexar"
-                  className="text-ink-2 max-md:size-10 max-md:rounded-full"
-                >
-                  {uploading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <>
-                      <Paperclip size={16} className="max-md:hidden" />
-                      <Plus size={18} className="md:hidden" />
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                {onSendMedia ? "Anexar arquivo" : "Anexos indisponíveis"}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {/* ⚠️ UMA LINHA QUE CRESCE, e nao mais duas fixas. A caixa partia de
-              tres linhas reservando o pior caso, e ocupava 27% da coluna o tempo
-              inteiro para uma mensagem que quase sempre cabe em uma linha.
-              `field-sizing: content` faz o crescimento sem JS; onde ele não
-              existe (Firefox hoje) o `rows` manda e a caixa fica de uma linha,
-              rolando dentro. O piso acompanha a altura do botão ao lado, para a
-              linha nascer alinhada, e o teto impede o composer de engolir a
-              conversa num texto longo. */}
           <Textarea
             variant="limpo"
             value={text}
@@ -449,12 +310,37 @@ export default function MessageComposer({
             rows={1}
             aria-label={skin.placeholder}
             placeholder={skin.placeholder}
-            className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 flex-1 px-1 py-2 text-corpo [field-sizing:content] max-md:order-first max-md:max-h-[132px] max-md:basis-full"
+            className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 basis-full px-2 py-2 text-corpo [field-sizing:content] max-md:max-h-[132px]"
           />
 
-          {/* A PÍLULA DO MODO, só no celular: tocar abre, para cima, os três
-              modos com a descrição de uma linha. Troca o MESMO estado `mode`
-              que as abas do desktop trocam. */}
+          {/* Anexo só existe no modo Responder: nota e orientação não vão ao
+              WhatsApp, então não há o que anexar. */}
+          {mode === "responder" && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="none"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploading || !onSendMedia}
+                  aria-label="Anexar"
+                  className="size-9 justify-center rounded-full text-ink-2 max-md:size-10"
+                >
+                  {uploading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Plus size={18} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                {onSendMedia ? "Anexar arquivo" : "Anexos indisponíveis"}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
+          {/* A PÍLULA DO MODO: tocar abre, para cima, os modos com uma linha
+              curta de destino cada. */}
           {modosDisponiveis.length > 1 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -463,9 +349,9 @@ export default function MessageComposer({
                   size="none"
                   data-slot="composer-modo"
                   className={cn(
-                    "h-10 gap-1.5 rounded-full px-3 text-apoio font-semibold md:hidden",
+                    "h-9 gap-1.5 rounded-full px-3 text-apoio font-semibold max-md:h-10",
                     skin.hint,
-                    SKIN[mode].frame,
+                    skin.frame,
                     skin.aviso,
                   )}
                 >
@@ -474,14 +360,14 @@ export default function MessageComposer({
                   <ChevronUp size={14} className="opacity-70" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" sideOffset={6} className="w-72">
+              <DropdownMenuContent side="top" align="start" sideOffset={6} className="w-64">
                 {modosDisponiveis.map((m) => {
                   const Icone = SKIN[m].Icon;
                   return (
                     <DropdownMenuItem
                       key={m}
                       onSelect={() => setMode(m)}
-                      className="min-h-12 items-start py-2"
+                      className="min-h-11 items-start py-2"
                     >
                       <Icone size={16} className={cn("mt-0.5 shrink-0", SKIN[m].hint)} />
                       <span className="flex min-w-0 flex-1 flex-col">
@@ -495,33 +381,26 @@ export default function MessageComposer({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <span className="flex-1 md:hidden" aria-hidden />
+          <span className="flex-1" aria-hidden />
 
-          {/* A ação principal SEM RÓTULO (pedido do dono, 21/09/2026): o ícone
-              mais a cor ja dizem o que ela faz, e o rotulo custava largura numa
-              linha que agora divide espaco com o campo. O atalho, que morava no
-              proprio botao, foi para o tooltip junto do nome. */}
+          {/* A ação principal SEM RÓTULO (pedido do dono, 21/09/2026): a seta e a
+              cor do modo já dizem o que ela faz. O atalho mora no tooltip. */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 type="submit"
                 variant={skin.variant}
-                // 36px quadrado, e não os 32px do clipe ao lado: a ação
-                // principal da tela continua sendo o único elemento desta faixa
-                // que sobe de degrau, e sem rótulo é o TAMANHO que carrega essa
-                // hierarquia sozinho.
-                size="icon-primary"
+                size="none"
                 disabled={!canSend}
-                // ⚠️ O nome acessível vem do `aria-label`, e não mais do texto
-                // visível: sem ele o botão ficaria sem nome nenhum para leitor
-                // de tela e para teste, que é o preço de tirar o rótulo.
+                // ⚠️ O nome acessível vem do `aria-label`: sem ele o botão
+                // ficaria sem nome para leitor de tela e para teste.
                 aria-label={skin.action}
                 className={cn(
                   // `disabled:opacity-100` e não `opacity-100`: com modificador
                   // diferente o tailwind-merge não considera as duas classes
                   // conflitantes, e a da base venceria. Este botão desabilitado
                   // não desbota, ele troca de cor.
-                  "shrink-0 transition max-md:size-10 max-md:rounded-full",
+                  "size-9 shrink-0 justify-center rounded-full transition max-md:size-10",
                   !canSend &&
                   "cursor-not-allowed bg-[var(--chip-bg)] text-ink-3 disabled:opacity-100",
                 )}
@@ -529,17 +408,10 @@ export default function MessageComposer({
                 {saving ? (
                   <Loader2 size={16} className="animate-spin" />
                 ) : (
-                  <>
-                    <ActionIcon size={16} className="max-md:hidden" />
-                    {/* Celular: seta para cima, como a caixa do Claude; a cor
-                        do modo continua sendo quem diz para onde vai. */}
-                    <ArrowUp size={18} className="md:hidden" />
-                  </>
+                  <ArrowUp size={18} />
                 )}
               </Button>
             </TooltipTrigger>
-            {/* O atalho vem junto do nome: ele morava no rótulo do botão, e sem
-                rótulo o tooltip é o único lugar que sobra para ele. */}
             <TooltipContent side="top">{skin.action} (Enter)</TooltipContent>
           </Tooltip>
         </div>
@@ -549,23 +421,18 @@ export default function MessageComposer({
   );
 }
 
-// Cada modo pinta o bloco inteiro (moldura, aviso, aba e botão) com o seu
-// matiz, porque a cor é o que diz para onde o texto vai antes de a pessoa ler.
-// Verde é ação humana no WhatsApp, âmbar é interno do time, roxo é a IA.
-// `button` (a classe do botão) virou `variant` (o nome da variante do Button),
-// e `tab` sumiu: era "font-semibold text-ink" nos três modos, ou seja, não
-// variava, e quem pinta a aba ativa agora é o `data-[state=active]` da base.
+// Cada modo pinta a moldura, a pílula e o enviar com o seu matiz, porque a cor
+// é o que diz para onde o texto vai antes de a pessoa ler. Verde é ação humana
+// no WhatsApp, âmbar é interno do time, roxo é a IA.
 const SKIN: Record<
   Mode,
   {
     frame: string;
-    /** Tinta do matiz: aviso, destino e ícones. Sempre `ink`, nunca `fill`. */
+    /** Tinta do matiz: pílula e ícones. Sempre `ink`, nunca `fill`. */
     hint: string;
-    /** O matiz como FUNDO do ponto ao lado do destino. Aqui sim é `fill`. */
-    ponto: string;
-    /** Fundo da faixa de aviso, logo abaixo dos modos. */
+    /** Fundo tingido da pílula do modo. */
     aviso: string;
-    /** Para onde vai o que está sendo escrito. Aparece ao lado dos modos. */
+    /** Uma linha curta no menu de modos: para onde vai o que está escrito. */
     destino: string;
     variant: React.ComponentProps<typeof Button>["variant"];
     placeholder: string;
@@ -576,48 +443,39 @@ const SKIN: Record<
   responder: {
     frame: "border border-[var(--human-line)]",
     hint: "text-human-ink",
-    ponto: "bg-human",
     aviso: "bg-human-surface",
     variant: "send",
     placeholder: "Escreva uma mensagem",
     action: "Enviar mensagem",
-    destino: "vai para o WhatsApp do cliente",
+    destino: "Vai para o cliente",
     Icon: Send,
   },
   nota: {
     frame: "border border-[var(--warn-line)]",
     hint: "text-warn-ink",
-    ponto: "bg-warn",
     aviso: "bg-warn-surface",
     variant: "warn",
     placeholder: "Anotar algo sobre este contato",
     action: "Salvar nota interna",
-    destino: "fica só entre vocês",
+    destino: "Só o time vê",
     Icon: StickyNote,
   },
   orientar: {
     frame: "border border-[var(--brand-line)]",
     hint: "text-brand-ink",
-    ponto: "bg-brand",
     aviso: "bg-brand-surface",
     variant: "brand",
     placeholder: "Diga o que a IA deve responder",
     action: "Orientar e reativar a IA",
-    // ⚠️ "não" com til. A linha dizia "nao com o cliente", sem acento, e é a
-    // única frase sem acento desta tela: o erro fica visível justamente onde o
-    // texto precisa ser levado a sério.
-    destino: "vai para a IA, não para o cliente",
+    destino: "Só a IA vê",
     Icon: Sparkles,
   },
 };
 
-/** Rótulo curto da pílula do modo, no celular. */
+/** Rótulo curto da pílula do modo. */
 const MODO_ROTULO: Record<Mode, string> = {
   responder: "Responder",
   nota: "Nota interna",
   orientar: "Orientar a IA",
 };
 
-// O componente `Tab` local morava aqui. Ele virou `TabsTrigger`
-// (components/ui/tabs.tsx), que desenha a mesma barra de 3px e ainda traz o
-// `role="tablist"` que faltava, navegação por seta e foco itinerante.

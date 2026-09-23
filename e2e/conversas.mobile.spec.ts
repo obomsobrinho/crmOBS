@@ -40,7 +40,8 @@ test("os três pontos trazem quem atende, a IA e os dados do contato", async ({ 
   await page.waitForLoadState("networkidle");
   await page.locator('[data-slot="conversa-mais"]').click();
   const menu = page.getByRole("menu");
-  await expect(menu.getByText("Quem atende")).toBeVisible();
+  // O preview abre com a conversa atribuída, então o rótulo é o da transferência.
+  await expect(menu.getByText("Transferir para")).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: /IA nesta conversa/ })).toBeVisible();
   await menu.getByRole("menuitem", { name: /Dados do contato/ }).click();
   const folha = page.locator('[data-slot="sheet-content"]');
@@ -57,6 +58,6 @@ test("a pílula do modo troca o destino e a frase de contexto", async ({ page })
   await page.getByRole("menuitem", { name: /Nota interna/ }).click();
   await expect(contexto).toHaveText("Só o time vê. O cliente não recebe.");
   await expect(page.locator('[data-slot="composer-modo"]')).toHaveText(/Nota interna/);
-  // As abas do desktop ficam escondidas, não duplicadas.
-  await expect(page.getByRole("tab", { name: /Nota interna/ })).toBeHidden();
+  // Não existem abas de modo (a pílula é o único controle, nos dois tamanhos).
+  await expect(page.locator("main form").getByRole("tab")).toHaveCount(0);
 });

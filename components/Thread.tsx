@@ -305,6 +305,47 @@ export default function Thread({
     return () => cancelAnimationFrame(id);
   }, [bubbles, phone]);
 
+  // ⚠️ GRUDADO NO FIM ENQUANTO A CONVERSA CARREGA (23/09/2026, achado no
+  // celular). A rolagem acima acontece UMA vez, na primeira pintura, e depois
+  // disso o conteúdo ainda cresce: imagem e áudio chegam por URL assinada, a
+  // faixa "O cliente quer" aparece depois da consulta e encolhe a área. Medido
+  // numa conversa com mídia: abria 444px antes da última mensagem, e a pessoa
+  // tinha que rolar ou tocar na seta. Aqui, qualquer mudança de tamanho (da
+  // área ou do conteúdo) devolve ao fim, ATÉ a pessoa rolar para cima por conta
+  // própria: aí ela está lendo o histórico e puxar de volta seria brigar com ela.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    let grudado = true;
+    // Onde o fim estava da última vez que grudamos. ⚠️ Não basta ouvir o evento
+    // de rolagem: quando alguém rola para cima, o conteúdo pode mudar de tamanho
+    // (a barra do Radix aparece) e o observador disparar ANTES do evento, e aí
+    // a conversa era puxada de volta para o fim. Comparar com a posição guardada
+    // percebe a subida mesmo nessa ordem.
+    let topoFim = el.scrollTop;
+    const noFim = () => el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+    const aoRolar = () => {
+      grudado = noFim();
+      if (grudado) topoFim = el.scrollTop;
+    };
+    const observador = new ResizeObserver(() => {
+      if (!grudado) return;
+      if (el.scrollTop < topoFim - 4 && !noFim()) {
+        grudado = false;
+        return;
+      }
+      el.scrollTop = el.scrollHeight;
+      topoFim = el.scrollTop;
+    });
+    observador.observe(el);
+    if (el.firstElementChild) observador.observe(el.firstElementChild);
+    el.addEventListener("scroll", aoRolar, { passive: true });
+    return () => {
+      observador.disconnect();
+      el.removeEventListener("scroll", aoRolar);
+    };
+  }, [phone]);
+
   const handleSend = useCallback(
     async (text: string) => {
       const tempId = crypto.randomUUID();
@@ -574,7 +615,12 @@ export default function Thread({
             <DropdownMenuContent align="end" sideOffset={4} className="w-64">
               {onAssign && myUserId && (
                 <>
-                  <DropdownMenuLabel>Quem atende</DropdownMenuLabel>
+                  {/* O rótulo diz a AÇÃO, e não a pergunta (pedido do dono,
+                      23/09/2026): "Quem atende" em cima de uma lista de nomes
+                      lia como informação, e tocar num nome é passar a conversa. */}
+                  <DropdownMenuLabel>
+                    {attendant ? "Transferir para" : "Atribuir a"}
+                  </DropdownMenuLabel>
                   {(members ?? []).map((m) => (
                     <DropdownMenuItem
                       key={m.userId}
@@ -795,28 +841,31 @@ export default function Thread({
               </Tooltip>
             )}
 
-            {/* O botão do painel GANHOU RÓTULO. Era um ícone nu com tooltip, e
-              tooltip é a legenda de quem já sabe: quem abre a conversa pela
-              primeira vez não descobre que existe uma coluna de dados do
-              cliente passando o mouse por um retângulo de 28px. Aceso, ele usa
-              o par surface/ink da marca, nunca `fill` como tinta. */}
+            {/* O botão do painel voltou a ser SÓ ÍCONE (pedido do dono,
+              23/09/2026: o rótulo "Ocultar cliente" era texto demais no
+              cabeçalho). O nome fica no `aria-label` e no tooltip. Aceso, ele
+              usa o par surface/ink da marca, nunca `fill` como tinta. */}
             {onToggleContext && (
-              <Button
-                variant="outline"
-                size="control"
-                onClick={onToggleContext}
-                aria-label={contextOpen ? "Ocultar cliente" : "Ver cliente"}
-                className={cn(
-                  "hidden text-apoio lg:flex",
-                  contextOpen &&
-                  "border-brand-line bg-brand-surface text-brand-ink",
-                )}
-              >
-                <PanelRight size={16} />
-                <span className="hidden 2xl:inline">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-control"
+                    onClick={onToggleContext}
+                    aria-label={contextOpen ? "Ocultar cliente" : "Ver cliente"}
+                    className={cn(
+                      "hidden lg:flex",
+                      contextOpen &&
+                      "border-brand-line bg-brand-surface text-brand-ink",
+                    )}
+                  >
+                    <PanelRight size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
                   {contextOpen ? "Ocultar cliente" : "Ver cliente"}
-                </span>
-              </Button>
+                </TooltipContent>
+              </Tooltip>
             )}
           </span>
         </div>
@@ -946,7 +995,6 @@ export default function Thread({
           pendingInstruction={pendingInstruction}
           onCancelInstruction={onCancelInstruction}
           iaAtiva={iaState !== null && !iaPausada}
-          contactName={displayName}
           clientId={clientId}
           readOnly={readOnly}
           atende={
