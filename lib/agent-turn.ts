@@ -11,6 +11,7 @@ import { applyGuardrail } from "@/lib/guardrail";
 import { embedTexts, toVector } from "@/lib/rag";
 import { nextIaStage } from "@/lib/pipeline";
 import { accessState } from "@/lib/billing";
+import { betaAberto } from "@/lib/beta";
 import type {
   TurnDiagnostics,
   RagMatchDiag,
@@ -156,11 +157,17 @@ export async function processTurn(
   // propósito: conta bloqueada não gasta token nosso e o agente fica em silêncio
   // (o nó do n8n recebe 402 e nada é enviado nem gravado). O layout do app cobre
   // as telas; este é o caminho que o n8n usa sem passar por layout nenhum.
-  const access = accessState({
-    subscription_status: (client.subscription_status as string) ?? "",
-    trial_ends_at: (client.trial_ends_at as string | null) ?? null,
-    grace_until: (client.grace_until as string | null) ?? null,
-  });
+  const access = accessState(
+    {
+      subscription_status: (client.subscription_status as string) ?? "",
+      trial_ends_at: (client.trial_ends_at as string | null) ?? null,
+      grace_until: (client.grace_until as string | null) ?? null,
+    },
+    undefined,
+    // A MESMA chave do beta que as telas usam: se só a tela liberasse, o
+    // testador veria o app aberto e o agente mudo no WhatsApp.
+    { betaAberto: betaAberto() }
+  );
   // DOIS gates, mesma resposta: turno silencioso, 200 e NÃO erro. O n8n segue o
   // fluxo e GRAVA a mensagem que o cliente mandou, então a conversa continua
   // aparecendo no inbox (como um WhatsApp Web aberto) e nada se perde. O que

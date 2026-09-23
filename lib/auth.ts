@@ -3,6 +3,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
+import { betaAberto } from "@/lib/beta";
 import { montagemState, type MontagemState } from "@/lib/onboarding";
 
 export interface MyClient {
@@ -122,11 +123,16 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     trialEndsAt: client.trial_ends_at,
     graceUntil: client.grace_until,
     billingPlan: client.billing_plan,
-    access: accessState({
-      subscription_status: client.subscription_status,
-      trial_ends_at: client.trial_ends_at,
-      grace_until: client.grace_until,
-    }),
+    access: accessState(
+      {
+        subscription_status: client.subscription_status,
+        trial_ends_at: client.trial_ends_at,
+        grace_until: client.grace_until,
+      },
+      undefined,
+      // Chave geral do beta: ligada, ninguém é bloqueado (lib/beta.ts).
+      { betaAberto: betaAberto() }
+    ),
     agentPublishedAt: client.agent_published_at,
     // `!== false` e não `?? true`: a coluna é NOT NULL com default true, mas um
     // tenant lido antes da migration chegaria com undefined, e nesse caso ligado

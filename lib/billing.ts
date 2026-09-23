@@ -304,7 +304,31 @@ function plural(n: number, um: string, muitos: string): string {
  * Decide se o tenant tem acesso ao app. Chamada no gate do servidor (layout
  * autenticado, /api/agent, /api/send) e também na UI para o aviso.
  */
-export function accessState(row: BillingRow, now: Date = new Date()): AccessState {
+export function accessState(
+  row: BillingRow,
+  now: Date = new Date(),
+  opcoes: {
+    /**
+     * CHAVE GERAL DO BETA (23/09/2026, decisão do dono). Ligada, ninguém é
+     * bloqueado nem avisado por assinatura: o beta existe para as pessoas
+     * usarem e gerarem dado, e o teste de 7 dias do cadastro só passa a valer
+     * quando o beta acabar e a chave desligar. Uma chave e não conta por conta,
+     * porque liberar e depois travar dez tenants à mão é trabalho e esquecimento.
+     * Quem lê a variável de ambiente é o servidor (`lib/beta.ts`); este módulo
+     * continua puro e só recebe o valor.
+     */
+    betaAberto?: boolean;
+  } = {}
+): AccessState {
+  if (opcoes.betaAberto) {
+    return {
+      blocked: false,
+      reason: null,
+      trialDaysLeft: null,
+      warn: null,
+      message: "Beta aberto: acesso liberado.",
+    };
+  }
   const t = now.getTime();
   const status = typeof row?.subscription_status === "string" ? row.subscription_status : "";
   const trialEnd = parse(row?.trial_ends_at);

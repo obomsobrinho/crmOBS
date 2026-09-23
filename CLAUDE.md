@@ -387,6 +387,11 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   trialDaysLeft, warn, message}`. `getMyClient()` já traz `access` pronto (as colunas vêm no mesmo
   select). **Conta bloqueada entra em MODO LEITURA** (decisão do dono do produto), não é expulsa: as
   mensagens seguem chegando e ela acompanha as conversas, como um WhatsApp Web aberto, mas não
+  trabalha. ⚠️ **CHAVE GERAL DO BETA (23/09/2026):** `BETA_ABERTO=1` no ambiente (lido em
+  `lib/beta.ts`, passado a `accessState` por `getMyClient` e `processTurn`) libera TODO tenant, sem
+  olhar teste nem assinatura. Existe porque o beta é para usar e gerar dado; o teste de 7 dias do
+  cadastro só vale quando a chave desligar. Ao desligar, quem se cadastrou no beta já está com o
+  `trial_ends_at` vencido e cai no bloqueio: decidir antes o que fazer com essas contas.
   trabalha. **Gate server-side em 4 pontos**, nunca esconder botão no client:
   (1) `requireActiveTenant()` (`lib/auth.ts`) manda para `/assinatura` nas páginas pagas
   (`/pipeline`, `/painel`, `/agente`, `/conhecimento`, `/equipe`); fica em CADA
