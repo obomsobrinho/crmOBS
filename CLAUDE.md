@@ -757,7 +757,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   (`app/page.tsx`): dono que ainda não publicou cai em `/montagem`, dono publicado em `/painel`,
   atendente em `/inbox`.
 - Rotas: `/login`, `/cadastro` (público, cria conta), `/recuperar-senha` (público),
-  `/connect` (QR + aviso de risco + import automático), `/montagem` (assistente de 4 passos da
+  `/connect` (QR + aviso de risco; **não importa histórico de forma nenhuma** desde 23/09/2026: a rota `import` foi apagada e a instância nova nasce com `syncFullHistory: false`), `/montagem` (assistente de 4 passos da
   primeira configuração, dono-only, fora do `(app)`, some depois da primeira ativação), `/inbox`,
   `/inbox/[id]`, `/pipeline` (board Kanban do funil), `/painel` (dashboard), `/agente` (três abas do
   construtor, com a base de conhecimento e a bancada de teste dentro),
@@ -767,7 +767,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   gate de assinatura; fora do route group `(app)`), `/definir-senha` (convidado escolhe a senha),
   `/auth/confirm` (verifica o link do e-mail).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
-  whatsapp-status, import, **agent-config** `PUT`, **notify-target** `PUT` dono-only,
+  whatsapp-status, **agent-config** `PUT`, **notify-target** `PUT` dono-only,
   **publish** `PUT` dono-only (`{ enabled }`, liga e desliga o agente),
   **knowledge** `DELETE` + **knowledge/upload-url** + **knowledge/process** dono-only, upload
   direto ao Storage por URL assinada + processamento à parte, compatível com o limite de corpo da

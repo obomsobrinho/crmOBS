@@ -1,6 +1,5 @@
 import ContactSidebar from "@/components/ContactSidebar";
 import { Card } from "@/components/ui/card";
-import AutoImport from "@/components/AutoImport";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
 import { buildInbox, type ConvRow, type ContatoRow } from "@/lib/inbox";
@@ -41,11 +40,9 @@ export default async function InboxLayout({
   // O gate de auth/instância já roda no layout do route group (app).
   const client = await getMyClient();
   const { items: initial, ia: initialIa } = await getInbox();
-  const needsImport = !!client?.evolution_instance && !client.imported_at;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col md:gap-3">
-      {needsImport && client && <AutoImport clientId={client.id} />}
       {/* TRÊS seções: o menu, a lista de conversas e a conversa com os detalhes
           do contato. Cada uma é um cartão, separada por espaço de verdade. A
           conversa e os detalhes dividem o mesmo cartão de propósito: quem está

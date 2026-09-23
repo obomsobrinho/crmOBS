@@ -38,35 +38,18 @@ export async function createInstance(instanceName: string, webhookUrl: string) {
       instanceName,
       integration: "WHATSAPP-BAILEYS",
       qrcode: true,
-      // Pede o máximo de histórico ao parear (o WhatsApp entrega o que puder).
-      syncFullHistory: true,
+      // ⚠️ NÃO pede histórico (23/09/2026, decisão do dono: o CRM não importa
+      // o passado de forma nenhuma). Vale para instância criada daqui em
+      // diante; as que já existem foram criadas com `true`.
+      syncFullHistory: false,
       webhook: { url: webhookUrl, byEvents: false, base64: false, events: EVENTS },
     }),
   });
 }
 
-// Lista as conversas da instância (usado no import da base existente).
-export async function findChats(instanceName: string) {
-  ensureEnv();
-  return fetch(`${BASE}/chat/findChats/${encodeURIComponent(instanceName)}`, {
-    method: "POST",
-    headers: headers(),
-    body: JSON.stringify({}),
-  });
-}
-
-// Mensagens de uma conversa (remoteJid) da instância.
-export async function findMessages(instanceName: string, remoteJid: string) {
-  ensureEnv();
-  return fetch(
-    `${BASE}/chat/findMessages/${encodeURIComponent(instanceName)}`,
-    {
-      method: "POST",
-      headers: headers(),
-      body: JSON.stringify({ where: { key: { remoteJid } } }),
-    }
-  );
-}
+// `findChats` e `findMessages` SAÍRAM junto com a importação de histórico
+// (23/09/2026): eram usados só por ela, e deixar o caminho pronto é convite a
+// religar sem querer.
 
 export async function connectInstance(instanceName: string) {
   ensureEnv();

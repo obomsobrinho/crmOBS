@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-type Phase = "idle" | "loading" | "waiting" | "importing" | "connected" | "error";
+type Phase = "idle" | "loading" | "waiting" | "connected" | "error";
 
 export default function ConnectWhatsApp({
   clientId,
@@ -27,12 +27,12 @@ export default function ConnectWhatsApp({
    * onde a moldura, o título e o sair já existem em volta.
    *
    * ⚠️ São duas MOLDURAS do mesmo componente, e não dois componentes: o QR, o
-   * polling e a importação são justamente a parte que não pode existir duas
+   * polling e o fim da conexão são justamente a parte que não pode existir duas
    * vezes.
    */
   enquadramento?: "pagina" | "passo";
   /**
-   * Chamado quando a conexão fecha e a importação termina. Quando existe, ele
+   * Chamado quando a conexão fecha. Quando existe, ele
    * SUBSTITUI o redirecionamento para o inbox: dentro do assistente, sair da
    * rota no meio da montagem perderia o rascunho e o passo.
    */
@@ -56,13 +56,12 @@ export default function ConnectWhatsApp({
     if (doneRef.current) return; // roda uma vez só
     doneRef.current = true;
     stopPolling();
-    // Importa a base existente (contatos + histórico) antes de entrar no inbox.
-    setPhase("importing");
-    try {
-      await fetch(`/api/clients/${clientId}/import`, { method: "POST" });
-    } catch {
-      // se falhar, segue mesmo assim — o inbox só ficará sem o histórico antigo
-    }
+    // ⚠️ NÃO IMPORTA MAIS O HISTÓRICO (23/09/2026, decisão do dono). A conexão
+    // por QR entrega o passado pela metade (a Evolution devolve uma mensagem
+    // por conversa, medido em 27/08), o painel já ignorava o `imported`, e a
+    // conversa aparecia cheia de buracos. A conta começa limpa e se enche com o
+    // que chega dali em diante, que é o que a API Oficial também faz. A rota
+    // de importação foi APAGADA junto, para não existir caminho de volta.
     setPhase("connected");
     setTimeout(() => {
       // Dentro do assistente quem decide o que vem depois é o assistente: ele
@@ -74,8 +73,10 @@ export default function ConnectWhatsApp({
       }
       router.replace("/inbox");
       router.refresh();
-    }, 1000);
-  }, [router, stopPolling, clientId, onConectado]);
+      // 2,5s e não 1s: a tela agora tem uma frase para ler (o histórico não
+      // vem), e em 1s ela sumia antes de alguém terminar a primeira linha.
+    }, 2500);
+  }, [router, stopPolling, onConectado]);
 
   const startPolling = useCallback(() => {
     stopPolling();
@@ -151,20 +152,15 @@ export default function ConnectWhatsApp({
           </div>
         )}
 
-        {phase === "connected" || phase === "importing" ? (
+        {phase === "connected" ? (
           <div className="space-y-2 py-8">
-            <div className="text-3xl">{phase === "importing" ? "⏳" : "✅"}</div>
-            <p className="font-medium text-human-ink">
-              {phase === "importing"
-                ? "Conectado! Importando sua base…"
-                : "Tudo pronto!"}
-            </p>
+            <div className="text-3xl">✅</div>
+            <p className="font-medium text-human-ink">Tudo pronto!</p>
+            {/* Dizer que o passado não vem é o que evita a pessoa procurar
+                conversas antigas e achar que perdeu alguma coisa. */}
             <p className="text-apoio text-ink-2">
-              {phase === "importing"
-                ? "Trazendo contatos e conversas do WhatsApp…"
-                : passo
-                  ? "Vamos para o próximo passo…"
-                  : "Redirecionando…"}
+              As conversas aparecem aqui a partir de agora. O histórico continua
+              no seu celular.
             </p>
           </div>
         ) : (
@@ -244,7 +240,7 @@ export default function ConnectWhatsApp({
           conectado a tela está de saída, então sai da frente.
           O aviso tem `max-w-md` próprio, que serve à coluna estreita da tela
           própria; no assistente ele acompanha a largura do passo. */}
-      {phase !== "connected" && phase !== "importing" && (
+      {phase !== "connected" && (
         <div className={passo ? "w-full [&>div]:max-w-none" : "contents"}>
           <ConnectionRiskNotice />
         </div>
