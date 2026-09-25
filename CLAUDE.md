@@ -682,11 +682,16 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   - Aviso de risco do QR em `/connect` e dentro do passo 1 do assistente
     (`components/ConnectionRiskNotice.tsx`): **nunca** prometer proteção contra bloqueio nem usar
     "não pague a API da Meta" (e2e trava isso). ⚠️ `ConnectWhatsApp` ganhou `enquadramento`
-    (`pagina`/`passo`) e `onConectado`: são duas MOLDURAS do mesmo componente, porque o QR, o polling
-    e a importação são a parte que não pode existir duas vezes.
-  - ⚠️ **Furo conhecido no celular:** quem abre o passo 1 no telefone não consegue ler o código na
-    própria tela, e este projeto não tem conexão por código de telefone. A tela diz isso; não
-    inventar pareamento que não existe.
+    (`pagina`/`passo`) e `onConectado`: são duas MOLDURAS do mesmo componente, porque o QR, o código
+    de pareamento e o polling são a parte que não pode existir duas vezes.
+  - ✅ **Conexão pelo número (24/09/2026):** `POST connect-whatsapp` com `{ number }` devolve o
+    `pairingCode` da Evolution (2.3.7), que a pessoa digita no WhatsApp em Aparelhos conectados >
+    Conectar com número de telefone. É o PADRÃO no celular (onde não dá para ler o QR na própria
+    tela) e a alternativa no computador. O código só nasce do estado fechado: instância parada em
+    `connecting` leva `logout` antes, e instância `open` NUNCA é derrubada (a rota devolve
+    `connected`). ⚠️ Não provado com número real até o dono testar.
+  - **O aviso de risco foi enxugado em 24/09/2026** (pedido do dono): número dedicado e risco de
+    bloqueio à vista; o resto atrás de "Saiba mais". As regras de conteúdo continuam.
 - **Decisões mantidas de propósito:** `dados_cliente.atendimento_ia` é `text`
   (`'ativa'`/`'reativada'` = ligada, `'pause'` = pausada) — não é boolean. `chat_messages.active`
   é coluna legada morta (mantida). Não sugerir trocar sem pedirem.

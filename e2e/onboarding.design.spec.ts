@@ -76,6 +76,11 @@ test.describe("Modo leitura de conta bloqueada (/design/bloqueio)", () => {
 test.describe("Aviso de risco da conexão (/design/connect)", () => {
   test("explica o QR, o risco e o número dedicado", async ({ page }) => {
     await page.goto("/design/connect");
+    await page.waitForLoadState("networkidle");
+    // Desde 24/09/2026 o aviso é UMA linha (pedido do dono: o alarme de
+    // bloqueio logo de cara era má primeira impressão). O número dedicado fica à
+    // vista; o risco de bloqueio, a um toque em "Entenda os riscos".
+    await page.getByRole("button", { name: /Entenda os riscos/ }).click();
     await expect(page.getByText(/Não é a API Oficial da Meta/)).toBeVisible();
     await expect(page.getByText(/Use um número dedicado ao atendimento/)).toBeVisible();
     await expect(page.getByText(/Existe risco de bloqueio/)).toBeVisible();
@@ -87,10 +92,10 @@ test.describe("Aviso de risco da conexão (/design/connect)", () => {
 
   test("tem a cláusula de contingência", async ({ page }) => {
     await page.goto("/design/connect");
-    await page
-      .getByRole("button", { name: /Se o número cair, o que acontece/ })
-      .click();
-    await expect(page.getByText(/Nada se perde aqui/)).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    // A contingência mora atrás de "Entenda os riscos" desde 24/09/2026.
+    await page.getByRole("button", { name: /Entenda os riscos/ }).click();
+    await expect(page.getByText(/nada se perde aqui/i)).toBeVisible();
     await expect(page.getByText(/Você conecta outro número/)).toBeVisible();
     await expect(page.getByText(/01\/10\/2026/)).toBeVisible();
   });

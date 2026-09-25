@@ -119,8 +119,13 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
 
     // O aviso de risco do QR vem junto, com as mesmas regras de conteúdo da tela
     // `/connect`: nada de prometer proteção contra bloqueio.
-    await expect(page.getByText(/Não é a API Oficial da Meta/)).toBeVisible();
+    // Desde 24/09/2026 o risco mora atrás de "Entenda os riscos" (uma linha à
+    // vista, pedido do dono). Continua na tela, a um toque.
+    await expect(page.getByText(/Use um número dedicado ao atendimento/)).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: /Entenda os riscos/ }).click();
     await expect(page.getByText(/Existe risco de bloqueio/)).toBeVisible();
+    await expect(page.getByText(/Não é a API Oficial da Meta/)).toBeVisible();
     const texto = (await page.locator("body").innerText()).toLowerCase();
     expect(texto).not.toContain("não pague a api");
     expect(texto).not.toContain("proteção contra banimento");

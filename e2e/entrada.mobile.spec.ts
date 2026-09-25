@@ -19,13 +19,16 @@ test("login sem moldura de cartão e com campos de 44px", async ({ page }) => {
   );
 });
 
-test("no QR, o aviso de celular vem ANTES do código", async ({ page }) => {
+test("no celular a conexão abre pelo número, com o QR como alternativa", async ({ page }) => {
+  // ⚠️ REESCRITO EM 24/09/2026. Era o cartão "Está neste celular?", que só
+  // dizia que o QR precisava de outro aparelho. Agora o celular conecta pelo
+  // número (código de pareamento da Evolution), e o QR vira o link de troca.
   await page.goto("/design/montagem?passo=conectar");
   await page.waitForLoadState("networkidle");
-  const aviso = page.locator('[data-slot="aviso-celular"]');
-  await expect(aviso).toBeVisible();
-  await expect(aviso).toContainText("Está neste celular?");
-  const qr = await page.getByText("Clique em Conectar para gerar o QR.").boundingBox();
-  const a = await aviso.boundingBox();
-  expect(a!.y).toBeLessThan(qr!.y);
+  const campo = page.getByRole("textbox", { name: "Número do WhatsApp" });
+  await expect(campo).toBeVisible();
+  await expect(campo).toHaveAttribute("inputmode", "tel");
+  await expect(page.getByRole("button", { name: "Gerar código" })).toBeDisabled();
+  await page.locator('[data-slot="trocar-modo-conexao"]').click();
+  await expect(page.getByText("Clique em Conectar para gerar o QR.")).toBeVisible();
 });

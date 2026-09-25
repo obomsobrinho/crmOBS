@@ -7,9 +7,25 @@ import LogoutButton from "./LogoutButton";
 import ConnectionRiskNotice from "./ConnectionRiskNotice";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { useCelular } from "@/lib/useCelular";
 
 type Phase = "idle" | "loading" | "waiting" | "connected" | "error";
+
+/**
+ * Máscara de celular brasileiro, "(31) 99999-8888", aplicada enquanto digita.
+ * Corta em 11 dígitos (DDD + 9 dígitos): sem isso dava para digitar um número
+ * gigante (achado do dono, 24/09/2026). O DDI 55 quem põe é o servidor.
+ */
+function mascaraTelefone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10)
+    return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 export default function ConnectWhatsApp({
   clientId,
@@ -42,6 +58,15 @@ export default function ConnectWhatsApp({
   const [phase, setPhase] = useState<Phase>("idle");
   const [qr, setQr] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // CONECTAR PELO NÚMERO (24/09/2026, pedido do dono): quem está no próprio
+  // celular não consegue ler um QR na mesma tela, e a Evolution gera um código
+  // de 8 caracteres para digitar no WhatsApp. No celular esse é o padrão; no
+  // computador o QR continua sendo, e os dois trocam por um link.
+  const celular = useCelular();
+  const [modoEscolhido, setModo] = useState<"qr" | "numero" | null>(null);
+  const modo = modoEscolhido ?? (celular ? "numero" : "qr");
+  const [numero, setNumero] = useState("");
+  const [codigo, setCodigo] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef = useRef(false);
 
@@ -91,28 +116,44 @@ export default function ConnectWhatsApp({
     }, 3000);
   }, [clientId, onConnected, stopPolling]);
 
-  const connect = useCallback(async () => {
-    setError(null);
-    setPhase("loading");
-    setQr(null);
-    try {
-      const res = await fetch(`/api/clients/${clientId}/connect-whatsapp`, {
-        method: "POST",
-      });
-      const data = (await res.json()) as { qr?: string | null; error?: string };
-      if (!res.ok) {
-        setError(data.error ?? "Falha ao iniciar a conexão.");
+  const connect = useCallback(
+    async (numero?: string) => {
+      setError(null);
+      setPhase("loading");
+      setQr(null);
+      setCodigo(null);
+      try {
+        const res = await fetch(`/api/clients/${clientId}/connect-whatsapp`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(numero ? { number: numero } : {}),
+        });
+        const data = (await res.json()) as {
+          qr?: string | null;
+          pairingCode?: string | null;
+          connected?: boolean;
+          error?: string;
+        };
+        if (!res.ok) {
+          setError(data.error ?? "Falha ao iniciar a conexão.");
+          setPhase("error");
+          return;
+        }
+        if (data.connected) {
+          void onConnected();
+          return;
+        }
+        setQr(data.qr ?? null);
+        setCodigo(data.pairingCode ?? null);
+        setPhase("waiting");
+        startPolling();
+      } catch {
+        setError("Não foi possível contatar o servidor.");
         setPhase("error");
-        return;
       }
-      setQr(data.qr ?? null);
-      setPhase("waiting");
-      startPolling();
-    } catch {
-      setError("Não foi possível contatar o servidor.");
-      setPhase("error");
-    }
-  }, [clientId, startPolling]);
+    },
+    [clientId, startPolling, onConnected]
+  );
 
   // Se já existe instância, começa checando se ela já está conectada.
   useEffect(() => {
@@ -165,56 +206,71 @@ export default function ConnectWhatsApp({
           </div>
         ) : (
           <>
-            <p className="text-apoio text-ink-2">
-              Abra o WhatsApp no celular do cliente, em Aparelhos conectados,
-              e escaneie o QR code abaixo.
-            </p>
-
-            {/* ⚠️ No celular a pessoa não consegue ler o QR na própria tela, e
-                este projeto NÃO tem conexão por código de telefone. Dizer isso é
-                a única saída honesta; inventar um pareamento que não existe
-                seria pior. */}
-            {/* Cartão da marca, e ANTES do código (desenho do mobile, 23/09/2026):
-                era uma linha cinza de 12px, e quem está no celular precisa ler
-                isto antes de gastar tempo tentando escanear a própria tela. */}
-            <div
-              data-slot="aviso-celular"
-              className="rounded-xl border border-brand-line bg-brand-surface px-4 py-3 text-left md:hidden"
-            >
-              <p className="text-apoio font-semibold text-brand-ink">
-                Está neste celular?
-              </p>
-              <p className="mt-0.5 text-apoio text-ink-2">
-                O código precisa ser lido por outro aparelho. Abra esta tela no
-                computador ou em outro aparelho e escaneie com o celular do
-                WhatsApp.
-              </p>
-            </div>
-
-            <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-bloco p-4">
-              {qr ? (
-                <Image
-                  src={qr}
-                  alt="QR code do WhatsApp"
-                  width={256}
-                  height={256}
-                  unoptimized
-                  className="h-64 w-64 rounded-lg"
+            {modo === "numero" ? (
+              <>
+                <p className="text-apoio text-ink-2">
+                  Digite o número do WhatsApp que vai atender. Você recebe um
+                  código para digitar no próprio WhatsApp.
+                </p>
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={numero}
+                  onChange={(e) => setNumero(mascaraTelefone(e.target.value))}
+                  maxLength={15}
+                  placeholder="(31) 99999-8888"
+                  aria-label="Número do WhatsApp"
+                  className="text-center"
                 />
-              ) : phase === "loading" ? (
-                <span className="text-apoio text-ink-3">Gerando QR…</span>
-              ) : (
-                <span className="text-apoio text-ink-3">
-                  {hasInstance
-                    ? "Aguardando conexão ou gere um novo QR."
-                    : "Clique em Conectar para gerar o QR."}
-                </span>
-              )}
-            </div>
+                {codigo && (
+                  <div
+                    data-slot="codigo-pareamento"
+                    className="space-y-2 rounded-xl border border-brand-line bg-brand-surface px-4 py-4"
+                  >
+                    <p className="font-display text-numero tracking-[0.12em] text-brand-ink">
+                      {codigo.length === 8 ? `${codigo.slice(0, 4)}-${codigo.slice(4)}` : codigo}
+                    </p>
+                    <p className="text-apoio text-ink-2">
+                      No WhatsApp desse número, abra Aparelhos conectados, toque
+                      em Conectar aparelho e depois em Conectar com número de
+                      telefone. Digite este código.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-apoio text-ink-2">
+                  No WhatsApp que vai atender, abra Aparelhos conectados e
+                  escaneie o QR code abaixo.
+                </p>
+                <div className="flex min-h-[280px] items-center justify-center rounded-xl border border-dashed border-line-strong bg-bloco p-4">
+                  {qr ? (
+                    <Image
+                      src={qr}
+                      alt="QR code do WhatsApp"
+                      width={256}
+                      height={256}
+                      unoptimized
+                      className="h-64 w-64 rounded-lg"
+                    />
+                  ) : phase === "loading" ? (
+                    <span className="text-apoio text-ink-3">Gerando QR…</span>
+                  ) : (
+                    <span className="text-apoio text-ink-3">
+                      {hasInstance
+                        ? "Aguardando conexão ou gere um novo QR."
+                        : "Clique em Conectar para gerar o QR."}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
 
             {phase === "waiting" && (
               <p className="text-legenda text-ink-3">
-                Aguardando você escanear… a tela avança sozinha ao conectar.
+                Aguardando a conexão… a tela avança sozinha.
               </p>
             )}
 
@@ -222,16 +278,40 @@ export default function ConnectWhatsApp({
 
             <Button
               size="field"
-              onClick={connect}
-              disabled={phase === "loading"}
-              className="w-full justify-center"
+              onClick={() => void connect(modo === "numero" ? numero : undefined)}
+              disabled={
+                phase === "loading" ||
+                // DDD + número: 10 dígitos (fixo) ou 11 (celular).
+                (modo === "numero" && numero.replace(/\D/g, "").length < 10)
+              }
+              className="w-full justify-center max-md:h-11"
             >
               {phase === "loading"
                 ? "Gerando…"
-                : qr
-                ? "Gerar novo QR"
-                : "Conectar WhatsApp"}
+                : modo === "numero"
+                  ? codigo
+                    ? "Gerar novo código"
+                    : "Gerar código"
+                  : qr
+                    ? "Gerar novo QR"
+                    : "Conectar WhatsApp"}
             </Button>
+
+            {/* A troca de modo. Muda só o jeito de ligar: a conexão, o polling e
+                o que vem depois são os mesmos. */}
+            <button
+              type="button"
+              data-slot="trocar-modo-conexao"
+              onClick={() => {
+                setModo(modo === "numero" ? "qr" : "numero");
+                setError(null);
+              }}
+              className="text-apoio font-medium text-brand-ink hover:underline"
+            >
+              {modo === "numero"
+                ? "Prefiro ler um QR code"
+                : "Conectar pelo número, sem QR code"}
+            </button>
           </>
         )}
       </div>
