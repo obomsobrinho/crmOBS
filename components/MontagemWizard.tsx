@@ -59,6 +59,7 @@ export default function MontagemWizard({
   stageNames,
   passoDoServidor,
   passoInicial,
+  conectadoInicial,
   preview = false,
 }: {
   clientId: string;
@@ -77,9 +78,14 @@ export default function MontagemWizard({
   /**
    * Força o passo de abertura, ignorando servidor e rascunho. Existe para o
    * `/design` e para o e2e conseguirem abrir um passo direto; em produção
-   * ninguém passa isto, porque escolher o passo à mão pularia a conexão.
+   * ninguém passa isto, porque escolher o passo à mão pularia a gravação.
    */
   passoInicial?: PassoMontagem;
+  /**
+   * Só `/design` e e2e: abre o último passo já no estado conectado. Em produção
+   * quem diz que conectou é o polling do `ConnectWhatsApp`, nunca uma prop.
+   */
+  conectadoInicial?: boolean;
   /** /design: não salva, não publica, não navega. */
   preview?: boolean;
 }) {
@@ -103,22 +109,27 @@ export default function MontagemWizard({
     preview,
   });
 
-  // Onde começar. Conectar é piso duro: sem instância não há o que configurar.
-  // Fora isso, o rascunho manda, porque ele é por definição mais novo que o
+  // Onde começar. O rascunho manda, porque ele é por definição mais novo que o
   // servidor e sabe em qual passo a pessoa parou de digitar.
-  const [passo, setPasso] = useState<PassoMontagem>(() => {
-    if (passoInicial) return passoInicial;
-    if (!hasInstance) return "conectar";
-    return rascunho?.passo ?? passoDoServidor;
-  });
+  // ⚠️ Até 24/09/2026 conectar era piso duro (sem instância, o assistente
+  // forçava o passo 1). A ordem foi invertida e conectar virou o ÚLTIMO passo,
+  // então a instância não decide mais onde a montagem abre.
+  const [passo, setPasso] = useState<PassoMontagem>(
+    () => passoInicial ?? rascunho?.passo ?? passoDoServidor
+  );
 
   const [ativando, setAtivando] = useState(false);
   const [erroAtivar, setErroAtivar] = useState<string | null>(null);
   const [bancadaAberta, setBancadaAberta] = useState(false);
+  // Conectado NESTA tela, visto pelo polling do `ConnectWhatsApp`. É estado de
+  // tela, e não de banco: `evolution_instance` preenchida só diz que a
+  // instância foi criada. Quem já chega com ela aberta vê o estado conectado
+  // assim que o primeiro polling responde `open`.
+  const [conectado, setConectado] = useState(!!conectadoInicial);
 
   const indice = PASSOS_MONTAGEM.findIndex((p) => p.key === passo);
   const atual = PASSOS_MONTAGEM[indice];
-  const ultimo = passo === "ativar";
+  const ultimo = passo === "conectar";
 
   function irPara(p: PassoMontagem) {
     setPasso(p);
@@ -137,7 +148,9 @@ export default function MontagemWizard({
 
   /**
    * Avança. A ÚNICA gravação no servidor da montagem inteira acontece na
-   * passagem de "o que ele sabe" para "ativar".
+   * passagem de "o que ele sabe" para "testar": a bancada testa a configuração
+   * em edição e não precisaria disso, mas conectar e ativar precisam de um
+   * agente configurado no banco.
    *
    * ⚠️ Sem validação no browser, de propósito. Quem diz o que é uma configuração
    * válida é `validateConfig`, no servidor; repetir a regra aqui criaria uma
@@ -146,8 +159,10 @@ export default function MontagemWizard({
    * resolvido.
    */
   async function avancar() {
-    if (passo === "conectar") return irPara("quem");
     if (passo === "quem") return irPara("sabe");
+    // Testar é OFERECIDO, nunca exigido (decisão do dono, 28/08/2026): o
+    // Continuar funciona sem ninguém ter aberto a bancada.
+    if (passo === "testar") return irPara("conectar");
     if (passo === "sabe") {
       const { ok, campos } = await form.save();
       if (!ok) {
@@ -161,7 +176,7 @@ export default function MontagemWizard({
       }
       // Gravou de verdade: o rascunho perdeu a razão de existir.
       if (!preview) limparRascunho(clientId);
-      setPasso("ativar");
+      setPasso("testar");
     }
   }
 
@@ -260,16 +275,6 @@ export default function MontagemWizard({
         )}
 
         <div className="mt-6 space-y-5">
-          {passo === "conectar" && (
-            <ConnectWhatsApp
-              clientId={clientId}
-              clientName={clientName}
-              hasInstance={hasInstance}
-              enquadramento="passo"
-              onConectado={() => irPara("quem")}
-            />
-          )}
-
           {passo === "quem" && (
             <>
               <SeletorDePreset
@@ -313,36 +318,96 @@ export default function MontagemWizard({
             </>
           )}
 
-          {passo === "ativar" && (
-            <>
-              <div className="rounded-xl border border-brand-line bg-brand-surface p-5">
-                <div className="flex items-start gap-3">
-                  <FlaskConical
-                    size={18}
-                    className="mt-0.5 shrink-0 text-brand-ink"
-                    aria-hidden
-                  />
-                  <div className="min-w-0">
-                    <p className="text-corpo font-semibold">Fale com ele antes</p>
-                    <p className="mt-1 text-apoio text-ink-2">
-                      Mande uma pergunta como se você fosse quem te chama no
-                      WhatsApp. Nada disso sai daqui e ninguém recebe mensagem.
-                    </p>
-                    <div className="mt-3">
-                      {/* Testar é OFERECIDO, nunca exigido (decisão do dono,
-                          28/08/2026): virava um ritual antes de cada ativação, e
-                          o gate saiu de `publishBlockers`. */}
-                      <AgentTestDrawer
-                        configuracao={form.configuracao}
-                        stageNames={stageNames}
-                        aberto={bancadaAberta}
-                        onAbertoChange={setBancadaAberta}
-                      />
-                    </div>
+          {passo === "testar" && (
+            <div className="rounded-xl border border-brand-line bg-brand-surface p-5">
+              <div className="flex items-start gap-3">
+                <FlaskConical
+                  size={18}
+                  className="mt-0.5 shrink-0 text-brand-ink"
+                  aria-hidden
+                />
+                <div className="min-w-0">
+                  <p className="text-corpo font-semibold">Fale com ele antes</p>
+                  <p className="mt-1 text-apoio text-ink-2">
+                    Pergunte o que mais te perguntam e veja como ele responde.
+                    Se algo sair diferente do que você quer, volte e ajuste.
+                    Testar não é obrigatório.
+                  </p>
+                  <div className="mt-3">
+                    {/* Testar é OFERECIDO, nunca exigido (decisão do dono,
+                        28/08/2026): virava um ritual antes de cada ativação, e
+                        o gate saiu de `publishBlockers`. Por isso o Continuar
+                        deste passo funciona sem a bancada ter sido aberta. */}
+                    <AgentTestDrawer
+                      configuracao={form.configuracao}
+                      stageNames={stageNames}
+                      aberto={bancadaAberta}
+                      onAbertoChange={setBancadaAberta}
+                    />
                   </div>
                 </div>
               </div>
+            </div>
+          )}
 
+          {passo === "conectar" && (
+            <>
+              {/* A frase que a ordem nova existe para dizer. Fica no TOPO, antes
+                  do QR, porque é o medo de quem chega aqui. */}
+              <p
+                data-slot="conectar-nao-liga"
+                className="flex items-start gap-2 rounded-xl border border-line bg-bloco px-4 py-3 text-apoio text-ink-2"
+              >
+                <Power
+                  size={15}
+                  className="mt-0.5 shrink-0 text-brand-ink"
+                  aria-hidden
+                />
+                <span>
+                  Conectar não liga o agente. Ele só começa a responder quando
+                  você ativar.
+                  {/* A razão do botão desabilitado mora AQUI, no topo, e não no
+                      pé do passo: o aviso de risco e o QR empurravam ela para
+                      baixo do rodapé grudado. */}
+                  {!conectado && (
+                    <span id="razao-ativar" className="block text-ink-3">
+                      Conecte o WhatsApp para ativar.
+                    </span>
+                  )}
+                </span>
+              </p>
+
+              {conectado ? (
+                <div
+                  data-slot="whatsapp-conectado"
+                  className="flex items-center gap-3 rounded-xl border border-human-line bg-human-surface px-4 py-3"
+                >
+                  <Check
+                    size={17}
+                    className="shrink-0 text-human-ink"
+                    aria-hidden
+                  />
+                  <p className="text-apoio font-medium text-human-ink">
+                    WhatsApp conectado. Falta só ativar.
+                  </p>
+                </div>
+              ) : (
+                // O `onConectado` NÃO avança de passo: ele revela a ativação logo
+                // abaixo, no mesmo passo. Conectar e ativar são dois gestos, e o
+                // segundo é da pessoa.
+                <ConnectWhatsApp
+                  clientId={clientId}
+                  clientName={clientName}
+                  hasInstance={hasInstance}
+                  enquadramento="passo"
+                  onConectado={() => setConectado(true)}
+                />
+              )}
+            </>
+          )}
+
+          {passo === "conectar" && conectado && (
+            <>
               <div className="rounded-xl border border-line bg-bloco p-5">
                 <p className="text-corpo font-semibold">
                   Ao ativar, o que acontece
@@ -418,28 +483,28 @@ export default function MontagemWizard({
             </Button>
           )}
 
-          {/* No passo de conectar não existe Continuar: quem avança é a conexão,
-              sozinha, quando o código é lido. Um botão ali levaria a pessoa para
-              um agente que não tem de onde responder. */}
-          {passo !== "conectar" && (
-            <Button
-              size="field"
-              disabled={form.saving || ativando}
-              onClick={() => (ultimo ? ativar() : avancar())}
-            >
-              {ultimo ? (
-                <>
-                  {ativando ? "Ativando…" : "Ativar o agente"}
-                  <Power size={15} />
-                </>
-              ) : (
-                <>
-                  {form.saving ? "Salvando…" : "Continuar"}
-                  <ArrowRight size={15} />
-                </>
-              )}
-            </Button>
-          )}
+          {/* No último passo o botão é "Ativar o agente", e ele fica DESABILITADO
+              até a conexão ser vista nesta tela: ativar sem número ligado seria
+              um agente sem de onde responder. A razão está escrita no passo
+              (`razao-ativar`), porque botão desabilitado não mostra dica. */}
+          <Button
+            size="field"
+            disabled={form.saving || ativando || (ultimo && !conectado)}
+            aria-describedby={ultimo && !conectado ? "razao-ativar" : undefined}
+            onClick={() => (ultimo ? ativar() : avancar())}
+          >
+            {ultimo ? (
+              <>
+                {ativando ? "Ativando…" : "Ativar o agente"}
+                <Power size={15} />
+              </>
+            ) : (
+              <>
+                {form.saving ? "Salvando…" : "Continuar"}
+                <ArrowRight size={15} />
+              </>
+            )}
+          </Button>
         </div>
       </footer>
     </div>

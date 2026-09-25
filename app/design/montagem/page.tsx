@@ -28,19 +28,28 @@ export default async function DesignMontagemPage({
   searchParams,
 }: {
   // Next 16: os parâmetros de busca chegam como Promise.
-  searchParams: Promise<{ passo?: string }>;
+  searchParams: Promise<{ passo?: string; conectado?: string }>;
 }) {
-  const { passo } = await searchParams;
-  const inicial: PassoMontagem = ehPasso(passo) ? passo : "conectar";
+  const { passo, conectado } = await searchParams;
+  // O padrão é o PRIMEIRO passo, que desde 24/09/2026 é "quem" (a ordem foi
+  // invertida: conectar virou o último).
+  const inicial: PassoMontagem = ehPasso(passo) ? passo : "quem";
+  // `?conectado=1` abre o último passo já conectado, que é onde a ativação
+  // aparece. Sem banco não existe polling que diga isso.
+  const jaConectado = conectado === "1";
 
   return (
     <div className="bg-canvas">
       <MontagemWizard
+        // A chave remonta o assistente ao trocar de passo pelos links abaixo:
+        // o passo inicial é lido uma vez só, no primeiro render.
+        key={`${inicial}-${jaConectado}`}
         clientId="preview"
         clientName="Ótica Vision"
-        // Sem instância: o passo 1 mostra o convite a gerar o código em vez de
-        // ficar consultando o status de uma conexão que não existe.
+        // Sem instância: o passo de conectar mostra o convite a gerar o código
+        // em vez de ficar consultando o status de uma conexão que não existe.
         hasInstance={false}
+        conectadoInicial={jaConectado}
         initialConfig={VAZIO}
         agentConfigUpdatedAt={null}
         initialNotifyJid={null}
@@ -48,7 +57,7 @@ export default async function DesignMontagemPage({
         knowledgeDocs={SEM_DOCS}
         knowledgeKeyConfigured
         stageNames={{ aguardando_humano: "Aguardando atendimento" }}
-        passoDoServidor="conectar"
+        passoDoServidor="quem"
         passoInicial={inicial}
         preview
       />
@@ -68,6 +77,14 @@ export default async function DesignMontagemPage({
             {i + 1}. {p.titulo}
           </Link>
         ))}
+        <Link
+          href="/design/montagem?passo=conectar&conectado=1"
+          className={`text-legenda ${
+            jaConectado ? "font-semibold text-brand-ink" : "text-ink-2"
+          }`}
+        >
+          4b. Já conectado
+        </Link>
       </div>
     </div>
   );

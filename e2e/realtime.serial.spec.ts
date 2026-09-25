@@ -51,7 +51,12 @@ test("voltar para a aba re-busca a lista (recuperação do realtime)", async ({
   await page
     .locator('[data-slot="inbox-periodo-opcao"]', { hasText: "Tudo" })
     .click();
-  await page.waitForSelector('a[href^="/inbox/"]', { timeout: 20_000 });
+  // ⚠️ O sinal de "lista carregada" era um link de conversa, e a OBS ficou sem
+  // conversa na limpeza de 24/09/2026: o teste falhava acusando o realtime por
+  // falta de dado. A conversa nunca foi o objeto do teste (ele conta buscas, e
+  // o refetch ao voltar o foco acontece com a lista vazia também), então o
+  // sinal passou a ser a rede parada, que vale nos dois casos, em vez de pular.
+  await page.waitForLoadState("networkidle");
   await page.waitForTimeout(3_000);
   expect(
     gets,

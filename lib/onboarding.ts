@@ -10,12 +10,21 @@
 // de tela cheia em rota própria, então o que sobrou aqui é: quais são os quatro
 // passos, onde retomar, e o que falta para ativar. A barra e o `onboardingState`
 // que a alimentava não existem mais.
+//
+// ⚠️ A ORDEM FOI INVERTIDA EM 24/09/2026 (decisão do dono). Era conectar, quem,
+// sabe, testar e ativar; virou quem, sabe, testar, conectar e ativar. Motivo: a
+// pessoa tinha medo de ligar o WhatsApp e o agente sair respondendo antes de ela
+// terminar de configurar. Isso nunca aconteceu (o `processTurn` fica mudo
+// enquanto `agent_published_at` é nulo), mas pedir o número no primeiro passo
+// passava exatamente essa impressão. Agora ela investe primeiro no que é fácil,
+// vê o agente funcionando na bancada (que não precisa de WhatsApp), e só no fim
+// liga o número. E conectar NÃO liga o agente: ativar é um gesto separado.
 
 /** Sinais no banco. Um por coluna de `clients`. */
 export type StepKey = "conectar" | "configurar" | "testar" | "publicar";
 
 /** Os quatro passos do assistente. Não são os mesmos quatro sinais acima. */
-export type PassoMontagem = "conectar" | "quem" | "sabe" | "ativar";
+export type PassoMontagem = "quem" | "sabe" | "testar" | "conectar";
 
 export interface OnboardingInput {
   /** clients.evolution_instance preenchida. */
@@ -50,12 +59,6 @@ export interface PassoDef {
 
 export const PASSOS_MONTAGEM: PassoDef[] = [
   {
-    key: "conectar",
-    titulo: "Conectar o WhatsApp",
-    porque:
-      "O agente responde do seu próprio número, então ele precisa estar ligado aqui antes de qualquer outra coisa.",
-  },
-  {
     key: "quem",
     titulo: "Quem atende",
     porque:
@@ -68,10 +71,19 @@ export const PASSOS_MONTAGEM: PassoDef[] = [
       "É daqui que sai uma resposta de verdade no lugar de um vou verificar: tudo que você escrever aqui o agente sabe de cor.",
   },
   {
-    key: "ativar",
-    titulo: "Testar e ativar",
+    // Testar vem ANTES de conectar, de propósito: a bancada não precisa de
+    // WhatsApp, e testar depois de conectar só faria sentido pelo número de
+    // verdade, com o agente já respondendo, que é o medo que a ordem nova tira.
+    key: "testar",
+    titulo: "Testar",
     porque:
-      "Fale com ele uma vez antes que qualquer pessoa fale, e depois ligue a chave.",
+      "Converse com ele como se fosse alguém chamando no WhatsApp. Nada sai daqui e ninguém recebe mensagem.",
+  },
+  {
+    key: "conectar",
+    titulo: "Conectar e ativar",
+    porque:
+      "Ligue o número que vai atender, pelo QR code ou pelo próprio número. Depois disso, ativar é com você.",
   },
 ];
 
@@ -97,15 +109,14 @@ export function montagemState(input: OnboardingInput): MontagemState {
     publicar: !!input.published,
   };
 
-  // Onde retomar. Só os sinais que representam trabalho IRREVERSÍVEL contam:
-  // conectar e configurar. "O que ele sabe" é opcional e não tem sinal próprio,
-  // então quem já configurou cai direto em ativar; se ele parou no meio do passo
-  // 3, quem sabe disso é o rascunho no navegador, que manda no que vem depois.
-  const passo: PassoMontagem = !feito.conectar
-    ? "conectar"
-    : !feito.configurar
-      ? "quem"
-      : "ativar";
+  // Onde retomar. Só o sinal de trabalho IRREVERSÍVEL conta: configurar. "O que
+  // ele sabe" e testar são opcionais e não têm sinal que diga "parou aqui",
+  // então quem já configurou cai direto em conectar; se parou no meio de um
+  // deles, quem sabe disso é o rascunho no navegador, que manda no que vem
+  // depois.
+  // ⚠️ A instância deixou de ser piso em 24/09/2026: conectar é o ÚLTIMO passo,
+  // e ter conectado antes de configurar não pula nada.
+  const passo: PassoMontagem = !feito.configurar ? "quem" : "conectar";
 
   return {
     passo,
@@ -122,8 +133,13 @@ export function montagemState(input: OnboardingInput): MontagemState {
  *
  * ⚠️ TESTAR SAIU DAQUI (decisão do dono, 28/08/2026). O gate já valia só na
  * primeira ativação, mas mesmo assim obrigava um teste antes de o agente poder
- * atender pela primeira vez. O assistente continua OFERECENDO o teste no passo
- * 4, com destaque; ele só não barra mais.
+ * atender pela primeira vez. O assistente continua OFERECENDO o teste, num passo
+ * próprio (o 3); ele só não barra mais.
+ *
+ * ⚠️ `hasInstance` é a instância CRIADA, que nasce ao pedir o QR ou o código, e
+ * não ao conectar. Por isso a rota de publicação confere também o estado real
+ * na Evolution, na primeira ativação (24/09/2026). Isso fica lá, e não aqui,
+ * porque este módulo é puro e não faz rede.
  */
 export function publishBlockers(input: OnboardingInput): string[] {
   const faltas: string[] = [];

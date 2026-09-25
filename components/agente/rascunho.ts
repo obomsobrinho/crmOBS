@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@/lib/agent-prompt";
-import type { PassoMontagem } from "@/lib/onboarding";
+import { PASSOS_MONTAGEM, type PassoMontagem } from "@/lib/onboarding";
 
 // Rascunho da montagem, no navegador.
 //
@@ -7,8 +7,8 @@ import type { PassoMontagem } from "@/lib/onboarding";
 // cada `PUT /agent-config` grava uma linha em `agent_publications`, então salvar
 // por passo encheria o histórico de versões com uma montagem só. E, mais
 // importante, o rascunho no navegador diz a verdade para quem está montando:
-// nada disto está no ar ainda. O assistente grava no servidor UMA vez, ao chegar
-// no passo de ativar.
+// nada disto está no ar ainda. O assistente grava no servidor UMA vez, ao sair
+// do passo "o que ele sabe".
 //
 // ⚠️ CUSTO ASSUMIDO: rascunho de navegador NÃO atravessa aparelho. Quem digitar
 // no celular e voltar no computador começa vazio. É o preço de não poluir o
@@ -56,6 +56,15 @@ export function lerRascunho(
     return null;
   }
   if (!r?.config || !r?.salvoEm) return null;
+
+  // ⚠️ RASCUNHO DA ORDEM ANTIGA (antes de 24/09/2026) pode trazer um passo que
+  // não existe mais. "ativar" era o último, e o último agora é "conectar";
+  // qualquer outro desconhecido vira "quem", o começo. Um passo inexistente
+  // deixaria o assistente sem título e sem conteúdo, travado.
+  const p = r.passo as string;
+  if (!PASSOS_MONTAGEM.some((d) => d.key === p)) {
+    r = { ...r, passo: p === "ativar" ? "conectar" : "quem" };
+  }
 
   if (agentConfigUpdatedAt) {
     // Comparação por INSTANTE, e nunca por texto: o banco devolve "+00:00" e o

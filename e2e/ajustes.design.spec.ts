@@ -569,7 +569,8 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     }));
 
     // O assistente conta passos e não tem Salvar avulso: ele grava sozinho ao
-    // sair do passo 3, e a pessoa nunca precisa decidir quando salvar.
+    // sair de "o que ele sabe" (passo 2 desde 24/09/2026, era o 3), e a pessoa
+    // nunca precisa decidir quando salvar.
     expect(montagem).toEqual({ contador: true, salvar: false, abas: 0 });
     // A tela permanente tem abas e Salvar, e NENHUM numeral de passo: aqueles
     // eram o wizard improvisado.

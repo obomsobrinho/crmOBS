@@ -57,3 +57,14 @@ test.describe("Guardas do assistente de montagem", () => {
 //    hoje (a OBM é avançada mas já publicou, e escrever na OBM é proibido pelo
 //    projeto). Virar a Loja Teste para avançado quebraria os testes do agente,
 //    que dependem do modo guiado.
+
+// ⚠️ SEM TESTE, desde 24/09/2026: o 409 da PRIMEIRA ATIVAÇÃO com o WhatsApp não
+// conectado de verdade (`PUT /api/clients/[id]/publish` consulta o estado real
+// na Evolution e recusa se não for `open`).
+//    Falta: uma conta que ainda NÃO publicou, com instância criada e nunca lida.
+//    A OBS já publicou, então a regra nem é consultada para ela (vale só na
+//    primeira ativação), e o teste passaria sem exercer nada. Criar um tenant
+//    novo por teste deixaria uma instância órfã na Evolution a cada execução.
+//    O que existe: o botão "Ativar o agente" desabilitado até conectar, provado
+//    sem login em `montagem.design.spec.ts`. A regra do servidor fica para o
+//    teste com chip real pelo dono.

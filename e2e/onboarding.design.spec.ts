@@ -40,7 +40,8 @@ test.describe("Aviso de montagem (/design/onboarding)", () => {
     // assume, e repetir a palavra nos dois lugares confundia os dois estados.
     await expect(page.getByText("Desativado")).toBeVisible();
     // ⚠️ "testar a conversa" SAIU da lista de pendências (decisão do dono,
-    // 28/08/2026): testar é oferecido no passo 4 do assistente, mas não barra
+    // 28/08/2026): testar é oferecido no passo 3 do assistente (era o 4 até a
+    // ordem ser invertida em 24/09/2026), mas não barra
     // mais a ativação. Sobraram conectar e configurar.
     await expect(
       page.getByText(/Antes de ativar o agente, falta: configurar o agente/)

@@ -70,9 +70,10 @@ select
   case
     when c.agent_published_at is not null and c.agent_enabled then 'no ar'
     when c.agent_published_at is not null then 'publicou e desligou'
-    when c.agent_config_updated_at is not null then 'parou em: testar e ativar'
-    when c.evolution_instance is not null then 'parou em: quem atende'
-    else 'parou em: conectar o WhatsApp'
+    when c.agent_config_updated_at is not null and c.evolution_instance is not null
+      then 'parou em: conectar e ativar (instância criada)'
+    when c.agent_config_updated_at is not null then 'parou em: testar ou conectar'
+    else 'parou em: quem atende'
   end as onde_parou,
   c.agent_published_at
 from public.clients c
@@ -80,9 +81,13 @@ where c.account_type = 'beta'
 order by c.agent_published_at nulls first, c.name;
 ```
 
-**Como ler.** `onde_parou` com "conectar o WhatsApp" é a conta que nunca saiu do
-zero: ou o QR não funcionou, ou a pessoa abriu no celular e não conseguiu ler o
-código na própria tela (furo conhecido, ver `proximos-passos.md`).
+**Como ler.** ⚠️ A ordem da montagem foi invertida em 24/09/2026 (quem atende, o
+que ele sabe, testar, conectar e ativar), e o `case` acima segue a ordem nova.
+"quem atende" é a conta que nunca saiu do zero. "conectar e ativar (instância
+criada)" é quem pediu o QR ou o código e não terminou: ou a conexão não
+funcionou, ou conectou e não ativou. `conectou` diz só que a instância foi
+criada, não que o número foi lido. Conta de antes da inversão pode ter conectado
+sem configurar, e cai em "quem atende".
 `publicou e desligou` é o sinal mais grave da lista: alguém foi ao ar, viu algo
 de que não gostou e desligou a IA. Vale a ligação no mesmo dia.
 

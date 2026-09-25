@@ -407,7 +407,7 @@ segue é o que ficou decidido no caminho, e é aqui que se olha antes de mexer n
 | Quando existe | só antes da primeira ativação | sempre |
 | Estrutura | 4 passos, tela cheia, sem menu | 3 abas dentro do app |
 | Contador | "Passo N de 4" | nenhum |
-| Salvar | automático, UMA vez, ao sair do passo 3 | botão no rodapé |
+| Salvar | automático, UMA vez, ao sair de "o que ele sabe" (passo 3 até 24/09/2026, hoje o 2) | botão no rodapé |
 | Modo avançado | nunca | botão à direita da faixa de abas |
 
 **Mapa de campos (o artefato aprovado).** O assistente pede **três campos digitados**, mais um clique
@@ -450,6 +450,20 @@ isso é o mínimo real, e não uma estimativa.
 6. **A ordem dos passos ficou como estava**, com o QR primeiro, mesmo a pesquisa apontando que é o
    passo mais caro: é o único que pode falhar por causa externa, e descobrir isso depois de dez
    minutos de formulário é pior.
+   ⚠️ **REVISTA EM 24/09/2026 (decisão do dono): a ordem foi INVERTIDA.** Agora é quem atende, o que
+   ele sabe, testar, conectar e ativar (plano em `docs/plano-montagem-invertida.md`). O que pesou
+   mais que o argumento acima: a pessoa tinha medo de conectar e o agente sair respondendo antes de
+   ela terminar de configurar. Tecnicamente isso nunca aconteceu (o `processTurn` fica mudo enquanto
+   `agent_published_at` é nulo), mas pedir o número no primeiro passo passava essa impressão, e a
+   tela nunca dizia o contrário. Com a ordem nova ela investe primeiro no que é fácil, vê o agente
+   responder na bancada (que não precisa de WhatsApp, por isso testar vem ANTES de conectar) e só no
+   fim liga o número. **Conectar não liga o agente:** o último passo diz isso no topo, e o botão
+   "Ativar o agente" fica desabilitado até a conexão aparecer na tela. O risco que o item 6 apontava
+   (descobrir que o QR falha depois do formulário) continua existindo e foi aceito; a configuração
+   já está salva quando ele aparece, então nada se perde.
+   Junto entrou a checagem de **conectado de verdade** na primeira ativação: o `PUT publish` consulta
+   o estado real na Evolution e recusa com 409 se não for `open` (se a Evolution não responder, não
+   bloqueia).
 
 **Pesquisa que mudou implementação**
 - **[DADO]** Yan, Conrad, Tourangeau e Couper, *Interacting with Computers* (2010), N=3.179:

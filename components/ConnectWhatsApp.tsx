@@ -39,7 +39,7 @@ export default function ConnectWhatsApp({
   hasInstance: boolean;
   /**
    * `pagina` = a tela `/connect` inteira (moldura de tela cheia, título próprio,
-   * botão de sair). `passo` = embutido como passo 1 do assistente de montagem,
+   * botão de sair). `passo` = embutido no último passo do assistente de montagem,
    * onde a moldura, o título e o sair já existem em volta.
    *
    * ⚠️ São duas MOLDURAS do mesmo componente, e não dois componentes: o QR, o
@@ -90,8 +90,8 @@ export default function ConnectWhatsApp({
     setPhase("connected");
     setTimeout(() => {
       // Dentro do assistente quem decide o que vem depois é o assistente: ele
-      // avança para o passo 2 sem trocar de rota, senão o rascunho da montagem
-      // e o passo atual iriam junto com a navegação.
+      // mostra a ativação sem trocar de rota, senão o rascunho da montagem e o
+      // passo atual iriam junto com a navegação.
       if (onConectado) {
         onConectado();
         return;
@@ -199,9 +199,13 @@ export default function ConnectWhatsApp({
             <p className="font-medium text-human-ink">Tudo pronto!</p>
             {/* Dizer que o passado não vem é o que evita a pessoa procurar
                 conversas antigas e achar que perdeu alguma coisa. */}
+            {/* No assistente, "as conversas aparecem aqui" confundiria: a pessoa
+                ainda não ativou, e o medo que a ordem nova da montagem tira é
+                justamente o de conectar e o agente sair respondendo. */}
             <p className="text-apoio text-ink-2">
-              As conversas aparecem aqui a partir de agora. O histórico continua
-              no seu celular.
+              {passo
+                ? "Número conectado. O agente continua desligado até você ativar."
+                : "As conversas aparecem aqui a partir de agora. O histórico continua no seu celular."}
             </p>
           </div>
         ) : (

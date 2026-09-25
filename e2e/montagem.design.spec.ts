@@ -7,11 +7,16 @@ import { test, expect } from "@playwright/test";
 // na conta, que nenhum texto fixo assume um segmento, e que a saída não perde
 // nada.
 
+// ⚠️ ORDEM INVERTIDA EM 24/09/2026 (decisão do dono). Era conectar, quem, sabe,
+// "testar e ativar"; virou quem, sabe, testar, "conectar e ativar". Motivo: pedir
+// o WhatsApp no primeiro passo passava a impressão de que o agente sairia
+// respondendo antes de a pessoa terminar de configurar. A lista abaixo é a ordem
+// nova, e o teste "a ordem é esta" prende ela.
 const PASSOS = [
-  { key: "conectar", titulo: "Conectar o WhatsApp" },
   { key: "quem", titulo: "Quem atende" },
   { key: "sabe", titulo: "O que ele sabe" },
-  { key: "ativar", titulo: "Testar e ativar" },
+  { key: "testar", titulo: "Testar" },
+  { key: "conectar", titulo: "Conectar e ativar" },
 ];
 
 test.describe("Assistente de montagem (/design/montagem)", () => {
@@ -26,6 +31,58 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       await expect(page.getByText(`Passo ${i + 1} de 4`)).toBeVisible();
       await expect(page.locator('[data-slot="montagem-trilho"]')).toHaveCount(4);
     }
+  });
+
+  test("a ordem é quem, sabe, testar e conectar, e abre em quem", async ({
+    page,
+  }) => {
+    // Sem `?passo=` o preview abre onde uma conta nova abre: no primeiro passo.
+    await page.goto("/design/montagem");
+    await expect(page.getByRole("heading", { name: "Quem atende" })).toBeVisible();
+
+    // Andando pelo Continuar, e não por URL: é o caminho que a pessoa faz. O
+    // preview não grava, então sair de "sabe" não depende de banco.
+    const continuar = page.getByRole("button", { name: "Continuar", exact: true });
+    await page.waitForLoadState("networkidle");
+    for (const p of PASSOS.slice(1)) {
+      await continuar.click();
+      await expect(page.getByRole("heading", { name: p.titulo })).toBeVisible();
+    }
+  });
+
+  test("testar vem antes de conectar e não é obrigatório", async ({ page }) => {
+    await page.goto("/design/montagem?passo=testar");
+    // A bancada está aqui, e não no último passo: ela não precisa de WhatsApp.
+    await expect(page.getByText("Fale com ele antes")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Continuar", exact: true })
+    ).toBeEnabled();
+    await expect(page.getByText(/Testar não é obrigatório/)).toBeVisible();
+  });
+
+  test("conectar não liga o agente: ativar fica travado até conectar", async ({
+    page,
+  }) => {
+    await page.goto("/design/montagem?passo=conectar");
+    await expect(page.locator('[data-slot="conectar-nao-liga"]')).toContainText(
+      "Conectar não liga o agente"
+    );
+    const ativar = page.getByRole("button", { name: "Ativar o agente" });
+    await expect(ativar).toBeDisabled();
+    // A razão escrita, porque botão desabilitado não mostra dica.
+    await expect(page.getByText("Conecte o WhatsApp para ativar.")).toBeVisible();
+    await expect(ativar).toHaveAttribute("aria-describedby", "razao-ativar");
+    // O que acontece ao ativar só aparece depois de conectar.
+    await expect(page.getByText("Ao ativar, o que acontece")).toHaveCount(0);
+
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await expect(page.locator('[data-slot="whatsapp-conectado"]')).toBeVisible();
+    await expect(page.getByText("Ao ativar, o que acontece")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Ativar o agente" })
+    ).toBeEnabled();
+    // Conectado, o QR sai da frente: a tela passa a ser sobre ativar.
+    await expect(page.getByText("Conecte o WhatsApp para ativar.")).toHaveCount(0);
   });
 
   test("um contador só, e ele é este", async ({ page }) => {
@@ -96,7 +153,9 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       page.getByRole("button", { name: "Deixar para depois" })
     ).toBeVisible();
 
-    for (const key of ["conectar", "quem", "ativar"]) {
+    // Testar também é opcional, mas tem "Continuar" livre, que já é o pular: um
+    // segundo botão diria a mesma coisa duas vezes.
+    for (const key of ["quem", "testar", "conectar"]) {
       await page.goto(`/design/montagem?passo=${key}`);
       await expect(
         page.getByRole("button", { name: "Deixar para depois" })
@@ -108,8 +167,10 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     page,
   }) => {
     await page.goto("/design/montagem?passo=conectar");
-    // Quem avança é a conexão, sozinha. Um Continuar aqui levaria a pessoa para
-    // um agente que não tem de onde responder.
+    // ⚠️ O MOTIVO MUDOU EM 24/09/2026. Antes: quem avançava era a conexão,
+    // sozinha, para o passo seguinte. Agora conectar é o ÚLTIMO passo, e o botão
+    // da direita é "Ativar o agente" (desabilitado até conectar, provado no
+    // teste acima). Continuar aqui não teria para onde ir.
     //
     // `exact` é obrigatório: sem ele o Playwright casa por SUBSTRING no nome
     // acessível, e "Continuar" encontraria "Sair e continuar depois".

@@ -635,9 +635,20 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   SUPERFÍCIES sobre UM formulário**, no padrão de setup do WooCommerce. Mapa de campos, decisões e o
   que ficou de fora em `docs/proximos-passos.md`.
   - **`/montagem`** é o assistente: tela cheia, fora do route group `(app)`, quatro passos
-    (conectar, quem atende, o que ele sabe, testar e ativar). **Roda uma vez na vida da conta** e
+    (**quem atende, o que ele sabe, testar, conectar e ativar**). **Roda uma vez na vida da conta** e
     some para sempre depois da primeira ativação. Pede **três campos digitados** (nome da empresa, o
     que a empresa faz, nome do agente), mais um clique de modelo e um de tom.
+  - ⚠️ **ORDEM INVERTIDA EM 24/09/2026 (decisão do dono; plano em `docs/plano-montagem-invertida.md`).**
+    Conectar era o passo 1 e virou o último. Motivo: a pessoa tinha medo de ligar o WhatsApp e o
+    agente sair respondendo antes de ela terminar. Isso nunca aconteceu (mudo enquanto
+    `agent_published_at` é nulo), mas a tela nunca disse, e pedir o número primeiro passava essa
+    impressão. **Testar vem ANTES de conectar de propósito:** a bancada não precisa de WhatsApp.
+    **CONECTAR NÃO LIGA O AGENTE**, e o último passo diz isso no topo: o `onConectado` do
+    `ConnectWhatsApp` NÃO avança de passo, só revela a lista "Ao ativar" e habilita o botão
+    "Ativar o agente" do rodapé, que fica **desabilitado até a conexão ser vista na tela** (com a
+    razão escrita). A instância deixou de ser piso: `montagemState` manda quem não configurou para
+    `quem` e quem configurou para `conectar`. Rascunho antigo com `passo: "ativar"` é lido como
+    `conectar`. O preview abre o estado conectado com `/design/montagem?passo=conectar&conectado=1`.
   - **`/agente`** é a tela permanente: **três abas de verdade** (quem atende, o que ele sabe, o que
     ele pode fazer) mais o modo avançado. Perdeu os numerais e os botões "Continuar", que eram um
     wizard improvisado de quando não existia um de verdade.
@@ -654,7 +665,7 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   - **Erro em aba fechada:** o `PUT` devolve `fields`, a tela troca sozinha para a primeira aba com
     erro e marca a aba com um ponto. Só DEPOIS de tentar salvar.
   - **Rascunho no navegador** (`components/agente/rascunho.ts`, chave `montagem:{clientId}`): o
-    assistente grava no servidor **UMA vez**, ao sair do passo 3. Se `agent_config_updated_at` for
+    assistente grava no servidor **UMA vez**, ao sair de "o que ele sabe" (passo 2). Se `agent_config_updated_at` for
     mais novo que o rascunho, o servidor vence. ⚠️ Rascunho não atravessa aparelho. É também por
     causa dele que `/montagem` carrega o wizard com `ssr: false` (`components/MontagemCliente.tsx`).
   - **Quatro guardas em `/montagem`**: conta bloqueada vai para `/assinatura`, atendente para
@@ -670,16 +681,22 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     para o dono. O contador de progresso da conta passou a existir num lugar só, dentro do
     assistente.
   - ⚠️ **`publishBlockers()` PERDEU O `tested`** (decisão do dono, 28/08/2026): sobraram conectar e
-    configurar. O passo 4 continua oferecendo o teste com destaque, mas ele não barra mais a
+    configurar. O passo "Testar" (o 3) oferece o teste com destaque, mas ele não barra a
     ativação. `onboarding_tested_at` continua sendo gravado pelo `/api/playground`, agora só como
     dado.
+  - ⚠️ **Conectado DE VERDADE na primeira ativação (24/09/2026):** `evolution_instance` nasce ao
+    PEDIR o QR ou o código, não ao conectar, então `publishBlockers` sozinho deixava ativar sobre
+    uma instância nunca lida. O `PUT publish` consulta `connectionState` na Evolution e responde 409
+    se o estado for claramente diferente de `open`. **Se a Evolution não responder, NÃO bloqueia**
+    (dado faltando não derruba quem está ativando). Só na primeira ativação. Sem teste com login
+    (exige conta nova não publicada; buraco declarado em `e2e/montagem.auth.spec.ts`).
   - **O interruptor do agente são DUAS colunas** (ver a regra no glossário de `clients`):
     `agent_published_at` nulo **ou** `agent_enabled` false e o `processTurn` devolve **200 com
     `messages` vazio** (e NÃO erro) antes de chamar o modelo, então a IA fica muda, não gasta token e
     **a mensagem do cliente continua sendo gravada** pelo n8n para um humano responder. Vale só fora
     do `dryRun`. `PUT /api/clients/[id]/publish` recebe `{ enabled: boolean }`, é dono-only, e os
     pré-requisitos valem **só na primeira ativação** (409 com o que falta).
-  - Aviso de risco do QR em `/connect` e dentro do passo 1 do assistente
+  - Aviso de risco do QR em `/connect` e dentro do passo de conectar do assistente
     (`components/ConnectionRiskNotice.tsx`): **nunca** prometer proteção contra bloqueio nem usar
     "não pague a API da Meta" (e2e trava isso). ⚠️ `ConnectWhatsApp` ganhou `enquadramento`
     (`pagina`/`passo`) e `onConectado`: são duas MOLDURAS do mesmo componente, porque o QR, o código
