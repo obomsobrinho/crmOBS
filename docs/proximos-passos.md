@@ -803,6 +803,22 @@ para agora: a cobrança segue parada até o beta acabar. É a lista para atacar 
    atender (Empresa e Conta a pessoa já sabe; "nenhum plano escolhido" é o que ela veio resolver).
    Decidir junto com o item 1, porque o desenho da caixa muda se o pagamento for por dentro.
 
+### Excluir conta: desativar primeiro, apagar de verdade só a pedido (anotado em 24/09/2026, DEPOIS do beta)
+
+Decisão do dono ao limpar à mão as contas de teste antes do beta (script SQL, instâncias na
+Evolution e arquivos no Storage, tudo manual). Duas saídas diferentes, e não uma:
+
+1. **"Excluir conta" desativa.** A conta fica parada, sem atender e sem cobrar, e se a pessoa voltar
+   ela entra direto, com tudo como deixou.
+2. **"Apagar tudo" apaga de verdade**, só quando a pessoa pede explicitamente (é também o caminho
+   da LGPD). Uma função faz na ordem: cancelar a assinatura no Asaas, apagar a instância na
+   Evolution, apagar os arquivos do tenant nos buckets `knowledge` e `whatsapp-media`, apagar no banco
+   numa transação (as tabelas sem cascata primeiro: `chat_messages`, `dados_cliente`,
+   `conversation_qualifications`, `knowledge_documents`, `knowledge_chunks`; depois `clients`, que
+   leva o resto) e por fim os logins que não pertencem a outra conta. A mesma função serve para o
+   dono limpar conta de teste sem SQL. A decidir: confirmação forte (digitar o nome da empresa),
+   prazo de arrependimento, e o que fica guardado de `billing_events` para o fiscal.
+
 ### Tela de Clientes (levantado pelo dono em 31/08, provável entrar ANTES do beta)
 
 **A lacuna:** o sistema tem **conversas**, não **clientes**. `dados_cliente` já guarda todo mundo que
