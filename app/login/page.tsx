@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +10,16 @@ import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
-export default function LoginPage() {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
+  // `/auth/confirm` e `/auth/concluir` mandam para cá com `?erro=convite` quando o
+  // link do e-mail não abriu a sessão. Sem este aviso a pessoa via só um login
+  // e não sabia o que fazer (25/09/2026): o caso comum é o link já usado, porque
+  // o Supabase aceita cada link uma vez só.
+  const linkFalhou = use(searchParams).erro === "convite";
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -48,6 +57,21 @@ export default function LoginPage() {
           <h1 className="text-titulo">Entrar</h1>
           <p className="text-apoio text-ink-2">Acesse a conta da sua empresa.</p>
         </div>
+
+        {linkFalhou && (
+          <p
+            role="alert"
+            data-slot="aviso-link"
+            className="rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink"
+          >
+            Esse link expirou ou já foi usado. Se ainda não criou sua senha,
+            peça um novo em{" "}
+            <Link href="/recuperar-senha" className="font-semibold underline">
+              Esqueci minha senha
+            </Link>
+            .
+          </p>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="email" className="text-apoio font-medium">
@@ -90,7 +114,7 @@ export default function LoginPage() {
         <Button
           type="submit"
           size="field"
-          disabled={loading}
+          carregando={loading}
           className="w-full justify-center max-md:h-11"
         >
           {loading ? "Entrando…" : "Entrar"}

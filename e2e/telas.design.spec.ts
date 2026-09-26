@@ -295,7 +295,7 @@ test.describe("Bancada de teste (/design/playground)", () => {
     await expect(page.getByText(/Encaixes de urgência/)).toBeVisible();
     // O campo de mensagem existe (fala direto com a IA).
     await expect(
-      page.getByPlaceholder("Escreva como um cliente escreveria...")
+      page.getByRole("textbox", { name: "Mensagem de teste" })
     ).toBeVisible();
   });
 });

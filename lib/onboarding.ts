@@ -75,15 +75,20 @@ export const PASSOS_MONTAGEM: PassoDef[] = [
     // WhatsApp, e testar depois de conectar só faria sentido pelo número de
     // verdade, com o agente já respondendo, que é o medo que a ordem nova tira.
     key: "testar",
-    titulo: "Testar",
+    // Título e frase encurtados em 26/09/2026 (dono): "Testar" sozinho era
+    // pobre, e a frase longa empurrava a conversa para baixo da dobra.
+    titulo: "Converse com o seu agente",
     porque:
-      "Converse com ele como se fosse alguém chamando no WhatsApp. Nada sai daqui e ninguém recebe mensagem.",
+      "Escreva ou grave um áudio como um cliente faria. Nada sai daqui.",
   },
   {
     key: "conectar",
     titulo: "Conectar e ativar",
     porque:
-      "Ligue o número que vai atender, pelo QR code ou pelo próprio número. Depois disso, ativar é com você.",
+      // Uma frase só (26/09/2026, dono): o passo tinha esta, uma caixa dizendo
+      // o mesmo e mais três instruções. Os passos de COMO conectar estão na
+      // própria área do código, no molde do WhatsApp Web.
+      "Conectar não liga o agente: ele só começa a responder quando você ativar.",
   },
 ];
 

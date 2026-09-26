@@ -860,6 +860,10 @@ test.describe("Kanban redesenhado", () => {
       .locator('[data-slot="pipeline-card"]')
       .filter({ hasText: "Sua vez" });
     const total = page.locator('[data-slot="pipeline-card"]');
+    // ⚠️ Esperar o quadro ANTES de contar (26/09/2026): `count()` não espera
+    // nada, e com a máquina carregada ele contava zero cards e o teste falhava
+    // sem defeito nenhum (falhou duas vezes na suíte inteira e passou sozinho).
+    await expect(comHandoff.first()).toBeVisible();
     const n = await comHandoff.count();
     expect(n).toBeGreaterThan(0);
     // Âmbar é pendência de verdade, e pendência de verdade é handoff aberto. Se

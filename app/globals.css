@@ -849,6 +849,42 @@ select:focus-visible,
   animation: msg-in var(--dur-slow) var(--ease-out) both;
 }
 
+/* "Digitando…" da bancada de teste (26/09/2026): os três pontos do WhatsApp
+   enquanto o agente pensa. Pedido do dono para a montagem, que é a primeira
+   impressão do produto: resposta que surge do nada lê como formulário, e não
+   como conversa. Cada ponto sobe e clareia em sequência. */
+@keyframes digitando {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+.digitando > span {
+  animation: digitando 1.2s var(--ease-out) infinite;
+}
+.digitando > span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.digitando > span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Gravando áudio: a bolinha pulsa, como no WhatsApp. */
+@keyframes gravando {
+  50% {
+    opacity: 0.3;
+  }
+}
+.gravando {
+  animation: gravando 1s ease-in-out infinite;
+}
+
 /* ── Item 12: entrada e saída de camada flutuante ──
    Escrito à mão, e NÃO com `tw-animate-css`: aquele pacote é exatamente este
    punhado de keyframes, a casa já tinha `msg-in` no mesmo padrão, e o combinado
@@ -1095,6 +1131,9 @@ select:focus-visible,
    o valor final declarado fora do keyframe. Hover e acordeão continuam
    funcionando, só sem transição. */
 @media (prefers-reduced-motion: reduce) {
+  /* Os pontos param, mas continuam lá: o "está digitando" é informação. */
+  .digitando > span,
+  .gravando,
   .msg-in,
   .anim-flutuante,
   .anim-lateral,

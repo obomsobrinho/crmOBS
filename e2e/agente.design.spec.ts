@@ -80,7 +80,7 @@ test.describe("Tela do agente (/design/agente)", () => {
     await expect(painel.getByText(/mesmo sem salvar/)).toBeVisible();
     // Conversa de um lado, diagnóstico do outro.
     await expect(
-      painel.getByPlaceholder("Escreva como um cliente escreveria...")
+      painel.getByRole("textbox", { name: "Mensagem de teste" })
     ).toBeVisible();
     await expect(painel.getByText("Classificação", { exact: true })).toBeVisible();
     await expect(painel.getByText("Handoff", { exact: true })).toBeVisible();

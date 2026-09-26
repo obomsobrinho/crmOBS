@@ -56,7 +56,7 @@ export default function CadastroPage() {
               <h1 className="text-titulo">Confira seu e-mail</h1>
               <p className="text-apoio text-ink-2">
                 Mandamos um link para <span className="font-medium">{email}</span>.
-                Abra o link para escolher sua senha e começar.
+                Abra o link para criar sua senha e começar.
               </p>
             </div>
           </div>
@@ -134,7 +134,7 @@ export default function CadastroPage() {
         <Button
           type="submit"
           size="field"
-          disabled={loading}
+          carregando={loading}
           className="w-full justify-center max-md:h-11"
         >
           {loading ? "Criando conta…" : "Criar conta"}

@@ -521,7 +521,7 @@ export default function AgentConfigForm({
             Agora teste a conversa
           </Button>
         )}
-        <Button size="field" onClick={() => salvar()} disabled={form.saving}>
+        <Button size="field" onClick={() => salvar()} carregando={form.saving}>
           <Save size={15} />
           {form.saving ? "Salvando…" : "Salvar"}
         </Button>

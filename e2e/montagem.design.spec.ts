@@ -15,7 +15,8 @@ import { test, expect } from "@playwright/test";
 const PASSOS = [
   { key: "quem", titulo: "Quem atende" },
   { key: "sabe", titulo: "O que ele sabe" },
-  { key: "testar", titulo: "Testar" },
+  // "Testar" virou "Converse com o seu agente" em 26/09/2026 (dono: pobre).
+  { key: "testar", titulo: "Converse com o seu agente" },
   { key: "conectar", titulo: "Conectar e ativar" },
 ];
 
@@ -53,25 +54,38 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
   test("testar vem antes de conectar e não é obrigatório", async ({ page }) => {
     await page.goto("/design/montagem?passo=testar");
     // A bancada está aqui, e não no último passo: ela não precisa de WhatsApp.
-    await expect(page.getByText("Fale com ele antes")).toBeVisible();
+    // ⚠️ DESDE 26/09/2026 A CONVERSA ESTÁ NO PASSO, sem botão para abrir um
+    // painel (pedido do dono): o cartão "Fale com ele antes" repetia o subtítulo
+    // e punha um clique a mais no único gesto que o passo existe para pedir.
+    const bancada = page.locator('[data-slot="montagem-bancada"]');
+    await expect(bancada.getByRole("textbox")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Testar o agente" })).toHaveCount(0);
+    await expect(page.getByText("Fale com ele antes")).toHaveCount(0);
+    // Sem diagnóstico na montagem: quem monta a conta quer ver a resposta.
+    await expect(page.getByRole("tab", { name: "Diagnóstico" })).toHaveCount(0);
+    // Opcional: o Continuar funciona sem mensagem nenhuma.
     await expect(
       page.getByRole("button", { name: "Continuar", exact: true })
     ).toBeEnabled();
-    await expect(page.getByText(/Testar não é obrigatório/)).toBeVisible();
   });
 
   test("conectar não liga o agente: ativar fica travado até conectar", async ({
     page,
   }) => {
     await page.goto("/design/montagem?passo=conectar");
-    await expect(page.locator('[data-slot="conectar-nao-liga"]')).toContainText(
-      "Conectar não liga o agente"
+    // ⚠️ Desde 26/09/2026 a frase mora UMA vez, no subtítulo do passo: a caixa
+    // "Conectar não liga o agente" e a linha "Conecte o WhatsApp para ativar"
+    // saíram por repetir o subtítulo (dono). O subtítulo virou a razão do
+    // botão desabilitado.
+    const porque = page.locator('[data-slot="montagem-porque"]');
+    await expect(porque).toHaveText(
+      "Conectar não liga o agente: ele só começa a responder quando você ativar."
     );
+    await expect(page.getByText(/Conectar não liga o agente/)).toHaveCount(1);
     const ativar = page.getByRole("button", { name: "Ativar o agente" });
     await expect(ativar).toBeDisabled();
-    // A razão escrita, porque botão desabilitado não mostra dica.
-    await expect(page.getByText("Conecte o WhatsApp para ativar.")).toBeVisible();
     await expect(ativar).toHaveAttribute("aria-describedby", "razao-ativar");
+    await expect(porque).toHaveAttribute("id", "razao-ativar");
     // O que acontece ao ativar só aparece depois de conectar.
     await expect(page.getByText("Ao ativar, o que acontece")).toHaveCount(0);
 
@@ -82,7 +96,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       page.getByRole("button", { name: "Ativar o agente" })
     ).toBeEnabled();
     // Conectado, o QR sai da frente: a tela passa a ser sobre ativar.
-    await expect(page.getByText("Conecte o WhatsApp para ativar.")).toHaveCount(0);
+    await expect(page.locator('[data-slot="passos-conexao"]')).toHaveCount(0);
   });
 
   test("um contador só, e ele é este", async ({ page }) => {
@@ -147,15 +161,12 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     expect(antes).toBe(true);
   });
 
-  test("pular existe só onde o passo é mesmo opcional", async ({ page }) => {
-    await page.goto("/design/montagem?passo=sabe");
-    await expect(
-      page.getByRole("button", { name: "Deixar para depois" })
-    ).toBeVisible();
-
-    // Testar também é opcional, mas tem "Continuar" livre, que já é o pular: um
-    // segundo botão diria a mesma coisa duas vezes.
-    for (const key of ["quem", "testar", "conectar"]) {
+  test("não existe \"Deixar para depois\" em passo nenhum", async ({ page }) => {
+    // ⚠️ MUDOU EM 26/09/2026. Ele existia só em "o que ele sabe" e fazia o
+    // mesmo que o Continuar (os dois gravam e avançam; nada ali é obrigatório,
+    // e o passo diz isso). Com a saída do assistente indo para o rodapé, seriam
+    // três botões com "depois" em dois. O Continuar livre é o pular.
+    for (const key of ["quem", "sabe", "testar", "conectar"]) {
       await page.goto(`/design/montagem?passo=${key}`);
       await expect(
         page.getByRole("button", { name: "Deixar para depois" })
@@ -173,7 +184,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     // teste acima). Continuar aqui não teria para onde ir.
     //
     // `exact` é obrigatório: sem ele o Playwright casa por SUBSTRING no nome
-    // acessível, e "Continuar" encontraria "Sair e continuar depois".
+    // acessível, e "Continuar" poderia casar com outro botão.
     await expect(
       page.getByRole("button", { name: "Continuar", exact: true })
     ).toHaveCount(0);
@@ -193,13 +204,41 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     expect(texto).not.toContain("anti-ban");
   });
 
-  test("a saída de continuar depois existe em todo passo", async ({ page }) => {
+  test("a saída existe em todo passo e diz o que fica para depois", async ({
+    page,
+  }) => {
+    // ⚠️ MUDOU EM 26/09/2026 (dono). Era "Sair e continuar depois", no alto, em
+    // todo passo: soava como sair de tudo, e era mais um lugar para clicar
+    // longe da ação. Agora o nome acompanha o progresso e, no computador, ela
+    // mora no rodapé ao lado da ação principal. No celular volta ao alto.
+    const ROTULO: Record<string, string> = {
+      quem: "Terminar depois",
+      sabe: "Terminar depois",
+      testar: "Testar depois",
+      conectar: "Conectar depois",
+    };
+    await page.setViewportSize({ width: 1440, height: 900 });
     for (const p of PASSOS) {
       await page.goto(`/design/montagem?passo=${p.key}`);
-      await expect(
-        page.getByRole("button", { name: "Sair e continuar depois" })
-      ).toBeVisible();
+      const saida = page.getByRole("button", { name: ROTULO[p.key], exact: true });
+      await expect(saida).toBeVisible();
+      // No computador, no rodapé.
+      await expect(page.locator("footer").getByRole("button", { name: ROTULO[p.key] })).toBeVisible();
+      await expect(page.getByText("Sair e continuar depois")).toHaveCount(0);
     }
+    // Conectado, o que fica para depois é ativar.
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await expect(page.getByRole("button", { name: "Ativar depois" })).toBeVisible();
+
+    // No celular a saída sobe para o cabeçalho.
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/design/montagem?passo=conectar");
+    await expect(
+      page.locator("header").getByRole("button", { name: "Conectar depois" })
+    ).toBeVisible();
+    await expect(
+      page.locator("footer").getByRole("button", { name: "Conectar depois" })
+    ).toBeHidden();
   });
 
   test("nenhum texto fixo assume um único segmento", async ({ page }) => {
@@ -277,4 +316,52 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     expect(m.rodapeVisivel).toBe(true);
     expect(m.cortados).toBe(0);
   });
+});
+
+test("trocar de modelo com o formulário preenchido pede confirmação e troca", async ({
+  page,
+}) => {
+  // Regressão de 26/09/2026 (achada pelo dono): o assistente não desenhava o
+  // diálogo de confirmação, e a segunda escolha de modelo ficava pendurada sem
+  // fazer nada.
+  await page.goto("/design/montagem?passo=quem");
+  await page.waitForLoadState("networkidle");
+  const convite = page.locator('[data-slot="preset-convite"]');
+  const advocacia = convite.getByRole("button", { name: "Advocacia" });
+  const pediatria = convite.getByRole("button", { name: "Pediatria" });
+
+  await pediatria.click();
+  await expect(pediatria).toHaveAttribute("aria-pressed", "true");
+
+  await advocacia.click();
+  await page.getByRole("button", { name: "Aplicar modelo" }).click();
+  await expect(advocacia).toHaveAttribute("aria-pressed", "true");
+  await expect(pediatria).toHaveAttribute("aria-pressed", "false");
+});
+
+test("conectar no molde do WhatsApp Web: três passos, o código ao lado", async ({
+  page,
+}) => {
+  // Pedido do dono com print do WhatsApp Web (26/09/2026): direto, pouco texto.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/design/montagem?passo=conectar");
+  await page.waitForLoadState("networkidle");
+  const passos = page.locator('[data-slot="passos-conexao"] > li');
+  await expect(passos).toHaveCount(3);
+  await expect(passos.nth(1)).toContainText("Aparelhos conectados");
+  // O botão diz o que faz: gera o QR. Nunca mais "Conectar WhatsApp".
+  await expect(page.getByRole("button", { name: "Gerar QR code" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Conectar WhatsApp" })).toHaveCount(0);
+  // Sem as frases soltas de antes.
+  await expect(page.getByText(/escaneie o QR code abaixo/)).toHaveCount(0);
+  await expect(page.getByText(/Clique em Conectar/)).toHaveCount(0);
+
+  // Troca de modo: pelo número, com os mesmos três passos.
+  await page.locator('[data-slot="trocar-modo-conexao"]').click();
+  await expect(passos).toHaveCount(3);
+  await expect(page.getByRole("textbox", { name: "Número do WhatsApp" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gerar código" })).toBeDisabled();
+  await expect(page.locator('[data-slot="trocar-modo-conexao"]')).toHaveText(
+    "Conectar com QR code"
+  );
 });

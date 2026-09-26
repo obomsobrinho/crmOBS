@@ -7,22 +7,22 @@ import {
   ArrowRight,
   Check,
   FileUp,
-  FlaskConical,
   Power,
   RotateCcw,
 } from "lucide-react";
 import BrandMark from "./BrandMark";
 import ConnectWhatsApp from "./ConnectWhatsApp";
-import AgentTestDrawer from "./AgentTestDrawer";
+import Playground from "./Playground";
 import {
   CamposOQueSabe,
   CamposQuemAtende,
   SeletorDePreset,
 } from "./agente/campos";
-import { Banner } from "./agente/ui";
+import { Banner, ConfirmModal } from "./agente/ui";
 import { useAgentConfig } from "./agente/useAgentConfig";
 import { gravarRascunho, lerRascunho, limparRascunho } from "./agente/rascunho";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { PASSOS_MONTAGEM, type PassoMontagem } from "@/lib/onboarding";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import type { KnowledgeDoc } from "@/lib/crm";
@@ -120,12 +120,33 @@ export default function MontagemWizard({
 
   const [ativando, setAtivando] = useState(false);
   const [erroAtivar, setErroAtivar] = useState<string | null>(null);
-  const [bancadaAberta, setBancadaAberta] = useState(false);
   // Conectado NESTA tela, visto pelo polling do `ConnectWhatsApp`. É estado de
   // tela, e não de banco: `evolution_instance` preenchida só diz que a
   // instância foi criada. Quem já chega com ela aberta vê o estado conectado
   // assim que o primeiro polling responde `open`.
   const [conectado, setConectado] = useState(!!conectadoInicial);
+
+  // Recomeçar a conversa de teste = remontar a bancada (a `key` muda), o mesmo
+  // truque do "Resetar" do `AgentTestDrawer`.
+  const [conversaTeste, setConversaTeste] = useState(0);
+  // O passo de conversa ocupa a tela inteira, SEM ROLAGEM (pedido do dono): o
+  // chat estica até o rodapé, como na tela de Conversas, e quem rola é só a
+  // conversa por dentro.
+  const telaCheia = passo === "testar";
+
+  // A saída diz O QUE fica para depois, e acompanha o progresso (26/09/2026,
+  // dono): "Sair e continuar depois" soava como sair de tudo. Em nenhum passo
+  // ela perde nada: antes de "o que ele sabe" o rascunho fica no navegador, e
+  // dali em diante a configuração já está salva no servidor.
+  const rotuloSaida =
+    passo === "conectar"
+      ? conectado
+        ? "Ativar depois"
+        : "Conectar depois"
+      : passo === "testar"
+        ? "Testar depois"
+        : "Terminar depois";
+  const sair = () => router.push("/inbox");
 
   const indice = PASSOS_MONTAGEM.findIndex((p) => p.key === passo);
   const atual = PASSOS_MONTAGEM[indice];
@@ -209,24 +230,38 @@ export default function MontagemWizard({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
+    <div
+      className={cn(
+        "flex flex-col bg-canvas",
+        telaCheia ? "h-dvh overflow-hidden" : "min-h-screen"
+      )}
+    >
       {/* A marca fica porque o assistente é tela cheia sem o menu, e sem ela a
           pessoa perde a referência de onde está. */}
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 sm:px-6">
         <BrandMark size="sm" />
         {/* SAIR SEM PERDER é o que separa abandono de desistência. O rascunho
             fica no navegador e a conta ganha uma linha de retorno nas outras
-            telas, então esta porta não custa nada. */}
+            telas, então esta porta não custa nada.
+            ⚠️ No computador ela mora no RODAPÉ, ao lado da ação principal
+            (26/09/2026, dono: "são vários lugares para clicar"). Aqui em cima
+            fica só no celular, onde o rodapé não tem espaço para três botões. */}
         <Button
           variant="ghost"
           size="chrome"
-          onClick={() => router.push("/inbox")}
+          onClick={sair}
+          className="sm:hidden"
         >
-          Sair e continuar depois
+          {rotuloSaida}
         </Button>
       </header>
 
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+      <main
+        className={cn(
+          "mx-auto w-full max-w-2xl flex-1 px-4 sm:px-6",
+          telaCheia ? "flex min-h-0 flex-col py-4 sm:py-6" : "py-6 sm:py-8"
+        )}
+      >
         {/* Indicador por PASSO, e não por porcentagem. Os passos levam tempos
             muito diferentes (escanear um QR contra digitar um nome), e barra de
             porcentagem que parece travada logo no começo é medidamente PIOR do
@@ -234,7 +269,7 @@ export default function MontagemWizard({
             pessoas (Yan, Conrad, Tourangeau e Couper, 2010), o indicador que
             parecia lento no início dobrou o abandono, de 11,3% para 21,8%, e
             ficou abaixo até do grupo sem indicador nenhum (12,7%). */}
-        <div className="mb-6">
+        <div className={telaCheia ? "mb-4" : "mb-6"}>
           <div className="mb-2 flex items-center gap-1.5">
             {PASSOS_MONTAGEM.map((p, i) => (
               <span
@@ -254,15 +289,41 @@ export default function MontagemWizard({
           </p>
         </div>
 
-        <h1 className="text-titulo">{atual.titulo}</h1>
-        <p className="mt-1.5 text-apoio text-ink-2">{atual.porque}</p>
-
-        {rascunho && (
-          <p className="mt-4 flex items-center gap-2 text-legenda text-ink-3">
-            <RotateCcw size={13} aria-hidden />
-            Retomamos de onde você parou. Nada foi ao ar ainda.
-          </p>
-        )}
+        {/* ⚠️ NÃO EXISTE MAIS o "Retomamos de onde você parou. Nada foi ao ar
+            ainda." (26/09/2026, dono): voltar com o que já tinha escrito é o
+            esperado e dispensa aviso, e a frase aparecia longe do que dizia, a
+            ponto de o próprio dono não entender. O rascunho continua sendo lido
+            do mesmo jeito; só o anúncio saiu. */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-titulo">{atual.titulo}</h1>
+            {/* No passo de conectar o subtítulo É a razão do Ativar desabilitado
+                (`aria-describedby` do botão aponta para cá). */}
+            <p
+              id={passo === "conectar" ? "razao-ativar" : undefined}
+              data-slot="montagem-porque"
+              className="mt-1.5 text-apoio text-ink-2"
+            >
+              {atual.porque}
+            </p>
+          </div>
+          {/* Sempre à vista, e não só depois da primeira mensagem (dono): é a
+              saída para testar de novo do zero depois de voltar e ajustar. */}
+          {passo === "testar" && (
+            <Button
+              variant="outline"
+              size="field"
+              onClick={() => setConversaTeste((n) => n + 1)}
+              aria-label="Recomeçar conversa"
+              // No celular só o ícone: com o rótulo o título quebrava em duas
+              // linhas e empurrava a conversa para baixo.
+              className="shrink-0 max-sm:w-10 max-sm:justify-center max-sm:px-0"
+            >
+              <RotateCcw size={14} />
+              <span className="max-sm:hidden">Recomeçar conversa</span>
+            </Button>
+          )}
+        </div>
 
         {form.error && (
           <div
@@ -274,7 +335,11 @@ export default function MontagemWizard({
           </div>
         )}
 
-        <div className="mt-6 space-y-5">
+        <div
+          className={
+            telaCheia ? "mt-4 flex min-h-0 flex-1 flex-col" : "mt-6 space-y-5"
+          }
+        >
           {passo === "quem" && (
             <>
               <SeletorDePreset
@@ -318,65 +383,33 @@ export default function MontagemWizard({
             </>
           )}
 
+          {/* A CONVERSA MORA NO PASSO (26/09/2026, pedido do dono). Era um cartão
+              repetindo o subtítulo com um botão que abria a bancada num painel
+              lateral: um clique a mais num passo cuja razão de existir é testar.
+              Sem o diagnóstico (`diagnostico={false}`), porque aqui quem testa
+              quer ver o agente responder, não RAG e estágio.
+              Testar continua OFERECIDO, nunca exigido (decisão de 28/08/2026):
+              o Continuar deste passo funciona sem mensagem nenhuma. */}
           {passo === "testar" && (
-            <div className="rounded-xl border border-brand-line bg-brand-surface p-5">
-              <div className="flex items-start gap-3">
-                <FlaskConical
-                  size={18}
-                  className="mt-0.5 shrink-0 text-brand-ink"
-                  aria-hidden
-                />
-                <div className="min-w-0">
-                  <p className="text-corpo font-semibold">Fale com ele antes</p>
-                  <p className="mt-1 text-apoio text-ink-2">
-                    Pergunte o que mais te perguntam e veja como ele responde.
-                    Se algo sair diferente do que você quer, volte e ajuste.
-                    Testar não é obrigatório.
-                  </p>
-                  <div className="mt-3">
-                    {/* Testar é OFERECIDO, nunca exigido (decisão do dono,
-                        28/08/2026): virava um ritual antes de cada ativação, e
-                        o gate saiu de `publishBlockers`. Por isso o Continuar
-                        deste passo funciona sem a bancada ter sido aberta. */}
-                    <AgentTestDrawer
-                      configuracao={form.configuracao}
-                      stageNames={stageNames}
-                      aberto={bancadaAberta}
-                      onAbertoChange={setBancadaAberta}
-                    />
-                  </div>
-                </div>
-              </div>
+            <div
+              data-slot="montagem-bancada"
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <Playground
+                key={conversaTeste}
+                stageNames={stageNames}
+                configuracao={form.configuracao}
+                diagnostico={false}
+              />
             </div>
           )}
 
           {passo === "conectar" && (
             <>
-              {/* A frase que a ordem nova existe para dizer. Fica no TOPO, antes
-                  do QR, porque é o medo de quem chega aqui. */}
-              <p
-                data-slot="conectar-nao-liga"
-                className="flex items-start gap-2 rounded-xl border border-line bg-bloco px-4 py-3 text-apoio text-ink-2"
-              >
-                <Power
-                  size={15}
-                  className="mt-0.5 shrink-0 text-brand-ink"
-                  aria-hidden
-                />
-                <span>
-                  Conectar não liga o agente. Ele só começa a responder quando
-                  você ativar.
-                  {/* A razão do botão desabilitado mora AQUI, no topo, e não no
-                      pé do passo: o aviso de risco e o QR empurravam ela para
-                      baixo do rodapé grudado. */}
-                  {!conectado && (
-                    <span id="razao-ativar" className="block text-ink-3">
-                      Conecte o WhatsApp para ativar.
-                    </span>
-                  )}
-                </span>
-              </p>
-
+              {/* ⚠️ A CAIXA "Conectar não liga o agente" SAIU (26/09/2026, dono):
+                  ela repetia o subtítulo quase palavra por palavra. A frase que
+                  a ordem nova existe para dizer mora agora no próprio subtítulo
+                  do passo (`PASSOS_MONTAGEM`), uma vez só. */}
               {conectado ? (
                 <div
                   data-slot="whatsapp-conectado"
@@ -467,29 +500,31 @@ export default function MontagemWizard({
         </Button>
 
         <div className="flex items-center gap-2">
-          {/* Pular existe só onde o passo é de fato opcional. Nos outros o passo
-              não é adiável, e oferecer a saída ali seria mentir sobre o que
-              acontece depois. */}
-          {passo === "sabe" && (
-            <Button
-              variant="ghost"
-              size="field"
-              disabled={form.saving}
-              onClick={() => avancar()}
-              // Celular: respiro menor, senão os três botões vazam em 360px.
-              className="max-sm:px-2"
-            >
-              Deixar para depois
-            </Button>
-          )}
+          {/* ⚠️ "Deixar para depois" SAIU de "o que ele sabe" (26/09/2026). Ele
+              fazia exatamente o mesmo que o Continuar (os dois gravam e
+              avançam, e nada ali é obrigatório, o que o passo já diz), e com a
+              saída vindo para o rodapé seriam três botões com "depois" em dois.
+              A saída fica ao lado da ação principal, com o nome do que fica
+              para depois. */}
+          <Button
+            variant="ghost"
+            size="field"
+            onClick={sair}
+            disabled={form.saving || ativando}
+            className="max-sm:hidden"
+          >
+            {rotuloSaida}
+          </Button>
 
           {/* No último passo o botão é "Ativar o agente", e ele fica DESABILITADO
               até a conexão ser vista nesta tela: ativar sem número ligado seria
               um agente sem de onde responder. A razão está escrita no passo
-              (`razao-ativar`), porque botão desabilitado não mostra dica. */}
+              (`razao-ativar`, o subtítulo do passo), porque botão desabilitado
+              não mostra dica. */}
           <Button
             size="field"
-            disabled={form.saving || ativando || (ultimo && !conectado)}
+            carregando={form.saving || ativando}
+            disabled={ultimo && !conectado}
             aria-describedby={ultimo && !conectado ? "razao-ativar" : undefined}
             onClick={() => (ultimo ? ativar() : avancar())}
           >
@@ -507,6 +542,20 @@ export default function MontagemWizard({
           </Button>
         </div>
       </footer>
+
+      {/* ⚠️ BUG DE 26/09/2026: trocar de modelo com o formulário preenchido
+          não fazia nada. `choosePreset` guarda o modelo em `pendingPreset` e
+          espera a confirmação, e só a tela `/agente` desenhava o diálogo: aqui
+          o clique ficava pendurado para sempre. A confirmação fica, porque o
+          modelo substitui o que a pessoa escreveu em "o que ele sabe". */}
+      <ConfirmModal
+        aberto={form.pendingPreset !== null}
+        title={`Aplicar o modelo ${form.pendingPreset?.label ?? ""}?`}
+        body="Isso substitui tom, objetivos, regras e detalhes pelo esqueleto do segmento. Nome, endereço, site e horário são mantidos."
+        confirmLabel="Aplicar modelo"
+        onCancel={() => form.setPendingPreset(null)}
+        onConfirm={form.confirmarPreset}
+      />
     </div>
   );
 }

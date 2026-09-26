@@ -222,7 +222,7 @@ export default function AiSummary({
               size="chrome"
               variant="outline"
               onClick={resolver}
-              disabled={resolvendo}
+              carregando={resolvendo}
               className="shrink-0"
             >
               <CheckCheck size={14} />
@@ -273,7 +273,7 @@ export default function AiSummary({
             size="field"
             variant="outline"
             onClick={resolver}
-            disabled={resolvendo}
+            carregando={resolvendo}
             className="mt-2 w-full justify-center"
           >
             <CheckCheck size={15} />

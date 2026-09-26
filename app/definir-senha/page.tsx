@@ -104,7 +104,8 @@ export default function DefinirSenhaPage() {
         <Button
           type="submit"
           size="field"
-          disabled={loading || ready === false}
+          carregando={loading}
+          disabled={ready === false}
           className="w-full justify-center max-md:h-11"
         >
           {loading ? "Salvando…" : "Salvar e entrar"}

@@ -151,9 +151,10 @@ export default function FeedbackDialog({
                 size="field"
                 className="px-4"
                 onClick={enviar}
-                disabled={!texto.trim() || estado === "enviando"}
+                carregando={estado === "enviando"}
+                disabled={!texto.trim()}
               >
-                {estado === "enviando" ? "Enviando..." : "Enviar"}
+                {estado === "enviando" ? "Enviando…" : "Enviar"}
               </Button>
             </div>
           </>

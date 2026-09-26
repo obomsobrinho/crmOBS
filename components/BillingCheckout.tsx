@@ -166,7 +166,7 @@ export default function BillingCheckout({
             variant="outline"
             size="field"
             onClick={cancelar}
-            disabled={loading}
+            carregando={loading}
             className="border-danger-line text-danger-ink hover:bg-danger-surface"
           >
             {loading ? "Cancelando…" : "Confirmar cancelamento"}
@@ -285,7 +285,8 @@ export default function BillingCheckout({
         <Button
           size="field"
           onClick={assinar}
-          disabled={loading || !podeEnviar}
+          carregando={loading}
+          disabled={!podeEnviar}
           className="w-full justify-center max-md:h-11"
         >
           {loading

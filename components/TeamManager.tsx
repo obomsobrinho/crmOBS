@@ -176,7 +176,8 @@ export default function TeamManager({
             <Button
               type="submit"
               size="field"
-              disabled={inviting || !email.trim()}
+              carregando={inviting}
+              disabled={!email.trim()}
               className="px-4"
             >
               {inviting ? "Enviando…" : "Convidar"}

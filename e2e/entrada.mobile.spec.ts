@@ -30,5 +30,7 @@ test("no celular a conexão abre pelo número, com o QR como alternativa", async
   await expect(campo).toHaveAttribute("inputmode", "tel");
   await expect(page.getByRole("button", { name: "Gerar código" })).toBeDisabled();
   await page.locator('[data-slot="trocar-modo-conexao"]').click();
-  await expect(page.getByText("Clique em Conectar para gerar o QR.")).toBeVisible();
+  // O botão diz o que faz (26/09/2026, dono): era "Conectar WhatsApp" e só
+  // gerava o QR.
+  await expect(page.getByRole("button", { name: "Gerar QR code" })).toBeVisible();
 });

@@ -381,6 +381,22 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   incompleta volta **400** com os campos que faltam. **Foi painel e não duas colunas** de propósito:
   duas colunas refariam o layout de `/agente` aprovado em 22/08. ⚠️ A tela `/playground` **não existe
   mais** (responde 404) e saiu do menu; ficaram o endpoint e o preview `/design/playground`.
+- **A bancada virou CONVERSA (26/09/2026, pedidos do dono para a primeira impressão):** vale para o
+  `/agente` e para a montagem, porque é o mesmo `components/Playground.tsx`.
+  - **Vestida como a tela de Conversas:** `FundoRede`, as peles de balão do `Thread` (quem testa é o
+    cliente, `--bubble-in-*`; o agente é a IA, `--bubble-ia-*`) e a moldura do `MessageComposer`.
+    Quem testa fica à DIREITA (é o celular do cliente), ao contrário do inbox.
+  - **"Digitando…"** (`.digitando` no `globals.css`) enquanto o modelo pensa, e **um balão por item
+    de `messages`**, revelados um a um com pausa (`partes` no turno). ⚠️ `content` continua sendo a
+    junção: o histórico que o agente lê trata o turno como UM bloco, igual ao `chat_messages`.
+  - **Áudio:** grava no navegador (`MediaRecorder`, até 2 min), transcreve em
+    **`POST /api/playground/transcrever`** (dono-only, `whisper-1`, sem `language`) e manda o TEXTO
+    ao agente, que é o que o nó "Whisper" do n8n faz com áudio do WhatsApp. Mandar o som a um
+    modelo que ouve mostraria um agente que não existe. A transcrição aparece sob o balão
+    ("Transcrição: …"). ⚠️ Transcrição real ainda não provada com voz; o e2e usa microfone falso do
+    Chromium e resposta falsa.
+  - **`diagnostico={false}`** tira o painel de diagnóstico (só na montagem: quem monta quer ver a
+    resposta, e a coluna de 672px não comporta os dois).
 - **Fase 4 (assinatura e gate):** a regra de acesso mora em `lib/billing.ts` (**módulo puro**, zero
   imports, igual `lib/agent-prompt.ts`, então servidor e browser usam a MESMA função):
   `accessState({subscription_status, trial_ends_at, grace_until})` devolve `{blocked, reason,
@@ -617,6 +633,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   de substituir (o modal andou 256px na primeira tentativa).
   ⚠️ Para `<form>` ou `<section>` que É o cartão, usar `cn(cardVariants(), ...)` em vez de
   `Card asChild`: evita um nó extra na árvore só para envolver.
+  8. **`carregando` no `Button` (26/09/2026, dono: "botão salvando bloqueado é horrível"):** spinner
+     no lugar do ícone, cor CHEIA (o `disabled:opacity-50` fica só para recusa, como campo vazio),
+     travado contra clique duplo e `aria-busy`. Toda ação assíncrona usa `carregando={…}` e deixa
+     `disabled` só para falta de dado. ⚠️ **Com `asChild` o filho vai SOZINHO**: um `false` ao lado
+     dele quebra o Slot do Radix, e a primeira versão derrubou o pipeline no celular. Sem biblioteca
+     de animação (decisão reafirmada: Motion só se um dia houver gesto ou layout animado).
 
 - **Fase 4 (cadastro self-service):** `/cadastro` (público) manda `{companyName, email}` para
   `POST /api/signup`. **O formulário NÃO pede senha de propósito:** a senha nunca passa pelo nosso
@@ -631,6 +653,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   que falha também conta. `/recuperar-senha` e a troca de senha em `/perfil` falam com o Supabase
   Auth **direto do browser** (a troca confere a senha atual antes, porque `updateUser` não pede).
   ⚠️ Cadastro e convite dependem de SMTP configurado no projeto Supabase.
+  ⚠️ **O LINK DO E-MAIL CHEGA NO FLUXO IMPLÍCITO** (achado do dono, 25/09/2026): o modelo de e-mail
+  do Supabase manda a sessão depois do `#` (`#access_token=…`), e o `#` nunca chega ao servidor.
+  O `/auth/confirm` caía em `/login?erro=convite` e o convidado via um login no lugar de criar a
+  senha. Agora, sem `code` nem `token_hash`, ele redireciona para **`/auth/concluir`** (o `#` é
+  herdado pelo redirecionamento), que no navegador faz `setSession`, apaga o token da barra de
+  endereço e segue para `next`. O login mostra "Esse link expirou ou já foi usado" quando chega com
+  `?erro=convite`. ⚠️ **O link vale UMA vez:** abrir com o servidor fora do ar gasta o link. Teste
+  sem e-mail: `auth.admin.generateLink` com a chave de serviço devolve o mesmo link.
 - **Montagem e publicação (refeito em 28/08/2026, passo 2 do MVP do beta):** o agente tem **DUAS
   SUPERFÍCIES sobre UM formulário**, no padrão de setup do WooCommerce. Mapa de campos, decisões e o
   que ficou de fora em `docs/proximos-passos.md`.
@@ -649,6 +679,23 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     razão escrita). A instância deixou de ser piso: `montagemState` manda quem não configurou para
     `quem` e quem configurou para `conectar`. Rascunho antigo com `passo: "ativar"` é lido como
     `conectar`. O preview abre o estado conectado com `/design/montagem?passo=conectar&conectado=1`.
+  - **Rodada de 26/09/2026 no assistente (pedidos do dono, um por um):**
+    - **Passo 3 = "Converse com o seu agente"**: a bancada MORA no passo (sem cartão nem botão), a
+      página NÃO ROLA (`h-dvh`, só a conversa rola; e2e mede em 375 e 1440) e há
+      "Recomeçar conversa" ao lado do título (só ícone no celular).
+    - **Passo 4 no molde do WhatsApp Web** (`ConnectWhatsApp`): três passos numerados à esquerda, o
+      código à direita, e embaixo a troca de modo mais o aviso de risco (que entrou no cartão). O
+      botão diz o que faz: **"Gerar QR code"**, nunca mais "Conectar WhatsApp". Uma frase só no
+      subtítulo; a caixa "Conectar não liga o agente" saiu por repetir. O QR é redesenhado no roxo
+      da marca (`QrDaMarca`, canvas por luminosidade, cai na imagem original se falhar). ⚠️ Gerar o
+      QR continua pedindo clique: gerar sozinho criaria a instância na Evolution só por abrir o passo
+      (decisão pendente do dono).
+    - **A saída diz o que fica para depois** e mora no rodapé, ao lado da ação principal (no celular,
+      no alto): "Terminar depois", "Testar depois", "Conectar depois", "Ativar depois". Saíram o
+      "Sair e continuar depois", o "Deixar para depois" do passo 2 (fazia o mesmo que Continuar) e o
+      aviso "Retomamos de onde você parou" (ninguém entendia).
+    - **Bug corrigido:** trocar de modelo com o formulário preenchido não fazia nada, porque o
+      assistente não desenhava o `ConfirmModal` que `choosePreset` espera. Agora desenha.
   - **`/agente`** é a tela permanente: **três abas de verdade** (quem atende, o que ele sabe, o que
     ele pode fazer) mais o modo avançado. Perdeu os numerais e os botões "Continuar", que eram um
     wizard improvisado de quando não existia um de verdade.
@@ -792,7 +839,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   segue existindo para não quebrar link salvo, mas o lugar da base é o grupo "O que ele sabe" do
   `/agente`), `/equipe` (membros do time), `/perfil`, `/assinatura` (estado da conta, destino do
   gate de assinatura; fora do route group `(app)`), `/definir-senha` (convidado escolhe a senha),
-  `/auth/confirm` (verifica o link do e-mail).
+  `/auth/confirm` (verifica o link do e-mail), `/auth/concluir` (fecha o link que chega com a sessão
+  depois do `#`).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
   whatsapp-status, **agent-config** `PUT`, **notify-target** `PUT` dono-only,
   **publish** `PUT` dono-only (`{ enabled }`, liga e desliga o agente),
@@ -800,7 +848,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   direto ao Storage por URL assinada + processamento à parte, compatível com o limite de corpo da
   Vercel), `app/api/agent` (cérebro, `processTurn`, protegido por `x-lookup-secret`),
   `app/api/playground` (bancada, dono-only por sessão, reusa `processTurn` em `dryRun`; aceita a
-  configuração CRUA em edição e COMPILA no servidor),
+  configuração CRUA em edição e COMPILA no servidor), `app/api/playground/transcrever` (áudio da
+  bancada, dono-only, `whisper-1`),
   `app/api/team/{invite,remove}` (dono-only, service_role), `app/api/signup` (**público**, freio de
   abuso por IP + `provision_tenant`) e `by-instance`.
 
@@ -937,8 +986,9 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **26 passando, 1 pulado**; sem login **160** (19/09/2026, já com
-  `atendimento.design.spec.ts`, os cinco ajustes do atendimento); `ia` **12 de 12** (11/09/2026).
+  Total com login: **26 passando, 5 pulados** (26/09/2026; os pulados precisam de conversa e a OBS
+  está vazia desde a limpeza de 24/09); sem login mais mobile **260** (26/09/2026); `ia` **12 de 12**
+  (11/09/2026).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
   projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca

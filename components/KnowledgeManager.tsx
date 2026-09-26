@@ -364,12 +364,8 @@ export default function KnowledgeManager({
             </ul>
           )}
           <div className="flex flex-wrap items-center gap-2 px-2 py-1.5">
-            <Button variant="ghost" onClick={escolherArquivo} disabled={uploading}>
-              {uploading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Upload size={14} />
-              )}
+            <Button variant="ghost" onClick={escolherArquivo} carregando={uploading}>
+              <Upload size={14} />
               {uploading ? "Processando…" : "Enviar documento"}
             </Button>
             <p className="ml-auto px-2 text-legenda text-ink-3">

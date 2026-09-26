@@ -16,6 +16,19 @@ export async function GET(req: NextRequest) {
   const nextParam = url.searchParams.get("next") || "/";
   const next = nextParam.startsWith("/") ? nextParam : "/";
 
+  // ⚠️ TERCEIRO FORMATO (25/09/2026): sem `code` e sem `token_hash`, o link veio
+  // no fluxo implícito, com a sessão DEPOIS do `#` (`#access_token=...`). É o
+  // que o modelo padrão de e-mail do Supabase manda, e o navegador nunca envia
+  // o `#` ao servidor, então daqui não dá para ler. Antes isso caía em
+  // `/login?erro=convite` e o convidado via um login no lugar de criar a senha.
+  // O redirecionamento sem `#` próprio HERDA o do endereço original, e
+  // `/auth/concluir` (no navegador) abre a sessão a partir dele.
+  if (!code && !tokenHash) {
+    const concluir = new URL("/auth/concluir", url.origin);
+    concluir.searchParams.set("next", next);
+    return NextResponse.redirect(concluir);
+  }
+
   const supabase = await createClient();
 
   let ok = false;

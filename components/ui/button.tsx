@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -125,15 +126,39 @@ const buttonVariants = cva(
   },
 );
 
+/**
+ * `carregando` (26/09/2026, pedido do dono: "botão salvando bloqueado é
+ * horrível"). O que era horrível é o `disabled:opacity-50`: a ação que a pessoa
+ * ACABOU de pedir desbotava como se tivesse sido recusada. Carregando, o botão:
+ *
+ * - mantém a cor cheia (`disabled:opacity-100` só enquanto carrega; desabilitado
+ *   por falta de dado continua desbotado, porque ali é recusa mesmo);
+ * - troca o ícone próprio por um spinner, no mesmo lugar, então o rótulo não
+ *   pula para o lado;
+ * - segue `disabled`, que é o que impede o clique duplo (salvar duas vezes grava
+ *   duas linhas em `agent_publications`);
+ * - diz `aria-busy` ao leitor de tela.
+ *
+ * O rótulo de gerúndio ("Salvando…") continua a cargo de quem usa: é texto de
+ * tela, não geometria. Com `asChild` não há spinner, porque o Slot exige um
+ * filho só.
+ *
+ * ⚠️ Sem biblioteca: o giro é o `animate-spin` do Tailwind, e com
+ * `prefers-reduced-motion` ele para (o ícone parado já diz "trabalhando").
+ */
 function Button({
   className,
   variant = "brand",
   size = "control",
   asChild = false,
+  carregando = false,
+  disabled,
+  children,
   ...props
 }: React.ComponentProps<"button"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
+    carregando?: boolean;
   }) {
   const Comp = asChild ? Slot.Root : "button";
 
@@ -142,9 +167,36 @@ function Button({
       data-slot="button"
       data-variant={variant}
       data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+      data-carregando={carregando || undefined}
+      aria-busy={carregando || undefined}
+      disabled={disabled || carregando}
+      className={cn(
+        buttonVariants({ variant, size, className }),
+        carregando &&
+          "cursor-progress disabled:cursor-progress disabled:opacity-100 [&>svg:not([data-spinner])]:hidden",
+      )}
       {...props}
-    />
+    >
+      {/* ⚠️ Com `asChild` o filho vai SOZINHO: o Slot do Radix exige um
+          elemento só, e até um `false` ao lado dele quebra a tela inteira
+          ("Slot failed to slot onto its children"). Foi o que derrubou o
+          pipeline no celular na primeira versão desta prop. */}
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {carregando && (
+            <Loader2
+              data-spinner
+              size={15}
+              aria-hidden
+              className="animate-spin motion-reduce:animate-none"
+            />
+          )}
+          {children}
+        </>
+      )}
+    </Comp>
   );
 }
 

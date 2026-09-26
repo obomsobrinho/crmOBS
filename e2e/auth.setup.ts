@@ -13,6 +13,11 @@ const ARQUIVO_ATENDENTE = "e2e/.auth/atendente.json";
 
 async function entrar(page: Page, email: string, password: string) {
   await page.goto("/login");
+  // ⚠️ Esperar a tela assentar antes de clicar (26/09/2026): com o dev
+  // compilando /login pela primeira vez, o clique chegava antes da hidratação e
+  // se perdia (o formulário não tinha dono ainda), e os DOIS logins falharam por
+  // tempo. Mesmo cuidado dos outros testes da casa.
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(password);
   await page.getByRole("button", { name: /Entrar/ }).click();

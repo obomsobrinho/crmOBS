@@ -43,7 +43,7 @@ test("a bancada separa conversa e diagnóstico em abas", async ({ page }) => {
   await page.getByRole("menuitem", { name: /Testar o agente/ }).click();
   const bancada = page.getByRole("tablist", { name: "Bancada" });
   await expect(bancada).toBeVisible();
-  await expect(page.getByPlaceholder("Escreva como um cliente escreveria...")).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Mensagem de teste" })).toBeVisible();
   await bancada.getByRole("tab", { name: "Diagnóstico" }).click();
-  await expect(page.getByPlaceholder("Escreva como um cliente escreveria...")).toBeHidden();
+  await expect(page.getByRole("textbox", { name: "Mensagem de teste" })).toBeHidden();
 });

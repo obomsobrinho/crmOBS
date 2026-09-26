@@ -228,7 +228,7 @@ function FormularioSenha({
         <Button
           type="submit"
           size="field"
-          disabled={loading}
+          carregando={loading}
         >
           {loading ? "Salvando…" : "Salvar nova senha"}
         </Button>

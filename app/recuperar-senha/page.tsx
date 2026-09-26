@@ -80,7 +80,7 @@ export default function RecuperarSenhaPage() {
             <Button
               type="submit"
               size="field"
-              disabled={loading}
+              carregando={loading}
               className="w-full justify-center max-md:h-11"
             >
               {loading ? "Enviando…" : "Enviar link"}

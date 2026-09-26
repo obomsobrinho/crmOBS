@@ -85,7 +85,7 @@ test.describe("Bancada de teste dentro do /agente", () => {
     await expect(painel).toBeVisible();
 
     await painel
-      .getByPlaceholder("Escreva como um cliente escreveria...")
+      .getByRole("textbox", { name: "Mensagem de teste" })
       .fill("Oi! Com quem eu falo?");
     // Waiters ARMADOS antes do clique: depois dele a requisição já pode ter
     // saído, e `waitForRequest` só enxerga o que vier a partir da chamada.
