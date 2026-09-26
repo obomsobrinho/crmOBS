@@ -92,32 +92,8 @@ test("resolver exige telefone", async ({ page }) => {
   expect(res.status()).toBe(400);
 });
 
-// A jornada completa na interface (bloco "Esperando você há", clique em
-// Resolvido, pendência sai da tela) foi verificada uma vez com um handoff
-// semeado, e o efeito conferido no banco: `handoff_at` voltou a nulo e
-// `atendimento_ia` voltou a "ativa". Desde 19/09/2026 a conferência à mão inclui
-// `assigned_user_id`, que também volta a nulo.
-//
-// Ela não fica no automático porque o CRM não tem como ABRIR um handoff: quem
-// abre é o `/api/agent`, e `conversations.handoff_at` não tem grant de UPDATE
-// para o browser, de propósito. Semear exige service_role, que o teste não tem
-// (e não deveria ter). Para rodar à mão, com a chave de serviço:
-//
-//   update public.conversations set handoff_at = now() - interval '6 hours'
-//    where phone = '<fone>' and client_id = '<tenant>';
-test.skip("jornada na interface: bloco de pendência e clique em Resolvido", async ({
-  page,
-}) => {
-  await page.goto(`/inbox/${encodeURIComponent(FONE)}`);
-  await expect(page.getByText(/Esperando você há/)).toBeVisible({
-    timeout: 15_000,
-  });
-  const resposta = page.waitForResponse(
-    (r) =>
-      r.url().includes("/api/conversations/resolve") &&
-      r.request().method() === "POST"
-  );
-  await page.getByRole("button", { name: "Resolvido" }).click();
-  expect((await resposta).status()).toBe(200);
-  await expect(page.getByText(/Esperando você há/)).toHaveCount(0);
-});
+// ✅ A JORNADA COMPLETA NA INTERFACE (handoff na lista, faixa "O cliente quer",
+// clique em Resolvido e o efeito no banco) deixou de ser verificação manual em
+// 26/09/2026: mora em `atendimento.serial.spec.ts`, que semeia o handoff com a
+// chave de serviço (autorização do dono, ver `e2e/semente.ts`). Aqui fica só o
+// contrato da rota.

@@ -970,7 +970,17 @@ decisões já travadas, **não reabrir**:
     o id do tenant no caminho e responde 403 nos DOIS casos (tenant errado e papel errado), e o id
     não aparece em lugar nenhum que o browser veja, porque a RLS o torna implícito.
   - **`logado-serial`** (`*.serial.spec.ts`): um worker só, `dependencies: ["logado"]`.
-  - **`setup`**: grava os storageState do dono E do atendente.
+  - **`setup`**: grava os storageState do dono E do atendente, e desde 26/09/2026 **semeia a conversa
+    de teste** (`e2e/semente.setup.ts`).
+  - ⚠️ **SEMENTE NO BANCO DE PRODUÇÃO (26/09/2026, autorização do dono, "depois a gente limpa"):**
+    `e2e/semente.ts` usa a chave de serviço do `.env.local` para criar UMA conversa de teste no tenant
+    de teste, com telefone impossível (`5500000000001`, DDD 00) e nome "Cliente de teste (e2e)". É o
+    que tirou do "pula" os testes que precisam de conversa, e o que permite provar
+    **`atendimento.serial.spec.ts`**: handoff na lista e na faixa "O cliente quer" com o Resolvido
+    conferido no banco, orientar a IA (grava, religa, larga o responsável, cancela), e DUAS chamadas
+    ao cérebro real sem dryRun: o agente abre o handoff quando pedem uma pessoa, e consome a
+    orientação no turno seguinte. Nada vai ao WhatsApp (quem envia é o n8n). O SQL de limpeza está
+    no topo de `e2e/semente.ts`.
   - **`ia`** (`*.ia.spec.ts`, 11/09/2026, C4 do plano da demo): as 12 armadilhas da bateria de 28/08 contra o
     **cérebro real** em `dryRun`, via `POST /api/playground` com a configuração FIXA no corpo (cópia da que a Loja
     Teste tinha em 28/08, para o resultado não mudar quando alguém editar o tenant). ⚠️ **Só existe quando pedido
@@ -986,9 +996,8 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **26 passando, 5 pulados** (26/09/2026; os pulados precisam de conversa e a OBS
-  está vazia desde a limpeza de 24/09); sem login mais mobile **260** (26/09/2026); `ia` **12 de 12**
-  (11/09/2026).
+  Total com login: **35 passando, nenhum pulado** (26/09/2026, com a semente); sem login mais
+  mobile **260** (26/09/2026); `ia` **12 de 12** (11/09/2026).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
   projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca

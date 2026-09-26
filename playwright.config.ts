@@ -57,7 +57,9 @@ export default defineConfig({
   projects: [
     // Prepara as sessões logadas (dono e atendente) uma vez; os testes
     // autenticados reusam.
-    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    // Desde 26/09/2026 também SEMEIA a conversa de teste no tenant de teste
+    // (`semente.setup.ts`, ver `e2e/semente.ts`), com autorização do dono.
+    { name: "setup", testMatch: /(auth|semente)\.setup\.ts/ },
     {
       name: "sem-login",
       testMatch: /.*\.design\.spec\.ts/,
