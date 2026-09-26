@@ -10,7 +10,8 @@ que fazer quando travar. Quem retomar lê este arquivo mais o `CLAUDE.md`.
 
 - **Fonte:** o export FINAL do projeto do Claude Design (as 5 rodadas mais os ajustes), em
   `C:\Users\franck\Desktop\Desk\projetos\desing mobile\` (arquivo `Conversas Prototipo.dc.html`, o
-  `support.js` e a pasta `screenshots/`), exportado em 23/09/2026 01:35. ⚠️ O export antigo em
+  `support.js` e a pasta `screenshots/`), exportado em 23/09/2026 01:35. ⚠️ Plano já aplicado; a pasta foi para a
+  Lixeira em 26/09/2026 (decisão do dono). Se precisar, ela está lá. ⚠️ O export antigo em
   `Desktop\mobile-rodada-1\desing\` é da rodada 1, ANTES dos ajustes: não serve de base.
 - **Apoio:** os briefings `C:\Users\franck\Desktop\mobile-rodada-{1..5}\BRIEFING.md` e
   `mobile-rodada-1\AJUSTES-{1,2}.md` dizem o que foi PEDIDO; o protótipo diz o que foi DESENHADO.
