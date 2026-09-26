@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-// O aviso de WhatsApp caído no layout REAL, com login (Loja Teste).
+// O aviso de WhatsApp caído no layout REAL, com login (tenant de teste, a OBS
+// desde 17/09/2026).
 //
 // A queda não dá para forçar na instância de verdade, então o teste intercepta
 // a resposta de `GET /api/clients/[id]/whatsapp-status` no browser e devolve o

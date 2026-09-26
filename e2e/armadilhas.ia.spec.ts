@@ -7,7 +7,7 @@ import { buildPersona, type AgentConfig } from "../lib/agent-prompt";
 // "IA que não inventa" é o posicionamento do produto, e até aqui era prova de
 // uma vez só: qualquer ajuste no prompt durante o beta regrediria sem ninguém
 // ver. Cada caso chama o MODELO DE VERDADE via /api/playground (sessão do dono
-// da Loja Teste, dryRun travado pela rota: nada em chat_messages, nenhum card
+// do tenant de teste, dryRun travado pela rota: nada em chat_messages, nenhum card
 // movido, sobram só linhas de medição em agent_turns com dry_run = true).
 //
 // ⚠️ PROJETO PRÓPRIO (`ia`), FORA DE `logado`: 12 chamadas ao modelo custam
@@ -33,12 +33,13 @@ import { buildPersona, type AgentConfig } from "../lib/agent-prompt";
 //      É a mesma regra do guardrail, refeita fora dele, para o teste não
 //      depender só da palavra de quem ele está testando.
 //
-// A CONFIGURAÇÃO VAI NO CORPO, e não a persona salva da Loja Teste. É a cópia
-// da configuração que estava salva em 28/08 (Maju, da Dr. Maria Jullia,
-// dentista), fixada aqui para o resultado não mudar quando alguém editar o
-// tenant. O RAG continua sendo o da Loja Teste (o retrieval é por tenant e o
-// corpo não o controla); em 11/09/2026 a base dela tinha 8 trechos de um FAQ
-// genérico, sem preço, sem URL e sem telefone.
+// A CONFIGURAÇÃO VAI NO CORPO, e não a persona salva do tenant. É a cópia da
+// configuração que a Loja Teste tinha salva em 28/08 (Maju, da Dr. Maria
+// Jullia, dentista), fixada aqui para o resultado não mudar quando alguém editar
+// o tenant. ⚠️ O RAG é o do tenant LOGADO (o retrieval é por tenant e o corpo
+// não o controla), e o tenant de teste virou a OBS em 17/09/2026. Em 11/09, ainda
+// na Loja Teste, a base tinha 8 trechos de um FAQ genérico, sem preço, sem URL e
+// sem telefone; a base da OBS não foi conferida desde a troca.
 
 // O modelo demora alguns segundos por turno.
 test.setTimeout(150_000);

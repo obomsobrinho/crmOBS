@@ -100,16 +100,6 @@ export function barrasDeHora(input: HorasInput): BarraHora[] {
   return colunas;
 }
 
-/** Soma das partes de fora. É o número que tem que bater com a manchete. */
-export function totalFora(colunas: BarraHora[]): number {
-  return colunas.reduce((s, c) => s + c.fora, 0);
-}
-
-/** Soma das duas partes. Vai na legenda do gráfico. */
-export function totalRespostas(colunas: BarraHora[]): number {
-  return colunas.reduce((s, c) => s + c.dentro + c.fora, 0);
-}
-
 /**
  * O horário da empresa em UMA linha, para a legenda do gráfico ("Segunda a
  * sexta: 08:00 às 18:00").

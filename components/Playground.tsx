@@ -15,14 +15,15 @@ import { cn } from "@/lib/utils";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
 // /api/playground (dryRun): nada é enviado no WhatsApp, nada é gravado, o card
-// NÃO é movido de verdade (só mostra o estágio que moveria). Painel esquerdo =
-// Conversa; painel direito = Diagnóstico do turno (handoff / classificação /
-// resumo). Botão resetar limpa tudo e começa do zero.
+// NÃO é movido de verdade (só mostra o estágio que moveria). Esquerda =
+// Conversa; direita = Diagnóstico do turno (handoff / classificação / resumo),
+// que a montagem desliga com `diagnostico={false}`.
 //
-// Mora dentro do painel lateral do `/agente` (`AgentTestDrawer`), e não em tela
-// própria: configurar e testar são a mesma atividade, e o ciclo real é editar,
-// testar, voltar, editar. Por isso este componente não desenha título nem
-// descrição: quem faz isso é o cabeçalho do painel.
+// Mora em DOIS lugares, e nenhum é tela própria: o painel lateral do `/agente`
+// (`AgentTestDrawer`, que reseta remontando por `key`) e o passo "Converse com
+// o seu agente" da montagem. Configurar e testar são a mesma atividade. Por isso
+// este componente não desenha título nem descrição: quem faz isso é quem o
+// hospeda.
 
 export interface PlaygroundTurn {
   role: "user" | "assistant";

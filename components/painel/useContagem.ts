@@ -81,15 +81,3 @@ export function useContagem(alvo: number): number {
 
   return valor;
 }
-
-/**
- * O mesmo, para um valor que pode não existir (o tempo de resposta, quando não
- * houve amostra). `null` passa direto, sem animar: não existe corrida até nada.
- *
- * A contagem roda sobre os MILISSEGUNDOS e quem formata é o chamador, senão a
- * interpolação passaria por strings sem sentido.
- */
-export function useContagemOpcional(alvo: number | null): number | null {
-  const contado = useContagem(alvo ?? 0);
-  return alvo === null ? null : contado;
-}

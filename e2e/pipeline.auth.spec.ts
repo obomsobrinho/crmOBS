@@ -7,8 +7,8 @@ import { test, expect, type Page } from "@playwright/test";
 //
 // ⚠️ ESTES TESTES ESCREVEM. Cada um desfaz o que fez: o ciclo de vida termina
 // arquivando o estágio que criou, e o arraste devolve o card ao estágio de
-// origem. Rodar contra qualquer tenant que não seja a Loja Teste é proibido pelo
-// projeto.
+// origem. Rodar contra qualquer tenant que não seja o de teste (a OBS desde
+// 17/09/2026) é proibido pelo projeto.
 //
 // ⚠️ Arquivar NÃO é apagar, então cada rodada deixa UMA linha arquivada em
 // `pipeline_stages`. É de propósito: arquivar é o que o produto oferece, e é o
@@ -18,7 +18,7 @@ import { test, expect, type Page } from "@playwright/test";
 //
 //   delete from pipeline_stages
 //    where name ilike 'Teste e2e%'
-//      and client_id = (select id from clients where name = 'Loja Teste');
+//      and client_id = '<id do tenant de teste>';
 
 const COLUNA = '[data-slot="pipeline-coluna"]';
 const CARD = '[data-slot="pipeline-card"]';

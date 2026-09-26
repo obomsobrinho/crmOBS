@@ -23,6 +23,9 @@ test.describe("Login e senha, sem sessão", () => {
 
   test("login com a senha certa entra; com a errada, avisa e fica", async ({ page }) => {
     await page.goto("/login");
+    // Esperar a tela assentar: clique antes da hidratação se perde (mesma
+    // corrida do auth.setup.ts, vista em 26/09/2026).
+    await page.waitForLoadState("networkidle");
     await page.getByLabel("E-mail").fill(EMAIL);
     await page.getByLabel("Senha").fill("senha-errada-de-proposito");
     await page.getByRole("button", { name: "Entrar" }).click();
@@ -39,6 +42,7 @@ test.describe("Login e senha, sem sessão", () => {
 
   test("esqueci a senha manda o link para uma conta que existe", async ({ page }) => {
     await page.goto("/recuperar-senha");
+    await page.waitForLoadState("networkidle");
     await page.getByLabel("E-mail").fill(EMAIL);
     await page.getByRole("button", { name: "Enviar link" }).click();
     // Mesma resposta de uma conta inexistente (não vira verificador de

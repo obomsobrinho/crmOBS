@@ -179,10 +179,8 @@ não tem computador.
 
 ## 7. Para um chat SEM acesso ao repositório
 
-Se a conversa for numa janela sem o código (revisão de estratégia, opinião de fora), existe um
-briefing pronto e com etiquetas de estado em **`Desktop/briefing-revisao-projeto.md`**. Ele foi
-escrito exatamente para isso: separa `[FEITO]`, `[DECIDIDO]`, `[IDEIA]` e `[VETADO]`, para o leitor
-não tratar ideia como coisa pronta nem sugerir o que já foi recusado.
+O briefing antigo de revisão (`Desktop/briefing-revisao-projeto.md`, 04/09) foi para a Lixeira em
+26/09/2026 por estar desatualizado. Para uma revisão de fora, gerar um novo a partir do `CLAUDE.md`,
+mantendo as etiquetas `[FEITO]`, `[DECIDIDO]`, `[IDEIA]` e `[VETADO]`.
 
-O design system também existe como **um HTML autônomo**, em `Desktop/design-system-obs.html`, que
-abre por `file://` sem servidor. Regerar: `npm run design:export`.
+O design system como HTML autônomo (abre por `file://`) se regera com `npm run design:export`.

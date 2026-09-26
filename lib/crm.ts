@@ -15,12 +15,6 @@ export interface ConversationNote {
   createdAt: string;
 }
 
-export interface QuickReply {
-  id: number;
-  title: string;
-  body: string;
-}
-
 // Qualificação produzida pela IA (gravada por /api/agent em
 // conversation_qualifications). O CRM só lê. Usada para explicar por que a
 // conversa caiu em "Precisa de você" e mostrar o resumo do caso.

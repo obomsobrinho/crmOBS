@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
-// Guardas de `/montagem`, COM LOGIN e contra o banco de verdade (Loja Teste, que
-// JÁ publicou o agente).
+// Guardas de `/montagem`, COM LOGIN e contra o banco de verdade (o tenant de
+// teste, a OBS desde 17/09/2026, que JÁ publicou o agente).
 //
 // O assistente tem QUATRO guardas, e elas são a diferença entre "roda uma vez na
 // vida da conta" e "existe um segundo lugar de editar o agente que está atendendo
@@ -11,7 +11,7 @@ import { test, expect } from "@playwright/test";
 //
 // ⚠️ Só a guarda 3 é testável com a sessão que existe hoje. As outras três estão
 // no fim do arquivo, com o motivo e o fixture que falta em cada uma. Escrever
-// qualquer uma delas com a sessão do dono da Loja Teste provaria o contrário do
+// qualquer uma delas com a sessão do dono do tenant de teste provaria o contrário do
 // que ela afirma.
 
 test.describe("Guardas do assistente de montagem", () => {
@@ -41,9 +41,9 @@ test.describe("Guardas do assistente de montagem", () => {
 // ⚠️ AS TRÊS GUARDAS SEM TESTE, e o que falta em cada uma:
 //
 // 1. CONTA BLOQUEADA vai para `/assinatura` (`requireActiveTenant`).
-//    Falta: sessão de uma conta com assinatura vencida. A Loja Teste é `active`
-//    com `trial_ends_at` nulo, de propósito, porque é o tenant onde todo o resto
-//    da suíte roda. Criar uma conta vencida só para isto significa mais um tenant
+//    Falta: sessão de uma conta com assinatura vencida. O tenant de teste nunca
+//    fica bloqueado, de propósito, porque é onde todo o resto da suíte roda (e
+//    no beta a chave `BETA_ABERTO` libera todo tenant de qualquer forma). Criar uma conta vencida só para isto significa mais um tenant
 //    de mentira no banco de produção; a alternativa honesta é testar
 //    `accessState` como função pura, que é onde a decisão mora de verdade
 //    (`lib/billing.ts`), e deixar o redirecionamento para verificação manual.
@@ -55,8 +55,8 @@ test.describe("Guardas do assistente de montagem", () => {
 //    Falta: uma conta em `prompt_mode='avancado'` que ainda NÃO publicou, que é
 //    exatamente o caso que esta guarda protege e que nenhum tenant real ocupa
 //    hoje (a OBM é avançada mas já publicou, e escrever na OBM é proibido pelo
-//    projeto). Virar a Loja Teste para avançado quebraria os testes do agente,
-//    que dependem do modo guiado.
+//    projeto). O tenant de teste (OBS) é avançado mas também já publicou, então
+//    a guarda 3 chega antes e esta nunca é exercida por ele.
 
 // ⚠️ SEM TESTE, desde 24/09/2026: o 409 da PRIMEIRA ATIVAÇÃO com o WhatsApp não
 // conectado de verdade (`PUT /api/clients/[id]/publish` consulta o estado real

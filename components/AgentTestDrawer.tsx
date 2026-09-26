@@ -59,14 +59,15 @@ export default function AgentTestDrawer({
   onAbertoChange?: (aberto: boolean) => void;
   /**
    * `false` no `/agente`: lá, no celular, "Testar" mora nos três pontos do
-   * cabeçalho. A montagem mantém o botão, porque não tem esse menu.
+   * cabeçalho. O `true` fica para o preview `/design/playground`.
    */
   gatilhoNoCelular?: boolean;
 }) {
-  // Estado interno com escape para CONTROLE externo. Existe porque o modo
-  // montagem oferece a bancada uma segunda vez, no rodapé, depois do primeiro
-  // save. Renderizar um segundo `AgentTestDrawer` ali daria DOIS `Playground` com
-  // conversas diferentes; controlar a abertura de fora mantém uma bancada só.
+  // Estado interno com escape para CONTROLE externo: no celular o `/agente` abre
+  // a bancada pelo menu dos três pontos, fora deste botão, e controlar a abertura
+  // de fora mantém uma bancada só (dois `Playground` teriam conversas
+  // diferentes). A montagem NÃO usa este painel desde 26/09/2026: lá a conversa
+  // mora dentro do passo.
   const [abertoLocal, setAbertoLocal] = useState(defaultOpen);
   const aberto = abertoExterno ?? abertoLocal;
   const setAberto = (v: boolean) => {
