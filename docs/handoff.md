@@ -19,7 +19,7 @@ diz onde está cada coisa e o que estava acontecendo no dia em que foi escrito.
 | Para **ler o que os testadores fizeram** | `docs/instrumentacao-beta.md`. Cinco consultas SQL. Não existe tela, e isso é decisão. |
 | Para **escrever no Next 16** | `node_modules/next/dist/docs/`. Esta versão tem mudanças que quebram o que você aprendeu; `AGENTS.md` avisa. |
 
-⚠️ **Não consultar `Desktop/DesingSystem/`**: está obsoleta e cita tokens que não existem mais.
+A antiga `Desktop/DesingSystem/` (obsoleta) foi para a Lixeira em 26/09/2026. O design system vale pelo `docs/design-system/`.
 
 ## 2. O que é o produto, em cinco linhas
 

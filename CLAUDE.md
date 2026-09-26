@@ -518,9 +518,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `app/globals.css` e a camada base em `components/ui/`; os documentos explicam o PORQUÊ, que é o
   que o código não guarda. São 8 arquivos: marca, cor, superfície, tipografia, geometria, animação,
   camada base e **pendências** (o que está medido e ainda sem decisão).
-  ⚠️ A pasta `Desktop/DesingSystem/` está **obsoleta**: cita tokens já apagados (`--ink-dim`,
-  `--ink-muted`, `--accent`), não cita nenhum papel tipográfico atual e afirma que o projeto não usa
-  Radix. Não consultar.
+  A antiga `Desktop/DesingSystem/` (obsoleta, com tokens apagados) foi para a Lixeira em 26/09/2026,
+  junto com os rascunhos e briefings de telas já aplicadas. Ficaram `Desktop/ATUAL DESING` (intocável)
+  e o briefing da Tela de Clientes.
   **A hierarquia de título tem TRÊS níveis** (fechada em 30/08/2026): `text-titulo` 18 = título da
   PÁGINA; `text-cartao` 16 caixa normal = título de bloco COM ESTRUTURA PRÓPRIA (faixa de
   cabeçalho, lista, gráfico); `text-rotulo` 12 CAIXA ALTA = rótulo de um VALOR, cartão simples que
