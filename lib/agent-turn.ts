@@ -351,6 +351,22 @@ export async function processTurn(
       .eq("client_id", clientId)
       .eq("phone", phone);
     if (clrErr) console.error("falha ao limpar a orientação:", clrErr.message);
+
+    // A ORIENTAÇÃO RESOLVEU O HANDOFF (26/09/2026, decisão do dono). Orientar é o
+    // jeito do time resolver a pendência sem assumir a conversa: se a IA usou a
+    // orientação e respondeu SEM escalar de novo (`none`), o que o cliente
+    // esperava foi atendido, e a conversa sai de "Esperando" sozinha. Antes ela
+    // ficava lá até alguém clicar em Resolvido, com o cliente já respondido.
+    // Se a IA escalou de novo (ou o guardrail degradou para `pausar`), o handoff
+    // continua aberto, com a espera original. Best-effort, como o resto daqui.
+    if (handoffAt && output.action === "none") {
+      const { error: hErr } = await svc
+        .from("conversations")
+        .update({ handoff_at: null })
+        .eq("client_id", clientId)
+        .eq("phone", phone);
+      if (hErr) console.error("falha ao fechar o handoff resolvido pela orientação:", hErr.message);
+    }
   }
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
@@ -381,8 +397,9 @@ export async function processTurn(
       // Só grava quando está nulo, porque o valor que interessa é o PRIMEIRO
       // handoff em aberto (é ele que mede a espera). O resumo do último pedido
       // vem de conversation_qualifications, que ganha uma linha por turno.
-      // Quem limpa é o envio manual (/api/send). Best-effort: um erro aqui não
-      // pode derrubar a resposta ao cliente.
+      // Quem limpa é o botão Resolvido (`/api/conversations/resolve`) ou, desde
+      // 26/09/2026, a orientação que resolveu (logo acima). Best-effort: um erro
+      // aqui não pode derrubar a resposta ao cliente.
       if (!handoffAt) {
         const { error: hErr } = await svc
           .from("conversations")

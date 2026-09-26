@@ -353,7 +353,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `handoff_at` guarda o **primeiro** handoff em aberto (é ele que dá a espera real, "esperando há
   6h"), é limpo por **`POST /api/conversations/resolve`** (service_role, porque a coluna não tem
   grant de UPDATE para o browser) e é o que alimenta o filtro "Precisa de você". ⚠️ Este documento
-  já disse que quem limpava era o `POST /api/send`; não é, e nunca foi. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
+  já disse que quem limpava era o `POST /api/send`; não é, e nunca foi.
+  ⚠️ **A ORIENTAÇÃO QUE RESOLVE FECHA O HANDOFF SOZINHA (26/09/2026, decisão do dono):** no
+  `processTurn`, se havia handoff aberto, a IA consumiu uma orientação do time e respondeu com
+  `action = none` (não escalou de novo), `handoff_at` volta a nulo e a conversa sai de "Esperando".
+  Se ela escalou de novo, ou o guardrail degradou para `pausar`, o handoff segue com a espera
+  original. O Resolvido continua existindo para quem resolve por fora. Provado com o cérebro real
+  em `e2e/atendimento.serial.spec.ts` (jornadas 1 e 2). **Pausa volta a significar só o que deveria:** um humano assumiu (nó
   `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave.
   ⚠️ **E "um humano assumiu" ficou MAIOR em 19/09/2026 (decisão do dono): IA e pessoa não atendem
   a mesma conversa, e isso passou a valer NO BANCO.** A invariante já era a regra de exibição

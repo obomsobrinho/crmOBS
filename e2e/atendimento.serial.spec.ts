@@ -20,9 +20,9 @@ import {
 // ⚠️ SERIAL porque os quatro testes mexem na MESMA conversa, e rodam depois do
 // `logado` inteiro para não brigar com quem escreve em `conversations`.
 //
-// ⚠️ Dois testes chamam o CÉREBRO REAL (`/api/agent`, sem dryRun), uma chamada
-// paga cada. É o único jeito de provar que o handoff nasce do agente e que a
-// orientação é consumida no turno seguinte. Nada vai para o WhatsApp: quem envia
+// ⚠️ As duas JORNADAS chamam o CÉREBRO REAL (`/api/agent`, sem dryRun), três
+// chamadas pagas no total. É o único jeito de provar que o handoff nasce do
+// agente e que a orientação muda a resposta seguinte. Nada vai para o WhatsApp: quem envia
 // é o n8n, e o teste fala direto com o cérebro. O telefone é impossível (DDD 00).
 
 let clientId = "";
@@ -133,45 +133,97 @@ async function turnoDoAgente(
     timeout: 60_000,
   });
   expect(res.status(), await res.text()).toBe(200);
-  return (await res.json()) as {
+  const corpo = (await res.json()) as {
     output: { messages: string[]; action: string; summary: string };
   };
+  // A conversa fica no relatório do teste: é o que o dono lê para julgar o tom,
+  // e o que ninguém consegue reconstruir depois (o turno não grava texto).
+  console.log(`[cliente] ${message}
+[agente:${corpo.output.action}] ${corpo.output.messages.join(" | ")}`);
+  return corpo;
 }
 
-test("o agente ABRE o handoff quando o cliente pede uma pessoa (cérebro real)", async ({
+/** Orienta a IA pela caixa de escrita, como o time faz. */
+async function orientarPelaTela(page: import("@playwright/test").Page, texto: string) {
+  await abrirConversa(page);
+  await page.locator('[data-slot="composer-modo"]').click();
+  await page.getByRole("menuitem", { name: /Orientar a IA/ }).click();
+  await page.getByRole("textbox", { name: /IA/ }).fill(texto);
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Orientação pendente")).toBeVisible();
+}
+
+// ── AS DUAS JORNADAS DO DONO (26/09/2026), com o cérebro real ──
+// Cada uma segue a ordem que o dono descreveu, do jeito que o time faria: o
+// cliente escreve (chamada ao `/api/agent`, o mesmo que o n8n faz), o time age
+// PELA TELA, e o cliente escreve de novo. Nada vai ao WhatsApp. Três chamadas
+// pagas no total.
+
+test("jornada 1: handoff aberto, time orienta, agente resolve e o handoff fecha sozinho", async ({
+  page,
   request,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(150_000);
   const svc = servico();
-  const r = await turnoDoAgente(request, "Quero falar com uma pessoa do atendimento, por favor.");
-  // Pedir uma pessoa é gatilho fixo de escalada da base do prompt.
-  expect(r.output.action).toBe("pausar");
-  // Handoff não emudece (regra de 20/08/2026): ela avisa o que vai fazer.
-  expect(r.output.messages.join(" ").trim().length).toBeGreaterThan(0);
+
+  // 1. O cliente pede uma pessoa: gatilho fixo de escalada, e o AGENTE abre o
+  //    handoff (ninguém semeia nada aqui).
+  const t1 = await turnoDoAgente(
+    request,
+    "Quero falar com uma pessoa sobre o valor do serviço, por favor."
+  );
+  expect(t1.output.action).toBe("pausar");
+  // Handoff não emudece (regra de 20/08/2026): ele avisa o que vai fazer.
+  expect(t1.output.messages.join(" ").trim().length).toBeGreaterThan(0);
   await expect
     .poll(() => estadoDaConversa(svc, clientId).then((e) => e.handoffAt !== null))
     .toBe(true);
+
+  // 2. O time vê a pendência e orienta pela tela.
+  await abrirConversa(page);
+  const faixa = page.locator('[data-slot="conversa-entendimento"]');
+  await expect(faixa).toContainText(/esperando há/, { timeout: 15_000 });
+  await orientarPelaTela(
+    page,
+    "O valor do serviço é R$ 497 por mês. Pode informar ao cliente e dizer que o time liga se ele quiser detalhes."
+  );
+
+  // 3. O cliente escreve de novo, e o agente responde COM a orientação.
+  const t2 = await turnoDoAgente(request, "Tudo bem. Então, qual é o valor?");
+  expect(t2.output.messages.join(" ")).toMatch(/497/);
+  expect(t2.output.action).toBe("none");
+
+  // 4. O handoff fechou sozinho (decisão do dono, 26/09/2026) e a orientação
+  //    foi consumida. Na tela, a pendência saiu.
+  await expect
+    .poll(() => estadoDaConversa(svc, clientId))
+    .toMatchObject({ handoffAt: null, orientacao: null });
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByText(/esperando há/)).toHaveCount(0);
+  await expect(page.getByText("Orientação pendente")).toHaveCount(0);
 });
 
-test("o agente USA a orientação no turno seguinte e ela some (cérebro real)", async ({
+test("jornada 2: o time recomenda um desconto e o agente oferece na mensagem seguinte", async ({
+  page,
   request,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const svc = servico();
-  await svc
-    .from("conversations")
-    .update({
-      pending_instruction: "A revisão custa R$ 150. Pode informar esse valor ao cliente.",
-      pending_instruction_at: new Date().toISOString(),
-      pending_instruction_by: donoId,
-    })
-    .eq("client_id", clientId)
-    .eq("phone", FONE_TESTE);
 
-  const r = await turnoDoAgente(request, "E quanto fica a revisão?");
-  // O valor só existe na orientação: se ele aparece, a IA leu a orientação (e o
-  // guardrail aceitou, porque a orientação do operador é fonte).
-  expect(r.output.messages.join(" ")).toMatch(/150/);
-  // Consumo único: depois do turno a orientação não existe mais.
+  // Sem handoff nenhum: orientar também serve para o time mandar o agente
+  // FAZER algo por aquele cliente.
+  await orientarPelaTela(
+    page,
+    "Este cliente é indicação. Ofereça 10% de desconto no primeiro mês."
+  );
+
+  const t = await turnoDoAgente(request, "Oi! Estou pensando em contratar, como funciona?");
+  const texto = t.output.messages.join(" ");
+  // O desconto só existe na orientação: se aparece, o agente seguiu o time (e a
+  // trava de segurança aceitou, porque orientação do time é fonte).
+  expect(texto).toMatch(/10\s?%/);
+  expect(texto).toMatch(/desconto/i);
+  // Consumo único: na mensagem seguinte ela não vale mais.
   await expect.poll(() => estadoDaConversa(svc, clientId)).toMatchObject({ orientacao: null });
 });
