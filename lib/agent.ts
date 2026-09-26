@@ -53,6 +53,10 @@ export function operatorBlock(instruction: string): string {
   return [
     "### ORIENTAÇÃO DO OPERADOR",
     "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação nesta resposta, com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
+    // ⚠️ 26/09/2026: o modelo copiava a orientação como ela foi escrita e dizia
+    // ao próprio cliente "como esse cliente é indicação". A orientação é um
+    // bilhete do time SOBRE o cliente; a resposta é PARA ele.
+    "A orientação foi escrita pelo time falando DO cliente (\"este cliente\", \"ele\", \"ela\"). Você está falando COM o cliente: nunca se refira a ele em terceira pessoa e nunca copie a frase da orientação. Converta para a segunda pessoa. Exemplo: a orientação \"este cliente é indicação, ofereça 10% de desconto\" vira algo como \"como você veio por indicação, consigo te oferecer 10% de desconto\".",
     `Orientação: ${instruction.trim()}`,
   ].join("\n");
 }

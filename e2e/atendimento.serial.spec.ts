@@ -224,6 +224,9 @@ test("jornada 2: o time recomenda um desconto e o agente oferece na mensagem seg
   // trava de segurança aceitou, porque orientação do time é fonte).
   expect(texto).toMatch(/10\s?%/);
   expect(texto).toMatch(/desconto/i);
+  // ⚠️ E fala COM o cliente, não SOBRE ele (26/09/2026): o agente chegou a dizer
+  // "como esse cliente é indicação" ao próprio cliente, copiando a orientação.
+  expect(texto).not.toMatch(/(esse|este|o) cliente/i);
   // Consumo único: na mensagem seguinte ela não vale mais.
   await expect.poll(() => estadoDaConversa(svc, clientId)).toMatchObject({ orientacao: null });
 });

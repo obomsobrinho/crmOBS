@@ -1003,7 +1003,8 @@ decisões já travadas, **não reabrir**:
     `retries: 1` só nesse projeto.
 
   Total com login: **35 passando, nenhum pulado** (26/09/2026, com a semente); sem login mais
-  mobile **260** (26/09/2026); `ia` **12 de 12** (11/09/2026).
+  mobile **260** (26/09/2026); `ia` **12 de 12** (26/09/2026, depois da regra de segunda pessoa na
+  orientação do operador, em `operatorBlock` de `lib/agent.ts`).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
   projeto `logado-serial` existe (07/09/2026). O teste do realtime exige "abrir o inbox provoca
