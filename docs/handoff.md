@@ -51,8 +51,11 @@ O próximo passo é tratar esse relatório. Ele testa em produção
 - Convite e cadastro: link do e-mail com sessão depois do `#` agora abre (`/auth/concluir`); login
   avisa quando o link venceu.
 - **Handoff fecha sozinho** quando o agente usa a orientação do time e responde sem escalar de novo.
+- **O handoff mora na conversa (27/09):** cartão âmbar na linha do tempo (`HandoffCard`, tabela
+  `handoffs`), com a orientação digitada dentro, "Resolvi por fora" e "Assumir a conversa"; fechado,
+  vira histórico. A faixa do topo perdeu o Resolvido. O dono aprovou pelos prints e estava testando.
+- **Favicon** é o mesmo do site da OBS; **menu do avatar** abre ao lado da coluna, com 12px de ar.
 - **Orientação chega ao cliente em segunda pessoa** (antes o agente dizia "esse cliente" ao cliente).
-- Favicon: o mesmo `favicon.ico` do site da OBS (a versão por tema saiu, o dono não gostou).
 - Faxina: código morto, comentários, pastas de design do Desktop na Lixeira (`ATUAL DESING` e o
   briefing da Tela de Clientes ficaram).
 - Testes: semente de conversa de teste no tenant de teste (`e2e/semente.ts`, telefone
