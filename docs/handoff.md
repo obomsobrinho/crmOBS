@@ -31,7 +31,52 @@ WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste re
 O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
 desligada de propósito**.
 
-## 3. Estado em 18/09/2026
+## 3. Estado em 27/09/2026
+
+### A sessão de 24 a 27/09/2026 (a mais recente; ler isto primeiro)
+
+**Onde paramos:** tudo commitado e em produção (último commit: `git log -1`). O dono foi fazer o
+**teste de ponta a ponta** com chip real e vai voltar com a lista do que está ok e do que falta.
+O próximo passo é tratar esse relatório. Ele testa em produção
+(`https://atendimento.obomsobrinho.com.br`).
+
+**O que entrou nesta sessão** (detalhe no `CLAUDE.md`, blocos de montagem, bancada e cadastro):
+- Montagem invertida: quem atende, o que ele sabe, conversa de teste, conectar e ativar. Conectar
+  não liga o agente; o Ativar só libera com a conexão vista na tela, e o servidor confere o estado
+  real na Evolution na primeira ativação.
+- Passo 3 com a conversa de teste dentro (digitando, um balão por mensagem, áudio transcrito com
+  `whisper-1`, recomeçar), sem rolar a página e com a cara da tela de Conversas.
+- Passo 4 no molde do WhatsApp Web, QR no roxo, "Gerar QR code", saída que diz o que fica para depois.
+- Botão `carregando` na base (spinner, cor cheia) em todas as ações assíncronas.
+- Convite e cadastro: link do e-mail com sessão depois do `#` agora abre (`/auth/concluir`); login
+  avisa quando o link venceu.
+- **Handoff fecha sozinho** quando o agente usa a orientação do time e responde sem escalar de novo.
+- **Orientação chega ao cliente em segunda pessoa** (antes o agente dizia "esse cliente" ao cliente).
+- Favicon da marca, uma versão por tema do navegador.
+- Faxina: código morto, comentários, pastas de design do Desktop na Lixeira (`ATUAL DESING` e o
+  briefing da Tela de Clientes ficaram).
+- Testes: semente de conversa de teste no tenant de teste (`e2e/semente.ts`, telefone
+  `5500000000001`, SQL de limpeza no topo) e `atendimento.serial.spec.ts` com as duas jornadas do
+  dono no cérebro real. Números: 261 sem login e mobile, 35 com login (nenhum pulado), `ia` 12 de 12.
+
+**Configuração feita pelo dono no painel do Supabase (27/09):** Site URL passou a ser o domínio de
+produção e ele entrou em Redirect URLs. Antes o cadastro em produção mandava o link para
+`localhost:3000`. ⚠️ A linha `http://localhost:3001/auth/confirm` da lista casa só o endereço exato;
+para o cadastro LOCAL voltar a funcionar, trocar por `http://localhost:3001/**`.
+
+**Decisões que ficaram com o dono:**
+- `/design` fica (é a base dos testes sem login); esconder em produção foi recomendado e não
+  respondido. Staging (projeto Supabase de testes) é o caminho de longo prazo, depois do beta.
+- Gerar o QR sozinho ao abrir o passo 4 (hoje pede clique, porque cria a instância na Evolution).
+- Tela de Clientes antes ou depois do beta: nunca decidido.
+- Ninguém é avisado quando abre handoff (limitação assumida).
+- `docs/arquitetura/` é dele e fica FORA do git, de propósito.
+
+**Só o teste com chip prova:** responder pelo CRM (chega no celular e pausa a IA), áudio do cliente,
+mídia nos dois sentidos, mensagem chegando em tempo real, conexão pelo número (código de pareamento
+nunca provado com número real) e QR roxo lido pela câmera.
+
+### Estado em 18/09/2026 (histórico)
 
 - **Árvore limpa, tudo enviado.** Último commit no dia, ver `git log -1`.
 - **Banco com 30 migrations aplicadas.** Nenhuma pendente.
