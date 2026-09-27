@@ -659,6 +659,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   que falha também conta. `/recuperar-senha` e a troca de senha em `/perfil` falam com o Supabase
   Auth **direto do browser** (a troca confere a senha atual antes, porque `updateUser` não pede).
   ⚠️ Cadastro e convite dependem de SMTP configurado no projeto Supabase.
+  ⚠️ **E dependem da URL Configuration do Supabase Auth** (achado do dono, 27/09/2026): o link do
+  e-mail volta para o `redirectTo` SÓ se ele estiver na lista "Redirect URLs"; fora dela o Supabase
+  manda para o "Site URL", que estava em `http://localhost:3000`, e o cadastro em produção caía no
+  localhost. Precisa ter o domínio de produção (`https://atendimento.obomsobrinho.com.br/**`) na
+  lista e como Site URL. Para conferir sem mandar e-mail: `auth.admin.generateLink` com o
+  `redirectTo` de produção e ver para onde o `action_link` redireciona.
   ⚠️ **O LINK DO E-MAIL CHEGA NO FLUXO IMPLÍCITO** (achado do dono, 25/09/2026): o modelo de e-mail
   do Supabase manda a sessão depois do `#` (`#access_token=…`), e o `#` nunca chega ao servidor.
   O `/auth/confirm` caía em `/login?erro=convite` e o convidado via um login no lugar de criar a
