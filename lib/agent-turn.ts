@@ -366,6 +366,15 @@ export async function processTurn(
         .eq("client_id", clientId)
         .eq("phone", phone);
       if (hErr) console.error("falha ao fechar o handoff resolvido pela orientação:", hErr.message);
+      // E o registro do cartão na conversa: "resolvido pela IA com a sua
+      // orientação", com a orientação guardada (27/09/2026).
+      const { error: rErr } = await svc
+        .from("handoffs")
+        .update({ instruction, closed_at: new Date().toISOString(), closed_how: "ia" })
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .is("closed_at", null);
+      if (rErr) console.error("falha ao fechar o registro do handoff:", rErr.message);
     }
   }
 
@@ -401,12 +410,29 @@ export async function processTurn(
       // 26/09/2026, a orientação que resolveu (logo acima). Best-effort: um erro
       // aqui não pode derrubar a resposta ao cliente.
       if (!handoffAt) {
+        const abertoEm = new Date().toISOString();
         const { error: hErr } = await svc
           .from("conversations")
-          .update({ handoff_at: new Date().toISOString() })
+          .update({ handoff_at: abertoEm })
           .eq("client_id", clientId)
           .eq("phone", phone);
         if (hErr) console.error("falha ao abrir o handoff:", hErr.message);
+        // O REGISTRO do pedido (27/09/2026): é ele que vira o cartão na linha
+        // do tempo da conversa. Um aberto por conversa (índice único parcial).
+        const { error: rErr } = await svc
+          .from("handoffs")
+          .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary });
+        if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
+      } else if (output.summary) {
+        // Handoff já aberto e a IA pediu ajuda de novo: o cartão mostra o
+        // ÚLTIMO pedido, a espera continua contando do primeiro.
+        const { error: rErr } = await svc
+          .from("handoffs")
+          .update({ summary: output.summary })
+          .eq("client_id", clientId)
+          .eq("phone", phone)
+          .is("closed_at", null);
+        if (rErr) console.error("falha ao atualizar o registro do handoff:", rErr.message);
       }
     }
   }

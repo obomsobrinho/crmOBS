@@ -19,6 +19,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 // para `authenticated`, de propósito), e é o `/api/agent` que abre.
 //
 // LIMPAR (quando o dono pedir), no SQL Editor:
+//   delete from handoffs where phone = '5500000000001';
 //   delete from conversation_qualifications where phone = '5500000000001';
 //   delete from agent_turns where phone = '5500000000001';
 //   delete from chat_messages where phone = '5500000000001';
@@ -120,6 +121,14 @@ export async function semearConversa(svc: SupabaseClient, clientId: string) {
     .eq("client_id", clientId)
     .eq("phone", FONE_TESTE);
   if (e3) throw e3;
+  // E nenhum pedido de ajuda aberto (o registro do cartão, tabela `handoffs`).
+  const { error: e4 } = await svc
+    .from("handoffs")
+    .update({ closed_at: new Date().toISOString(), closed_how: "resolvido" })
+    .eq("client_id", clientId)
+    .eq("phone", FONE_TESTE)
+    .is("closed_at", null);
+  if (e4) throw e4;
 }
 
 /**
@@ -127,9 +136,14 @@ export async function semearConversa(svc: SupabaseClient, clientId: string) {
  * que dá o "esperando há 6h") e uma qualificação `pausar` com o resumo do pedido.
  */
 export async function abrirHandoff(svc: SupabaseClient, clientId: string, resumo: string) {
+  const abertoEm = new Date(Date.now() - 6 * 3600_000).toISOString();
+  const { error: e0 } = await svc
+    .from("handoffs")
+    .insert({ client_id: clientId, phone: FONE_TESTE, opened_at: abertoEm, summary: resumo });
+  if (e0) throw e0;
   const { error: e1 } = await svc
     .from("conversations")
-    .update({ handoff_at: new Date(Date.now() - 6 * 3600_000).toISOString() })
+    .update({ handoff_at: abertoEm })
     .eq("client_id", clientId)
     .eq("phone", FONE_TESTE);
   if (e1) throw e1;
@@ -155,7 +169,17 @@ export async function estadoDaConversa(svc: SupabaseClient, clientId: string) {
       .eq("telefone", FONE_TESTE)
       .single(),
   ]);
+  const { data: ultimo } = await svc
+    .from("handoffs")
+    .select("closed_how")
+    .eq("client_id", clientId)
+    .eq("phone", FONE_TESTE)
+    .order("opened_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
   return {
+    /** Desfecho do último pedido de ajuda: "ia", "resolvido", "aberto" ou null. */
+    registro: (ultimo?.closed_how as string | null) ?? (ultimo ? "aberto" : null),
     handoffAt: (conv?.handoff_at as string | null) ?? null,
     responsavel: (conv?.assigned_user_id as string | null) ?? null,
     orientacao: (conv?.pending_instruction as string | null) ?? null,

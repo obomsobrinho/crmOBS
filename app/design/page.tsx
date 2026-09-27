@@ -98,14 +98,22 @@ const LIST: InboxItem[] = [
 export default async function DesignPreview({
   searchParams,
 }: {
-  searchParams: Promise<{ entendimento?: string; lista?: string }>;
+  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string }>;
 }) {
   // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
   // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
   // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
-  const { entendimento, lista } = await searchParams;
+  const { entendimento, lista, handoff } = await searchParams;
+  // `?handoff=aberto|orientado|resolvido` (27/09/2026): o cartão do pedido de
+  // ajuda da IA na linha da conversa, nos três momentos dele.
+  const handoffsPreview =
+    handoff === "aberto" || handoff === "orientado"
+      ? [{ id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: null, closedAt: null, closedHow: null }]
+      : handoff === "resolvido"
+        ? [{ id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: "O plano anual sai por R$ 1.800. Pode passar o valor.", closedAt: HOJE(12.05), closedHow: "ia" as const }]
+        : undefined;
   // `?lista=1` abre SEM conversa (a tela de /inbox), que no celular é outra
   // tela: só a lista (plano do mobile, fase 1).
   const soLista = lista === "1";
@@ -169,7 +177,10 @@ export default async function DesignPreview({
               members={MEMBERS}
               myUserId={ME}
               conversationId={1}
-              pendingInstruction={null}
+              pendingInstruction={
+                handoff === "orientado" ? "O plano anual sai por R$ 1.800. Pode passar o valor." : null
+              }
+              handoffsPreview={handoffsPreview}
               clientId="00000000-0000-0000-0000-0000000000cc"
               displayName={null}
               customFields={{ Origem: "QR Code", Interesse: "Plano anual" }}

@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Sparkles, Clock, CheckCheck } from "lucide-react";
+import { Sparkles, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
-import { formatEspera } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +51,6 @@ export default function AiSummary({
   // Handoff em aberto desta conversa. Vem junto porque é aqui que o pedido
   // pendente está descrito, e é aqui que faz sentido declarar que acabou.
   const [handoffAt, setHandoffAt] = useState<string | null>(null);
-  const [resolvendo, setResolvendo] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data }, { data: conv }] = await Promise.all([
@@ -84,26 +82,6 @@ export default function AiSummary({
     });
   }, [supabase, clientId, phone]);
 
-  // Declara o pedido resolvido: fecha o handoff e devolve o atendimento para a
-  // IA. Vai por rota (service_role) porque `handoff_at` não tem grant de UPDATE
-  // para o browser, justamente para ninguém tirar conversa da fila por acidente.
-  const resolver = useCallback(async () => {
-    setResolvendo(true);
-    const anterior = handoffAt;
-    setHandoffAt(null); // otimista
-    try {
-      const res = await fetch("/api/conversations/resolve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      if (!res.ok) setHandoffAt(anterior); // reverte
-    } catch {
-      setHandoffAt(anterior);
-    } finally {
-      setResolvendo(false);
-    }
-  }, [phone, handoffAt]);
 
   useEffect(() => {
     // Com qualificacao injetada nao ha o que buscar nem o que escutar: o
@@ -208,27 +186,24 @@ export default function AiSummary({
             {horario}
           </span>
         )}
+        {/* ⚠️ SEM BOTÃO DE RESOLVER AQUI (27/09/2026, pedido do dono). O pedido
+            de ajuda virou um CARTÃO na linha da conversa (`HandoffCard`), com
+            a orientação digitada dentro dele; dois lugares para resolver a mesma
+            coisa era o que confundia. Com pedido aberto, a faixa só aponta para
+            ele. */}
         {handoffAt && (
-          <>
-            {/* A espera virou CHIP (desenho): na faixa neutra, texto âmbar solto
-                se perdia entre o resumo e o botão. */}
-            <span
-              className="inline-flex h-6 shrink-0 items-center rounded-[7px] border border-warn-line bg-warn-surface px-2.5 text-legenda font-semibold text-warn-ink"
-              suppressHydrationWarning
-            >
-              esperando há {formatEspera(handoffAt)}
-            </span>
-            <Button
-              size="chrome"
-              variant="outline"
-              onClick={resolver}
-              carregando={resolvendo}
-              className="shrink-0"
-            >
-              <CheckCheck size={14} />
-              {resolvendo ? "Resolvendo…" : "Resolvido"}
-            </Button>
-          </>
+          <Button
+            size="chrome"
+            variant="outline"
+            onClick={() =>
+              document
+                .querySelector('[data-slot="handoff-cartao"][data-estado="aberto"]')
+                ?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }
+            className="shrink-0 border-warn-line text-warn-ink"
+          >
+            Ver pedido
+          </Button>
         )}
         {direita}
       </div>
@@ -259,28 +234,6 @@ export default function AiSummary({
         </p>
       )}
 
-      {/* Pendência em aberto. Âmbar aqui é o significado certo da cor: alguém
-          espera. Só aparece com handoff aberto, e sai quando for resolvido. */}
-      {handoffAt && (
-        <div className="mt-1 rounded-lg border border-warn-line bg-warn-surface px-3 py-2.5">
-          <p className="text-apoio font-medium text-warn-ink">
-            Esperando você há {formatEspera(handoffAt)}
-          </p>
-          <p className="mt-0.5 text-legenda text-ink-2">
-            Resolver fecha essa pendência e devolve o atendimento para a IA.
-          </p>
-          <Button
-            size="field"
-            variant="outline"
-            onClick={resolver}
-            carregando={resolvendo}
-            className="mt-2 w-full justify-center"
-          >
-            <CheckCheck size={15} />
-            {resolvendo ? "Resolvendo…" : "Resolvido"}
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -66,6 +66,20 @@ export async function POST(req: Request) {
     );
   }
 
+  // Fecha o registro do cartão na conversa ("resolvido por fora", com quem
+  // resolveu). Best-effort: o que a pessoa pediu, fechar a pendência, já foi.
+  const { error: regErr } = await svc
+    .from("handoffs")
+    .update({
+      closed_at: new Date().toISOString(),
+      closed_how: "resolvido",
+      closed_by: client.userId,
+    })
+    .eq("client_id", client.id)
+    .eq("phone", phone)
+    .is("closed_at", null);
+  if (regErr) console.error("falha ao fechar o registro do handoff:", regErr.message);
+
   // Devolve o atendimento para a IA. Best-effort: se falhar, o handoff já está
   // fechado (que é o que a pessoa pediu) e a chave da IA continua na tela.
   const { error: iaErr } = await svc

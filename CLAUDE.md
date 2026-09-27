@@ -359,7 +359,19 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `action = none` (não escalou de novo), `handoff_at` volta a nulo e a conversa sai de "Esperando".
   Se ela escalou de novo, ou o guardrail degradou para `pausar`, o handoff segue com a espera
   original. O Resolvido continua existindo para quem resolve por fora. Provado com o cérebro real
-  em `e2e/atendimento.serial.spec.ts` (jornadas 1 e 2). **Pausa volta a significar só o que deveria:** um humano assumiu (nó
+  em `e2e/atendimento.serial.spec.ts` (jornadas 1 e 2).
+  ⚠️ **O HANDOFF MORA NA CONVERSA (27/09/2026, pedido do dono, que testando não soube como "responder
+  o handoff pedindo para a IA resolver"):** cada pedido de ajuda é uma linha da tabela **`handoffs`**
+  (`opened_at`, `summary`, `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`;
+  um aberto por conversa; leitura por membro, escrita só service_role; no realtime com replica FULL)
+  e vira o **`HandoffCard`** na linha do tempo, logo depois da resposta da IA que pediu ajuda. A
+  orientação se digita DENTRO do cartão (âmbar, a cor do pedido), com "Resolvi por fora" e
+  "Assumir a conversa" ao lado; fechado, vira linha de histórico. `conversations.handoff_at` continua
+  sendo o sinal de "Precisa de você"; a tabela é o histórico. Quem grava: o `processTurn` (abre,
+  atualiza o pedido, fecha pela orientação) e o `/api/conversations/resolve`. A faixa "O cliente
+  quer" PERDEU o Resolvido e o chip de espera: com pedido aberto mostra só "Ver pedido", que rola
+  até o cartão. A pílula "Orientar a IA" da caixa de escrita continua, para orientar sem pedido
+  aberto (o desconto). Prévia: `/design?handoff=aberto|orientado|resolvido`. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
   `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave.
   ⚠️ **E "um humano assumiu" ficou MAIOR em 19/09/2026 (decisão do dono): IA e pessoa não atendem
   a mesma conversa, e isso passou a valer NO BANCO.** A invariante já era a regra de exibição

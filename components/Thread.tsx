@@ -42,6 +42,7 @@ import { quemAtende, type Qualification } from "@/lib/crm";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
+import HandoffCard, { type Handoff } from "./HandoffCard";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 import { memberName, memberInitials, type Member } from "@/lib/team";
 
@@ -160,6 +161,7 @@ export default function Thread({
   pendingInstruction,
   onCancelInstruction,
   qualificacaoPreview,
+  handoffsPreview,
   onOpenContato,
 }: {
   phone: string;
@@ -190,6 +192,8 @@ export default function Thread({
   onCancelInstruction?: () => void | Promise<void>;
   /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
   qualificacaoPreview?: Qualification;
+  /** Só o preview /design: os pedidos de ajuda, que sem banco não existem. */
+  handoffsPreview?: Handoff[];
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
@@ -222,6 +226,68 @@ export default function Thread({
     setRows(initialRows);
     setPending([]);
   }
+
+  // PEDIDOS DE AJUDA DA IA (tabela `handoffs`, 27/09/2026): viram cartões na
+  // linha do tempo. Carregados e escutados em tempo real, porque quem abre e
+  // fecha é o servidor (o agente e o Resolvido), fora desta tela.
+  const [handoffs, setHandoffs] = useState<Handoff[]>(handoffsPreview ?? []);
+  const carregarHandoffs = useCallback(async () => {
+    if (handoffsPreview) return;
+    const { data } = await supabase
+      .from("handoffs")
+      .select("id, opened_at, summary, instruction, closed_at, closed_how")
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .order("opened_at", { ascending: true });
+    setHandoffs(
+      ((data ?? []) as {
+        id: number;
+        opened_at: string;
+        summary: string | null;
+        instruction: string | null;
+        closed_at: string | null;
+        closed_how: "ia" | "resolvido" | null;
+      }[]).map((r) => ({
+        id: r.id,
+        openedAt: r.opened_at,
+        summary: r.summary,
+        instruction: r.instruction,
+        closedAt: r.closed_at,
+        closedHow: r.closed_how,
+      }))
+    );
+  }, [supabase, clientId, phone, handoffsPreview]);
+
+  useEffect(() => {
+    if (handoffsPreview) return;
+    void (async () => {
+      await carregarHandoffs();
+    })();
+    const canal = supabase
+      .channel(`handoffs-${phone}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "handoffs", filter: `phone=eq.${phone}` },
+        () => void carregarHandoffs()
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(canal);
+    };
+  }, [carregarHandoffs, supabase, phone, handoffsPreview]);
+
+  const handoffAberto = handoffs.find((h) => !h.closedAt) ?? null;
+
+  // "Resolvi por fora": a mesma rota do antigo botão Resolvido (fecha o
+  // handoff, devolve a IA, larga o responsável e fecha o registro).
+  const resolverHandoff = useCallback(async () => {
+    const res = await fetch("/api/conversations/resolve", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    if (res.ok) await carregarHandoffs();
+  }, [phone, carregarHandoffs]);
 
   const refetch = useCallback(async () => {
     const { data } = await supabase
@@ -408,8 +474,31 @@ export default function Thread({
     type Item =
       | { kind: "day"; label: string; key: string }
       | { kind: "marco"; label: string; key: string }
-      | { kind: "bubble"; bubble: Bubble; showLabel: boolean };
+      | { kind: "bubble"; bubble: Bubble; showLabel: boolean }
+      | { kind: "handoff"; handoff: Handoff; key: string };
     const result: Item[] = [];
+    // ONDE O CARTÃO ENTRA: logo depois da resposta da IA que pediu ajuda. O
+    // registro nasce no /api/agent ANTES de o n8n gravar essa resposta, então o
+    // ponto de ancoragem é a primeira mensagem da IA até 2 minutos depois de
+    // aberto (mais 5s, para pegar as duas mensagens do mesmo turno). Sem ela,
+    // o próprio horário de abertura.
+    const ancoras = handoffs.map((h) => {
+      const t = Date.parse(h.openedAt);
+      const resposta = bubbles.find((b) => {
+        const tb = Date.parse(b.created_at);
+        return b.author === "ia" && tb >= t - 5_000 && tb <= t + 120_000;
+      });
+      return { h, ate: resposta ? Date.parse(resposta.created_at) + 5_000 : t };
+    });
+    let proximo = 0;
+    const soltarAte = (limite: number) => {
+      while (proximo < ancoras.length && ancoras[proximo].ate < limite) {
+        const h = ancoras[proximo].h;
+        result.push({ kind: "handoff", handoff: h, key: `h-${h.id}` });
+        lastAuthor = "";
+        proximo++;
+      }
+    };
     let lastDay = "";
     let lastAuthor = "";
     // Quem respondeu por último ANTES deste balão, atravessando a virada de dia:
@@ -417,6 +506,7 @@ export default function Thread({
     // conversa dormiu uma noite.
     let ultimaResposta = "";
     for (const b of bubbles) {
+      soltarAte(Date.parse(b.created_at));
       const day = new Date(b.created_at).toDateString();
       if (day !== lastDay) {
         lastDay = day;
@@ -450,6 +540,7 @@ export default function Thread({
       });
       lastAuthor = b.author;
     }
+    soltarAte(Infinity);
     // ⚠️ `lastOfGroup` SAIU. Ele existia para pôr o canto serrado só no último
     // balão de uma sequência, à moda do WhatsApp. No desenho aprovado o canto
     // recortado é do AUTOR, não da posição: todo balão recebido tem o recorte
@@ -457,7 +548,7 @@ export default function Thread({
     // antiga, um balão sozinho e um balão no meio de uma sequência tinham
     // geometrias diferentes sem que isso significasse nada para quem lê.
     return result;
-  }, [bubbles]);
+  }, [bubbles, handoffs]);
 
   const displayName = name || prettyPhone(phone);
   const ini = initials(name);
@@ -964,6 +1055,20 @@ export default function Thread({
                   </span>
                   <span className="h-px flex-1 bg-human-line" aria-hidden />
                 </div>
+              ) : item.kind === "handoff" ? (
+                <HandoffCard
+                  key={item.key}
+                  h={item.handoff}
+                  orientacaoPendente={item.handoff.closedAt ? null : (pendingInstruction ?? null)}
+                  onOrientar={onInstruct}
+                  onCancelarOrientacao={onCancelInstruction}
+                  // Na prévia sem banco o botão aparece e não faz nada.
+                  onResolver={handoffsPreview ? () => undefined : resolverHandoff}
+                  onAssumir={
+                    onAssign && myUserId ? () => onAssign(myUserId) : undefined
+                  }
+                  readOnly={readOnly}
+                />
               ) : (
                 <BubbleView
                   key={item.bubble.key}
@@ -992,7 +1097,9 @@ export default function Thread({
           onSendMedia={handleSendMedia}
           onAddNote={onAddNote}
           onInstruct={onInstruct}
-          pendingInstruction={pendingInstruction}
+          // Com pedido de ajuda aberto, a orientação pendente aparece NO CARTÃO;
+          // repetir aqui seria o mesmo aviso em dois lugares.
+          pendingInstruction={handoffAberto ? null : pendingInstruction}
           onCancelInstruction={onCancelInstruction}
           iaAtiva={iaState !== null && !iaPausada}
           clientId={clientId}

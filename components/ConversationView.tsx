@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
+import type { Handoff } from "./HandoffCard";
 import ContextPanel from "./ContextPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -33,6 +34,7 @@ export default function ConversationView({
   contactExists,
   readOnly,
   qualificacaoPreview,
+  handoffsPreview,
 }: {
   phone: string;
   name: string | null;
@@ -53,6 +55,8 @@ export default function ConversationView({
   readOnly?: boolean;
   /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
   qualificacaoPreview?: Qualification;
+  /** Só o preview /design: os pedidos de ajuda da IA. */
+  handoffsPreview?: Handoff[];
 }) {
   const supabase = createClient();
   const [showContext, setShowContext] = useState(true);
@@ -369,6 +373,7 @@ export default function ConversationView({
           onAssign={assign}
           conversationId={conversationId}
           qualificacaoPreview={qualificacaoPreview}
+          handoffsPreview={handoffsPreview}
         />
       </div>
       {showContext && (

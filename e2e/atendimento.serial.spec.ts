@@ -43,7 +43,7 @@ async function abrirConversa(page: import("@playwright/test").Page) {
   await page.waitForLoadState("networkidle");
 }
 
-test("handoff: entra em Esperando, mostra a espera e o pedido, e Resolvido fecha", async ({
+test("handoff: entra em Esperando, vira cartão na conversa, e Resolvi por fora fecha", async ({
   page,
 }) => {
   const svc = servico();
@@ -61,25 +61,31 @@ test("handoff: entra em Esperando, mostra a espera e o pedido, e Resolvido fecha
   await page.waitForURL(`**/inbox/${FONE_TESTE}`);
   await page.waitForLoadState("networkidle");
 
-  // Na CONVERSA: a faixa "O cliente quer" traz o pedido, nas palavras da IA, e
-  // há quanto tempo a pessoa espera.
-  const faixa = page.locator('[data-slot="conversa-entendimento"]');
-  await expect(faixa).toContainText("Quer saber o valor da revisão do carro", {
+  // Na CONVERSA (27/09/2026): o pedido é um CARTÃO na linha do tempo, com a
+  // espera e o pedido nas palavras da IA. A faixa do topo só aponta para ele.
+  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
+  await expect(cartao).toContainText("Quer saber o valor da revisão do carro", {
     timeout: 15_000,
   });
-  await expect(faixa).toContainText(/esperando há 6h/);
+  await expect(cartao).toContainText(/esperando há 6h/);
+  await expect(
+    page.locator('[data-slot="conversa-entendimento"]').getByRole("button", { name: "Resolvido" })
+  ).toHaveCount(0);
 
   const resposta = page.waitForResponse(
     (r) => r.url().includes("/api/conversations/resolve") && r.request().method() === "POST"
   );
-  await faixa.getByRole("button", { name: "Resolvido" }).click();
+  await cartao.getByRole("button", { name: "Resolvi por fora" }).click();
   expect((await resposta).status()).toBe(200);
-  await expect(page.getByText(/esperando há/)).toHaveCount(0);
+  // Fechado, o cartão vira uma linha de histórico, e não some.
+  await expect(
+    page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
+  ).toContainText("resolvido pelo time", { timeout: 15_000 });
 
   // No BANCO: handoff fechado, IA de volta, ninguém segurando a conversa.
   await expect
     .poll(() => estadoDaConversa(svc, clientId))
-    .toMatchObject({ handoffAt: null, responsavel: null, ia: "ativa" });
+    .toMatchObject({ handoffAt: null, responsavel: null, ia: "ativa", registro: "resolvido" });
 });
 
 test("orientar a IA: grava, religa a IA, larga o responsável e dá para cancelar", async ({
@@ -179,14 +185,17 @@ test("jornada 1: handoff aberto, time orienta, agente resolve e o handoff fecha 
     .poll(() => estadoDaConversa(svc, clientId).then((e) => e.handoffAt !== null))
     .toBe(true);
 
-  // 2. O time vê a pendência e orienta pela tela.
+  // 2. O time vê o pedido NA CONVERSA e orienta pelo próprio cartão.
   await abrirConversa(page);
-  const faixa = page.locator('[data-slot="conversa-entendimento"]');
-  await expect(faixa).toContainText(/esperando há/, { timeout: 15_000 });
-  await orientarPelaTela(
-    page,
-    "O valor do serviço é R$ 497 por mês. Pode informar ao cliente e dizer que o time liga se ele quiser detalhes."
-  );
+  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
+  await expect(cartao).toContainText(/esperando há/, { timeout: 15_000 });
+  await cartao
+    .getByRole("textbox", { name: "Orientação para a IA" })
+    .fill(
+      "O valor do serviço é R$ 497 por mês. Pode informar ao cliente e dizer que o time liga se ele quiser detalhes."
+    );
+  await cartao.getByRole("button", { name: "Enviar orientação" }).click();
+  await expect(cartao.locator('[data-slot="handoff-orientado"]')).toContainText("Você orientou");
 
   // 3. O cliente escreve de novo, e o agente responde COM a orientação.
   const t2 = await turnoDoAgente(request, "Tudo bem. Então, qual é o valor?");
@@ -197,11 +206,12 @@ test("jornada 1: handoff aberto, time orienta, agente resolve e o handoff fecha 
   //    foi consumida. Na tela, a pendência saiu.
   await expect
     .poll(() => estadoDaConversa(svc, clientId))
-    .toMatchObject({ handoffAt: null, orientacao: null });
-  await page.reload();
-  await page.waitForLoadState("networkidle");
-  await expect(page.getByText(/esperando há/)).toHaveCount(0);
-  await expect(page.getByText("Orientação pendente")).toHaveCount(0);
+    .toMatchObject({ handoffAt: null, orientacao: null, registro: "ia" });
+  // O cartão fecha SOZINHO na tela (tempo real) e vira histórico.
+  await expect(
+    page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
+  ).toContainText("resolvido pela IA com a sua orientação", { timeout: 15_000 });
+  await expect(page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]')).toHaveCount(0);
 });
 
 test("jornada 2: o time recomenda um desconto e o agente oferece na mensagem seguinte", async ({
