@@ -52,7 +52,7 @@ O próximo passo é tratar esse relatório. Ele testa em produção
   avisa quando o link venceu.
 - **Handoff fecha sozinho** quando o agente usa a orientação do time e responde sem escalar de novo.
 - **Orientação chega ao cliente em segunda pessoa** (antes o agente dizia "esse cliente" ao cliente).
-- Favicon da marca, uma versão por tema do navegador.
+- Favicon: o mesmo `favicon.ico` do site da OBS (a versão por tema saiu, o dono não gostou).
 - Faxina: código morto, comentários, pastas de design do Desktop na Lixeira (`ATUAL DESING` e o
   briefing da Tela de Clientes ficaram).
 - Testes: semente de conversa de teste no tenant de teste (`e2e/semente.ts`, telefone

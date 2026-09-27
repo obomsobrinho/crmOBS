@@ -19,22 +19,11 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: BRAND.name,
   description: BRAND.tagline,
-  // FAVICON POR TEMA (27/09/2026, pedido do dono: era o triângulo padrão do
-  // Next). A marca tem as letras "OBS" em espaço negativo: na versão de letras
-  // BRANCAS elas somem numa aba clara (o padrão do Chrome) e sobra uma moldura
-  // vazia; na de letras ESCURAS somem numa aba escura. Por isso uma para cada
-  // tema. `app/favicon.ico` é a de letras escuras, para quem não lê `media`
-  // (Safari, favoritos), e `app/apple-icon.png` leva fundo branco porque o iOS
-  // pinta de preto o que é transparente.
-  icons: {
-    icon: [
-      { url: "/marca/obs-mark-light.png", media: "(prefers-color-scheme: light)" },
-      { url: "/marca/obs-mark-dark.png", media: "(prefers-color-scheme: dark)" },
-    ],
-    // ⚠️ Declarado à mão: com `icons` no metadata o Next deixa de emitir sozinho
-    // o `apple-icon.png` da pasta `app/` (medido: o link sumia do <head>).
-    apple: "/apple-icon.png",
-  },
+  // FAVICON: `app/favicon.ico` é o MESMO arquivo do site da OBS (decisão do
+  // dono, 27/09/2026). Houve uma versão com um ícone por tema do navegador
+  // (`media` no link), e ela saiu: o dono não gostou do resultado e preferiu o
+  // padrão da marca. `app/apple-icon.png` (fundo branco) é o ícone da tela
+  // inicial do iPhone. Os dois são emitidos pelo Next a partir da pasta `app/`.
 };
 
 /**
