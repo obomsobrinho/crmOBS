@@ -375,7 +375,9 @@ export default function NavRail({
             // (`align="end"`) fica na altura do avatar, que é onde o olho está.
             side="right"
             align="end"
-            sideOffset={8}
+            // 20 e não 8: o gatilho fica a 8px da borda da coluna (o `p-2` do
+            // rail), então com 8 o menu nascia colado nela. Sobram 12px de ar.
+            sideOffset={20}
             className="w-56 overflow-hidden bg-menu"
           >
             <DropdownMenuItem
