@@ -32,7 +32,6 @@ import {
   Calendar,
   Repeat2,
   LogOut,
-  ChevronUp,
   ChevronRight,
   MessageSquarePlus,
   Ellipsis,
@@ -336,12 +335,6 @@ export default function NavRail({
           <ThemeToggle collapsed={collapsed} />
         </div>
 
-        {/* O painel abre ACIMA DO BLOCO INTEIRO, não colado no avatar: ele
-            cobre o indicador do WhatsApp e o seletor de tema. Antes isso vinha
-            de graça, porque o `absolute bottom-full` era do contêiner; o Radix
-            ancora no gatilho, então os 104px repõem exatamente a diferença
-            (8 do pt-2, 36 do indicador, 8 do gap, 36 do tema, 8 do gap, mais os
-            8 do mb-2). São alturas fixas, então a conta não anda. */}
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -367,27 +360,23 @@ export default function NavRail({
                       Ver perfil
                     </span>
                   </span>
-                  <ChevronUp size={15} className="shrink-0 text-ink-3" />
+                  {/* A seta aponta para ONDE o menu abre (ao lado). Era uma seta
+                      para cima, de quando ele abria por cima do bloco. */}
+                  <ChevronRight size={15} className="shrink-0 text-ink-3" />
                 </>
               )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            side="top"
-            align="start"
-            // Sem sideOffset: fica o padrão (4) da camada base. Era 104, um
-            // número mágico posto para o menu não cobrir a faixa "WhatsApp
-            // conectado" e o "Tema claro", que ficam logo acima do gatilho. O
-            // efeito foi pior que o problema: o painel flutuava solto, a 104px do
-            // botão, parecendo estar POR CIMA daqueles itens em vez de ancorado
-            // nele. Menu cobrir o que está imediatamente acima é o comportamento
-            // normal de um dropdown, e é o que a pessoa espera.
-            className={cn(
-              "overflow-hidden bg-menu",
-              collapsed
-                ? "w-48"
-                : "w-[var(--radix-dropdown-menu-trigger-width)]",
-            )}
+            // ⚠️ ABRE AO LADO (27/09/2026, pedido do dono). Abria para CIMA,
+            // cobrindo a faixa "WhatsApp conectado" e o seletor de tema, com a
+            // largura do gatilho: parecia um pedaço da coluna subindo, e não um
+            // menu. Ao lado ele sai da coluna, não cobre nada dela, e a base
+            // (`align="end"`) fica na altura do avatar, que é onde o olho está.
+            side="right"
+            align="end"
+            sideOffset={8}
+            className="w-56 overflow-hidden bg-menu"
           >
             <DropdownMenuItem
               asChild
