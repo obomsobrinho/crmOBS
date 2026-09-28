@@ -152,8 +152,17 @@ test.describe("Pipeline", () => {
     const origem = await stageDoCard(page, phone);
     const destino = stages.find((s) => s !== origem)!;
 
+    // ⚠️ Esperar a ESCRITA no banco responder antes de recarregar (28/09/2026):
+    // o card muda de coluna na tela antes de a gravação terminar, e o reload que
+    // chegava primeiro trazia o estágio antigo. O teste falhava de vez em quando
+    // sem defeito nenhum no produto.
+    const gravou = page.waitForResponse(
+      (r) =>
+        r.url().includes("/rest/v1/conversations") && r.request().method() === "PATCH"
+    );
     await arrastarCard(page, phone, destino);
     await expect.poll(() => stageDoCard(page, phone)).toBe(destino);
+    expect((await gravou).status()).toBeLessThan(400);
 
     // ⚠️ ESTA é a asserção que importa. O board move o card em memória ANTES de
     // falar com o banco (atualização otimista), então conferir só a tela provaria

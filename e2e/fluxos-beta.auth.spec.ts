@@ -37,7 +37,10 @@ test.describe("Login e senha, sem sessão", () => {
     await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 30_000 });
     // O "/" decide o destino (painel, montagem ou conversas); qualquer um vale,
     // desde que seja tela do app e não o login de novo.
-    await expect(page).toHaveURL(/\/(painel|montagem|inbox|connect)/);
+    // 20s e não os 5 padrão (28/09/2026): no dev server, a primeira visita ao
+    // painel compila a página, e o redirecionamento de "/" demorava mais que 5s
+    // na suíte cheia. O teste falhava sem defeito nenhum no login.
+    await expect(page).toHaveURL(/\/(painel|montagem|inbox|connect)/, { timeout: 20_000 });
   });
 
   test("esqueci a senha manda o link para uma conta que existe", async ({ page }) => {
@@ -89,6 +92,9 @@ interface Resposta {
 }
 
 test.describe("Handoff e orientação, com o cérebro real", () => {
+  // Uma nova tentativa, como no projeto `ia`: a resposta do modelo varia com o
+  // código certo. Duas falhas seguidas continuam reprovando (28/09/2026).
+  test.describe.configure({ retries: 1 });
   test("pedido que a IA não pode resolver abre handoff E ela responde", async ({
     request,
   }) => {

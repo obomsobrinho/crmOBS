@@ -76,6 +76,13 @@ export default defineConfig({
     {
       name: "logado",
       testMatch: /.*\.auth\.spec\.ts/,
+      // ⚠️ DOIS workers, não o padrão (28/09/2026). Cada tela com login consulta a
+      // sessão no Supabase Auth mais de uma vez, e com 4 workers a suíte fazia de
+      // 100 a 200 chamadas por minuto ao Auth. O projeto do Supabase é pequeno: o
+      // Auth passou a devolver 500 e 504 (sem conseguir falar com o próprio banco)
+      // e os testes de login, recuperar senha e arrastar caíam de vez em quando,
+      // sem defeito nenhum no produto. Visto nos logs do Auth.
+      workers: 2,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/dono.json",

@@ -50,10 +50,9 @@ O próximo passo é tratar esse relatório. Ele testa em produção
 - Botão `carregando` na base (spinner, cor cheia) em todas as ações assíncronas.
 - Convite e cadastro: link do e-mail com sessão depois do `#` agora abre (`/auth/concluir`); login
   avisa quando o link venceu.
-- **Handoff fecha sozinho** quando o agente usa a orientação do time e responde sem escalar de novo.
-- **O handoff mora na conversa (27/09):** cartão âmbar na linha do tempo (`HandoffCard`, tabela
-  `handoffs`), com a orientação digitada dentro, "Resolvi por fora" e "Assumir a conversa"; fechado,
-  vira histórico. A faixa do topo perdeu o Resolvido. O dono aprovou pelos prints e estava testando.
+- **Pedidos de ajuda viraram a tabela `handoffs`** (27/09). O desenho passou por duas versões no
+  mesmo dia (cartão na conversa, depois a caixa de escrita); o que vale é o da "Segunda rodada"
+  abaixo.
 - **Favicon** é o mesmo do site da OBS; **menu do avatar** abre ao lado da coluna, com 12px de ar.
 - **Orientação chega ao cliente em segunda pessoa** (antes o agente dizia "esse cliente" ao cliente).
 - Faxina: código morto, comentários, pastas de design do Desktop na Lixeira (`ATUAL DESING` e o

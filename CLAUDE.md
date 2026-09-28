@@ -357,14 +357,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   6h"), é limpo por **`POST /api/conversations/resolve`** (service_role, porque a coluna não tem
   grant de UPDATE para o browser) e é o que alimenta o filtro "Precisa de você". ⚠️ Este documento
   já disse que quem limpava era o `POST /api/send`; não é, e nunca foi.
-  ⚠️ **A ORIENTAÇÃO QUE RESOLVE FECHA O HANDOFF SOZINHA (26/09/2026, decisão do dono):** no
-  `processTurn`, se havia handoff aberto, a IA consumiu uma orientação do time e respondeu com
-  `action = none` (não escalou de novo), `handoff_at` volta a nulo e a conversa sai de "Esperando".
-  Se ela escalou de novo, ou o guardrail degradou para `pausar`, o handoff segue com a espera
-  original. O Resolvido continua existindo para quem resolve por fora. Provado com o cérebro real
-  em `e2e/atendimento.serial.spec.ts` (jornadas 1 e 2).
-  ⚠️ **ORIENTAR O CARTÃO RESOLVE NA HORA (27/09/2026, decisão do dono: "se eu já orientei, está
-  resolvido").** `POST /api/conversations/orientar` fecha o pedido (`ia`), religa a IA, larga o
+  ⚠️ **ORIENTAR O PEDIDO RESOLVE NA HORA (27/09/2026, decisão do dono: "se eu já orientei, está
+  resolvido").** Substituiu a regra de 26/09, em que o pedido só fechava quando o `processTurn`
+  consumia a orientação no turno seguinte; o `processTurn` não fecha mais pedido nenhum. `POST /api/conversations/orientar` fecha o pedido (`ia`), religa a IA, larga o
   responsável e roda um **turno de RETOMADA** (`processTurn` com `retomada`: sem mensagem nova do
   cliente, o histórico fecha com `DEIXA_RETOMADA` de `lib/agent.ts`). A resposta vai pelo fluxo
   **"CRM Envio IA"** do n8n (`N8N_IA_SEND_WEBHOOK_URL`, `n8n/crm-envio-ia.json`), que grava a linha
@@ -392,18 +387,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   cria pedido repetido (medido: "e aí, conseguiu ver?" deu `false` duas vezes, assunto novo deu
   `true`). A orientação consumida pelo `processTurn` NÃO fecha mais pedido nenhum: fechar "todos
   os abertos" ali resolveria de brinde o que ninguém respondeu.
-  ⚠️ **O HANDOFF MORA NA CONVERSA (27/09/2026, pedido do dono, que testando não soube como "responder
-  o handoff pedindo para a IA resolver"):** cada pedido de ajuda é uma linha da tabela **`handoffs`**
-  (`opened_at`, `summary`, `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`;
-  um aberto por conversa; leitura por membro, escrita só service_role; no realtime com replica FULL)
-  e vira o **`HandoffCard`** na linha do tempo, logo depois da resposta da IA que pediu ajuda. A
-  orientação se digita DENTRO do cartão (âmbar, a cor do pedido), com "Resolvi por fora" e
-  "Assumir a conversa" ao lado; fechado, vira linha de histórico. `conversations.handoff_at` continua
-  sendo o sinal de "Precisa de você"; a tabela é o histórico. Quem grava: o `processTurn` (abre,
-  atualiza o pedido, fecha pela orientação) e o `/api/conversations/resolve`. A faixa "O cliente
-  quer" PERDEU o Resolvido e o chip de espera: com pedido aberto mostra só "Ver pedido", que rola
-  até o cartão. A pílula "Orientar a IA" da caixa de escrita continua, para orientar sem pedido
-  aberto (o desconto). Prévia: `/design?handoff=aberto|orientado|resolvido`. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
+  **A TABELA `handoffs`** (27/09/2026): cada pedido de ajuda é uma linha (`opened_at`, `summary`,
+  `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`; leitura por membro,
+  escrita só service_role; no realtime com replica FULL). `conversations.handoff_at` continua sendo
+  o sinal de "Precisa de você" (a abertura do pedido aberto mais antigo); a tabela é a fila e o
+  histórico. Quem abre é o `processTurn`; quem fecha são as três portas acima, via `fecharPedido`.
+  A faixa "O cliente quer" não tem botão de pedido nenhum: o pedido está na caixa de escrita. A
+  pílula "Orientar a IA" (sem pedido aberto) continua, para orientar algo que ninguém pediu (o
+  desconto). Prévia: `/design?handoff=aberto|resolvido`. **Pausa volta a significar só o que deveria:** um humano assumiu (nó
   `Pausar IA (Franck digitou)` do n8n) ou alguém desligou na chave.
   ⚠️ **E "um humano assumiu" ficou MAIOR em 19/09/2026 (decisão do dono): IA e pessoa não atendem
   a mesma conversa, e isso passou a valer NO BANCO.** A invariante já era a regra de exibição
@@ -1052,8 +1043,9 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **35 passando, nenhum pulado** (26/09/2026, com a semente); sem login mais
-  mobile **260** (26/09/2026); `ia` **12 de 12** (26/09/2026, depois da regra de segunda pessoa na
+  Total com login: **35 passando, nenhum pulado**, 3 rodadas seguidas verdes em 28/09/2026 depois de
+  limitar o projeto `logado` a 2 workers (ver o comentário em `playwright.config.ts`); sem login mais
+  mobile **265** (27/09/2026); `ia` **12 de 12** (26/09/2026, depois da regra de segunda pessoa na
   orientação do operador, em `operatorBlock` de `lib/agent.ts`).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
