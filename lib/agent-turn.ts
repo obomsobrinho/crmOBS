@@ -432,9 +432,18 @@ export async function processTurn(
       // (`pedido_novo`, que ela decide vendo a lista PEDIDOS DE AJUDA EM
       // ABERTO); o cliente insistindo no mesmo assunto não gera pedido repetido.
       // O guardrail que degrada para `pausar` só abre quando não há nenhum.
+      // ⚠️ REDE DE SEGURANÇA (28/09/2026, teste ao vivo): a IA às vezes dizia
+      // "mesmo pedido" para assunto novo (orçamento do site com a nota fiscal
+      // aberta), e o pedido sumia sem ninguém ver. Se o resumo não divide
+      // nenhuma palavra de assunto com os pedidos abertos, entra na fila mesmo
+      // assim. Errar para o lado da duplicata é de propósito: pedido repetido o
+      // time fecha em um clique, pedido engolido ninguém vê.
       // Best-effort: um erro aqui não pode derrubar a resposta ao cliente.
+      const novo =
+        output.pedido_novo ||
+        !abertos.some((p) => mesmoAssunto(output.summary, p.summary ?? ""));
       const entraNaFila =
-        !handoffAt || abertos.length === 0 || (output.pedido_novo && !guardrail.blocked);
+        !handoffAt || abertos.length === 0 || (novo && !guardrail.blocked);
       if (entraNaFila) {
         const abertoEm = new Date().toISOString();
         const { error: rErr } = await svc
@@ -636,6 +645,34 @@ function pedidosResolvidos(
       // OPERADOR do turno como já usada e a ignorava (medido, 0 de 3).
       return `${hora}: ${p.summary?.trim() || "pedido sem resumo"} (já respondido pelo time)`;
     });
+}
+
+// Palavras que aparecem em QUALQUER pedido de ajuda e por isso não dizem o
+// assunto ("cliente quer falar com uma pessoa do time sobre..."). Fora delas,
+// uma palavra em comum basta para dois resumos serem do mesmo assunto.
+const PALAVRAS_DE_PEDIDO = new Set([
+  "cliente", "quer", "queria", "pediu", "pedido", "pede", "falar", "fala", "pessoa", "alguem",
+  "time", "equipe", "humano", "atendente", "sobre", "contato", "retorno", "resposta", "responder",
+  "ajuda", "saber", "perguntou", "pergunta", "verificar", "confirmar", "dono", "voces", "para",
+  "com", "uma", "mais", "ainda", "agora", "direto", "depois", "entender", "conversar", "cobrou",
+  "cobra", "insistiu", "novamente", "tambem", "outra", "outro", "coisa", "assunto", "questao",
+]);
+function palavrasDeAssunto(texto: string): Set<string> {
+  return new Set(
+    texto
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .split(/[^a-z0-9]+/)
+      .filter((p) => p.length >= 4 && !PALAVRAS_DE_PEDIDO.has(p))
+  );
+}
+/** Dois resumos de pedido falam do mesmo assunto? (uma palavra de assunto em comum) */
+export function mesmoAssunto(a: string, b: string): boolean {
+  const pa = palavrasDeAssunto(a);
+  if (pa.size === 0) return true; // resumo vazio de assunto: não dá para dizer que é novo
+  for (const p of palavrasDeAssunto(b)) if (pa.has(p)) return true;
+  return false;
 }
 
 // Canônicos ativos do tenant (para calcular o estágio que a IA moveria).

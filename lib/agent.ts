@@ -120,7 +120,7 @@ const OUTPUT_SCHEMA = {
     pedido_novo: {
       type: "boolean",
       description:
-        "true só quando action for agendar ou pausar E o assunto for NOVO, diferente de todos os pedidos listados em PEDIDOS DE AJUDA EM ABERTO. Se o cliente só insiste, cobra ou repete um pedido que já está aberto, false. false quando action for none.",
+        "Só vale quando action for agendar ou pausar (com none, false). false SOMENTE quando o cliente repete ou cobra um pedido que JÁ ESTÁ listado em PEDIDOS DE AJUDA EM ABERTO, sobre o MESMO assunto daquele pedido. Qualquer assunto diferente de todos os listados é true, mesmo que o cliente já tenha comentado dele antes na conversa. Na dúvida, true: pedido repetido o time fecha em um clique, pedido engolido ninguém vê.",
     },
   },
   required: ["messages", "action", "summary", "preferencia_horario", "pedido_novo"],
@@ -303,7 +303,7 @@ export function pedidosResolvidosBlock(linhas: string[]): string {
 export function pedidosAbertosBlock(resumos: string[]): string {
   return [
     "### PEDIDOS DE AJUDA EM ABERTO",
-    "Pedidos que você já passou ao time nesta conversa e que ainda não foram respondidos. Não abra outro pedido pelo mesmo assunto: se o cliente insistir, diga que o time já está vendo e use pedido_novo = false.",
+    "Pedidos que você já passou ao time nesta conversa e que ainda não foram respondidos. Se o cliente insistir ou cobrar UM DESTES assuntos, diga que o time já está vendo e use pedido_novo = false. Assunto que não está nesta lista é pedido novo (pedido_novo = true).",
     ...resumos.map((r, i) => `${i + 1}. ${r}`),
   ].join("\n");
 }

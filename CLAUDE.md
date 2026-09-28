@@ -385,7 +385,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   da fila. **Quem decide se o pedido é novo é a IA:** campo `pedido_novo` no formato de saída
   (`lib/agent.ts`) mais a seção `### PEDIDOS DE AJUDA EM ABERTO`; insistir no mesmo assunto não
   cria pedido repetido (medido: "e aí, conseguiu ver?" deu `false` duas vezes, assunto novo deu
-  `true`). A orientação consumida pelo `processTurn` NÃO fecha mais pedido nenhum: fechar "todos
+  `true`). ⚠️ **E existe REDE DE SEGURANÇA em código** (`mesmoAssunto`, 28/09/2026, achada no teste ao
+  vivo): a IA disse "mesmo pedido" para o orçamento do site com a nota fiscal aberta, e o pedido
+  sumia sem ninguém ver. Se o resumo não divide NENHUMA palavra de assunto com os pedidos abertos
+  (tirando as palavras que todo pedido tem, como "cliente", "falar", "pessoa"), entra na fila mesmo
+  assim. Errar para a duplicata é de propósito: pedido repetido se fecha em um clique, pedido
+  engolido ninguém vê. Medido depois: 12 de 12 (assunto novo entra, insistência não duplica). A orientação consumida pelo `processTurn` NÃO fecha mais pedido nenhum: fechar "todos
   os abertos" ali resolveria de brinde o que ninguém respondeu.
   **A TABELA `handoffs`** (27/09/2026): cada pedido de ajuda é uma linha (`opened_at`, `summary`,
   `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`; leitura por membro,
