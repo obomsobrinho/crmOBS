@@ -121,7 +121,7 @@ export default function HandoffCard({
                   <span className="font-semibold">Você orientou:</span> “{orientacaoPendente}”
                 </p>
                 <p className="mt-0.5 text-legenda text-ink-3">
-                  A IA responde na próxima mensagem do cliente, e este pedido fecha sozinho.
+                  A IA responde na próxima mensagem do cliente.
                 </p>
               </div>
               {onCancelarOrientacao && (

@@ -1,7 +1,14 @@
+// ⚠️ TODA data na tela sai em America/Sao_Paulo, nunca no fuso da máquina.
+// O componente é renderizado primeiro no servidor (Vercel, em UTC), e o
+// `suppressHydrationWarning` MANTÉM o texto do servidor: sem o fuso fixo, a
+// mensagem das 17:47 aparecia como 20:47 no celular (achado do dono, 27/09/2026).
+export const FUSO = "America/Sao_Paulo";
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: FUSO,
   });
 }
 

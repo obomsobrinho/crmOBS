@@ -39,6 +39,7 @@ Server-only (**NUNCA** prefixar com `NEXT_PUBLIC`):
 | `EVOLUTION_API_KEY` | apikey **global** da Evolution (`AUTHENTICATION_API_KEY`) |
 | `N8N_BOT_WEBHOOK_URL` | webhook fixo do bot (nó `Webhook EVO`), ex.: `.../webhook/agente_obm` |
 | `N8N_SEND_WEBHOOK_URL` | webhook do fluxo de **envio manual** |
+| `N8N_IA_SEND_WEBHOOK_URL` | webhook do fluxo **CRM Envio IA** (a IA responde na hora em que o time orienta um pedido de ajuda) |
 | `N8N_LOOKUP_SECRET` | segredo do `GET /api/clients/by-instance/[instanceName]` |
 
 Veja `.env.example`.

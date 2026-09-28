@@ -224,6 +224,26 @@ export default function ConversationView({
     [supabase, clientId, conversationId, myUserId]
   );
 
+  // ORIENTAR UM PEDIDO DE AJUDA (o cartão na conversa, 27/09/2026): resolve o
+  // pedido e a IA responde NA HORA (`POST /api/conversations/orientar`, que
+  // também religa a IA e larga o responsável). Se ela não conseguir responder
+  // agora, a orientação fica pendente e aparece colada na caixa de escrita.
+  const orientarPedido = useCallback(
+    async (text: string) => {
+      const res = await fetch("/api/conversations/orientar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, instruction: text }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as { enviado?: boolean };
+      setIaState("ativa");
+      setAssigned(null);
+      if (!data.enviado) setInstruction(text);
+    },
+    [phone]
+  );
+
   // Orienta a IA e reativa: ela consome a orientação na PRÓXIMA mensagem do
   // cliente (consumo único em /api/agent) e segue sozinha.
   const instruct = useCallback(
@@ -365,6 +385,7 @@ export default function ConversationView({
           readOnly={readOnly}
           onAddNote={conversationId != null ? addNote : undefined}
           onInstruct={instruct}
+          onOrientarPedido={orientarPedido}
           pendingInstruction={instruction}
           onCancelInstruction={cancelInstruction}
           assignedUserId={assigned}

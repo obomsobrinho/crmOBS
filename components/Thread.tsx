@@ -39,8 +39,8 @@ import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
 import { quemAtende, type Qualification } from "@/lib/crm";
-import { formatTime, prettyPhone } from "@/lib/format";
-import { initials, avatarPair } from "@/lib/inbox";
+import { FUSO, formatTime, prettyPhone } from "@/lib/format";
+import { initials, avatarPair, diaSP } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import HandoffCard, { type Handoff } from "./HandoffCard";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
@@ -123,21 +123,18 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
   return bubbles;
 }
 
+// Dia em America/Sao_Paulo, pelo mesmo motivo de `formatTime`: o servidor
+// renderiza em UTC, e a mensagem das 22h virava "de amanhã".
 function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const y = new Date();
-  y.setDate(today.getDate() - 1);
-  const same = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
-  if (same(d, today)) return "Hoje";
-  if (same(d, y)) return "Ontem";
-  return d.toLocaleDateString("pt-BR", {
+  const t = Date.parse(iso);
+  const agora = Date.now();
+  if (diaSP(t) === diaSP(agora)) return "Hoje";
+  if (diaSP(t) === diaSP(agora - 86_400_000)) return "Ontem";
+  return new Date(t).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: FUSO,
   });
 }
 
@@ -153,6 +150,7 @@ export default function Thread({
   readOnly,
   onAddNote,
   onInstruct,
+  onOrientarPedido,
   assignedUserId,
   members,
   myUserId,
@@ -179,6 +177,8 @@ export default function Thread({
   /** Repassados à caixa de mensagem (abas "Nota interna" e "Orientar"). */
   onAddNote?: (body: string) => void | Promise<void>;
   onInstruct?: (text: string) => void | Promise<void>;
+  /** Orientar o pedido de ajuda aberto (o cartão): resolve e a IA responde na hora. */
+  onOrientarPedido?: (text: string) => void | Promise<void>;
   /* A segunda linha do cabeçalho carrega quem é o dono da conversa e como ela
      está classificada. São decisões sobre a conversa, então moram junto dela e
      não a duas colunas de distância, no painel. */
@@ -1060,7 +1060,14 @@ export default function Thread({
                   key={item.key}
                   h={item.handoff}
                   orientacaoPendente={item.handoff.closedAt ? null : (pendingInstruction ?? null)}
-                  onOrientar={onInstruct}
+                  onOrientar={
+                    onOrientarPedido
+                      ? async (t: string) => {
+                          await onOrientarPedido(t);
+                          await carregarHandoffs();
+                        }
+                      : onInstruct
+                  }
                   onCancelarOrientacao={onCancelInstruction}
                   // Na prévia sem banco o botão aparece e não faz nada.
                   onResolver={handoffsPreview ? () => undefined : resolverHandoff}

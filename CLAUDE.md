@@ -229,9 +229,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `GET /api/clients/[id]/whatsapp-status`. `estadoForcado` é só para o preview `/design/conexao` e
   para o teste; o layout nunca passa. O e2e com login intercepta a rota com `page.route` para forçar
   `close`, porque queda real não dá para provocar na Loja Teste.
+- **Data na tela SEMPRE com `timeZone: "America/Sao_Paulo"`** (`FUSO` em `lib/format.ts`): o
+  componente renderiza primeiro no servidor (UTC) e o `suppressHydrationWarning` mantém o texto dele;
+  sem o fuso, 17:47 virava 20:47 no celular (27/09/2026).
 - **Env server-only** (nunca `NEXT_PUBLIC`): `SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`,
   `EVOLUTION_API_KEY` (apikey GLOBAL da Evolution), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`,
-  `N8N_LOOKUP_SECRET`, `OPENAI_API_KEY` (cérebro do agente + embeddings do RAG),
+  `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `OPENAI_API_KEY` (cérebro do agente + embeddings do RAG),
   `OPENAI_AGENT_MODEL` (opcional, padrão `gpt-5.4-mini`). Nunca colar segredos no chat nem commitar.
 - **Fase 2 (tabelas novas):** `conversation_qualifications` (qualificação da IA por
   `(client_id, phone)`: `action`/`summary`/`preferencia_horario`; gravada por `/api/agent`, lida
@@ -360,6 +363,17 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   Se ela escalou de novo, ou o guardrail degradou para `pausar`, o handoff segue com a espera
   original. O Resolvido continua existindo para quem resolve por fora. Provado com o cérebro real
   em `e2e/atendimento.serial.spec.ts` (jornadas 1 e 2).
+  ⚠️ **ORIENTAR O CARTÃO RESOLVE NA HORA (27/09/2026, decisão do dono: "se eu já orientei, está
+  resolvido").** `POST /api/conversations/orientar` fecha o pedido (`ia`), religa a IA, larga o
+  responsável e roda um **turno de RETOMADA** (`processTurn` com `retomada`: sem mensagem nova do
+  cliente, o histórico fecha com `DEIXA_RETOMADA` de `lib/agent.ts`). A resposta vai pelo fluxo
+  **"CRM Envio IA"** do n8n (`N8N_IA_SEND_WEBHOOK_URL`, `n8n/crm-envio-ia.json`), que grava a linha
+  como resposta DA IA; o envio manual NÃO serve (grava `manual` e pausa a IA). Qualquer falha cai
+  na orientação pendente, como antes. A pílula da caixa de escrita (orientar sem pedido) segue
+  esperando o cliente.
+  ⚠️ **PEDIDO FECHADO ENTRA NO HISTÓRICO DA IA** (`buildHistory`/`notaDoPedido`): nota interna
+  `system` no ponto em que fechou. Sem ela a IA reabria o mesmo assunto a cada "ok, fico no
+  aguardo" (3 de 3 medido; com a nota, 0 de 3).
   ⚠️ **O HANDOFF MORA NA CONVERSA (27/09/2026, pedido do dono, que testando não soube como "responder
   o handoff pedindo para a IA resolver"):** cada pedido de ajuda é uma linha da tabela **`handoffs`**
   (`opened_at`, `summary`, `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`;

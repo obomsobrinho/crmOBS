@@ -19,9 +19,19 @@ export interface AgentOutput {
 }
 
 export interface ChatTurn {
-  role: "user" | "assistant";
+  /** `system` só em produção: nota interna do CRM na linha do tempo (ver
+   *  `notaDoPedido` em lib/agent-turn.ts). O playground nunca manda. */
+  role: "user" | "assistant" | "system";
   content: string;
 }
+
+// TURNO SEM MENSAGEM NOVA DO CLIENTE (27/09/2026, pedido do dono): o time
+// orientou um pedido de ajuda e a IA responde NA HORA, em vez de esperar o
+// cliente escrever de novo. Não existe mensagem do cliente para fechar o
+// histórico, então quem fecha é esta deixa. Ela diz o que fazer e não é
+// mostrada a ninguém.
+export const DEIXA_RETOMADA =
+  "Nota interna do sistema: o cliente NÃO mandou mensagem nova. O time acabou de responder ao pedido de ajuda que você abriu nesta conversa (veja a ORIENTAÇÃO DO OPERADOR). Retome a conversa agora, por iniciativa sua, e dê ao cliente o retorno que você prometeu, seguindo a orientação. Não cumprimente de novo como se fosse o começo da conversa.";
 
 // Modelo usado hoje no nó "OpenAI Chat Model" do n8n. Configurável por env.
 export const AGENT_MODEL = process.env.OPENAI_AGENT_MODEL || "gpt-5.4-mini";
@@ -139,7 +149,8 @@ export interface AgentRun {
 export async function runAgent(params: {
   persona: string;
   history: ChatTurn[];
-  message: string;
+  /** `null` = turno de retomada, sem mensagem nova do cliente (fecha com `DEIXA_RETOMADA`). */
+  message: string | null;
   apiKey: string;
   /** Trechos recuperados da base de conhecimento (RAG), se houver. */
   knowledge?: string[];
@@ -165,7 +176,9 @@ export async function runAgent(params: {
   const messages = [
     { role: "system", content: system },
     ...history.map((t) => ({ role: t.role, content: t.content })),
-    { role: "user", content: message },
+    message === null
+      ? { role: "system", content: DEIXA_RETOMADA }
+      : { role: "user", content: message },
   ];
 
   let res: Response;

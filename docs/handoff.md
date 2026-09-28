@@ -62,6 +62,19 @@ O próximo passo é tratar esse relatório. Ele testa em produção
   `5500000000001`, SQL de limpeza no topo) e `atendimento.serial.spec.ts` com as duas jornadas do
   dono no cérebro real. Números: 261 sem login e mobile, 35 com login (nenhum pulado), `ia` 12 de 12.
 
+**Primeiro relatório do teste com chip (27/09, à noite), três ajustes no handoff:**
+- **Orientar É resolver, e a IA responde na hora.** O cartão chama `POST /api/conversations/orientar`:
+  fecha o pedido, roda o cérebro num turno de RETOMADA (sem mensagem nova do cliente) e manda a
+  resposta pelo n8n. ⚠️ **Falta o lado do n8n:** o fluxo `n8n/crm-envio-ia.json` ("CRM Envio IA")
+  tem que ser criado e ativado, e a URL dele vai em `N8N_IA_SEND_WEBHOOK_URL` (Vercel). Sem isso
+  a rota cai na orientação pendente (a IA usa na próxima mensagem do cliente), sem erro.
+- **Pedido resolvido não volta.** A IA pedia ajuda de novo pelo mesmo assunto quando o cliente
+  respondia "ok, fico no aguardo". Agora cada pedido fechado entra no histórico dela como nota
+  interna com a hora. Medido na conversa de teste: sem a nota, 3 de 3 reabriram; com ela, 0 de 3,
+  e assunto novo continua abrindo pedido.
+- **Horário na tela saía em UTC** (17:47 aparecia 20:47): o servidor renderiza em UTC e o
+  `suppressHydrationWarning` mantinha o texto dele. Toda data agora sai em America/Sao_Paulo.
+
 **Configuração feita pelo dono no painel do Supabase (27/09):** Site URL passou a ser o domínio de
 produção e ele entrou em Redirect URLs. Antes o cadastro em produção mandava o link para
 `localhost:3000`. ⚠️ A linha `http://localhost:3001/auth/confirm` da lista casa só o endereço exato;

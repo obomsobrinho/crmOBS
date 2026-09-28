@@ -70,6 +70,14 @@ export interface ProcessTurnParams {
    * então isto já chega compilado.
    */
   personaOverride?: string | null;
+  /**
+   * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
+   * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
+   * `message` é ignorada (não existe mensagem nova) e a orientação vem daqui,
+   * não de `pending_instruction`. Só produção: quem chama é
+   * `POST /api/conversations/orientar`, que já fechou o pedido e envia a resposta.
+   */
+  retomada?: { instruction: string } | null;
 }
 
 /**
@@ -134,8 +142,10 @@ function personaDoTenant(client: {
 export async function processTurn(
   params: ProcessTurnParams
 ): Promise<{ output: AgentOutput; diagnostics: TurnDiagnostics }> {
-  const { clientId, phone, message, apiKey } = params;
+  const { clientId, phone, apiKey } = params;
   const dryRun = params.dryRun === true;
+  const retomada = !dryRun && params.retomada?.instruction?.trim() ? params.retomada : null;
+  const message = retomada ? "" : params.message;
   const svc = createServiceClient();
   const t0 = Date.now();
 
@@ -261,9 +271,23 @@ export async function processTurn(
         .maybeSingle(),
     ]);
     if (histErr) throw new TurnError(500, "falha ao carregar o histórico");
-    history = buildHistory(rows);
+    // Pedidos de ajuda JÁ FECHADOS, para entrarem na linha do tempo que a IA lê
+    // (ver `notaDoPedido`). Best-effort: sem eles o turno segue como antes.
+    const { data: pedidos } = await svc
+      .from("handoffs")
+      .select("summary, closed_at, closed_how")
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .not("closed_at", "is", null)
+      .order("closed_at", { ascending: false })
+      .limit(HISTORY_ROWS);
+    history = buildHistory(rows, pedidos);
     const pend = (conv?.pending_instruction as string | null) ?? null;
-    instruction = pend && pend.trim() ? pend.trim() : null;
+    instruction = retomada
+      ? retomada.instruction.trim()
+      : pend && pend.trim()
+        ? pend.trim()
+        : null;
     handoffAt = (conv?.handoff_at as string | null) ?? null;
   }
 
@@ -279,7 +303,9 @@ export async function processTurn(
       .eq("client_id", clientId);
     if ((count ?? 0) > 0) {
       ragSearched = true;
-      const [queryVec] = await embedTexts(apiKey, [message.slice(0, MAX_TURN_CHARS)]);
+      // Na retomada não há mensagem do cliente: o que diz o assunto é a orientação.
+      const consulta = retomada ? retomada.instruction : message;
+      const [queryVec] = await embedTexts(apiKey, [consulta.slice(0, MAX_TURN_CHARS)]);
       const { data: matches } = await svc.rpc("match_knowledge_chunks", {
         p_client_id: clientId,
         p_query_embedding: toVector(queryVec),
@@ -302,7 +328,7 @@ export async function processTurn(
   const run = await runAgent({
     persona,
     history,
-    message: message.slice(0, MAX_TURN_CHARS),
+    message: retomada ? null : message.slice(0, MAX_TURN_CHARS),
     apiKey,
     knowledge,
     operatorInstruction: instruction,
@@ -340,7 +366,9 @@ export async function processTurn(
 
   // Consumo único: em produção, limpa a orientação depois de usada (best-effort;
   // um erro aqui não pode derrubar a resposta).
-  if (!dryRun && instruction) {
+  // Na retomada a orientação não veio da coluna, e o pedido já foi fechado por
+  // quem chamou: nada a consumir aqui.
+  if (!dryRun && instruction && !retomada) {
     const { error: clrErr } = await svc
       .from("conversations")
       .update({
@@ -559,11 +587,33 @@ function sanitizeHistory(input: ChatTurn[] | undefined): ChatTurn[] {
 }
 
 // Reconstrói o histórico a partir das linhas de chat_messages (produção).
+//
+// ⚠️ OS PEDIDOS DE AJUDA FECHADOS ENTRAM NA LINHA DO TEMPO (27/09/2026, achado
+// do dono): a IA abria um pedido, o time resolvia, o cliente respondia "ok, fico
+// no aguardo" e a IA pedia ajuda DE NOVO pelo mesmo assunto, porque nada no
+// histórico dizia que o time já tinha respondido. Agora cada pedido fechado vira
+// uma nota interna no ponto exato em que fechou, e a ordem no tempo diz à IA o
+// que é assunto velho (já resolvido) e o que é pedido novo.
 function buildHistory(
-  rows: { user_message: string | null; bot_message: string | null }[] | null
+  rows: { user_message: string | null; bot_message: string | null; created_at?: string | null }[] | null,
+  pedidos?: { summary: string | null; closed_at: string | null; closed_how: string | null }[] | null
 ): ChatTurn[] {
   const history: ChatTurn[] = [];
-  for (const r of (rows ?? []).reverse()) {
+  const linhas = (rows ?? []).slice().reverse();
+  const inicio = linhas.length > 0 ? Date.parse(linhas[0].created_at ?? "") : NaN;
+  const notas = (pedidos ?? [])
+    .map((p) => ({ p, t: Date.parse(p.closed_at ?? "") }))
+    // Só o que cabe na janela do histórico: nota de pedido anterior à primeira
+    // mensagem lida falaria de um assunto que a IA não enxerga.
+    .filter(({ t }) => Number.isFinite(t) && (!Number.isFinite(inicio) || t >= inicio))
+    .sort((a, b) => a.t - b.t);
+  let n = 0;
+  for (const r of linhas) {
+    const tr = Date.parse(r.created_at ?? "");
+    while (n < notas.length && Number.isFinite(tr) && notas[n].t <= tr) {
+      history.push({ role: "system", content: notaDoPedido(notas[n].p, notas[n].t) });
+      n++;
+    }
     const um = typeof r.user_message === "string" ? r.user_message.trim() : "";
     const bm = typeof r.bot_message === "string" ? r.bot_message.trim() : "";
     if (um) history.push({ role: "user", content: um.slice(0, MAX_TURN_CHARS) });
@@ -574,7 +624,25 @@ function buildHistory(
         content: bm.replace(/\s*\|\s*/g, "\n").slice(0, MAX_TURN_CHARS),
       });
   }
+  for (; n < notas.length; n++) {
+    history.push({ role: "system", content: notaDoPedido(notas[n].p, notas[n].t) });
+  }
   return history;
+}
+
+function notaDoPedido(
+  p: { summary: string | null; closed_how: string | null },
+  t: number
+): string {
+  const hora = new Date(t).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
+  });
+  const assunto = p.summary?.trim() ? ` ("${p.summary.trim()}")` : "";
+  const como =
+    p.closed_how === "ia" ? "o time respondeu com uma orientação" : "o time resolveu por fora";
+  return `Nota interna do sistema, ${hora}: o pedido de ajuda que você abriu${assunto} foi resolvido (${como}). Esse pedido está ENCERRADO: não peça ajuda de novo pelo mesmo assunto. Peça ajuda ao time só se o cliente trouxer um pedido NOVO.`;
 }
 
 // Canônicos ativos do tenant (para calcular o estágio que a IA moveria).

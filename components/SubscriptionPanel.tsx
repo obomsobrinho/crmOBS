@@ -42,6 +42,7 @@ function fmt(iso: string | null): string {
     day: "2-digit",
     month: "long",
     year: "numeric",
+    timeZone: "America/Sao_Paulo",
   });
 }
 

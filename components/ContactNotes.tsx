@@ -156,6 +156,7 @@ export default function ContactNotes({
                 {new Date(n.createdAt).toLocaleDateString("pt-BR", {
                   day: "2-digit",
                   month: "short",
+                  timeZone: "America/Sao_Paulo",
                 })}
               </span>
               <Button

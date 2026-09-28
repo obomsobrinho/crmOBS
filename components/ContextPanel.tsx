@@ -19,7 +19,7 @@ import ContactTags from "./ContactTags";
 function fmtDate(iso: string | null): string {
   if (!iso) return "sempre";
   return new Date(iso)
-    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
     .replace(" de ", " ")
     .replace(".", "");
 }

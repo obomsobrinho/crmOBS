@@ -8,6 +8,7 @@ workflow que alguém quebrou). Não são fonte de verdade: quem atende é o work
 |---|---|---|---|
 | `obs-atendimento.json` | OBS Atendimento (o cano do WhatsApp até `POST /api/agent`) | `sWzQUqqrTLcf6F45` | 50 |
 | `crm-envio-manual.json` | CRM Envio Manual (envio manual disparado pelo CRM) | `MkDoUMLyZZzZBrjQ` | 11 |
+| `crm-envio-ia.json` | CRM Envio IA (resposta da IA quando o time orienta um pedido de ajuda; 27/09/2026) | `QbWUBuzXjvIEnQZN` | 4 |
 
 ## O que foi tirado antes de gravar
 

@@ -165,7 +165,7 @@ async function orientarPelaTela(page: import("@playwright/test").Page, texto: st
 // PELA TELA, e o cliente escreve de novo. Nada vai ao WhatsApp. Três chamadas
 // pagas no total.
 
-test("jornada 1: handoff aberto, time orienta, agente resolve e o handoff fecha sozinho", async ({
+test("jornada 1: handoff aberto, orientar resolve na hora, e o pedido resolvido não volta", async ({
   page,
   request,
 }) => {
@@ -194,24 +194,35 @@ test("jornada 1: handoff aberto, time orienta, agente resolve e o handoff fecha 
     .fill(
       "O valor do serviço é R$ 497 por mês. Pode informar ao cliente e dizer que o time liga se ele quiser detalhes."
     );
+  const resposta = page.waitForResponse((r) => r.url().includes("/api/conversations/orientar"));
   await cartao.getByRole("button", { name: "Enviar orientação" }).click();
-  await expect(cartao.locator('[data-slot="handoff-orientado"]')).toContainText("Você orientou");
 
-  // 3. O cliente escreve de novo, e o agente responde COM a orientação.
-  const t2 = await turnoDoAgente(request, "Tudo bem. Então, qual é o valor?");
-  expect(t2.output.messages.join(" ")).toMatch(/497/);
-  expect(t2.output.action).toBe("none");
-
-  // 4. O handoff fechou sozinho (decisão do dono, 26/09/2026) e a orientação
-  //    foi consumida. Na tela, a pendência saiu.
+  // 3. ORIENTAR É RESOLVER (27/09/2026, decisão do dono): o pedido fecha NA HORA,
+  //    sem esperar o cliente. Com o fluxo "CRM Envio IA" configurado a IA também
+  //    responde na hora; aqui ele não está (nada pode ir ao WhatsApp a partir do
+  //    teste), então a rota cai na orientação pendente, e é isso que se prova.
+  const r = await resposta;
+  expect(r.status()).toBe(200);
+  expect(await r.json()).toMatchObject({ ok: true, enviado: false, motivo: "envio_nao_configurado" });
   await expect
     .poll(() => estadoDaConversa(svc, clientId))
-    .toMatchObject({ handoffAt: null, orientacao: null, registro: "ia" });
-  // O cartão fecha SOZINHO na tela (tempo real) e vira histórico.
+    .toMatchObject({ handoffAt: null, registro: "ia" });
   await expect(
     page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
   ).toContainText("resolvido pela IA com a sua orientação", { timeout: 15_000 });
   await expect(page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]')).toHaveCount(0);
+
+  // 4. O cliente escreve de novo, e o agente responde COM a orientação pendente.
+  const t2 = await turnoDoAgente(request, "Tudo bem. Então, qual é o valor?");
+  expect(t2.output.messages.join(" ")).toMatch(/497/);
+  expect(t2.output.action).toBe("none");
+  await expect.poll(() => estadoDaConversa(svc, clientId)).toMatchObject({ orientacao: null });
+
+  // 5. PEDIDO RESOLVIDO NÃO VOLTA (27/09/2026, achado do dono): o cliente só
+  //    agradece, e a IA não pede ajuda de novo pelo mesmo assunto, porque o
+  //    pedido fechado entra no histórico dela como nota com a hora.
+  const t3 = await turnoDoAgente(request, "Ok, obrigado. Fico no aguardo.");
+  expect(t3.output.action).toBe("none");
 });
 
 test("jornada 2: o time recomenda um desconto e o agente oferece na mensagem seguinte", async ({
