@@ -571,7 +571,21 @@ export default function PipelineBoard({
         {esperandoCount > 0 && (
           <Button
             variant="outline"
-            onClick={() => setSoEsperando((v) => !v)}
+            onClick={() => {
+              const ligando = !soEsperando;
+              setSoEsperando(ligando);
+              // CELULAR (achado do dono, 27/09/2026): lá aparece UMA coluna por
+              // vez, então ligar o filtro escondia cards de outras colunas e a
+              // tela que ele estava vendo não mudava nada. Ligar leva direto à
+              // primeira coluna com alguém esperando, que é o que ele quer ver.
+              if (ligando) {
+                const alvo = stageColumns(
+                  stages,
+                  filteredCards.filter((c) => c.handoffAt)
+                ).find((col) => col.cards.length > 0);
+                if (alvo) setEstagioCel(alvo.stage.key);
+              }
+            }}
             aria-pressed={soEsperando}
             className={cn(
               "gap-1.5 text-warn-ink max-md:h-9 max-md:rounded-full",

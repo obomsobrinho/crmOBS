@@ -16,12 +16,17 @@ export interface AgentOutput {
   action: AgentAction;
   summary: string;
   preferencia_horario: string;
+  /**
+   * FILA DE PEDIDOS (27/09/2026): `true` quando a IA pede ajuda por um assunto
+   * NOVO, diferente dos pedidos que já estão abertos. É o que separa "o cliente
+   * pediu outra coisa" (entra na fila) de "o cliente insistiu no mesmo" (atualiza
+   * o pedido aberto). Só o `processTurn` lê; o n8n ignora.
+   */
+  pedido_novo: boolean;
 }
 
 export interface ChatTurn {
-  /** `system` só em produção: nota interna do CRM na linha do tempo (ver
-   *  `notaDoPedido` em lib/agent-turn.ts). O playground nunca manda. */
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -62,7 +67,7 @@ export function agoraBlock(now: Date = new Date()): string {
 export function operatorBlock(instruction: string): string {
   return [
     "### ORIENTAÇÃO DO OPERADOR",
-    "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação nesta resposta, com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
+    "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação JÁ nesta resposta, mesmo que seja a primeira da conversa ou que o cliente ainda não tenha tocado no assunto (não deixe para depois), com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
     // ⚠️ 26/09/2026: o modelo copiava a orientação como ela foi escrita e dizia
     // ao próprio cliente "como esse cliente é indicação". A orientação é um
     // bilhete do time SOBRE o cliente; a resposta é PARA ele.
@@ -112,8 +117,13 @@ const OUTPUT_SCHEMA = {
       description:
         "Dia e período preferidos pela pessoa (ex.: quarta de manhã). Só quando action for agendar.",
     },
+    pedido_novo: {
+      type: "boolean",
+      description:
+        "true só quando action for agendar ou pausar E o assunto for NOVO, diferente de todos os pedidos listados em PEDIDOS DE AJUDA EM ABERTO. Se o cliente só insiste, cobra ou repete um pedido que já está aberto, false. false quando action for none.",
+    },
   },
-  required: ["messages", "action", "summary", "preferencia_horario"],
+  required: ["messages", "action", "summary", "preferencia_horario", "pedido_novo"],
   additionalProperties: false,
 } as const;
 
@@ -156,6 +166,10 @@ export async function runAgent(params: {
   knowledge?: string[];
   /** Orientação do operador para este turno (handoff coach), se houver. */
   operatorInstruction?: string | null;
+  /** Resumos dos pedidos de ajuda ainda abertos (produção). */
+  pedidosAbertos?: string[];
+  /** Pedidos de ajuda já resolvidos, com a hora (produção). */
+  pedidosResolvidos?: string[];
   model?: string;
   now?: Date;
 }): Promise<AgentRun> {
@@ -167,6 +181,14 @@ export async function runAgent(params: {
     parts.push(knowledgeBlock(params.knowledge));
   }
   parts.push(agoraBlock(params.now));
+  // Depois do AGORA, junto do que muda a cada turno: não mexe no prefixo que o
+  // cache de prompt reaproveita (persona).
+  if (params.pedidosResolvidos && params.pedidosResolvidos.length > 0) {
+    parts.push(pedidosResolvidosBlock(params.pedidosResolvidos));
+  }
+  if (params.pedidosAbertos && params.pedidosAbertos.length > 0) {
+    parts.push(pedidosAbertosBlock(params.pedidosAbertos));
+  }
   // A orientação do operador vai por último (recência): é o que a IA deve
   // priorizar neste turno.
   if (params.operatorInstruction && params.operatorInstruction.trim()) {
@@ -261,5 +283,27 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
     summary: typeof raw.summary === "string" ? raw.summary : "",
     preferencia_horario:
       typeof raw.preferencia_horario === "string" ? raw.preferencia_horario : "",
+    pedido_novo: raw.pedido_novo === true,
   };
+}
+
+// Pedidos de ajuda que o time JÁ resolveu nesta conversa, com a hora em que
+// fecharam (ver `pedidosResolvidos` em lib/agent-turn.ts).
+export function pedidosResolvidosBlock(linhas: string[]): string {
+  return [
+    "### PEDIDOS DE AJUDA JÁ RESOLVIDOS",
+    "Pedidos que você passou ao time nesta conversa e que o time já resolveu, com dia e hora em que foram resolvidos. Estão ENCERRADOS: não peça ajuda de novo pelo mesmo assunto. Se o cliente só agradecer, confirmar ou disser que aguarda, siga a conversa normalmente. Peça ajuda ao time só por um assunto NOVO.",
+    ...linhas.map((l) => `- ${l}`),
+  ].join("\n");
+}
+
+// Pedidos de ajuda que o time ainda não respondeu nesta conversa. Sem isto, a IA
+// não tem como dizer se o cliente trouxe um assunto novo (vai para a fila) ou
+// só insistiu num que já está com o time (`pedido_novo`).
+export function pedidosAbertosBlock(resumos: string[]): string {
+  return [
+    "### PEDIDOS DE AJUDA EM ABERTO",
+    "Pedidos que você já passou ao time nesta conversa e que ainda não foram respondidos. Não abra outro pedido pelo mesmo assunto: se o cliente insistir, diga que o time já está vendo e use pedido_novo = false.",
+    ...resumos.map((r, i) => `${i + 1}. ${r}`),
+  ].join("\n");
 }

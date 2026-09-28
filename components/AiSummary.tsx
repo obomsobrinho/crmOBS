@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sparkles, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // "Entendimento": o que a IA entendeu desta conversa. Lê a qualificação mais
@@ -186,25 +185,9 @@ export default function AiSummary({
             {horario}
           </span>
         )}
-        {/* ⚠️ SEM BOTÃO DE RESOLVER AQUI (27/09/2026, pedido do dono). O pedido
-            de ajuda virou um CARTÃO na linha da conversa (`HandoffCard`), com
-            a orientação digitada dentro dele; dois lugares para resolver a mesma
-            coisa era o que confundia. Com pedido aberto, a faixa só aponta para
-            ele. */}
-        {handoffAt && (
-          <Button
-            size="chrome"
-            variant="outline"
-            onClick={() =>
-              document
-                .querySelector('[data-slot="handoff-cartao"][data-estado="aberto"]')
-                ?.scrollIntoView({ behavior: "smooth", block: "center" })
-            }
-            className="shrink-0 border-warn-line text-warn-ink"
-          >
-            Ver pedido
-          </Button>
-        )}
+        {/* ⚠️ SEM BOTÃO DE PEDIDO AQUI (27/09/2026, pedido do dono): o pedido de
+            ajuda aberto é a própria caixa de escrita (`MessageComposer` com a prop `pedido`), que já
+            está à vista. Resolver ou apontar para ele daqui repetiria o lugar. */}
         {direita}
       </div>
     );

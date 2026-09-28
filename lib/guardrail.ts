@@ -68,6 +68,7 @@ export function applyGuardrail(
     action: "pausar",
     summary: `Resposta retida pelo guardrail: ${reason}.`,
     preferencia_horario: "",
+    pedido_novo: output.pedido_novo,
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

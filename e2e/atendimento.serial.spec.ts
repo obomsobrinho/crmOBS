@@ -43,11 +43,21 @@ async function abrirConversa(page: import("@playwright/test").Page) {
   await page.waitForLoadState("networkidle");
 }
 
-test("handoff: entra em Esperando, vira cartão na conversa, e Resolvi por fora fecha", async ({
+test("handoff: entra em Esperando, a caixa vira a fila, e Resolvido fecha um de cada vez", async ({
   page,
 }) => {
   const svc = servico();
   await abrirHandoff(svc, clientId, "Quer saber o valor da revisão do carro");
+  // Um segundo pedido, mais novo: a FILA (27/09/2026). Resolve do mais antigo.
+  const { error: e2 } = await svc.from("handoffs").insert({
+    client_id: clientId,
+    phone: FONE_TESTE,
+    // 1 minuto atrás: tem que ser o pedido mais novo da conversa, porque o
+    // `registro` da semente lê o último por abertura.
+    opened_at: new Date(Date.now() - 60_000).toISOString(),
+    summary: "Quer saber se dá para parcelar",
+  });
+  if (e2) throw e2;
 
   // Na LISTA: o recorte "Esperando" traz a conversa. Handoff aberto nunca some
   // pelo filtro de tempo, então nem precisa escolher "Tudo".
@@ -61,28 +71,38 @@ test("handoff: entra em Esperando, vira cartão na conversa, e Resolvi por fora 
   await page.waitForURL(`**/inbox/${FONE_TESTE}`);
   await page.waitForLoadState("networkidle");
 
-  // Na CONVERSA (27/09/2026): o pedido é um CARTÃO na linha do tempo, com a
-  // espera e o pedido nas palavras da IA. A faixa do topo só aponta para ele.
-  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
-  await expect(cartao).toContainText("Quer saber o valor da revisão do carro", {
+  // Na CONVERSA (27/09/2026): o pedido é a CAIXA DE ESCRITA, o mais antigo
+  // primeiro, com a posição na fila e a espera.
+  const caixa = page.locator('[data-slot="pedido-caixa"]');
+  await expect(caixa).toContainText("Quer saber o valor da revisão do carro", {
     timeout: 15_000,
   });
-  await expect(cartao).toContainText(/esperando há 6h/);
-  await expect(
-    page.locator('[data-slot="conversa-entendimento"]').getByRole("button", { name: "Resolvido" })
-  ).toHaveCount(0);
+  await expect(caixa.locator('[data-slot="pedido-posicao"]')).toContainText("1 de 2 · há 6h");
 
-  const resposta = page.waitForResponse(
-    (r) => r.url().includes("/api/conversations/resolve") && r.request().method() === "POST"
-  );
-  await cartao.getByRole("button", { name: "Resolvi por fora" }).click();
+  const resolver = () =>
+    page.waitForResponse(
+      (r) => r.url().includes("/api/conversations/resolve") && r.request().method() === "POST"
+    );
+  let resposta = resolver();
+  await caixa.getByRole("button", { name: "Resolvido" }).click();
   expect((await resposta).status()).toBe(200);
-  // Fechado, o cartão vira uma linha de histórico, e não some.
-  await expect(
-    page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
-  ).toContainText("resolvido pelo time", { timeout: 15_000 });
+  // Vem o próximo da fila, e a espera passa a contar dele.
+  await expect(caixa).toContainText("Quer saber se dá para parcelar", { timeout: 15_000 });
+  await expect(page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()).toContainText(
+    "resolvido pelo time"
+  );
+  const meio = await estadoDaConversa(svc, clientId);
+  expect(meio.handoffAt).not.toBeNull();
+  expect(Date.now() - Date.parse(meio.handoffAt!)).toBeLessThan(2 * 3600_000);
 
-  // No BANCO: handoff fechado, IA de volta, ninguém segurando a conversa.
+  resposta = resolver();
+  await caixa.getByRole("button", { name: "Resolvido" }).click();
+  expect((await resposta).status()).toBe(200);
+  // Fila vazia: a caixa volta ao normal.
+  await expect(caixa).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByRole("textbox", { name: "Escreva uma mensagem" })).toBeVisible();
+
+  // No BANCO: nada esperando, IA de volta, ninguém segurando a conversa.
   await expect
     .poll(() => estadoDaConversa(svc, clientId))
     .toMatchObject({ handoffAt: null, responsavel: null, ia: "ativa", registro: "resolvido" });
@@ -185,17 +205,17 @@ test("jornada 1: handoff aberto, orientar resolve na hora, e o pedido resolvido 
     .poll(() => estadoDaConversa(svc, clientId).then((e) => e.handoffAt !== null))
     .toBe(true);
 
-  // 2. O time vê o pedido NA CONVERSA e orienta pelo próprio cartão.
+  // 2. O time vê o pedido NA CAIXA DE ESCRITA e orienta por ela.
   await abrirConversa(page);
-  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
-  await expect(cartao).toContainText(/esperando há/, { timeout: 15_000 });
-  await cartao
+  const caixa = page.locator('[data-slot="pedido-caixa"]');
+  await expect(caixa).toContainText("A IA pediu sua ajuda", { timeout: 15_000 });
+  await caixa
     .getByRole("textbox", { name: "Orientação para a IA" })
     .fill(
       "O valor do serviço é R$ 497 por mês. Pode informar ao cliente e dizer que o time liga se ele quiser detalhes."
     );
   const resposta = page.waitForResponse((r) => r.url().includes("/api/conversations/orientar"));
-  await cartao.getByRole("button", { name: "Enviar orientação" }).click();
+  await caixa.getByRole("button", { name: "Enviar orientação" }).click();
 
   // 3. ORIENTAR É RESOLVER (27/09/2026, decisão do dono): o pedido fecha NA HORA,
   //    sem esperar o cliente. Com o fluxo "CRM Envio IA" configurado a IA também
@@ -209,8 +229,8 @@ test("jornada 1: handoff aberto, orientar resolve na hora, e o pedido resolvido 
     .toMatchObject({ handoffAt: null, registro: "ia" });
   await expect(
     page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
-  ).toContainText("resolvido pela IA com a sua orientação", { timeout: 15_000 });
-  await expect(page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]')).toHaveCount(0);
+  ).toContainText("resolvido com a sua orientação", { timeout: 15_000 });
+  await expect(caixa).toHaveCount(0);
 
   // 4. O cliente escreve de novo, e o agente responde COM a orientação pendente.
   const t2 = await turnoDoAgente(request, "Tudo bem. Então, qual é o valor?");

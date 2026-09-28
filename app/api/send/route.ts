@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fecharPedido } from "@/lib/handoffs";
 
 // Responder pelo CRM é ASSUMIR a conversa: pausa a resposta da IA e registra
 // quem assumiu. Best-effort e NUNCA lança: a mensagem já saiu, e falhar aqui não
@@ -84,6 +85,8 @@ export async function POST(req: Request) {
   let body: {
     phone?: string;
     text?: string;
+    /** "Eu respondo" (27/09/2026): o pedido de ajuda que esta resposta resolve. */
+    pedidoId?: number;
     media?: { bucket?: string; path?: string; type?: string; mime?: string; filename?: string };
   };
   try {
@@ -155,6 +158,24 @@ export async function POST(req: Request) {
     // a conversa passa a ter dono. O handoff NÃO é fechado por isso: fechar é o
     // botão Resolvido, que também devolve o atendimento à IA.
     await assumirConversa(client.id, phone, client.userId);
+    // "EU RESPONDO" (27/09/2026, decisão do dono): quem responde um pedido de
+    // ajuda com as próprias palavras o resolve, como "resolvido pelo time". Só
+    // quando a tela diz QUAL pedido (`pedidoId`): uma resposta qualquer, sem
+    // ter escolhido responder o pedido, continua não fechando nada. A IA segue
+    // pausada, porque quem respondeu assumiu. Best-effort: a mensagem já saiu.
+    if (typeof body.pedidoId === "number") {
+      try {
+        await fecharPedido(createServiceClient(), {
+          clientId: client.id,
+          phone,
+          id: body.pedidoId,
+          como: "resolvido",
+          por: client.userId,
+        });
+      } catch (e) {
+        console.error("falha ao fechar o pedido respondido:", e);
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json(

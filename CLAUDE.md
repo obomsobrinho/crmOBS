@@ -371,9 +371,27 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   como resposta DA IA; o envio manual NÃO serve (grava `manual` e pausa a IA). Qualquer falha cai
   na orientação pendente, como antes. A pílula da caixa de escrita (orientar sem pedido) segue
   esperando o cliente.
-  ⚠️ **PEDIDO FECHADO ENTRA NO HISTÓRICO DA IA** (`buildHistory`/`notaDoPedido`): nota interna
-  `system` no ponto em que fechou. Sem ela a IA reabria o mesmo assunto a cada "ok, fico no
-  aguardo" (3 de 3 medido; com a nota, 0 de 3).
+  ⚠️ **PEDIDOS JÁ RESOLVIDOS ENTRAM NO PROMPT** (`pedidosResolvidos` em `lib/agent-turn.ts`,
+  seção `### PEDIDOS DE AJUDA JÁ RESOLVIDOS` de `lib/agent.ts`, os 2 mais recentes da janela, com
+  dia e hora). Sem ela a IA reabria o mesmo assunto a cada "ok, fico no aguardo" (3 de 3 medido;
+  com ela, 0 de 3). ⚠️ **Nunca como nota `system` no meio do histórico, e nunca com a palavra
+  "orientação" na linha:** as duas coisas faziam a IA ignorar a ORIENTAÇÃO DO OPERADOR do turno
+  (desconto orientado caiu para 0 de 3; na versão final, 6 de 6 contra 4 de 6 sem a seção).
+  ⚠️ **FILA DE PEDIDOS E O PEDIDO NA CAIXA DE ESCRITA (27/09/2026, desenho aprovado pelo dono).**
+  A conversa pode ter VÁRIOS pedidos abertos (`mt_handoffs_fila` tirou o índice único), resolvidos
+  do mais antigo para o mais novo. Com pedido aberto a caixa de escrita (`MessageComposer`, prop
+  `pedido`) mostra o pedido em cima ("1 de 2 · há 6h") e ABRE em "Orientar a IA" (âmbar); o seletor
+  troca só entre orientar e Responder (nota interna some), e "Resolvido" fica ao lado. Uma visão só
+  nos dois modos, decisão do dono: não existe "Eu respondo" nem "Voltar ao pedido". Responder daqui
+  manda `pedidoId` ao `POST /api/send`, que fecha o pedido como `resolvido` (a IA segue pausada:
+  quem respondeu assumiu). A conversa não tem âmbar, só a linha cinza do pedido fechado
+  (`HandoffCard`, que agora só desenha o fechado, ancorado em `closed_at`). **As três portas passam por
+  `fecharPedido` (`lib/handoffs.ts`)**, que fecha UM pedido e recalcula `handoff_at` para o próximo
+  da fila. **Quem decide se o pedido é novo é a IA:** campo `pedido_novo` no formato de saída
+  (`lib/agent.ts`) mais a seção `### PEDIDOS DE AJUDA EM ABERTO`; insistir no mesmo assunto não
+  cria pedido repetido (medido: "e aí, conseguiu ver?" deu `false` duas vezes, assunto novo deu
+  `true`). A orientação consumida pelo `processTurn` NÃO fecha mais pedido nenhum: fechar "todos
+  os abertos" ali resolveria de brinde o que ninguém respondeu.
   ⚠️ **O HANDOFF MORA NA CONVERSA (27/09/2026, pedido do dono, que testando não soube como "responder
   o handoff pedindo para a IA resolver"):** cada pedido de ajuda é uma linha da tabela **`handoffs`**
   (`opened_at`, `summary`, `instruction`, `closed_at`, `closed_how` = `ia`/`resolvido`, `closed_by`;

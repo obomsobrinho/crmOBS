@@ -177,8 +177,8 @@ export default function Thread({
   /** Repassados à caixa de mensagem (abas "Nota interna" e "Orientar"). */
   onAddNote?: (body: string) => void | Promise<void>;
   onInstruct?: (text: string) => void | Promise<void>;
-  /** Orientar o pedido de ajuda aberto (o cartão): resolve e a IA responde na hora. */
-  onOrientarPedido?: (text: string) => void | Promise<void>;
+  /** Orientar o pedido de ajuda aberto (a caixa em modo pedido): resolve e a IA responde na hora. */
+  onOrientarPedido?: (text: string, pedidoId: number) => void | Promise<void>;
   /* A segunda linha do cabeçalho carrega quem é o dono da conversa e como ela
      está classificada. São decisões sobre a conversa, então moram junto dela e
      não a duas colunas de distância, no painel. */
@@ -276,18 +276,30 @@ export default function Thread({
     };
   }, [carregarHandoffs, supabase, phone, handoffsPreview]);
 
-  const handoffAberto = handoffs.find((h) => !h.closedAt) ?? null;
+  // A FILA: pedidos abertos do mais antigo para o mais novo. A caixa de escrita
+  // mostra o primeiro; resolvido ele, vem o próximo.
+  const fila = useMemo(
+    () =>
+      handoffs
+        .filter((h) => !h.closedAt)
+        .sort((a, b) => Date.parse(a.openedAt) - Date.parse(b.openedAt)),
+    [handoffs]
+  );
+  const pedidoAtual = fila[0] ?? null;
 
-  // "Resolvi por fora": a mesma rota do antigo botão Resolvido (fecha o
-  // handoff, devolve a IA, larga o responsável e fecha o registro).
-  const resolverHandoff = useCallback(async () => {
-    const res = await fetch("/api/conversations/resolve", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
-    });
-    if (res.ok) await carregarHandoffs();
-  }, [phone, carregarHandoffs]);
+  // "Resolvido": fecha o pedido da vez sem mandar nada (a mesma rota do antigo
+  // Resolvido, que também devolve a IA e larga o responsável).
+  const resolverHandoff = useCallback(
+    async (pedidoId: number) => {
+      const res = await fetch("/api/conversations/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, pedidoId }),
+      });
+      if (res.ok) await carregarHandoffs();
+    },
+    [phone, carregarHandoffs]
+  );
 
   const refetch = useCallback(async () => {
     const { data } = await supabase
@@ -420,19 +432,23 @@ export default function Thread({
         { tempId, content: text, created_at: new Date().toISOString(), status: "pending" },
       ]);
       try {
+        // Responder com um pedido aberto é responder A ELE: a caixa mostra o
+        // pedido nos dois modos, então quem responde daqui resolve o pedido.
+        const pedidoId = pedidoAtual?.id;
         const res = await fetch("/api/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone, text }),
+          body: JSON.stringify({ phone, text, ...(pedidoId ? { pedidoId } : {}) }),
         });
         if (!res.ok) throw new Error("send failed");
+        if (pedidoId) void carregarHandoffs();
       } catch {
         setPending((prev) =>
           prev.map((p) => (p.tempId === tempId ? { ...p, status: "failed" } : p))
         );
       }
     },
-    [phone]
+    [phone, pedidoAtual, carregarHandoffs]
   );
 
   // Envio de mídia: o arquivo já subiu pro Storage (composer); aqui só dispara o
@@ -477,19 +493,12 @@ export default function Thread({
       | { kind: "bubble"; bubble: Bubble; showLabel: boolean }
       | { kind: "handoff"; handoff: Handoff; key: string };
     const result: Item[] = [];
-    // ONDE O CARTÃO ENTRA: logo depois da resposta da IA que pediu ajuda. O
-    // registro nasce no /api/agent ANTES de o n8n gravar essa resposta, então o
-    // ponto de ancoragem é a primeira mensagem da IA até 2 minutos depois de
-    // aberto (mais 5s, para pegar as duas mensagens do mesmo turno). Sem ela,
-    // o próprio horário de abertura.
-    const ancoras = handoffs.map((h) => {
-      const t = Date.parse(h.openedAt);
-      const resposta = bubbles.find((b) => {
-        const tb = Date.parse(b.created_at);
-        return b.author === "ia" && tb >= t - 5_000 && tb <= t + 120_000;
-      });
-      return { h, ate: resposta ? Date.parse(resposta.created_at) + 5_000 : t };
-    });
+    // SÓ O PEDIDO FECHADO ENTRA NA CONVERSA, no ponto em que fechou (a linha
+    // de histórico). O aberto mora na caixa de escrita (27/09/2026).
+    const ancoras = handoffs
+      .filter((h) => h.closedAt)
+      .map((h) => ({ h, ate: Date.parse(h.closedAt!) }))
+      .sort((a, b) => a.ate - b.ate);
     let proximo = 0;
     const soltarAte = (limite: number) => {
       while (proximo < ancoras.length && ancoras[proximo].ate < limite) {
@@ -1056,26 +1065,7 @@ export default function Thread({
                   <span className="h-px flex-1 bg-human-line" aria-hidden />
                 </div>
               ) : item.kind === "handoff" ? (
-                <HandoffCard
-                  key={item.key}
-                  h={item.handoff}
-                  orientacaoPendente={item.handoff.closedAt ? null : (pendingInstruction ?? null)}
-                  onOrientar={
-                    onOrientarPedido
-                      ? async (t: string) => {
-                          await onOrientarPedido(t);
-                          await carregarHandoffs();
-                        }
-                      : onInstruct
-                  }
-                  onCancelarOrientacao={onCancelInstruction}
-                  // Na prévia sem banco o botão aparece e não faz nada.
-                  onResolver={handoffsPreview ? () => undefined : resolverHandoff}
-                  onAssumir={
-                    onAssign && myUserId ? () => onAssign(myUserId) : undefined
-                  }
-                  readOnly={readOnly}
-                />
+                <HandoffCard key={item.key} h={item.handoff} />
               ) : (
                 <BubbleView
                   key={item.bubble.key}
@@ -1100,13 +1090,31 @@ export default function Thread({
 
       <div className="relative z-10 shrink-0">
         <MessageComposer
+          // Trocar de pedido remonta a caixa, e ela volta a abrir em orientar.
+          key={pedidoAtual ? `pedido-${pedidoAtual.id}` : "normal"}
+          pedido={
+            pedidoAtual && !readOnly
+              ? {
+                  handoff: pedidoAtual,
+                  posicao: 1,
+                  total: fila.length,
+                  onOrientar: async (t: string) => {
+                    if (handoffsPreview || !onOrientarPedido) return;
+                    await onOrientarPedido(t, pedidoAtual.id);
+                    await carregarHandoffs();
+                  },
+                  onResolvido: async () => {
+                    if (handoffsPreview) return;
+                    await resolverHandoff(pedidoAtual.id);
+                  },
+                }
+              : undefined
+          }
           onSend={handleSend}
           onSendMedia={handleSendMedia}
           onAddNote={onAddNote}
           onInstruct={onInstruct}
-          // Com pedido de ajuda aberto, a orientação pendente aparece NO CARTÃO;
-          // repetir aqui seria o mesmo aviso em dois lugares.
-          pendingInstruction={handoffAberto ? null : pendingInstruction}
+          pendingInstruction={pendingInstruction}
           onCancelInstruction={onCancelInstruction}
           iaAtiva={iaState !== null && !iaPausada}
           clientId={clientId}

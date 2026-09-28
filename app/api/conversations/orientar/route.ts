@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { processTurn } from "@/lib/agent-turn";
+import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // ORIENTAR UM PEDIDO DE AJUDA É RESOLVÊ-LO, E A IA RESPONDE NA HORA
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: client.access.message }, { status: 402 });
   }
 
-  let body: { phone?: string; instruction?: string };
+  let body: { phone?: string; instruction?: string; pedidoId?: number };
   try {
     body = await req.json();
   } catch {
@@ -52,21 +53,25 @@ export async function POST(req: Request) {
   const svc = createServiceClient();
   const agora = new Date().toISOString();
 
-  // 1. Fecha o pedido. O tenant vem da sessão, nunca do corpo.
-  const { data: fechados, error: regErr } = await svc
-    .from("handoffs")
-    .update({ instruction, closed_at: agora, closed_how: "ia", closed_by: client.userId })
-    .eq("client_id", client.id)
-    .eq("phone", phone)
-    .is("closed_at", null)
-    .select("id");
-  if (regErr) {
+  // 1. Fecha O pedido que a caixa mostrava (o mais antigo da fila, ou o
+  // `pedidoId` que veio da tela). O tenant vem da sessão, nunca do corpo.
+  let fechado: number | null;
+  try {
+    fechado = await fecharPedido(svc, {
+      clientId: client.id,
+      phone,
+      id: typeof body.pedidoId === "number" ? body.pedidoId : null,
+      como: "ia",
+      por: client.userId,
+      instrucao: instruction,
+    });
+  } catch (e) {
     return NextResponse.json(
-      { error: "falha ao fechar o pedido", detail: regErr.message },
+      { error: "falha ao fechar o pedido", detail: (e as Error).message },
       { status: 500 }
     );
   }
-  if (!fechados || fechados.length === 0) {
+  if (fechado == null) {
     // Sem pedido aberto não há o que resolver (outra aba já resolveu, ou a IA
     // nunca pediu). A orientação sem pedido segue pela pílula da caixa de escrita.
     return NextResponse.json({ error: "nenhum pedido de ajuda aberto" }, { status: 409 });
@@ -76,7 +81,6 @@ export async function POST(req: Request) {
     svc
       .from("conversations")
       .update({
-        handoff_at: null,
         assigned_user_id: null,
         pending_instruction: null,
         pending_instruction_at: null,

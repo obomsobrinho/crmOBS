@@ -229,11 +229,11 @@ export default function ConversationView({
   // também religa a IA e larga o responsável). Se ela não conseguir responder
   // agora, a orientação fica pendente e aparece colada na caixa de escrita.
   const orientarPedido = useCallback(
-    async (text: string) => {
+    async (text: string, pedidoId?: number) => {
       const res = await fetch("/api/conversations/orientar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, instruction: text }),
+        body: JSON.stringify({ phone, instruction: text, pedidoId }),
       });
       if (!res.ok) return;
       const data = (await res.json()) as { enviado?: boolean };

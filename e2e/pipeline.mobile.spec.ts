@@ -66,3 +66,17 @@ test("gerenciar estágios abre em tela cheia", async ({ page }) => {
     })
     .toEqual([0, 375]);
 });
+
+// ACHADO DO DONO (27/09/2026): no celular aparece UMA coluna por vez, e ligar
+// "Esperando você" escondia cards de OUTRAS colunas, então a tela que ele estava
+// vendo não mudava. Ligar o filtro leva à primeira coluna com alguém esperando.
+test("Esperando você leva à coluna de quem espera", async ({ page }) => {
+  await page.goto("/design/pipeline");
+  const botao = page.getByRole("button", { name: /Esperando você/ });
+  await expect(botao).toBeVisible();
+  await page.waitForTimeout(600);
+  await botao.click();
+  const visivel = page.locator('[data-slot="pipeline-coluna"]:visible');
+  await expect(visivel).toHaveCount(1);
+  await expect(visivel.locator('[data-slot="pipeline-card"]').first()).toContainText("Sua vez");
+});

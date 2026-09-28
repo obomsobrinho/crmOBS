@@ -106,13 +106,20 @@ export default async function DesignPreview({
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
   const { entendimento, lista, handoff } = await searchParams;
-  // `?handoff=aberto|orientado|resolvido` (27/09/2026): o cartão do pedido de
-  // ajuda da IA na linha da conversa, nos três momentos dele.
+  // `?handoff=aberto|resolvido` (27/09/2026): a FILA de pedidos de ajuda. Aberto
+  // são dois pedidos (a caixa de escrita em modo pedido, "1 de 2"); resolvido
+  // são os dois fechados, como linhas de histórico na conversa.
   const handoffsPreview =
-    handoff === "aberto" || handoff === "orientado"
-      ? [{ id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: null, closedAt: null, closedHow: null }]
+    handoff === "aberto"
+      ? [
+          { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: null, closedAt: null, closedHow: null },
+          { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: null, closedHow: null },
+        ]
       : handoff === "resolvido"
-        ? [{ id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: "O plano anual sai por R$ 1.800. Pode passar o valor.", closedAt: HOJE(12.05), closedHow: "ia" as const }]
+        ? [
+            { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: "O plano anual sai por R$ 1.800. Pode passar o valor.", closedAt: HOJE(12.05), closedHow: "ia" as const },
+            { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: HOJE(12.1), closedHow: "resolvido" as const },
+          ]
         : undefined;
   // `?lista=1` abre SEM conversa (a tela de /inbox), que no celular é outra
   // tela: só a lista (plano do mobile, fase 1).
@@ -177,9 +184,7 @@ export default async function DesignPreview({
               members={MEMBERS}
               myUserId={ME}
               conversationId={1}
-              pendingInstruction={
-                handoff === "orientado" ? "O plano anual sai por R$ 1.800. Pode passar o valor." : null
-              }
+              pendingInstruction={null}
               handoffsPreview={handoffsPreview}
               clientId="00000000-0000-0000-0000-0000000000cc"
               displayName={null}

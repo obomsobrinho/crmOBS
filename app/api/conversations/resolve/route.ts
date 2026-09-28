@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { fecharPedido } from "@/lib/handoffs";
 
 // Resolve o handoff de uma conversa: fecha a pendência, LARGA O RESPONSÁVEL e
 // devolve o atendimento para a IA. Um gesto, três escritas, de propósito.
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: client.access.message }, { status: 402 });
   }
 
-  let body: { phone?: string };
+  let body: { phone?: string; pedidoId?: number };
   try {
     body = await req.json();
   } catch {
@@ -54,9 +55,26 @@ export async function POST(req: Request) {
 
   // O tenant vem SEMPRE da sessão, nunca do corpo: é o que impede resolver
   // conversa de outro tenant mandando um phone qualquer.
+  // FILA (27/09/2026): "Resolvido" fecha UM pedido, o que a caixa mostra (o
+  // mais antigo, ou `pedidoId`). O `handoff_at` passa para o próximo da fila,
+  // ou nulo se não sobrou nenhum (`fecharPedido`).
+  try {
+    await fecharPedido(svc, {
+      clientId: client.id,
+      phone,
+      id: typeof body.pedidoId === "number" ? body.pedidoId : null,
+      como: "resolvido",
+      por: client.userId,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: "falha ao resolver o handoff", detail: (e as Error).message },
+      { status: 500 }
+    );
+  }
   const { error: convErr } = await svc
     .from("conversations")
-    .update({ handoff_at: null, assigned_user_id: null })
+    .update({ assigned_user_id: null })
     .eq("client_id", client.id)
     .eq("phone", phone);
   if (convErr) {
@@ -66,19 +84,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Fecha o registro do cartão na conversa ("resolvido por fora", com quem
-  // resolveu). Best-effort: o que a pessoa pediu, fechar a pendência, já foi.
-  const { error: regErr } = await svc
-    .from("handoffs")
-    .update({
-      closed_at: new Date().toISOString(),
-      closed_how: "resolvido",
-      closed_by: client.userId,
-    })
-    .eq("client_id", client.id)
-    .eq("phone", phone)
-    .is("closed_at", null);
-  if (regErr) console.error("falha ao fechar o registro do handoff:", regErr.message);
 
   // Devolve o atendimento para a IA. Best-effort: se falhar, o handoff já está
   // fechado (que é o que a pessoa pediu) e a chave da IA continua na tela.

@@ -12,6 +12,8 @@ import {
   ChevronUp,
   ArrowUp,
   Check,
+  CheckCheck,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,8 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { formatEspera } from "@/lib/format";
+import type { Handoff } from "./HandoffCard";
 
 export type OutgoingMedia = {
   bucket: string;
@@ -55,6 +59,7 @@ export default function MessageComposer({
   onAddNote,
   onInstruct,
   pendingInstruction,
+  pedido,
   onCancelInstruction,
   iaAtiva,
   clientId,
@@ -69,6 +74,20 @@ export default function MessageComposer({
   onInstruct?: (text: string) => void | Promise<void>;
   /** Orientação já dada e ainda não consumida pela IA. */
   pendingInstruction?: string | null;
+  /**
+   * PEDIDO DE AJUDA ABERTO (27/09/2026, desenho do dono): a caixa mostra o
+   * pedido em cima e abre em "Orientar a IA". O seletor troca só entre orientar
+   * e responder (nota interna some), e "Resolvido" fica ao lado. Orientar ou
+   * responder daqui resolve o pedido; a próxima da fila entra em seguida.
+   */
+  pedido?: {
+    handoff: Handoff;
+    /** 1 = o mais antigo. */
+    posicao: number;
+    total: number;
+    onOrientar: (texto: string) => void | Promise<void>;
+    onResolvido: () => void | Promise<void>;
+  };
   onCancelInstruction?: () => void | Promise<void>;
   iaAtiva?: boolean;
   clientId: string;
@@ -81,7 +100,10 @@ export default function MessageComposer({
   atende?: { quem: "ia" | "ninguem" | "voce" | "outro"; nome?: string };
 }) {
   const supabase = createClient();
-  const [mode, setMode] = useState<Mode>("responder");
+  // Com pedido aberto a caixa ABRE em orientar: é a resposta que o pedido espera.
+  // Quem troca de pedido remonta a caixa (`key` no Thread), e o modo volta a ele.
+  const [mode, setMode] = useState<Mode>(pedido ? "orientar" : "responder");
+  const [resolvendo, setResolvendo] = useState(false);
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,7 +119,8 @@ export default function MessageComposer({
       setText("");
       return;
     }
-    const action = mode === "nota" ? onAddNote : onInstruct;
+    const action =
+      mode === "nota" ? onAddNote : pedido ? pedido.onOrientar : onInstruct;
     if (!action) return;
     // Nota e orientação gravam no banco antes de limpar: se falhar, o que a
     // pessoa escreveu continua no campo em vez de sumir sem aviso.
@@ -181,7 +204,10 @@ export default function MessageComposer({
     );
   }
 
-  const skin = SKIN[mode];
+  // No pedido, orientar é âmbar (a cor do pedido: é a resposta a ele), e não o
+  // roxo da orientação solta. Responder continua verde: vai para o cliente.
+  const skinDe = (m: Mode) => (pedido && m === "orientar" ? SKIN_PEDIDO : SKIN[m]);
+  const skin = skinDe(mode);
   const ActionIcon = skin.Icon;
   // A FRASE DE CONTEXTO (AJUSTES-2 do desenho do mobile, e desde 23/09/2026
   // também no desktop, a pedido do dono): UMA frase dizendo a consequência de
@@ -201,12 +227,14 @@ export default function MessageComposer({
             : atende?.quem === "ia" || (!atende && iaAtiva)
               ? "Vai para o WhatsApp do cliente. A IA pausa e você assume."
               : "Vai para o WhatsApp do cliente. Ao responder, você assume a conversa.";
-  const modosDisponiveis = (["responder", "nota", "orientar"] as Mode[]).filter(
-    (m) =>
-      m === "responder" ||
-      (m === "nota" && !!onAddNote) ||
-      (m === "orientar" && !!onInstruct),
-  );
+  const modosDisponiveis = pedido
+    ? (["orientar", "responder"] as Mode[])
+    : (["responder", "nota", "orientar"] as Mode[]).filter(
+        (m) =>
+          m === "responder" ||
+          (m === "nota" && !!onAddNote) ||
+          (m === "orientar" && !!onInstruct),
+      );
 
   return (
     // ⚠️ `pt-3` e não `pt-0` (19/09/2026). Sem respiro, a caixa branca nascia
@@ -232,6 +260,7 @@ export default function MessageComposer({
           A coluna continua a de 960px da conversa, e o raio de 16px é o do
           balão: as duas superfícies grandes da conversa são da mesma família. */}
       <form
+        data-slot={pedido ? "pedido-caixa" : undefined}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -277,14 +306,36 @@ export default function MessageComposer({
           </div>
         )}
 
+        {/* O PEDIDO, em cima, igual nos dois modos (orientar e responder): uma
+            visão só, pedido do dono. */}
+        {pedido && (
+          <div className="flex items-start gap-3 bg-warn-surface px-3.5 py-2.5">
+            <LifeBuoy size={16} className="mt-0.5 shrink-0 text-warn-ink" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-legenda text-warn-ink">
+                <span className="font-semibold">A IA pediu sua ajuda</span>
+                <span data-slot="pedido-posicao" suppressHydrationWarning>
+                  {pedido.total > 1 ? `${pedido.posicao} de ${pedido.total} · ` : ""}há{" "}
+                  {formatEspera(pedido.handoff.openedAt)}
+                </span>
+              </p>
+              <p className="mt-0.5 text-corpo font-semibold text-ink" style={{ textWrap: "pretty" }}>
+                {pedido.handoff.summary || "Ela não soube responder e passou para o time."}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* A frase de contexto, numa faixa interna arredondada e SEM cor de
             estado no fundo: quem carrega a cor do modo é a moldura e a pílula. */}
-        <p
-          data-slot="composer-contexto"
-          className="mx-2 mt-2 rounded-[10px] bg-bloco px-3 py-2 text-apoio text-ink-2"
-        >
-          {contexto}
-        </p>
+        {!pedido && (
+          <p
+            data-slot="composer-contexto"
+            className="mx-2 mt-2 rounded-[10px] bg-bloco px-3 py-2 text-apoio text-ink-2"
+          >
+            {contexto}
+          </p>
+        )}
 
         {/* Campo na largura toda e, embaixo, a linha de botões. O campo cresce
             com o texto (`field-sizing: content`) até o teto, e rola a partir
@@ -308,7 +359,7 @@ export default function MessageComposer({
               }
             }}
             rows={1}
-            aria-label={skin.placeholder}
+            aria-label={pedido && mode === "orientar" ? "Orientação para a IA" : skin.placeholder}
             placeholder={skin.placeholder}
             className="min-h-[var(--h-primary)] max-h-[180px] min-w-0 basis-full px-2 py-2 text-corpo [field-sizing:content] max-md:max-h-[132px]"
           />
@@ -362,17 +413,17 @@ export default function MessageComposer({
               </DropdownMenuTrigger>
               <DropdownMenuContent side="top" align="start" sideOffset={6} className="w-64">
                 {modosDisponiveis.map((m) => {
-                  const Icone = SKIN[m].Icon;
+                  const Icone = skinDe(m).Icon;
                   return (
                     <DropdownMenuItem
                       key={m}
                       onSelect={() => setMode(m)}
                       className="min-h-11 items-start py-2"
                     >
-                      <Icone size={16} className={cn("mt-0.5 shrink-0", SKIN[m].hint)} />
+                      <Icone size={16} className={cn("mt-0.5 shrink-0", skinDe(m).hint)} />
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="font-semibold text-ink">{MODO_ROTULO[m]}</span>
-                        <span className="text-legenda text-ink-3">{SKIN[m].destino}</span>
+                        <span className="text-legenda text-ink-3">{skinDe(m).destino}</span>
                       </span>
                       {m === mode && <Check size={14} className="mt-0.5 shrink-0 text-brand-ink" />}
                     </DropdownMenuItem>
@@ -380,6 +431,31 @@ export default function MessageComposer({
                 })}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+          {/* "Resolvido" ao lado do seletor: fecha o pedido sem enviar nada. */}
+          {pedido && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="chrome"
+                  carregando={resolvendo}
+                  onClick={async () => {
+                    setResolvendo(true);
+                    try {
+                      await pedido.onResolvido();
+                    } finally {
+                      setResolvendo(false);
+                    }
+                  }}
+                  className="max-md:h-10"
+                >
+                  <CheckCheck size={14} />
+                  Resolvido
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Fecha o pedido sem enviar nada ao cliente</TooltipContent>
+            </Tooltip>
           )}
           <span className="flex-1" aria-hidden />
 
@@ -447,7 +523,7 @@ const SKIN: Record<
     variant: "send",
     placeholder: "Escreva uma mensagem",
     action: "Enviar mensagem",
-    destino: "Vai para o cliente",
+    destino: "Você responde ao cliente e assume a conversa",
     Icon: Send,
   },
   nota: {
@@ -470,6 +546,18 @@ const SKIN: Record<
     destino: "Só a IA vê",
     Icon: Sparkles,
   },
+};
+
+// Orientar DENTRO de um pedido de ajuda: âmbar, e a IA responde na hora.
+const SKIN_PEDIDO: (typeof SKIN)[Mode] = {
+  frame: "border border-[var(--warn-line)]",
+  hint: "text-warn-ink",
+  aviso: "bg-warn-surface",
+  variant: "warn",
+  placeholder: "Diga à IA o que responder ao cliente",
+  action: "Enviar orientação",
+  destino: "A IA responde ao cliente na hora",
+  Icon: Sparkles,
 };
 
 /** Rótulo curto da pílula do modo. */

@@ -248,6 +248,9 @@ export async function processTurn(
   // sobrescrever o primeiro handoff em aberto: é o primeiro que dá a espera real
   // ("esperando há 6h"); o último só troca o resumo.
   let handoffAt: string | null = null;
+  // Pedidos de ajuda ainda abertos, do mais antigo para o mais novo (a fila).
+  let abertos: { id: number; summary: string | null }[] = [];
+  let resolvidos: string[] = [];
   if (dryRun) {
     history = sanitizeHistory(params.history);
     instruction =
@@ -271,8 +274,8 @@ export async function processTurn(
         .maybeSingle(),
     ]);
     if (histErr) throw new TurnError(500, "falha ao carregar o histórico");
-    // Pedidos de ajuda JÁ FECHADOS, para entrarem na linha do tempo que a IA lê
-    // (ver `notaDoPedido`). Best-effort: sem eles o turno segue como antes.
+    // Pedidos de ajuda JÁ FECHADOS (ver `pedidosResolvidos`). Best-effort: sem
+    // eles o turno segue como antes.
     const { data: pedidos } = await svc
       .from("handoffs")
       .select("summary, closed_at, closed_how")
@@ -281,7 +284,16 @@ export async function processTurn(
       .not("closed_at", "is", null)
       .order("closed_at", { ascending: false })
       .limit(HISTORY_ROWS);
-    history = buildHistory(rows, pedidos);
+    history = buildHistory(rows);
+    resolvidos = pedidosResolvidos(rows, pedidos);
+    const { data: fila } = await svc
+      .from("handoffs")
+      .select("id, summary")
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .is("closed_at", null)
+      .order("opened_at", { ascending: true });
+    abertos = (fila ?? []) as { id: number; summary: string | null }[];
     const pend = (conv?.pending_instruction as string | null) ?? null;
     instruction = retomada
       ? retomada.instruction.trim()
@@ -332,6 +344,10 @@ export async function processTurn(
     apiKey,
     knowledge,
     operatorInstruction: instruction,
+    pedidosResolvidos: resolvidos,
+    pedidosAbertos: abertos
+      .map((p) => (p.summary ?? "").trim())
+      .filter((t) => t !== ""),
   });
   const raw = run.output;
 
@@ -380,30 +396,10 @@ export async function processTurn(
       .eq("phone", phone);
     if (clrErr) console.error("falha ao limpar a orientação:", clrErr.message);
 
-    // A ORIENTAÇÃO RESOLVEU O HANDOFF (26/09/2026, decisão do dono). Orientar é o
-    // jeito do time resolver a pendência sem assumir a conversa: se a IA usou a
-    // orientação e respondeu SEM escalar de novo (`none`), o que o cliente
-    // esperava foi atendido, e a conversa sai de "Esperando" sozinha. Antes ela
-    // ficava lá até alguém clicar em Resolvido, com o cliente já respondido.
-    // Se a IA escalou de novo (ou o guardrail degradou para `pausar`), o handoff
-    // continua aberto, com a espera original. Best-effort, como o resto daqui.
-    if (handoffAt && output.action === "none") {
-      const { error: hErr } = await svc
-        .from("conversations")
-        .update({ handoff_at: null })
-        .eq("client_id", clientId)
-        .eq("phone", phone);
-      if (hErr) console.error("falha ao fechar o handoff resolvido pela orientação:", hErr.message);
-      // E o registro do cartão na conversa: "resolvido pela IA com a sua
-      // orientação", com a orientação guardada (27/09/2026).
-      const { error: rErr } = await svc
-        .from("handoffs")
-        .update({ instruction, closed_at: new Date().toISOString(), closed_how: "ia" })
-        .eq("client_id", clientId)
-        .eq("phone", phone)
-        .is("closed_at", null);
-      if (rErr) console.error("falha ao fechar o registro do handoff:", rErr.message);
-    }
+    // ⚠️ A orientação NÃO fecha mais pedido aqui (27/09/2026). Quem fecha é a
+    // porta que o time usou (`POST /api/conversations/orientar`), na hora, e só
+    // o pedido que ele respondeu. Fechar "todos os abertos" neste ponto, como
+    // era antes da fila, resolveria de brinde pedidos que ninguém respondeu.
   }
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
@@ -430,37 +426,29 @@ export async function processTurn(
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
       stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
 
-      // Abre o handoff: marca que a IA pediu ajuda e o time ainda não respondeu.
-      // Só grava quando está nulo, porque o valor que interessa é o PRIMEIRO
-      // handoff em aberto (é ele que mede a espera). O resumo do último pedido
-      // vem de conversation_qualifications, que ganha uma linha por turno.
-      // Quem limpa é o botão Resolvido (`/api/conversations/resolve`) ou, desde
-      // 26/09/2026, a orientação que resolveu (logo acima). Best-effort: um erro
-      // aqui não pode derrubar a resposta ao cliente.
-      if (!handoffAt) {
+      // FILA DE PEDIDOS (27/09/2026, decisão do dono). Sem pedido aberto, este
+      // abre o primeiro e marca `handoff_at` (a espera conta dele). Com pedido
+      // aberto, só entra na fila se a IA disse que o assunto é NOVO
+      // (`pedido_novo`, que ela decide vendo a lista PEDIDOS DE AJUDA EM
+      // ABERTO); o cliente insistindo no mesmo assunto não gera pedido repetido.
+      // O guardrail que degrada para `pausar` só abre quando não há nenhum.
+      // Best-effort: um erro aqui não pode derrubar a resposta ao cliente.
+      const entraNaFila =
+        !handoffAt || abertos.length === 0 || (output.pedido_novo && !guardrail.blocked);
+      if (entraNaFila) {
         const abertoEm = new Date().toISOString();
-        const { error: hErr } = await svc
-          .from("conversations")
-          .update({ handoff_at: abertoEm })
-          .eq("client_id", clientId)
-          .eq("phone", phone);
-        if (hErr) console.error("falha ao abrir o handoff:", hErr.message);
-        // O REGISTRO do pedido (27/09/2026): é ele que vira o cartão na linha
-        // do tempo da conversa. Um aberto por conversa (índice único parcial).
         const { error: rErr } = await svc
           .from("handoffs")
           .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary });
         if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
-      } else if (output.summary) {
-        // Handoff já aberto e a IA pediu ajuda de novo: o cartão mostra o
-        // ÚLTIMO pedido, a espera continua contando do primeiro.
-        const { error: rErr } = await svc
-          .from("handoffs")
-          .update({ summary: output.summary })
-          .eq("client_id", clientId)
-          .eq("phone", phone)
-          .is("closed_at", null);
-        if (rErr) console.error("falha ao atualizar o registro do handoff:", rErr.message);
+        if (!handoffAt) {
+          const { error: hErr } = await svc
+            .from("conversations")
+            .update({ handoff_at: abertoEm })
+            .eq("client_id", clientId)
+            .eq("phone", phone);
+          if (hErr) console.error("falha ao abrir o handoff:", hErr.message);
+        }
       }
     }
   }
@@ -553,7 +541,13 @@ function silentTurn(
   flags: { subscriptionBlocked?: boolean; notPublished?: boolean }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {
-    output: { messages: [], action: "none", summary: "", preferencia_horario: "" },
+    output: {
+      messages: [],
+      action: "none",
+      summary: "",
+      preferencia_horario: "",
+      pedido_novo: false,
+    },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
       // nenhum prompt foi para o modelo. "fallback" seria mentira, então a
@@ -587,33 +581,11 @@ function sanitizeHistory(input: ChatTurn[] | undefined): ChatTurn[] {
 }
 
 // Reconstrói o histórico a partir das linhas de chat_messages (produção).
-//
-// ⚠️ OS PEDIDOS DE AJUDA FECHADOS ENTRAM NA LINHA DO TEMPO (27/09/2026, achado
-// do dono): a IA abria um pedido, o time resolvia, o cliente respondia "ok, fico
-// no aguardo" e a IA pedia ajuda DE NOVO pelo mesmo assunto, porque nada no
-// histórico dizia que o time já tinha respondido. Agora cada pedido fechado vira
-// uma nota interna no ponto exato em que fechou, e a ordem no tempo diz à IA o
-// que é assunto velho (já resolvido) e o que é pedido novo.
 function buildHistory(
-  rows: { user_message: string | null; bot_message: string | null; created_at?: string | null }[] | null,
-  pedidos?: { summary: string | null; closed_at: string | null; closed_how: string | null }[] | null
+  rows: { user_message: string | null; bot_message: string | null }[] | null
 ): ChatTurn[] {
   const history: ChatTurn[] = [];
-  const linhas = (rows ?? []).slice().reverse();
-  const inicio = linhas.length > 0 ? Date.parse(linhas[0].created_at ?? "") : NaN;
-  const notas = (pedidos ?? [])
-    .map((p) => ({ p, t: Date.parse(p.closed_at ?? "") }))
-    // Só o que cabe na janela do histórico: nota de pedido anterior à primeira
-    // mensagem lida falaria de um assunto que a IA não enxerga.
-    .filter(({ t }) => Number.isFinite(t) && (!Number.isFinite(inicio) || t >= inicio))
-    .sort((a, b) => a.t - b.t);
-  let n = 0;
-  for (const r of linhas) {
-    const tr = Date.parse(r.created_at ?? "");
-    while (n < notas.length && Number.isFinite(tr) && notas[n].t <= tr) {
-      history.push({ role: "system", content: notaDoPedido(notas[n].p, notas[n].t) });
-      n++;
-    }
+  for (const r of (rows ?? []).slice().reverse()) {
     const um = typeof r.user_message === "string" ? r.user_message.trim() : "";
     const bm = typeof r.bot_message === "string" ? r.bot_message.trim() : "";
     if (um) history.push({ role: "user", content: um.slice(0, MAX_TURN_CHARS) });
@@ -624,25 +596,46 @@ function buildHistory(
         content: bm.replace(/\s*\|\s*/g, "\n").slice(0, MAX_TURN_CHARS),
       });
   }
-  for (; n < notas.length; n++) {
-    history.push({ role: "system", content: notaDoPedido(notas[n].p, notas[n].t) });
-  }
   return history;
 }
 
-function notaDoPedido(
-  p: { summary: string | null; closed_how: string | null },
-  t: number
-): string {
-  const hora = new Date(t).toLocaleTimeString("pt-BR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  });
-  const assunto = p.summary?.trim() ? ` ("${p.summary.trim()}")` : "";
-  const como =
-    p.closed_how === "ia" ? "o time respondeu com uma orientação" : "o time resolveu por fora";
-  return `Nota interna do sistema, ${hora}: o pedido de ajuda que você abriu${assunto} foi resolvido (${como}). Esse pedido está ENCERRADO: não peça ajuda de novo pelo mesmo assunto. Peça ajuda ao time só se o cliente trouxer um pedido NOVO.`;
+// ⚠️ OS PEDIDOS JÁ RESOLVIDOS, COM A HORA (27/09/2026, achado do dono): a IA
+// abria um pedido, o time resolvia, o cliente respondia "ok, fico no aguardo" e
+// a IA pedia ajuda DE NOVO pelo mesmo assunto, porque nada dizia a ela que o time
+// já tinha respondido. Cada pedido fechado dentro da janela do histórico vira uma
+// linha com a hora em que fechou (seção PEDIDOS DE AJUDA JÁ RESOLVIDOS).
+// ⚠️ NÃO como nota no meio do histórico: essa foi a primeira versão, e as notas
+// abafavam a ORIENTAÇÃO DO OPERADOR (medido: com 8 notas na conversa de teste a
+// IA ignorou o desconto orientado 2 de 2 vezes; sem elas, usou 2 de 2).
+function pedidosResolvidos(
+  rows: { created_at?: string | null }[] | null,
+  pedidos: { summary: string | null; closed_at: string | null; closed_how: string | null }[] | null
+): string[] {
+  const tempos = (rows ?? [])
+    .map((r) => Date.parse(r.created_at ?? ""))
+    .filter((t) => Number.isFinite(t));
+  // Só o que cabe na janela do histórico: pedido anterior à primeira mensagem
+  // lida falaria de um assunto que a IA não enxerga.
+  const inicio = tempos.length > 0 ? Math.min(...tempos) : -Infinity;
+  return (pedidos ?? [])
+    .map((p) => ({ p, t: Date.parse(p.closed_at ?? "") }))
+    .filter(({ t }) => Number.isFinite(t) && t >= inicio)
+    .sort((x, y) => x.t - y.t)
+    // Os dois mais recentes bastam para a IA não reabrir o assunto de agora, e
+    // lista longa de pedidos velhos só disputa atenção com a orientação do time.
+    .slice(-2)
+    .map(({ p, t }) => {
+      const hora = new Date(t).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Sao_Paulo",
+      });
+      // ⚠️ Sem a palavra "orientação" aqui: com ela, a IA lia a ORIENTAÇÃO DO
+      // OPERADOR do turno como já usada e a ignorava (medido, 0 de 3).
+      return `${hora}: ${p.summary?.trim() || "pedido sem resumo"} (já respondido pelo time)`;
+    });
 }
 
 // Canônicos ativos do tenant (para calcular o estágio que a IA moveria).

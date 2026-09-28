@@ -1,44 +1,54 @@
 import { test, expect } from "@playwright/test";
 
-// O PEDIDO DE AJUDA MORA NA CONVERSA (27/09/2026, pedido do dono): um cartão
-// âmbar na linha do tempo, com a orientação digitada dentro dele. Antes o
-// pedido era uma faixa no topo e a orientação uma pílula roxa embaixo, e nada
-// dizia que uma respondia à outra. Prévia `/design?handoff=...`, sem banco.
+// O PEDIDO DE AJUDA MORA NA CAIXA DE ESCRITA (27/09/2026, desenho aprovado pelo
+// dono): com pedido aberto, a caixa vira o pedido, com a fila ("1 de 2"), e a
+// conversa não tem âmbar. Fechado, o pedido vira uma linha de histórico na
+// conversa. Prévia `/design?handoff=...`, sem banco.
 
-test("aberto: pedido, espera, campo de orientar e as duas saídas", async ({ page }) => {
+test("aberto: a caixa vira o pedido, abre em orientar, com a fila e o Resolvido", async ({ page }) => {
   await page.goto("/design?handoff=aberto");
-  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
-  await expect(cartao).toContainText("A IA pediu sua ajuda");
-  await expect(cartao).toContainText(/esperando há/);
-  await expect(cartao).toContainText("Cliente quer falar com o dono");
-  await expect(cartao.getByRole("textbox", { name: "Orientação para a IA" })).toBeVisible();
-  await expect(cartao.getByRole("button", { name: "Resolvi por fora" })).toBeVisible();
-  await expect(cartao.getByRole("button", { name: "Assumir a conversa" })).toBeVisible();
-  // O enviar é âmbar, a cor do pedido: roxo aqui era a desconexão que o dono apontou.
-  await expect(cartao.getByRole("button", { name: "Enviar orientação" })).toHaveAttribute(
+  const caixa = page.locator('[data-slot="pedido-caixa"]');
+  await expect(caixa).toContainText("A IA pediu sua ajuda");
+  // O mais antigo primeiro.
+  await expect(caixa).toContainText("valor do plano anual");
+  await expect(caixa.locator('[data-slot="pedido-posicao"]')).toContainText("1 de 2");
+  await expect(caixa.getByRole("textbox", { name: "Orientação para a IA" })).toBeVisible();
+  await expect(caixa.locator('[data-slot="composer-modo"]')).toContainText("Orientar a IA");
+  await expect(caixa.getByRole("button", { name: "Resolvido" })).toBeVisible();
+  await expect(caixa.getByRole("button", { name: "Enviar orientação" })).toHaveAttribute(
     "data-variant",
     "warn"
   );
-  // A faixa do topo não resolve mais nada.
+  // A conversa não tem cartão aberto, e a faixa do topo não resolve nada.
+  await expect(page.locator('[data-slot="handoff-cartao"]')).toHaveCount(0);
   await expect(
-    page.locator('[data-slot="conversa-entendimento"]').getByRole("button", { name: "Resolvido" })
+    page.locator('[data-slot="conversa-entendimento"]').getByRole("button", { name: /Resolvido|Ver pedido/ })
   ).toHaveCount(0);
 });
 
-test("orientado: o cartão diz o que vem, e a caixa de baixo não repete o aviso", async ({
+test("o seletor troca para Responder sem perder o pedido, e não oferece nota", async ({
   page,
 }) => {
-  await page.goto("/design?handoff=orientado");
-  const cartao = page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]');
-  await expect(cartao.locator('[data-slot="handoff-orientado"]')).toContainText("Você orientou");
-  await expect(cartao).toContainText("A IA responde na próxima mensagem do cliente");
-  await expect(page.getByText("Orientação pendente")).toHaveCount(0);
+  await page.goto("/design?handoff=aberto");
+  await page.waitForTimeout(600);
+  const caixa = page.locator('[data-slot="pedido-caixa"]');
+  await caixa.locator('[data-slot="composer-modo"]').click();
+  await expect(page.getByRole("menuitem", { name: /Nota interna/ })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: /Responder/ }).click();
+  // Uma visão só: o pedido continua em cima, e o Resolvido ao lado.
+  await expect(caixa).toContainText("valor do plano anual");
+  await expect(caixa.locator('[data-slot="composer-modo"]')).toContainText("Responder");
+  await expect(caixa.getByRole("textbox", { name: "Escreva uma mensagem" })).toBeVisible();
+  await expect(caixa.getByRole("button", { name: "Resolvido" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Voltar ao pedido|Eu respondo/ })).toHaveCount(0);
 });
 
-test("resolvido: vira uma linha de histórico, com a orientação", async ({ page }) => {
+test("resolvido: vira linha de histórico, e a caixa volta ao normal", async ({ page }) => {
   await page.goto("/design?handoff=resolvido");
-  const linha = page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]');
-  await expect(linha).toContainText("resolvido pela IA com a sua orientação");
-  await expect(linha).toContainText("Orientação:");
-  await expect(page.locator('[data-slot="handoff-cartao"][data-estado="aberto"]')).toHaveCount(0);
+  const linhas = page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]');
+  await expect(linhas).toHaveCount(2);
+  await expect(linhas.first()).toContainText("resolvido com a sua orientação");
+  await expect(linhas.first()).toContainText("Orientação:");
+  await expect(linhas.last()).toContainText("resolvido pelo time");
+  await expect(page.locator('[data-slot="pedido-caixa"]')).toHaveCount(0);
 });

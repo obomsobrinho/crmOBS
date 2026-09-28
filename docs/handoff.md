@@ -75,6 +75,22 @@ O próximo passo é tratar esse relatório. Ele testa em produção
 - **Horário na tela saía em UTC** (17:47 aparecia 20:47): o servidor renderiza em UTC e o
   `suppressHydrationWarning` mantinha o texto dele. Toda data agora sai em America/Sao_Paulo.
 
+**Segunda rodada (27/09, noite), desenho aprovado pelo dono:**
+- **O pedido mora na caixa de escrita, em fila.** O pedido fica em cima da caixa ("1 de 2"), que
+  abre em "Orientar a IA", troca para Responder pelo seletor e tem "Resolvido" ao lado; a conversa só
+  guarda a linha de histórico.
+- **Orientação aplicada já na primeira resposta:** a IA cumprimentava e deixava a orientação do time
+  para depois (desconto orientado: 3 de 6). Uma frase na ORIENTAÇÃO DO OPERADOR (`lib/agent.ts`)
+  levou a 6 de 6. Vários pedidos por
+  conversa, do mais antigo para o mais novo; a IA diz se o pedido é novo (`pedido_novo`).
+- **Pipeline no celular:** ligar "Esperando você" leva à coluna de quem espera (antes o recorte
+  acontecia em outra coluna e a tela não mudava).
+- Fluxo **"CRM Envio IA"** criado e ativo no n8n (`QbWUBuzXjvIEnQZN`); a URL está na Vercel.
+- Bateria `ia` 12 de 12. O caso 3 (conselho clínico) oscila entre `pausar` e `none` nas duas
+  versões do código (1 em 8 no código anterior), com resposta segura nas duas.
+- **Próximo assunto combinado com o dono:** o contato que é AVISADO quando abre um pedido de ajuda
+  (ele lembrava de ter isso na montagem, e não tem). Fazer o plano depois de ele testar esta rodada.
+
 **Configuração feita pelo dono no painel do Supabase (27/09):** Site URL passou a ser o domínio de
 produção e ele entrou em Redirect URLs. Antes o cadastro em produção mandava o link para
 `localhost:3000`. ⚠️ A linha `http://localhost:3001/auth/confirm` da lista casa só o endereço exato;
