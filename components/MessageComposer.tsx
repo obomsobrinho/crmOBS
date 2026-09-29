@@ -65,6 +65,7 @@ export default function MessageComposer({
   clientId,
   readOnly,
   atende,
+  embutida = false,
 }: {
   onSend: (text: string) => void | Promise<void>;
   onSendMedia?: (media: OutgoingMedia) => void | Promise<void>;
@@ -98,6 +99,12 @@ export default function MessageComposer({
    * lugar de Ana"). O desktop segue com o aviso de sempre.
    */
   atende?: { quem: "ia" | "ninguem" | "voce" | "outro"; nome?: string };
+  /**
+   * Dentro de outro bloco (a linha aberta da página de Pedidos, 29/09/2026):
+   * sem a faixa de superfície e o respiro que separam a caixa da CONVERSA.
+   * Só a moldura muda; a caixa é a mesma.
+   */
+  embutida?: boolean;
 }) {
   const supabase = createClient();
   // Com pedido aberto a caixa ABRE em orientar: é a resposta que o pedido espera.
@@ -242,7 +249,13 @@ export default function MessageComposer({
     // viravam uma linha só. Com 12px de superfície lisa entre elas, a mensagem
     // termina de se dissolver antes de a caixa começar, e a caixa passa a ler
     // como algo que FLUTUA sobre a conversa, que é o que ela é.
-    <div className="shrink-0 bg-msg px-5 pb-[18px] pt-3 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))] max-md:pt-2">
+    <div
+      className={
+        embutida
+          ? "shrink-0"
+          : "shrink-0 bg-msg px-5 pb-[18px] pt-3 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))] max-md:pt-2"
+      }
+    >
       {attachError && (
         <div className="mx-auto mb-2 w-full max-w-[960px] rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
           {attachError}

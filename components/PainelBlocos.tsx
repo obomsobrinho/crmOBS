@@ -31,7 +31,8 @@ export function PainelFilaCartao({
   quantas,
   esperaMs,
   espera,
-  href = "/inbox",
+  // Leva à página de pedidos (29/09/2026): é lá que se age sobre a fila.
+  href = "/pedidos",
 }: {
   /** Conversas com handoff em aberto agora. `null` = não foi possível medir. */
   quantas: number | null;

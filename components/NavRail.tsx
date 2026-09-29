@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BRAND } from "@/lib/brand";
 import {
+  HandHelping,
   MessagesSquare,
   KanbanSquare,
   LayoutDashboard,
@@ -54,6 +55,10 @@ const NAV: {
   // novidade passa. A tela INICIAL, porém, depende do papel (ver app/page.tsx):
   // quem trabalha na operação abre em Conversas.
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
+  // PEDIDOS (29/09/2026, decisão do dono): entre Painel e Conversas, com o
+  // número âmbar dos pedidos de ajuda esperando. É a coisa que o produto existe
+  // para não deixar esquecer, e é para onde o aviso no WhatsApp leva.
+  { href: "/pedidos", label: "Pedidos", icon: HandHelping },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
@@ -118,6 +123,7 @@ export default function NavRail({
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackAberto, setFeedbackAberto] = useState(false);
   const [unreadConvos, setUnreadConvos] = useState(0);
+  const [pedidosAbertos, setPedidosAbertos] = useState(0);
 
   // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
   // no estado inicial: o servidor não tem localStorage e o HTML sairia com um
@@ -157,6 +163,34 @@ export default function NavRail({
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "conversations" },
+        () => void load()
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [numeroAvisos]);
+
+  // Pedidos de ajuda esperando (tabela `handoffs`), para o número âmbar do
+  // item "Pedidos". Só a contagem (HEAD), com o número de avisos fora no banco.
+  useEffect(() => {
+    const supabase = createClient();
+    const load = async () => {
+      const fora = grafiasDoNumeroDeAvisos(numeroAvisos);
+      let consulta = supabase
+        .from("handoffs")
+        .select("id", { count: "exact", head: true })
+        .is("closed_at", null);
+      if (fora.length > 0) consulta = consulta.not("phone", "in", `(${fora.join(",")})`);
+      const { count } = await consulta;
+      setPedidosAbertos(count ?? 0);
+    };
+    void load();
+    const channel = supabase
+      .channel("rail-pedidos")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "handoffs" },
         () => void load()
       )
       .subscribe();
@@ -239,6 +273,7 @@ export default function NavRail({
         const atual = activeHref ?? pathname;
         const active = atual === href || atual.startsWith(href + "/");
         const unread = href === "/inbox" && unreadConvos > 0;
+        const esperando = href === "/pedidos" && pedidosAbertos > 0;
         const item = (
           <Button
             asChild
@@ -267,6 +302,16 @@ export default function NavRail({
               {unread && collapsed && (
                 <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
               )}
+              {/* Âmbar, e não a cor da marca: aqui o número é ESTADO (tem gente
+                  esperando), e âmbar é a cor de estado de espera do sistema. */}
+              {esperando && !collapsed && (
+                <Badge variant="pedidos" data-slot="rail-pedidos" className="ml-auto">
+                  {pedidosAbertos > 99 ? "99+" : pedidosAbertos}
+                </Badge>
+              )}
+              {esperando && collapsed && (
+                <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
+              )}
             </Link>
           </Button>
         );
@@ -276,7 +321,11 @@ export default function NavRail({
           <Tooltip key={href}>
             <TooltipTrigger asChild>{item}</TooltipTrigger>
             <TooltipContent side="right">
-              {unread ? `${label} (${unreadConvos} não lidas)` : label}
+              {unread
+                ? `${label} (${unreadConvos} não lidas)`
+                : esperando
+                  ? `${label} (${pedidosAbertos} esperando)`
+                  : label}
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -435,6 +484,7 @@ export default function NavRail({
       role={role}
       clientName={clientName}
       unread={unreadConvos}
+      pedidos={pedidosAbertos}
       estadoCanal={estadoCanal}
       whatsappConnected={whatsappConnected}
       onFeedback={() => setFeedbackAberto(true)}
@@ -485,6 +535,7 @@ function BarraAbas({
   role,
   clientName,
   unread,
+  pedidos,
   estadoCanal,
   whatsappConnected,
   onFeedback,
@@ -494,6 +545,7 @@ function BarraAbas({
   role?: string;
   clientName: string;
   unread: number;
+  pedidos: number;
   estadoCanal: string;
   whatsappConnected: boolean;
   onFeedback: () => void;
@@ -504,18 +556,27 @@ function BarraAbas({
     /^\/inbox\/[^/]+/.test(pathname) || pathname.startsWith("/agente");
   if (escondida) return null;
 
-  const emMais = ["/agente", "/equipe", "/perfil"].some((p) =>
+  // Pedidos entrou na barra no lugar do Pipeline (29/09/2026, decisão do
+  // dono), e o Pipeline foi para "Mais".
+  const emMais = ["/pipeline", "/agente", "/equipe", "/perfil"].some((p) =>
     pathname.startsWith(p),
   );
-  const abas: { href?: string; label: string; icon: LucideIcon; ativa: boolean; badge?: number }[] = [
+  const abas: {
+    href?: string;
+    label: string;
+    icon: LucideIcon;
+    ativa: boolean;
+    badge?: number;
+    badgeTom?: "marca" | "espera";
+  }[] = [
     { href: "/painel", label: "Painel", icon: LayoutDashboard, ativa: pathname.startsWith("/painel") },
+    { href: "/pedidos", label: "Pedidos", icon: HandHelping, ativa: pathname.startsWith("/pedidos"), badge: pedidos, badgeTom: "espera" },
     { href: "/inbox", label: "Conversas", icon: MessagesSquare, ativa: pathname.startsWith("/inbox"), badge: unread },
-    { href: "/pipeline", label: "Pipeline", icon: KanbanSquare, ativa: pathname.startsWith("/pipeline") },
     { label: "Mais", icon: Ellipsis, ativa: emMais || maisAberto },
   ];
   const itensMais = NAV.filter(
     (n) =>
-      !["/painel", "/inbox", "/pipeline"].includes(n.href) &&
+      !["/painel", "/pedidos", "/inbox"].includes(n.href) &&
       (!n.donoOnly || role === "dono"),
   );
 
@@ -532,7 +593,14 @@ function BarraAbas({
             <span className="relative">
               <Icone size={22} strokeWidth={1.8} />
               {!!a.badge && (
-                <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-legenda font-semibold leading-none text-white tabular-nums">
+                <span
+                  className={cn(
+                    "absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-legenda font-semibold leading-none tabular-nums",
+                    a.badgeTom === "espera"
+                      ? "bg-[var(--warn-fill)] text-[var(--warn-on)]"
+                      : "bg-brand text-white"
+                  )}
+                >
                   {a.badge > 99 ? "99+" : a.badge}
                 </span>
               )}

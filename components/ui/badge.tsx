@@ -35,6 +35,12 @@ const badgeVariants = cva(
         /** Não lidas. Uma só, para a lista de conversas e para o rail. */
         "nao-lidas":
           "flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-legenda font-semibold tabular-nums text-primary-foreground",
+        /**
+         * Pedidos de ajuda esperando (item "Pedidos" do menu). Âmbar porque é
+         * ESTADO de espera, com o par `fill`/`on` (nunca `fill` como texto).
+         */
+        pedidos:
+          "flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warn-fill)] px-1.5 text-legenda font-semibold tabular-nums text-[var(--warn-on)]",
         /** Separador de dia no meio da conversa. */
         dia: "rounded-full bg-bloco px-3 py-1 text-legenda font-semibold tracking-wide uppercase text-ink-2",
         /** Tag do contato. */

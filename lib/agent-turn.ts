@@ -502,9 +502,12 @@ export async function processTurn(
       // pode derrubar a resposta ao cliente.
       if (entraNaFila) {
         const abertoEm = new Date().toISOString();
-        const { error: rErr } = await svc
+        // O id volta porque o link do aviso abre ESTE pedido na página.
+        const { data: novoPedido, error: rErr } = await svc
           .from("handoffs")
-          .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary });
+          .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary })
+          .select("id")
+          .maybeSingle();
         if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
 
         // AVISO NO WHATSAPP DO TIME (29/09/2026). Só em pedido de ajuda
@@ -515,6 +518,7 @@ export async function processTurn(
           avisoAgendado = agendarAviso({
             clientId,
             phone,
+            pedidoId: (novoPedido?.id as number | undefined) ?? null,
             resumo: output.summary,
             instancia: (client.evolution_instance as string | null) ?? null,
             destino: avisos,
@@ -566,15 +570,19 @@ export async function processTurn(
 }
 
 /**
- * Link do "Abrir" do aviso. `VERCEL_PROJECT_PRODUCTION_URL` é a variável que a
+ * Link do "Abrir" do aviso: a página de pedidos com ESTE pedido já aberto
+ * (decisão do dono, 29/09/2026), e não a conversa: quem abre pelo celular
+ * resolve este e já vê o que mais espera. Sem o id, a página sem nada aberto.
+ * `VERCEL_PROJECT_PRODUCTION_URL` é a variável que a
  * própria Vercel preenche com o domínio de produção (sem protocolo), então não
  * existe env nossa para esquecer de configurar. Fora da Vercel ela não existe, e
  * o aviso sai sem a linha "Abrir" em vez de apontar para lugar nenhum.
  */
-function linkDaConversa(phone: string): string | null {
+function linkDoPedido(pedidoId: number | null): string | null {
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
   if (!host) return null;
-  return `https://${host.replace(/^https?:\/\//, "")}/inbox/${encodeURIComponent(phone)}`;
+  const base = `https://${host.replace(/^https?:\/\//, "")}/pedidos`;
+  return pedidoId ? `${base}?abrir=${pedidoId}` : base;
 }
 
 /**
@@ -589,6 +597,7 @@ function linkDaConversa(phone: string): string | null {
 function agendarAviso(a: {
   clientId: string;
   phone: string;
+  pedidoId: number | null;
   resumo: string;
   instancia: string | null;
   destino: string | null;
@@ -618,7 +627,7 @@ function agendarAviso(a: {
             nome,
             phone: a.phone,
             resumo: a.resumo,
-            abrir: linkDaConversa(a.phone),
+            abrir: linkDoPedido(a.pedidoId),
           })
         );
         if (!ok) console.error("aviso de pedido de ajuda recusado pela Evolution");

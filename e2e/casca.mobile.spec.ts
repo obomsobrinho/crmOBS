@@ -38,7 +38,8 @@ test("a folha Mais leva a Equipe, Perfil, tema, feedback e sair", async ({ page 
   await barra(page).getByRole("button", { name: /Mais/ }).click();
   const folha = page.locator('[data-slot="sheet-content"]');
   await expect(folha).toBeVisible();
-  for (const nome of ["Equipe", "Perfil"])
+  // Pipeline foi para cá quando Pedidos entrou na barra (29/09/2026).
+  for (const nome of ["Pipeline", "Equipe", "Perfil"])
     await expect(folha.getByRole("link", { name: nome })).toBeVisible();
   await expect(folha.getByRole("button", { name: "Enviar feedback" })).toBeVisible();
   await expect(folha.getByRole("button", { name: "Sair" })).toBeVisible();
