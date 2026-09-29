@@ -80,6 +80,7 @@ export default function PipelineBoard({
   initialCards,
   preview = false,
   previewMembers = [],
+  numeroAvisos = null,
 }: {
   clientId: string;
   myRole: string | null;
@@ -88,6 +89,8 @@ export default function PipelineBoard({
   /** No /design (sem login) usa mocks e simula as ações em memória. */
   preview?: boolean;
   previewMembers?: Member[];
+  /** Destino dos avisos: esse número nunca é card (lib/avisos.ts). */
+  numeroAvisos?: string | null;
 }) {
   const router = useRouter();
   const isOwner = myRole === "dono";
@@ -140,7 +143,8 @@ export default function PipelineBoard({
       ]);
     const { items, ia } = buildInbox(
       (convs ?? []) as ConvRow[],
-      (contatos ?? []) as ContatoRow[]
+      (contatos ?? []) as ContatoRow[],
+      numeroAvisos
     );
     const qual = lastQualByPhone(
       (quals ?? []) as { phone: string; summary: string | null }[]
@@ -152,7 +156,7 @@ export default function PipelineBoard({
           ? c.stage_source
           : null;
     setCards(buildCards(items, ia, qual, source));
-  }, [supabase]);
+  }, [supabase, numeroAvisos]);
 
   const refetchStages = useCallback(async () => {
     if (!supabase) return;

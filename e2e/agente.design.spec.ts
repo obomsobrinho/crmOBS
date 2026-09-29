@@ -45,15 +45,19 @@ test.describe("Tela do agente (/design/agente)", () => {
     expect(depois).toBe(true);
   });
 
-  test("o grupo de avisos mora dentro dos objetivos", async ({ page }) => {
+  test("os avisos moram na aba do que ele pode fazer, sem JID digitado", async ({ page }) => {
     await page.goto("/design/agente");
-    // Objetivos moram na terceira aba desde 28/08/2026.
     await page.getByRole("tab", { name: "O que ele pode fazer" }).click();
-    // O mock tem "Agendar" marcado, que é o único objetivo que usa o grupo.
-    await expect(page.getByText("Grupo de WhatsApp para avisar")).toBeVisible();
-    await expect(page.getByPlaceholder("120363000000000000@g.us")).toBeVisible();
-    // E não existe mais um cartão próprio com Salvar separado para isso.
-    await expect(page.getByText("Notificações no WhatsApp")).toHaveCount(0);
+    // Desde 29/09/2026 o bloco é "Avisos", sempre visível (não depende mais
+    // de "Agendar"), e o grupo é ESCOLHIDO numa lista, nunca digitado.
+    await expect(page.getByRole("heading", { name: "Avisos", exact: true })).toBeVisible();
+    await expect(page.getByText("Grupo de WhatsApp para avisar")).toHaveCount(0);
+    await expect(page.getByPlaceholder(/@g.us/)).toHaveCount(0);
+    // O mock tem um grupo salvo: a tela diz o NOME dele, não o código.
+    await expect(page.locator('[data-slot="avisos-destino"]')).toContainText(
+      "o grupo Time de atendimento"
+    );
+    await expect(page.getByRole("button", { name: "Mandar teste" })).toBeVisible();
   });
 
   test("a chave de ligar substituiu o cartão de publicar", async ({ page }) => {

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 // Lê a lista de conversas (tabela `conversations`, mantida por trigger) e o
 // cadastro de contatos numa tacada. A RLS já restringe tudo ao tenant logado.
-async function getInbox(): Promise<{
+async function getInbox(avisos: string | null): Promise<{
   items: InboxItem[];
   ia: Record<string, string | null>;
 }> {
@@ -28,7 +28,8 @@ async function getInbox(): Promise<{
   ]);
   return buildInbox(
     (convs ?? []) as ConvRow[],
-    (contatos ?? []) as ContatoRow[]
+    (contatos ?? []) as ContatoRow[],
+    avisos
   );
 }
 
@@ -39,7 +40,7 @@ export default async function InboxLayout({
 }) {
   // O gate de auth/instância já roda no layout do route group (app).
   const client = await getMyClient();
-  const { items: initial, ia: initialIa } = await getInbox();
+  const { items: initial, ia: initialIa } = await getInbox(client?.avisos ?? null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col md:gap-3">
@@ -57,6 +58,7 @@ export default async function InboxLayout({
           initial={initial}
           initialIa={initialIa}
           myUserId={client?.userId}
+          numeroAvisos={client?.avisos ?? null}
         />
         <Card
           asChild

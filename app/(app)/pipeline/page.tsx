@@ -45,7 +45,8 @@ export default async function PipelinePage() {
 
   const { items, ia } = buildInbox(
     (convs ?? []) as ConvRow[],
-    (contatos ?? []) as ContatoRow[]
+    (contatos ?? []) as ContatoRow[],
+    client.avisos
   );
   const qual = lastQualByPhone(
     (quals ?? []) as { phone: string; summary: string | null }[]
@@ -61,6 +62,7 @@ export default async function PipelinePage() {
     <PipelineBoard
       clientId={client?.id ?? ""}
       myRole={client?.role ?? null}
+      numeroAvisos={client.avisos}
       initialStages={((stages ?? []) as StageRow[]).map(rowToStage)}
       initialCards={buildCards(items, ia, qual, source)}
     />

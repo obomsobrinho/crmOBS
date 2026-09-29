@@ -25,6 +25,7 @@ const INPUT = {
   // existindo no banco.
   tested: false,
   published: false,
+  hasNotify: true,
 };
 
 export default function DesignOnboardingPage() {

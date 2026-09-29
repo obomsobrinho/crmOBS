@@ -101,3 +101,100 @@ export async function connectionState(instanceName: string) {
     { method: "GET", headers: headers() }
   );
 }
+
+// ———— Avisos no WhatsApp (29/09/2026, docs/plano-avisos.md) ————
+// Os três formatos abaixo foram conferidos na doc (context7) E numa leitura real
+// da instância da OBM em 29/09/2026 (Evolution 2.3.x). ⚠️ A doc publicada da v2
+// ainda mostra `fetchInstances` como `[{ instance: { owner } }]`; a resposta de
+// verdade é a linha do banco dela, com `ownerJid` no topo. Não trocar para o
+// formato da doc sem medir de novo.
+
+/**
+ * Manda um texto. `destino` é o JID inteiro (`...@g.us` ou
+ * `...@s.whatsapp.net`), igual ao que o nó "Notifica grupo" do n8n passa.
+ * Devolve `true` só com 2xx (a Evolution responde 201).
+ */
+export async function sendText(
+  instanceName: string,
+  destino: string,
+  text: string
+): Promise<boolean> {
+  ensureEnv();
+  const res = await fetch(
+    `${BASE}/message/sendText/${encodeURIComponent(instanceName)}`,
+    {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({ number: destino, text }),
+      signal: AbortSignal.timeout(15_000),
+    }
+  );
+  return res.ok;
+}
+
+export interface GrupoWhatsApp {
+  jid: string;
+  nome: string;
+}
+
+/**
+ * Grupos em que o número conectado participa (`getParticipants=false`: só o
+ * nome interessa, e com participantes a resposta cresce com o tamanho do grupo).
+ * ⚠️ A comunidade em si (`isCommunity`) sai da lista: ela é o contêiner dos
+ * grupos e não recebe mensagem; os grupos dela aparecem cada um na própria linha.
+ * `null` = a Evolution não respondeu ou respondeu algo que não dá para ler.
+ */
+export async function fetchGroups(
+  instanceName: string
+): Promise<GrupoWhatsApp[] | null> {
+  ensureEnv();
+  const res = await fetch(
+    `${BASE}/group/fetchAllGroups/${encodeURIComponent(instanceName)}?getParticipants=false`,
+    { method: "GET", headers: headers(), signal: AbortSignal.timeout(20_000) }
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as unknown;
+  if (!Array.isArray(data)) return null;
+  return data
+    .filter(
+      (g): g is { id: string; subject?: unknown; isCommunity?: unknown } =>
+        !!g &&
+        typeof g === "object" &&
+        typeof (g as { id?: unknown }).id === "string" &&
+        (g as { id: string }).id.endsWith("@g.us") &&
+        (g as { isCommunity?: unknown }).isCommunity !== true
+    )
+    .map((g) => ({
+      jid: g.id,
+      nome:
+        typeof g.subject === "string" && g.subject.trim()
+          ? g.subject.trim()
+          : "Grupo sem nome",
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+/**
+ * Dígitos do número conectado na instância (`ownerJid`), ou `null` quando não
+ * dá para saber (instância nunca conectada, Evolution fora do ar, formato
+ * diferente). Quem usa trata `null` como "não sei" e NÃO bloqueia: dado
+ * faltando não derruba quem está configurando, a mesma regra do `publish`.
+ */
+export async function ownerNumber(instanceName: string): Promise<string | null> {
+  try {
+    ensureEnv();
+    const res = await fetch(
+      `${BASE}/instance/fetchInstances?instanceName=${encodeURIComponent(instanceName)}`,
+      { method: "GET", headers: headers(), signal: AbortSignal.timeout(10_000) }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as unknown;
+    const linha = Array.isArray(data) ? data[0] : null;
+    const jid = (linha as { ownerJid?: unknown } | null)?.ownerJid;
+    if (typeof jid !== "string" || !jid.includes("@")) return null;
+    const d = jid.split("@")[0].split(":")[0].replace(/\D/g, "");
+    return d || null;
+  } catch {
+    return null;
+  }
+}

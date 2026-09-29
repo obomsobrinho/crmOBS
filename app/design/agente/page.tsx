@@ -100,7 +100,7 @@ export default async function DesignAgentePage({
           initialConfig={MOCK}
           initialPersona={null}
           hasManualPersona={false}
-          initialNotifyJid="120363000000000000@g.us"
+          initialNotifyJid="120363000000000001@g.us"
           stageNames={{ aguardando_humano: "Aguardando atendimento" }}
           knowledgeDocs={DOCS}
           knowledgeKeyConfigured

@@ -45,6 +45,7 @@ export default async function AppLayout({
         clientName={client.name}
         clientId={client.id}
         role={client.role ?? undefined}
+        numeroAvisos={client.avisos}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
         {/* Estado da conta: bloqueio (leitura só) ou aviso (trial acabando,

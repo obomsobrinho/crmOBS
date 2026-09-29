@@ -40,6 +40,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import FeedbackDialog from "./FeedbackDialog";
+import { grafiasDoNumeroDeAvisos } from "@/lib/avisos";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const NAV: {
@@ -91,6 +92,7 @@ export default function NavRail({
   activeHref,
   role,
   whatsappConnected = true,
+  numeroAvisos = null,
 }: {
   clientName: string;
   /**
@@ -107,6 +109,8 @@ export default function NavRail({
       navegação ficou para uma rodada própria, então a faixa existe e está no
       lugar certo, mas ainda não mede nada. */
   whatsappConnected?: boolean;
+  /** Destino dos avisos: não conta como conversa não lida (lib/avisos.ts). */
+  numeroAvisos?: string | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -134,10 +138,17 @@ export default function NavRail({
   useEffect(() => {
     const supabase = createClient();
     const load = async () => {
-      const { count } = await supabase
+      // Só a contagem (HEAD), como sempre foi, e o número de avisos fica fora
+      // no próprio banco, nas duas grafias dele (com e sem o nono dígito, ver
+      // lib/avisos.ts). Trazer as linhas para filtrar aqui seria um GET a mais
+      // em toda página, e o teste do realtime conta exatamente esses GETs.
+      const fora = grafiasDoNumeroDeAvisos(numeroAvisos);
+      let consulta = supabase
         .from("conversations")
         .select("id", { count: "exact", head: true })
         .gt("unread_count", 0);
+      if (fora.length > 0) consulta = consulta.not("phone", "in", `(${fora.join(",")})`);
+      const { count } = await consulta;
       setUnreadConvos(count ?? 0);
     };
     void load();
@@ -152,7 +163,7 @@ export default function NavRail({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [numeroAvisos]);
 
   // O listener no `document` para fechar ao clicar fora saiu daqui: quem faz
   // isso agora é o DropdownMenu, junto com Esc, devolução do foco e navegação

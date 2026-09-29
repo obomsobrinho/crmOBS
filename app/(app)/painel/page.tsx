@@ -51,6 +51,7 @@ import {
   type ValorQual,
 } from "@/lib/valor";
 import type { BusinessHours } from "@/lib/agent-prompt";
+import { semNumeroDeAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
 
@@ -118,24 +119,36 @@ export default async function PainelPage() {
       // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
       // número acionável do painel, e por isso o único que vale consulta
       // própria. A ordenação usa o índice parcial em (client_id, handoff_at).
+      // Sem `limit(1)` e sem `count` do banco (29/09/2026): o número de
+      // avisos sai da conta (lib/avisos.ts), e isso só dá para fazer com os
+      // telefones na mão. São só as conversas com pedido aberto agora.
       supabase
         .from("conversations")
-        .select("phone, handoff_at", { count: "exact" })
+        .select("phone, handoff_at")
         .not("handoff_at", "is", null)
-        .order("handoff_at", { ascending: true })
-        .limit(1),
+        .order("handoff_at", { ascending: true }),
     ]);
 
   const hours =
     (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
 
-  const acumuladoMsgs = (todasMsgs ?? []) as (ValorMsg & {
-    nomewpp: string | null;
-  })[];
-  const acumuladoQuals = (todasQuals ?? []) as (ValorQual & {
-    id: number;
-    summary: string | null;
-  })[];
+  // O número que RECEBE os avisos do time não é cliente: fora de toda conta
+  // (lib/avisos.ts). Tirado aqui, na entrada, para nenhum bloco abaixo vê-lo.
+  const acumuladoMsgs = semNumeroDeAvisos(
+    (todasMsgs ?? []) as (ValorMsg & { nomewpp: string | null })[],
+    client.avisos,
+    (m) => m.phone
+  );
+  const acumuladoQuals = semNumeroDeAvisos(
+    (todasQuals ?? []) as (ValorQual & { id: number; summary: string | null })[],
+    client.avisos,
+    (q) => q.phone
+  );
+  const abertas = semNumeroDeAvisos(
+    (espera.data ?? []) as { phone: string; handoff_at: string }[],
+    client.avisos,
+    (c) => c.phone
+  );
 
   // O relógio vem de `lib/periodo`, e não de `Date.now()` escrito aqui: chamada
   // impura no corpo de um Server Component é erro de lint.
@@ -225,8 +238,8 @@ export default async function PainelPage() {
   ) as Record<MovimentoKey, MovimentoJanela>;
 
   // ── A fila ─────────────────────────────────────────────────────────────────
-  const esperando = espera.error ? null : (espera.count ?? 0);
-  const maisVelha = espera.data?.[0]?.handoff_at as string | null | undefined;
+  const esperando = espera.error ? null : abertas.length;
+  const maisVelha = abertas[0]?.handoff_at as string | null | undefined;
   const esperaMs = maisVelha ? agora - Date.parse(maisVelha) : null;
   const esperaTexto = maisVelha ? esperaLegivel(maisVelha, agora) : "";
 

@@ -180,7 +180,13 @@ async function turnoDoAgente(
   expect(res.status(), await res.text()).toBe(200);
   const corpo = (await res.json()) as {
     output: { messages: string[]; action: string; summary: string };
+    diagnostics?: { avisoAgendado?: boolean };
   };
+  // ⚠️ NENHUM AVISO NO WHATSAPP (29/09/2026). O tenant de teste tem destino de
+  // avisos, e esta jornada abre pedido de ajuda de verdade: sem a trava do
+  // telefone impossível (`telefoneImpossivel`, lib/avisos.ts) cada rodada
+  // mandaria WhatsApp real ao time.
+  expect(corpo.diagnostics?.avisoAgendado).toBeFalsy();
   // A conversa fica no relatório do teste: é o que o dono lê para julgar o tom,
   // e o que ninguém consegue reconstruir depois (o turno não grava texto).
   console.log(`[cliente] ${message}

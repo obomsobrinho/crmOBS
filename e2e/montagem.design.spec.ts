@@ -89,7 +89,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     // O que acontece ao ativar só aparece depois de conectar.
     await expect(page.getByText("Ao ativar, o que acontece")).toHaveCount(0);
 
-    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.goto("/design/montagem?passo=conectar&conectado=1&avisos=1");
     await expect(page.locator('[data-slot="whatsapp-conectado"]')).toBeVisible();
     await expect(page.getByText("Ao ativar, o que acontece")).toBeVisible();
     await expect(

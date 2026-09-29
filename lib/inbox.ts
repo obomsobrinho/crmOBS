@@ -1,4 +1,5 @@
 import { parteLocal } from "./valor";
+import { ehNumeroDeAvisos } from "./avisos";
 import type { ChatRow, InboxItem } from "./types";
 
 // "Você" vem do pushName de mensagens ENVIADAS (fromMe) — nunca é nome de
@@ -36,9 +37,14 @@ export interface ContatoRow {
 // last_message_at) e do cadastro de contatos. O nome vem de dados_cliente
 // (fonte de verdade do contato); sem nome real, a UI mostra o telefone. Puro:
 // usado tanto no Server Component quanto no refetch em realtime do cliente.
+//
+// `avisos` (clients.notify_group_jid): o número que RECEBE os avisos do time
+// nunca aparece como conversa (lib/avisos.ts). É aqui, e não em cada tela,
+// porque conversas e pipeline passam todos por esta função.
 export function buildInbox(
   convs: ConvRow[],
-  contatos: ContatoRow[]
+  contatos: ContatoRow[],
+  avisos: string | null = null
 ): { items: InboxItem[]; ia: Record<string, string | null> } {
   const nameByPhone = new Map<string, string | null>();
   const ia: Record<string, string | null> = {};
@@ -47,7 +53,9 @@ export function buildInbox(
     nameByPhone.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
     ia[c.telefone] = c.atendimento_ia ?? null;
   }
-  const items: InboxItem[] = convs.map((c) => ({
+  const items: InboxItem[] = convs
+    .filter((c) => !ehNumeroDeAvisos(c.phone, avisos))
+    .map((c) => ({
     phone: c.phone,
     name: nameByPhone.get(c.phone) ?? null,
     lastPreview: c.last_message_preview ?? "",

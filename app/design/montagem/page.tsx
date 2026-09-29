@@ -28,9 +28,12 @@ export default async function DesignMontagemPage({
   searchParams,
 }: {
   // Next 16: os parâmetros de busca chegam como Promise.
-  searchParams: Promise<{ passo?: string; conectado?: string }>;
+  searchParams: Promise<{ passo?: string; conectado?: string; avisos?: string }>;
 }) {
-  const { passo, conectado } = await searchParams;
+  const { passo, conectado, avisos } = await searchParams;
+  // `?avisos=1` abre com o destino dos avisos já salvo (um número de mentira),
+  // que é o que libera o Ativar junto com a conexão (29/09/2026).
+  const destinoAvisos = avisos === "1" ? "5511912345678@s.whatsapp.net" : null;
   // O padrão é o PRIMEIRO passo, que desde 24/09/2026 é "quem" (a ordem foi
   // invertida: conectar virou o último).
   const inicial: PassoMontagem = ehPasso(passo) ? passo : "quem";
@@ -43,7 +46,7 @@ export default async function DesignMontagemPage({
       <MontagemWizard
         // A chave remonta o assistente ao trocar de passo pelos links abaixo:
         // o passo inicial é lido uma vez só, no primeiro render.
-        key={`${inicial}-${jaConectado}`}
+        key={`${inicial}-${jaConectado}-${destinoAvisos}`}
         clientId="preview"
         clientName="Ótica Vision"
         // Sem instância: o passo de conectar mostra o convite a gerar o código
@@ -52,7 +55,7 @@ export default async function DesignMontagemPage({
         conectadoInicial={jaConectado}
         initialConfig={VAZIO}
         agentConfigUpdatedAt={null}
-        initialNotifyJid={null}
+        initialNotifyJid={destinoAvisos}
         prefillCompanyName="Ótica Vision"
         knowledgeDocs={SEM_DOCS}
         knowledgeKeyConfigured

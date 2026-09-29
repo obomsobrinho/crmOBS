@@ -162,6 +162,7 @@ export default function ContactSidebar({
   initialIa,
   activePhone,
   myUserId,
+  numeroAvisos = null,
 }: {
   initial: InboxItem[];
   initialIa: Record<string, string | null>;
@@ -169,6 +170,8 @@ export default function ContactSidebar({
   activePhone?: string;
   /** Sem ele o filtro "Suas" não aparece (não dá para saber o que é seu). */
   myUserId?: string;
+  /** Destino dos avisos: esse número nunca é conversa (lib/avisos.ts). */
+  numeroAvisos?: string | null;
 }) {
   const supabase = createClient();
   const [items, setItems] = useState<InboxItem[]>(initial);
@@ -221,7 +224,8 @@ export default function ContactSidebar({
       ]);
     const { items: next, ia } = buildInbox(
       (convs ?? []) as ConvRow[],
-      (contatos ?? []) as ContatoRow[]
+      (contatos ?? []) as ContatoRow[],
+      numeroAvisos
     );
     // Última qualificação por telefone (a lista já vem do mais recente).
     const qmap: Record<string, string> = {};
@@ -231,7 +235,7 @@ export default function ContactSidebar({
     setItems(next);
     setIaByPhone(ia);
     setQualByPhone(qmap);
-  }, [supabase]);
+  }, [supabase, numeroAvisos]);
 
   // Realtime: uma mudança nas conversas (o trigger atualiza a cada mensagem) ou
   // no estado da IA re-busca a lista.

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AlertTriangle,
   Bell,
   Bot,
   Building2,
@@ -38,6 +37,13 @@ import {
 } from "@/lib/agent-prompt";
 import { AGENT_PRESETS, type AgentPreset } from "@/lib/agent-presets";
 import type { KnowledgeDoc } from "@/lib/crm";
+import AvisosCampo from "./AvisosCampo";
+
+/** /design: a lista de grupos que o WhatsApp devolveria. */
+export const GRUPOS_PREVIEW = [
+  { jid: "120363000000000001@g.us", nome: "Time de atendimento" },
+  { jid: "120363000000000002@g.us", nome: "Sócios" },
+];
 import { AvisoCache, Field, Hint, Par, SubBloco, Trio } from "./ui";
 
 // Os campos do agente, em três grupos, na ordem em que se pensa sobre um
@@ -448,18 +454,18 @@ export function CamposOQuePodeFazer({
   cfg,
   patch,
   fields,
-  notifyJid,
-  setNotifyJid,
+  clientId,
+  initialNotifyJid,
+  preview = false,
   onDraft,
 }: Omit<CamposComuns, "mostrarOpcionais"> & {
-  notifyJid: string;
-  setNotifyJid: (v: string) => void;
+  clientId: string;
+  /** Destino dos avisos como está no banco (clients.notify_group_jid). */
+  initialNotifyJid: string | null;
+  preview?: boolean;
   /** Rascunho ainda não adicionado numa lista, guardado pelo pai. */
   onDraft: (campo: "dontDo" | "escalateWhen", v: string) => void;
 }) {
-  const agendarSemGrupo =
-    cfg.goals.includes("agendar") && notifyJid.trim() === "";
-
   return (
     <>
       {/* Objetivos SEM pintura. Eram três cartões em `bg-brand-surface`, o
@@ -510,38 +516,24 @@ export function CamposOQuePodeFazer({
         </div>
       </SubBloco>
 
-      {/* O grupo de avisos aparece só com "Agendar" marcado: é o único objetivo
-          que depende dele. Fora daí seria um campo técnico (um JID) pedido sem
-          motivo. E o aviso de que ele está vazio mora AQUI, embaixo do campo que
-          resolve, em vez de no topo da tela. */}
-      {cfg.goals.includes("agendar") && (
-        <SubBloco
-          titulo="Grupo de WhatsApp para avisar"
-          icone={Bell}
-          descricao="Onde o agente avisa o time quando marca uma conversa."
-        >
-          {/* A dica de antes ("quando o agente marca uma conversa, ele avisa
-              neste grupo") virou o subtítulo; repetir embaixo seria ruído. */}
-          <div className="space-y-1.5">
-            <Input
-              value={notifyJid}
-              onChange={(e) => setNotifyJid(e.target.value)}
-              placeholder="120363000000000000@g.us"
-              className="font-mono"
-            />
-            {agendarSemGrupo && (
-              <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
-                <AlertTriangle size={14} className="mt-px shrink-0" />
-                <span>
-                  Sem este grupo o agente não consegue avisar o time, e marcar
-                  uma conversa não vai funcionar. Peça o JID do grupo a quem
-                  cuida da automação.
-                </span>
-              </p>
-            )}
-          </div>
-        </SubBloco>
-      )}
+      {/* AVISOS, SEMPRE VISÍVEL (29/09/2026). Era "Grupo de WhatsApp para
+          avisar", um JID digitado e só com "Agendar" marcado; virou o destino
+          único de TODO aviso (pedido de ajuda, reunião marcada, "a IA não
+          respondeu"), então não depende mais de objetivo nenhum. O aviso de
+          que está vazio mora embaixo do campo que resolve. */}
+      <SubBloco
+        titulo="Avisos"
+        icone={Bell}
+        descricao="Quando a IA pedir sua ajuda, o aviso chega neste WhatsApp."
+      >
+        <AvisosCampo
+          clientId={clientId}
+          initialJid={initialNotifyJid}
+          avisarSeVazio
+          preview={preview}
+          gruposPreview={preview ? GRUPOS_PREVIEW : undefined}
+        />
+      </SubBloco>
 
       {/* ⚠️ DEIXOU DE RECOLHER em 22/09/2026 (pedido do dono: "não precisa ser
           colapsado também, tem espaço abaixo, não faz sentido deixar

@@ -77,6 +77,7 @@ export async function PUT(
       agentConfigured: mine.montagem.feito.configurar,
       tested: mine.montagem.feito.testar,
       published: !!mine.agentPublishedAt,
+      hasNotify: !!mine.avisos,
     });
     if (faltas.length > 0) {
       return NextResponse.json(

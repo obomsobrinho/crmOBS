@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
   Check,
   FileUp,
   Power,
@@ -17,8 +18,10 @@ import {
   CamposOQueSabe,
   CamposQuemAtende,
   SeletorDePreset,
+  GRUPOS_PREVIEW,
 } from "./agente/campos";
-import { Banner, ConfirmModal } from "./agente/ui";
+import { Banner, CabecalhoBloco, ConfirmModal } from "./agente/ui";
+import AvisosCampo from "./agente/AvisosCampo";
 import { useAgentConfig } from "./agente/useAgentConfig";
 import { gravarRascunho, lerRascunho, limparRascunho } from "./agente/rascunho";
 import { Button } from "@/components/ui/button";
@@ -105,7 +108,6 @@ export default function MontagemWizard({
     initialPersona: null,
     prefillCompanyName,
     hasManualPersona: false,
-    initialNotifyJid,
     preview,
   });
 
@@ -125,6 +127,14 @@ export default function MontagemWizard({
   // instância foi criada. Quem já chega com ela aberta vê o estado conectado
   // assim que o primeiro polling responde `open`.
   const [conectado, setConectado] = useState(!!conectadoInicial);
+  // Destino dos avisos SALVO (29/09/2026). Obrigatório na primeira ativação,
+  // decisão do dono: quem não vive na tela não fica sabendo quando a IA pede
+  // ajuda. O servidor confere de novo (`publishBlockers`); aqui é só para o
+  // botão não oferecer o que vai ser recusado.
+  const [destinoAvisos, setDestinoAvisos] = useState<string | null>(
+    initialNotifyJid
+  );
+  const podeAtivar = conectado && !!destinoAvisos;
 
   // Recomeçar a conversa de teste = remontar a bancada (a `key` muda), o mesmo
   // truque do "Resetar" do `AgentTestDrawer`.
@@ -441,6 +451,36 @@ export default function MontagemWizard({
 
           {passo === "conectar" && conectado && (
             <>
+              {/* AVISOS vêm DEPOIS de conectar (plano de 29/09/2026): a lista
+                  de grupos e o "Mandar teste" saem do próprio WhatsApp. */}
+              <div
+                data-slot="montagem-avisos"
+                className="rounded-xl border border-line bg-bloco p-5"
+              >
+                <CabecalhoBloco
+                  icone={Bell}
+                  titulo="Para onde vão os avisos"
+                  descricao="Quando a IA pedir sua ajuda, ela avisa neste WhatsApp. Sem isso, ninguém fica sabendo."
+                  className="mb-4"
+                />
+                <AvisosCampo
+                  clientId={clientId}
+                  initialJid={initialNotifyJid}
+                  onSalvo={setDestinoAvisos}
+                  preview={preview}
+                  gruposPreview={preview ? GRUPOS_PREVIEW : undefined}
+                />
+                {!destinoAvisos && (
+                  <p
+                    id="razao-avisos"
+                    data-slot="montagem-razao-avisos"
+                    className="mt-3 text-legenda text-warn-ink"
+                  >
+                    Salve um número ou um grupo para poder ativar o agente.
+                  </p>
+                )}
+              </div>
+
               <div className="rounded-xl border border-line bg-bloco p-5">
                 <p className="text-corpo font-semibold">
                   Ao ativar, o que acontece
@@ -524,8 +564,14 @@ export default function MontagemWizard({
           <Button
             size="field"
             carregando={form.saving || ativando}
-            disabled={ultimo && !conectado}
-            aria-describedby={ultimo && !conectado ? "razao-ativar" : undefined}
+            disabled={ultimo && !podeAtivar}
+            aria-describedby={
+              ultimo && !conectado
+                ? "razao-ativar"
+                : ultimo && !destinoAvisos
+                  ? "razao-avisos"
+                  : undefined
+            }
             onClick={() => (ultimo ? ativar() : avancar())}
           >
             {ultimo ? (

@@ -41,6 +41,12 @@ export interface MyClient {
   agentEnabled: boolean;
   /** Progresso da montagem, derivado por lib/onboarding.montagemState. */
   montagem: MontagemState;
+  /**
+   * Destino dos avisos no WhatsApp (`clients.notify_group_jid`): grupo ou
+   * número. Vem aqui porque toda lista e contagem esconde o número de avisos
+   * (`ehNumeroDeAvisos`, lib/avisos.ts), e as telas delas já chamam isto.
+   */
+  avisos: string | null;
 }
 
 // Cliente (tenant) do usuário logado. A RLS já restringe `clients` ao(s)
@@ -75,7 +81,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     supabase
       .from("clients")
       .select(
-        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at"
+        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at, notify_group_jid"
       )
       // ⚠️ `order` ANTES do `limit(1)`, e não é detalhe (achado A2): sem ordenação
       // o banco devolve qualquer uma das linhas que a RLS liberou, então um
@@ -105,6 +111,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     agent_published_at: string | null;
     agent_enabled: boolean | null;
     onboarding_tested_at: string | null;
+    notify_group_jid: string | null;
   };
 
   const membership =
@@ -143,7 +150,9 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       agentConfigured: !!client.agent_config_updated_at,
       tested: !!client.onboarding_tested_at,
       published: !!client.agent_published_at,
+      hasNotify: !!client.notify_group_jid,
     }),
+    avisos: client.notify_group_jid ?? null,
   };
 });
 

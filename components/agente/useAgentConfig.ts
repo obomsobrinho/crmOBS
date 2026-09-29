@@ -37,7 +37,6 @@ export interface UseAgentConfigArgs {
   /** Nome sugerido p/ o campo "empresa" na 1ª configuração (sem agent_config). */
   prefillCompanyName?: string | null;
   hasManualPersona: boolean;
-  initialNotifyJid: string | null;
   /** /design e mocks: desativa o fetch de salvar. */
   preview?: boolean;
 }
@@ -49,7 +48,6 @@ export function useAgentConfig({
   initialPersona,
   prefillCompanyName,
   hasManualPersona,
-  initialNotifyJid,
   preview = false,
 }: UseAgentConfigArgs) {
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -71,10 +69,9 @@ export function useAgentConfig({
   // o texto dela sumiria em silêncio no primeiro save.
   const [tailRemovido] = useState<string[]>(inicial.removed);
 
-  // Grupo de notificação. Mora aqui, e não em cartão próprio, para existir um
-  // único Salvar na tela; o save dispara os dois PUT.
-  const [notifyJid, setNotifyJid] = useState<string>(initialNotifyJid ?? "");
-  const [savedJid, setSavedJid] = useState<string>(initialNotifyJid ?? "");
+  // ⚠️ O destino dos avisos SAIU daqui em 29/09/2026: ele salva sozinho, no
+  // `AvisosCampo` (o "Mandar teste" e a primeira ativação precisam do destino
+  // SALVO, e preso a este Salvar ele só existiria depois do formulário inteiro).
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -282,31 +279,6 @@ export function useAgentConfig({
         return { ok: false, campos: data.fields ?? {} };
       }
 
-      // Grupo de notificação, só quando mudou. Vai DEPOIS do prompt porque é o
-      // menos importante dos dois: se falhar, a configuração do agente já está
-      // salva e a tela mantém o que a pessoa digitou, com o erro explicando o
-      // que não foi.
-      if (notifyJid.trim() !== savedJid.trim()) {
-        const resJid = await fetch(`/api/clients/${clientId}/notify-target`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jid: notifyJid }),
-        });
-        const dataJid = (await resJid.json()) as {
-          error?: string;
-          jid?: string | null;
-        };
-        if (!resJid.ok) {
-          falhar(
-            dataJid.error ?? "O agente foi salvo, mas o grupo de avisos não."
-          );
-          return { ok: false, campos: {} };
-        }
-        const proximo = dataJid.jid ?? "";
-        setSavedJid(proximo);
-        setNotifyJid(proximo);
-      }
-
       setSavedAt(
         new Date().toLocaleTimeString("pt-BR", {
           hour: "2-digit",
@@ -366,8 +338,6 @@ export function useAgentConfig({
     rawPersona,
     setRawPersona,
     tailRemovido,
-    notifyJid,
-    setNotifyJid,
     saving,
     error,
     fields,

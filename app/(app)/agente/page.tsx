@@ -118,6 +118,7 @@ export default async function AgentePage() {
           agentConfigured: client!.montagem.feito.configurar,
           tested: client!.montagem.feito.testar,
           published: !!client!.agentPublishedAt,
+          hasNotify: !!client!.avisos,
         })}
       />
     </Card>

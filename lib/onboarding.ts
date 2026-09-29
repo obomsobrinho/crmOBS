@@ -41,6 +41,12 @@ export interface OnboardingInput {
   tested: boolean;
   /** clients.agent_published_at preenchida. */
   published: boolean;
+  /**
+   * clients.notify_group_jid preenchida: existe para onde mandar os avisos
+   * (29/09/2026, decisão do dono: obrigatório na PRIMEIRA ativação, porque
+   * quem não vive na tela não fica sabendo quando a IA pede ajuda).
+   */
+  hasNotify: boolean;
 }
 
 export interface PassoDef {
@@ -150,5 +156,6 @@ export function publishBlockers(input: OnboardingInput): string[] {
   const faltas: string[] = [];
   if (!input.hasInstance) faltas.push("conectar o WhatsApp");
   if (!input.agentConfigured) faltas.push("configurar o agente");
+  if (!input.hasNotify) faltas.push("definir para onde vão os avisos");
   return faltas;
 }

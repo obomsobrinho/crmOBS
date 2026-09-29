@@ -111,10 +111,8 @@ export default function AgentConfigForm({
   prefillCompanyName?: string | null;
   hasManualPersona: boolean;
   /**
-   * Grupo de WhatsApp que recebe os avisos (clients.notify_group_jid). Era um
-   * cartão separado com Salvar próprio; virou campo daqui porque o único caso em
-   * que ele importa é o objetivo "Agendar", então o lugar dele é ao lado do
-   * objetivo que o exige.
+   * Destino dos avisos no WhatsApp (clients.notify_group_jid), número ou grupo.
+   * Vai direto ao `AvisosCampo`, que salva sozinho (ver o porquê lá).
    */
   initialNotifyJid: string | null;
   /** key -> nome do estágio do funil, para a bancada rotular o card que moveria. */
@@ -139,7 +137,6 @@ export default function AgentConfigForm({
     initialPersona,
     prefillCompanyName,
     hasManualPersona,
-    initialNotifyJid,
     preview,
   });
 
@@ -417,8 +414,9 @@ export default function AgentConfigForm({
               cfg={form.cfg}
               patch={form.patch}
               fields={form.fields}
-              notifyJid={form.notifyJid}
-              setNotifyJid={form.setNotifyJid}
+              clientId={clientId}
+              initialNotifyJid={initialNotifyJid}
+              preview={preview}
               onDraft={form.onDraft}
             />
           </TabsContent>

@@ -12,6 +12,14 @@ import { embedTexts, toVector } from "@/lib/rag";
 import { nextIaStage } from "@/lib/pipeline";
 import { accessState } from "@/lib/billing";
 import { betaAberto } from "@/lib/beta";
+import { after } from "next/server";
+import { sendText } from "@/lib/evolution";
+import {
+  ehNumeroDeAvisos,
+  telefoneImpossivel,
+  textoDoAviso,
+} from "@/lib/avisos";
+import { cleanName } from "@/lib/inbox";
 import type {
   TurnDiagnostics,
   RagMatchDiag,
@@ -163,12 +171,34 @@ export async function processTurn(
   const { data: client, error: clientErr } = await svc
     .from("clients")
     .select(
-      "persona, agent_config, prompt_mode, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled"
+      "persona, agent_config, prompt_mode, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance"
     )
     .eq("id", clientId)
     .maybeSingle();
   if (clientErr) throw new TurnError(500, "falha ao carregar o tenant");
   if (!client) throw new TurnError(404, "tenant não encontrado");
+  const avisos = (client.notify_group_jid as string | null) ?? null;
+
+  // O NÚMERO DE AVISOS NUNCA É ATENDIDO (29/09/2026, docs/plano-avisos.md). O
+  // aviso de pedido de ajuda sai do número do agente para o número do time; se
+  // alguém do time responder por ali, a troca chega aqui como se fosse um
+  // cliente, e sem esta regra a IA atenderia o próprio time. Vem ANTES dos
+  // outros gates: não importa se a conta está em dia, esse número nunca é
+  // conversa. Grupo nunca cai aqui (o n8n recusa `@g.us` no nó `Rotas`).
+  if (!dryRun && ehNumeroDeAvisos(phone, avisos)) {
+    const t = silentTurn(t0, { numeroDeAvisos: true });
+    await logTurn(svc, {
+      clientId,
+      phone,
+      dryRun,
+      diagnostics: t.diagnostics,
+      messagesSent: 0,
+      silenced: "numero_de_avisos",
+      model: null,
+      usage: null,
+    });
+    return t;
+  }
 
   // Gate de assinatura no servidor. Vem ANTES do modelo e do retrieval de
   // propósito: conta bloqueada não gasta token nosso e o agente fica em silêncio
@@ -445,6 +475,7 @@ export async function processTurn(
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
   let stageWouldMove: string | null = null;
+  let avisoAgendado = false;
   if (output.action !== "none") {
     if (dryRun) {
       const canonical = await loadCanonical(svc, clientId);
@@ -475,6 +506,20 @@ export async function processTurn(
           .from("handoffs")
           .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary });
         if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
+
+        // AVISO NO WHATSAPP DO TIME (29/09/2026). Só em pedido de ajuda
+        // (`pausar`): a reunião marcada (`agendar`) também entra na fila, mas
+        // quem avisa dela é o nó "Notifica grupo" do n8n, para o MESMO destino,
+        // e avisar aqui também daria aviso em dobro.
+        if (output.action === "pausar") {
+          avisoAgendado = agendarAviso({
+            clientId,
+            phone,
+            resumo: output.summary,
+            instancia: (client.evolution_instance as string | null) ?? null,
+            destino: avisos,
+          });
+        }
         if (!handoffAt) {
           const { error: hErr } = await svc
             .from("conversations")
@@ -500,6 +545,7 @@ export async function processTurn(
     handoffOpened:
       output.action === "pausar" || output.action === "agendar" || guardrail.blocked,
     pedidoNaFila: entraNaFila,
+    ...(avisoAgendado ? { avisoAgendado: true } : {}),
   };
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado
@@ -519,6 +565,75 @@ export async function processTurn(
   return { output, diagnostics };
 }
 
+/**
+ * Link do "Abrir" do aviso. `VERCEL_PROJECT_PRODUCTION_URL` é a variável que a
+ * própria Vercel preenche com o domínio de produção (sem protocolo), então não
+ * existe env nossa para esquecer de configurar. Fora da Vercel ela não existe, e
+ * o aviso sai sem a linha "Abrir" em vez de apontar para lugar nenhum.
+ */
+function linkDaConversa(phone: string): string | null {
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  if (!host) return null;
+  return `https://${host.replace(/^https?:\/\//, "")}/inbox/${encodeURIComponent(phone)}`;
+}
+
+/**
+ * Agenda o aviso de pedido de ajuda para DEPOIS da resposta (`after`, do
+ * next/server). O aviso nasce dentro do `/api/agent`, que o n8n espera
+ * responder para mandar a resposta ao cliente: chamar a Evolution antes disso
+ * atrasaria o cliente pelo tempo de um envio que não é para ele.
+ * Devolve se agendou (há destino e instância). Se a mensagem de fato saiu só se
+ * sabe depois da resposta, então o resultado vai para o log do servidor.
+ * NUNCA lança: aviso que falha não pode derrubar o atendimento.
+ */
+function agendarAviso(a: {
+  clientId: string;
+  phone: string;
+  resumo: string;
+  instancia: string | null;
+  destino: string | null;
+}): boolean {
+  if (!a.instancia || !a.destino) return false;
+  // A conversa de teste da suíte (DDD 00) nunca avisa ninguém (ver
+  // `telefoneImpossivel`): senão cada rodada mandaria WhatsApp real.
+  if (telefoneImpossivel(a.phone)) return false;
+  const { instancia, destino } = a;
+  try {
+    after(async () => {
+      try {
+        const svc = createServiceClient();
+        const { data: contato } = await svc
+          .from("dados_cliente")
+          .select("display_name, nomewpp")
+          .eq("client_id", a.clientId)
+          .eq("telefone", a.phone)
+          .maybeSingle();
+        const nome =
+          cleanName(contato?.display_name as string | null) ??
+          cleanName(contato?.nomewpp as string | null);
+        const ok = await sendText(
+          instancia,
+          destino,
+          textoDoAviso({
+            nome,
+            phone: a.phone,
+            resumo: a.resumo,
+            abrir: linkDaConversa(a.phone),
+          })
+        );
+        if (!ok) console.error("aviso de pedido de ajuda recusado pela Evolution");
+      } catch (e) {
+        console.error("falha ao mandar o aviso de pedido de ajuda:", e);
+      }
+    });
+    return true;
+  } catch (e) {
+    // `after` fora de um request (não acontece nas rotas de hoje).
+    console.error("falha ao agendar o aviso de pedido de ajuda:", e);
+    return false;
+  }
+}
+
 // Grava o turno em agent_turns. NUNCA lança: um erro de medição não pode virar
 // erro de atendimento. O `rag_top_similarity` guarda o melhor trecho recuperado,
 // que é o que diz se a base de conhecimento está sendo útil.
@@ -530,7 +645,7 @@ async function logTurn(
     dryRun: boolean;
     diagnostics: TurnDiagnostics;
     messagesSent: number;
-    silenced: "nao_publicado" | "assinatura" | null;
+    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | null;
     model: string | null;
     usage: TurnUsage | null;
   }
@@ -573,7 +688,11 @@ async function logTurn(
 // diz qual gate silenciou (aparece no playground e no log do n8n).
 function silentTurn(
   t0: number,
-  flags: { subscriptionBlocked?: boolean; notPublished?: boolean }
+  flags: {
+    subscriptionBlocked?: boolean;
+    notPublished?: boolean;
+    numeroDeAvisos?: boolean;
+  }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {
     output: {

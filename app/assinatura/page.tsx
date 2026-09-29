@@ -13,6 +13,7 @@ import {
   type ValorQual,
 } from "@/lib/valor";
 import type { BusinessHours } from "@/lib/agent-prompt";
+import { semNumeroDeAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
 
@@ -85,8 +86,9 @@ export default async function AssinaturaPage({
     ]);
 
   const acumulado = resumoDeValor({
-    msgs: (todasMsgs ?? []) as ValorMsg[],
-    quals: (todasQuals ?? []) as ValorQual[],
+    // O número de avisos do time não é cliente (lib/avisos.ts).
+    msgs: semNumeroDeAvisos((todasMsgs ?? []) as ValorMsg[], client.avisos, (m) => m.phone),
+    quals: semNumeroDeAvisos((todasQuals ?? []) as ValorQual[], client.avisos, (q) => q.phone),
     hours: (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null,
   });
   const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
