@@ -434,8 +434,14 @@ export async function processTurn(
   // "Sem pedido aberto": no dryRun só existe a lista que a bancada mandou
   // (`handoff_at` é da conversa de verdade e não vale para o teste).
   const semPedido = dryRun ? abertos.length === 0 : !handoffAt || abertos.length === 0;
+  // ⚠️ A RETOMADA NUNCA ABRE PEDIDO (29/09/2026, achado do dono): ela é a IA
+  // cumprindo a orientação que acabou de fechar o pedido, sem mensagem nova do
+  // cliente. Num assunto sério ela ainda devolve `pausar`, e como a fila tinha
+  // acabado de esvaziar, o mesmo assunto voltava como pedido novo na hora.
   const entraNaFila =
-    output.action !== "none" && (semPedido || (novo && !guardrail.blocked));
+    !retomada &&
+    output.action !== "none" &&
+    (semPedido || (novo && !guardrail.blocked));
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
   let stageWouldMove: string | null = null;

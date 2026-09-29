@@ -52,9 +52,12 @@ export const LIMITS = {
   details: 2000,
   bullet: 200,
   handoffNotice: 200,
-  persona: 12000,
+  // Era 12.000. Subiu 2.000 em 29/09/2026 junto com a CONDUÇÃO DA CONVERSA
+  // (+1.477 no rabo da base, +~170 no FLUXO do guiado): o teto conta o prompt inteiro, e sem isso a base
+  // nova comia o espaço do texto do tenant (a persona da OBM passou do teto).
+  persona: 14000,
   /**
-   * Aviso de tamanho: 85% do teto de `persona`.
+   * Aviso de tamanho: 85% do teto de `persona` (14.000).
    *
    * Era 9.500, calibrado quando o esqueleto fixo tinha ~5 KB. O esqueleto passou
    * de 7.900 (o rabo da base cresceu) e o aviso começou a disparar com o
@@ -66,7 +69,7 @@ export const LIMITS = {
    * ele responde é "estou perto do limite?", que continua valendo nos dois modos
    * (no avançado não existe esqueleto guiado para descontar).
    */
-  personaWarn: 10200,
+  personaWarn: 11900,
 } as const;
 
 // Base do aviso de handoff quando o tenant não cadastrou o dele. Genérica de
@@ -408,7 +411,7 @@ export function buildPersona(cfg: AgentConfig): string {
   }
   if (wantsAgendar) {
     fluxoLines.push(
-      "5. Quando fizer sentido, convide a pessoa a marcar uma conversa com o time, ancorando no que ela ganha com isso.",
+      "5. Quando o caso estiver pronto para uma conversa com o time, convide a pessoa a marcar, ancorando no que ela ganha com isso. Convide uma vez: se ela não aceitou, não convide de novo. Se ainda falta algo acontecer antes (um exame, um documento, um retorno), o convite espera.",
       "6. Aceitou: pergunte um dia e um período. Se vier só um dos dois, pergunte o que falta. Nunca confirme com informação incompleta.",
       "7. Dia E período combinados: recapitule, avise que alguém do time confirma o horário exato, agradeça e se despeça. Use action agendar."
     );
@@ -569,6 +572,7 @@ const TAIL_HEADERS = [
   "PRECEDÊNCIA",
   "QUANDO CHAMAR UM HUMANO",
   "QUANDO PASSAR PRO TIME",
+  "CONDUÇÃO DA CONVERSA",
   "ANTI-MANIPULAÇÃO",
   "OUTPUT",
 ] as const;
@@ -590,7 +594,7 @@ export interface BaseTailOpts {
 }
 
 /**
- * As quatro seções finais, iguais para todo tenant e em toda modalidade.
+ * As cinco seções finais, iguais para todo tenant e em toda modalidade.
  *
  * Por que existem juntas e por último: a ordem é a defesa. O modelo dá mais peso
  * ao que lê por último, então o contrato de saída tem que vir DEPOIS de tudo que
@@ -629,6 +633,20 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     "Pausar não é desculpa pra não atender: se a informação existe nas suas seções, responda antes de pausar.",
   ].join("\n");
 
+  // Achados do dono no teste de 29/09/2026: a IA leu "tem um laboratorio aqui
+  // perto" (afirmação sem ponto) como pergunta e levou isso ao pedido de ajuda;
+  // e respondeu "obrigado" oferecendo pela terceira vez a conversa com o time,
+  // quando o caso só andava depois do exame. As duas coisas são falta de LER a
+  // conversa, e valem para qualquer negócio, então moram na base.
+  const conducao = [
+    "### CONDUÇÃO DA CONVERSA",
+    "Cada resposta nasce do que acabou de acontecer na conversa, nunca de frase pronta.",
+    "- Frase que pode ser pergunta ou afirmação (no WhatsApp muita gente pergunta sem ponto de interrogação): não pressuponha. Confirme em poucas palavras o que a pessoa quis dizer. No summary, entra só o que ela pediu com certeza. Exemplo: \"qual exame preciso fazer? tem um laboratório aqui perto\" pede o exame; o laboratório pode ser só ela contando que tem um perto, então não vira pedido.",
+    "- Antes de oferecer algo (conversa com o time, horário, próximo passo), confira se faz sentido AGORA. Se o caso depende de algo que ainda não aconteceu (um exame, um documento, um retorno de alguém), o próximo passo vem depois disso, e é isso que você diz.",
+    "- Não repita uma oferta que a pessoa ignorou ou recusou. Antes de oferecer, releia as suas mensagens anteriores: se você já ofereceu isso e a pessoa seguiu falando de outra coisa, ela não aceitou, e oferecer de novo soa como robô. Isso vale também quando você chama o time.",
+    "- Quando a pessoa agradece ou encerra, feche curto e cordial e, se houver, lembre o próximo passo concreto que apareceu na conversa. Não ofereça o que ela não pediu nem abra assunto novo. Agradecimento e despedida são action none. Exemplo: a pessoa ainda vai fazer um exame e agradece. Errado: \"Por nada. Se quiser, posso ver um horário com o time.\" Certo: \"Por nada! Assim que tiver o resultado, me manda por aqui que o time segue com o seu caso.\"",
+  ].join("\n");
+
   // Decisão do dono em 11/09/2026: TODA tentativa de manipulação abre handoff.
   // Antes a regra era "não reconheça e siga normalmente", para trote não entupir
   // a fila. Inverteu: com o handoff aberto o time VÊ o ataque e pode desligar a
@@ -665,7 +683,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
       : "- preferencia_horario: nunca preencha.",
   ].join("\n");
 
-  return [precedencia, quandoHumano, antiManip, output].join("\n\n");
+  return [precedencia, quandoHumano, conducao, antiManip, output].join("\n\n");
 }
 
 /**

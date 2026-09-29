@@ -1609,7 +1609,7 @@ RAG quando a similaridade é baixa, e `HISTORY_ROWS` de 10 para 6.
 custam por turno o mesmo que 5. Indexar um PDF de 50 páginas sai abaixo de R$ 0,01. Por isso a
 lista de planos oferece base ilimitada em todos: é generosidade de graça.
 
-**Teto duro por turno:** no pior caso (persona de 12.000 chars e histórico cheio) o turno custa
+**Teto duro por turno:** no pior caso (persona de 12.000 chars, hoje o teto é 14.000, e histórico cheio) o turno custa
 R$ 0,065. Nenhum tenant consegue explodir a conta além disso.
 
 ### Custo fixo e break-even

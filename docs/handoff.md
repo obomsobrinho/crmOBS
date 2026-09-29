@@ -33,7 +33,24 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### A sessão de 24 a 27/09/2026 (a mais recente; ler isto primeiro)
+### 29/09/2026 (a mais recente; ler isto primeiro)
+
+O dono segue no teste com chip real. Entrou nesta rodada: a retomada (orientar) nunca abre pedido
+novo, a bancada sempre mostra a última mensagem (`AreaRolavel` engolia o `ref`), a seção
+`CONDUÇÃO DA CONVERSA` na base do prompt, e o teto `LIMITS.persona` subiu para 14.000.
+**Próximo:** o plano do contato AVISADO quando abre um pedido de ajuda (o dono trata como
+obrigatório para o beta).
+
+**Anotado para depois, com a posição do dono:**
+- Convite com link vencido: o `/login?erro=convite` ainda manda para "Esqueci minha senha", que
+  confunde quem nunca criou senha. O dono achava que já estava corrigido; não está.
+- `account_type`: **não marcar testador um a um.** Decisão do dono: o projeto inteiro está em beta,
+  e quando mudar, muda para todos. Não propor de novo a marcação manual.
+- Trocar o token do Supabase exposto no chat: o dono recusou. Não levantar de novo.
+- Ao desligar o `BETA_ABERTO`, quem se cadastrou no beta cai no bloqueio (teste vencido): decidir
+  antes de desligar.
+
+### A sessão de 24 a 27/09/2026
 
 **Onde paramos:** tudo commitado e em produção (último commit: `git log -1`). O dono foi fazer o
 **teste de ponta a ponta** com chip real e vai voltar com a lista do que está ok e do que falta.

@@ -69,8 +69,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     base, senão existe uma base por cliente), e **precedência declarada** (o cliente manda no jeito
     de atender: tratamento, apelido, tom; a base manda no contrato).
   - **O rabo da base é UMA função, usada pelos DOIS modos:** `buildBaseTail()` em
-    `lib/agent-prompt.ts` produz `PRECEDÊNCIA` + `QUANDO CHAMAR UM HUMANO` + `ANTI-MANIPULAÇÃO` +
-    `### OUTPUT`, e `buildPersona` termina chamando ela. **`agentName`/`companyName` são OPCIONAIS
+    `lib/agent-prompt.ts` produz `PRECEDÊNCIA` + `QUANDO CHAMAR UM HUMANO` + `CONDUÇÃO DA CONVERSA`
+    + `ANTI-MANIPULAÇÃO` + `### OUTPUT`, e `buildPersona` termina chamando ela. A `CONDUÇÃO` entrou
+    em 29/09/2026 (teste do dono): frase ambígua não vira pedido, oferta não se repete, e
+    agradecimento fecha com o próximo passo real e `action none` (antes a IA oferecia a conversa
+    com o time pela terceira vez no "obrigado"; medido depois, 3 de 3 certo). ⚠️ Junto, o teto
+    `LIMITS.persona` subiu de 12.000 para 14.000 (aviso em 11.900): o teto conta o prompt INTEIRO, e
+    a base maior deixou a persona da OBM acima dele (a bancada e o Salvar recusavam). **`agentName`/`companyName` são OPCIONAIS
     ali de propósito:** tenant em modo avançado pode não ter `agent_config` (a OBM não tem), e um
     rabo que dependesse de dado do tenant não seria invariante; sem os nomes o texto fica genérico.
   - **Modo avançado = liberdade com rabo colado.** O tenant escreve o que quiser e o servidor
@@ -452,7 +457,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     mesmo `HandoffCard`) e a IA responde NA HORA: o `processTurn` aceita `retomada` também em
     `dryRun`, e a bancada manda `pedidosAbertos` porque a fila de teste mora no navegador. **A decisão
     de entrar na fila é a MESMA do atendimento** (`diagnostics.pedidoNaFila`, com a rede de segurança),
-    calculada no servidor. O painel de handoff do diagnóstico virou só leitura (o antigo "Orientar e
+    calculada no servidor. ⚠️ **A retomada nunca abre pedido** (29/09/2026): num assunto sério ela
+    ainda devolve `pausar`, e com a fila recém-esvaziada o mesmo assunto voltava como pedido novo.
+    O painel de handoff do diagnóstico virou só leitura (o antigo "Orientar e
     responder" reexecutava a última pergunta e saiu).
   - **`diagnostico={false}`** tira o painel de diagnóstico (só na montagem: quem monta quer ver a
     resposta, e a coluna de 672px não comporta os dois).

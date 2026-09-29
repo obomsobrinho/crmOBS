@@ -237,6 +237,13 @@ export function rolarAteOFim(el: HTMLElement | null) {
  * mentindo, e deixar isso para quem chama é o tipo de detalhe que alguém esquece
  * e só aparece no dia em que a lista cresce.
  */
+function atribuirRefs<T>(el: T | null, ...refs: (React.Ref<T> | undefined)[]) {
+  for (const r of refs) {
+    if (typeof r === "function") r(el);
+    else if (r) (r as React.RefObject<T | null>).current = el;
+  }
+}
+
 export function AreaRolavel({
   tamanho = DISSOLVER_PADRAO,
   className,
@@ -254,11 +261,19 @@ export function AreaRolavel({
     tamanho,
     [children]
   );
+  // ⚠️ O `ref` de quem chama também recebe o elemento (29/09/2026). Antes o do
+  // hook o sobrescrevia em silêncio, e a bancada rolava até o fim num `null`:
+  // a última mensagem ficava escondida e o dono tinha de rolar à mão.
+  const refDeFora = props.ref;
+  const juntarRefs = React.useCallback(
+    (el: HTMLDivElement | null) => atribuirRefs(el, ref, refDeFora),
+    [ref, refDeFora]
+  );
   return (
     <div
       data-slot="area-rolavel"
       {...props}
-      ref={ref}
+      ref={juntarRefs}
       style={{ ...style, ...props.style }}
       onScroll={(e) => {
         onScroll(e);
