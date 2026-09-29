@@ -661,14 +661,30 @@ export default function Playground({
             </div>
           ) : (
           <>
+          {/* DEVOLVER PARA A IA (29/09/2026, decisão do dono): responder como time
+              pausa a IA, e sem saída isso encerrava o teste. É o gesto da chave
+              da IA no cabeçalho da tela de Conversas; a bancada não tem esse
+              cabeçalho, então o botão mora junto do aviso, onde a pessoa está
+              olhando quando a IA para de responder. */}
           {iaPausada && (
-            <p
+            <div
               data-slot="ia-pausada-teste"
-              className="relative mx-3 mt-2 rounded-lg bg-human-surface px-3 py-2 text-legenda text-human-ink"
+              className="relative mx-3 mt-2 flex items-center gap-3 rounded-lg border border-human-line bg-human-surface px-3 py-2"
             >
-              Você assumiu esta conversa, e a IA não responde mais o cliente. Para
-              testar de novo, recomece a conversa.
-            </p>
+              <span className="size-1.5 shrink-0 rounded-full bg-human" aria-hidden />
+              <p className="min-w-0 flex-1 text-legenda text-human-ink">
+                Você assumiu esta conversa, e a IA não responde enquanto você atende.
+                Devolva para ela para continuar o teste.
+              </p>
+              <Button
+                variant="outline"
+                size="chrome"
+                onClick={() => setIaPausada(false)}
+                className="shrink-0 border-human-line text-human-ink"
+              >
+                Devolver para a IA
+              </Button>
+            </div>
           )}
           {/* A caixa de escrita no molde da tela de Conversas (`MessageComposer`):
               moldura de 16px com relevo sobre o fundo da conversa, campo limpo

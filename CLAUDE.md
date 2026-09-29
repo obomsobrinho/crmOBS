@@ -446,7 +446,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     `MessageComposer` com a prop `pedido` (decisão do dono: "mostrar de um jeito na montagem e de outro
     quando funcionar não é bom"): abre em Orientar a IA, troca para Responder e tem o Resolvido.
     Responder como time põe o marco "O time assumiu a conversa", o balão verde, fecha o pedido como
-    `resolvido` e PAUSA a IA do teste, como no atendimento. Orientar fecha o pedido (linha cinza, o
+    `resolvido` e PAUSA a IA do teste, como no atendimento; uma faixa verde acima da caixa do cliente diz
+    isso e tem "Devolver para a IA" (o gesto da chave da IA no cabeçalho das Conversas), senão
+    responder encerrava o teste. Orientar fecha o pedido (linha cinza, o
     mesmo `HandoffCard`) e a IA responde NA HORA: o `processTurn` aceita `retomada` também em
     `dryRun`, e a bancada manda `pedidosAbertos` porque a fila de teste mora no navegador. **A decisão
     de entrar na fila é a MESMA do atendimento** (`diagnostics.pedidoNaFila`, com a rede de segurança),
