@@ -102,7 +102,7 @@ export async function connectionState(instanceName: string) {
   );
 }
 
-// ———— Avisos no WhatsApp (29/09/2026, docs/plano-avisos.md) ————
+// AVISOS NO WHATSAPP (29/09/2026, docs/plano-avisos.md).
 // Os três formatos abaixo foram conferidos na doc (context7) E numa leitura real
 // da instância da OBM em 29/09/2026 (Evolution 2.3.x). ⚠️ A doc publicada da v2
 // ainda mostra `fetchInstances` como `[{ instance: { owner } }]`; a resposta de

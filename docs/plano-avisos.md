@@ -1,8 +1,9 @@
 # Plano: destino de AVISOS no WhatsApp
 
-Aprovado pelo dono em 29/09/2026 e **executado no mesmo dia** (commit "Avisos no WhatsApp do time"). O que saiu diferente dos passos: o texto de "Revisão de 29/09/2026" abaixo, o link "Abrir" que leva à página de pedidos (`docs/plano-pedidos.md`) e a trava do telefone de teste (DDD 00). Texto original:
-começa numa sessão nova. Contexto de produto e regras gerais no `CLAUDE.md` (blocos de handoff,
-montagem e n8n).
+Aprovado pelo dono em 29/09/2026 e **executado no mesmo dia** (commit "Avisos no WhatsApp do
+time"). O que saiu diferente dos passos abaixo: a "Revisão de 29/09/2026" no fim, o link "Abrir"
+que leva à página de pedidos (`docs/plano-pedidos.md`) e a trava do telefone de teste (DDD 00).
+Contexto de produto e regras gerais no `CLAUDE.md` (blocos de handoff, montagem e n8n).
 
 ## O problema
 
