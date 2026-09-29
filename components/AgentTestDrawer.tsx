@@ -6,6 +6,7 @@ import Playground, {
   type ConfiguracaoEmEdicao,
   type PlaygroundTurn,
 } from "./Playground";
+import type { Handoff } from "./HandoffCard";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -39,6 +40,7 @@ export default function AgentTestDrawer({
   stageNames,
   defaultOpen = false,
   initialTurns,
+  initialPedidos,
   aberto: abertoExterno,
   onAbertoChange,
   gatilhoNoCelular = true,
@@ -54,6 +56,8 @@ export default function AgentTestDrawer({
   /** Só para o /design: abre o painel já aberto, com conversa de exemplo. */
   defaultOpen?: boolean;
   initialTurns?: PlaygroundTurn[];
+  /** Só o preview /design: pedidos de ajuda abertos na conversa de teste. */
+  initialPedidos?: Handoff[];
   /** Abertura controlada de fora. Sem ela, o painel gerencia o próprio estado. */
   aberto?: boolean;
   onAbertoChange?: (aberto: boolean) => void;
@@ -129,6 +133,7 @@ export default function AgentTestDrawer({
             stageNames={stageNames}
             configuracao={configuracao}
             initialTurns={initialTurns}
+            initialPedidos={initialPedidos}
           />
         </div>
       </SheetContent>

@@ -74,10 +74,17 @@ export interface ProcessTurnParams {
    * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
    * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
    * `message` é ignorada (não existe mensagem nova) e a orientação vem daqui,
-   * não de `pending_instruction`. Só produção: quem chama é
-   * `POST /api/conversations/orientar`, que já fechou o pedido e envia a resposta.
+   * não de `pending_instruction`. Em produção quem chama é
+   * `POST /api/conversations/orientar`, que já fechou o pedido e envia a resposta;
+   * no dryRun, a bancada de teste (29/09/2026), que mostra o pedido de ajuda na
+   * conversa de teste e deixa o dono orientar como faria no atendimento.
    */
   retomada?: { instruction: string } | null;
+  /**
+   * Só no dryRun: os pedidos de ajuda ainda abertos NA CONVERSA DE TESTE (a
+   * bancada guarda do lado dela). Em produção a lista sai da tabela `handoffs`.
+   */
+  pedidosAbertos?: string[];
 }
 
 /**
@@ -144,7 +151,7 @@ export async function processTurn(
 ): Promise<{ output: AgentOutput; diagnostics: TurnDiagnostics }> {
   const { clientId, phone, apiKey } = params;
   const dryRun = params.dryRun === true;
-  const retomada = !dryRun && params.retomada?.instruction?.trim() ? params.retomada : null;
+  const retomada = params.retomada?.instruction?.trim() ? params.retomada : null;
   const message = retomada ? "" : params.message;
   const svc = createServiceClient();
   const t0 = Date.now();
@@ -253,10 +260,15 @@ export async function processTurn(
   let resolvidos: string[] = [];
   if (dryRun) {
     history = sanitizeHistory(params.history);
-    instruction =
-      typeof params.instruction === "string" && params.instruction.trim()
+    instruction = retomada
+      ? retomada.instruction.trim()
+      : typeof params.instruction === "string" && params.instruction.trim()
         ? params.instruction.trim()
         : null;
+    abertos = (Array.isArray(params.pedidosAbertos) ? params.pedidosAbertos : [])
+      .filter((t): t is string => typeof t === "string" && t.trim() !== "")
+      .slice(0, 10)
+      .map((summary, i) => ({ id: -1 - i, summary: summary.slice(0, 500) }));
   } else {
     const [{ data: rows, error: histErr }, { data: conv }] = await Promise.all([
       svc
@@ -402,6 +414,29 @@ export async function processTurn(
     // era antes da fila, resolveria de brinde pedidos que ninguém respondeu.
   }
 
+  // FILA DE PEDIDOS (27/09/2026, decisão do dono). Sem pedido aberto, este
+  // abre o primeiro e marca `handoff_at` (a espera conta dele). Com pedido
+  // aberto, só entra na fila se a IA disse que o assunto é NOVO
+  // (`pedido_novo`, que ela decide vendo a lista PEDIDOS DE AJUDA EM
+  // ABERTO); o cliente insistindo no mesmo assunto não gera pedido repetido.
+  // O guardrail que degrada para `pausar` só abre quando não há nenhum.
+  // ⚠️ REDE DE SEGURANÇA (28/09/2026, teste ao vivo): a IA às vezes dizia
+  // "mesmo pedido" para assunto novo (orçamento do site com a nota fiscal
+  // aberta), e o pedido sumia sem ninguém ver. Se o resumo não divide
+  // nenhuma palavra de assunto com os pedidos abertos, entra na fila mesmo
+  // assim. Errar para o lado da duplicata é de propósito: pedido repetido o
+  // time fecha em um clique, pedido engolido ninguém vê.
+  // Calculado FORA do ramo de produção porque a bancada (dryRun) mostra o
+  // pedido pela mesma regra; regra copiada nos dois lugares divergiria.
+  const novo =
+    output.pedido_novo ||
+    !abertos.some((p) => mesmoAssunto(output.summary, p.summary ?? ""));
+  // "Sem pedido aberto": no dryRun só existe a lista que a bancada mandou
+  // (`handoff_at` é da conversa de verdade e não vale para o teste).
+  const semPedido = dryRun ? abertos.length === 0 : !handoffAt || abertos.length === 0;
+  const entraNaFila =
+    output.action !== "none" && (semPedido || (novo && !guardrail.blocked));
+
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
   let stageWouldMove: string | null = null;
   if (output.action !== "none") {
@@ -426,24 +461,8 @@ export async function processTurn(
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
       stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
 
-      // FILA DE PEDIDOS (27/09/2026, decisão do dono). Sem pedido aberto, este
-      // abre o primeiro e marca `handoff_at` (a espera conta dele). Com pedido
-      // aberto, só entra na fila se a IA disse que o assunto é NOVO
-      // (`pedido_novo`, que ela decide vendo a lista PEDIDOS DE AJUDA EM
-      // ABERTO); o cliente insistindo no mesmo assunto não gera pedido repetido.
-      // O guardrail que degrada para `pausar` só abre quando não há nenhum.
-      // ⚠️ REDE DE SEGURANÇA (28/09/2026, teste ao vivo): a IA às vezes dizia
-      // "mesmo pedido" para assunto novo (orçamento do site com a nota fiscal
-      // aberta), e o pedido sumia sem ninguém ver. Se o resumo não divide
-      // nenhuma palavra de assunto com os pedidos abertos, entra na fila mesmo
-      // assim. Errar para o lado da duplicata é de propósito: pedido repetido o
-      // time fecha em um clique, pedido engolido ninguém vê.
-      // Best-effort: um erro aqui não pode derrubar a resposta ao cliente.
-      const novo =
-        output.pedido_novo ||
-        !abertos.some((p) => mesmoAssunto(output.summary, p.summary ?? ""));
-      const entraNaFila =
-        !handoffAt || abertos.length === 0 || (novo && !guardrail.blocked);
+      // A fila (`entraNaFila`, calculada acima). Best-effort: um erro aqui não
+      // pode derrubar a resposta ao cliente.
       if (entraNaFila) {
         const abertoEm = new Date().toISOString();
         const { error: rErr } = await svc
@@ -474,6 +493,7 @@ export async function processTurn(
     guardrail,
     handoffOpened:
       output.action === "pausar" || output.action === "agendar" || guardrail.blocked,
+    pedidoNaFila: entraNaFila,
   };
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado

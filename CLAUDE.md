@@ -441,6 +441,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     modelo que ouve mostraria um agente que não existe. A transcrição aparece sob o balão
     ("Transcrição: …"). ⚠️ Transcrição real ainda não provada com voz; o e2e usa microfone falso do
     Chromium e resposta falsa.
+  - **O PEDIDO DE AJUDA MORA NA CONVERSA DE TESTE (29/09/2026, dono: "gap de primeira impressão"):**
+    quando a IA pede ajuda, aparece acima da caixa do cliente o mesmo bloco âmbar da caixa da tela de
+    Conversas (`data-slot="pedido-teste"`), com orientar e Resolvido. Orientar fecha o pedido (linha
+    cinza, o mesmo `HandoffCard`) e a IA responde NA HORA: o `processTurn` aceita `retomada` também em
+    `dryRun`, e a bancada manda `pedidosAbertos` porque a fila de teste mora no navegador. **A decisão
+    de entrar na fila é a MESMA do atendimento** (`diagnostics.pedidoNaFila`, com a rede de segurança),
+    calculada no servidor. O painel de handoff do diagnóstico virou só leitura (o antigo "Orientar e
+    responder" reexecutava a última pergunta e saiu).
   - **`diagnostico={false}`** tira o painel de diagnóstico (só na montagem: quem monta quer ver a
     resposta, e a coluna de 672px não comporta os dois).
 - **Fase 4 (assinatura e gate):** a regra de acesso mora em `lib/billing.ts` (**módulo puro**, zero

@@ -44,6 +44,10 @@ export interface TurnDiagnostics {
   stageWouldMove: string | null; // estágio (key) que a IA moveria; null = não move
   guardrail: GuardrailDiag;
   handoffOpened: boolean; // o turno abriu handoff (pausar/agendar ou guardrail)
+  // O turno pôs um pedido NA FILA (29/09/2026). É a MESMA regra do atendimento
+  // (`entraNaFila` em lib/agent-turn.ts, com a rede de segurança), calculada
+  // também no dryRun para a bancada mostrar o pedido como ele apareceria.
+  pedidoNaFila?: boolean;
   // true = o agente não está publicado, então o turno foi silenciado sem chamar
   // o modelo (a mensagem do cliente continua sendo gravada pelo n8n).
   notPublished?: boolean;

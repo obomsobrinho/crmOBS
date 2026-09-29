@@ -40,6 +40,13 @@ export async function POST(req: NextRequest) {
     currentStage?: string | null;
     stageSource?: string | null;
     instruction?: string | null;
+    /**
+     * A bancada orientou um pedido de ajuda (29/09/2026): a IA responde SEM
+     * mensagem nova do cliente, como no atendimento de verdade.
+     */
+    retomada?: { instruction?: string } | null;
+    /** Pedidos de ajuda abertos na conversa de teste. */
+    pedidosAbertos?: string[];
     /** Configuração em edição: "guiado" usa `config`, "avancado" usa `persona`. */
     mode?: string;
     config?: unknown;
@@ -54,7 +61,11 @@ export async function POST(req: NextRequest) {
   }
 
   const message = typeof body.message === "string" ? body.message.trim() : "";
-  if (!message) {
+  const retomada =
+    typeof body.retomada?.instruction === "string" && body.retomada.instruction.trim()
+      ? { instruction: body.retomada.instruction.trim().slice(0, 2000) }
+      : null;
+  if (!message && !retomada) {
     return NextResponse.json({ error: "mensagem obrigatória" }, { status: 400 });
   }
 
@@ -125,6 +136,8 @@ export async function POST(req: NextRequest) {
       currentStage: body.currentStage ?? null,
       stageSource: body.stageSource ?? null,
       instruction: body.instruction ?? null,
+      retomada,
+      pedidosAbertos: Array.isArray(body.pedidosAbertos) ? body.pedidosAbertos : [],
       personaOverride,
     });
 

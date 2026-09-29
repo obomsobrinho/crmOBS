@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Mic, Pause, Play, Sparkles, Trash2 } from "lucide-react";
+import { ArrowUp, CheckCheck, LifeBuoy, Mic, Pause, Play, Trash2 } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dissolver-rolagem";
 import { Textarea } from "@/components/ui/textarea";
 import FundoRede from "./FundoRede";
+import HandoffCard, { type Handoff } from "./HandoffCard";
+import { formatEspera } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
@@ -26,7 +28,8 @@ import { cn } from "@/lib/utils";
 // hospeda.
 
 export interface PlaygroundTurn {
-  role: "user" | "assistant";
+  /** `marco` = linha de histórico de um pedido de ajuda fechado (não vai ao agente). */
+  role: "user" | "assistant" | "marco";
   /** O que vai no histórico do agente. No áudio, é a transcrição. */
   content: string;
   diag?: TurnDiagnostics;
@@ -39,6 +42,15 @@ export interface PlaygroundTurn {
   partes?: string[];
   /** Mensagem de voz gravada na bancada. */
   audio?: { url: string; segundos: number; transcrevendo?: boolean };
+  /** Só em `marco`: o pedido de ajuda que fechou. */
+  pedido?: Handoff;
+}
+
+/** O que o agente lê: a conversa, sem as linhas de pedido fechado. */
+function historico(turns: PlaygroundTurn[]) {
+  return turns
+    .filter((t) => t.role !== "marco")
+    .map((t) => ({ role: t.role, content: t.content }));
 }
 
 /** Pausa entre um balão e o próximo, pelo tamanho do texto: nem instantâneo
@@ -75,13 +87,20 @@ export type ConfiguracaoEmEdicao =
   | { mode: "avancado"; persona: string; handoffNotice: string };
 
 interface ApiResult {
-  output: { messages: string[]; action: string; summary: string; preferencia_horario: string };
+  output: {
+    messages: string[];
+    action: string;
+    summary: string;
+    preferencia_horario: string;
+    pedido_novo?: boolean;
+  };
   diagnostics: TurnDiagnostics;
 }
 
 export default function Playground({
   stageNames,
   initialTurns = [],
+  initialPedidos = [],
   initialStage = null,
   configuracao = null,
   diagnostico = true,
@@ -90,6 +109,8 @@ export default function Playground({
   stageNames: Record<string, string>;
   // Só para o /design: começa com uma conversa de exemplo.
   initialTurns?: PlaygroundTurn[];
+  /** Só para o /design: começa com pedidos de ajuda abertos. */
+  initialPedidos?: Handoff[];
   initialStage?: string | null;
   /**
    * Configuração em edição. Lida na hora de cada turno (e não copiada para o
@@ -108,7 +129,14 @@ export default function Playground({
 }) {
   const [turns, setTurns] = useState<PlaygroundTurn[]>(initialTurns);
   const [input, setInput] = useState("");
-  const [coachDraft, setCoachDraft] = useState("");
+  // PEDIDOS DE AJUDA NA CONVERSA DE TESTE (29/09/2026, pedido do dono: "gap de
+  // primeira impressão"). Quando a IA pede ajuda, o pedido aparece aqui como no
+  // atendimento de verdade, e a pessoa orienta e vê a IA responder. Fila do mais
+  // antigo para o mais novo, igual à caixa de escrita da tela de Conversas.
+  const [pedidos, setPedidos] = useState<Handoff[]>(initialPedidos);
+  const fila = pedidos.filter((p) => !p.closedAt);
+  const pedidoAtual = fila[0] ?? null;
+  const [orientacao, setOrientacao] = useState("");
   const [sending, setSending] = useState(false);
   // "Digitando…": o agente está pensando ou ainda vai mandar outro balão.
   const [pensando, setPensando] = useState(false);
@@ -120,14 +148,11 @@ export default function Playground({
   );
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const lastUserIndex = (() => {
-    for (let i = turns.length - 1; i >= 0; i--) if (turns[i].role === "user") return i;
-    return -1;
+  const lastDiag = (() => {
+    for (let i = turns.length - 1; i >= 0; i--)
+      if (turns[i].role === "assistant") return turns[i].diag ?? null;
+    return null;
   })();
-  const lastDiag =
-    turns.length > 0 && turns[turns.length - 1].role === "assistant"
-      ? turns[turns.length - 1].diag ?? null
-      : null;
 
   const scrollDown = () => {
     requestAnimationFrame(() => {
@@ -139,7 +164,8 @@ export default function Playground({
   async function callApi(payload: {
     message: string;
     history: { role: string; content: string }[];
-    instruction?: string | null;
+    retomada?: { instruction: string } | null;
+    pedidosAbertos?: string[];
   }): Promise<ApiResult> {
     const res = await fetch("/api/playground", {
       method: "POST",
@@ -185,17 +211,38 @@ export default function Playground({
    */
   async function responder(
     message: string,
-    history: { role: string; content: string }[]
+    history: { role: string; content: string }[],
+    retomada: { instruction: string } | null = null,
+    abertos: Handoff[] = fila
   ) {
     setPensando(true);
     scrollDown();
     let res: ApiResult;
     try {
-      res = await callApi({ message, history });
+      res = await callApi({
+        message,
+        history,
+        retomada,
+        pedidosAbertos: abertos.map((p) => p.summary ?? "").filter(Boolean),
+      });
     } finally {
       setPensando(false);
     }
     const { output, diagnostics } = res;
+    // O servidor decide pela MESMA regra do atendimento (`pedidoNaFila`).
+    if (diagnostics.pedidoNaFila) {
+      setPedidos((prev) => [
+        ...prev,
+        {
+          id: Date.now(),
+          openedAt: new Date().toISOString(),
+          summary: output.summary || diagnostics.summary || null,
+          instruction: null,
+          closedAt: null,
+          closedHow: null,
+        },
+      ]);
+    }
     const content = output.messages.join("\n");
     const partes = output.messages.filter((m) => m.trim());
     applyStage(diagnostics);
@@ -222,7 +269,7 @@ export default function Playground({
     if (!text || sending) return;
     setError(null);
     setSending(true);
-    const history = turns.map((t) => ({ role: t.role, content: t.content }));
+    const history = historico(turns);
     setTurns((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     scrollDown();
@@ -317,7 +364,7 @@ export default function Playground({
 
   async function enviarAudio(blob: Blob, duracao: number) {
     setSending(true);
-    const history = turns.map((t) => ({ role: t.role, content: t.content }));
+    const history = historico(turns);
     const url = URL.createObjectURL(blob);
     setTurns((prev) => [
       ...prev,
@@ -351,30 +398,33 @@ export default function Playground({
     }
   }
 
-  // Orienta a IA (handoff coach) e reexecuta a última pergunta do cliente com a
-  // orientação, para ver a IA retomar sozinha, tudo dentro do playground.
-  async function coach() {
-    const instruction = coachDraft.trim();
-    if (!instruction || sending || lastUserIndex < 0) return;
+  // Fecha o pedido da vez: vira a linha de histórico na conversa, no ponto em
+  // que fechou, como no atendimento.
+  function fecharPedido(p: Handoff, como: "ia" | "resolvido", instrucao: string | null) {
+    const fechado: Handoff = {
+      ...p,
+      instruction: instrucao,
+      closedAt: new Date().toISOString(),
+      closedHow: como,
+    };
+    setPedidos((prev) => prev.map((x) => (x.id === p.id ? fechado : x)));
+    setTurns((prev) => [...prev, { role: "marco", content: "", pedido: fechado }]);
+    scrollDown();
+  }
+
+  // ORIENTAR (o mesmo gesto da tela de Conversas): o pedido fecha e a IA
+  // responde NA HORA, sem mensagem nova do cliente (turno de retomada).
+  async function orientarPedido() {
+    const texto = orientacao.trim();
+    if (!texto || sending || !pedidoAtual) return;
     setError(null);
     setSending(true);
-    const lastUserMsg = turns[lastUserIndex].content;
-    const history = turns
-      .slice(0, lastUserIndex)
-      .map((t) => ({ role: t.role, content: t.content }));
+    const history = historico(turns);
+    const restantes = fila.slice(1);
+    fecharPedido(pedidoAtual, "ia", texto);
+    setOrientacao("");
     try {
-      const { output, diagnostics } = await callApi({
-        message: lastUserMsg,
-        history,
-        instruction,
-      });
-      setTurns((prev) => [
-        ...prev.slice(0, lastUserIndex + 1),
-        { role: "assistant", content: output.messages.join("\n"), diag: diagnostics },
-      ]);
-      setCoachDraft("");
-      applyStage(diagnostics);
-      scrollDown();
+      await responder("", history, { instruction: texto }, restantes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "erro inesperado");
     } finally {
@@ -449,14 +499,15 @@ export default function Playground({
               </div>
             ) : (
               turns.map((t, i) => {
+                if (t.role === "marco" && t.pedido) {
+                  return <HandoffCard key={i} h={t.pedido} />;
+                }
                 // Handoff silencioso: a IA não envia nada, só abre o handoff.
                 if (t.role === "assistant" && !t.content.trim()) {
                   return (
                     <div key={i} className="flex justify-center">
                       <div className="rounded-full bg-warn-surface px-3 py-1 text-legenda text-warn-ink">
-                        {diagnostico
-                          ? "A IA abriu handoff e não respondeu. Oriente ao lado ou assuma a conversa."
-                          : "A IA passou esta conversa para você."}
+                        A IA passou esta conversa para você.
                       </div>
                     </div>
                   );
@@ -528,6 +579,75 @@ export default function Playground({
               </div>
             )}
           </AreaRolavel>
+          {/* O PEDIDO DE AJUDA, no molde da caixa da tela de Conversas (29/09/2026):
+              em cima o pedido, embaixo a orientação e o Resolvido. Fica ACIMA da
+              caixa do cliente, porque aqui quem testa faz os dois papéis: o
+              cliente continua podendo escrever enquanto o pedido espera. */}
+          {pedidoAtual && (
+            <div className="relative shrink-0 px-3 pt-2">
+              <div
+                data-slot="pedido-teste"
+                className="overflow-hidden rounded-[16px] border border-warn-line bg-raised shadow-[var(--panel-shadow)]"
+              >
+                <div className="flex items-start gap-3 bg-warn-surface px-3.5 py-2.5">
+                  <LifeBuoy size={16} className="mt-0.5 shrink-0 text-warn-ink" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-legenda text-warn-ink">
+                      <span className="font-semibold">A IA pediu sua ajuda</span>
+                      <span suppressHydrationWarning>
+                        {fila.length > 1 ? `1 de ${fila.length} · ` : ""}há{" "}
+                        {formatEspera(pedidoAtual.openedAt)}
+                      </span>
+                    </p>
+                    <p className="mt-0.5 text-corpo font-semibold text-ink" style={{ textWrap: "pretty" }}>
+                      {pedidoAtual.summary || "Ela não soube responder e passou para o time."}
+                    </p>
+                    <p className="mt-1 text-legenda text-ink-2">
+                      No atendimento, este pedido aparece para o seu time na conversa.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-end gap-2 p-2">
+                  <Textarea
+                    variant="limpo"
+                    rows={1}
+                    value={orientacao}
+                    onChange={(e) => setOrientacao(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void orientarPedido();
+                      }
+                    }}
+                    aria-label="Orientação para a IA"
+                    placeholder="Diga à IA o que responder ao cliente"
+                    className="max-h-[132px] min-h-9 min-w-0 flex-1 px-2 py-2 text-corpo [field-sizing:content]"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="chrome"
+                    onClick={() => fecharPedido(pedidoAtual, "resolvido", null)}
+                    disabled={sending}
+                    className="shrink-0 max-md:h-10"
+                  >
+                    <CheckCheck size={14} />
+                    Resolvido
+                  </Button>
+                  <Button
+                    variant="warn"
+                    size="none"
+                    onClick={() => void orientarPedido()}
+                    carregando={sending && !!orientacao.trim()}
+                    disabled={!orientacao.trim() || sending}
+                    aria-label="Enviar orientação"
+                    className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
+                  >
+                    <ArrowUp size={18} />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* A caixa de escrita no molde da tela de Conversas (`MessageComposer`):
               moldura de 16px com relevo sobre o fundo da conversa, campo limpo
               que cresce com o texto e o botão redondo à direita. Aqui não há os
@@ -625,14 +745,7 @@ export default function Playground({
             simStage={simStage}
             stageNames={stageNames}
           />
-          <HandoffPanel
-            diag={lastDiag}
-            canCoach={lastUserIndex >= 0}
-            coachDraft={coachDraft}
-            setCoachDraft={setCoachDraft}
-            onCoach={coach}
-            sending={sending}
-          />
+          <HandoffPanel diag={lastDiag} />
           <SummaryPanel diag={lastDiag} />
         </AreaRolavel>
         )}
@@ -656,21 +769,9 @@ function actionLabel(action: string): string {
   return "Segue a conversa";
 }
 
-function HandoffPanel({
-  diag,
-  canCoach,
-  coachDraft,
-  setCoachDraft,
-  onCoach,
-  sending,
-}: {
-  diag: TurnDiagnostics | null;
-  canCoach: boolean;
-  coachDraft: string;
-  setCoachDraft: (v: string) => void;
-  onCoach: () => void;
-  sending: boolean;
-}) {
+// Só leitura (29/09/2026): orientar mora na CONVERSA de teste, no molde da
+// caixa da tela de Conversas. Aqui fica o que a IA decidiu e por quê.
+function HandoffPanel({ diag }: { diag: TurnDiagnostics | null }) {
   const open = !!diag?.handoffOpened;
   return (
     <Panel title="Handoff">
@@ -697,37 +798,9 @@ function HandoffPanel({
           <div className="rounded-lg bg-raised px-3 py-2.5 text-apoio text-ink-2">
             {diag
               ? "Nenhum handoff neste turno. A IA seguiu sozinha."
-              : "Nenhum handoff aberto. Quando a IA precisar de um humano, aparece aqui pra você orientar ou assumir."}
+              : "Nenhum pedido de ajuda. Quando a IA precisar do time, o pedido aparece na conversa para você orientar."}
           </div>
         )}
-        <div>
-          <div className="mb-1.5 flex items-center gap-1.5 text-legenda text-ink-2">
-            <Sparkles size={12} className="text-human-ink" />
-            Orientar a IA
-          </div>
-          <Textarea
-            value={coachDraft}
-            onChange={(e) => setCoachDraft(e.target.value)}
-            rows={3}
-            maxLength={800}
-            disabled={!open}
-            placeholder={
-              open
-                ? "Ex.: diga que sim, pode vir agora, e peça o nome."
-                : "Fica disponível quando a IA abrir um handoff."
-            }
-            className="resize-none"
-          />
-          <Button
-            size="primary"
-            onClick={onCoach}
-            carregando={sending && coachDraft.trim() !== ""}
-            disabled={!open || !coachDraft.trim() || sending || !canCoach}
-            className="mt-2 w-full justify-center"
-          >
-            {sending && coachDraft.trim() ? "Orientando…" : "Orientar e responder"}
-          </Button>
-        </div>
       </div>
     </Panel>
   );

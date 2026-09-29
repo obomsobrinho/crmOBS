@@ -49,9 +49,11 @@ const TURNS: PlaygroundTurn[] = [
   },
   { role: "user", content: "Vocês têm atendimento de emergência pra daqui meia hora?" },
   {
-    // Turno sem mensagem: exercita o aviso central de handoff na conversa.
+    // A IA pede ajuda e AVISA o que vai verificar (handoff não emudece desde
+    // 20/08/2026); o pedido aparece na conversa de teste para orientar.
     role: "assistant",
-    content: "",
+    content: "Vou confirmar com o time se dá pra encaixar em meia hora e já te retorno.",
+    partes: ["Vou confirmar com o time se dá pra encaixar em meia hora e já te retorno."],
     diag: diag({
       action: "pausar",
       summary: "Cliente quer um atendimento de emergência em cerca de 30 minutos.",
@@ -61,6 +63,17 @@ const TURNS: PlaygroundTurn[] = [
         { similarity: 0.41, preview: "Encaixes de urgência dependem da agenda do dia." },
       ],
     }),
+  },
+];
+
+const PEDIDOS = [
+  {
+    id: 1,
+    openedAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+    summary: "Cliente quer um atendimento de emergência em cerca de 30 minutos.",
+    instruction: null,
+    closedAt: null,
+    closedHow: null,
   },
 ];
 
@@ -75,6 +88,7 @@ export default function DesignPlaygroundPage() {
             stageNames={STAGE_NAMES}
             defaultOpen
             initialTurns={TURNS}
+            initialPedidos={PEDIDOS}
           />
         </Card>
       </div>

@@ -281,15 +281,18 @@ test.describe("Bancada de teste (/design/playground)", () => {
     await expect(page.getByText("Handoff", { exact: true })).toBeVisible();
     await expect(page.getByText("Classificação", { exact: true })).toBeVisible();
     await expect(page.getByText("Resumo", { exact: true })).toBeVisible();
-    // A conversa de exemplo termina em handoff aberto: a IA não manda bolha
-    // (handoff silencioso), aparece o aviso central e o painel de handoff.
+    // A conversa de exemplo termina com a IA pedindo ajuda. Desde 29/09/2026 o
+    // pedido aparece NA CONVERSA de teste, no molde da caixa da tela de
+    // Conversas, e o painel de handoff do diagnóstico só informa.
     await expect(
       page.getByText("A IA abriu handoff", { exact: true })
     ).toBeVisible();
-    await expect(page.getByText(/não respondeu\. Oriente/)).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Orientar e responder" })
-    ).toBeVisible();
+    const pedido = page.locator('[data-slot="pedido-teste"]');
+    await expect(pedido).toContainText("A IA pediu sua ajuda");
+    await expect(pedido).toContainText("emergência");
+    await expect(pedido.getByRole("button", { name: "Enviar orientação" })).toBeVisible();
+    await expect(pedido.getByRole("button", { name: "Resolvido" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Orientar e responder" })).toHaveCount(0);
     await expect(page.getByText("Aguardando atendimento")).toBeVisible();
     // Trecho recuperado do RAG aparece no painel de classificação.
     await expect(page.getByText(/Encaixes de urgência/)).toBeVisible();
