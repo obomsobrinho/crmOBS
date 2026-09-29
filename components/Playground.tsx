@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, CheckCheck, LifeBuoy, Mic, Pause, Play, Trash2 } from "lucide-react";
+import { ArrowUp, Mic, Pause, Play, Trash2 } from "lucide-react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import FundoRede from "./FundoRede";
 import HandoffCard, { type Handoff } from "./HandoffCard";
-import { formatEspera } from "@/lib/format";
+import MessageComposer from "./MessageComposer";
 import { cn } from "@/lib/utils";
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
@@ -28,8 +28,12 @@ import { cn } from "@/lib/utils";
 // hospeda.
 
 export interface PlaygroundTurn {
-  /** `marco` = linha de histórico de um pedido de ajuda fechado (não vai ao agente). */
-  role: "user" | "assistant" | "marco";
+  /**
+   * `marco` = linha que atravessa a conversa (pedido fechado ou "o time
+   * assumiu"); não vai ao agente. `time` = resposta do time pela caixa de
+   * escrita, como no atendimento.
+   */
+  role: "user" | "assistant" | "marco" | "time";
   /** O que vai no histórico do agente. No áudio, é a transcrição. */
   content: string;
   diag?: TurnDiagnostics;
@@ -44,13 +48,17 @@ export interface PlaygroundTurn {
   audio?: { url: string; segundos: number; transcrevendo?: boolean };
   /** Só em `marco`: o pedido de ajuda que fechou. */
   pedido?: Handoff;
+  /** Só em `marco` sem pedido: o texto do selo ("O time assumiu a conversa"). */
+  rotulo?: string;
 }
 
 /** O que o agente lê: a conversa, sem as linhas de pedido fechado. */
 function historico(turns: PlaygroundTurn[]) {
+  // A resposta do time entra como fala do atendimento, igual ao chat_messages
+  // (a linha manual é bot_message e o agente a lê como "assistant").
   return turns
     .filter((t) => t.role !== "marco")
-    .map((t) => ({ role: t.role, content: t.content }));
+    .map((t) => ({ role: t.role === "time" ? "assistant" : t.role, content: t.content }));
 }
 
 /** Pausa entre um balão e o próximo, pelo tamanho do texto: nem instantâneo
@@ -73,6 +81,9 @@ const GRAVACAO_MAX_S = 120;
 const PELE_CLIENTE =
   "border-line-soft bg-[var(--bubble-in-bg)] text-[var(--bubble-in-fg)] shadow-[var(--bubble-shadow)]";
 const PELE_IA = "border-brand-line bg-[var(--bubble-ia-bg)] text-[var(--bubble-ia-fg)]";
+// O time respondendo (`voce` no Thread): do lado do atendimento, junto da IA.
+const PELE_TIME =
+  "border-human-line bg-[var(--bubble-you-bg)] text-[var(--bubble-you-fg)]";
 
 /**
  * Configuração que a pessoa está EDITANDO no formulário, enviada em cada turno.
@@ -136,7 +147,8 @@ export default function Playground({
   const [pedidos, setPedidos] = useState<Handoff[]>(initialPedidos);
   const fila = pedidos.filter((p) => !p.closedAt);
   const pedidoAtual = fila[0] ?? null;
-  const [orientacao, setOrientacao] = useState("");
+  // Respondeu como time: a IA pausa, como no atendimento (quem responde assume).
+  const [iaPausada, setIaPausada] = useState(false);
   const [sending, setSending] = useState(false);
   // "Digitando…": o agente está pensando ou ainda vai mandar outro balão.
   const [pensando, setPensando] = useState(false);
@@ -268,11 +280,13 @@ export default function Playground({
     const text = input.trim();
     if (!text || sending) return;
     setError(null);
-    setSending(true);
     const history = historico(turns);
     setTurns((prev) => [...prev, { role: "user", content: text }]);
     setInput("");
     scrollDown();
+    // IA pausada (o time assumiu): a mensagem chega e ninguém responde por ela.
+    if (iaPausada) return;
+    setSending(true);
     try {
       await responder(text, history);
     } catch (e) {
@@ -414,22 +428,35 @@ export default function Playground({
 
   // ORIENTAR (o mesmo gesto da tela de Conversas): o pedido fecha e a IA
   // responde NA HORA, sem mensagem nova do cliente (turno de retomada).
-  async function orientarPedido() {
-    const texto = orientacao.trim();
-    if (!texto || sending || !pedidoAtual) return;
+  async function orientarPedido(texto: string) {
+    if (!texto.trim() || sending || !pedidoAtual) return;
     setError(null);
     setSending(true);
     const history = historico(turns);
     const restantes = fila.slice(1);
-    fecharPedido(pedidoAtual, "ia", texto);
-    setOrientacao("");
+    fecharPedido(pedidoAtual, "ia", texto.trim());
     try {
-      await responder("", history, { instruction: texto }, restantes);
+      await responder("", history, { instruction: texto.trim() }, restantes);
     } catch (e) {
       setError(e instanceof Error ? e.message : "erro inesperado");
     } finally {
       setSending(false);
     }
+  }
+
+  // RESPONDER COMO TIME (o modo Responder da caixa): o pedido fecha como
+  // "resolvido pelo time", o time assume e a IA pausa, como no atendimento.
+  function responderComoTime(texto: string) {
+    const t = texto.trim();
+    if (!t) return;
+    if (pedidoAtual) fecharPedido(pedidoAtual, "resolvido", null);
+    setTurns((prev) => [
+      ...prev,
+      ...(iaPausada ? [] : [{ role: "marco" as const, content: "", rotulo: "O time assumiu a conversa" }]),
+      { role: "time", content: t },
+    ]);
+    setIaPausada(true);
+    scrollDown();
   }
 
   return (
@@ -501,6 +528,35 @@ export default function Playground({
               turns.map((t, i) => {
                 if (t.role === "marco" && t.pedido) {
                   return <HandoffCard key={i} h={t.pedido} />;
+                }
+                if (t.role === "marco") {
+                  // O mesmo selo "passagem de bastão" da tela de Conversas.
+                  return (
+                    <div key={i} className="flex items-center gap-3 py-1" data-slot="conversa-marco">
+                      <span className="h-px flex-1 bg-human-line" aria-hidden />
+                      <span className="inline-flex h-[26px] shrink-0 items-center gap-2 rounded-md border border-human-line bg-human-surface px-2.5">
+                        <span className="h-1.5 w-1.5 rounded-full bg-human" aria-hidden />
+                        <span className="whitespace-nowrap text-rotulo uppercase text-human-ink">
+                          {t.rotulo}
+                        </span>
+                      </span>
+                      <span className="h-px flex-1 bg-human-line" aria-hidden />
+                    </div>
+                  );
+                }
+                if (t.role === "time") {
+                  return (
+                    <div key={i} className="flex flex-col items-start gap-1.5">
+                      <div
+                        className={cn(
+                          "msg-in max-w-[80%] whitespace-pre-wrap break-words rounded-[4px_16px_16px_16px] border px-3 py-2 text-corpo",
+                          PELE_TIME
+                        )}
+                      >
+                        {t.content}
+                      </div>
+                    </div>
+                  );
                 }
                 // Handoff silencioso: a IA não envia nada, só abre o handoff.
                 if (t.role === "assistant" && !t.content.trim()) {
@@ -579,74 +635,40 @@ export default function Playground({
               </div>
             )}
           </AreaRolavel>
-          {/* O PEDIDO DE AJUDA, no molde da caixa da tela de Conversas (29/09/2026):
-              em cima o pedido, embaixo a orientação e o Resolvido. Fica ACIMA da
-              caixa do cliente, porque aqui quem testa faz os dois papéis: o
-              cliente continua podendo escrever enquanto o pedido espera. */}
-          {pedidoAtual && (
-            <div className="relative shrink-0 px-3 pt-2">
-              <div
-                data-slot="pedido-teste"
-                className="overflow-hidden rounded-[16px] border border-warn-line bg-raised shadow-[var(--panel-shadow)]"
-              >
-                <div className="flex items-start gap-3 bg-warn-surface px-3.5 py-2.5">
-                  <LifeBuoy size={16} className="mt-0.5 shrink-0 text-warn-ink" aria-hidden />
-                  <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-legenda text-warn-ink">
-                      <span className="font-semibold">A IA pediu sua ajuda</span>
-                      <span suppressHydrationWarning>
-                        {fila.length > 1 ? `1 de ${fila.length} · ` : ""}há{" "}
-                        {formatEspera(pedidoAtual.openedAt)}
-                      </span>
-                    </p>
-                    <p className="mt-0.5 text-corpo font-semibold text-ink" style={{ textWrap: "pretty" }}>
-                      {pedidoAtual.summary || "Ela não soube responder e passou para o time."}
-                    </p>
-                    <p className="mt-1 text-legenda text-ink-2">
-                      No atendimento, este pedido aparece para o seu time na conversa.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-end gap-2 p-2">
-                  <Textarea
-                    variant="limpo"
-                    rows={1}
-                    value={orientacao}
-                    onChange={(e) => setOrientacao(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void orientarPedido();
-                      }
-                    }}
-                    aria-label="Orientação para a IA"
-                    placeholder="Diga à IA o que responder ao cliente"
-                    className="max-h-[132px] min-h-9 min-w-0 flex-1 px-2 py-2 text-corpo [field-sizing:content]"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="chrome"
-                    onClick={() => fecharPedido(pedidoAtual, "resolvido", null)}
-                    disabled={sending}
-                    className="shrink-0 max-md:h-10"
-                  >
-                    <CheckCheck size={14} />
-                    Resolvido
-                  </Button>
-                  <Button
-                    variant="warn"
-                    size="none"
-                    onClick={() => void orientarPedido()}
-                    carregando={sending && !!orientacao.trim()}
-                    disabled={!orientacao.trim() || sending}
-                    aria-label="Enviar orientação"
-                    className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
-                  >
-                    <ArrowUp size={18} />
-                  </Button>
-                </div>
-              </div>
+          {/* ⚠️ COM PEDIDO ABERTO, A CAIXA É A DA TELA DE CONVERSAS (29/09/2026,
+              decisão do dono: "mostrar de um jeito na montagem e de outro quando
+              funcionar não é bom"). É o PRÓPRIO `MessageComposer` com a prop
+              `pedido`, e não uma cópia: abre em Orientar a IA, troca para
+              Responder, e tem o Resolvido ao lado. Enquanto o pedido espera, o
+              cliente de teste não escreve, exatamente como a caixa do time não
+              escreve pelo cliente. */}
+          {pedidoAtual ? (
+            <div className="relative shrink-0">
+              <MessageComposer
+                key={`pedido-${pedidoAtual.id}`}
+                clientId=""
+                onSend={responderComoTime}
+                atende={{ quem: iaPausada ? "voce" : "ia" }}
+                pedido={{
+                  handoff: pedidoAtual,
+                  posicao: 1,
+                  total: fila.length,
+                  onOrientar: orientarPedido,
+                  onResolvido: () => fecharPedido(pedidoAtual, "resolvido", null),
+                }}
+              />
+              {error && <p className="px-4 pb-2 text-legenda text-danger-ink">{error}</p>}
             </div>
+          ) : (
+          <>
+          {iaPausada && (
+            <p
+              data-slot="ia-pausada-teste"
+              className="relative mx-3 mt-2 rounded-lg bg-human-surface px-3 py-2 text-legenda text-human-ink"
+            >
+              Você assumiu esta conversa, e a IA não responde mais o cliente. Para
+              testar de novo, recomece a conversa.
+            </p>
           )}
           {/* A caixa de escrita no molde da tela de Conversas (`MessageComposer`):
               moldura de 16px com relevo sobre o fundo da conversa, campo limpo
@@ -728,6 +750,8 @@ export default function Playground({
               <p className="mt-1.5 px-1 text-legenda text-danger-ink">{error}</p>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* DIREITA: Diagnóstico do turno, em coluna única. Eram duas colunas

@@ -442,9 +442,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     ("Transcrição: …"). ⚠️ Transcrição real ainda não provada com voz; o e2e usa microfone falso do
     Chromium e resposta falsa.
   - **O PEDIDO DE AJUDA MORA NA CONVERSA DE TESTE (29/09/2026, dono: "gap de primeira impressão"):**
-    quando a IA pede ajuda, aparece acima da caixa do cliente o mesmo bloco âmbar da caixa da tela de
-    Conversas (`data-slot="pedido-teste"`), com orientar e Resolvido. Orientar fecha o pedido (linha
-    cinza, o mesmo `HandoffCard`) e a IA responde NA HORA: o `processTurn` aceita `retomada` também em
+    com pedido aberto, a caixa do cliente DÁ LUGAR à caixa da tela de Conversas, e é o PRÓPRIO
+    `MessageComposer` com a prop `pedido` (decisão do dono: "mostrar de um jeito na montagem e de outro
+    quando funcionar não é bom"): abre em Orientar a IA, troca para Responder e tem o Resolvido.
+    Responder como time põe o marco "O time assumiu a conversa", o balão verde, fecha o pedido como
+    `resolvido` e PAUSA a IA do teste, como no atendimento. Orientar fecha o pedido (linha cinza, o
+    mesmo `HandoffCard`) e a IA responde NA HORA: o `processTurn` aceita `retomada` também em
     `dryRun`, e a bancada manda `pedidosAbertos` porque a fila de teste mora no navegador. **A decisão
     de entrar na fila é a MESMA do atendimento** (`diagnostics.pedidoNaFila`, com a rede de segurança),
     calculada no servidor. O painel de handoff do diagnóstico virou só leitura (o antigo "Orientar e

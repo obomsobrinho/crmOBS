@@ -287,16 +287,20 @@ test.describe("Bancada de teste (/design/playground)", () => {
     await expect(
       page.getByText("A IA abriu handoff", { exact: true })
     ).toBeVisible();
-    const pedido = page.locator('[data-slot="pedido-teste"]');
+    // É a MESMA caixa da tela de Conversas (MessageComposer com pedido), no
+    // lugar da caixa do cliente, e não uma cópia.
+    const pedido = page.locator('[data-slot="pedido-caixa"]');
     await expect(pedido).toContainText("A IA pediu sua ajuda");
     await expect(pedido).toContainText("emergência");
-    await expect(pedido.getByRole("button", { name: "Enviar orientação" })).toBeVisible();
+    await expect(pedido.locator('[data-slot="composer-modo"]')).toContainText("Orientar a IA");
     await expect(pedido.getByRole("button", { name: "Resolvido" })).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Mensagem de teste" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Orientar e responder" })).toHaveCount(0);
     await expect(page.getByText("Aguardando atendimento")).toBeVisible();
     // Trecho recuperado do RAG aparece no painel de classificação.
     await expect(page.getByText(/Encaixes de urgência/)).toBeVisible();
-    // O campo de mensagem existe (fala direto com a IA).
+    // Resolvido devolve a caixa do cliente (o campo que fala direto com a IA).
+    await pedido.getByRole("button", { name: "Resolvido" }).click();
     await expect(
       page.getByRole("textbox", { name: "Mensagem de teste" })
     ).toBeVisible();
