@@ -33,7 +33,23 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### 29/09/2026 (a mais recente; ler isto primeiro)
+### 29/09/2026, noite: P0 do beta FEITO (a mais recente; ler isto primeiro)
+
+Os dois itens do P0 do plano vigente estão commitados, **sem push** (o dono decide):
+- **Avisos no WhatsApp** (`docs/plano-avisos.md`): o pedido de ajuda novo avisa o destino de avisos
+  (número ou grupo, configurado no passo 4 da montagem e no `/agente`; obrigatório na primeira
+  ativação). O número de avisos nunca é atendido e some de toda lista.
+- **Página `/pedidos`** (`docs/plano-pedidos.md`): todos os pedidos abertos, do mais antigo para o
+  mais novo, com as três saídas da caixa de escrita na própria linha. O "Abrir" do aviso leva a ela.
+
+**Falta, e só o dono faz:** o teste com o chip do envio real (configurar o destino, "Mandar teste" e
+um pedido de ajuda de verdade chegando no celular). Nenhum teste automatizado manda WhatsApp.
+Depois do deploy, conferir que `VERCEL_PROJECT_PRODUCTION_URL` existe na Vercel (sem ela o aviso
+sai sem o link "Abrir").
+**Anotado, sem decisão:** o "Notifica grupo" do n8n (reunião marcada) ainda diz "🚨 Novo Lead" e
+dispara a cada turno de agendamento; trocar é mexer no n8n.
+
+### 29/09/2026, tarde
 
 O dono segue no teste com chip real. Entrou nesta rodada: a retomada (orientar) nunca abre pedido
 novo, a bancada sempre mostra a última mensagem (`AreaRolavel` engolia o `ref`), a seção
@@ -117,7 +133,6 @@ para o cadastro LOCAL voltar a funcionar, trocar por `http://localhost:3001/**`.
   respondido. Staging (projeto Supabase de testes) é o caminho de longo prazo, depois do beta.
 - Gerar o QR sozinho ao abrir o passo 4 (hoje pede clique, porque cria a instância na Evolution).
 - Tela de Clientes antes ou depois do beta: nunca decidido.
-- Ninguém é avisado quando abre handoff (limitação assumida).
 - `docs/arquitetura/` é dele e fica FORA do git, de propósito.
 
 **Só o teste com chip prova:** responder pelo CRM (chega no celular e pausa a IA), áudio do cliente,

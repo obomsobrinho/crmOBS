@@ -34,8 +34,8 @@ sacadas, com o Deskcomm como catálogo).
 
 | Prioridade | Item | Por quê |
 |---|---|---|
-| **P0, antes de abrir o beta** | 1. **Avisos no WhatsApp** do time quando a IA pede ajuda (`docs/plano-avisos.md`) | Obrigatório para o beta, decisão do dono: quem não vive na tela não fica sabendo |
-| | 2. **Página de pedidos abertos**, com orientar na própria linha | O aviso leva direto para ela |
+| **P0, antes de abrir o beta** | 1. ✅ **Avisos no WhatsApp** do time quando a IA pede ajuda (`docs/plano-avisos.md`). **Feito em 29/09/2026**; falta o teste do dono com o chip | Obrigatório para o beta, decisão do dono: quem não vive na tela não fica sabendo |
+| | 2. ✅ **Página de pedidos abertos**, com orientar na própria linha (`docs/plano-pedidos.md`). **Feito em 29/09/2026** | O aviso leva direto para ela |
 | **P1, durante o beta** | 3. **Motivo do pedido de ajuda** gravado + métricas de decisão da IA | É o dado que diz o que ensinar à IA |
 | | 4. **Orientação vira regra permanente** do agente (sugestão "salvar como regra") | Hoje cada orientação vale uma vez |
 | | 5. **Custo de IA por empresa em reais, com teto** | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |

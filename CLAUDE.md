@@ -32,6 +32,17 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   para quem entrou pelo `/cadastro` inventaria um fato. Marcar é manual (`update clients set
   account_type = 'beta'`), porque com 5 a 10 testadores uma tela de administração custa mais do que
   resolve. É a coluna que as consultas de `docs/instrumentacao-beta.md` filtram.
+  - **`notify_group_jid` = DESTINO DOS AVISOS NO WHATSAPP (29/09/2026, `docs/plano-avisos.md`).**
+    O nome ficou (o n8n lê a coluna), a semântica mudou: um GRUPO (`...@g.us`, escolhido numa lista
+    que vem do WhatsApp, nunca digitado) OU um NÚMERO (`<dígitos>@s.whatsapp.net`, 55 automático),
+    **nunca o número do próprio agente** (a rota `notify-target` responde 400, conferindo o
+    `ownerJid` da Evolution). Destino ÚNICO de todo aviso: pedido de ajuda (sai do app), reunião
+    marcada e "a IA não respondeu" (saem do n8n). As regras moram em `lib/avisos.ts` (puro).
+    ⚠️ **O NÚMERO DE AVISOS NUNCA É CONVERSA:** o `processTurn` devolve turno silencioso
+    (`diagnostics.numeroDeAvisos`, `agent_turns.silenced = 'numero_de_avisos'`) e
+    `ehNumeroDeAvisos` tira ele de TODA lista e contagem (Conversas, Pipeline, contador do menu,
+    Painel, Assinatura, Pedidos). A comparação tolera o nono dígito (`chaveTelefone`), e onde a
+    exclusão é no banco (contadores HEAD do menu) usa `grafiasDoNumeroDeAvisos`.
   - ⚠️ **REGRA REVISTA EM 17/09/2026: o n8n NÃO lê a persona, e não lê desde o cutover.** Ele manda
     só `client_id`, telefone, instância e mensagem; quem busca no Supabase é o nosso `processTurn`.
     O comentário antigo no código dizia o contrário e induziu ao erro.
@@ -420,6 +431,26 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   rota nova. **Bancada de teste** (painel
   lateral dentro de `/agente`, dono-only) fala com o cérebro REAL via `POST /api/playground`
   (sessão do dono, força `dryRun`), sem WhatsApp.
+- **AVISO NO WHATSAPP E PÁGINA DE PEDIDOS (29/09/2026, P0 do beta).** Quem não vive na tela fica
+  sabendo do pedido de ajuda. Planos em `docs/plano-avisos.md` e `docs/plano-pedidos.md`.
+  - **O aviso sai do `processTurn`**, só em pedido NOVO com `action = pausar` (o `entraNaFila`).
+    A reunião marcada (`agendar`) continua avisada pelo "Notifica grupo" do n8n, para o MESMO
+    destino: avisar pelos dois daria aviso em dobro. Envio por `after()` do `next/server` (não
+    atrasa a resposta que o n8n espera), best-effort, `diagnostics.avisoAgendado`. O texto é
+    `textoDoAviso`, e o "Abrir" é `https://{VERCEL_PROJECT_PRODUCTION_URL}/pedidos?abrir={id}`
+    (fora da Vercel, a linha sai do texto).
+    ⚠️ **Telefone com DDD 00 nunca gera aviso** (`telefoneImpossivel`): é a conversa de teste da
+    suíte, e o tenant de teste TEM destino de avisos. Sem a trava, cada rodada com login mandaria
+    WhatsApp real ao grupo, e `atendimento.serial.spec.ts` confere a cada turno.
+  - **`/pedidos`** lista todos os pedidos abertos, do MAIS ANTIGO para o mais novo (decisão do dono),
+    com espera (âmbar acima de `ESPERA_AVISO_MS`), cliente, resumo e "2 de 3 nesta conversa". Abrir
+    a linha mostra as últimas mensagens e o MESMO `MessageComposer` com `pedido` (prop `embutida`
+    tira só a faixa de superfície da conversa). ⚠️ **Nenhum caminho novo:** orientar, responder e
+    Resolvido chamam `/orientar`, `/send` com `pedidoId` e `/resolve`. Conta bloqueada vê em
+    leitura. Menu: "Pedidos" entre Painel e Conversas com número âmbar (badge `pedidos`); no
+    celular, na barra de baixo no lugar do Pipeline (que foi para "Mais"). Regra pura em
+    `lib/pedidos.ts`. ⚠️ **O login NÃO volta para o link pedido, de propósito** (dono: é
+    segurança, e a pessoa precisa ver a fila inteira de qualquer jeito).
 - **Bancada de teste dentro do `/agente` (22/08/2026):** `components/AgentTestDrawer.tsx` abre o
   `Playground` num `sheet` (`tamanho="largo"`). **Ela testa a configuração EM EDIÇÃO, não a salva**,
   e é isso que resolve o problema: salvar já é publicar, então antes disso testar significava mexer
@@ -803,6 +834,14 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     configurar. O passo "Testar" (o 3) oferece o teste com destaque, mas ele não barra a
     ativação. `onboarding_tested_at` continua sendo gravado pelo `/api/playground`, agora só como
     dado.
+  - ⚠️ **AVISOS OBRIGATÓRIOS NA PRIMEIRA ATIVAÇÃO (29/09/2026, decisão do dono):**
+    `publishBlockers` ganhou `hasNotify` ("definir para onde vão os avisos"). No passo 4 o bloco
+    de avisos (`components/agente/AvisosCampo.tsx`) aparece DEPOIS de conectar, porque a lista de
+    grupos e o "Mandar teste" saem do próprio WhatsApp, e o Ativar fica desabilitado com a razão
+    escrita (`razao-avisos`) até haver destino SALVO. O mesmo componente mora no `/agente`, aba
+    "O que ele pode fazer", sempre visível. ⚠️ **Ele salva sozinho** ("Salvar destino"), fora do
+    Salvar do formulário: o teste e o Ativar precisam do destino gravado. Preview com destino:
+    `/design/montagem?passo=conectar&conectado=1&avisos=1`.
   - ⚠️ **Conectado DE VERDADE na primeira ativação (24/09/2026):** `evolution_instance` nasce ao
     PEDIR o QR ou o código, não ao conectar, então `publishBlockers` sozinho deixava ativar sobre
     uma instância nunca lida. O `PUT publish` consulta `connectionState` na Evolution e responde 409
@@ -896,7 +935,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   guiado ou um telefone escrito no arquivo. Regra para teste novo: **não travar o modo do tenant nem
   o número da conversa.** Quem precisa de conversa pega a primeira da lista; quem precisa do
   construtor trata os dois modos.
-- **Menu (`components/NavRail.tsx`, 27/08/2026): Painel PRIMEIRO**, depois Conversas, Pipeline,
+- **Menu (`components/NavRail.tsx`, 27/08/2026): Painel PRIMEIRO**, depois Pedidos (29/09/2026),
+  Conversas, Pipeline,
   Agente (dono-only) e Equipe. **"Em breve" é Agenda e Follow-up; Campanhas SAIU** (manter prometia
   disparo em massa sobre QR, que é o cenário de banimento que o projeto decidiu não correr, e atrai
   o cliente errado logo no beta). ⚠️ **A tela INICIAL depende do papel E da montagem**
@@ -905,7 +945,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
 - Rotas: `/login`, `/cadastro` (público, cria conta), `/recuperar-senha` (público),
   `/connect` (QR + aviso de risco; **não importa histórico de forma nenhuma** desde 23/09/2026: a rota `import` foi apagada e a instância nova nasce com `syncFullHistory: false`), `/montagem` (assistente de 4 passos da
   primeira configuração, dono-only, fora do `(app)`, some depois da primeira ativação), `/inbox`,
-  `/inbox/[id]`, `/pipeline` (board Kanban do funil), `/painel` (dashboard), `/agente` (três abas do
+  `/inbox/[id]`, `/pedidos` (pedidos de ajuda abertos; `?abrir={id}` abre a linha do aviso),
+  `/pipeline` (board Kanban do funil), `/painel` (dashboard), `/agente` (três abas do
   construtor, com a base de conhecimento e a bancada de teste dentro),
   `/conhecimento` (base de conhecimento/RAG, dono-only; **fora do menu desde 26/08/2026**, a rota
   segue existindo para não quebrar link salvo, mas o lugar da base é o grupo "O que ele sabe" do
@@ -914,7 +955,8 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   `/auth/confirm` (verifica o link do e-mail), `/auth/concluir` (fecha o link que chega com a sessão
   depois do `#`).
   Endpoints em `app/api/clients/[id]/...` (connect-whatsapp,
-  whatsapp-status, **agent-config** `PUT`, **notify-target** `PUT` dono-only,
+  whatsapp-status, **agent-config** `PUT`, **notify-target** `PUT` (`{ numero }` ou `{ grupo }`) + `GET` (grupos do WhatsApp) +
+  **notify-target/teste** `POST` (manda WhatsApp de verdade ao destino salvo), todos dono-only,
   **publish** `PUT` dono-only (`{ enabled }`, liga e desliga o agente),
   **knowledge** `DELETE` + **knowledge/upload-url** + **knowledge/process** dono-only, upload
   direto ao Storage por URL assinada + processamento à parte, compatível com o limite de corpo da
@@ -1073,9 +1115,10 @@ decisões já travadas, **não reabrir**:
     `buildBaseTail`; a OBM só recebe quando voltar ao guiado ou salvar (decisão dele, sem recompilar).
     `retries: 1` só nesse projeto.
 
-  Total com login: **35 passando, nenhum pulado**, 3 rodadas seguidas verdes em 28/09/2026 depois de
-  limitar o projeto `logado` a 2 workers (ver o comentário em `playwright.config.ts`); sem login mais
-  mobile **265** (27/09/2026); `ia` **12 de 12** (26/09/2026, depois da regra de segunda pessoa na
+  Total com login: **41 passando, nenhum pulado** (29/09/2026, com os avisos e a página de
+  pedidos; 2 workers no `logado`, ver o comentário em `playwright.config.ts`); sem login mais
+  mobile **286** (29/09/2026). ⚠️ Intermitentes conhecidos, que passam sozinhos: `pipeline.serial`
+  (criar e arquivar estágio) e os que batem no Supabase Auth sob carga (recuperar senha); `ia` **12 de 12** (26/09/2026, depois da regra de segunda pessoa na
   orientação do operador, em `operatorBlock` de `lib/agent.ts`).
 
   ⚠️ **TESTE QUE AFIRMA AUSÊNCIA NÃO CONVIVE COM ESCRITOR CONCORRENTE**, e é por isso que o
