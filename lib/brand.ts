@@ -10,7 +10,7 @@
 
 export const BRAND = {
   /** Nome que aparece na UI e no título da aba. */
-  name: "O Bom Sobrinho",
+  name: "Atendimento",
   /** Sigla de fallback, usada como texto alternativo do selo. */
   initial: "OBS",
   /** Descrição curta, usada na metadata. */
