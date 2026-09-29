@@ -20,6 +20,86 @@ pesquisa de mercado com fontes citadas.
 > As seções abaixo ficam como registro do raciocínio de mercado; as conclusões prescritivas antigas
 > estão superadas pelos 5 pontos acima.
 
+---
+
+## Atualização de 29/09/2026 (ler antes do resto)
+
+O corpo deste documento é de julho. Três coisas mudaram desde então, e elas valem mais do que o
+texto original onde os dois discordarem.
+
+### 1. O produto saiu do localhost
+
+A seção 0 diz "não está no ar, não existe cadastro, criar cliente exige SQL". Isso acabou:
+- **No ar** em `https://atendimento.obomsobrinho.com.br`, com cadastro self-service, montagem do
+  agente em 4 passos com conversa de teste, e a OBM atendendo de verdade.
+- **Beta gratuito** com conhecidos do dono (advogado, pediatra, barbeiro, clínica, comércio),
+  cobrança construída e desligada (`BETA_ABERTO=1`).
+- **O que o doc chamava de "ativo jogado no lixo" virou produto:** a qualificação da IA é gravada
+  (`conversation_qualifications`), vira a faixa "O cliente quer", move o card do pipeline e alimenta
+  o painel de valor percebido.
+- **Handoff sem emudecer a IA e com orientação:** a IA avisa o que vai verificar e segue atendendo;
+  o time orienta pela caixa de escrita e ela responde na hora (fila de pedidos, provado ao vivo em
+  28/09/2026). Não vimos equivalente em nenhum par pesquisado.
+
+Consequência: as seções **14 (plano dos primeiros 10 clientes)** e **18 (roadmap de 30/90 dias)**
+são registro histórico. O plano vigente mora em `proximos-passos.md`.
+
+### 2. A conta da API Oficial fechou (a seção 5 previa, agora é fato)
+
+[DADO] https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages
+(verificado 29/09/2026):
+- A partir de **01/10/2026** a Meta cobra **por mensagem de serviço** (a resposta dentro da janela
+  de 24h, que é exatamente o que um agente de atendimento manda), "consistent with how Meta charges
+  for template messages".
+- **Sem desconto por volume** ("Meta does not offer volume tiers for service messages").
+- Referência de preço para o Brasil citada pela própria página: **0,68 centavo de dólar por
+  mensagem** (o valor de utility), com a ressalva de que a tabela de outubro ainda não estava
+  publicada quando a página foi escrita.
+- [HIPÓTESE] Blogs de revendedores (Wati, SendPulse, ChatMaxima) falam em **1.000 mensagens de
+  serviço grátis por número por mês**. Isso **não** aparece na página da Meta lida acima. Não usar
+  em conta de preço até achar na fonte oficial.
+
+[INFERÊNCIA] A conta da seção 5 continua de pé: cerca de R$ 175 por mês para 5.000 respostas. Ficar
+no QR agora segue certo, e qualquer migração precisa de repasse transparente da tarifa. O que mudou
+é que um par (Deskcomm, abaixo) já oferece os dois canais, então "suporta a API Oficial" deixou de
+ser diferencial futuro e virou item de paridade.
+
+### 3. Par novo: Deskcomm (código aberto, gratuito)
+
+[DADO] https://www.deskcomm.com.br/ e https://github.com/melgarafael/DeskcommCRM (lidos em
+29/09/2026: site, especificação de handoff, telas de Radar, Central de avisos e Evolução da IA; o
+sistema NÃO foi rodado, então o que é promessa deles não foi conferido).
+- CRM de WhatsApp com IA, **licença MIT, sem cobrança de licença nem por usuário**: o cliente
+  instala no próprio servidor e paga servidor e IA. Mesma base técnica nossa (Next 16, Supabase,
+  shadcn). QR (WAHA Plus) **e** API Oficial da Meta.
+- Público: "qualquer negócio que venda por conversa". Exige alguém técnico para instalar e manter.
+
+**Por que importa:** muda o piso de preço para quem tem técnico na equipe (zero de licença). Para o
+nosso público (dono sem técnico), a instalação própria o exclui na prática. Mas ele é, hoje, o
+melhor catálogo do que o mercado já usa, e é para isso que ele entra aqui.
+
+### 4. Sacadas do mercado para trazer (o que eles já usam e nós não)
+
+O objetivo não é comparar, é **não ficar para trás em nada que o mercado já trata como normal, e
+fazer melhor**. Cada item diz o que eles fazem e como faríamos melhor.
+
+| # | O que o mercado usa | Como seria melhor aqui |
+|---|---|---|
+| 1 | **Central de avisos** (pedido de ajuda, conexão caída, falha) com gravidade e "marcar resolvido" | Aviso no WhatsApp do time (quem não vive na tela) + página de pedidos com orientar na própria linha |
+| 2 | **Motivo do handoff** gravado (pediu pessoa, cliente irritado, IA sem certeza, assunto sensível) | Gravar o motivo e mostrar "o que ensinar à IA" a partir dele |
+| 3 | **"Evolução da IA"**: o que ela aprendeu, o que fez, o que mudou, o que trava | Painel mensal com o mesmo arco, em cima de `agent_turns`, `handoffs` e qualificações |
+| 4 | **Regras que o dono ensinou** viram memória permanente da IA | Orientação que se repete vira sugestão "salvar como regra do agente" (hoje cada orientação vale uma vez) |
+| 5 | **Radar de risco**: conversas que esfriaram, sem próximo passo, "parado há 6h" | Encaixa no filtro "Esperando" e no painel; a IA já sabe qual é o próximo passo pela qualificação |
+| 6 | **Custo da IA por empresa, com teto** | `agent_turns` já tem os tokens: converter em reais, mostrar ao dono e travar no teto |
+| 7 | **Sentimento e confiança** da resposta como gatilho de handoff | Entrar como motivo (item 2), não como número solto na tela |
+| 8 | **Distribuição de conversas** entre atendentes (rodízio, por assunto) | Relevante quando o beta tiver empresa com 3+ atendentes |
+| 9 | **API Oficial ao lado do QR** | Canal agnóstico já é regra do Follow-up; fazer o envio passar por uma camada só |
+| 10 | **Auditoria** (quem fez o quê, inclusive a IA) e ferramentas de **LGPD** | Antes de cobrar: exportar e apagar dados de um contato é exigência de cliente sério |
+| 11 | **Follow-up automático** | Já decidido (26/08); só para conversa recente, com teto e saída fácil |
+
+O que **não** trazer, e por quê: IA muda até alguém reativar (revertido em 20/08/2026, travou 46
+contatos da OBM), construtor de regras "se/então" e campanhas (os dois estão no "nunca construir").
+
 Convenção usada em todo o documento:
 - **[DADO]** informação verificada em fonte citada.
 - **[INFERÊNCIA]** conclusão minha derivada dos dados.

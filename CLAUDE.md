@@ -966,6 +966,11 @@ Regras que saem desses documentos e valem para qualquer sugestão minha:
 - **Nunca** construir disparo em massa em cima da conexão QR (Baileys): é o cenário de banimento
   documentado. E nunca escrever material de marketing que anuncie disparo em massa, "não pague a API
   da Meta" ou proteção contra banimento.
+  ⚠️ **EXCEÇÃO ÚNICA (29/09/2026, decisão consciente do dono): a PROSPECÇÃO do próprio dono do
+  produto**, dentro do `/admin`, para ele buscar clientes para o CRM. Só o usuário dele, nunca
+  funcionalidade de tenant, em número dedicado (nunca o que atende clientes), com teto diário e
+  intervalo. Não reabre a regra para os clientes nem traz Campanhas de volta. Detalhes no "Plano
+  vigente" de `docs/proximos-passos.md`.
   ⚠️ **Mensagem ativa deixou de ser proibição total em 26/08/2026** (decisão consciente do dono, com
   o risco pesado): lembrete de consulta e mensagem de aniversário **vão ser construídos**, e o menu
   passa a prometer "Follow-up". O que continua valendo: **só para contato com conversa recente**,

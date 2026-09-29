@@ -117,7 +117,31 @@ Estado hoje:
   bloco de montagem (passo 4 e o bloqueio), bloco de handoff (quem é avisado), e remover a frase
   "ninguém é avisado quando abre handoff (limitação assumida)" de `docs/handoff.md`.
 
+## Revisão de 29/09/2026 (aprovada pelo dono; vale sobre os passos acima onde discordar)
+
+1. **Só `pausar` avisa pelo app.** O `entraNaFila` também é verdade em `agendar`, e o n8n já manda
+   "Notifica grupo" para o mesmo destino em todo `agendar`: avisar nos dois daria aviso em dobro. A
+   reunião marcada continua com o n8n (zero mudança nele). ⚠️ Anotado, sem decisão: o texto do n8n
+   é "🚨 Novo Lead" e dispara a cada turno de agendamento, não só no primeiro; trocar é mexer no n8n.
+2. **Enviar com `after()` do `next/server`** (conferido em
+   `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/after.md`): o aviso nasce
+   dentro do `/api/agent`, que o n8n espera responder, e chamar a Evolution ali atrasaria a resposta
+   ao cliente.
+3. **URL do "Abrir":** usar `VERCEL_PROJECT_PRODUCTION_URL` (variável automática da Vercel) em vez de
+   criar `APP_URL`. Sem ela (local), a linha "Abrir" sai fora da mensagem.
+4. `lib/evolution.ts` **já existe** (criar instância, conectar, estado, QR): o passo 1 amplia, não cria.
+5. `ehNumeroDeAvisos` vale em **toda** contagem e lista (inclusive qualquer contador de
+   "Precisa de você"), não só nas três telas do passo 4. Em grupo o problema não existe: o nó `Rotas`
+   do n8n recusa `@g.us`.
+6. A OBM já tem destino (um grupo, `@g.us`): segue valendo sem migração.
+
 ## Riscos e pontos para o avaliador olhar
+- ✅ **Resolvido com evidência (29/09/2026): o aviso NÃO volta pelo n8n.** No teste ao vivo de
+  28/09, as duas mensagens enviadas pela API ao número do dono (21:10:05 e 21:10:36 UTC) não geraram
+  nenhuma execução do "OBS Atendimento". Mas o texto abaixo está errado num ponto: o nó `Cria Lead`
+  **faz** INSERT em `dados_cliente` quando o contato não existe, e toda mensagem enviada pelo celular
+  do agente que não seja "Atendimento finalizado" cai em `Pausar IA (Franck digitou)`. Não afeta o
+  aviso (que não chega ao n8n), só vale saber.
 - **`fromMe` do aviso no n8n:** o nó `Pausar IA (Franck digitou)` faz `update` em `dados_cliente`
   do número de avisos; se a linha não existe, é no-op. Confirmar lendo `n8n/obs-atendimento.json`
   que nenhum nó faz INSERT do contato nesse caminho.

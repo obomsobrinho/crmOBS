@@ -2,7 +2,8 @@
 
 Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estrategia-2026-07.md).
 
-Última revisão: 12/08/2026 (revisado contra o estado real: n8n, git e app em produção).
+Última revisão: 29/09/2026 (plano vigente com as prioridades aprovadas pelo dono, logo abaixo da
+direção travada).
 
 ## Direção travada
 
@@ -23,6 +24,69 @@ Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estr
   não menos). A lentidão percebida no dev era compile sob demanda (some em produção) + render
   dinâmico, mitigada com `loading.tsx`; não é motivo de troca de stack. Reavaliar só se o produto
   virar uma SPA pura com backend próprio à parte (não é o caso).
+
+## ⭐ PLANO VIGENTE: prioridades aprovadas pelo dono em 29/09/2026
+
+**Esta lista manda na ordem de trabalho.** As seções mais abaixo (plano da demo, MVP do beta, fases)
+são histórico e contexto. De onde vieram os itens: o teste com chip real de 27 a 29/09 e as práticas
+de mercado registradas na "Atualização de 29/09/2026" do `estrategia-2026-07.md` (tabela de 11
+sacadas, com o Deskcomm como catálogo).
+
+| Prioridade | Item | Por quê |
+|---|---|---|
+| **P0, antes de abrir o beta** | 1. **Avisos no WhatsApp** do time quando a IA pede ajuda (`docs/plano-avisos.md`) | Obrigatório para o beta, decisão do dono: quem não vive na tela não fica sabendo |
+| | 2. **Página de pedidos abertos**, com orientar na própria linha | O aviso leva direto para ela |
+| **P1, durante o beta** | 3. **Motivo do pedido de ajuda** gravado + métricas de decisão da IA | É o dado que diz o que ensinar à IA |
+| | 4. **Orientação vira regra permanente** do agente (sugestão "salvar como regra") | Hoje cada orientação vale uma vez |
+| | 5. **Custo de IA por empresa em reais, com teto** | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |
+| | 6. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos | Mesma conta do item 5; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
+| **P2, antes de cobrar** | 7. **Admin v2**: pagamentos e assinatura | Cobrança está construída e desligada |
+| | 8. **LGPD**: exportar e apagar os dados de um contato | Cliente sério pede |
+| | 9. **Agenda** com Google Calendar | Já decidido como primeiro depois do beta (26/08) |
+| | 10. **Follow-up** | Já decidido, com as regras de segurança (26/08) |
+| **P3** | 11. **Admin v3**: base da IA versionada e "ver como o cliente" | Ver o cuidado abaixo |
+| | 12. **Camada de canal** (QR e API Oficial) | Pré-requisito para migrar; a Meta cobra o atendimento desde 01/10/2026 |
+| | 13. **Distribuição de conversas** entre atendentes | Só pesa com equipe de 3 ou mais |
+| | 14. **Radar** de conversas esfriando | Encaixa no filtro "Esperando" e no painel |
+
+### Admin (decidido em 29/09/2026)
+
+- **Só o dono do produto acessa.** Identificado por uma lista fixa no servidor (o id do usuário numa
+  variável de ambiente), **nunca** por coluna no banco que um cliente pudesse alterar.
+- **Mesmo projeto, em `/admin`**, não um projeto separado. Motivo: o admin usa as MESMAS regras do app
+  (`lib/billing.ts` para acesso, `lib/agent-prompt.ts` para a base, métricas e custo); em outro projeto
+  elas seriam copiadas e iam divergir. O isolamento vem de três travas: a lista fixa, `/admin` barrado
+  no `proxy.ts` para qualquer outro login e leitura sempre no servidor (service_role). Domínio próprio,
+  se um dia quiser, aponta para o mesmo deploy.
+- **Toda ação do admin fica registrada** (quem, o quê, quando), porque ele enxerga todas as empresas.
+- **v1 (P1):** lista de clientes com montagem, conexão, agente ativo, última atividade, tipo
+  (`account_type`), pedidos abertos; gasto de IA por cliente em reais e o teto; leitura do `feedback`
+  (substitui a consulta por SQL de `docs/instrumentacao-beta.md`).
+- **Prospecção, um dos primeiros tópicos do admin (decisão do dono, 29/09/2026).** É a ferramenta
+  para o DONO DO PRODUTO buscar clientes para o CRM. **Só o usuário dele, dentro do `/admin`; nunca
+  vira funcionalidade dos tenants.** Ele sabe que abordar contato frio pelo QR é o cenário de bloqueio
+  documentado (`estrategia-2026-07.md`, seção 5) e aceita o risco para uso próprio. Isso **não reabre**
+  "nunca disparo em massa para clientes" nem traz Campanhas de volta ao menu.
+  - **Como o Deskcomm fez** (código lido em 29/09/2026, `app/app/prospecting`): três passos,
+    "Encontrar empresas" (nicho, cidade, até 100, teto de gasto em dólar; busca por raspagem via
+    **Apify**, serviço pago com chave própria), "Preparar a abordagem" (agente de IA de prospecção
+    com "o que oferecer" e "quando considerar qualificado", número de saída, etapa do funil) e
+    "Acompanhar resultados". Freios: **1 a 50 abordagens por dia, no mínimo 5 minutos entre elas**,
+    pausar e retomar. Campo **obrigatório** de referência da "avaliação de legítimo interesse" (LGPD).
+    Status do contato: Encontrado, Na fila, Abordado, Respondeu, Qualificado, Não abordado. Quem
+    responde vira conversa normal do inbox.
+  - **Regras para a nossa versão (propostas, a confirmar no plano):**
+    - **Número dedicado à prospecção, NUNCA o número que atende clientes** (o da OBM). Se ele for
+      bloqueado, perde-se só ele.
+    - Teto diário e intervalo aleatório (o mesmo freio do Follow-up), saída fácil ("responda SAIR")
+      e a base legal registrada antes de começar, como no Deskcomm.
+    - Fonte das empresas: avaliar Apify (Google Maps) contra alternativas; custo não verificado ainda.
+    - Alternativa mais segura para volume: templates de marketing na API Oficial (tarifa Brasil de
+      US$ 0,0625 por mensagem em 01/07/2026, `estrategia-2026-07.md` seção 5).
+- **v2 (P2):** pagamentos e assinatura (Asaas), liberar e bloquear, estender teste, marcar beta ou pago.
+- **v3 (P3):** a base da IA **nunca** é editada e publicada direto: ela vale para todos os clientes na
+  mensagem seguinte. O fluxo é rascunho, roda a bateria `ia`, e só então publica, com histórico de
+  versões. "Ver como o cliente" é só leitura.
 
 ## Achados medidos entre 31/08 e 07/09/2026, SEM decisão do dono
 
