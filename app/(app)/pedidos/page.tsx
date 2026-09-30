@@ -1,19 +1,25 @@
 import { redirect } from "next/navigation";
-import { HandHelping } from "lucide-react";
-import PedidosAbertos from "@/components/PedidosAbertos";
-import { Card } from "@/components/ui/card";
+import Pedidos from "@/components/Pedidos";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import type { ContatoLinha, PedidoLinha } from "@/lib/pedidos";
+import { fetchMembers } from "@/lib/team";
+import { agoraMs } from "@/lib/periodo";
+import {
+  inicioDosResolvidos,
+  type ContatoLinha,
+  type PedidoLinha,
+  type PedidoResolvidoLinha,
+} from "@/lib/pedidos";
 
 export const dynamic = "force-dynamic";
 
-// PEDIDOS ABERTOS (29/09/2026, docs/plano-pedidos.md). É para onde o "Abrir"
-// do aviso no WhatsApp leva, com `?abrir={id}` para a linha nascer aberta.
+// PEDIDOS DE AJUDA (29/09/2026, refeita em 30/09/2026: docs/plano-fechar-p0.md).
+// É para onde o "Abrir" do aviso no WhatsApp leva, com `?abrir={id}` para o
+// pedido nascer selecionado. Abertos e resolvidos dos últimos 30 dias (D5).
 //
 // ⚠️ `getMyClient` e não `requireActiveTenant`, de propósito (decisão do dono):
 // conta bloqueada vê a fila como vê o `/inbox`, só não age. As rotas de
-// orientar, responder e resolver já respondem 402 nesse caso.
+// orientar e resolver já respondem 402 nesse caso.
 export default async function PedidosPage({
   searchParams,
 }: {
@@ -24,36 +30,32 @@ export default async function PedidosPage({
   const supabase = await createClient();
   const abrir = Number((await searchParams).abrir);
 
-  const [{ data: pedidos }, { data: contatos }] = await Promise.all([
-    supabase
-      .from("handoffs")
-      .select("id, phone, opened_at, summary")
-      .is("closed_at", null)
-      .order("opened_at", { ascending: true }),
-    supabase.from("dados_cliente").select("telefone, nomewpp, display_name"),
-  ]);
+  const [{ data: abertos }, { data: resolvidos }, { data: contatos }, members] =
+    await Promise.all([
+      supabase
+        .from("handoffs")
+        .select("id, phone, opened_at, summary")
+        .is("closed_at", null)
+        .order("opened_at", { ascending: true }),
+      supabase
+        .from("handoffs")
+        .select("id, phone, opened_at, summary, instruction, closed_at, closed_how, closed_by")
+        .not("closed_at", "is", null)
+        .gte("closed_at", inicioDosResolvidos(agoraMs()))
+        .order("closed_at", { ascending: false }),
+      supabase.from("dados_cliente").select("telefone, nomewpp, display_name"),
+      fetchMembers(supabase),
+    ]);
 
   return (
-    <Card
-      variant="pagina"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:rounded-none max-md:border-0 max-md:p-4"
-    >
-      <div className="mb-1 flex items-center gap-2">
-        <HandHelping size={20} className="text-brand-ink" />
-        <h1 className="text-titulo">Pedidos de ajuda</h1>
-      </div>
-      <p className="mb-5 text-apoio text-ink-2">
-        O que a IA passou para o time e ainda espera resposta, de quem espera há
-        mais tempo para o mais recente.
-      </p>
-      <PedidosAbertos
-        initialPedidos={(pedidos ?? []) as PedidoLinha[]}
-        initialContatos={(contatos ?? []) as ContatoLinha[]}
-        numeroAvisos={client.avisos}
-        clientId={client.id}
-        readOnly={client.access.blocked}
-        abrirId={Number.isInteger(abrir) && abrir > 0 ? abrir : null}
-      />
-    </Card>
+    <Pedidos
+      initialAbertos={(abertos ?? []) as PedidoLinha[]}
+      initialResolvidos={(resolvidos ?? []) as PedidoResolvidoLinha[]}
+      initialContatos={(contatos ?? []) as ContatoLinha[]}
+      members={members}
+      numeroAvisos={client.avisos}
+      readOnly={client.access.blocked}
+      abrirId={Number.isInteger(abrir) && abrir > 0 ? abrir : null}
+    />
   );
 }

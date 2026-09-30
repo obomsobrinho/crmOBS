@@ -73,7 +73,7 @@ test("Resolvido pela página fecha o pedido no banco", async ({ page }) => {
   await expect(linha).toContainText("Quer saber se aceita cartão de débito");
 
   await linha.getByRole("button").first().click();
-  await linha.getByRole("button", { name: "Resolvido" }).click();
+  await page.locator('[data-slot="pedido-detalhe"]').getByRole("button", { name: "Resolvido" }).click();
   await expect(page.locator('[data-slot="pedidos-resultado"]')).toHaveText("Marcado como resolvido.", {
     timeout: 20_000,
   });
@@ -89,7 +89,10 @@ test("Orientar pela página fecha como IA e guarda a orientação", async ({ pag
   const linha = await linhaDoPedido(page, id);
 
   await linha.getByRole("button").first().click();
-  await linha.getByRole("textbox", { name: /IA/ }).fill("Diga que a entrega leva 3 dias úteis.");
+  await page
+    .locator('[data-slot="pedido-detalhe"]')
+    .getByRole("textbox", { name: /IA/ })
+    .fill("Diga que a entrega leva 3 dias úteis.");
   await page.keyboard.press("Enter");
 
   // Sem o fluxo de envio no ambiente local, a IA usa na próxima mensagem.

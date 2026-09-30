@@ -29,9 +29,9 @@ teste com o que falta do P0 (fatia B da tela de Clientes, `docs/plano-clientes.m
 
 ## Fatias, na ordem proposta (cada uma fecha com teste e commit)
 
-- **F1, acertos pequenos (itens 3, 4, 5 e 7):** abas no padrão, máscara, texto do grupo com
+- ✅ **F1, acertos pequenos (itens 3, 4, 5 e 7), feita em 30/09/2026:** abas no padrão, máscara, texto do grupo com
   Atualizar, faixa de chips. Um commit.
-- **F2, página de pedidos refeita (itens 1 e 2):** Abertos e Resolvidos, lista mais detalhe ao lado,
+- ✅ **F2, página de pedidos refeita (itens 1 e 2), feita em 30/09/2026:** Abertos e Resolvidos, lista mais detalhe ao lado,
   sem chat. As ações continuam passando pelas MESMAS rotas (`/orientar`, `/resolve`); nenhum caminho
   novo.
 - **F3, fatia B de Clientes:** "Novo cliente" (rota service_role, telefone com a máscara da F1),

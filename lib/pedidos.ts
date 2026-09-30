@@ -7,7 +7,6 @@
 
 import { cleanName } from "./inbox";
 import { semNumeroDeAvisos } from "./avisos";
-import { respostaDaIa } from "./mensagem";
 
 export interface PedidoLinha {
   id: number;
@@ -71,39 +70,85 @@ export function montarFila(
   });
 }
 
-export interface MensagemContexto {
-  autor: "cliente" | "ia" | "time";
-  texto: string;
-  em: string;
+// ---------------------------------------------------------------------------
+// HISTÓRICO DE RESOLVIDOS (30/09/2026, docs/plano-fechar-p0.md, itens 1 e 2).
+// ---------------------------------------------------------------------------
+
+/** Quantos dias de resolvidos a página mostra (D5 do dono, 30/09/2026). */
+export const DIAS_DE_RESOLVIDOS = 30;
+
+/** O instante mais antigo de resolução que a página traz. */
+export function inicioDosResolvidos(agora: number): string {
+  return new Date(agora - DIAS_DE_RESOLVIDOS * 86_400_000).toISOString();
+}
+
+export interface PedidoResolvidoLinha {
+  id: number;
+  phone: string;
+  opened_at: string;
+  summary: string | null;
+  instruction: string | null;
+  closed_at: string;
+  closed_how: string | null;
+  closed_by: string | null;
+}
+
+export interface PedidoResolvido {
+  id: number;
+  phone: string;
+  openedAt: string;
+  closedAt: string;
+  summary: string | null;
+  nome: string | null;
+  /** `ia` = orientado e a IA respondeu; `resolvido` = alguém do time fechou. */
+  como: "ia" | "resolvido" | null;
+  /** A orientação que o time deu, quando foi por ela. */
+  orientacao: string | null;
+  /** Quem fechou (user id), para a tela nomear pelo membro. */
+  porQuem: string | null;
 }
 
 /**
- * As últimas mensagens da conversa, para quem vai orientar saber o que o
- * cliente disse sem sair da página. Uma linha de `chat_messages` pode ter a
- * mensagem recebida E a resposta; e o n8n grava um turno de duas mensagens
- * unido por " | ", que aqui volta a ser um balão por mensagem (como no painel).
- * `linhas` em ordem cronológica; devolve as `max` últimas mensagens.
+ * Os resolvidos, do MAIS RECENTE para o mais antigo (é histórico: o que acabou
+ * de acontecer vem primeiro, ao contrário da fila dos abertos). O número de
+ * avisos fica fora, como em toda lista.
  */
-export function mensagensDeContexto(
-  linhas: {
-    user_message: string | null;
-    bot_message: string | null;
-    message_type: string | null;
-    created_at: string;
-  }[],
-  max = 6
-): MensagemContexto[] {
-  const out: MensagemContexto[] = [];
-  for (const l of linhas) {
-    if (l.user_message?.trim()) {
-      out.push({ autor: "cliente", texto: l.user_message.trim(), em: l.created_at });
-    }
-    if (l.bot_message?.trim()) {
-      const autor = respostaDaIa(l) ? "ia" : "time";
-      for (const parte of l.bot_message.split(" | ")) {
-        if (parte.trim()) out.push({ autor, texto: parte.trim(), em: l.created_at });
-      }
-    }
+export function montarResolvidos(
+  linhas: PedidoResolvidoLinha[],
+  contatos: ContatoLinha[],
+  avisos: string | null
+): PedidoResolvido[] {
+  const nomes = new Map<string, string | null>();
+  for (const c of contatos) {
+    nomes.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
   }
-  return out.slice(-max);
+  return semNumeroDeAvisos(linhas, avisos, (p) => p.phone)
+    .sort((a, b) => Date.parse(b.closed_at) - Date.parse(a.closed_at) || b.id - a.id)
+    .map((p) => ({
+      id: p.id,
+      phone: p.phone,
+      openedAt: p.opened_at,
+      closedAt: p.closed_at,
+      summary: p.summary,
+      nome: nomes.get(p.phone) ?? null,
+      como: p.closed_how === "ia" || p.closed_how === "resolvido" ? p.closed_how : null,
+      orientacao: p.instruction?.trim() || null,
+      porQuem: p.closed_by,
+    }));
+}
+
+function normalizar(s: string): string {
+  return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/** Busca por cliente (nome ou telefone) e pelo que foi pedido. */
+export function casaBuscaPedido(
+  p: { nome: string | null; phone: string; summary: string | null },
+  q: string
+): boolean {
+  const nq = normalizar(q.trim());
+  if (!nq) return true;
+  if (normalizar([p.nome, p.summary].filter(Boolean).join(" ")).includes(nq)) return true;
+  const dq = q.replace(/\D/g, "");
+  return dq.length >= 2 && p.phone.replace(/\D/g, "").includes(dq);
 }

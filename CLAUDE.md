@@ -447,12 +447,15 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     ⚠️ **Telefone com DDD 00 nunca gera aviso** (`telefoneImpossivel`): é a conversa de teste da
     suíte, e o tenant de teste TEM destino de avisos. Sem a trava, cada rodada com login mandaria
     WhatsApp real ao grupo, e `atendimento.serial.spec.ts` confere a cada turno.
-  - **`/pedidos`** lista todos os pedidos abertos, do MAIS ANTIGO para o mais novo (decisão do dono),
-    com espera (âmbar acima de `ESPERA_AVISO_MS`), cliente, resumo e "2 de 3 nesta conversa". Abrir
-    a linha mostra as últimas mensagens e o MESMO `MessageComposer` com `pedido` (prop `embutida`
-    tira só a faixa de superfície da conversa). ⚠️ **Nenhum caminho novo:** orientar, responder e
-    Resolvido chamam `/orientar`, `/send` com `pedidoId` e `/resolve`. Conta bloqueada vê em
-    leitura. Menu: "Pedidos" entre Painel e Conversas com número âmbar (badge `pedidos`); no
+  - **`/pedidos`** (refeita em 30/09/2026, `docs/plano-fechar-p0.md`, `components/Pedidos.tsx`):
+    lista à esquerda com abas **Abertos** (do MAIS ANTIGO para o mais novo, decisão do dono) e
+    **Resolvidos** (últimos 30 dias, mais recente primeiro, com como fechou, a orientação dada e
+    quem resolveu), busca por cliente ou pelo que foi pedido, e o pedido selecionado ao lado.
+    ⚠️ **O detalhe é a FICHA do pedido, NUNCA um chat** (dono: "como se eu estivesse em Conversas,
+    não faz sentido"): resumo, espera, "2 de 3 nesta conversa", **Orientar a IA** e **Resolvido**,
+    e "Abrir conversa" para quem quer ver as mensagens. Responder é na conversa.
+    ⚠️ **Nenhum caminho novo:** orientar e Resolvido chamam `/orientar` e `/resolve`. Conta
+    bloqueada vê em leitura. Menu: "Pedidos" entre Painel e Conversas com número âmbar (badge `pedidos`); no
     celular, na barra de baixo no lugar do Pipeline (que foi para "Mais"). Regra pura em
     `lib/pedidos.ts`. ⚠️ **O login NÃO volta para o link pedido, de propósito** (dono: é
     segurança, e a pessoa precisa ver a fila inteira de qualquer jeito).

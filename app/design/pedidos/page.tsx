@@ -1,11 +1,9 @@
-import { HandHelping } from "lucide-react";
 import NavRail from "@/components/NavRail";
-import PedidosAbertos from "@/components/PedidosAbertos";
-import { Card } from "@/components/ui/card";
+import Pedidos from "@/components/Pedidos";
 import { agoraMs } from "@/lib/periodo";
-import type { ContatoLinha, MensagemContexto, PedidoLinha } from "@/lib/pedidos";
+import type { ContatoLinha, PedidoLinha, PedidoResolvidoLinha } from "@/lib/pedidos";
 
-// Preview da página de PEDIDOS ABERTOS (dev-only, liberado pelo proxy). Sem
+// Preview da página de PEDIDOS (abertos e resolvidos) (dev-only, liberado pelo proxy). Sem
 // banco: três pedidos em duas conversas, um deles acima de 2h (âmbar), e as
 // ações só simulam. `?vazio=1` mostra a página sem pedido; `?abrir=` abre a
 // linha como o link do aviso faz.
@@ -35,44 +33,35 @@ export default async function DesignPedidosPage({
     { telefone: "5511912345678", nomewpp: "Ana Paula", display_name: null },
     { telefone: "5511955554444", nomewpp: null, display_name: null },
   ];
-  const contexto: Record<string, MensagemContexto[]> = {
-    "5511912345678": [
-      { autor: "cliente", texto: "Oi, quanto fica a troca da lente com antirreflexo?", em: iso(6 * H + 60_000) },
-      { autor: "ia", texto: "Vou verificar o valor certinho com o time e já te respondo por aqui.", em: iso(6 * H) },
-      { autor: "cliente", texto: "E vocês abrem no feriado?", em: iso(40 * 60_000) },
-    ],
-    "5511955554444": [
-      { autor: "cliente", texto: "Dá para parcelar em 10x?", em: iso(12 * 60_000) },
-      { autor: "ia", texto: "Vou confirmar as condições de parcelamento e te aviso.", em: iso(12 * 60_000) },
-    ],
-  };
+  const resolvidos: PedidoResolvidoLinha[] =
+    vazio === "1"
+      ? []
+      : [
+          {
+            id: 7, phone: "5511944443333", opened_at: iso(28 * H), summary: "Quis saber se entregam no sábado",
+            instruction: "Diga que sim, até as 13h, com frete grátis acima de R$ 200.",
+            closed_at: iso(27 * H), closed_how: "ia", closed_by: "u1",
+          },
+          {
+            id: 6, phone: "5511912345678", opened_at: iso(50 * H), summary: "Pediu para falar com uma pessoa sobre a garantia",
+            instruction: null, closed_at: iso(48 * H), closed_how: "resolvido", closed_by: "u1",
+          },
+        ];
+  contatos.push({ telefone: "5511944443333", nomewpp: "Carlos Mendes", display_name: null });
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pedidos" role="dono" />
-      <Card
-        variant="pagina"
-        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-6 max-md:rounded-none max-md:border-0 max-md:p-4"
-      >
-        <div className="mb-1 flex items-center gap-2">
-          <HandHelping size={20} className="text-brand-ink" />
-          <h1 className="text-titulo">Pedidos de ajuda</h1>
-        </div>
-        <p className="mb-5 text-apoio text-ink-2">
-          O que a IA passou para o time e ainda espera resposta, de quem espera
-          há mais tempo para o mais recente.
-        </p>
-        <PedidosAbertos
-          key={`${vazio}-${abrir}`}
-          initialPedidos={pedidos}
-          initialContatos={contatos}
-          numeroAvisos={null}
-          clientId="preview"
-          abrirId={abrir ? Number(abrir) : null}
-          preview
-          contextoPreview={contexto}
-        />
-      </Card>
+      <Pedidos
+        key={`${vazio}-${abrir}`}
+        initialAbertos={pedidos}
+        initialResolvidos={resolvidos}
+        initialContatos={contatos}
+        members={[{ userId: "u1", email: "franck@exemplo.com", role: "dono" }]}
+        numeroAvisos={null}
+        abrirId={abrir ? Number(abrir) : null}
+        preview
+      />
     </div>
   );
 }
