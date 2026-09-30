@@ -114,7 +114,7 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
   test("grupo é escolhido numa lista, nunca digitado", async ({ page }) => {
     await page.goto("/design/montagem?passo=conectar&conectado=1");
     const bloco = page.locator('[data-slot="montagem-avisos"]');
-    await bloco.getByRole("button", { name: "Um grupo" }).click();
+    await bloco.getByRole("tab", { name: "Um grupo" }).click();
     await expect(bloco.locator('[data-slot="avisos-numero"]')).toHaveCount(0);
     await bloco.getByRole("combobox", { name: "Grupo que recebe os avisos" }).click();
     await page.getByRole("option", { name: "Time de atendimento" }).click();
@@ -123,6 +123,20 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
       "o grupo Time de atendimento"
     );
     await expect(page.getByRole("button", { name: "Ativar o agente" })).toBeEnabled();
+  });
+
+  test("número com máscara, e o seletor é o mesmo componente das abas do Painel", async ({ page }) => {
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    const bloco = page.locator('[data-slot="montagem-avisos"]');
+    const campo = bloco.locator('[data-slot="avisos-numero"]');
+    await campo.fill("");
+    await campo.pressSequentially("5511912345678");
+    await expect(campo).toHaveValue("(11) 91234-5678");
+    await campo.fill("1133334444");
+    await expect(campo).toHaveValue("(11) 3333-4444");
+    // Abas de verdade (role tab), dentro da bandeja da variante painel.
+    await expect(bloco.getByRole("tab", { name: "Um número" })).toHaveAttribute("data-state", "active");
+    await expect(bloco.locator('[data-slot="tabs-list"]')).toHaveClass(/rounded-\[10px\]/);
   });
 
   test("o texto do bloco não tem travessão nem assume segmento", async ({ page }) => {

@@ -565,7 +565,9 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
       salvar: [...document.querySelectorAll("button")].some(
         (b) => b.textContent?.trim() === "Salvar"
       ),
-      abas: document.querySelectorAll('[role="tab"]').length,
+      // As abas do FORMULÁRIO. O "Um número / Um grupo" dos avisos também é
+      // aba desde 30/09/2026 (o componente do Painel) e não entra na conta.
+      abas: document.querySelectorAll('[role="tab"]:not([data-slot="avisos-tipo"])').length,
     }));
 
     // O assistente conta passos e não tem Salvar avulso: ele grava sozinho ao

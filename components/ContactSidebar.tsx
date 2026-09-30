@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DISSOLVER_LISTA,
   useDissolverLateral,
@@ -463,6 +464,11 @@ export default function ContactSidebar({
   // O agrupamento vale para a lista INTEIRA. Filtrada, a lista já é de um grupo
   // só, e um cabeçalho repetindo o nome do filtro seria ruído.
   const agrupar = filter === "all" && !query.trim();
+  // Chip com zero não entra, EXCETO "Todas": um filtro que não recorta nada só
+  // ocupa a faixa e ainda sugere que há algo ali.
+  const chipsVisiveis = (["all", "needs", "unanswered", "mine"] as FiltroKey[])
+    .filter((k) => k !== "mine" || myUserId)
+    .filter((k) => k === "all" || k === filter || contagem[k] > 0);
 
   return (
     <Card
@@ -488,35 +494,32 @@ export default function ContactSidebar({
               com folga, e o que estava nela, o total de conversas, saiu: com
               recorte de tempo um total solto é ambíguo ("5 de quando?"), e o
               chip "Todas" logo abaixo já mostra o número da janela. */}
-          <span
-            data-slot="inbox-periodo"
-            role="group"
-            aria-label="Período das conversas"
-            className="flex shrink-0 items-center gap-px rounded-md border border-line bg-[var(--chip-bg)] p-px"
-          >
-            {ORDEM_JANELAS.map((k) => {
-              const ativa = janela === k;
-              return (
-                <Button
+          {/* ⚠️ É o MESMO componente das abas do Painel (`Tabs variant="painel"`),
+              decisão do dono em 30/09/2026 ("temos que seguir um padrão"). Era
+              um seletor feito à mão, com outra cor, e foi copiado para os avisos
+              do Agente antes de alguém perceber. Compacto (12px) como o do
+              movimento no Painel, porque divide a linha com o título. */}
+          <Tabs value={janela} onValueChange={(v) => setJanela(v as JanelaKey)}>
+            <TabsList
+              variant="painel"
+              data-slot="inbox-periodo"
+              aria-label="Período das conversas"
+              className="shrink-0 bg-canvas"
+            >
+              {ORDEM_JANELAS.map((k) => (
+                <TabsTrigger
                   key={k}
-                  variant="ghost"
-                  size="none"
+                  value={k}
+                  variant="painel"
                   data-slot="inbox-periodo-opcao"
-                  data-ativo={ativa ? "sim" : undefined}
-                  aria-pressed={ativa}
-                  onClick={() => setJanela(k)}
-                  className={cn(
-                    "h-6 rounded-[5px] px-2 text-legenda font-semibold transition-colors",
-                    ativa
-                      ? "bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)] hover:bg-[var(--chip-ativo-bg)]"
-                      : "text-ink-3 hover:bg-transparent hover:text-ink"
-                  )}
+                  data-ativo={janela === k ? "sim" : undefined}
+                  className="whitespace-nowrap px-2 py-1 text-legenda"
                 >
                   {JANELAS[k].rotulo}
-                </Button>
-              );
-            })}
-          </span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* ⚠️ A BUSCA VEM ANTES DOS CHIPS, e a ordem inverteu em 18/09/2026.
@@ -550,18 +553,16 @@ export default function ContactSidebar({
             de aplicação de desenho; eles envolvem com `flex-wrap`. */}
         {/* No celular os chips NÃO reenvolvem: rolam para o lado, dissolvendo
             na borda (desenho do mobile), para a lista começar mais alto. */}
+        {/* ⚠️ Com um chip só ("Todas"), a faixa inteira some (achado do dono,
+            30/09/2026): um filtro que não recorta nada não tem o que escolher. */}
+        {chipsVisiveis.length > 1 && (
         <div
           ref={chipsRef}
           style={chipsStyle}
           onScroll={chipsOnScroll}
           className="mt-[11px] flex flex-wrap items-center gap-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4 max-md:[scrollbar-width:none]"
         >
-          {(["all", "needs", "unanswered", "mine"] as FiltroKey[])
-            .filter((k) => k !== "mine" || myUserId)
-            // Chip com zero não entra, EXCETO "Todas": um filtro que não recorta
-            // nada só ocupa a faixa e ainda sugere que há algo ali.
-            .filter((k) => k === "all" || contagem[k] > 0)
-            .map((k) => {
+          {chipsVisiveis.map((k) => {
               const ativo = filter === k;
               const urgente = k === "needs";
               return (
@@ -605,6 +606,7 @@ export default function ContactSidebar({
               );
             })}
         </div>
+        )}
       </div>
 
       <ScrollArea

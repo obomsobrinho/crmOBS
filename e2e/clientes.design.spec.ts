@@ -162,9 +162,15 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(ana).toContainText("Nunca escreveu");
     await expect(ana).not.toHaveAttribute("data-frio", /.*/);
 
+    // Chip com zero some (D4, a mesma regra das Conversas): na conta nova
+    // ninguém esfriou, e o chip nem aparece.
     await page.goto("/design/clientes?cenario=nova");
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" }).click();
-    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ninguém esfriou");
+    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" })).toHaveCount(0);
+    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Em conversa" })).toHaveCount(1);
+
+    // Com um chip só, a faixa inteira some.
+    await page.goto("/design/clientes?cenario=vazia");
+    await expect(page.locator('[data-slot="clientes-chip"]')).toHaveCount(0);
   });
 
   test("a ficha do contato frio diz há quanto tempo, e a de quem está em dia não diz", async ({ page }) => {

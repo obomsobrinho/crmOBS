@@ -43,3 +43,22 @@ export function prettyPhone(jid: string): string {
   }
   return d ? `+${d}` : jid;
 }
+
+/**
+ * Máscara de telefone do Brasil enquanto a pessoa digita: `(11) 91234-5678`
+ * ou `(11) 1234-5678`. O 55 é automático no produto, então quem cola
+ * `+55 11 ...` tem o 55 tirado aqui (achado do dono, 30/09/2026: "colocar um
+ * número precisa de máscara").
+ */
+export function mascaraTelefoneBR(v: string): string {
+  let d = v.replace(/\D/g, "");
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (!d) return "";
+  if (d.length <= 2) return `(${d}`;
+  const ddd = d.slice(0, 2);
+  const resto = d.slice(2);
+  if (resto.length <= 4) return `(${ddd}) ${resto}`;
+  const corte = resto.length === 9 ? 5 : 4;
+  return `(${ddd}) ${resto.slice(0, corte)}-${resto.slice(corte)}`;
+}

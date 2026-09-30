@@ -89,6 +89,9 @@ export default function ListaClientes({
   );
 
   const temBusca = q.trim().length > 0;
+  const chipsVisiveis = (Object.keys(ROTULO_FILTRO) as FiltroClientes[]).filter(
+    (k) => k === "todos" || k === filtro || contagem[k] > 0
+  );
 
   return (
     <Card
@@ -134,8 +137,12 @@ export default function ListaClientes({
             )}
           </div>
 
+          {/* A MESMA regra da lista de conversas (D4, 30/09/2026): chip com zero
+              some, menos "Todos" e o que estiver ligado; com um chip só, a faixa
+              inteira some. */}
+          {chipsVisiveis.length > 1 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {(Object.keys(ROTULO_FILTRO) as FiltroClientes[]).map((k) => {
+            {chipsVisiveis.map((k) => {
               const on = filtro === k;
               return (
                 <Button
@@ -159,6 +166,7 @@ export default function ListaClientes({
               );
             })}
           </div>
+          )}
         </div>
 
         {/* Cabeçalho das colunas: só no computador. No celular cada linha é um

@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { digitosDoJid, ehGrupo, formatarNumero } from "@/lib/avisos";
+import { mascaraTelefoneBR } from "@/lib/format";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // DESTINO DOS AVISOS NO WHATSAPP (29/09/2026, docs/plano-avisos.md).
 //
@@ -52,7 +54,9 @@ async function buscarGrupos(
 function numeroEditavel(jid: string | null): string {
   const d = digitosDoJid(jid);
   if (!d) return "";
-  return d.startsWith("55") && (d.length === 12 || d.length === 13) ? d.slice(2) : d;
+  return mascaraTelefoneBR(
+    d.startsWith("55") && (d.length === 12 || d.length === 13) ? d.slice(2) : d
+  );
 }
 
 export default function AvisosCampo({
@@ -204,35 +208,23 @@ export default function AvisosCampo({
 
   return (
     <div data-slot="avisos" className="space-y-3">
-      {/* Número ou grupo. Mesmo desenho do seletor de período da lista de
-          conversas: duas posições, uma acesa. */}
-      <span
-        role="group"
-        aria-label="Para onde vão os avisos"
-        className="inline-flex items-center gap-px rounded-md border border-line bg-[var(--chip-bg)] p-px"
-      >
-        {(["numero", "grupo"] as const).map((t) => {
-          const ativo = tipo === t;
-          return (
-            <Button
-              key={t}
-              variant="ghost"
-              size="none"
-              data-slot="avisos-tipo"
-              aria-pressed={ativo}
-              onClick={() => escolherTipo(t)}
-              className={cn(
-                "h-7 rounded-[5px] px-3 text-legenda font-semibold transition-colors",
-                ativo
-                  ? "bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)] hover:bg-[var(--chip-ativo-bg)]"
-                  : "text-ink-3 hover:bg-transparent hover:text-ink"
-              )}
-            >
+      {/* Número ou grupo. É o MESMO componente das abas do Painel (`Tabs
+          variant="painel"`), decisão do dono em 30/09/2026; era um seletor feito
+          à mão, com outra cor. A bandeja recua para o canvas porque mora dentro
+          de um cartão, como a do movimento no Painel. */}
+      <Tabs value={tipo} onValueChange={(v) => escolherTipo(v as Tipo)}>
+        <TabsList
+          variant="painel"
+          className="bg-canvas"
+          aria-label="Para onde vão os avisos"
+        >
+          {(["numero", "grupo"] as const).map((t) => (
+            <TabsTrigger key={t} value={t} variant="painel" data-slot="avisos-tipo">
               {t === "numero" ? "Um número" : "Um grupo"}
-            </Button>
-          );
-        })}
-      </span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
       <div className="flex flex-wrap items-start gap-2">
         {tipo === "numero" ? (
@@ -240,12 +232,12 @@ export default function AvisosCampo({
             data-slot="avisos-numero"
             value={numero}
             onChange={(e) => {
-              setNumero(e.target.value);
+              setNumero(mascaraTelefoneBR(e.target.value));
               setErro(null);
             }}
             inputMode="tel"
             autoComplete="tel"
-            placeholder="11 91234-5678"
+            placeholder="(11) 91234-5678"
             aria-label="Número que recebe os avisos"
             aria-invalid={erro ? true : undefined}
             className="min-w-0 flex-1 basis-56"
@@ -313,9 +305,21 @@ export default function AvisosCampo({
         </p>
       ) : (
         <p className="text-legenda text-ink-3">
+          {tipo === "grupo" && grupos && grupos.length > 0 && (
+            <Button
+              variant="brand-ghost"
+              size="none"
+              data-slot="avisos-atualizar-grupos"
+              onClick={carregarGrupos}
+              disabled={carregandoGrupos}
+              className="float-right ml-2 rounded-sm px-1 text-legenda font-semibold"
+            >
+              Atualizar lista
+            </Button>
+          )}
           {tipo === "numero"
             ? "O número de quem vai responder, com DDD. Não pode ser o número do agente."
-            : "Aparecem os grupos em que o número do agente participa."}
+            : "A lista mostra os grupos em que o número do agente está (não os do seu celular pessoal). Para usar outro grupo, adicione o número do agente nele e atualize a lista."}
         </p>
       )}
 
