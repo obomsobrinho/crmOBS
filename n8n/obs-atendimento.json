@@ -700,6 +700,54 @@
               },
               "renameOutput": true,
               "outputKey": "image"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "t4",
+                    "leftValue": "={{ $('Dados').item.json.tipo }}",
+                    "rightValue": "video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "video"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "t5",
+                    "leftValue": "={{ $('Dados').item.json.tipo }}",
+                    "rightValue": "document",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "document"
             }
           ]
         },
@@ -753,7 +801,8 @@
       "position": [
         4208,
         128
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -774,7 +823,8 @@
           "id": "cMdJb46UKgnJa0ZB",
           "name": "OpenAI account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -838,7 +888,8 @@
       "position": [
         4400,
         272
-      ]
+      ],
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -867,7 +918,8 @@
           "id": "cMdJb46UKgnJa0ZB",
           "name": "OpenAI account"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
@@ -1714,6 +1766,98 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a111aa21-4d7a-4b40-9722-3ddb07ad982d",
+      "name": "Audio base64",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4104,
+        40
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ab1",
+              "name": "base64",
+              "value": "={{ $('Dados').item.json.base64 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "94db4926-2ae1-4446-aa7c-c6d68dc67a3c",
+      "name": "Áudio sem transcrição",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4608,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "as1",
+              "name": "content",
+              "value": "[Áudio enviado. Não foi possível transcrever.]",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "11f61184-5620-4569-8f93-0a3156aaff02",
+      "name": "Imagem sem leitura",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4800,
+        420
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "is1",
+              "name": "content",
+              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\n\n' : '') }}[Imagem enviada. Não foi possível ver a imagem.]",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "400a9dfd-188c-4ba8-ac5d-4040ee266df4",
+      "name": "Vídeo ou documento",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4208,
+        560
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vd1",
+              "name": "content",
+              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\n\n' : '') }}[{{ $('Dados').item.json.tipo === 'video' ? 'Vídeo enviado' : 'Documento enviado' + ($('Dados').item.json.filename ? ': ' + $('Dados').item.json.filename : '') }}. O conteúdo não pôde ser lido.]",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -1855,7 +1999,7 @@
         ],
         [
           {
-            "node": "Audio → Binary",
+            "node": "Audio base64",
             "type": "main",
             "index": 0
           }
@@ -1863,6 +2007,20 @@
         [
           {
             "node": "Image base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vídeo ou documento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Vídeo ou documento",
             "type": "main",
             "index": 0
           }
@@ -1888,6 +2046,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Áudio sem transcrição",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1896,6 +2061,13 @@
         [
           {
             "node": "Audio → texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Áudio sem transcrição",
             "type": "main",
             "index": 0
           }
@@ -1932,6 +2104,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Imagem sem leitura",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -1940,6 +2119,13 @@
         [
           {
             "node": "Image → texto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Imagem sem leitura",
             "type": "main",
             "index": 0
           }
@@ -2258,6 +2444,50 @@
         [
           {
             "node": "Avisa falha no grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audio base64": {
+      "main": [
+        [
+          {
+            "node": "Audio → Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Áudio sem transcrição": {
+      "main": [
+        [
+          {
+            "node": "Push msg (Redis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Imagem sem leitura": {
+      "main": [
+        [
+          {
+            "node": "Push msg (Redis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vídeo ou documento": {
+      "main": [
+        [
+          {
+            "node": "Push msg (Redis)",
             "type": "main",
             "index": 0
           }

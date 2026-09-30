@@ -905,6 +905,15 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   ⚠️ **O que o item 3 conserta não é só o silêncio: é a PERDA.** `Salva chat_messages` vem DEPOIS
   do `Atendente`, então, sem a saída de erro, a mensagem do cliente não era gravada em lugar nenhum
   quando o cérebro falhava, e ninguém ficava sabendo que alguém tinha escrito.
+- ⚠️ **ÁUDIO ESTAVA QUEBRADO E NINGUÉM VIA (achado do dono, 30/09/2026).** O `Sobe mídia recebida`
+  troca o item pela resposta da rota (`{path, type}`), e o `Audio → Binary` lia `base64` do item:
+  erro, execução parada ANTES de gravar, áudio sumido do CRM e a IA sem resposta. A imagem não
+  sofria porque tinha o `Image base64` relendo do `Dados`; o áudio ganhou o `Audio base64`, igual.
+  Junto: `Audio → Binary`, `Whisper`, `Image → Binary` e `Vision` têm SAÍDA DE ERRO para
+  `Áudio sem transcrição` / `Imagem sem leitura` (a mensagem segue para a IA com o aviso entre
+  colchetes, nunca se perde), e o `Tipo de mensagem` ganhou **vídeo e documento**, que não tinham
+  saída nenhuma e morriam ali. ⚠️ Limitação que continua: no debounce de 15s só a PRIMEIRA
+  execução segue, então com várias mídias seguidas o `media_url` gravado é o da primeira.
 - ⚠️ **O domínio mudou em 17/09/2026 e derrubou o canal em silêncio.** `crm-obs.vercel.app`
   passou a responder **404** ("deployment could not be found"), e os DOIS nós que chamam o app
   (`Atendente` e `Sobe mídia recebida`) apontavam para lá. O agente ficou mudo e as mensagens do
