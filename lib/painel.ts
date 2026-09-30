@@ -131,10 +131,11 @@ export interface CandidatoVerbatim {
   /**
    * A pergunta do cliente.
    *
-   * ⚠️ Vem na MESMA linha que a resposta: é assim que o n8n grava, uma linha com
-   * `user_message` e `bot_message` juntos e UM `created_at`. É por isso que dá
-   * para mostrar o par pergunta/resposta, e é pelo mesmo motivo que NÃO dá para
-   * medir quanto tempo a IA levou: não existem dois instantes no dado.
+   * ⚠️ Até 30/09/2026 vinha na MESMA linha que a resposta (o n8n gravava
+   * `user_message` e `bot_message` juntos). Desde então cada mensagem recebida
+   * é uma linha e a resposta é outra, e a pergunta é montada com as mensagens do
+   * cliente entre a resposta anterior e esta (`perguntaDe`). As linhas antigas
+   * continuam funcionando pelo caminho de antes.
    */
   user_message?: string | null;
   bot_message: string | null;
@@ -215,7 +216,7 @@ export function escolherVerbatim(
 
   const monta = (m: CandidatoVerbatim): Verbatim => ({
     mensagens: separarMensagens(m.bot_message as string),
-    pergunta: m.user_message?.trim() || null,
+    pergunta: m.user_message?.trim() || perguntaDe(m, candidatos),
     phone: m.phone,
     nomewpp: m.nomewpp,
     created_at: m.created_at,
@@ -229,4 +230,25 @@ export function escolherVerbatim(
     (m) => (m.bot_message as string).trim().length >= VERBATIM_MIN_CHARS
   );
   return longa ? monta(longa) : null;
+}
+
+/**
+ * A pergunta de uma resposta gravada SOZINHA (desde 30/09/2026): as mensagens do
+ * cliente da mesma conversa entre a resposta anterior e esta, na ordem.
+ */
+function perguntaDe(
+  resposta: CandidatoVerbatim,
+  candidatos: CandidatoVerbatim[]
+): string | null {
+  const ate = Date.parse(resposta.created_at);
+  const daConversa = candidatos
+    .filter((m) => m.phone === resposta.phone && Date.parse(m.created_at) <= ate && m !== resposta)
+    .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  const partes: string[] = [];
+  for (const m of daConversa) {
+    if (m.bot_message?.trim()) break;
+    const t = m.user_message?.trim();
+    if (t) partes.unshift(t);
+  }
+  return partes.length ? partes.join("\n") : null;
 }

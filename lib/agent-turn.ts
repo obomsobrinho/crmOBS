@@ -20,6 +20,7 @@ import {
   textoDoAviso,
 } from "@/lib/avisos";
 import { cleanName } from "@/lib/inbox";
+import { semLoteAtual } from "@/lib/mensagem";
 import type {
   TurnDiagnostics,
   RagMatchDiag,
@@ -37,7 +38,10 @@ import type {
 
 // Quantas linhas de chat_messages carregar de contexto (produção). Cada linha
 // tem user + bot, então ~10 linhas equivalem à janela de 20 mensagens.
-const HISTORY_ROWS = 10;
+// ⚠️ Era 10 quando uma linha era "pergunta + resposta". Desde 30/09/2026 cada
+// mensagem recebida é uma linha e a resposta é outra, então 24 linhas cobrem
+// mais ou menos o mesmo tanto de conversa que as 10 antigas.
+const HISTORY_ROWS = 24;
 const MAX_TURN_CHARS = 2000;
 const RAG_PREVIEW_CHARS = 240;
 
@@ -326,7 +330,9 @@ export async function processTurn(
       .not("closed_at", "is", null)
       .order("closed_at", { ascending: false })
       .limit(HISTORY_ROWS);
-    history = buildHistory(rows);
+    // As mensagens do lote que está sendo respondido já estão gravadas e vêm no
+    // `message`: sem o corte a IA leria cada uma duas vezes (`semLoteAtual`).
+    history = buildHistory(retomada ? rows : semLoteAtual(rows ?? [], Date.now(), message));
     resolvidos = pedidosResolvidos(rows, pedidos);
     const { data: fila } = await svc
       .from("handoffs")
