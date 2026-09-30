@@ -4,7 +4,7 @@ import ListaClientes from "@/components/ListaClientes";
 import { Card } from "@/components/ui/card";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { agoraMs } from "@/lib/periodo";
-import { montarClientes, type ContatoClienteRow, type ConversaClienteRow, type TagClienteRow } from "@/lib/clientes";
+import { diasSemContato, montarClientes, type ContatoClienteRow, type ConversaClienteRow, type TagClienteRow } from "@/lib/clientes";
 
 // Preview da tela de CLIENTES (dev-only, liberado pelo proxy). Sem banco.
 // `?cenario=historico|nova|vazia` troca a conta; `?sel={id}` abre uma ficha
@@ -57,9 +57,11 @@ export default async function DesignClientesPage({
     c(14, "5547991875502", "Lucas Tavares"),
     c(15, "553532210090", null, { nomewpp: "Ótica Central" }),
     c(16, "5511966200187", "Carlos Mendes", { email: "carlos.mendes@outlook.com" }),
+    // Nunca escreveu: sem conversa. NÃO é frio (fatia C), é outro estado.
+    c(17, "5511955118890", "Ana Clara Ribeiro", { email: "anaclara.r@gmail.com" }),
   ];
   const ultimos = [0.005, 2, 0.01, 3, 5, 8, 10, 1, 25, 40, 70, 75, 100, 120, 135, 150];
-  const conversas: ConversaClienteRow[] = todos.map((t, i) => ({
+  const conversas: ConversaClienteRow[] = todos.filter((t) => t.id !== 17).map((t, i) => ({
     id: 100 + t.id,
     phone: t.telefone,
     last_message_at: iso(ultimos[i] * D),
@@ -74,7 +76,7 @@ export default async function DesignClientesPage({
     { conversation_id: 106, tags: { name: "Fechado", color: "green" } },
   ];
 
-  const contatos = cenario === "vazia" ? [] : cenario === "nova" ? todos.filter((t) => [1, 3, 12].includes(t.id)) : todos;
+  const contatos = cenario === "vazia" ? [] : cenario === "nova" ? todos.filter((t) => [1, 3, 8].includes(t.id)) : todos;
   const itens = montarClientes(contatos, conversas, tags, null);
   const aberto = contatos.find((t) => t.id === Number(sel)) ?? null;
   const base = `/design/clientes?cenario=${cenario}&sel={id}`;
@@ -102,7 +104,10 @@ export default async function DesignClientesPage({
                 messageCount={aberto.id * 3 + 2}
                 members={[]}
                 myUserId=""
-                conversationId={100 + aberto.id}
+                conversationId={aberto.id === 17 ? null : 100 + aberto.id}
+                diasSemContato={
+                  aberto.id === 17 ? null : diasSemContato(iso(ultimos[aberto.id - 1] * D), agora)
+                }
                 clientId=""
                 editableName={aberto.display_name}
                 customFields={aberto.custom_fields}

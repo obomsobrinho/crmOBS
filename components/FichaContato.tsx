@@ -81,6 +81,7 @@ export default function FichaContato({
   email = null,
   birthDate = null,
   entendimento = null,
+  diasSemContato = null,
   contactExists,
 }: {
   /** Onde a ficha está. `clientes` acrescenta o atalho da conversa e o Entendimento. */
@@ -90,6 +91,8 @@ export default function FichaContato({
   birthDate?: string | null;
   /** O último resumo da IA (`conversation_qualifications.summary`). Só em `clientes`. */
   entendimento?: string | null;
+  /** Contato frio (60+ dias sem mensagem, `lib/clientes.ts`). Só em `clientes`. */
+  diasSemContato?: number | null;
   name: string | null;
   phone: string;
   firstMessageAt: string | null;
@@ -181,15 +184,24 @@ export default function FichaContato({
         </div>
 
         {superficie === "clientes" && conversationId != null && (
-          <Button asChild variant="outline" size="control" className="self-start">
-            <Link
-              data-slot="ficha-abrir-conversa"
-              href={`/inbox/${encodeURIComponent(phone)}`}
-            >
-              <MessagesSquare size={14} />
-              Abrir conversa
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <Button asChild variant="outline" size="control">
+              <Link
+                data-slot="ficha-abrir-conversa"
+                href={`/inbox/${encodeURIComponent(phone)}`}
+              >
+                <MessagesSquare size={14} />
+                Abrir conversa
+              </Link>
+            </Button>
+            {/* O CONTATO FRIO, dito sem alarme: tinta de apoio, nunca âmbar.
+                Âmbar é "alguém espera por você", e aqui ninguém espera. */}
+            {diasSemContato != null && (
+              <span data-slot="ficha-frio" className="text-legenda text-ink-3">
+                Última mensagem há {diasSemContato} dias
+              </span>
+            )}
+          </div>
         )}
 
         <ContactTags

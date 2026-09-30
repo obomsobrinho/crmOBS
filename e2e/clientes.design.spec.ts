@@ -2,7 +2,10 @@ import { test, expect } from "@playwright/test";
 import {
   cadastroCompleto,
   casaBusca,
+  LIMIAR_FRIO_DIAS,
+  diasSemContato,
   emConversa,
+  estadoContato,
   montarClientes,
   telaParaIso,
   textoUltimoContato,
@@ -87,11 +90,37 @@ test.describe("Regra da lista (lib/clientes.ts)", () => {
   });
 });
 
+test.describe("Contato frio (lib/clientes.ts, fatia C)", () => {
+  // 9h de 30/09/2026 em São Paulo.
+  const agora = Date.parse("2026-09-30T12:00:00Z");
+
+  test("o limiar é 60 dias civis: 59 ainda não é frio, 60 já é", () => {
+    expect(LIMIAR_FRIO_DIAS).toBe(60);
+    expect(estadoContato("2026-08-02T15:00:00Z", agora)).toBe("normal"); // 59 dias
+    expect(estadoContato("2026-08-01T15:00:00Z", agora)).toBe("frio"); // 60 dias
+    expect(diasSemContato("2026-08-01T15:00:00Z", agora)).toBe(60);
+    expect(diasSemContato("2026-08-02T15:00:00Z", agora)).toBeNull();
+  });
+
+  test("conta o dia de São Paulo, não o UTC", () => {
+    // 23h30 de 01/08 em SP já é 02/08 em UTC: em SP são 60 dias, frio.
+    expect(estadoContato("2026-08-02T02:30:00Z", agora)).toBe("frio");
+    // 0h30 de 02/08 em SP: 59 dias, ainda não.
+    expect(estadoContato("2026-08-02T03:30:00Z", agora)).toBe("normal");
+  });
+
+  test("nunca escreveu não é frio, é outro estado", () => {
+    expect(estadoContato(null, agora)).toBe("nunca");
+    expect(diasSemContato(null, agora)).toBeNull();
+    expect(estadoContato("2026-09-30T10:00:00Z", agora)).toBe("conversa");
+  });
+});
+
 test.describe("Tela de Clientes (/design/clientes)", () => {
   test("lista, busca, filtros e estados vazios", async ({ page }) => {
     await page.goto("/design/clientes");
     const itens = page.locator('[data-slot="clientes-item"]');
-    await expect(itens).toHaveCount(16);
+    await expect(itens).toHaveCount(17);
     await expect(page.locator("[data-clientes-vazio]")).toContainText("Escolha um cliente");
 
     const busca = page.getByLabel("Buscar clientes");
@@ -108,13 +137,42 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(itens).toHaveCount(2);
     await page.locator('[data-slot="clientes-chip"]', { hasText: "Cadastro incompleto" }).click();
     // Completos no dado falso (nome dado pelo time, nascimento e e-mail):
-    // Marina, Helena e Juliana. Os outros 13 são incompletos.
-    await expect(itens).toHaveCount(13);
+    // Marina, Helena e Juliana. Os outros 14 são incompletos.
+    await expect(itens).toHaveCount(14);
 
     await page.goto("/design/clientes?cenario=vazia");
     await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ainda não há clientes");
     await page.goto("/design/clientes?cenario=nova");
     await expect(itens).toHaveCount(3);
+  });
+
+  test("filtro de contato frio: 60+ dias, e quem nunca escreveu fica de fora", async ({ page }) => {
+    await page.goto("/design/clientes");
+    const itens = page.locator('[data-slot="clientes-item"]');
+    const chip = page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato há 60+ dias" });
+    await expect(chip).toContainText("6");
+    await chip.click();
+    await expect(itens).toHaveCount(6);
+    await expect(itens.first()).toContainText("Sem contato há 70 dias");
+    await expect(page.locator('[data-slot="clientes-item"]:not([data-frio])')).toHaveCount(0);
+    await expect(itens.filter({ hasText: "Ana Clara" })).toHaveCount(0);
+
+    await page.locator('[data-slot="clientes-chip"]', { hasText: "Todos" }).click();
+    const ana = itens.filter({ hasText: "Ana Clara" });
+    await expect(ana).toContainText("Nunca escreveu");
+    await expect(ana).not.toHaveAttribute("data-frio", /.*/);
+
+    await page.goto("/design/clientes?cenario=nova");
+    await page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" }).click();
+    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ninguém esfriou");
+  });
+
+  test("a ficha do contato frio diz há quanto tempo, e a de quem está em dia não diz", async ({ page }) => {
+    await page.goto("/design/clientes?sel=11");
+    await expect(page.locator('[data-slot="ficha-frio"]')).toHaveText("Última mensagem há 70 dias");
+    await page.goto("/design/clientes?sel=2");
+    await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toBeVisible();
+    await expect(page.locator('[data-slot="ficha-frio"]')).toHaveCount(0);
   });
 
   test("a ficha é a do painel da conversa, com o atalho e o Entendimento", async ({ page }) => {
@@ -151,6 +209,12 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(page.locator('[data-slot="clientes-lista"]')).toBeVisible();
     await expect(page.locator("[data-clientes-vazio]")).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+
+    // O número de dias do contato frio cabe inteiro na linha dele.
+    await page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" }).click();
+    const linha = page.locator('[data-slot="clientes-contato-celular"]').last();
+    await expect(linha).toHaveText("Sem contato há 150 dias");
+    expect(await linha.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 
     await page.goto("/design/clientes?sel=1");
     await expect(page.locator('[data-slot="painel-completude"]')).toBeVisible();

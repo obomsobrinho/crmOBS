@@ -19,8 +19,10 @@ import { quemAtende, tagColor } from "@/lib/crm";
 import { agoraMs } from "@/lib/periodo";
 import {
   DADOS_DO_CADASTRO,
+  LIMIAR_FRIO_DIAS,
   ROTULO_FILTRO,
   casaBusca,
+  diasSemContato,
   emConversa,
   passaFiltro,
   preenchidos,
@@ -71,10 +73,11 @@ export default function ListaClientes({
   }, [router]);
 
   const contagem = useMemo(() => {
-    const c: Record<FiltroClientes, number> = { todos: 0, conversa: 0, incompleto: 0 };
+    const c: Record<FiltroClientes, number> = { todos: 0, conversa: 0, frio: 0, incompleto: 0 };
     for (const it of itens) {
       c.todos++;
       if (passaFiltro(it, "conversa", agora)) c.conversa++;
+      if (passaFiltro(it, "frio", agora)) c.frio++;
       if (passaFiltro(it, "incompleto", agora)) c.incompleto++;
     }
     return c;
@@ -193,6 +196,11 @@ export default function ListaClientes({
                 titulo="Ninguém em conversa hoje"
                 texto="Quem escrever hoje aparece aqui."
               />
+            ) : filtro === "frio" ? (
+              <Vazio
+                titulo="Ninguém esfriou"
+                texto={`Nenhum cliente passou ${LIMIAR_FRIO_DIAS} dias sem falar com você.`}
+              />
             ) : (
               <Vazio
                 titulo="Todos os cadastros estão completos"
@@ -235,9 +243,12 @@ function Linha({
   const n = cheios.filter(Boolean).length;
   const titulo = it.name ?? prettyPhone(it.phone);
 
+  const frio = diasSemContato(it.lastMessageAt, agora);
   const contato = !it.lastMessageAt
-    ? { texto: "Sem conversa", sub: null }
-    : hoje
+    ? { texto: "Nunca escreveu", sub: null }
+    : frio != null
+      ? { texto: `Sem contato há ${frio} dias`, sub: null }
+      : hoje
       ? {
           texto: `Hoje, ${formatTime(it.lastMessageAt)}`,
           sub:
@@ -254,6 +265,7 @@ function Linha({
       <Link
         href={href}
         data-slot="clientes-item"
+        data-frio={frio != null ? "sim" : undefined}
         aria-current={ativa ? "page" : undefined}
         className={cn(
           "relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line-soft py-2.5 pl-4 pr-4 transition-colors duration-100 md:grid-cols-[minmax(0,1fr)_150px_72px] md:pl-5 md:pr-5 xl:grid-cols-[minmax(0,1fr)_150px_minmax(0,180px)_72px]",
@@ -277,11 +289,16 @@ function Linha({
             </span>
             <span className="truncate text-legenda text-ink-3">
               {it.name ? prettyPhone(it.phone) : "Sem nome"}
-              {/* No celular o último contato vem aqui, na segunda linha. */}
-              <span className="md:hidden" suppressHydrationWarning>
-                {" · "}
-                {contato.texto}
-              </span>
+            </span>
+            {/* No celular o último contato ganha LINHA PRÓPRIA: colado ao
+                telefone ele era cortado justo no número de dias, que é o que
+                o contato frio existe para dizer. */}
+            <span
+              data-slot="clientes-contato-celular"
+              className="truncate text-legenda text-ink-2 md:hidden"
+              suppressHydrationWarning
+            >
+              {contato.texto}
             </span>
           </span>
         </span>

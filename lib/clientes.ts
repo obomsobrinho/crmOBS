@@ -150,16 +150,25 @@ function variantesSemNove(d: string): string[] {
   return v;
 }
 
-export type FiltroClientes = "todos" | "conversa" | "incompleto";
+/**
+ * Quantos dias civis sem mensagem fazem um contato FRIO. Decisão do dono (D3,
+ * 30/09/2026): 60 fixo no beta, configurável quando um testador pedir. 60 cobre
+ * com folga quem volta todo mês (barbeiro, ótica) sem chamar de frio.
+ */
+export const LIMIAR_FRIO_DIAS = 60;
+
+export type FiltroClientes = "todos" | "conversa" | "frio" | "incompleto";
 
 export const ROTULO_FILTRO: Record<FiltroClientes, string> = {
   todos: "Todos",
   conversa: "Em conversa",
+  frio: `Sem contato há ${LIMIAR_FRIO_DIAS}+ dias`,
   incompleto: "Cadastro incompleto",
 };
 
 export function passaFiltro(c: ClienteItem, f: FiltroClientes, agora: number): boolean {
   if (f === "conversa") return emConversa(c.lastMessageAt, agora);
+  if (f === "frio") return estadoContato(c.lastMessageAt, agora) === "frio";
   if (f === "incompleto") return !cadastroCompleto(c);
   return true;
 }
@@ -225,4 +234,29 @@ export function textoUltimoContato(iso: string, agora: number): string {
   if (d < 30) return `Há ${d} dias`;
   const dia = diaSP(Date.parse(iso));
   return `${dia % 100} ${MESES[Math.floor((dia % 10000) / 100) - 1]}`;
+}
+
+// ---------------------------------------------------------------------------
+// Contato frio (fatia C, 30/09/2026).
+// ---------------------------------------------------------------------------
+
+/**
+ * O estado do contato pela última mensagem, em dias civis de São Paulo.
+ *
+ * ⚠️ "Nunca escreveu" NÃO é frio: frio é quem conversou e parou, e é a lista de
+ * quem vale a pena procurar de novo. Quem nunca escreveu (o contato criado à
+ * mão da fatia B) é outro estado, com outro risco ao escrever.
+ */
+export type EstadoContato = "nunca" | "conversa" | "normal" | "frio";
+
+export function estadoContato(lastMessageAt: string | null, agora: number): EstadoContato {
+  if (!lastMessageAt || !Number.isFinite(Date.parse(lastMessageAt))) return "nunca";
+  const d = diasDesde(lastMessageAt, agora);
+  if (d <= 0) return "conversa";
+  return d >= LIMIAR_FRIO_DIAS ? "frio" : "normal";
+}
+
+/** Dias sem contato quando o contato está frio; `null` nos outros estados. */
+export function diasSemContato(lastMessageAt: string | null, agora: number): number | null {
+  return estadoContato(lastMessageAt, agora) === "frio" ? diasDesde(lastMessageAt!, agora) : null;
 }

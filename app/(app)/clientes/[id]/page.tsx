@@ -5,6 +5,8 @@ import FichaContato from "@/components/FichaContato";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { getMyClient } from "@/lib/auth";
 import { cleanName } from "@/lib/inbox";
+import { diasSemContato } from "@/lib/clientes";
+import { agoraMs } from "@/lib/periodo";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembers } from "@/lib/team";
 import type { Cliente } from "@/lib/types";
@@ -33,7 +35,11 @@ export default async function ClientePage({
 
   const [{ data: conv }, { count }, { data: primeira }, { data: qual }, members, client] =
     await Promise.all([
-      supabase.from("conversations").select("id").eq("phone", phone).maybeSingle(),
+      supabase
+        .from("conversations")
+        .select("id, last_message_at")
+        .eq("phone", phone)
+        .maybeSingle(),
       supabase
         .from("chat_messages")
         .select("id", { count: "exact", head: true })
@@ -80,6 +86,10 @@ export default async function ClientePage({
           members={members}
           myUserId={client?.userId ?? ""}
           conversationId={(conv as { id: number } | null)?.id ?? null}
+          diasSemContato={diasSemContato(
+            (conv as { last_message_at: string | null } | null)?.last_message_at ?? null,
+            agoraMs()
+          )}
           clientId={client?.id ?? ""}
           editableName={contato.display_name ?? null}
           customFields={contato.custom_fields ?? null}

@@ -18,6 +18,12 @@ Briefing: `Desktop/briefing-clientes-claude-design/LEIA-PRIMEIRO.md`.
 5. **D5**: dono e atendente veem; conta bloqueada vê em leitura.
 6. O tenant de teste é a OBS, que no banco se chama **OBM** (são o mesmo). O dono limpou as
    conversas e os contatos dele em 29/09/2026.
+7. **D6 (fatia B, 30/09/2026) = criar a conversa vazia no cadastro**: a rota de criação também cria a
+   linha de `conversations`, para tags e notas funcionarem desde o primeiro minuto.
+8. **D7 (fatia B, 30/09/2026) = a primeira mensagem para quem nunca falou NÃO pausa a IA**: quem abre
+   a conversa quer que a IA atenda quando o cliente responder. É exceção só desse envio (o "Enviar
+   primeira mensagem" do contato que nunca escreveu); responder numa conversa existente continua
+   pausando, pela regra "um humano assumiu".
 
 ## O problema
 
@@ -123,14 +129,21 @@ navegador também.
     caminho do envio manual (`POST /api/send`), **um por vez**, sem seleção múltipla em lugar nenhum.
 - **Tags e notas de quem não tem conversa**: a rota de criação também cria a linha de
   `conversations` (vazia), para tags e notas terem onde morar desde o cadastro. A alternativa é
-  esconder os dois blocos até a primeira mensagem. Decisão do dono na hora da fatia B.
-- **Pendência herdada**: o envio manual PAUSA a IA ("um humano assumiu"). O briefing diz "a IA
-  assume a partir da segunda mensagem". As duas coisas brigam: decidir na fatia B se a primeira
-  mensagem para quem nunca falou pausa ou não.
+  esconder os dois blocos até a primeira mensagem. ✅ Decidido: criar a conversa vazia (D6).
+- **Pendência herdada, resolvida**: o envio manual PAUSA a IA ("um humano assumiu"), e o briefing diz
+  "a IA assume a partir da segunda mensagem". ✅ Decidido (D7): a primeira mensagem para quem nunca
+  falou NÃO pausa a IA. Só esse envio; o resto do envio manual segue pausando.
 - Testes: criar contato com telefone impossível (DDD 00), diálogo exige o aceite; o envio real NÃO é
   exercido (seria WhatsApp de verdade), só a rota recusando sem aceite.
 
-## Fatia C: contato frio
+## Fatia C: contato frio (✅ feita em 30/09/2026)
+
+Regra em `lib/clientes.ts`: `LIMIAR_FRIO_DIAS = 60`, `estadoContato` (`nunca`/`conversa`/`normal`/`frio`)
+e `diasSemContato`, em dias civis de America/Sao_Paulo. "Nunca escreveu" é estado próprio e nunca
+entra no filtro de frio. Na lista, chip "Sem contato há 60+ dias" e a coluna com "Sem contato há X
+dias" (no celular, linha própria, senão o número de dias era cortado); na ficha, "Última mensagem há
+X dias" ao lado de "Abrir conversa", em tinta de apoio e nunca âmbar (ninguém espera por você).
+
 
 - Filtro "Sem contato há N+ dias", coluna "Sem contato há X dias" na lista e a linha "Última mensagem
   há X dias" na ficha. Regra pura num módulo (`lib/clientes.ts`), com o dia civil de
