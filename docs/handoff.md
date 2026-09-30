@@ -38,8 +38,9 @@ desligada de propósito**.
 Item 3 do P0 (`docs/plano-clientes.md`, aprovado pelo dono). **Fatia A commitada, sem push**: lista
 `/clientes` com busca e filtros, ficha única (`FichaContato`) nas duas superfícies, Nascimento e
 E-mail no cadastro. **Próximo: fatia B** (criar contato e iniciar conversa com alerta), depois C
-(contato frio, 60 dias). O tenant de teste agora é a **OBM** (o dono limpou conversas e contatos em
-29/09; OBS e Loja Teste não existem mais).
+(contato frio, 60 dias). **OBS e OBM são o MESMO tenant de teste** (no banco
+ele se chama "OBM"); o dono limpou as conversas e os contatos dele em 29/09. A Loja Teste não existe
+mais.
 
 ### 29/09/2026, noite: P0 do beta FEITO
 
@@ -288,7 +289,8 @@ não tem computador.
 
 1. **"Cliente" é ambíguo neste schema.** `clients` é o TENANT (a empresa que usa o CRM);
    `dados_cliente` são os CONTATOS (o cliente do seu cliente). Trocar os dois é o erro mais caro.
-2. **Escrita de teste só na Loja Teste, nunca na OBM.** A OBM atende cliente de verdade.
+2. **Escrita de teste só no tenant de teste**, que é a OBS (no banco, "OBM": são o mesmo, confirmado
+   pelo dono em 30/09/2026). A Loja Teste não existe mais.
 3. **Nunca usar travessão** (`—` ou `–`) em texto visível nem em prompt gerado. Vale para UI,
    `buildPersona`, mensagem de erro, documentação e commit.
 4. **Nunca modificar ou ativar workflow do n8n sem confirmação explícita**: é produção.

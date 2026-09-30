@@ -16,7 +16,8 @@ Briefing: `Desktop/briefing-clientes-claude-design/LEIA-PRIMEIRO.md`.
 3. **D3 = 60 dias fixo** no beta; configurável quando um testador pedir.
 4. **D4 = A**: Clientes entre Conversas e Pipeline; no celular, em "Mais".
 5. **D5**: dono e atendente veem; conta bloqueada vê em leitura.
-6. O tenant de teste é a **OBM** (o dono limpou conversas e contatos em 29/09/2026).
+6. O tenant de teste é a OBS, que no banco se chama **OBM** (são o mesmo). O dono limpou as
+   conversas e os contatos dele em 29/09/2026.
 
 ## O problema
 
