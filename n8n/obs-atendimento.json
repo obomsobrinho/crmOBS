@@ -100,6 +100,12 @@
               "name": "messageId",
               "value": "={{ $json.body.data.key.id || '' }}",
               "type": "string"
+            },
+            {
+              "id": "d14",
+              "name": "recebidoEm",
+              "value": "={{ $json.body.data.messageTimestamp ? DateTime.fromSeconds(Number($json.body.data.messageTimestamp)).toISO() : $now.toISO() }}",
+              "type": "string"
             }
           ]
         },
@@ -1121,16 +1127,12 @@
               "fieldValue": "={{ $('Dados').item.json.Telefone }}"
             },
             {
-              "fieldId": "user_message",
-              "fieldValue": "={{ $('Combina mensagens').item.json.mensagem_completa }}"
-            },
-            {
               "fieldId": "bot_message",
               "fieldValue": "={{ ($json.output && $json.output.messages) ? $json.output.messages.join(' | ') : '' }}"
             },
             {
               "fieldId": "message_type",
-              "fieldValue": "={{ $('Dados').item.json.tipo }}"
+              "fieldValue": "text"
             },
             {
               "fieldId": "nomewpp",
@@ -1143,14 +1145,6 @@
             {
               "fieldId": "client_id",
               "fieldValue": "={{ $('Resolve tenant').first().json.id }}"
-            },
-            {
-              "fieldId": "media_url",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.path || null }}"
-            },
-            {
-              "fieldId": "media_type",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.type || null }}"
             }
           ]
         }
@@ -1685,16 +1679,12 @@
               "fieldValue": "={{ $('Dados').item.json.Telefone }}"
             },
             {
-              "fieldId": "user_message",
-              "fieldValue": "={{ $('Combina mensagens').item.json.mensagem_completa }}"
-            },
-            {
               "fieldId": "bot_message",
               "fieldValue": "Recebi sua mensagem, já te respondo por aqui."
             },
             {
               "fieldId": "message_type",
-              "fieldValue": "={{ $('Dados').item.json.tipo }}"
+              "fieldValue": "text"
             },
             {
               "fieldId": "nomewpp",
@@ -1858,6 +1848,62 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "f76380b8-7473-4cb2-913c-a09e749b82c9",
+      "name": "Salva recebida",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        5104,
+        300
+      ],
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Dados').item.json.Telefone }}"
+            },
+            {
+              "fieldId": "user_message",
+              "fieldValue": "={{ $('Push msg (Redis)').item.json.content }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "={{ $('Dados').item.json.tipo }}"
+            },
+            {
+              "fieldId": "nomewpp",
+              "fieldValue": "={{ $('Dados').item.json.NomeWpp }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $('Dados').item.json.recebidoEm }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Resolve tenant').first().json.id }}"
+            },
+            {
+              "fieldId": "media_url",
+              "fieldValue": "={{ $('Sobe mídia recebida').first().json.path || null }}"
+            },
+            {
+              "fieldId": "media_type",
+              "fieldValue": "={{ $('Sobe mídia recebida').first().json.type || null }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -2147,7 +2193,7 @@
       "main": [
         [
           {
-            "node": "Lock counter",
+            "node": "Salva recebida",
             "type": "main",
             "index": 0
           }
@@ -2488,6 +2534,17 @@
         [
           {
             "node": "Push msg (Redis)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva recebida": {
+      "main": [
+        [
+          {
+            "node": "Lock counter",
             "type": "main",
             "index": 0
           }
