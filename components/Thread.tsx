@@ -214,6 +214,10 @@ export default function Thread({
   /** O elemento que rola de verdade, dentro do ScrollArea. */
   const viewportRef = useRef<HTMLDivElement>(null);
   const phoneRef = useRef(phone);
+  // Se a pessoa está no fim da conversa. Quem escreve é o efeito que ouve a
+  // rolagem (mais abaixo); quem lê é o efeito que rola quando chega mensagem.
+  const grudadoRef = useRef(true);
+  const pendentesRef = useRef(0);
 
   // Ressincroniza ao navegar entre conversas (o componente é reaproveitado).
   //
@@ -367,10 +371,22 @@ export default function Thread({
   // (o wrapper interno é `display: table`, injetado por ele na montagem). O
   // resultado era a conversa abrindo no TOPO em vez de na última mensagem.
   // O rAF garante que a medida acontece depois da pintura.
+  //
+  // ⚠️ SÓ ROLA SOZINHO QUANDO A PESSOA JÁ ESTÁ NO FIM (achado do dono,
+  // 30/09/2026, com vídeo: "rolo a primeira vez e funciona, depois fica
+  // invertido"). Antes, QUALQUER recarga da lista (tempo real, voltar o foco)
+  // levava ao fim, e quem estava lendo o histórico era puxado para baixo no meio
+  // da rolagem. Agora rola só ao trocar de conversa, quando quem está lendo já
+  // estava no fim, ou quando a própria pessoa mandou a mensagem (pendente nova).
+  // Fora disso, a seta "tem mais embaixo" já avisa, como no WhatsApp Web.
   useEffect(() => {
-    const behavior: ScrollBehavior =
-      phoneRef.current === phone ? "smooth" : "auto";
+    const trocou = phoneRef.current !== phone;
+    const behavior: ScrollBehavior = trocou ? "auto" : "smooth";
     phoneRef.current = phone;
+    const mandou = pending.length > pendentesRef.current;
+    pendentesRef.current = pending.length;
+    if (trocou) grudadoRef.current = true;
+    if (!trocou && !mandou && !grudadoRef.current) return;
     const id = requestAnimationFrame(() => {
       const el = viewportRef.current;
       if (!el) return;
@@ -381,6 +397,9 @@ export default function Thread({
       // nascer errada antes do primeiro evento de rolagem.
     });
     return () => cancelAnimationFrame(id);
+    // `pending` é lido só para saber se a pessoa acabou de mandar; ele já
+    // muda `bubbles`, então não dispara nada a mais.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubbles, phone]);
 
   // ⚠️ GRUDADO NO FIM ENQUANTO A CONVERSA CARREGA (23/09/2026, achado no
@@ -395,6 +414,7 @@ export default function Thread({
     const el = viewportRef.current;
     if (!el) return;
     let grudado = true;
+    grudadoRef.current = true;
     // Onde o fim estava da última vez que grudamos. ⚠️ Não basta ouvir o evento
     // de rolagem: quando alguém rola para cima, o conteúdo pode mudar de tamanho
     // (a barra do Radix aparece) e o observador disparar ANTES do evento, e aí
@@ -404,12 +424,14 @@ export default function Thread({
     const noFim = () => el.scrollHeight - el.scrollTop - el.clientHeight < 24;
     const aoRolar = () => {
       grudado = noFim();
+      grudadoRef.current = grudado;
       if (grudado) topoFim = el.scrollTop;
     };
     const observador = new ResizeObserver(() => {
       if (!grudado) return;
       if (el.scrollTop < topoFim - 4 && !noFim()) {
         grudado = false;
+        grudadoRef.current = false;
         return;
       }
       el.scrollTop = el.scrollHeight;
