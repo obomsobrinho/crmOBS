@@ -912,8 +912,16 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   Junto: `Audio → Binary`, `Whisper`, `Image → Binary` e `Vision` têm SAÍDA DE ERRO para
   `Áudio sem transcrição` / `Imagem sem leitura` (a mensagem segue para a IA com o aviso entre
   colchetes, nunca se perde), e o `Tipo de mensagem` ganhou **vídeo e documento**, que não tinham
-  saída nenhuma e morriam ali. ⚠️ Limitação que continua: no debounce de 15s só a PRIMEIRA
-  execução segue, então com várias mídias seguidas o `media_url` gravado é o da primeira.
+  saída nenhuma e morriam ali.
+- ⚠️ **UMA LINHA POR MENSAGEM RECEBIDA (30/09/2026, "áudio, texto, áudio e imagem de uma vez").**
+  Antes o debounce de 15s gravava UMA linha por lote, com a mídia só da primeira. Agora
+  `Salva recebida` (depois do `Push msg (Redis)`) grava CADA mensagem na hora, com a própria mídia
+  e a hora de chegada no WhatsApp (`Dados.recebidoEm`, de `messageTimestamp`; sem ela a transcrição
+  lenta do áudio embaralhava a ordem), e `Salva chat_messages` grava só a RESPOSTA, numa linha
+  separada. O app acompanha: `semLoteAtual` (`lib/mensagem.ts`) tira do histórico as mensagens que
+  já vêm no `message` do pedido (senão a IA lia cada uma duas vezes), `HISTORY_ROWS` subiu para 24,
+  e a frase real do agente no Painel monta a pergunta com as mensagens entre as duas respostas.
+  ⚠️ Ordem de deploy: APP antes do n8n. Provado com lote simulado no telefone impossível.
 - ⚠️ **O domínio mudou em 17/09/2026 e derrubou o canal em silêncio.** `crm-obs.vercel.app`
   passou a responder **404** ("deployment could not be found"), e os DOIS nós que chamam o app
   (`Atendente` e `Sobe mídia recebida`) apontavam para lá. O agente ficou mudo e as mensagens do
