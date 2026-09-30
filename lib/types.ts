@@ -22,6 +22,8 @@ export interface Cliente {
   created_at: string;
   display_name?: string | null; // nome editado no CRM (precede nomewpp)
   custom_fields?: Record<string, unknown> | null;
+  email?: string | null;
+  birth_date?: string | null; // AAAA-MM-DD
 }
 
 // Item da lista de conversas (inbox). Vem da tabela `conversations`, mantida

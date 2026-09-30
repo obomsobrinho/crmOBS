@@ -80,6 +80,8 @@ export default async function ThreadPage({
       clientId={client?.id ?? ""}
       displayName={contato?.display_name ?? null}
       customFields={contato?.custom_fields ?? null}
+      contactEmail={contato?.email ?? null}
+      contactBirthDate={contato?.birth_date ?? null}
       contactExists={!!contato}
       readOnly={client?.access.blocked ?? false}
     />

@@ -80,7 +80,7 @@ export function bestName(rows: ChatRow[]): string | null {
 
 // Iniciais para avatar. Retorna null quando não há nome real (a UI mostra um
 // ícone de pessoa em vez de "55" derivado do telefone). Centraliza a lógica que
-// estava duplicada em ContactSidebar/Thread/ContextPanel.
+// estava duplicada em ContactSidebar/Thread/FichaContato.
 // Avatar determinístico a partir de uma chave (telefone ou e-mail).
 // Devolve um PAR de fundo tingido e tinta do mesmo matiz, não uma cor sólida:
 // inicial branca sobre cor cheia dava 2,80:1 e reprovava WCAG AA. Os oito pares

@@ -111,7 +111,7 @@ esperando"). Em qualquer opção, o "N esperando" do cabeçalho do painel vira l
 
 - Radar de conversas esfriando (sacada 5 do Deskcomm): é o P3, item 14. A página só trata pedido
   aberto pela IA.
-- Motivo do pedido e "salvar orientação como regra": P1, itens 3 e 4.
+- Motivo do pedido e "salvar orientação como regra": P1, itens 4 e 5 (renumerados em 30/09, quando a tela de Clientes entrou como item 3).
 - Qualquer mudança no n8n.
 
 ## Testes

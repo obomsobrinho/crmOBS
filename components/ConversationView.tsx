@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
 import type { Handoff } from "./HandoffCard";
-import ContextPanel from "./ContextPanel";
+import FichaContato from "./FichaContato";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
@@ -31,6 +31,8 @@ export default function ConversationView({
   clientId,
   displayName,
   customFields,
+  contactEmail = null,
+  contactBirthDate = null,
   contactExists,
   readOnly,
   qualificacaoPreview,
@@ -50,6 +52,8 @@ export default function ConversationView({
   clientId: string;
   displayName: string | null;
   customFields: Record<string, unknown> | null;
+  contactEmail?: string | null;
+  contactBirthDate?: string | null;
   contactExists: boolean;
   /** Conta bloqueada por assinatura: a conversa é visível, mas não se trabalha. */
   readOnly?: boolean;
@@ -334,7 +338,8 @@ export default function ConversationView({
   }, [assigned, iaState, phone, supabase, readOnly]);
 
   const painelContato = (
-    <ContextPanel
+    <FichaContato
+      superficie="conversa"
       name={name}
       phone={phone}
       firstMessageAt={firstMessageAt}
@@ -347,6 +352,8 @@ export default function ConversationView({
       clientId={clientId}
       editableName={displayName}
       customFields={customFields}
+      email={contactEmail}
+      birthDate={contactBirthDate}
       contactExists={contactExists}
     />
   );

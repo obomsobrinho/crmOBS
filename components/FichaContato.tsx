@@ -1,7 +1,9 @@
 "use client";
 
-import { User } from "lucide-react";
+import Link from "next/link";
+import { MessagesSquare, User } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -11,7 +13,7 @@ import { prettyPhone, phoneDigits } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
-import ContactFields from "./ContactFields";
+import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
@@ -24,7 +26,16 @@ function fmtDate(iso: string | null): string {
     .replace(".", "");
 }
 
-// Coluna da direita: quem é a pessoa e o que se sabe dela.
+// A FICHA DO CONTATO: quem é a pessoa e o que se sabe dela.
+//
+// ⚠️ UM COMPONENTE, DUAS SUPERFÍCIES (tela de Clientes, 30/09/2026, decisão do
+// dono de 31/08: edita nos dois lugares). É a coluna da direita da conversa E a
+// ficha da tela de Clientes. A diferença entre as duas é a prop `superficie` e
+// mais nada, como o `mostrarOpcionais` do agente: Tags, Dados e Notas são os
+// MESMOS blocos, então o campo que alguém acrescentar aparece nos dois lugares.
+// O que `clientes` acrescenta: o atalho para a conversa (ali a pessoa não está
+// nela) e o Entendimento (na conversa ele já é a faixa "O cliente quer").
+// Era `ContextPanel`.
 //
 // ⚠️ ESTRUTURA REFEITA EM 18/09/2026, pelo desenho aprovado (a coluna da direita
 // de `atendimento.html`). Quatro mudanças de ESTRUTURA, e não de enfeite:
@@ -55,7 +66,8 @@ function fmtDate(iso: string | null): string {
 // A seção "Atendimento" saiu daqui na migração de UI: quem atende agora é um
 // chip no cabeçalho da conversa, e ter os dois era a mesma decisão em dois
 // lugares.
-export default function ContextPanel({
+export default function FichaContato({
+  superficie = "conversa",
   name,
   phone,
   firstMessageAt,
@@ -66,8 +78,18 @@ export default function ContextPanel({
   clientId,
   editableName,
   customFields,
+  email = null,
+  birthDate = null,
+  entendimento = null,
   contactExists,
 }: {
+  /** Onde a ficha está. `clientes` acrescenta o atalho da conversa e o Entendimento. */
+  superficie?: "conversa" | "clientes";
+  email?: string | null;
+  /** AAAA-MM-DD. */
+  birthDate?: string | null;
+  /** O último resumo da IA (`conversation_qualifications.summary`). Só em `clientes`. */
+  entendimento?: string | null;
   name: string | null;
   phone: string;
   firstMessageAt: string | null;
@@ -158,6 +180,18 @@ export default function ContextPanel({
           />
         </div>
 
+        {superficie === "clientes" && conversationId != null && (
+          <Button asChild variant="outline" size="control" className="self-start">
+            <Link
+              data-slot="ficha-abrir-conversa"
+              href={`/inbox/${encodeURIComponent(phone)}`}
+            >
+              <MessagesSquare size={14} />
+              Abrir conversa
+            </Link>
+          </Button>
+        )}
+
         <ContactTags
           conversationId={conversationId}
           clientId={clientId}
@@ -168,6 +202,22 @@ export default function ContextPanel({
           quer" no topo da conversa. Ter os dois seria a mesma frase duas vezes na
           mesma tela, e a de cima é a que a pessoa lê primeiro. O componente
           continua existindo, e agora tem um lugar só. */}
+
+      {superficie === "clientes" && conversationId != null && (
+        <div data-slot="ficha-entendimento" className="flex flex-col gap-2 px-4 pt-4">
+          <CabecalhoBloco rotulo="Entendimento" />
+          <p
+            className={
+              entendimento
+                ? "text-apoio text-ink-2"
+                : "text-apoio text-ink-3"
+            }
+            style={{ textWrap: "pretty" }}
+          >
+            {entendimento ?? "A IA ainda não resumiu o que a pessoa quer."}
+          </p>
+        </div>
+      )}
 
       {!contactExists && (
         /* Este número ainda não tem linha em `dados_cliente` (quem cria é o n8n,
@@ -194,10 +244,13 @@ export default function ContextPanel({
         phone={phone}
         initialDisplayName={editableName}
         initialCustomFields={customFields}
+        initialEmail={email}
+        initialBirthDate={birthDate}
         editable={contactExists}
       />
 
       <ContactNotes
+        foraDaConversa={superficie === "clientes"}
         conversationId={conversationId}
         myUserId={myUserId}
         members={members}

@@ -186,11 +186,17 @@ test.describe("Coluna do cliente (/design)", () => {
       const estilo = await rotulo.evaluate((el) => {
         const c = getComputedStyle(el);
         const fio = el.nextElementSibling as HTMLElement;
+        // O que vem depois do filete na mesma linha (a contagem "1 de 3
+        // preenchidos" do bloco Dados, desde 30/09/2026) não conta como sobra.
+        const depois = fio.nextElementSibling as HTMLElement | null;
+        const linha = el.parentElement!.getBoundingClientRect();
+        const f = fio.getBoundingClientRect();
         return {
           caixaAlta: c.textTransform,
           tamanho: c.fontSize,
-          fioLargura: Math.round(fio.getBoundingClientRect().width),
-          fioAltura: Math.round(fio.getBoundingClientRect().height),
+          fioLargura: Math.round(f.width),
+          fioAltura: Math.round(f.height),
+          sobra: Math.round(linha.right - f.right - (depois ? depois.getBoundingClientRect().width : 0)),
         };
       });
       expect(estilo.caixaAlta).toBe("uppercase");
@@ -198,7 +204,8 @@ test.describe("Coluna do cliente (/design)", () => {
       expect(estilo.tamanho).toBe("12px");
       expect(estilo.fioAltura).toBe(1);
       // Ocupa o resto da linha, e não um traço decorativo de 20px.
-      expect(estilo.fioLargura).toBeGreaterThan(150);
+      expect(estilo.fioLargura).toBeGreaterThan(60);
+      expect(estilo.sobra).toBeLessThanOrEqual(8);
     }
   });
 

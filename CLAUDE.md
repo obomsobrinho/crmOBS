@@ -130,6 +130,11 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   (ex.: um lead da OBM). "O cliente do seu cliente". PK `bigint`. Único por `(client_id, telefone)`.
   Editável pelo CRM (grant de coluna, browser direto): `atendimento_ia`, `display_name` (nome que
   o CRM mostra, precede `nomewpp`) e `custom_fields` (jsonb). O n8n segue dono de `nomewpp`.
+  **`email` e `birth_date`** (30/09/2026, tela de Clientes, D1 = B) também têm grant de UPDATE;
+  **CPF ficou de fora de propósito** (LGPD). A tela `/clientes` (lista com busca + ficha) usa a MESMA
+  ficha do painel da conversa: **`components/FichaContato.tsx`** (era `ContextPanel`), com a prop
+  `superficie` (`conversa`/`clientes`) e mais nada de diferente. Regra pura em `lib/clientes.ts`;
+  plano e fatias em `docs/plano-clientes.md`.
 - **Tabelas próprias do CRM** (browser faz CRUD via RLS por tenant, não passam pelo n8n): `tags`
   + `conversation_tags` (rótulos por conversa), `conversation_notes` (notas internas, nunca vão
   ao WhatsApp; `author_user_id` = `auth.uid()`), `quick_replies` (mensagens prontas por tenant).

@@ -36,18 +36,19 @@ sacadas, com o Deskcomm como catálogo).
 |---|---|---|
 | **P0, antes de abrir o beta** | 1. ✅ **Avisos no WhatsApp** do time quando a IA pede ajuda (`docs/plano-avisos.md`). **Feito em 29/09/2026**; falta o teste do dono com o chip | Obrigatório para o beta, decisão do dono: quem não vive na tela não fica sabendo |
 | | 2. ✅ **Página de pedidos abertos**, com orientar na própria linha (`docs/plano-pedidos.md`). **Feito em 29/09/2026** | O aviso leva direto para ela |
-| **P1, durante o beta** | 3. **Motivo do pedido de ajuda** gravado + métricas de decisão da IA | É o dado que diz o que ensinar à IA |
-| | 4. **Orientação vira regra permanente** do agente (sugestão "salvar como regra") | Hoje cada orientação vale uma vez |
-| | 5. **Custo de IA por empresa em reais, com teto** | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |
-| | 6. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos | Mesma conta do item 5; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
-| **P2, antes de cobrar** | 7. **Admin v2**: pagamentos e assinatura | Cobrança está construída e desligada |
-| | 8. **LGPD**: exportar e apagar os dados de um contato | Cliente sério pede |
-| | 9. **Agenda** com Google Calendar | Já decidido como primeiro depois do beta (26/08) |
-| | 10. **Follow-up** | Já decidido, com as regras de segurança (26/08) |
-| **P3** | 11. **Admin v3**: base da IA versionada e "ver como o cliente" | Ver o cuidado abaixo |
-| | 12. **Camada de canal** (QR e API Oficial) | Pré-requisito para migrar; a Meta cobra o atendimento desde 01/10/2026 |
-| | 13. **Distribuição de conversas** entre atendentes | Só pesa com equipe de 3 ou mais |
-| | 14. **Radar** de conversas esfriando | Encaixa no filtro "Esperando" e no painel |
+| | 3. **Tela de Clientes**: lista com busca, ficha única (Clientes e painel da conversa), criar contato e iniciar conversa com alerta, contato frio (`docs/plano-clientes.md`). **Antes do beta**, decisão do dono em 30/09/2026 | Paridade básica de CRM: hoje quem falou há meses só aparece rolando o inbox, e quem nunca escreveu não existe |
+| **P1, durante o beta** | 4. **Motivo do pedido de ajuda** gravado + métricas de decisão da IA | É o dado que diz o que ensinar à IA |
+| | 5. **Orientação vira regra permanente** do agente (sugestão "salvar como regra") | Hoje cada orientação vale uma vez |
+| | 6. **Custo de IA por empresa em reais, com teto** | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |
+| | 7. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos | Mesma conta do item 6; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
+| **P2, antes de cobrar** | 8. **Admin v2**: pagamentos e assinatura | Cobrança está construída e desligada |
+| | 9. **LGPD**: exportar e apagar os dados de um contato | Cliente sério pede |
+| | 10. **Agenda** com Google Calendar | Já decidido como primeiro depois do beta (26/08) |
+| | 11. **Follow-up** | Já decidido, com as regras de segurança (26/08) |
+| **P3** | 12. **Admin v3**: base da IA versionada e "ver como o cliente" | Ver o cuidado abaixo |
+| | 13. **Camada de canal** (QR e API Oficial) | Pré-requisito para migrar; a Meta cobra o atendimento desde 01/10/2026 |
+| | 14. **Distribuição de conversas** entre atendentes | Só pesa com equipe de 3 ou mais |
+| | 15. **Radar** de conversas esfriando | Encaixa no filtro "Esperando" e no painel |
 
 ### Admin (decidido em 29/09/2026)
 

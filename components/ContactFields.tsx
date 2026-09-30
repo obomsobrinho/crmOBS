@@ -11,6 +11,12 @@ import {
   listToCustomFields,
   type CustomField,
 } from "@/lib/crm";
+import {
+  emailValido,
+  isoParaTela,
+  mascaraData,
+  telaParaIso,
+} from "@/lib/clientes";
 
 // "Dados": nome de exibição (display_name, precede o pushName do WhatsApp) e
 // campos personalizados (custom_fields jsonb). Escrita direta na dados_cliente
@@ -42,11 +48,18 @@ export default function ContactFields({
   phone,
   initialDisplayName,
   initialCustomFields,
+  initialEmail = null,
+  initialBirthDate = null,
   editable,
 }: {
   phone: string;
   initialDisplayName: string | null;
   initialCustomFields: Record<string, unknown> | null;
+  /** Nascimento e e-mail entraram com a tela de Clientes (30/09/2026, D1 = B).
+   *  CPF ficou de fora de propósito (LGPD). */
+  initialEmail?: string | null;
+  /** AAAA-MM-DD, como o banco guarda. */
+  initialBirthDate?: string | null;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -55,30 +68,53 @@ export default function ContactFields({
   const [fields, setFields] = useState<CustomField[]>(
     customFieldsToList(initialCustomFields)
   );
-  const [status, setStatus] = useState<"idle" | "salvando" | "salvo" | "erro">(
-    "idle"
-  );
+  const [email, setEmail] = useState(initialEmail ?? "");
+  const [nascimento, setNascimento] = useState(isoParaTela(initialBirthDate));
+  const [status, setStatus] = useState<
+    "idle" | "salvando" | "salvo" | "erro" | "data" | "email"
+  >("idle");
 
   // O que já está no banco, para não gravar a cada foco perdido sem mudança.
   const gravado = useRef(
-    marca(initialDisplayName ?? "", customFieldsToList(initialCustomFields))
+    marca(
+      initialDisplayName ?? "",
+      customFieldsToList(initialCustomFields),
+      initialEmail ?? "",
+      isoParaTela(initialBirthDate)
+    )
   );
 
   if (!editable) return null;
+
+  const cheios = [name.trim(), nascimento.trim(), email.trim()].filter(Boolean).length;
+  const completude = cheios === 3 ? "Completo" : `${cheios} de 3 preenchidos`;
 
   function setField(i: number, patch: Partial<CustomField>) {
     setFields((f) => f.map((x, idx) => (idx === i ? { ...x, ...patch } : x)));
   }
 
   async function salvar(nome: string, lista: CustomField[]) {
-    const atual = marca(nome, lista);
+    const atual = marca(nome, lista, email, nascimento);
     if (atual === gravado.current) return;
+    // Valor que não dá para gravar fica NA TELA, com o motivo, e nada vai ao
+    // banco: gravar meia data ou um e-mail sem arroba seria dado inventado.
+    const birth = telaParaIso(nascimento);
+    if (birth === undefined) {
+      setStatus("data");
+      return;
+    }
+    if (!emailValido(email)) {
+      setStatus("email");
+      return;
+    }
     setStatus("salvando");
     const { error } = await supabase
       .from("dados_cliente")
       .update({
         display_name: nome.trim() || null,
         custom_fields: listToCustomFields(lista),
+        email: email.trim() || null,
+        birth_date: birth,
       })
       .eq("telefone", phone);
     if (error) {
@@ -99,17 +135,33 @@ export default function ContactFields({
   return (
     <div className="flex flex-col gap-2 px-4 pt-4">
       <CabecalhoBloco rotulo="Dados">
-        {status !== "idle" && (
+        {status !== "idle" ? (
           <span
+            data-slot="painel-dados-status"
             className={`shrink-0 text-legenda font-normal ${
-              status === "erro" ? "text-danger-ink" : "text-ink-3"
+              status === "salvando" || status === "salvo"
+                ? "text-ink-3"
+                : "text-danger-ink"
             }`}
           >
             {status === "salvando"
               ? "salvando"
               : status === "salvo"
                 ? "salvo"
-                : "não deu para salvar"}
+                : status === "data"
+                  ? "data inválida"
+                  : status === "email"
+                    ? "e-mail inválido"
+                    : "não deu para salvar"}
+          </span>
+        ) : (
+          // O CONVITE A COMPLETAR, sem cobrar (desenho de Clientes): só a
+          // contagem, em tinta de apoio. Nada de cor de aviso nem faixa.
+          <span
+            data-slot="painel-completude"
+            className="shrink-0 text-legenda font-normal text-ink-3"
+          >
+            {completude}
           </span>
         )}
       </CabecalhoBloco>
@@ -124,6 +176,22 @@ export default function ContactFields({
           valor={name}
           placeholder="Adicionar nome"
           onChange={setName}
+          onCommit={() => void salvar(name, fields)}
+        />
+        <Linha
+          rotulo="Nascimento"
+          valor={nascimento}
+          placeholder="Adicionar data"
+          inputMode="numeric"
+          onChange={(v) => setNascimento(mascaraData(v))}
+          onCommit={() => void salvar(name, fields)}
+        />
+        <Linha
+          rotulo="E-mail"
+          valor={email}
+          placeholder="Adicionar e-mail"
+          inputMode="email"
+          onChange={setEmail}
           onCommit={() => void salvar(name, fields)}
         />
 
@@ -193,8 +261,18 @@ export function CabecalhoBloco({
 
 // Assinatura do que de fato vai para o banco (chave vazia é descartada por
 // listToCustomFields, então uma linha em branco recém-criada não conta).
-function marca(nome: string, lista: CustomField[]): string {
-  return JSON.stringify([nome.trim(), listToCustomFields(lista)]);
+function marca(
+  nome: string,
+  lista: CustomField[],
+  email: string,
+  nascimento: string
+): string {
+  return JSON.stringify([
+    nome.trim(),
+    listToCustomFields(lista),
+    email.trim(),
+    nascimento.trim(),
+  ]);
 }
 
 function Linha({
@@ -206,7 +284,9 @@ function Linha({
   onChange,
   onCommit,
   onRemover,
+  inputMode,
 }: {
+  inputMode?: "numeric" | "email";
   rotulo: string;
   rotuloEditavel?: boolean;
   onRotulo?: (v: string) => void;
@@ -245,6 +325,7 @@ function Linha({
           if (e.key === "Enter") e.currentTarget.blur();
         }}
         placeholder={placeholder}
+        inputMode={inputMode}
         aria-label={rotulo || "Valor do campo"}
         className="w-auto flex-1 text-right font-semibold text-ink placeholder:font-normal placeholder:text-ink-3"
       />

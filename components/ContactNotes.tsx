@@ -35,10 +35,13 @@ export default function ContactNotes({
   conversationId,
   myUserId,
   members,
+  foraDaConversa = false,
 }: {
   conversationId: number | null;
   myUserId: string;
   members: Member[];
+  /** Na tela de Clientes não existe caixa de escrita: o vazio diz onde a nota nasce. */
+  foraDaConversa?: boolean;
 }) {
   const supabase = createClient();
   // Sufixo por instância no nome do canal: no celular o painel do contato
@@ -175,7 +178,9 @@ export default function ContactNotes({
 
       {notes.length === 0 && (
         <span className="text-apoio text-ink-3" style={{ textWrap: "pretty" }}>
-          Nenhuma nota ainda. Use a aba Nota interna no campo de escrita.
+          {foraDaConversa
+            ? "Nenhuma nota ainda. Notas se escrevem na conversa, pela aba Nota interna."
+            : "Nenhuma nota ainda. Use a aba Nota interna no campo de escrita."}
         </span>
       )}
 

@@ -33,7 +33,15 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### 29/09/2026, noite: P0 do beta FEITO (a mais recente; ler isto primeiro)
+### 30/09/2026: tela de Clientes, fatia A (a mais recente; ler isto primeiro)
+
+Item 3 do P0 (`docs/plano-clientes.md`, aprovado pelo dono). **Fatia A commitada, sem push**: lista
+`/clientes` com busca e filtros, ficha única (`FichaContato`) nas duas superfícies, Nascimento e
+E-mail no cadastro. **Próximo: fatia B** (criar contato e iniciar conversa com alerta), depois C
+(contato frio, 60 dias). O tenant de teste agora é a **OBM** (o dono limpou conversas e contatos em
+29/09; OBS e Loja Teste não existem mais).
+
+### 29/09/2026, noite: P0 do beta FEITO
 
 Os dois itens do P0 do plano vigente estão commitados, **sem push** (o dono decide):
 - **Avisos no WhatsApp** (`docs/plano-avisos.md`): o pedido de ajuda novo avisa o destino de avisos

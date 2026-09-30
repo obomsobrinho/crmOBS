@@ -25,6 +25,7 @@ import { BRAND } from "@/lib/brand";
 import {
   HandHelping,
   MessagesSquare,
+  BookUser,
   KanbanSquare,
   LayoutDashboard,
   Bot,
@@ -60,6 +61,10 @@ const NAV: {
   // para não deixar esquecer, e é para onde o aviso no WhatsApp leva.
   { href: "/pedidos", label: "Pedidos", icon: HandHelping },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
+  // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
+  // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
+  // e Conversas.
+  { href: "/clientes", label: "Clientes", icon: BookUser },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
