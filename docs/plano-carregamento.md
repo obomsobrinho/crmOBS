@@ -58,7 +58,18 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
   realtime busca SÓ o card. ⚠️ Achado: `pipeline_stages` e `conversation_notes` nunca estiveram na
   publicação do realtime; o Supabase recusava a assinatura e derrubava o canal INTEIRO (o realtime do
   Pipeline nunca funcionou, e o das notas também não). As duas entraram, com replica FULL.
-- **6. Painel:** números calculados no banco (hoje ele baixa tudo e conta no servidor).
+- ✅ **6. Painel (parcial, de propósito):** as contas continuam em JS (lib/valor, lib/metrics,
+  lib/painel: regra num lugar só, com feriados e horário de atendimento), mas recebem as linhas SEM
+  TEXTO (`public.painel_linhas`: só se há mensagem recebida e se há resposta), e a frase do agente
+  vem de `public.painel_verbatim` (as poucas linhas de onde ela é escolhida, com "conversa com
+  humano" medido na conta inteira). Provado em `e2e/painel-equivalencia.serial.spec.ts`: as mesmas
+  funções sobre as duas formas, com massa variada, dão resultado idêntico.
+  ⚠️ **O que ficou para depois, e por quê:** o acumulado "desde o início" ainda lê até 20.000
+  linhas (com a guarda de truncamento que já existia). O passo seguinte é um RESUMO GUARDADO por
+  mês fechado, com estado que se soma (por conversa: houve humano, primeira recebida, primeira
+  resposta; contadores e o mapa de pico), montado pelas MESMAS funções JS. Levar as regras para SQL
+  criaria uma segunda definição dos mesmos números, que é o defeito que `lib/mensagem.ts` existe
+  para impedir.
 
 ⚠️ **A ordem da lista existe em dois lugares:** no `order by` de `inbox_pagina` e em
 `compararItens` (`lib/inbox-lista.ts`), que reposiciona a linha que o realtime atualizou. Mudou um,

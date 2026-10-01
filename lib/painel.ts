@@ -203,11 +203,18 @@ export function separarMensagens(texto: string): string[] {
  * então na prática cobre a conta inteira.
  */
 export function escolherVerbatim(
-  candidatos: CandidatoVerbatim[]
+  candidatos: CandidatoVerbatim[],
+  /**
+   * Conversas em que alguém do time respondeu, medidas na conta INTEIRA (o
+   * banco sabe, `painel_verbatim`). Sem ele, mede sobre os próprios candidatos.
+   */
+  comHumanoNaConta?: Set<string>
 ): Verbatim | null {
-  const comHumano = new Set<string>();
-  for (const m of candidatos) {
-    if (respostaHumana(m)) comHumano.add(m.phone);
+  const comHumano = new Set<string>(comHumanoNaConta ?? []);
+  if (!comHumanoNaConta) {
+    for (const m of candidatos) {
+      if (respostaHumana(m)) comHumano.add(m.phone);
+    }
   }
 
   const daIa = candidatos

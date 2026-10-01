@@ -39,8 +39,10 @@ import {
   barrasDeHora,
   escolherVerbatim,
   rotuloHorario,
+  VERBATIM_MIN_CHARS,
   type CandidatoVerbatim,
 } from "@/lib/painel";
+import { foraDaLista } from "@/lib/inbox-lista";
 import { dentroDoHorario, parteLocal } from "@/lib/valor";
 import {
   frasesDeValor,
@@ -82,7 +84,7 @@ export default async function PainelPage() {
   const supabase = await createClient();
   const mes = mesFechado();
 
-  const [{ data: todasMsgs }, { data: todasQuals }, { data: cfg }, espera] =
+  const [{ data: linhas }, { data: todasQuals }, { data: cfg }, espera, { data: verbatimLinhas }] =
     await Promise.all([
       // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e
       // é ele que trava a mão de quem ia cancelar. As janelas de período, o mês
@@ -96,13 +98,11 @@ export default async function PainelPage() {
       //
       // `nomewpp` vem junto agora: o verbatim precisa do nome do contato, e
       // antes isso era uma quinta consulta só para uma linha.
-      supabase
-        .from("chat_messages")
-        .select(
-          "phone, nomewpp, user_message, bot_message, message_type, created_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(TETO),
+      // ⚠️ SEM O TEXTO (01/10/2026, docs/plano-carregamento.md, fase 6): as
+      // contas só olham SE a linha tem mensagem recebida e SE tem resposta, e
+      // `painel_linhas` devolve exatamente isso. Antes vinham até 20.000
+      // linhas com o texto inteiro. A frase do agente tem consulta própria.
+      supabase.rpc("painel_linhas", { p_client: client.id, p_limite: TETO }),
       supabase
         .from("conversation_qualifications")
         .select("id, phone, action, summary, created_at")
@@ -127,7 +127,33 @@ export default async function PainelPage() {
         .select("phone, handoff_at")
         .not("handoff_at", "is", null)
         .order("handoff_at", { ascending: true }),
+      // As poucas linhas de onde sai a frase real do agente (lib/painel.ts).
+      supabase.rpc("painel_verbatim", {
+        p_client: client.id,
+        p_min: VERBATIM_MIN_CHARS,
+        p_fora: foraDaLista(client.avisos),
+      }),
     ]);
+
+  // A linha sem texto vira a forma que as contas já leem: o que importa é se
+  // existe mensagem recebida e se existe resposta (`!!user_message`,
+  // `!!bot_message`), e o marcador "·" diz exatamente isso.
+  const todasMsgs = (
+    (linhas ?? []) as {
+      phone: string;
+      created_at: string;
+      message_type: string | null;
+      tem_user: boolean;
+      tem_bot: boolean;
+    }[]
+  ).map((l) => ({
+    phone: l.phone,
+    nomewpp: null as string | null,
+    created_at: l.created_at,
+    message_type: l.message_type,
+    user_message: l.tem_user ? "·" : null,
+    bot_message: l.tem_bot ? "·" : null,
+  }));
 
   const hours =
     (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
@@ -248,7 +274,13 @@ export default async function PainelPage() {
   // A regra mora em lib/painel.ts e é OBJETIVA: a mais recente de uma conversa
   // que a IA atendeu sozinha, com reserva por comprimento. Nunca escolhida a
   // dedo. Sai do acumulado que já está em memória, sem consulta nova.
-  const verbatim = escolherVerbatim(acumuladoMsgs as CandidatoVerbatim[]);
+  const candidatosVerbatim = (verbatimLinhas ?? []) as (CandidatoVerbatim & {
+    conversa_com_humano: boolean;
+  })[];
+  const verbatim = escolherVerbatim(
+    candidatosVerbatim,
+    new Set(candidatosVerbatim.filter((m) => m.conversa_com_humano).map((m) => m.phone))
+  );
   // Hora da pergunta e se a resposta saiu com a empresa fechada. As duas saem
   // do MESMO instante, porque pergunta e resposta moram na mesma linha.
   // ⚠️ A LATÊNCIA não é passada: com um `created_at` só, a diferença entre
