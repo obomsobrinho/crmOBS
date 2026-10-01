@@ -64,6 +64,10 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
   vem de `public.painel_verbatim` (as poucas linhas de onde ela é escolhida, com "conversa com
   humano" medido na conta inteira). Provado em `e2e/painel-equivalencia.serial.spec.ts`: as mesmas
   funções sobre as duas formas, com massa variada, dão resultado idêntico.
+  ⚠️ **ATUALIZADO em 02/10/2026 (R-04/R-06/R-19):** o "Max rows" do PostgREST é 1000, então o teto
+  de 20.000 nunca existiu de fato. As contas agora saem de agregações do banco
+  (`painel_janelas`/`painel_series`, `docs/adr/2026-10-02-painel-agrega-no-banco.md`), sem linha
+  nenhuma; o parágrafo abaixo descreve o estado de 01/10.
   ⚠️ **O que ficou para depois, e por quê:** o acumulado "desde o início" ainda lê até 20.000
   linhas (com a guarda de truncamento que já existia). O passo seguinte é um RESUMO GUARDADO por
   mês fechado, com estado que se soma (por conversa: houve humano, primeira recebida, primeira

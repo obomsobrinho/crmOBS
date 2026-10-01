@@ -14,6 +14,30 @@
 //
 // É exatamente o erro que o produto não pode cometer: o cliente confere no
 // WhatsApp dele em dez segundos, e "a IA não inventa" é o nosso eixo.
+//
+// ⚠️ CÓPIAS EM SQL (R-18, auditoria de 01/10/2026). O painel agrega no banco
+// porque o "Max rows" do PostgREST corta qualquer conjunto de linhas em 1000, e
+// por isso a regra existe TAMBÉM em SQL, nestes lugares e só nestes:
+//   - public.painel_janelas e public.painel_series
+//     (supabase/migrations/20261002200100_painel_agregados_janelas_series.sql)
+//   - public.painel_verbatim (mesma migration)
+//   - as cinco consultas de docs/instrumentacao-beta.md
+// A tradução, que as três funções repetem igual:
+//   ehImportada(t)     <=>  message_type = 'imported'
+//   respostaDaIa(m)    <=>  coalesce(bot_message, '') <> ''
+//                           and message_type is distinct from 'manual'
+//                           and message_type is distinct from 'imported'
+//   respostaHumana(m)  <=>  coalesce(bot_message, '') <> ''
+//                           and message_type in ('manual', 'imported')
+//   `!!m.user_message` <=>  coalesce(user_message, '') <> ''   (sem btrim)
+// Quem acrescentar um `message_type` novo (agendamento, template...) muda ESTE
+// arquivo e essas funções juntos. O teste que prova que os dois lados concordam
+// é e2e/painel-agregado.serial.spec.ts (semeia todas as combinações de tipo e
+// texto e compara o banco com `agregarLinhas`, que usa as funções abaixo).
+// Única diferença declarada: `painel_verbatim` exige texto não vazio DEPOIS do
+// btrim, porque `escolherVerbatim` (lib/painel.ts) faz o mesmo `trim()` em
+// seguida; a linha só de espaços é resposta da IA para a contagem e nunca vira
+// frase de vitrine.
 
 /** Histórico do WhatsApp trazido no onboarding. Aconteceu ANTES da IA. */
 export const IMPORTADA = "imported";

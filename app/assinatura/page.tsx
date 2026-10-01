@@ -6,14 +6,11 @@ import { createServiceClient } from "@/lib/supabase/service";
 import SubscriptionPanel from "@/components/SubscriptionPanel";
 import BillingCheckout from "@/components/BillingCheckout";
 import { type PlanKey } from "@/lib/billing";
-import {
-  frasesDeValor,
-  resumoDeValor,
-  type ValorMsg,
-  type ValorQual,
-} from "@/lib/valor";
+import { frasesDeValor, type FraseValor } from "@/lib/valor";
+import { agoraMs } from "@/lib/periodo";
+import { resumoDeValorAgregado } from "@/lib/painel-agregado";
+import { carregarAgregadoDoPainel } from "@/lib/painel-dados";
 import type { BusinessHours } from "@/lib/agent-prompt";
-import { semNumeroDeAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
 
@@ -63,35 +60,41 @@ export default async function AssinaturaPage({
   const planoSugerido = planoDaUrl((await searchParams).plano);
 
   // Acumulado de valor desde o início, para o passo de cancelar. Sem janela de
-  // data de propósito: é o "tudo que a IA já fez aqui". Teto de linhas porque um
-  // tenant com um ano de operação tem dezenas de milhares, e esta tela precisa
-  // abrir rápido. Quando o teto doer, o caminho é uma tabela de agregado mensal.
-  const [{ data: todasMsgs }, { data: todasQuals }, { data: cfg }] =
-    await Promise.all([
-      supabase
-        .from("chat_messages")
-        .select("phone, user_message, bot_message, message_type, created_at")
-        .order("created_at", { ascending: false })
-        .limit(20000),
-      supabase
-        .from("conversation_qualifications")
-        .select("phone, action, created_at")
-        .order("created_at", { ascending: false })
-        .limit(5000),
-      supabase
-        .from("clients")
-        .select("agent_config")
-        .eq("id", client.id)
-        .maybeSingle(),
-    ]);
-
-  const acumulado = resumoDeValor({
-    // O número de avisos do time não é cliente (lib/avisos.ts).
-    msgs: semNumeroDeAvisos((todasMsgs ?? []) as ValorMsg[], client.avisos, (m) => m.phone),
-    quals: semNumeroDeAvisos((todasQuals ?? []) as ValorQual[], client.avisos, (q) => q.phone),
-    hours: (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null,
-  });
-  const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
+  // data de propósito: é o "tudo que a IA já fez aqui". Vem do MESMO agregado do
+  // /painel (lib/painel-dados.ts: o banco soma, nenhuma linha de mensagem sobe),
+  // e só é buscado para o dono, porque o bloco de valor mora no passo de cancelar.
+  // Falhar aqui nunca pode travar a tela de pagamento: sem o acumulado, só some
+  // o argumento de retenção.
+  let frasesAcumuladas: FraseValor[] = [];
+  if (client.role === "dono") {
+    try {
+      const agora = agoraMs();
+      const [agregado, { data: cfg }] = await Promise.all([
+        carregarAgregadoDoPainel(supabase, {
+          clientId: client.id,
+          avisos: client.avisos,
+          agora,
+          janelas: [],
+          mes: null,
+        }),
+        // Só `hours` sai do jsonb (R-51).
+        supabase
+          .from("clients")
+          .select("hours:agent_config->hours")
+          .eq("id", client.id)
+          .maybeSingle(),
+      ]);
+      const acumulado = resumoDeValorAgregado({
+        janela: agregado.janela(0),
+        series: agregado.series,
+        hours: (cfg?.hours as BusinessHours | null | undefined) ?? null,
+        mes: null,
+      });
+      frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
+    } catch {
+      frasesAcumuladas = [];
+    }
+  }
 
   return (
     <SubscriptionPanel

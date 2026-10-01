@@ -99,15 +99,6 @@ export function limites(p: Periodo, agora: number): Limites {
   };
 }
 
-/**
- * O instante mais antigo de que o painel precisa para montar TODAS as janelas,
- * inclusive as anteriores. É com ele que a página decide se a consulta truncou e
- * o selo tem que sumir.
- */
-export function instanteMaisAntigoNecessario(agora: number): number {
-  return agora - PERIODOS.mes.anteriorDias * DIA_MS;
-}
-
 /** O instante está dentro de [de, ate)? */
 export function naJanela(t: number, de: number, ate: number): boolean {
   return t >= de && t < ate;

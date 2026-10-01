@@ -148,6 +148,21 @@ export function computeMetrics(input: MetricsInput): DashboardMetrics {
   };
 }
 
+/**
+ * A mesma mediana de `mediana`, a partir de n e dos DOIS valores centrais da
+ * lista ordenada (`dif_n`, `dif_lo`, `dif_hi` de `painel_janelas`): o banco
+ * entrega os centrais, a definição (ímpar: o do meio; par: média arredondada dos
+ * dois) fica aqui. `null` quando não há amostra.
+ */
+export function medianaDeCentrais(
+  n: number,
+  lo: number | null,
+  hi: number | null
+): number | null {
+  if (n === 0 || lo === null || hi === null) return null;
+  return n % 2 === 1 ? hi : Math.round((lo + hi) / 2);
+}
+
 /** Mediana de uma lista de durações. `null` quando não há amostra. */
 export function mediana(valores: number[]): number | null {
   if (valores.length === 0) return null;
@@ -205,6 +220,37 @@ function balde(inst: Date, porHora: boolean): string {
  */
 export function barras(msgs: JanelaMsg[], dias: number, agora: number): Barra[] {
   const porHora = dias <= 1;
+  const baldes: BaldesDeBarras = new Map();
+  for (const m of msgs) {
+    if (!m.bot_message || ehImportada(m.message_type)) continue;
+    const chave = balde(new Date(m.created_at), porHora);
+    let e = baldes.get(chave);
+    if (!e) {
+      e = { ia: 0, time: 0 };
+      baldes.set(chave, e);
+    }
+    if (respostaDaIa(m)) e.ia++;
+    else if (respostaHumana(m)) e.time++;
+  }
+  return barrasDeBaldes(baldes, dias, agora);
+}
+
+/** Contagem por balde: chave `AAAA-MM-DD` (dia) ou `AAAA-MM-DDTHH` (hora), em São Paulo. */
+export type BaldesDeBarras = Map<string, { ia: number; time: number }>;
+
+/**
+ * O esqueleto do gráfico preenchido com contagens JÁ agrupadas por balde.
+ *
+ * É o miolo de `barras`, separado para a tela real poder alimentá-lo com o que o
+ * banco agrega (`painel_series`, lib/painel-agregado.ts) em vez de linhas. Balde
+ * fora do esqueleto é ignorado, igual ao "fora da janela" de antes.
+ */
+export function barrasDeBaldes(
+  baldes: BaldesDeBarras,
+  dias: number,
+  agora: number
+): Barra[] {
+  const porHora = dias <= 1;
   const passos = porHora ? 24 : dias;
   const passoMs = porHora ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
 
@@ -222,12 +268,11 @@ export function barras(msgs: JanelaMsg[], dias: number, agora: number): Barra[] 
     mapa.set(chave, { chave, eixo, titulo: "", ia: 0, time: 0 });
   }
 
-  for (const m of msgs) {
-    if (!m.bot_message || ehImportada(m.message_type)) continue;
-    const e = mapa.get(balde(new Date(m.created_at), porHora));
+  for (const [chave, n] of baldes) {
+    const e = mapa.get(chave);
     if (!e) continue; // fora da janela
-    if (respostaDaIa(m)) e.ia++;
-    else if (respostaHumana(m)) e.time++;
+    e.ia += n.ia;
+    e.time += n.time;
   }
 
   return ordem.map((c) => {
