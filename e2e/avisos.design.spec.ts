@@ -69,9 +69,9 @@ test.describe("Regra do número de avisos (lib/avisos.ts)", () => {
       abrir: "https://exemplo.test/inbox/5511912345678",
     });
     expect(t).toContain("A IA pediu sua ajuda");
-    expect(t).toContain("Cliente: Ana (wa.me/5511912345678)");
-    expect(t).toContain("Pedido: Quer saber se aceita cartão");
-    expect(t).toContain("Abrir: https://exemplo.test/inbox/5511912345678");
+    expect(t).toBe(
+      "🙋 *A IA pediu sua ajuda*\n\n*Cliente:* Ana\nwa.me/5511912345678\n\n*Pedido:* Quer saber se aceita cartão\n\nAbrir no CRM:\nhttps://exemplo.test/inbox/5511912345678"
+    );
     expect(t).not.toMatch(/[—–]/);
     // Sem nome, o telefone formatado; sem URL (fora da Vercel), sem a linha.
     const semNada = textoDoAviso({
@@ -80,8 +80,8 @@ test.describe("Regra do número de avisos (lib/avisos.ts)", () => {
       resumo: "x",
       abrir: null,
     });
-    expect(semNada).toContain("Cliente: +55 11 91234-5678");
-    expect(semNada).not.toContain("Abrir:");
+    expect(semNada).toContain("*Cliente:* +55 11 91234-5678");
+    expect(semNada).not.toContain("Abrir");
   });
 });
 

@@ -104,6 +104,12 @@ export function formatarNumero(digitos: string): string {
  * O texto do aviso de pedido de ajuda. Sem travessão e sem assumir segmento.
  * `abrir` ausente (rodando fora da Vercel) tira a linha inteira, em vez de
  * mandar um link para lugar nenhum.
+ *
+ * ⚠️ FORMATO REFEITO EM 30/09/2026 (dono: "está meio quebrada"): quatro linhas
+ * coladas liam como um bloco só no celular. Agora são blocos separados por linha
+ * em branco, com o negrito do WhatsApp (`*...*`) nos rótulos, e o telefone e o
+ * link em linha própria, que é onde o WhatsApp os deixa tocáveis. O mesmo
+ * desenho vale para o aviso de conversa marcada, que sai do n8n.
  */
 export function textoDoAviso(a: {
   nome: string | null;
@@ -112,14 +118,13 @@ export function textoDoAviso(a: {
   abrir: string | null;
 }): string {
   const digitos = a.phone.replace(/\D/g, "");
-  const quem = a.nome ? a.nome : formatarNumero(digitos);
-  const linhas = [
-    "🙋 A IA pediu sua ajuda",
-    `Cliente: ${quem} (wa.me/${digitos})`,
-    `Pedido: ${a.resumo.trim() || "sem resumo"}`,
+  const blocos = [
+    "🙋 *A IA pediu sua ajuda*",
+    [`*Cliente:* ${a.nome ?? formatarNumero(digitos)}`, `wa.me/${digitos}`].join("\n"),
+    `*Pedido:* ${a.resumo.trim() || "sem resumo"}`,
   ];
-  if (a.abrir) linhas.push(`Abrir: ${a.abrir}`);
-  return linhas.join("\n");
+  if (a.abrir) blocos.push(`Abrir no CRM:\n${a.abrir}`);
+  return blocos.join("\n\n");
 }
 
 export const TEXTO_TESTE_AVISO =

@@ -114,6 +114,11 @@ export async function connectionState(instanceName: string) {
  * `...@s.whatsapp.net`), igual ao que o nó "Notifica grupo" do n8n passa.
  * Devolve `true` só com 2xx (a Evolution responde 201).
  */
+/**
+ * Manda texto. ⚠️ `linkPreview: false` (30/09/2026): com a prévia ligada, o
+ * aviso com o link "Abrir no CRM" chegava com o cartão grande do site em cima,
+ * maior que a própria mensagem.
+ */
 export async function sendText(
   instanceName: string,
   destino: string,
@@ -125,7 +130,7 @@ export async function sendText(
     {
       method: "POST",
       headers: headers(),
-      body: JSON.stringify({ number: destino, text }),
+      body: JSON.stringify({ number: destino, text, linkPreview: false }),
       signal: AbortSignal.timeout(15_000),
     }
   );
