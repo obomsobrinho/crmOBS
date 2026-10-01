@@ -17,6 +17,8 @@ test("as contas do painel sem o texto saem idênticas às com o texto", async ()
   const { clientId } = await tenantDeTeste(sb);
   const PREF = "55000000080";
   await sb.from("chat_messages").delete().like("phone", `${PREF}%`);
+    // O gatilho de chat_messages cria a conversa junto: ela sai também.
+    await sb.from("conversations").delete().like("phone", `${PREF}%`);
   const tipos = [null, "text", "manual", "imported", "audio"];
   const linhasSeed = Array.from({ length: 400 }, (_, i) => {
     const t = tipos[i % 5];
@@ -55,6 +57,8 @@ test("as contas do painel sem o texto saem idênticas às com o texto", async ()
     expect(JSON.stringify(vNovo)).toBe(JSON.stringify(vVelho));
   } finally {
     await sb.from("chat_messages").delete().like("phone", `${PREF}%`);
+    // O gatilho de chat_messages cria a conversa junto: ela sai também.
+    await sb.from("conversations").delete().like("phone", `${PREF}%`);
   }
 });
 
