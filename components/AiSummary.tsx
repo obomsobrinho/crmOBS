@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sparkles, Clock } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +89,8 @@ export default function AiSummary({
     void (async () => {
       await load();
     })();
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`qual-${phone}`)
       .on(
         "postgres_changes",
@@ -104,9 +105,10 @@ export default function AiSummary({
         { event: "*", schema: "public", table: "conversations" },
         () => void load()
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [load, supabase, phone, qualificacaoForcada]);
 

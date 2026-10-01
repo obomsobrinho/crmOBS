@@ -43,6 +43,7 @@ import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
 import FeedbackDialog from "./FeedbackDialog";
 import { grafiasDoNumeroDeAvisos } from "@/lib/avisos";
+import { useContagemAoVivo } from "@/lib/use-contagem-ao-vivo";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 const NAV: {
@@ -127,8 +128,6 @@ export default function NavRail({
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackAberto, setFeedbackAberto] = useState(false);
-  const [unreadConvos, setUnreadConvos] = useState(0);
-  const [pedidosAbertos, setPedidosAbertos] = useState(0);
 
   // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
   // no estado inicial: o servidor não tem localStorage e o HTML sairia com um
@@ -144,65 +143,50 @@ export default function NavRail({
     }
   }, []);
 
-  // Contador de conversas não lidas no rail (realtime). O trigger mantém
-  // conversations.unread_count; aqui só contamos as conversas com pendência.
-  useEffect(() => {
-    const supabase = createClient();
-    const load = async () => {
-      // Só a contagem (HEAD), como sempre foi, e o número de avisos fica fora
-      // no próprio banco, nas duas grafias dele (com e sem o nono dígito, ver
-      // lib/avisos.ts). Trazer as linhas para filtrar aqui seria um GET a mais
-      // em toda página, e o teste do realtime conta exatamente esses GETs.
-      const fora = grafiasDoNumeroDeAvisos(numeroAvisos);
+  // OS DOIS NÚMEROS DO MENU (não lidas e pedidos abertos), acompanhando o banco
+  // do jeito barato: só o tenant, uma contagem por rajada de eventos, e nada em
+  // aba escondida (docs/plano-carregamento.md, fase 2). Antes cada mudança em
+  // QUALQUER conversa do banco refazia as duas contagens em toda aba aberta.
+  //
+  // ⚠️ O número de avisos sai da conta nas grafias de DÍGITOS e de JID: a
+  // coluna `phone` guarda o JID (`...@s.whatsapp.net`), e a exclusão só com
+  // dígitos nunca casava com nada (achado de 01/10/2026).
+  const fora = React.useMemo(() => {
+    const g = grafiasDoNumeroDeAvisos(numeroAvisos);
+    return g.flatMap((d) => [d, `${d}@s.whatsapp.net`]);
+  }, [numeroAvisos]);
+  const unreadConvos = useContagemAoVivo({
+    clientId,
+    tabela: "conversations",
+    canal: "rail-unread",
+    contar: async (supabase, id) => {
       let consulta = supabase
         .from("conversations")
         .select("id", { count: "exact", head: true })
+        .eq("client_id", id)
         .gt("unread_count", 0);
       if (fora.length > 0) consulta = consulta.not("phone", "in", `(${fora.join(",")})`);
-      const { count } = await consulta;
-      setUnreadConvos(count ?? 0);
-    };
-    void load();
-    const channel = supabase
-      .channel("rail-unread")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => void load()
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [numeroAvisos]);
-
-  // Pedidos de ajuda esperando (tabela `handoffs`), para o número âmbar do
-  // item "Pedidos". Só a contagem (HEAD), com o número de avisos fora no banco.
-  useEffect(() => {
-    const supabase = createClient();
-    const load = async () => {
-      const fora = grafiasDoNumeroDeAvisos(numeroAvisos);
+      const { count, error } = await consulta;
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+  const pedidosAbertos = useContagemAoVivo({
+    clientId,
+    tabela: "handoffs",
+    canal: "rail-pedidos",
+    contar: async (supabase, id) => {
       let consulta = supabase
         .from("handoffs")
         .select("id", { count: "exact", head: true })
+        .eq("client_id", id)
         .is("closed_at", null);
       if (fora.length > 0) consulta = consulta.not("phone", "in", `(${fora.join(",")})`);
-      const { count } = await consulta;
-      setPedidosAbertos(count ?? 0);
-    };
-    void load();
-    const channel = supabase
-      .channel("rail-pedidos")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "handoffs" },
-        () => void load()
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [numeroAvisos]);
+      const { count, error } = await consulta;
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
 
   // O listener no `document` para fechar ao clicar fora saiu daqui: quem faz
   // isso agora é o DropdownMenu, junto com Esc, devolução do foco e navegação

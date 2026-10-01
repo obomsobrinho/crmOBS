@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { CabecalhoBloco } from "./ContactFields";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { FUSO, formatEspera, prettyPhone } from "@/lib/format";
 import { avatarPair, initials } from "@/lib/inbox";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
@@ -154,7 +154,8 @@ export default function Pedidos({
   const primeira = useRef(true);
   useEffect(() => {
     if (!supabase) return;
-    const canal = supabase
+    const canalSair = assinarComSessao((sb) =>
+      sb
       .channel("pedidos")
       .on("postgres_changes", { event: "*", schema: "public", table: "handoffs" }, () => void refetch())
       .subscribe((status: string) => {
@@ -164,7 +165,8 @@ export default function Pedidos({
           return;
         }
         void refetch();
-      });
+      })
+    );
     const aoVoltar = () => {
       if (document.visibilityState === "visible") void refetch();
     };
@@ -172,7 +174,7 @@ export default function Pedidos({
     window.addEventListener("focus", aoVoltar);
     const relogio = setInterval(() => setAgora(Date.now()), 60_000);
     return () => {
-      void supabase.removeChannel(canal);
+      canalSair();
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("focus", aoVoltar);
       clearInterval(relogio);

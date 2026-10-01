@@ -7,7 +7,7 @@ import FichaContato from "./FichaContato";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { anunciarIa } from "@/lib/ia-bus";
 import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
@@ -102,7 +102,8 @@ export default function ConversationView({
 
   // Realtime da atribuição desta conversa (outro atendente pode assumir).
   useEffect(() => {
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`conv-assign-${phone}`)
       .on(
         "postgres_changes",
@@ -119,9 +120,10 @@ export default function ConversationView({
           }
         }
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [phone, supabase]);
 
@@ -192,7 +194,8 @@ export default function ConversationView({
 
   // Realtime do estado da IA deste contato.
   useEffect(() => {
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`cliente-${phone}`)
       .on(
         "postgres_changes",
@@ -209,9 +212,10 @@ export default function ConversationView({
           }
         }
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [phone, supabase]);
 

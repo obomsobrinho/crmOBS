@@ -35,7 +35,16 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
   filtrado pelo tenant que busca SÓ a linha (debounce de 500ms), aba escondida parada, revalidação
   ao voltar o foco no máximo a cada 10s. Provado em `e2e/realtime.serial.spec.ts` (25 conversas
   semeadas, contando as chamadas às funções).
-- **2. Menu:** contadores com debounce, só do tenant, parados em aba escondida.
+- ✅ **2. Menu:** `lib/use-contagem-ao-vivo.ts` (só o tenant, uma contagem por rajada, nada em aba
+  escondida). Achados no caminho, os três corrigidos:
+  - **Realtime assinado antes da sessão entrava como anônimo** e ficava mudo (a RLS escondia todo
+    evento). Toda assinatura passa por `assinarComSessao` (`lib/supabase/client.ts`).
+  - **A exclusão do número de avisos no menu nunca casava** (comparava dígitos com o JID).
+  - **Segurança:** `_persona_backup_20260820` estava sem RLS e LEGÍVEL pela chave pública (anon);
+    o de 22/08 sem RLS. Os dois ganharam RLS e perderam os grants de `anon`/`authenticated`, e
+    sobras de grant do `anon` em `conversations`, `chat_messages`, `pipeline_stages` e
+    `dados_cliente` saíram (`mt_fecha_backups_e_sobras_anon`). Conferido pela API pública: 42501.
+  - `inbox_pagina`/`inbox_contagens` viraram plpgsql (plano guardado): 1,5 ms e 0,1 ms por chamada.
 - **3. Clientes:** 10 por vez, busca e filtros no servidor com debounce.
 - **4. Conversa aberta:** últimas 30 mensagens, as antigas ao rolar para cima, mensagem nova pela
   linha do realtime.

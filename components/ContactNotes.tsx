@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
 import { CabecalhoBloco } from "./ContactFields";
@@ -93,7 +93,8 @@ export default function ContactNotes({
   // Nota escrita na aba "Nota interna" do rodapé cai aqui na hora.
   useEffect(() => {
     if (conversationId == null) return;
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`notes-${conversationId}-${instancia}`)
       .on(
         "postgres_changes",
@@ -105,9 +106,10 @@ export default function ContactNotes({
         },
         () => void load()
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [supabase, conversationId, load, instancia]);
 

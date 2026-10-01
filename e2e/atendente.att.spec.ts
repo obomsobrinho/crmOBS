@@ -18,7 +18,10 @@ test.describe("Atendente", () => {
 
     // E a guarda é de SERVIDOR, não só de menu: entrar pela URL não passa.
     await page.goto("/agente");
-    await expect(page).toHaveURL(/\/inbox/);
+    // 30s e não os 5 padrão: o redirecionamento sai na hora, mas sob a carga da
+    // suíte o servidor de desenvolvimento leva mais que isso para COMPILAR e
+    // servir o /inbox (falhou assim duas vezes em 01/10/2026, passando sozinho).
+    await expect(page).toHaveURL(/\/inbox/, { timeout: 30_000 });
   });
 
   test("uma rota dono-only recusa pelo papel", async ({ page }) => {

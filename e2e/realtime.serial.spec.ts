@@ -175,3 +175,37 @@ test("a busca vai ao servidor só depois de parar de digitar, e ignora a janela"
   await expect(itens(page).first()).toContainText(NOME(23));
   expect(c.pagina, "uma busca, não uma por letra").toBe(1);
 });
+
+// FASE 2: o contador do menu. Uma rajada de mudanças vira UMA contagem, e aba
+// escondida não conta.
+test("o contador do menu conta uma vez por rajada, e nunca em aba escondida", async ({ page }) => {
+  let heads = 0;
+  page.on("request", (r) => {
+    if (r.method() === "HEAD" && r.url().includes("/rest/v1/conversations")) heads++;
+  });
+  await page.goto("/painel");
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(3_000);
+  heads = 0;
+  const svc = servico();
+  for (const n of [3, 4, 5]) {
+    await svc.from("conversations").update({ unread_count: 2 }).eq("client_id", clientId).eq("phone", fone(n));
+  }
+  await expect(page.locator('a[href="/inbox"]').first()).toContainText(/[1-9]/, { timeout: 15_000 });
+  await page.waitForTimeout(2_000);
+  expect(heads, "três mudanças seguidas, uma contagem").toBe(1);
+
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  heads = 0;
+  await svc.from("conversations").update({ unread_count: 0 }).eq("client_id", clientId).like("phone", `${PREFIXO}%`);
+  await page.waitForTimeout(3_000);
+  expect(heads, "aba escondida não conta").toBe(0);
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await expect.poll(() => heads, { timeout: 10_000 }).toBe(1);
+});

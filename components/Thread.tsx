@@ -34,7 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
@@ -271,16 +271,18 @@ export default function Thread({
     void (async () => {
       await carregarHandoffs();
     })();
-    const canal = supabase
+    const canalSair = assinarComSessao((sb) =>
+      sb
       .channel(`handoffs-${phone}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "handoffs", filter: `phone=eq.${phone}` },
         () => void carregarHandoffs()
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(canal);
+      canalSair();
     };
   }, [carregarHandoffs, supabase, phone, handoffsPreview]);
 
@@ -333,7 +335,8 @@ export default function Thread({
 
   // Realtime: mudanças nesta conversa.
   useEffect(() => {
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`thread-${phone}`)
       .on(
         "postgres_changes",
@@ -347,9 +350,10 @@ export default function Thread({
           void refetch();
         }
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [phone, refetch, supabase]);
 

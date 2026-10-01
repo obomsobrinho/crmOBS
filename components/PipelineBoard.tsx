@@ -17,7 +17,7 @@ import {
   ArrowRightLeft,
   Check,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { formatEspera, prettyPhone } from "@/lib/format";
 import {
   buildInbox,
@@ -171,7 +171,8 @@ export default function PipelineBoard({
   // muda as colunas.
   useEffect(() => {
     if (!supabase) return;
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel("pipeline")
       .on(
         "postgres_changes",
@@ -193,9 +194,10 @@ export default function PipelineBoard({
         { event: "*", schema: "public", table: "pipeline_stages" },
         () => void refetchStages()
       )
-      .subscribe();
+      .subscribe()
+    );
     return () => {
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [supabase, refetchCards, refetchStages]);
 

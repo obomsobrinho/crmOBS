@@ -258,6 +258,12 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   atualiza SÓ a linha que mudou e aba escondida não busca. A lista de conversas lê
   `public.inbox_pagina`/`inbox_contagens` (SQL, `security invoker`), nunca mais 500 linhas para
   filtrar na memória. RLS reescrita com `(select auth.uid())`: política nova segue esse molde.
+  ⚠️ **TODA ASSINATURA DE REALTIME PASSA POR `assinarComSessao`** (`lib/supabase/client.ts`): canal
+  montado no primeiro carregamento entrava ANTES da sessão, como anônimo, e ficava mudo para sempre
+  (foi assim que o contador do menu parou de acompanhar o banco sem ninguém ver). E canal novo
+  filtra pelo tenant (`client_id=eq.`), nunca escuta a tabela inteira.
+  ⚠️ **`anon` não tem grant em NADA do `public`** (01/10/2026: um backup de persona estava legível
+  pela chave pública). Tabela nova nasce com RLS e sem grant a `anon`.
 - **A lista de conversas abre em HOJE (19/09/2026, decisão do dono).** Seletor de três posições na
   linha do título (`Hoje` / `7 dias` / `Tudo`, `data-slot="inbox-periodo"`), com os chips de estado
   seguindo iguais. Motivo: a lista dele abria com 48 conversas.

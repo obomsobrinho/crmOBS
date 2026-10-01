@@ -22,7 +22,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
   avatarPair,
@@ -405,7 +405,8 @@ export default function ContactSidebar({
       (pl.new as Linha)?.telefone ??
       (pl.old as Linha)?.phone ??
       (pl.old as Linha)?.telefone;
-    const channel = supabase
+    const channelSair = assinarComSessao((sb) =>
+      sb
       .channel(`inbox-list-${clientId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
       .on("postgres_changes", { event: "*", schema: "public", table: "dados_cliente", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
@@ -418,10 +419,11 @@ export default function ContactSidebar({
         }
         if (document.visibilityState === "visible") void revalidar(paramsRef.current);
         else atrasadaRef.current = true;
-      });
+      })
+    );
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      void supabase.removeChannel(channel);
+      channelSair();
     };
   }, [clientId, supabase, anotar, revalidar]);
 
