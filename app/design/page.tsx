@@ -4,6 +4,10 @@ import { Card } from "@/components/ui/card";
 import ConversationView from "@/components/ConversationView";
 import type { Member } from "@/lib/team";
 import type { ChatRow, InboxItem } from "@/lib/types";
+import { JANELA_PADRAO } from "@/lib/inbox";
+import { PAGINA_INBOX, inicioDaJanela, type ItemLista } from "@/lib/inbox-lista";
+import { fonteDaMemoria } from "@/lib/inbox-fonte";
+import { agoraMs } from "@/lib/periodo";
 
 // Página de PREVIEW de design (só em desenvolvimento — bloqueada em produção
 // pelo proxy). Renderiza os componentes reais com dados fake, sem exigir login,
@@ -138,6 +142,31 @@ export default async function DesignPreview({
     "553584774753@s.whatsapp.net": "pause",
     "553384339086@s.whatsapp.net": "pause",
   };
+  // A lista paginada (01/10/2026) roda aqui sobre a memória, com a MESMA regra
+  // do banco (`fonteDaMemoria`). A primeira página sai do servidor, como na rota.
+  const todos: ItemLista[] = items.map((it, i) => ({
+    ...it,
+    id: i + 1,
+    grupo: 0,
+    ia: initialIa[it.phone] ?? null,
+    resumo: it.handoffAt ? "Cliente quer falar com o dono sobre o valor do plano anual" : null,
+    trecho: null,
+  }));
+  const previewMensagens = [
+    { phone: "553584774753@s.whatsapp.net", texto: "Vocês parcelam o plano anual no cartão?" },
+  ];
+  const fontePreview = fonteDaMemoria(todos, previewMensagens);
+  const paramsPreview = {
+    inicio: inicioDaJanela(JANELA_PADRAO, agoraMs()),
+    filtro: "all" as const,
+    busca: "",
+    eu: ME,
+    fora: [],
+  };
+  const [paginaPreview, contagensPreview] = await Promise.all([
+    fontePreview.pagina(paramsPreview, null),
+    fontePreview.contagens(paramsPreview),
+  ]);
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
@@ -150,8 +179,13 @@ export default async function DesignPreview({
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 md:gap-3">
           <ContactSidebar
-            initial={items}
-            initialIa={initialIa}
+            inicial={{
+              itens: paginaPreview,
+              contagens: contagensPreview,
+              temMais: paginaPreview.length === PAGINA_INBOX,
+            }}
+            previewTodos={todos}
+            previewMensagens={previewMensagens}
             activePhone={soLista ? undefined : "553584774753@s.whatsapp.net"}
             myUserId={ME}
           />

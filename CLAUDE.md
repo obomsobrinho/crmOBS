@@ -253,6 +253,11 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   ⚠️ **Teste de coisa AUSENTE conta requisição, não pixel.** O e2e que existia para "marcar como
   lida" só conferia que saiu um PATCH com status < 400: navegava por URL, nunca clicava na lista
   e nunca olhava a bolinha, então não pegava nada disso.
+- ⚠️ **CARREGAMENTO DE PRODUÇÃO (01/10/2026, `docs/plano-carregamento.md`, regras do dono):** lista
+  grande é paginada de 10 em 10 com rolagem infinita, busca vai ao servidor com debounce, realtime
+  atualiza SÓ a linha que mudou e aba escondida não busca. A lista de conversas lê
+  `public.inbox_pagina`/`inbox_contagens` (SQL, `security invoker`), nunca mais 500 linhas para
+  filtrar na memória. RLS reescrita com `(select auth.uid())`: política nova segue esse molde.
 - **A lista de conversas abre em HOJE (19/09/2026, decisão do dono).** Seletor de três posições na
   linha do título (`Hoje` / `7 dias` / `Tudo`, `data-slot="inbox-periodo"`), com os chips de estado
   seguindo iguais. Motivo: a lista dele abria com 48 conversas.

@@ -1,7 +1,7 @@
 "use client";
 
 import AvatarContato from "@/components/AvatarContato";
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
@@ -25,16 +25,28 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
-  buildInbox,
   avatarPair,
-  dentroDaJanela,
   JANELAS,
   JANELA_PADRAO,
   ORDEM_JANELAS,
-  type ConvRow,
-  type ContatoRow,
   type JanelaKey,
 } from "@/lib/inbox";
+import {
+  PAGINA_INBOX,
+  cursorDe,
+  encaixar,
+  foraDaLista,
+  inicioDaJanela,
+  type Contagens,
+  type ItemLista,
+} from "@/lib/inbox-lista";
+import {
+  fonteDaMemoria,
+  fonteDoBanco,
+  type FonteInbox,
+  type ParamsLista,
+} from "@/lib/inbox-fonte";
+import { useDebounce } from "@/lib/use-debounce";
 import { agoraMs } from "@/lib/periodo";
 import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
@@ -108,7 +120,6 @@ const GRUPO_TINTA: Record<Grupo, { texto: string; ponto: string }> = {
   ia: { texto: "text-brand-ink", ponto: "bg-brand-ink" },
 };
 
-const GRUPO_ORDEM: Grupo[] = ["espera", "time", "ia"];
 
 /**
  * O chip de estado que fica DEBAIXO da prévia, na terceira linha do item
@@ -159,14 +170,20 @@ function makeSnippet(text: string, q: string): string {
 }
 
 export default function ContactSidebar({
-  initial,
-  initialIa,
+  inicial,
+  clientId,
+  previewTodos,
+  previewMensagens,
   activePhone,
   myUserId,
   numeroAvisos = null,
 }: {
-  initial: InboxItem[];
-  initialIa: Record<string, string | null>;
+  /** A primeira página e as contagens, que o servidor já buscou. */
+  inicial: { itens: ItemLista[]; contagens: Contagens; temMais: boolean };
+  /** Tenant logado. Sem ele (preview /design) a lista roda sobre `previewTodos`. */
+  clientId?: string;
+  previewTodos?: ItemLista[];
+  previewMensagens?: { phone: string; texto: string }[];
   /** Só para o preview de design (/design): força a conversa "aberta". */
   activePhone?: string;
   /** Sem ele o filtro "Suas" não aparece (não dá para saber o que é seu). */
@@ -174,14 +191,29 @@ export default function ContactSidebar({
   /** Destino dos avisos: esse número nunca é conversa (lib/avisos.ts). */
   numeroAvisos?: string | null;
 }) {
-  const supabase = createClient();
-  const [items, setItems] = useState<InboxItem[]>(initial);
-  const [iaByPhone, setIaByPhone] =
-    useState<Record<string, string | null>>(initialIa);
+  const supabase = useMemo(() => createClient(), []);
+  // DE ONDE VÊM AS CONVERSAS (01/10/2026, docs/plano-carregamento.md): o banco,
+  // 10 por vez, com recorte, filtro e busca aplicados LÁ (`inbox_pagina`). O
+  // preview /design usa a mesma regra sobre uma lista na memória.
+  const fonte = useMemo<FonteInbox>(
+    () =>
+      clientId
+        ? fonteDoBanco(supabase, clientId)
+        : fonteDaMemoria(previewTodos ?? inicial.itens, previewMensagens),
+    [clientId, supabase, previewTodos, previewMensagens, inicial.itens]
+  );
+  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+
+  const [items, setItems] = useState<ItemLista[]>(inicial.itens);
+  const [temMais, setTemMais] = useState(inicial.temMais);
+  const [contagens, setContagens] = useState<Contagens>(inicial.contagens);
+  const [carregando, setCarregando] = useState(false);
+  // A chave da IA mudada AGORA nesta aba (ver `ouvirIa`), por cima do banco.
+  const [iaLocal, setIaLocal] = useState<Record<string, string | null>>({});
   const [membersById, setMembersById] = useState<Record<string, Member>>({});
-  // phone -> resumo da IA (motivo do handoff), da última qualificação.
-  const [qualByPhone, setQualByPhone] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
+  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  const busca = useDebounce(query.trim(), 300);
   // "unanswered" = a última mensagem foi do contato, ou seja, a bola está com a
   // gente. É o corte que o operador realmente faz ao abrir a tela.
   const [filter, setFilter] = useState<FiltroKey>("all");
@@ -190,8 +222,6 @@ export default function ContactSidebar({
   // dono em 19/09/2026: a lista dele abria com 48 conversas e ele disse "não faz
   // sentido eu querer ficar vendo todas as conversas".
   const [janela, setJanela] = useState<JanelaKey>(JANELA_PADRAO);
-  // phone -> texto da mensagem que casou com a busca (conteúdo, não só nome).
-  const [msgMatches, setMsgMatches] = useState<Record<string, string>>({});
   const pathname = usePathname();
   // No CELULAR a lista e a conversa não dividem a tela (plano do mobile, fase
   // 1): com uma conversa aberta a lista some, e quem volta é a seta do
@@ -204,95 +234,212 @@ export default function ContactSidebar({
     onScroll: chipsOnScroll,
   } = useDissolverLateral<HTMLDivElement>();
 
-  const refetch = useCallback(async () => {
-    const [{ data: convs }, { data: contatos }, { data: quals }] =
-      await Promise.all([
-        supabase
-          .from("conversations")
-          .select(
-            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, handoff_at"
-          )
-          .order("last_message_at", { ascending: false, nullsFirst: false })
-          .limit(500),
-        supabase
-          .from("dados_cliente")
-          .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
-        supabase
-          .from("conversation_qualifications")
-          .select("phone, summary")
-          .order("created_at", { ascending: false })
-          .limit(300),
-      ]);
-    const { items: next, ia } = buildInbox(
-      (convs ?? []) as ConvRow[],
-      (contatos ?? []) as ContatoRow[],
-      numeroAvisos
-    );
-    // Última qualificação por telefone (a lista já vem do mais recente).
-    const qmap: Record<string, string> = {};
-    for (const q of (quals ?? []) as { phone: string; summary: string | null }[]) {
-      if (!qmap[q.phone] && q.summary) qmap[q.phone] = q.summary;
-    }
-    setItems(next);
-    setIaByPhone(ia);
-    setQualByPhone(qmap);
-  }, [supabase, numeroAvisos]);
-
-  // Realtime: uma mudança nas conversas (o trigger atualiza a cada mensagem) ou
-  // no estado da IA re-busca a lista.
-  //
-  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO. Antes o `.subscribe()` era
-  // chamado sem callback, então `CHANNEL_ERROR` e `TIMED_OUT` passavam em
-  // silêncio: se o WebSocket morria (máquina dormiu, queda de rede, aba parada há
-  // horas), a lista congelava com os números que tinha e só F5 consertava. Foi
-  // assim que uma bolinha de 4 não lidas ficou acesa com o banco já em zero.
-  // `SUBSCRIBED` chega de novo a cada reassinatura automática do supabase-js, e é
-  // exatamente aí que a lista pode estar velha: entre a queda e a volta ninguém
-  // recebeu evento. A PRIMEIRA assinatura é pulada de propósito, porque nessa
-  // hora `initial` acabou de vir do servidor e re-buscar seriam três consultas
-  // jogadas fora em toda abertura do inbox.
+  // O recorte de agora. Fica também num ref, para o realtime e a rolagem lerem
+  // o valor atual sem reassinar o canal a cada troca de filtro.
+  const params = useMemo<ParamsLista>(
+    () => ({
+      inicio: inicioDaJanela(janela, agoraMs()),
+      filtro: filter,
+      busca,
+      eu: myUserId ?? null,
+      fora,
+    }),
+    [janela, filter, busca, myUserId, fora]
+  );
+  const paramsRef = useRef(params);
+  const estadoRef = useRef({ items, temMais });
   useEffect(() => {
+    paramsRef.current = params;
+    estadoRef.current = { items, temMais };
+  });
+  // Resposta de um recorte antigo (a pessoa trocou de filtro no meio) é jogada fora.
+  const versaoRef = useRef(0);
+  const carregandoRef = useRef(false);
+
+  const recarregarContagens = useCallback(
+    async (p: ParamsLista) => {
+      try {
+        setContagens(await fonte.contagens({ inicio: p.inicio, eu: p.eu, fora: p.fora }));
+      } catch (e) {
+        console.error("contagens da lista:", e);
+      }
+    },
+    [fonte]
+  );
+
+  /**
+   * Busca de novo o que já está na tela (as N primeiras linhas), sem jogar a
+   * rolagem fora. É o "revalidar": depois de o realtime cair, ao voltar para a
+   * aba, ou ao trocar de recorte (aí com N = 1 página).
+   */
+  const revalidar = useCallback(
+    async (p: ParamsLista, quantas?: number) => {
+      const v = ++versaoRef.current;
+      const n = Math.min(50, Math.max(PAGINA_INBOX, quantas ?? estadoRef.current.items.length));
+      setCarregando(true);
+      try {
+        const [pagina] = await Promise.all([fonte.pagina(p, null, n), recarregarContagens(p)]);
+        if (v !== versaoRef.current) return;
+        setItems(pagina);
+        setTemMais(pagina.length === n);
+      } catch (e) {
+        console.error("lista de conversas:", e);
+      } finally {
+        if (v === versaoRef.current) setCarregando(false);
+      }
+    },
+    [fonte, recarregarContagens]
+  );
+
+  const carregarMais = useCallback(async () => {
+    const { items: atuais, temMais: mais } = estadoRef.current;
+    if (!mais || carregandoRef.current || atuais.length === 0) return;
+    const v = versaoRef.current;
+    carregandoRef.current = true;
+    setCarregando(true);
+    try {
+      const pagina = await fonte.pagina(paramsRef.current, cursorDe(atuais[atuais.length - 1]));
+      if (v !== versaoRef.current) return;
+      setItems((cur) => {
+        const vistos = new Set(cur.map((i) => i.phone));
+        return [...cur, ...pagina.filter((i) => !vistos.has(i.phone))];
+      });
+      setTemMais(pagina.length === PAGINA_INBOX);
+    } catch (e) {
+      console.error("mais conversas:", e);
+    } finally {
+      carregandoRef.current = false;
+      if (v === versaoRef.current) setCarregando(false);
+    }
+  }, [fonte]);
+
+  // Trocou recorte, filtro ou busca: primeira página do recorte novo. A
+  // PRIMEIRA renderização é pulada: ela já veio do servidor, com o recorte
+  // padrão, e buscar de novo seria jogar a consulta fora.
+  const primeiraRef = useRef(true);
+  useEffect(() => {
+    if (primeiraRef.current) {
+      primeiraRef.current = false;
+      return;
+    }
+    void revalidar(params, PAGINA_INBOX);
+  }, [params, revalidar]);
+
+  // ROLAGEM INFINITA: um marcador no fim da lista; quando ele aparece, vem a
+  // próxima página. O observador é refeito a cada página nova, e é isso que
+  // continua carregando enquanto a lista não enche a altura da coluna.
+  const fimRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    const alvo = fimRef.current;
+    if (!alvo || !temMais) return;
+    const obs = new IntersectionObserver(
+      (es) => {
+        if (es.some((e) => e.isIntersecting)) void carregarMais();
+      },
+      { rootMargin: "200px 0px" }
+    );
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [items.length, temMais, carregarMais]);
+
+  // REALTIME, LINHA A LINHA (01/10/2026). Antes cada mensagem que chegava fazia
+  // a lista buscar TUDO de novo (500 conversas, todos os contatos, 300 resumos),
+  // em toda aba aberta, inclusive escondida. Agora:
+  // 1. o canal só escuta o tenant (`client_id=eq.`), não o banco inteiro;
+  // 2. o evento só anota QUAL conversa mudou, e um debounce junta a rajada de
+  //    um lote (4 mensagens e a resposta viram uma busca por conversa);
+  // 3. a busca é da LINHA, com o recorte de agora, e ela é encaixada no lugar
+  //    (`encaixar`) sem tocar no resto;
+  // 4. aba escondida não busca nada: anota que ficou para trás e revalida
+  //    quando a pessoa voltar.
+  const pendentesRef = useRef<Set<string>>(new Set());
+  const atrasadaRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const processarPendentes = useCallback(async () => {
+    const fones = [...pendentesRef.current];
+    pendentesRef.current.clear();
+    if (fones.length === 0) return;
+    const v = versaoRef.current;
+    const p = paramsRef.current;
+    try {
+      const linhas = await Promise.all(
+        fones.map((f) => fonte.linha(p, f).then((l) => [f, l] as const))
+      );
+      if (v !== versaoRef.current) return;
+      setItems((cur) =>
+        linhas.reduce((acc, [f, l]) => encaixar(acc, f, l, estadoRef.current.temMais), cur)
+      );
+      void recarregarContagens(p);
+    } catch (e) {
+      console.error("linha da lista:", e);
+    }
+  }, [fonte, recarregarContagens]);
+
+  const anotar = useCallback(
+    (phone: string | null | undefined) => {
+      if (!phone) return;
+      if (document.visibilityState !== "visible") {
+        atrasadaRef.current = true;
+        return;
+      }
+      pendentesRef.current.add(phone);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => void processarPendentes(), 500);
+    },
+    [processarPendentes]
+  );
+
+  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO (31/08/2026). `SUBSCRIBED`
+  // chega de novo a cada reassinatura automática do supabase-js, e é exatamente
+  // aí que a lista pode estar velha: entre a queda e a volta ninguém recebeu
+  // evento. A PRIMEIRA assinatura é pulada de propósito, porque nessa hora a
+  // lista acabou de vir do servidor.
+  useEffect(() => {
+    if (!clientId) return;
     let primeira = true;
+    const filtro = `client_id=eq.${clientId}`;
+    type Linha = { phone?: string; telefone?: string } | null;
+    const fone = (pl: { new?: unknown; old?: unknown }) =>
+      (pl.new as Linha)?.phone ??
+      (pl.new as Linha)?.telefone ??
+      (pl.old as Linha)?.phone ??
+      (pl.old as Linha)?.telefone;
     const channel = supabase
-      .channel("inbox-list")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => void refetch()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "dados_cliente" },
-        () => void refetch()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversation_qualifications" },
-        () => void refetch()
-      )
+      .channel(`inbox-list-${clientId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
+      .on("postgres_changes", { event: "*", schema: "public", table: "dados_cliente", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversation_qualifications", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
       .subscribe((status: string) => {
         if (status !== "SUBSCRIBED") return;
         if (primeira) {
           primeira = false;
           return;
         }
-        void refetch();
+        if (document.visibilityState === "visible") void revalidar(paramsRef.current);
+        else atrasadaRef.current = true;
       });
     return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       void supabase.removeChannel(channel);
     };
-  }, [refetch, supabase]);
+  }, [clientId, supabase, anotar, revalidar]);
 
-  // Rede de segurança do de cima: voltar para a aba re-busca a lista.
-  //
-  // A reassinatura cobre a queda que o cliente PERCEBE. Esta cobre a que ele não
-  // percebe: um socket derrubado pelo sistema operacional enquanto a máquina
-  // dormia pode demorar a ser detectado, e nesse meio-tempo a pessoa está olhando
-  // número velho. Voltar o foco é o instante exato em que ela vai acreditar no
-  // que está na tela.
+  // Rede de segurança do de cima: VOLTAR PARA A ABA revalida o que está na tela.
+  // Cobre o socket derrubado pelo sistema operacional enquanto a máquina dormia
+  // (a queda demora a ser percebida) e a aba que ficou escondida acumulando
+  // mudança. Foco e `visibilitychange` chegam juntos: um só a cada 10s, menos
+  // quando a aba ficou para trás de verdade.
   useEffect(() => {
+    if (!clientId) return;
+    let ultima = 0;
     const aoVoltar = () => {
-      if (document.visibilityState === "visible") void refetch();
+      if (document.visibilityState !== "visible") return;
+      const agora = Date.now();
+      if (!atrasadaRef.current && agora - ultima < 10_000) return;
+      ultima = agora;
+      atrasadaRef.current = false;
+      void revalidar(paramsRef.current);
     };
     document.addEventListener("visibilitychange", aoVoltar);
     window.addEventListener("focus", aoVoltar);
@@ -300,170 +447,52 @@ export default function ContactSidebar({
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("focus", aoVoltar);
     };
-  }, [refetch]);
+  }, [clientId, revalidar]);
 
-  // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime acima também
-  // vai chegar, mas depois de ir ao Postgres, voltar pelo WebSocket e re-buscar
-  // três tabelas, e nesse intervalo a marca do avatar mostrava o estado antigo
-  // enquanto a chave já mostrava o novo. Aqui a correção é local e imediata.
+  // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime também vai
+  // chegar, mas depois de ir ao Postgres e voltar; aqui a correção é imediata.
   useEffect(() => ouvirIa(({ phone, estado }) => {
-    setIaByPhone((m) => (m[phone] === estado ? m : { ...m, [phone]: estado }));
+    setIaLocal((m) => (m[phone] === estado ? m : { ...m, [phone]: estado }));
   }), []);
 
   // Membros do time (para nomear o atendente de cada conversa). Mudam raramente;
   // uma busca no mount basta (a navegação entre páginas revalida).
   useEffect(() => {
+    if (!clientId) return;
     void (async () => {
       const list = await fetchMembers(supabase);
       setMembersById(Object.fromEntries(list.map((m) => [m.userId, m])));
     })();
-  }, [supabase]);
-
-  // Busca no CONTEÚDO das mensagens (debounce). A RLS restringe chat_messages ao
-  // tenant. Guarda o texto que casou para mostrar o trecho na lista.
-  useEffect(() => {
-    const q = query.trim();
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      if (q.length < 2) {
-        if (!cancelled) setMsgMatches({});
-        return;
-      }
-      const like = `%${q}%`;
-      const [{ data: a }, { data: b }] = await Promise.all([
-        supabase
-          .from("chat_messages")
-          .select("phone, user_message, bot_message")
-          .ilike("user_message", like)
-          .order("created_at", { ascending: false })
-          .limit(60),
-        supabase
-          .from("chat_messages")
-          .select("phone, user_message, bot_message")
-          .ilike("bot_message", like)
-          .order("created_at", { ascending: false })
-          .limit(60),
-      ]);
-      if (cancelled) return;
-      const ql = q.toLowerCase();
-      const map: Record<string, string> = {};
-      const rows = [...(a ?? []), ...(b ?? [])] as {
-        phone: string;
-        user_message: string | null;
-        bot_message: string | null;
-      }[];
-      for (const r of rows) {
-        if (map[r.phone]) continue;
-        const text =
-          r.user_message && r.user_message.toLowerCase().includes(ql)
-            ? r.user_message
-            : r.bot_message && r.bot_message.toLowerCase().includes(ql)
-              ? r.bot_message
-              : null;
-        if (text) map[r.phone] = text;
-      }
-      setMsgMatches(map);
-    }, 250);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [query, supabase]);
-
-  /**
-   * A BASE de tudo o que a faixa mostra: as conversas depois do recorte de
-   * tempo, antes dos chips de estado e da busca.
-   *
-   * ⚠️ DUAS REGRAS MORAM AQUI, e nenhuma é detalhe.
-   *
-   * 1. **Quem espera por você nunca some pelo filtro de tempo.** Um handoff
-   *    aberto ontem continua na lista em "Hoje", senão o recorte esconde
-   *    justamente o que o produto existe para não deixar esquecer. Por isso o
-   *    `needsYou(it) ||`, e é ele que faz o grupo "Esperando você" ignorar a
-   *    janela enquanto os outros dois a respeitam.
-   * 2. **A busca ignora a janela.** Quem digita um nome quer achar a pessoa, não
-   *    filtrar por data: procurar alguém e não encontrar porque a conversa é de
-   *    três semanas atrás é a busca mentindo.
-   *
-   * As CONTAGENS dos chips saem daqui também, e não de `items`: chip dizendo 12
-   * com três linhas na tela é a lista e o contador discordando, que é o defeito
-   * que o agrupamento desta tela já nasceu para não ter.
-   */
-  const base = useMemo(() => {
-    if (query.trim()) return items;
-    const j = JANELAS[janela];
-    if (j.dias == null) return items;
-    const agora = agoraMs();
-    return items.filter(
-      (it) => needsYou(it) || dentroDaJanela(it.lastMessageAt, j, agora)
-    );
-  }, [items, janela, query]);
-
-  // Sem `iaByPhone` nas dependências: a fila deixou de depender do estado da IA
-  // quando "precisa de você" passou a ser só handoff em aberto.
-  const needsCount = useMemo(
-    () => base.filter((it) => needsYou(it)).length,
-    [base]
-  );
-  const unansweredCount = useMemo(
-    () => base.filter((it) => it.lastFrom === "in").length,
-    [base]
-  );
-  const mineCount = useMemo(
-    () => (myUserId ? base.filter((it) => it.assignedUserId === myUserId).length : 0),
-    [base, myUserId]
-  );
+  }, [supabase, clientId]);
 
   const contagem: Record<FiltroKey, number> = {
-    all: base.length,
-    unanswered: unansweredCount,
-    mine: mineCount,
-    needs: needsCount,
+    all: contagens.todas,
+    unanswered: contagens.sem_resposta,
+    mine: contagens.suas,
+    needs: contagens.esperando,
   };
 
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return base
-      .filter((it) => {
-        if (filter === "needs" && !needsYou(it)) return false;
-        if (filter === "unanswered" && it.lastFrom !== "in") return false;
-        if (filter === "mine" && it.assignedUserId !== myUserId) return false;
-        if (!q) return true;
-        const name = (it.name ?? "").toLowerCase();
-        if (name.includes(q) || it.phone.includes(q)) return true;
-        return msgMatches[it.phone] != null; // casou no conteúdo da mensagem
-      })
-      .map((it) => {
-        const name = (it.name ?? "").toLowerCase();
-        const byNameOrPhone =
-          !!q && (name.includes(q) || it.phone.includes(q));
-        // Só mostra o trecho quando casou no conteúdo (e não já pelo nome).
-        const snippet =
-          q && !byNameOrPhone && msgMatches[it.phone]
-            ? makeSnippet(msgMatches[it.phone], query.trim())
-            : null;
-        return { it, snippet };
-      })
-      // Ordena por GRUPO só quando a lista está inteira e sem busca. Com filtro
-      // ou busca ativos o recorte já É o agrupamento, e reordenar ali só faria o
-      // resultado da busca sair de uma ordem que a pessoa não pediu.
-      .sort((a, b) =>
-        filter === "all" && !q
-          ? GRUPO_ORDEM.indexOf(grupoDe(a.it)) - GRUPO_ORDEM.indexOf(grupoDe(b.it))
-          : 0
-      );
-  }, [base, query, filter, msgMatches, myUserId]);
+  // Ordenada e recortada pelo BANCO; aqui só o trecho da busca.
+  const results = useMemo(
+    () =>
+      items.map((it) => ({
+        it,
+        snippet: it.trecho && busca ? makeSnippet(it.trecho, busca) : null,
+      })),
+    [items, busca]
+  );
 
-  // Quantas conversas em cada grupo, para o cabeçalho de seção.
-  const porGrupo = useMemo(() => {
-    const c: Record<Grupo, number> = { espera: 0, time: 0, ia: 0 };
-    for (const { it } of results) c[grupoDe(it)] += 1;
-    return c;
-  }, [results]);
+  // Quantas conversas em cada grupo, para o cabeçalho de seção: do BANCO, não
+  // do que já carregou (com 10 na tela, o grupo pode ter 40).
+  const porGrupo: Record<Grupo, number> = {
+    espera: contagens.esperando,
+    time: contagens.grupo_time,
+    ia: contagens.grupo_ia,
+  };
 
   // O agrupamento vale para a lista INTEIRA. Filtrada, a lista já é de um grupo
   // só, e um cabeçalho repetindo o nome do filtro seria ruído.
-  const agrupar = filter === "all" && !query.trim();
+  const agrupar = filter === "all" && !busca;
   // Chip com zero não entra, EXCETO "Todas": um filtro que não recorta nada só
   // ocupa a faixa e ainda sugere que há algo ali.
   const chipsVisiveis = (["all", "needs", "unanswered", "mine"] as FiltroKey[])
@@ -615,9 +644,9 @@ export default function ContactSidebar({
         setaRotulo="Ver as conversas de baixo"
         className="min-h-0 flex-1"
       >
-        {results.length === 0 && (
+        {results.length === 0 && !carregando && (
           <div className="p-4 text-apoio text-ink-3">
-            {query.trim()
+            {busca
               ? "Nada encontrado."
               : filter === "needs"
                 ? "Nenhuma conversa precisa de você."
@@ -629,7 +658,7 @@ export default function ContactSidebar({
                       // seria mentira: numa conta com 48 conversas, o vazio é do
                       // RECORTE, não da conta. E a frase diz onde está o resto,
                       // senão a pessoa conclui que perdeu o histórico.
-                      janela !== "tudo" && items.length > 0
+                      janela !== "tudo" && contagens.existe_alguma
                       ? `Nada em ${JANELAS[janela].rotulo.toLowerCase()}. Veja em Tudo.`
                       : "Nenhuma conversa ainda."}
           </div>
@@ -643,13 +672,13 @@ export default function ContactSidebar({
               agrupar && (indice === 0 || grupoDe(results[indice - 1].it) !== grupo);
             const href = `/inbox/${encodeURIComponent(phone)}`;
             const active = activePhone ? activePhone === phone : pathname === href;
-            const paused = isPaused(iaByPhone[phone]);
+            const paused = isPaused(phone in iaLocal ? iaLocal[phone] : it.ia);
             // Handoff em aberto: o que a IA pediu (resumo da ÚLTIMA
             // qualificação, então reflete o último pedido da pessoa) e há quanto
             // tempo isso está esperando. O tempo sai do PRIMEIRO handoff em
             // aberto, que é a espera de verdade.
             const needs = needsYou(it);
-            const reason = needs && qualByPhone[phone] ? qualByPhone[phone] : null;
+            const reason = needs ? it.resumo : null;
             const espera = needs && it.handoffAt ? formatEspera(it.handoffAt) : null;
             const att = it.assignedUserId ? membersById[it.assignedUserId] : null;
             // Quem atende: outra pergunta, outra resposta. Regra em lib/crm para
@@ -936,6 +965,15 @@ export default function ContactSidebar({
               </Fragment>
             );
           })}
+          {/* O fim da lista: quando aparece, vem a próxima página. */}
+          {temMais && (
+            <li ref={fimRef} data-slot="inbox-mais" aria-hidden className="h-px" />
+          )}
+          {carregando && (
+            <li data-slot="inbox-carregando" className="px-4 py-3 text-legenda text-ink-3">
+              Carregando…
+            </li>
+          )}
           </ul>
         </ScrollArea>
       </aside>

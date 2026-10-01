@@ -4,35 +4,46 @@ import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
-import { buildInbox, type ConvRow, type ContatoRow } from "@/lib/inbox";
-import type { InboxItem } from "@/lib/types";
+import { JANELA_PADRAO } from "@/lib/inbox";
+import {
+  CONTAGENS_VAZIAS,
+  PAGINA_INBOX,
+  foraDaLista,
+  inicioDaJanela,
+  type Contagens,
+  type ItemLista,
+} from "@/lib/inbox-lista";
+import { fonteDoBanco } from "@/lib/inbox-fonte";
+import { agoraMs } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
-// Lê a lista de conversas (tabela `conversations`, mantida por trigger) e o
-// cadastro de contatos numa tacada. A RLS já restringe tudo ao tenant logado.
-async function getInbox(avisos: string | null): Promise<{
-  items: InboxItem[];
-  ia: Record<string, string | null>;
-}> {
-  const supabase = await createClient();
-  const [{ data: convs }, { data: contatos }] = await Promise.all([
-    supabase
-      .from("conversations")
-      .select(
-        "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, handoff_at"
-      )
-      .order("last_message_at", { ascending: false, nullsFirst: false })
-      .limit(500),
-    supabase
-      .from("dados_cliente")
-      .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
-  ]);
-  return buildInbox(
-    (convs ?? []) as ConvRow[],
-    (contatos ?? []) as ContatoRow[],
-    avisos
-  );
+// A PRIMEIRA PÁGINA da lista (10 conversas de hoje, mais os pedidos abertos) e
+// as contagens dos chips, pela MESMA função do banco que o navegador usa para
+// as páginas seguintes (docs/plano-carregamento.md). A RLS restringe ao tenant.
+async function getInbox(
+  clientId: string,
+  userId: string | null,
+  avisos: string | null
+): Promise<{ itens: ItemLista[]; contagens: Contagens; temMais: boolean }> {
+  const fonte = fonteDoBanco(await createClient(), clientId);
+  const params = {
+    inicio: inicioDaJanela(JANELA_PADRAO, agoraMs()),
+    filtro: "all" as const,
+    busca: "",
+    eu: userId,
+    fora: foraDaLista(avisos),
+  };
+  try {
+    const [itens, contagens] = await Promise.all([
+      fonte.pagina(params, null),
+      fonte.contagens(params),
+    ]);
+    return { itens, contagens, temMais: itens.length === PAGINA_INBOX };
+  } catch (e) {
+    console.error("inbox, primeira página:", e);
+    return { itens: [], contagens: CONTAGENS_VAZIAS, temMais: false };
+  }
 }
 
 export default async function InboxLayout({
@@ -42,7 +53,9 @@ export default async function InboxLayout({
 }) {
   // O gate de auth/instância já roda no layout do route group (app).
   const client = await getMyClient();
-  const { items: initial, ia: initialIa } = await getInbox(client?.avisos ?? null);
+  const inicial = client
+    ? await getInbox(client.id, client.userId ?? null, client.avisos ?? null)
+    : { itens: [], contagens: CONTAGENS_VAZIAS, temMais: false };
   // Fotos de perfil vencidas são conferidas DEPOIS de a tela sair (lib/fotos.ts).
   if (client) after(() => atualizarFotos(client.id, client.evolution_instance));
 
@@ -59,8 +72,8 @@ export default async function InboxLayout({
           layout é Server Component e não sabe a rota. */}
       <div className="flex min-h-0 flex-1 md:gap-3">
         <ContactSidebar
-          initial={initial}
-          initialIa={initialIa}
+          inicial={inicial}
+          clientId={client?.id}
           myUserId={client?.userId}
           numeroAvisos={client?.avisos ?? null}
         />
