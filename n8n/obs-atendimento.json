@@ -757,7 +757,9 @@
             }
           ]
         },
-        "options": {}
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "id": "b730650d-a54c-4a67-be87-bfa4bdb7ccab",
       "name": "Tipo de mensagem",
@@ -2098,6 +2100,29 @@
         "amount": 4
       },
       "webhookId": "3dbd5ec8-bc4a-4b16-939b-a945836b62ce"
+    },
+    {
+      "id": "4ea4fe24-d4e1-430f-8af9-ae7b1a7f3190",
+      "name": "Pronto sem turno",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4400,
+        760
+      ],
+      "parameters": {
+        "operation": "incr",
+        "key": "=pronto:{{ $('Dados').item.json.Telefone }}",
+        "expire": true,
+        "ttl": 120
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -2261,6 +2286,13 @@
         [
           {
             "node": "Vídeo ou documento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Pronto sem turno",
             "type": "main",
             "index": 0
           }
@@ -2834,6 +2866,17 @@
         [
           {
             "node": "Lê chegou",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva cliente (pausa)": {
+      "main": [
+        [
+          {
+            "node": "Pronto sem turno",
             "type": "main",
             "index": 0
           }
