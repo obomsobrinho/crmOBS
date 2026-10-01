@@ -16,7 +16,7 @@ Audit F3 (R-07, RT-03, STRUCT-03). `app/(app)/pedidos/page.tsx` and `components/
 - The notices number is excluded in SQL (`p_fora` from `foraDaLista`, same as `inbox_pagina`) and again by `ehNumeroDeAvisos` on events.
 
 ## Consequences
-Migration `20261002210000_mt_pedidos_pagina.sql` (two functions and two partial indexes on `handoffs`) must be applied before this code is deployed. The search rule is written twice (`casaBuscaPedido` and the SQL `where`); keep them equal.
+Migration `20261001224315_mt_pedidos_pagina.sql` (two functions and two partial indexes on `handoffs`) must be applied before this code is deployed. The search rule is written twice (`casaBuscaPedido` and the SQL `where`); keep them equal.
 
 ## Evidence
 - Before: 3 queries per realtime event, all open and 30 days of resolved loaded on every visit.
