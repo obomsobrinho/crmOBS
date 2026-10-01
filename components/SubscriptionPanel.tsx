@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CreditCard, ShieldAlert } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
 import BrandMark from "@/components/BrandMark";
+import { dataLongaSP } from "@/lib/fuso";
 import { Card } from "@/components/ui/card";
 import {
   billableSeats,
@@ -38,12 +39,7 @@ export interface SubscriptionPanelProps {
 
 function fmt(iso: string | null): string {
   if (!iso) return "não definido";
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Sao_Paulo",
-  });
+  return dataLongaSP(iso);
 }
 
 export default function SubscriptionPanel({

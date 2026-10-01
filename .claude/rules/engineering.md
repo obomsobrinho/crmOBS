@@ -32,6 +32,7 @@ Scoped rules (`data`, `realtime`, `ui`, ...) add detail; this file is the floor.
 
 ## Dates and writing
 - Dates and day boundaries on screen and in logic use `America/Sao_Paulo` (`FUSO`, `lib/format.ts`; `diaSP`, `lib/inbox.ts`). Never UTC, never `Date.now()` in a Server Component body (wrap the clock, e.g. `agoraMs()`).  (why: docs/adr/2026-09-27-dates-on-screen-use-sao-paulo-timezone.md)
+- The zone and screen date formatters live ONLY in `lib/fuso.ts` (`FUSO`, `diaIsoSP`, `dataLongaSP`, `diaMesCurtoSP`, `diaMesHoraSP`); never type `"America/Sao_Paulo"` elsewhere. Contact name = `nomeDoContato` (`lib/inbox.ts`); ninth digit spellings = `grafiasDeDigitos` (`lib/avisos.ts`).  (why: docs/adr/2026-10-01-one-source-for-timezone-names-and-phone-spellings.md)
 - NEVER use an em dash or en dash in any visible text, generated prompt, error message or doc. Use comma, period, colon or parentheses.
 - Visible vocabulary: "Agente ativo" / "Desativado" for the agent switch, never "pausado" (pausada = the AI of ONE conversation when a human took over).  (why: docs/adr/undated-agent-enabled-vs-published-at.md)
 

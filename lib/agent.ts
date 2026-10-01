@@ -1,4 +1,5 @@
 import "server-only";
+import { FUSO } from "./fuso";
 import { diaDosHorarios, notaDeHorarios } from "./horarios";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
@@ -47,7 +48,7 @@ export const AGENT_MODEL = process.env.OPENAI_AGENT_MODEL || "gpt-5.4-mini";
 // agente segue sabendo data e hora. Sem travessão.
 export function agoraBlock(now: Date = new Date()): string {
   const parts = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
+    timeZone: FUSO,
     weekday: "long",
     day: "2-digit",
     month: "long",

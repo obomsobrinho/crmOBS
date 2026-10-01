@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { prettyPhone, phoneDigits } from "@/lib/format";
+import { diaMesCurtoSP } from "@/lib/fuso";
 import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields, { CabecalhoBloco } from "./ContactFields";
@@ -21,8 +22,7 @@ import AvatarContato from "./AvatarContato";
 // ponto final, que numa legenda de rodapé vira ruído.
 function fmtDate(iso: string | null): string {
   if (!iso) return "sempre";
-  return new Date(iso)
-    .toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: "America/Sao_Paulo" })
+  return diaMesCurtoSP(iso)
     .replace(" de ", " ")
     .replace(".", "");
 }

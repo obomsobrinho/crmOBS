@@ -24,6 +24,7 @@
 
 import type { BusinessHours, DayKey } from "@/lib/agent-prompt";
 import { DAY_ORDER } from "@/lib/agent-prompt";
+import { FUSO } from "@/lib/fuso";
 import { ehImportada, respostaDaIa, respostaHumana } from "@/lib/mensagem";
 
 // ---------------------------------------------------------------------------
@@ -70,7 +71,6 @@ export interface ValorInput {
 // (o bloco AGORA da persona usa esse fuso). Classificar em UTC jogaria as
 // mensagens da noite para o dia seguinte e estragaria justamente o número mais
 // forte, que é "fora do horário".
-const FUSO = "America/Sao_Paulo";
 
 /** Partes locais de um instante, sem depender de o servidor estar no Brasil. */
 export interface ParteLocal {

@@ -1,4 +1,4 @@
-import type { InboxItem } from "./types";
+import { diaIsoSP } from "./fuso";
 
 // Pipeline (funil) do tenant. Módulo puro (sem server-only / supabase): usado no
 // Server Component, no board (client) e no /design. A fonte de verdade dos
@@ -60,37 +60,6 @@ export interface PipelineCard {
   handoffAt: string | null;
   /** Quem pôs o card nesta coluna: 'ia', 'human' ou null (nunca foi movido). */
   stageSource: "human" | "ia" | null;
-}
-
-// Última qualificação (summary) por telefone. A lista já vem do mais recente.
-export function lastQualByPhone(
-  rows: { phone: string; summary: string | null }[] | null
-): Record<string, string> {
-  const m: Record<string, string> = {};
-  for (const q of rows ?? []) if (!m[q.phone] && q.summary) m[q.phone] = q.summary;
-  return m;
-}
-
-export function buildCards(
-  items: InboxItem[],
-  ia: Record<string, string | null>,
-  qual: Record<string, string>,
-  source: Record<string, "human" | "ia" | null> = {}
-): PipelineCard[] {
-  return items.map((it) => ({
-    phone: it.phone,
-    name: it.name,
-    lastPreview: it.lastPreview,
-    lastFrom: it.lastFrom,
-    lastMessageAt: it.lastMessageAt,
-    unread: it.unread,
-    assignedUserId: it.assignedUserId,
-    stage: it.stage,
-    summary: qual[it.phone] ?? null,
-    paused: ia[it.phone] === "pause",
-    handoffAt: it.handoffAt ?? null,
-    stageSource: source[it.phone] ?? null,
-  }));
 }
 
 // Distribui os cards nas colunas (estágios não arquivados, em ordem). Card com
@@ -202,15 +171,8 @@ export function idadeEmDias(iso: string | null, agora = Date.now()): string | nu
   if (!iso) return null;
   const ms = Date.parse(iso);
   if (Number.isNaN(ms)) return null;
-  const dia = (d: number) =>
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Sao_Paulo",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date(d));
-  const a = dia(ms);
-  const b = dia(agora);
+  const a = diaIsoSP(ms);
+  const b = diaIsoSP(agora);
   if (a === b) return "hoje";
   const dias = Math.round(
     (Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000
@@ -233,30 +195,10 @@ export function origemDoCard(source: "human" | "ia" | null): string {
 }
 
 /**
- * Subtítulo da coluna: "mais antigo há 1 dia", "2 esperando você". Devolve null
- * quando não há o que dizer, e a coluna então não desenha a linha.
- */
-export function resumoDaColuna(
-  cards: PipelineCard[],
-  agora = Date.now()
-): string | null {
-  if (cards.length === 0) return null;
-  const antigo = cards
-    .map((c) => Date.parse(c.lastMessageAt))
-    .filter((n) => !Number.isNaN(n))
-    .sort((a, b) => a - b)[0];
-  return resumoDosNumeros(
-    {
-      esperando: cards.filter((c) => c.handoffAt).length,
-      maisAntigo: antigo ? new Date(antigo).toISOString() : null,
-    },
-    agora
-  );
-}
-
-/**
- * O mesmo subtítulo a partir dos NÚMEROS da coluna, que vêm do banco (com a
- * coluna paginada, os cards na tela não são a coluna inteira).
+ * Subtítulo da coluna: "mais antigo há 1 dia", "2 esperando você". Vem dos
+ * NÚMEROS da coluna, que vêm do banco (com a coluna paginada, os cards na tela
+ * não são a coluna inteira). Devolve null quando não há o que dizer, e a coluna
+ * então não desenha a linha.
  */
 export function resumoDosNumeros(
   n: { esperando: number; maisAntigo: string | null },

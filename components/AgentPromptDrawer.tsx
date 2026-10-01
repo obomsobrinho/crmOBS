@@ -9,6 +9,7 @@ import {
   type AgentConfig,
 } from "@/lib/agent-prompt";
 import { createClient } from "@/lib/supabase/client";
+import { diaMesHoraSP } from "@/lib/fuso";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { Button } from "@/components/ui/button";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
@@ -41,13 +42,7 @@ interface Versao {
 }
 
 function quando(iso: string): string {
-  return new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Sao_Paulo",
-  });
+  return diaMesHoraSP(iso);
 }
 
 export default function AgentPromptDrawer({

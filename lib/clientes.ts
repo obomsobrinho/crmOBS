@@ -1,5 +1,5 @@
-import { cleanName, diaSP } from "./inbox";
-import { chaveTelefone, ehNumeroDeAvisos } from "./avisos";
+import { diaSP, nomeDoContato } from "./inbox";
+import { chaveTelefone, ehNumeroDeAvisos, grafiasDeDigitos } from "./avisos";
 
 // TELA DE CLIENTES (30/09/2026, docs/plano-clientes.md). Módulo puro: monta a
 // lista, busca e recorta. Servidor e navegador usam as MESMAS funções.
@@ -101,7 +101,7 @@ export function montarClientes(
       return {
         id: c.id,
         phone: c.telefone,
-        name: cleanName(c.display_name) ?? cleanName(c.nomewpp),
+        name: nomeDoContato(c),
         nomeCadastrado: !!c.display_name?.trim(),
         lastMessageAt: conv?.last_message_at ?? null,
         conversationId: conv?.id ?? null,
@@ -309,8 +309,5 @@ export function jidDePessoa(digitos: string): string {
  * quem já escreveu (o WhatsApp entrega números antigos sem o 9).
  */
 export function grafiasDoTelefone(digitos: string): string[] {
-  const chave = chaveTelefone(digitos);
-  const nums = new Set([digitos, chave]);
-  if (chave.length === 12 && chave.startsWith("55")) nums.add(`${chave.slice(0, 4)}9${chave.slice(4)}`);
-  return [...nums].flatMap((n) => [n, jidDePessoa(n)]);
+  return grafiasDeDigitos(digitos).flatMap((n) => [n, jidDePessoa(n)]);
 }

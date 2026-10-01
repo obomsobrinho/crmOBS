@@ -49,6 +49,11 @@ export function ehImportada(messageType: string | null): boolean {
   return messageType === IMPORTADA;
 }
 
+/** A linha foi enviada por alguém do time pelo CRM (balão enviado, não da IA). */
+export function ehManual(messageType: string | null): boolean {
+  return messageType === MANUAL;
+}
+
 /**
  * A linha carrega uma resposta DA IA?
  *

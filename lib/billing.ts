@@ -143,11 +143,6 @@ export function extraSeatsPriceBRL(n: number): number {
   return primeiros * EXTRA_SEAT_BRL_UP_TO_3 + restantes * EXTRA_SEAT_BRL_FROM_4;
 }
 
-/** Preço anual de um plano (12 meses menos os grátis). */
-export function annualPriceBRL(plan: Plan): number {
-  return plan.priceBRL * (12 - ANNUAL_FREE_MONTHS);
-}
-
 export const PLAN_ORDER: PlanKey[] = ["essencial", "profissional", "avancado"];
 
 function isPlanKey(v: unknown): v is PlanKey {

@@ -3,7 +3,7 @@ import ConversationView from "@/components/ConversationView";
 import { PAGINA_MENSAGENS } from "@/lib/mensagem";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
-import { bestName, cleanName } from "@/lib/inbox";
+import { bestName, nomeDoContato } from "@/lib/inbox";
 import { fetchMembers } from "@/lib/team";
 import type { ChatRow, Cliente } from "@/lib/types";
 
@@ -78,10 +78,7 @@ export default async function ThreadPage({
   if (initialRows.length === 0 && !contato) notFound();
 
   // display_name (CRM) precede o nomewpp (pushName do WhatsApp).
-  const name =
-    cleanName(contato?.display_name) ??
-    cleanName(contato?.nomewpp) ??
-    bestName(initialRows);
+  const name = nomeDoContato(contato) ?? bestName(initialRows);
   const firstMessageAt =
     (primeiraMsg as { created_at: string } | null)?.created_at ?? initialRows[0]?.created_at ?? null;
   const convRow = conv as {

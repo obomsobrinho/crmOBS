@@ -119,19 +119,6 @@ export interface AsaasPayment {
   externalReference: string | null;
 }
 
-export interface AsaasAccountStatus {
-  id?: string;
-  general?: string;
-  commercialInfo?: string;
-  bankAccountInfo?: string;
-  documentation?: string;
-}
-
-/** Situação cadastral da conta Asaas. Serve de teste de fumaça da chave. */
-export function accountStatus(): Promise<AsaasAccountStatus> {
-  return call<AsaasAccountStatus>("/myAccount/status");
-}
-
 /**
  * Cria o cliente no Asaas. Aqui "cliente" é a EMPRESA QUE PAGA A GENTE (o
  * tenant), não o lead que manda mensagem no WhatsApp dela (isso é

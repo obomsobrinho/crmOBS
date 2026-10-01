@@ -5,7 +5,7 @@
 // função. Nada aqui fecha pedido: quem fecha são as rotas de sempre
 // (orientar, resolve e send), todas por `fecharPedido` (lib/handoffs.ts).
 
-import { cleanName } from "./inbox";
+import { nomeDoContato } from "./inbox";
 import { semNumeroDeAvisos } from "./avisos";
 
 export interface PedidoLinha {
@@ -47,7 +47,7 @@ export function montarFila(
 ): PedidoAberto[] {
   const nomes = new Map<string, string | null>();
   for (const c of contatos) {
-    nomes.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
+    nomes.set(c.telefone, nomeDoContato(c));
   }
   const ordenados = semNumeroDeAvisos(pedidos, avisos, (p) => p.phone).sort(
     (a, b) => Date.parse(a.opened_at) - Date.parse(b.opened_at) || a.id - b.id
@@ -120,7 +120,7 @@ export function montarResolvidos(
 ): PedidoResolvido[] {
   const nomes = new Map<string, string | null>();
   for (const c of contatos) {
-    nomes.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
+    nomes.set(c.telefone, nomeDoContato(c));
   }
   return semNumeroDeAvisos(linhas, avisos, (p) => p.phone)
     .sort((a, b) => Date.parse(b.closed_at) - Date.parse(a.closed_at) || b.id - a.id)
@@ -189,7 +189,7 @@ export function ehAberto(p: PedidoItem): p is PedidoAberto {
 }
 
 export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
-  const nome = cleanName(l.display_name) ?? cleanName(l.nomewpp);
+  const nome = nomeDoContato(l);
   if (l.closed_at == null) {
     return {
       id: l.id,

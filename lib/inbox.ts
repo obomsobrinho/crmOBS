@@ -12,6 +12,16 @@ export function cleanName(n: string | null | undefined): string | null {
   return t;
 }
 
+// Nome de exibição de um contato: o `display_name` (editado no CRM) precede o
+// `nomewpp` (pushName do WhatsApp), e "Você"/vazio não contam. É o ÚNICO lugar
+// onde essa precedência é decidida: lista, clientes, pedidos, pipeline, ficha e
+// o aviso do agente chamam esta função, nenhuma reescreve o `??`.
+export function nomeDoContato(
+  c: { display_name?: string | null; nomewpp?: string | null } | null | undefined
+): string | null {
+  return cleanName(c?.display_name) ?? cleanName(c?.nomewpp);
+}
+
 // Linha crua da tabela `conversations` (o que o inbox lê).
 export interface ConvRow {
   phone: string;
@@ -52,7 +62,7 @@ export function buildInbox(
   const ia: Record<string, string | null> = {};
   for (const c of contatos) {
     // display_name (editado no CRM) precede o nomewpp (pushName do WhatsApp).
-    nameByPhone.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
+    nameByPhone.set(c.telefone, nomeDoContato(c));
     ia[c.telefone] = c.atendimento_ia ?? null;
     if (c.foto_path) fotoByPhone.set(c.telefone, c.foto_path);
   }

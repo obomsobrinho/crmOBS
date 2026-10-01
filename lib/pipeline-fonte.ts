@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cleanName } from "./inbox";
+import { nomeDoContato } from "./inbox";
 import { normalizar } from "./clientes";
 import type { PipelineCard, Stage } from "./pipeline";
 
@@ -68,7 +68,7 @@ function paraCard(l: LinhaCard): PipelineCard {
   return {
     id: l.id,
     phone: l.phone,
-    name: cleanName(l.display_name) ?? cleanName(l.nomewpp),
+    name: nomeDoContato(l),
     lastPreview: l.last_message_preview ?? "",
     lastFrom: l.last_message_from === "out" ? "out" : "in",
     lastMessageAt: l.last_message_at,
