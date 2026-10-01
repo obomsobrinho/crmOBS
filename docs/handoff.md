@@ -33,7 +33,24 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### 30/09/2026: tela de Clientes, fatia A (a mais recente; ler isto primeiro)
+### 01/10/2026, madrugada: FAZER PRIMEIRO NA PRÓXIMA SESSÃO
+
+O Supabase parou de responder a esta máquina por volta das 01:50 (login e banco; 25 minutos de
+tentativas) e a sessão terminou sem duas conferências:
+1. **Destino de avisos da OBM.** O cenário de agendamento da bateria `npm run test:e2e:n8n` troca
+   `clients.notify_group_jid` por `5500000000099@s.whatsapp.net` e devolve no fim. O cenário passou,
+   mas a devolução não conferia erro (corrigido depois). Conferir:
+   `select notify_group_jid from clients where name='OBM';` tem que ser o GRUPO do dono (`...@g.us`).
+   Se vier o número impossível, avisar o dono e pedir para escolher o grupo de novo em `/agente`.
+2. **Limpar a conversa de teste** (SQL no topo de `e2e/semente.ts`, com `like '5500000000001%'`,
+   porque a bateria do n8n grava o telefone com `@s.whatsapp.net`).
+
+O resto da madrugada está commitado e no ar: espera deslizante no n8n, aviso "Conversa marcada",
+envio que falha não para o resto, horários contados em código (`lib/horarios.ts`) e a bateria de
+ponta a ponta (`e2e/atendimento.n8n.spec.ts`). O dono quer ser chamado para testar só com tudo
+verde: rodar `npm run test:e2e:n8n` e `npm run test:e2e:ia` antes de chamá-lo.
+
+### 30/09/2026: tela de Clientes, fatia A
 
 Item 3 do P0 (`docs/plano-clientes.md`, aprovado pelo dono). **Fatia A commitada, sem push**: lista
 `/clientes` com busca e filtros, ficha única (`FichaContato`) nas duas superfícies, Nascimento e
