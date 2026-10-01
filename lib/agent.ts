@@ -1,4 +1,5 @@
 import "server-only";
+import { diaDosHorarios, notaDeHorarios } from "./horarios";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -58,19 +59,15 @@ export function agoraBlock(now: Date = new Date()): string {
   const get = (t: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === t)?.value ?? "";
   const quando = `${get("weekday")}, ${get("day")} de ${get("month")} de ${get("year")}, ${get("hour")}:${get("minute")}`;
-  return `### AGORA\nData e hora atuais (São Paulo): ${quando}.`;
+  return `### AGORA\nData e hora atuais (São Paulo): ${quando}. Qualquer horário de hoje até ${get("hour")}:${get("minute")} já passou.`;
 }
 
 // Orientação do operador (handoff coach): um humano do time disse o que a IA
 // deve fazer no próximo turno. É instrução prioritária e confiável (vem do time,
 // não do cliente). Injetada no system para a IA retomar sozinha a conversa.
 export function operatorBlock(instruction: string, now: Date = new Date()): string {
-  const hora = new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(now);
+  const nota = notaDeHorarios(instruction, now);
+  const dia = diaDosHorarios(instruction, now);
   return [
     "### ORIENTAÇÃO DO OPERADOR",
     "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação JÁ nesta resposta, mesmo que seja a primeira da conversa ou que o cliente ainda não tenha tocado no assunto (não deixe para depois), com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
@@ -82,8 +79,12 @@ export function operatorBlock(instruction: string, now: Date = new Date()): stri
     // às 16h" virou "Tenho disponibilidade às 16h. Você consegue?", sem o dia
     // (0 de 3 medido). A regra de datas da base não bastou, porque esta seção vem
     // depois e manda seguir a orientação; por isso ela é repetida aqui.
-    `Agora são ${hora}. Se a orientação fala de um horário sem dizer o dia, diga o dia ao cliente: horário que já passou hoje é amanhã (ou o próximo dia de atendimento), e aí não diga \"hoje\" nem \"agora\". Exemplo, às 22:00: a orientação \"tenho disponibilidade às 16h\" vira \"tenho disponibilidade amanhã às 16h\".`,
-    `Orientação: ${instruction.trim()}`,
+    // A conta "já passou ou não" é do CÓDIGO (`lib/horarios.ts`, 01/10/2026): o
+    // modelo errava para os dois lados ("hoje às 16h" às 22h, "amanhã" às 10h).
+    ...(nota
+      ? [`Horários citados na orientação (diga sempre o dia junto da hora):\n${nota}`]
+      : []),
+    `Orientação: ${instruction.trim()}${dia ? ` (ou seja: ${dia})` : ""}`,
   ].join("\n");
 }
 

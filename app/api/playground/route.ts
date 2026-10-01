@@ -53,6 +53,8 @@ export async function POST(req: NextRequest) {
     persona?: string;
     /** Base do aviso de handoff em edição (só usada no modo avançado). */
     handoffNotice?: string;
+    /** Hora fixa do turno (ISO), para a bateria de testes de data e horário. */
+    agoraTeste?: string;
   };
   try {
     body = await req.json();
@@ -139,6 +141,7 @@ export async function POST(req: NextRequest) {
       retomada,
       pedidosAbertos: Array.isArray(body.pedidosAbertos) ? body.pedidosAbertos : [],
       personaOverride,
+      agoraTeste: typeof body.agoraTeste === "string" ? body.agoraTeste : null,
     });
 
     // Marca `onboarding_tested_at` na primeira conversa que der certo.

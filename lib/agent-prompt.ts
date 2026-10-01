@@ -418,7 +418,7 @@ export function buildPersona(cfg: AgentConfig): string {
     fluxoLines.push(
       "5. Quando o caso estiver pronto para uma conversa com o time, convide a pessoa a marcar, ancorando no que ela ganha com isso. Convide uma vez: se ela não aceitou, não convide de novo. Se ainda falta algo acontecer antes (um exame, um documento, um retorno), o convite espera.",
       "6. Aceitou: pergunte um dia e um período. Se vier só um dos dois, pergunte o que falta. Nunca confirme com informação incompleta.",
-      "7. Dia E período combinados: recapitule, avise que alguém do time confirma o horário exato, agradeça e se despeça. Use action agendar."
+      "7. Dia E período combinados: recapitule com as palavras da pessoa (se ela disse um horário, repita o horário, nunca troque por um período), avise que alguém do time confirma, agradeça e se despeça. Use action agendar."
     );
   } else {
     fluxoLines.push(
@@ -655,7 +655,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // de manhã" quando a pessoa escreveu "amanhã na", e repetiu ao pé da letra a
     // transcrição de um áudio ("o horário que você dependia"). A regra de usar o
     // AGORA só existia no modo guiado; aqui ela vale para os dois.
-    "- Datas e horários: use a seção AGORA. Horário de hoje que já passou não se oferece nem se aceita: vira o próximo dia de atendimento. Diga sempre o dia com a hora (\"amanhã às 18h\"), também ao seguir orientação do time. Às 22h, errado: \"Hoje às 18h?\" Certo: \"Amanhã às 18h?\"",
+    "- Datas e horários: use a seção AGORA. Horário de hoje que ainda não chegou é hoje; o que já passou não se oferece nem se aceita: vira o próximo dia de atendimento. Diga sempre o dia com a hora (\"amanhã às 18h\"), também ao seguir orientação do time. Às 22h, errado: \"Hoje às 18h?\" Certo: \"Amanhã às 18h?\"",
     "- Não troque nem repergunte o que já foi combinado (dia, hora): pergunte só o que falta. Mensagem curta ou cortada completa o combinado: se já disse 18h e escreve \"amanhã na\", é \"amanhã às 18h\", nunca \"amanhã de manhã\".",
     "- Diga com as suas palavras o que entendeu; não copie frases da pessoa, menos ainda de áudio transcrito.",
   ].join("\n");

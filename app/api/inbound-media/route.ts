@@ -30,11 +30,14 @@ const EXT: Record<string, string> = {
 };
 
 function extFor(mime: string, filename: string): string {
-  const byMime = EXT[mime.toLowerCase()];
+  // ⚠️ O WhatsApp manda "audio/ogg; codecs=opus": sem tirar os parâmetros, o
+  // áudio era salvo como ".oggcodec" (visto em 01/10/2026).
+  const base = mime.split(";")[0].trim().toLowerCase();
+  const byMime = EXT[base];
   if (byMime) return byMime;
   const byName = filename.toLowerCase().match(/\.([a-z0-9]{1,8})$/);
   if (byName) return byName[1];
-  const sub = mime.split("/")[1]?.replace(/[^a-z0-9]/gi, "").slice(0, 8);
+  const sub = base.split("/")[1]?.replace(/[^a-z0-9]/gi, "").slice(0, 8);
   return sub || "bin";
 }
 

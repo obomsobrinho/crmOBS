@@ -83,6 +83,13 @@ export interface ProcessTurnParams {
    */
   personaOverride?: string | null;
   /**
+   * Hora fixa do turno (ISO), SÓ em `dryRun` (01/10/2026). Existe para a
+   * bateria de testes provar as regras de data e horário ("às 22h, 18h de hoje
+   * já passou") com o mesmo resultado a qualquer hora do dia. Em produção é
+   * ignorada: o atendimento sempre usa o relógio de verdade.
+   */
+  agoraTeste?: string | null;
+  /**
    * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
    * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
    * `message` é ignorada (não existe mensagem nova) e a orientação vem daqui,
@@ -396,6 +403,9 @@ export async function processTurn(
     pedidosAbertos: abertos
       .map((p) => (p.summary ?? "").trim())
       .filter((t) => t !== ""),
+    now: dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
+      ? new Date(params.agoraTeste)
+      : undefined,
   });
   const raw = run.output;
 

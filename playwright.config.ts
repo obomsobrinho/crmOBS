@@ -37,6 +37,13 @@ const IA_PEDIDO =
   process.env.E2E_IA === "1" ||
   process.argv.some((a) => a === "ia" || a === "--project=ia");
 if (IA_PEDIDO) process.env.E2E_IA = "1";
+// O projeto `n8n` (01/10/2026) segue a MESMA regra: ponta a ponta contra o n8n
+// de PRODUÇÃO e o cérebro real, com o telefone impossível (DDD 00). Cada rodada
+// chama o modelo e o Whisper de verdade, então só roda quando pedida pelo nome.
+const N8N_PEDIDO =
+  process.env.E2E_N8N === "1" ||
+  process.argv.some((a) => a === "n8n" || a === "--project=n8n");
+if (N8N_PEDIDO) process.env.E2E_N8N = "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -136,6 +143,25 @@ export default defineConfig({
             testMatch: /.*\.ia\.spec\.ts/,
             retries: 1,
             workers: 3,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: "e2e/.auth/dono.json",
+            },
+            dependencies: ["setup"],
+          },
+        ]
+      : []),
+    // Ponta a ponta do atendimento (`*.n8n.spec.ts`): webhook simulado da
+    // Evolution -> n8n de produção -> cérebro -> banco, e a tela de Conversas
+    // conferindo o resultado. Um worker só: os cenários escrevem na MESMA
+    // conversa de teste.
+    ...(N8N_PEDIDO
+      ? [
+          {
+            name: "n8n",
+            testMatch: /.*.n8n.spec.ts/,
+            workers: 1,
+            timeout: 240_000,
             use: {
               ...devices["Desktop Chrome"],
               storageState: "e2e/.auth/dono.json",
