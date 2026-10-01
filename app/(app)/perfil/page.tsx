@@ -6,17 +6,13 @@ import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { statusLabel } from "@/lib/billing";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { dataLongaSP } from "@/lib/fuso";
 
 export const dynamic = "force-dynamic";
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Sao_Paulo",
-  });
+  return dataLongaSP(iso);
 }
 
 export default async function PerfilPage() {

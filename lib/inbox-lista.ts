@@ -1,5 +1,5 @@
-import { cleanName, diaSP, JANELAS, type JanelaKey } from "./inbox";
-import { chaveTelefone } from "./avisos";
+import { nomeDoContato, diaSP, JANELAS, type JanelaKey } from "./inbox";
+import { grafiasDeDigitos } from "./avisos";
 import type { InboxItem } from "./types";
 
 // LISTA DE CONVERSAS PAGINADA (01/10/2026, docs/plano-carregamento.md, fase 1).
@@ -80,7 +80,7 @@ export function paraItem(l: LinhaInbox): ItemLista {
   return {
     id: l.id,
     phone: l.phone,
-    name: cleanName(l.display_name) ?? cleanName(l.nomewpp),
+    name: nomeDoContato(l),
     fotoPath: l.foto_path,
     lastPreview: l.last_message_preview ?? "",
     lastFrom: l.last_message_from === "out" ? "out" : "in",
@@ -168,8 +168,5 @@ export function foraDaLista(destino: string | null | undefined): string[] {
   if (!destino || destino.includes("@g.us")) return [];
   const d = destino.split("@")[0].replace(/\D/g, "");
   if (!d) return [];
-  const chave = chaveTelefone(d);
-  const g = new Set([d, chave]);
-  if (chave.length === 12 && chave.startsWith("55")) g.add(`${chave.slice(0, 4)}9${chave.slice(4)}`);
-  return [...g];
+  return grafiasDeDigitos(d);
 }

@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import FichaContato from "@/components/FichaContato";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { getMyClient } from "@/lib/auth";
-import { cleanName } from "@/lib/inbox";
+import { nomeDoContato } from "@/lib/inbox";
 import { diasSemContato } from "@/lib/clientes";
 import { agoraMs } from "@/lib/periodo";
 import { createClient } from "@/lib/supabase/server";
@@ -79,7 +79,7 @@ export default async function ClientePage({
         <FichaContato
           key={contato.id}
           superficie="clientes"
-          name={cleanName(contato.display_name) ?? cleanName(contato.nomewpp)}
+          name={nomeDoContato(contato)}
           phone={phone}
           firstMessageAt={(primeira as { created_at: string } | null)?.created_at ?? null}
           messageCount={count ?? 0}

@@ -19,7 +19,8 @@ import {
   telefoneImpossivel,
   textoDoAviso,
 } from "@/lib/avisos";
-import { cleanName } from "@/lib/inbox";
+import { nomeDoContato } from "@/lib/inbox";
+import { diaMesHoraSP } from "@/lib/fuso";
 import { semLoteAtual } from "@/lib/mensagem";
 import type {
   TurnDiagnostics,
@@ -635,9 +636,7 @@ function agendarAviso(a: {
           .eq("client_id", a.clientId)
           .eq("telefone", a.phone)
           .maybeSingle();
-        const nome =
-          cleanName(contato?.display_name as string | null) ??
-          cleanName(contato?.nomewpp as string | null);
+        const nome = nomeDoContato(contato);
         const ok = await sendText(
           instancia,
           destino,
@@ -806,13 +805,7 @@ function pedidosResolvidos(
     // lista longa de pedidos velhos só disputa atenção com a orientação do time.
     .slice(-2)
     .map(({ p, t }) => {
-      const hora = new Date(t).toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: "America/Sao_Paulo",
-      });
+      const hora = diaMesHoraSP(t);
       // ⚠️ Sem a palavra "orientação" aqui: com ela, a IA lia a ORIENTAÇÃO DO
       // OPERADOR do turno como já usada e a ignorava (medido, 0 de 3).
       return `${hora}: ${p.summary?.trim() || "pedido sem resumo"} (já respondido pelo time)`;

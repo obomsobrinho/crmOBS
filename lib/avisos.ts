@@ -150,8 +150,19 @@ export function telefoneImpossivel(phone: string): boolean {
 export function grafiasDoNumeroDeAvisos(destino: string | null | undefined): string[] {
   const d = digitosDoJid(destino);
   if (!d) return [];
-  const chave = chaveTelefone(d);
-  const grafias = new Set([d, chave]);
+  return grafiasDeDigitos(d);
+}
+
+/**
+ * ÚNICA fonte de "com e sem o nono dígito": os dígitos como vieram, a chave sem
+ * o 9 e, para celular BR de 12 dígitos (sem o 9), a grafia com o 9. Quem
+ * precisa dessas grafias (número de avisos, `p_fora` do SQL, busca de contato)
+ * chama esta função em vez de reescrever a lista. A ordem é `[como veio,
+ * chave, com 9]`, sem repetidos.
+ */
+export function grafiasDeDigitos(digitos: string): string[] {
+  const chave = chaveTelefone(digitos);
+  const grafias = new Set([digitos, chave]);
   if (chave.length === 12 && chave.startsWith("55")) {
     grafias.add(`${chave.slice(0, 4)}9${chave.slice(4)}`);
   }

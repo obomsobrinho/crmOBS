@@ -8,6 +8,7 @@ import { JANELA_PADRAO } from "@/lib/inbox";
 import { PAGINA_INBOX, inicioDaJanela, type ItemLista } from "@/lib/inbox-lista";
 import { fonteDaMemoria } from "@/lib/inbox-fonte";
 import { agoraMs } from "@/lib/periodo";
+import { diaIsoSP } from "@/lib/fuso";
 
 // Página de PREVIEW de design (só em desenvolvimento — bloqueada em produção
 // pelo proxy). Renderiza os componentes reais com dados fake, sem exigir login,
@@ -65,12 +66,7 @@ const DIA = 24 * HORA;
  * desde que o Brasil acabou com o horário de verão, em 2019.
  */
 const MEIA_NOITE = Date.parse(
-  `${new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(AGORA))}T00:00:00-03:00`
+  `${diaIsoSP(AGORA)}T00:00:00-03:00`
 );
 /**
  * Hoje, às `h` horas de São Paulo, nunca depois de agora: o `Math.min` evita o

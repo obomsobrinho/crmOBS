@@ -2,7 +2,10 @@
 // O componente é renderizado primeiro no servidor (Vercel, em UTC), e o
 // `suppressHydrationWarning` MANTÉM o texto do servidor: sem o fuso fixo, a
 // mensagem das 17:47 aparecia como 20:47 no celular (achado do dono, 27/09/2026).
-export const FUSO = "America/Sao_Paulo";
+import { FUSO } from "./fuso";
+
+// Reexporta: o fuso mora em lib/fuso.ts, quem já importava daqui continua igual.
+export { FUSO };
 
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {

@@ -7,7 +7,7 @@
 // não" é aritmética, então quem faz é o código, e o prompt recebe a conclusão
 // pronta ("16h já passou hoje: diga amanhã às 16h").
 
-const FUSO = "America/Sao_Paulo";
+import { FUSO } from "./fuso";
 
 /** Minutos desde a meia-noite em São Paulo. */
 export function minutosAgoraSP(now: Date): number {

@@ -12,6 +12,7 @@
 // agente, contavam como trabalho da IA. Ver lib/mensagem.ts para o tamanho
 // medido do estrago.
 
+import { FUSO, diaIsoSP } from "@/lib/fuso";
 import { ehImportada, respostaDaIa, respostaHumana } from "@/lib/mensagem";
 
 /** Uma mensagem da janela (derivada de chat_messages). */
@@ -187,15 +188,6 @@ export interface Barra {
   time: number;
 }
 
-const FUSO = "America/Sao_Paulo";
-
-const FMT_DIA = new Intl.DateTimeFormat("en-CA", {
-  timeZone: FUSO,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 const FMT_HORA = new Intl.DateTimeFormat("en-GB", {
   timeZone: FUSO,
   hour: "2-digit",
@@ -204,7 +196,7 @@ const FMT_HORA = new Intl.DateTimeFormat("en-GB", {
 
 /** Chave do balde de um instante, por hora ou por dia. */
 function balde(inst: Date, porHora: boolean): string {
-  const dia = FMT_DIA.format(inst);
+  const dia = diaIsoSP(inst);
   return porHora ? `${dia}T${FMT_HORA.format(inst)}` : dia;
 }
 
@@ -263,7 +255,7 @@ export function barrasDeBaldes(
     const chave = balde(inst, porHora);
     const eixo = porHora
       ? `${FMT_HORA.format(inst)}h`
-      : DIA_CURTO[new Date(`${FMT_DIA.format(inst)}T12:00:00Z`).getUTCDay()];
+      : DIA_CURTO[new Date(`${diaIsoSP(inst)}T12:00:00Z`).getUTCDay()];
     ordem.push(chave);
     mapa.set(chave, { chave, eixo, titulo: "", ia: 0, time: 0 });
   }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { diaMesCurtoSP } from "@/lib/fuso";
 import { useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
@@ -167,11 +168,7 @@ export default function ContactNotes({
             <span className="mt-0.5 flex items-center gap-1.5 text-legenda font-normal text-ink-3">
               <span suppressHydrationWarning>
                 {authorLabel(n.authorUserId)} ·{" "}
-                {new Date(n.createdAt).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "short",
-                  timeZone: "America/Sao_Paulo",
-                })}
+                {diaMesCurtoSP(n.createdAt)}
               </span>
               <Button
                 variant="ghost"

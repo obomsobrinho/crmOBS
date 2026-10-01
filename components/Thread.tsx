@@ -38,7 +38,7 @@ import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalConversa, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
-import { respostaHumana } from "@/lib/mensagem";
+import { ehManual, respostaHumana } from "@/lib/mensagem";
 import { quemAtende, type Qualification } from "@/lib/crm";
 import { FUSO, formatTime, prettyPhone } from "@/lib/format";
 import { avatarPair, diaSP } from "@/lib/inbox";
@@ -70,7 +70,7 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
     // O que decide o lado é o message_type: 'manual' = enviado pelo CRM (balão
     // "out"), qualquer outro = recebido do contato (balão "in"). Não dá para
     // usar bot_message, porque mídia enviada sem legenda tem bot_message ''.
-    const isManual = r.message_type === "manual";
+    const isManual = ehManual(r.message_type);
     // Balão recebido: tem texto do contato, ou é mídia recebida (não manual e
     // sem resposta do bot na mesma linha).
     if (r.user_message || (media && !isManual && !r.bot_message)) {
@@ -383,7 +383,7 @@ export default function Thread({
       prev.filter((p) =>
         p.mediaPath
           ? !novas.some((r) => r.media_url === p.mediaPath)
-          : !novas.some((r) => r.message_type === "manual" && r.bot_message === p.content)
+          : !novas.some((r) => ehManual(r.message_type) && r.bot_message === p.content)
       )
     );
   }, []);

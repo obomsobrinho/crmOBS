@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { cleanName } from "./inbox";
+import { nomeDoContato } from "./inbox";
 import { inicioDeDias } from "./inbox-lista";
 import {
   LIMIAR_FRIO_DIAS,
@@ -80,7 +80,7 @@ function paraCliente(l: LinhaCliente): ClienteItem {
   return {
     id: l.id,
     phone: l.telefone,
-    name: cleanName(l.display_name) ?? cleanName(l.nomewpp),
+    name: nomeDoContato(l),
     nomeCadastrado: !!l.display_name?.trim(),
     lastMessageAt: l.last_message_at,
     conversationId: l.conversa_id,
