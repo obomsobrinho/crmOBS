@@ -23,16 +23,15 @@ export default async function AppLayout({
 }) {
   const client = await getMyClient();
   if (!client) redirect("/login");
-  // Sem WhatsApp conectado não há app: o dono que ainda não publicou vai para o
-  // assistente, que começa exatamente por conectar. Atendente segue indo para
-  // `/connect`, porque `/montagem` é do dono e o mandaria de volta para cá, o
-  // que seria um laço.
-  if (!client.evolution_instance) {
-    redirect(
-      client.role === "dono" && !client.agentPublishedAt
-        ? "/montagem"
-        : "/connect"
-    );
+  // ⚠️ O DONO ENTRA MESMO SEM WHATSAPP CONECTADO (30/09/2026, achado do dono no
+  // celular). Esta guarda mandava o dono sem instância para `/montagem`, de quando
+  // conectar era o PRIMEIRO passo. Desde que virou o último (24/09), o "Terminar
+  // depois" do assistente leva ao `/inbox`, este layout devolvia ao assistente, e
+  // a pessoa ficava presa num laço sem saída. O dono entra; quem lembra de
+  // terminar é a linha `AvisoMontagem` no topo. Atendente sem instância segue
+  // indo para `/connect` (ele não tem o assistente).
+  if (!client.evolution_instance && client.role !== "dono") {
+    redirect("/connect");
   }
 
   return (
@@ -56,7 +55,10 @@ export default async function AppLayout({
             navegação, e uma chamada à Evolution por página faria a tela inteira
             esperar por API de terceiro (achado A1, latência de troca de
             conversa). */}
-        <WhatsAppBanner clientId={client.id} />
+        {/* Conta que NUNCA conectou não leva a faixa vermelha de "caiu": o
+            WhatsApp não caiu, ele ainda não existe, e quem diz isso é a linha
+            da montagem logo abaixo (um sinal por fato). */}
+        {client.evolution_instance && <WhatsAppBanner clientId={client.id} />}
         {/* Porta de volta para a montagem: uma linha, em toda página, até o
             agente ir ao ar. NÃO conta passos, porque o único contador da conta
             mora dentro do assistente.
