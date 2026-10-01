@@ -94,3 +94,10 @@ export function semLoteAtual<
   }
   return linhas.slice(i);
 }
+
+/**
+ * Quantas mensagens a conversa aberta traz por vez (01/10/2026,
+ * docs/plano-carregamento.md, fase 4): as mais recentes ao abrir, e as
+ * anteriores de tantas em tantas ao rolar para cima.
+ */
+export const PAGINA_MENSAGENS = 30;

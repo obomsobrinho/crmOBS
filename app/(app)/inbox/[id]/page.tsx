@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ConversationView from "@/components/ConversationView";
+import { PAGINA_MENSAGENS } from "@/lib/mensagem";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
 import { bestName, cleanName } from "@/lib/inbox";
@@ -26,13 +27,26 @@ export default async function ThreadPage({
   // mensagem. Com a memoização por request em `lib/auth.ts`, aqui ele costuma
   // voltar do cache do layout, mas a ordem continua certa se um dia deixar de
   // voltar.
-  const [{ data: rows }, { data: cliente }, { data: conv }, members, client] =
+  // CONVERSA PAGINADA (01/10/2026, docs/plano-carregamento.md, fase 4): só as
+  // 30 mais recentes; as anteriores vêm ao rolar para cima. O total e a data da
+  // primeira mensagem saem de consultas próprias, baratas (contagem e uma linha).
+  const [
+    { data: rows },
+    { data: cliente },
+    { data: conv },
+    members,
+    client,
+    { count: totalMensagens },
+    { data: primeiraMsg },
+  ] =
     await Promise.all([
       supabase
         .from("chat_messages")
         .select("*")
         .eq("phone", phone)
-        .order("created_at", { ascending: true }),
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(PAGINA_MENSAGENS),
       supabase
         .from("dados_cliente")
         .select("*")
@@ -45,9 +59,20 @@ export default async function ThreadPage({
         .maybeSingle(),
       fetchMembers(supabase),
       getMyClient(),
+      supabase
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("phone", phone),
+      supabase
+        .from("chat_messages")
+        .select("created_at")
+        .eq("phone", phone)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
-  const initialRows = (rows ?? []) as ChatRow[];
+  const initialRows = ((rows ?? []) as ChatRow[]).reverse();
   const contato = cliente as Cliente | null;
 
   if (initialRows.length === 0 && !contato) notFound();
@@ -57,7 +82,8 @@ export default async function ThreadPage({
     cleanName(contato?.display_name) ??
     cleanName(contato?.nomewpp) ??
     bestName(initialRows);
-  const firstMessageAt = initialRows[0]?.created_at ?? null;
+  const firstMessageAt =
+    (primeiraMsg as { created_at: string } | null)?.created_at ?? initialRows[0]?.created_at ?? null;
   const convRow = conv as {
     id: number;
     assigned_user_id: string | null;
@@ -72,7 +98,8 @@ export default async function ThreadPage({
       atendimentoIa={contato?.atendimento_ia ?? null}
       initialRows={initialRows}
       firstMessageAt={firstMessageAt}
-      messageCount={initialRows.length}
+      messageCount={totalMensagens ?? initialRows.length}
+      temAntigas={(totalMensagens ?? 0) > initialRows.length}
       assignedUserId={convRow?.assigned_user_id ?? null}
       members={members}
       myUserId={client?.userId ?? ""}

@@ -22,6 +22,7 @@ export default function ConversationView({
   fotoPath = null,
   atendimentoIa,
   initialRows,
+  temAntigas = false,
   firstMessageAt,
   messageCount,
   assignedUserId,
@@ -45,6 +46,8 @@ export default function ConversationView({
   fotoPath?: string | null;
   atendimentoIa: string | null;
   initialRows: ChatRow[];
+  /** Há mensagens mais antigas que as que vieram (a conversa é paginada). */
+  temAntigas?: boolean;
   firstMessageAt: string | null;
   messageCount: number;
   assignedUserId: string | null;
@@ -394,6 +397,7 @@ export default function ConversationView({
           iaState={iaState}
           onToggleIa={toggleIa}
           initialRows={initialRows}
+          temAntigasInicial={temAntigas}
           onToggleContext={() => setShowContext((v) => !v)}
           onOpenContato={() => setContatoFolha(true)}
           contextOpen={showContext}

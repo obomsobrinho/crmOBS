@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import {
   Bot,
   User,
@@ -42,6 +42,7 @@ import { quemAtende, type Qualification } from "@/lib/crm";
 import { FUSO, formatTime, prettyPhone } from "@/lib/format";
 import { avatarPair, diaSP } from "@/lib/inbox";
 import AvatarContato from "@/components/AvatarContato";
+import { PAGINA_MENSAGENS } from "@/lib/mensagem";
 import type { Bubble, ChatRow } from "@/lib/types";
 import HandoffCard, { type Handoff } from "./HandoffCard";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
@@ -139,6 +140,13 @@ function dayLabel(iso: string): string {
   });
 }
 
+/** A ordem da conversa: chegada no WhatsApp, e o id desempata. */
+function ordemDasLinhas(a: ChatRow, b: ChatRow): number {
+  const ta = Date.parse(a.created_at);
+  const tb = Date.parse(b.created_at);
+  return ta !== tb ? ta - tb : a.id - b.id;
+}
+
 export default function Thread({
   phone,
   name,
@@ -146,6 +154,7 @@ export default function Thread({
   iaState,
   onToggleIa,
   initialRows,
+  temAntigasInicial = false,
   onToggleContext,
   contextOpen,
   clientId,
@@ -171,6 +180,8 @@ export default function Thread({
   iaState: string | null;
   onToggleIa: () => void;
   initialRows: ChatRow[];
+  /** A conversa tem mensagens mais antigas que as que vieram do servidor. */
+  temAntigasInicial?: boolean;
   onToggleContext?: () => void;
   /** Celular: "Dados do contato" nos três pontos abre a folha do contato. */
   onOpenContato?: () => void;
@@ -202,6 +213,14 @@ export default function Thread({
   const supabase = createClient();
   const [rows, setRows] = useState<ChatRow[]>(initialRows);
   const [rowsProp, setRowsProp] = useState<ChatRow[]>(initialRows);
+  // CONVERSA PAGINADA (01/10/2026, docs/plano-carregamento.md, fase 4): abre
+  // com as 30 mais recentes e busca as anteriores ao chegar no topo.
+  const [temAntigas, setTemAntigas] = useState(temAntigasInicial);
+  const [carregandoAntigas, setCarregandoAntigas] = useState(false);
+  const topoRef = useRef<HTMLDivElement>(null);
+  // Distância até o FIM antes de crescer em cima: devolvida depois, para a
+  // mensagem que a pessoa lia não sair do lugar.
+  const restaurarRef = useRef<number | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
   const [assignOpen, setAssignOpen] = useState(false);
   // ⚠️ NÃO EXISTE MAIS ESTADO DE ROLAGEM AQUI (19/09/2026, quarta rodada). Eram
@@ -233,6 +252,7 @@ export default function Thread({
     setRowsProp(initialRows);
     setRows(initialRows);
     setPending([]);
+    setTemAntigas(temAntigasInicial);
   }
 
   // PEDIDOS DE AJUDA DA IA (tabela `handoffs`, 27/09/2026): viram cartões na
@@ -311,30 +331,93 @@ export default function Thread({
     [phone, carregarHandoffs]
   );
 
-  const refetch = useCallback(async () => {
+  /**
+   * Junta linhas que chegaram (realtime, recarga) às que estão na tela, por id e
+   * na ordem de chegada no WhatsApp. Pendente que virou linha no banco sai: mídia
+   * casa pelo media_url, texto pela mensagem 'manual'.
+   */
+  const mesclar = useCallback((novas: ChatRow[]) => {
+    if (novas.length === 0) return;
+    setRows((cur) => {
+      const porId = new Map(cur.map((r) => [r.id, r]));
+      for (const r of novas) porId.set(r.id, r);
+      return [...porId.values()].sort(ordemDasLinhas);
+    });
+    setPending((prev) =>
+      prev.filter((p) =>
+        p.mediaPath
+          ? !novas.some((r) => r.media_url === p.mediaPath)
+          : !novas.some((r) => r.message_type === "manual" && r.bot_message === p.content)
+      )
+    );
+  }, []);
+
+  /** As mais recentes de novo (o realtime caiu e voltou): junta, não substitui. */
+  const recarregarRecentes = useCallback(async () => {
     const { data } = await supabase
       .from("chat_messages")
       .select("*")
       .eq("phone", phone)
-      .order("created_at", { ascending: true });
-    if (!data) return;
-    const fresh = data as ChatRow[];
-    setRows(fresh);
-    // Reconcilia: remove pendentes que já viraram linha no banco. Mídia casa pelo
-    // media_url (o caminho no Storage); texto casa pela mensagem 'manual'.
-    setPending((prev) =>
-      prev.filter((p) =>
-        p.mediaPath
-          ? !fresh.some((r) => r.media_url === p.mediaPath)
-          : !fresh.some(
-            (r) => r.message_type === "manual" && r.bot_message === p.content
-          )
-      )
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(PAGINA_MENSAGENS);
+    if (data) mesclar((data as ChatRow[]).reverse());
+  }, [phone, supabase, mesclar]);
+
+  /** As 30 anteriores à primeira da tela. */
+  const carregarAntigas = useCallback(async () => {
+    const primeira = rows[0];
+    if (!temAntigas || carregandoAntigas || !primeira) return;
+    setCarregandoAntigas(true);
+    try {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("phone", phone)
+        .or(`created_at.lt.${primeira.created_at},and(created_at.eq.${primeira.created_at},id.lt.${primeira.id})`)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(PAGINA_MENSAGENS);
+      if (error) throw error;
+      const antigas = ((data ?? []) as ChatRow[]).reverse();
+      const el = viewportRef.current;
+      if (el) restaurarRef.current = el.scrollHeight - el.scrollTop;
+      setTemAntigas(antigas.length === PAGINA_MENSAGENS);
+      mesclar(antigas);
+    } catch (e) {
+      console.error("mensagens anteriores:", e);
+    } finally {
+      setCarregandoAntigas(false);
+    }
+  }, [rows, temAntigas, carregandoAntigas, phone, supabase, mesclar]);
+
+  // Cresceu em cima: a mensagem que a pessoa lia fica onde estava.
+  useLayoutEffect(() => {
+    const el = viewportRef.current;
+    if (el && restaurarRef.current != null) {
+      el.scrollTop = el.scrollHeight - restaurarRef.current;
+      restaurarRef.current = null;
+    }
+  }, [rows]);
+
+  // O marcador do TOPO: quando aparece, vêm as anteriores.
+  useEffect(() => {
+    const alvo = topoRef.current;
+    const raiz = viewportRef.current;
+    if (!alvo || !raiz || !temAntigas) return;
+    const obs = new IntersectionObserver(
+      (es) => {
+        if (es.some((e) => e.isIntersecting)) void carregarAntigas();
+      },
+      { root: raiz, rootMargin: "300px 0px 0px 0px" }
     );
-  }, [phone, supabase]);
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [temAntigas, carregarAntigas, rows.length]);
 
   // Realtime: mudanças nesta conversa.
   useEffect(() => {
+    let primeira = true;
     const channelSair = assinarComSessao((sb) =>
       sb
       .channel(`thread-${phone}`)
@@ -346,16 +429,31 @@ export default function Thread({
           table: "chat_messages",
           filter: `phone=eq.${phone}`,
         },
-        () => {
-          void refetch();
+        (pl: { eventType?: string; new?: unknown; old?: unknown }) => {
+          // A LINHA que mudou entra direto, sem baixar a conversa de novo.
+          if (pl.eventType === "DELETE") {
+            const id = (pl.old as { id?: number } | null)?.id;
+            if (id != null) setRows((cur) => cur.filter((r) => r.id !== id));
+            return;
+          }
+          if (pl.new) mesclar([pl.new as ChatRow]);
         }
       )
-      .subscribe()
+      .subscribe((status: string) => {
+        // Reassinatura (o realtime caiu e voltou): pode ter chegado mensagem no
+        // meio. A primeira assinatura é pulada: a conversa acabou de vir.
+        if (status !== "SUBSCRIBED") return;
+        if (primeira) {
+          primeira = false;
+          return;
+        }
+        void recarregarRecentes();
+      })
     );
     return () => {
       channelSair();
     };
-  }, [phone, refetch, supabase]);
+  }, [phone, mesclar, recarregarRecentes]);
 
   const bubbles = useMemo(() => {
     const base = rowsToBubbles(rows);
@@ -1049,6 +1147,13 @@ export default function Thread({
               seguinte. Os 20px de respiro lateral ficam aqui dentro para que a
               coluna encoste na moldura só quando a tela é estreita. */}
           <div className="mx-auto w-full max-w-[960px] px-5 max-md:px-3">
+            {temAntigas && (
+              <div ref={topoRef} data-slot="conversa-antigas" className="flex justify-center pb-2">
+                {carregandoAntigas && (
+                  <span className="text-legenda text-ink-3">Carregando mensagens anteriores…</span>
+                )}
+              </div>
+            )}
             {items.map((item) =>
               item.kind === "day" ? (
                 <div
