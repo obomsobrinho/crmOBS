@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { mascaraTelefoneBR } from "@/lib/format";
+import { anunciarContato } from "@/lib/contato-bus";
 import { emailValido, mascaraData, telaParaIso, telefoneDoCadastro } from "@/lib/clientes";
 
 // NOVO CLIENTE (fatia B da tela de Clientes, 01/10/2026). Só o telefone é
@@ -94,7 +95,9 @@ export default function NovoClienteDialog({
       }
       fechar();
       router.push(`/clientes/${data.id}`);
-      router.refresh();
+      // A lista de clientes (sem realtime) busca de novo as linhas que tem, em vez
+      // de refazer a página inteira (R-15, lib/contato-bus.ts).
+      anunciarContato({ phone: null });
     } catch {
       setErro({ campo: null, texto: "Não deu para cadastrar agora. Tente de novo em instantes." });
     } finally {

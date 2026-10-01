@@ -39,12 +39,15 @@ import {
   Ellipsis,
   type LucideIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
 import ThemeToggle from "./ThemeToggle";
-import FeedbackDialog from "./FeedbackDialog";
 import { grafiasDoNumeroDeAvisos } from "@/lib/avisos";
 import { useContagemAoVivo } from "@/lib/use-contagem-ao-vivo";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+
+// O diálogo de feedback está em toda página mas só pesa quando alguém o abre (R-30).
+const FeedbackDialog = dynamic(() => import("./FeedbackDialog"));
 
 const NAV: {
   href: string;
@@ -128,6 +131,12 @@ export default function NavRail({
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackAberto, setFeedbackAberto] = useState(false);
+  // Monta na primeira abertura e fica (o chunk só baixa quando alguém pede).
+  const [feedbackMontado, setFeedbackMontado] = useState(false);
+  const abrirFeedback = () => {
+    setFeedbackMontado(true);
+    setFeedbackAberto(true);
+  };
 
   // Restaura o menu recolhido depois de montar. Não dá para ler o localStorage
   // no estado inicial: o servidor não tem localStorage e o HTML sairia com um
@@ -442,7 +451,7 @@ export default function NavRail({
                 que a pessoa usa poucas vezes. O menu do avatar já é o lugar do
                 "coisas sobre mim e sobre a conta". */}
             <DropdownMenuItem
-              onSelect={() => setFeedbackAberto(true)}
+              onSelect={abrirFeedback}
               className="h-9 px-3 text-apoio hover:bg-[var(--rail-hover)] hover:text-ink focus:bg-[var(--rail-hover)] focus:text-ink"
             >
               <MessageSquarePlus size={16} /> Enviar feedback
@@ -460,12 +469,14 @@ export default function NavRail({
 
         {/* Fora do DropdownMenu de propósito: o menu desmonta o conteúdo ao
             fechar, e o diálogo iria junto no mesmo clique que o abre. */}
-        <FeedbackDialog
-          aberto={feedbackAberto}
-          onFechar={() => setFeedbackAberto(false)}
-          clientId={clientId}
-          path={pathname}
-        />
+        {feedbackMontado && (
+          <FeedbackDialog
+            aberto={feedbackAberto}
+            onFechar={() => setFeedbackAberto(false)}
+            clientId={clientId}
+            path={pathname}
+          />
+        )}
       </nav>
     </Card>
     <BarraAbas
@@ -476,7 +487,7 @@ export default function NavRail({
       pedidos={pedidosAbertos}
       estadoCanal={estadoCanal}
       whatsappConnected={whatsappConnected}
-      onFeedback={() => setFeedbackAberto(true)}
+      onFeedback={abrirFeedback}
       onLogout={logout}
     />
     </>

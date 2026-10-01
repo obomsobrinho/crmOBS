@@ -63,16 +63,22 @@ export interface MyClient {
 // memoizado é sempre o atual.
 export const getMyClient = cache(async function getMyClient(): Promise<MyClient | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  // `getClaims()` e não `getUser()` (R-08, 01/10/2026): valida a assinatura do
+  // JWT e a validade LOCALMENTE (o projeto assina com chave assimétrica ES256,
+  // JWKS em cache), sem a ida ao Auth que `getUser()` faz em toda navegação. Um
+  // token inválido ou vencido volta sem claims e a pessoa vai ao login. O custo
+  // aceito: um usuário revogado só é percebido quando o token vence; os DADOS
+  // dele fecham na hora, porque a RLS olha `user_clients` em cada query. Rota
+  // que ESCREVE algo sensível reconfere no Auth (`revalidar` em `sessaoDaRota`).
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const userId = claimsData?.claims?.sub;
+  if (!userId) return null;
 
   // As colunas de assinatura e de montagem vêm no mesmo select (custo zero)
   // porque o gate e a linha de aviso rodam em toda navegação do app. Só
   // escalares: `persona` (9 KB na OBM) e `agent_config` ficam FORA de propósito.
   //
-  // `clients` e `user_clients` saem JUNTOS: a segunda só precisa de `user.id`,
+  // `clients` e `user_clients` saem JUNTOS: a segunda só precisa do id do usuário,
   // que já existe, e a policy de `user_clients` devolve só as linhas do próprio
   // usuário, então filtrar pelo tenant depois, em memória, dá o mesmo resultado
   // que filtrar no banco. Eram três viagens em série (getUser, clients,
@@ -94,7 +100,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle(),
-    supabase.from("user_clients").select("client_id, role").eq("user_id", user.id),
+    supabase.from("user_clients").select("client_id, role").eq("user_id", userId),
   ]);
   if (!data) return null;
 
@@ -125,7 +131,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     evolution_instance: client.evolution_instance,
     imported_at: client.imported_at,
     role: (membership as { role: string } | null)?.role ?? null,
-    userId: user.id,
+    userId,
     subscriptionStatus: client.subscription_status,
     trialEndsAt: client.trial_ends_at,
     graceUntil: client.grace_until,

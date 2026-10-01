@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   UserPlus,
   Trash2,
@@ -62,7 +61,6 @@ export default function TeamManager({
   /** No /design (sem login) simula as ações em memória. */
   preview?: boolean;
 }) {
-  const router = useRouter();
   const isOwner = myRole === "dono";
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [email, setEmail] = useState("");
@@ -77,7 +75,6 @@ export default function TeamManager({
     if (preview) return;
     const next = await fetchMembers(createClient());
     if (next.length) setMembers(next);
-    router.refresh();
   }
 
   async function invite(e: React.FormEvent) {

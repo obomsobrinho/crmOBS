@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import Pedidos from "@/components/Pedidos";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { fetchMembers } from "@/lib/team";
+import { membrosDoTenant } from "@/lib/team-servidor";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { PAGINA_PEDIDOS, ehAberto } from "@/lib/pedidos";
 import { fonteDoBanco } from "@/lib/pedidos-fonte";
@@ -36,7 +36,7 @@ export default async function PedidosPage({
   // O pedido do link primeiro: se já está resolvido, a página abre na aba dele.
   const [pedidoDoLink, members, contagens] = await Promise.all([
     Number.isInteger(abrir) && abrir > 0 ? fonte.porId(fora, abrir) : Promise.resolve(null),
-    fetchMembers(supabase),
+    membrosDoTenant(supabase, client.id),
     fonte.contagens(fora),
   ]);
   const aba = pedidoDoLink && !ehAberto(pedidoDoLink) ? "resolvidos" : "abertos";

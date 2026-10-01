@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
+import { invalidarMembros } from "@/lib/team-servidor";
 
 // Remove um membro do tenant do dono logado (desfaz o vínculo em user_clients;
 // não apaga o login, que pode pertencer a outros tenants).
@@ -8,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 // - Não pode remover a si mesmo, nem o último dono do tenant.
 // Write via service_role (user_clients sem policy de DELETE para authenticated).
 export async function POST(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "só o dono pode remover membros" });
+  const r = await sessaoDaRota({ dono: "só o dono pode remover membros", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
@@ -70,6 +71,8 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  invalidarMembros(mine.id);
 
   return NextResponse.json({ ok: true });
 }

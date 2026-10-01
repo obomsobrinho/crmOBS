@@ -25,7 +25,7 @@ import {
 const CPF_CNPJ_RE = /^\d{11}$|^\d{14}$/;
 
 export async function POST(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "só o dono pode contratar ou trocar o plano" });
+  const r = await sessaoDaRota({ dono: "só o dono pode contratar ou trocar o plano", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
 
 // Cancelamento self-service (decisão do dono do produto: botão, não ligação).
 export async function DELETE(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "só o dono pode cancelar a assinatura" });
+  const r = await sessaoDaRota({ dono: "só o dono pode cancelar a assinatura", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 

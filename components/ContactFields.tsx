@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import { anunciarContato } from "@/lib/contato-bus";
 import {
   customFieldsToList,
   listToCustomFields,
@@ -62,7 +62,6 @@ export default function ContactFields({
   initialBirthDate?: string | null;
   editable: boolean;
 }) {
-  const router = useRouter();
   const supabase = createClient();
   const [name, setName] = useState(initialDisplayName ?? "");
   const [fields, setFields] = useState<CustomField[]>(
@@ -123,7 +122,9 @@ export default function ContactFields({
     }
     gravado.current = atual;
     setStatus("salvo");
-    router.refresh(); // re-resolve o nome no cabeçalho e na lista
+    // Cabeçalho, ficha e lista corrigem o próprio nome pelo barramento, sem
+    // refazer a página inteira (R-15, lib/contato-bus.ts).
+    anunciarContato({ phone, nome: nome.trim() || null });
   }
 
   function remover(i: number) {

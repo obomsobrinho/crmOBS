@@ -4,11 +4,12 @@ import { ArrowLeft } from "lucide-react";
 import FichaContato from "@/components/FichaContato";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { getMyClient } from "@/lib/auth";
-import { nomeDoContato } from "@/lib/inbox";
+import { cleanName, nomeDoContato } from "@/lib/inbox";
 import { diasSemContato } from "@/lib/clientes";
 import { agoraMs } from "@/lib/periodo";
 import { createClient } from "@/lib/supabase/server";
-import { fetchMembers } from "@/lib/team";
+import { membrosDoTenant } from "@/lib/team-servidor";
+import { resumoDaConversa } from "@/lib/conversa-resumo";
 import type { Cliente } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -26,31 +27,22 @@ export default async function ClientePage({
 
   const { data } = await supabase
     .from("dados_cliente")
-    .select("*")
+    .select("id, telefone, nomewpp, atendimento_ia, created_at, display_name, custom_fields, email, birth_date, foto_path")
     .eq("id", id)
     .maybeSingle();
   const contato = data as Cliente | null;
   if (!contato) notFound();
   const phone = contato.telefone;
 
-  const [{ data: conv }, { count }, { data: primeira }, { data: qual }, members, client] =
+  const clientPromise = getMyClient();
+  const [{ data: conv }, resumo, { data: qual }, members, client] =
     await Promise.all([
       supabase
         .from("conversations")
         .select("id, last_message_at")
         .eq("phone", phone)
         .maybeSingle(),
-      supabase
-        .from("chat_messages")
-        .select("id", { count: "exact", head: true })
-        .eq("phone", phone),
-      supabase
-        .from("chat_messages")
-        .select("created_at")
-        .eq("phone", phone)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
+      resumoDaConversa(supabase, phone),
       supabase
         .from("conversation_qualifications")
         .select("summary")
@@ -59,8 +51,8 @@ export default async function ClientePage({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      fetchMembers(supabase),
-      getMyClient(),
+      clientPromise.then((c) => (c ? membrosDoTenant(supabase, c.id) : [])),
+      clientPromise,
     ]);
 
   return (
@@ -80,9 +72,10 @@ export default async function ClientePage({
           key={contato.id}
           superficie="clientes"
           name={nomeDoContato(contato)}
+          nomeBase={cleanName(contato.nomewpp)}
           phone={phone}
-          firstMessageAt={(primeira as { created_at: string } | null)?.created_at ?? null}
-          messageCount={count ?? 0}
+          firstMessageAt={resumo.primeira}
+          messageCount={resumo.total}
           members={members}
           myUserId={client?.userId ?? ""}
           conversationId={(conv as { id: number } | null)?.id ?? null}

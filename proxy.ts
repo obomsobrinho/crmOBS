@@ -27,10 +27,14 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  // NÃO colocar código entre createServerClient e getUser().
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // NÃO colocar código entre createServerClient e getClaims().
+  // `getClaims()` confere assinatura e validade do JWT localmente (chave pública
+  // em cache) e só vai à rede para renovar um token vencido, o que também regrava
+  // o cookie por `setAll`. `getUser()` aqui custava uma ida ao Auth em TODA
+  // navegação (R-08, 01/10/2026). Rota que escreve algo sensível reconfere no
+  // Auth por conta própria (`revalidar`, lib/rota.ts).
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ?? null;
 
   const { pathname } = request.nextUrl;
   const isPublic =

@@ -17,6 +17,7 @@ import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
 import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
 import AvatarContato from "./AvatarContato";
+import { useNomeDoContato } from "@/lib/use-nome-contato";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
 // ponto final, que numa legenda de rodapé vira ruído.
@@ -70,6 +71,7 @@ function fmtDate(iso: string | null): string {
 export default function FichaContato({
   superficie = "conversa",
   name,
+  nomeBase = null,
   phone,
   firstMessageAt,
   messageCount,
@@ -104,6 +106,8 @@ export default function FichaContato({
   /** Contato frio (60+ dias sem mensagem, `lib/clientes.ts`). Só em `clientes`. */
   diasSemContato?: number | null;
   name: string | null;
+  /** O nome SEM o apelido, para quando o apelido é apagado (R-15). */
+  nomeBase?: string | null;
   phone: string;
   firstMessageAt: string | null;
   messageCount: number;
@@ -120,7 +124,8 @@ export default function FichaContato({
   customFields: Record<string, unknown> | null;
   contactExists: boolean;
 }) {
-  const displayName = name || prettyPhone(phone);
+  const nome = useNomeDoContato(phone, name, nomeBase);
+  const displayName = nome || prettyPhone(phone);
   const number = prettyPhone(phone);
   const [primeiraAberta, setPrimeiraAberta] = useState(false);
   // Nenhuma mensagem, em nenhum sentido: o contato cadastrado à mão (fatia B).
@@ -142,7 +147,7 @@ export default function FichaContato({
               continua REDONDO aqui de propósito: o cabeçalho da conversa já foi
               aplicado e ficou redondo, e duas formas de avatar na mesma tela é
               pior do que uma divergência assumida contra a prancha. */}
-          <AvatarContato size="lg" phone={phone} name={name} fotoPath={fotoPath} />
+          <AvatarContato size="lg" phone={phone} name={nome} fotoPath={fotoPath} />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <div
               data-slot="painel-nome"

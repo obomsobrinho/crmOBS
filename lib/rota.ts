@@ -1,6 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { getMyClient, type MyClient } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * O que a rota exige de quem chama. Tudo opcional: o piso, sempre aplicado, é
@@ -17,6 +18,14 @@ export interface Exigencias {
    * modo leitura, e as rotas de leitura seguem abertas.
    */
   ativa?: boolean;
+  /**
+   * Reconfere a sessão NO AUTH (`getUser()`, uma ida à rede) antes de seguir.
+   * O padrão confere o JWT só localmente (`getClaims()`, R-08): um usuário
+   * revogado ainda passa até o token vencer. Rota que ESCREVE algo sensível
+   * (convidar ou remover membro, publicar, assinatura, config do agente, avisos)
+   * liga isto e fecha a janela.
+   */
+  revalidar?: boolean;
 }
 
 /**
@@ -34,6 +43,13 @@ export interface Exigencias {
 export async function sessaoDaRota(
   exige: Exigencias = {}
 ): Promise<{ mine: MyClient } | { erro: NextResponse }> {
+  if (exige.revalidar) {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data.user) {
+      return { erro: NextResponse.json({ error: "não autenticado" }, { status: 401 }) };
+    }
+  }
   const mine = await getMyClient();
   if (!mine) {
     return { erro: NextResponse.json({ error: "não autenticado" }, { status: 401 }) };

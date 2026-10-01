@@ -46,7 +46,7 @@ export async function PUT(
 ) {
   const { id } = await ctx.params;
 
-  const r = await sessaoDaRota({ id, dono: "só o dono pode publicar o agente" });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode publicar o agente", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus, Search, UsersRound, X } from "lucide-react";
-import NovoClienteDialog from "@/components/NovoClienteDialog";
 import AvatarContato from "@/components/AvatarContato";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { useDebounce } from "@/lib/use-debounce";
 import { usePaginada } from "@/lib/use-paginada";
+import { ouvirContato } from "@/lib/contato-bus";
 import {
   PAGINA_CLIENTES,
   fonteClientesDaMemoria,
@@ -41,6 +42,9 @@ import {
   type ClienteItem,
   type FiltroClientes,
 } from "@/lib/clientes";
+
+// O diálogo só pesa quando alguém clica em "Novo cliente" (R-30): chunk à parte.
+const NovoClienteDialog = dynamic(() => import("@/components/NovoClienteDialog"));
 
 // LISTA DE CLIENTES (30/09/2026, docs/plano-clientes.md; paginada em 01/10/2026,
 // docs/plano-carregamento.md, fase 3).
@@ -84,9 +88,12 @@ export default function ListaClientes({
   const busca = useDebounce(q.trim(), 300);
   const [filtro, setFiltro] = useState<FiltroClientes>("todos");
   const [novoAberto, setNovoAberto] = useState(false);
+  // O diálogo (chunk à parte) monta na primeira abertura e fica: fechar não perde o rascunho.
+  const [novoMontado, setNovoMontado] = useState(false);
   const [novoTelefone, setNovoTelefone] = useState("");
   const abrirNovo = (telefone = "") => {
     setNovoTelefone(telefone);
+    setNovoMontado(true);
     setNovoAberto(true);
   };
   const agora = useMemo(() => agoraMs(), []);
@@ -122,6 +129,7 @@ export default function ListaClientes({
     temMais,
     carregando,
     fimRef,
+    revalidar,
   } = usePaginada<ClienteItem, ParamsClientes>({
     inicial: inicial.itens,
     temMaisInicial: inicial.temMais,
@@ -132,6 +140,14 @@ export default function ListaClientes({
     revalidarAoVoltar: !!clientId,
     aoRevalidar: clientId ? recontar : undefined,
   });
+
+  // Contato renomeado ou cadastrado NESTA aba (R-15): a lista não tem realtime,
+  // então busca de novo as linhas que já tem na tela (uma função do banco), em
+  // vez de a tela chamar `router.refresh()` e refazer a página inteira.
+  useEffect(() => {
+    if (!clientId) return;
+    return ouvirContato(() => void revalidar());
+  }, [clientId, revalidar]);
 
   // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
   // some (por CSS, como a lista de conversas), e quem volta é o "voltar".
@@ -320,12 +336,14 @@ export default function ListaClientes({
             </ul>
           )}
         </AreaRolavel>
-        <NovoClienteDialog
-          aberto={novoAberto}
-          onFechar={() => setNovoAberto(false)}
-          telefoneInicial={novoTelefone}
-          simular={simular}
-        />
+        {novoMontado && (
+          <NovoClienteDialog
+            aberto={novoAberto}
+            onFechar={() => setNovoAberto(false)}
+            telefoneInicial={novoTelefone}
+            simular={simular}
+          />
+        )}
       </section>
     </Card>
   );

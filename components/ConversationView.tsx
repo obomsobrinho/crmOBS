@@ -10,6 +10,7 @@ import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { anunciarIa } from "@/lib/ia-bus";
+import { useNomeDoContato } from "@/lib/use-nome-contato";
 import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
 import type { ChatRow } from "@/lib/types";
@@ -20,6 +21,7 @@ import type { ChatRow } from "@/lib/types";
 export default function ConversationView({
   phone,
   name,
+  nomeBase = null,
   fotoPath = null,
   atendimentoIa,
   initialRows,
@@ -39,10 +41,13 @@ export default function ConversationView({
   contactExists,
   readOnly,
   qualificacaoPreview,
+  handoffAtInicial,
   handoffsPreview,
 }: {
   phone: string;
   name: string | null;
+  /** O nome SEM o apelido (pushName ou melhor nome das mensagens): vale quando o apelido é apagado (R-15). */
+  nomeBase?: string | null;
   /** Foto de perfil guardada (lib/fotos.ts). */
   fotoPath?: string | null;
   atendimentoIa: string | null;
@@ -66,10 +71,14 @@ export default function ConversationView({
   readOnly?: boolean;
   /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
   qualificacaoPreview?: Qualification;
+  /** `conversations.handoff_at` já lido pelo servidor (R-14): poupa a consulta da faixa. */
+  handoffAtInicial?: string | null;
   /** Só o preview /design: os pedidos de ajuda da IA. */
   handoffsPreview?: Handoff[];
 }) {
   const supabase = createClient();
+  // Renomear o contato (aba "Dados") corrige o cabeçalho na hora, sem refresh (R-15).
+  const nomeExibido = useNomeDoContato(phone, name, nomeBase);
   const [showContext, setShowContext] = useState(true);
   // Celular: o painel do contato não cabe ao lado da conversa e vira folha de
   // baixo, aberta pelos três pontos do cabeçalho (plano do mobile, fase 1).
@@ -332,7 +341,8 @@ export default function ConversationView({
   const painelContato = (
     <FichaContato
       superficie="conversa"
-      name={name}
+      name={nomeExibido}
+      nomeBase={nomeBase}
       fotoPath={fotoPath}
       phone={phone}
       firstMessageAt={firstMessageAt}
@@ -374,7 +384,7 @@ export default function ConversationView({
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-msg">
         <Thread
           phone={phone}
-          name={name}
+          name={nomeExibido}
       fotoPath={fotoPath}
           iaState={iaState}
           onToggleIa={toggleIa}
@@ -396,6 +406,7 @@ export default function ConversationView({
           onAssign={assign}
           conversationId={conversationId}
           qualificacaoPreview={qualificacaoPreview}
+          handoffAtInicial={handoffAtInicial}
           handoffsPreview={handoffsPreview}
         />
       </div>
