@@ -71,6 +71,7 @@ export default function Pedidos({
   initialResolvidos,
   initialContatos,
   members,
+  clientId,
   numeroAvisos,
   readOnly = false,
   abrirId = null,
@@ -81,6 +82,8 @@ export default function Pedidos({
   initialContatos: ContatoLinha[];
   /** Para nomear quem resolveu. */
   members: Member[];
+  /** Tenant logado: o realtime escuta só ele. Ausente no /design. */
+  clientId?: string;
   /** Destino dos avisos: esse número nunca é pedido (lib/avisos.ts). */
   numeroAvisos: string | null;
   /** Conta bloqueada: vê a fila e o histórico, não age (as rotas já respondem 402). */
@@ -128,7 +131,7 @@ export default function Pedidos({
   const refetch = useCallback(async () => {
     if (!supabase) return;
     const agoraMs = Date.now();
-    const [{ data: hs }, { data: rs }, { data: cs }] = await Promise.all([
+    const [{ data: hs }, { data: rs }] = await Promise.all([
       supabase
         .from("handoffs")
         .select("id, phone, opened_at, summary")
@@ -140,46 +143,68 @@ export default function Pedidos({
         .not("closed_at", "is", null)
         .gte("closed_at", inicioDosResolvidos(agoraMs))
         .order("closed_at", { ascending: false }),
-      supabase.from("dados_cliente").select("telefone, nomewpp, display_name"),
     ]);
+    // Nomes só dos telefones da fila e do histórico, nunca a base inteira.
+    const fones = [...new Set([...(hs ?? []), ...(rs ?? [])].map((h) => (h as { phone: string }).phone))];
+    const { data: cs } = fones.length
+      ? await supabase.from("dados_cliente").select("telefone, nomewpp, display_name").in("telefone", fones)
+      : { data: [] };
     setAbertosRaw((hs ?? []) as PedidoLinha[]);
     setResolvidosRaw((rs ?? []) as PedidoResolvidoLinha[]);
     setContatos((cs ?? []) as ContatoLinha[]);
     setAgora(agoraMs);
   }, [supabase]);
 
-  // Tempo real nas duas regras da casa (CLAUDE.md, "Realtime cai"): callback
-  // no subscribe, primeira assinatura PULADA (a lista acabou de vir do
-  // servidor) e re-busca a cada reassinatura e ao voltar o foco.
+  // Tempo real nas regras da casa (CLAUDE.md, "Realtime cai", e
+  // docs/plano-carregamento.md): só o tenant, uma rajada de eventos vira UMA
+  // busca, aba escondida não busca (anota e busca ao voltar), primeira
+  // assinatura PULADA (a lista acabou de vir do servidor) e re-busca a cada
+  // reassinatura e ao voltar o foco (no máximo a cada 10s).
   const primeira = useRef(true);
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase || !clientId) return;
+    let atrasada = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let ultima = Date.now();
+    const agendar = () => {
+      if (document.visibilityState !== "visible") {
+        atrasada = true;
+        return;
+      }
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refetch(), 500);
+    };
     const canalSair = assinarComSessao((sb) =>
       sb
-      .channel("pedidos")
-      .on("postgres_changes", { event: "*", schema: "public", table: "handoffs" }, () => void refetch())
+      .channel(`pedidos-${clientId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "handoffs", filter: `client_id=eq.${clientId}` }, agendar)
       .subscribe((status: string) => {
         if (status !== "SUBSCRIBED") return;
         if (primeira.current) {
           primeira.current = false;
           return;
         }
-        void refetch();
+        agendar();
       })
     );
     const aoVoltar = () => {
-      if (document.visibilityState === "visible") void refetch();
+      if (document.visibilityState !== "visible") return;
+      if (!atrasada && Date.now() - ultima < 10_000) return;
+      ultima = Date.now();
+      atrasada = false;
+      void refetch();
     };
     document.addEventListener("visibilitychange", aoVoltar);
     window.addEventListener("focus", aoVoltar);
     const relogio = setInterval(() => setAgora(Date.now()), 60_000);
     return () => {
+      if (timer) clearTimeout(timer);
       canalSair();
       document.removeEventListener("visibilitychange", aoVoltar);
       window.removeEventListener("focus", aoVoltar);
       clearInterval(relogio);
     };
-  }, [supabase, refetch]);
+  }, [supabase, clientId, refetch]);
 
   /** O pedido saiu dos abertos: vira resolvido na tela, com o que aconteceu. */
   function concluir(p: PedidoAberto, r: Resultado, como: "ia" | "resolvido", orientacao: string | null) {

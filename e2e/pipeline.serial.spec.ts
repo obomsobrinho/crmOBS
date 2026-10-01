@@ -19,6 +19,10 @@ test.describe("Pipeline (escreve estágio)", () => {
 
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // As colunas chegam no HTML do servidor ANTES de o botão funcionar: clicar
+    // antes da hidratação perde o clique (era a intermitência conhecida deste
+    // teste, "criar e arquivar estágio").
+    await page.waitForLoadState("networkidle");
     const antes = await page.locator(COLUNA).count();
 
     await page.getByRole("button", { name: "Gerenciar estágios" }).click();

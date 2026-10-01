@@ -30,7 +30,7 @@ export default async function PedidosPage({
   const supabase = await createClient();
   const abrir = Number((await searchParams).abrir);
 
-  const [{ data: abertos }, { data: resolvidos }, { data: contatos }, members] =
+  const [{ data: abertos }, { data: resolvidos }, members] =
     await Promise.all([
       supabase
         .from("handoffs")
@@ -43,9 +43,18 @@ export default async function PedidosPage({
         .not("closed_at", "is", null)
         .gte("closed_at", inicioDosResolvidos(agoraMs()))
         .order("closed_at", { ascending: false }),
-      supabase.from("dados_cliente").select("telefone, nomewpp, display_name"),
       fetchMembers(supabase),
     ]);
+  // Os NOMES só dos telefones que estão na fila e no histórico, e não a lista
+  // inteira de contatos da conta (docs/plano-carregamento.md).
+  const fones = [
+    ...new Set(
+      [...(abertos ?? []), ...(resolvidos ?? [])].map((h) => (h as { phone: string }).phone)
+    ),
+  ];
+  const { data: contatos } = fones.length
+    ? await supabase.from("dados_cliente").select("telefone, nomewpp, display_name").in("telefone", fones)
+    : { data: [] };
 
   return (
     <Pedidos
@@ -53,6 +62,7 @@ export default async function PedidosPage({
       initialResolvidos={(resolvidos ?? []) as PedidoResolvidoLinha[]}
       initialContatos={(contatos ?? []) as ContatoLinha[]}
       members={members}
+      clientId={client.id}
       numeroAvisos={client.avisos}
       readOnly={client.access.blocked}
       abrirId={Number.isInteger(abrir) && abrir > 0 ? abrir : null}
