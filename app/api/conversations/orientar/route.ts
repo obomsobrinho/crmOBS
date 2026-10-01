@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
+import { headersN8n } from "@/lib/n8n";
 import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -143,7 +144,7 @@ async function responderAgora(
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headersN8n(),
       body: JSON.stringify({ phone, instance, client_id: clientId, messages }),
     });
     if (!res.ok) return { ok: false, motivo: `n8n_${res.status}` };

@@ -39,5 +39,5 @@ Floor rules (pagination, tenant scope, service_role, SQL parity) are in `enginee
 - Who replied (AI / human / imported) is decided ONLY in `lib/mensagem.ts`; `imported` is not an AI reply; SQL uses `is distinct from`, not `<>`.  (why: docs/adr/2026-08-27-dashboard-imported-is-not-ai-reply.md)
 
 ## Env (server-only, never `NEXT_PUBLIC`)
-`SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` (GLOBAL apikey), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`, `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `OPENAI_API_KEY`, `OPENAI_AGENT_MODEL` (optional, default `gpt-5.4-mini`). Billing envs in `billing.md`.
+`SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` (GLOBAL apikey), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`, `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` (sent as `x-webhook-secret` by `headersN8n`, `lib/n8n.ts`; every app call to an n8n webhook uses it), `OPENAI_API_KEY`, `OPENAI_AGENT_MODEL` (optional, default `gpt-5.4-mini`). Billing envs in `billing.md`.
 - Knowledge base upload goes straight to Storage by signed URL (`knowledge/upload-url`) and processing is a separate call (`knowledge/process`), to fit the Vercel request body limit. Never stream the file through a route handler.

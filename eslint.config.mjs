@@ -77,6 +77,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Copias isoladas dos subagentes (git worktree): nao sao codigo deste checkout.
+    ".claude/worktrees/**",
   ]),
 ]);
 

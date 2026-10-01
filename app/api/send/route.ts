@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
+import { headersN8n } from "@/lib/n8n";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
 
@@ -163,7 +164,7 @@ export async function POST(req: Request) {
   try {
     const res = await fetch(webhookUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headersN8n(),
       body: JSON.stringify({
         phone,
         // text vira legenda quando há mídia; senão, mensagem de texto normal.
