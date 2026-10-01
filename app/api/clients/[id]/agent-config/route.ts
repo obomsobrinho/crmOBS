@@ -19,7 +19,7 @@ export async function PUT(
   const { id } = await ctx.params;
 
   // Só o dono edita o agente (atendente não tem acesso ao /agente).
-  const r = await sessaoDaRota({ id, dono: "só o dono pode editar o agente" });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode editar o agente", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 

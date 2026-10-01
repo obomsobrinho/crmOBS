@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
+import { invalidarMembros } from "@/lib/team-servidor";
 import {
   billableSeats,
   extraSeatsPriceBRL,
@@ -18,7 +19,7 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "só o dono pode convidar membros", ativa: true });
+  const r = await sessaoDaRota({ dono: "só o dono pode convidar membros", ativa: true, revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // O cache de membros das páginas (lib/team-servidor.ts) expira junto.
+  invalidarMembros(mine.id);
 
   return NextResponse.json({ ok: true, email, role });
 }

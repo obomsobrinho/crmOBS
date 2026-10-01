@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { urlAssinadaDaMidia, urlGuardadaDaMidia } from "@/lib/midia-url";
 import { foneDoEvento, useCanalConversa, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
@@ -175,6 +176,7 @@ export default function Thread({
   pendingInstruction,
   onCancelInstruction,
   qualificacaoPreview,
+  handoffAtInicial,
   handoffsPreview,
   onOpenContato,
 }: {
@@ -212,6 +214,8 @@ export default function Thread({
   onCancelInstruction?: () => void | Promise<void>;
   /** Só o preview /design: injeta o entendimento, que sem banco não existe. */
   qualificacaoPreview?: Qualification;
+  /** `handoff_at` já lido pelo servidor (R-14), repassado à faixa do entendimento. */
+  handoffAtInicial?: string | null;
   /** Só o preview /design: os pedidos de ajuda, que sem banco não existem. */
   handoffsPreview?: Handoff[];
 }) {
@@ -1133,6 +1137,7 @@ export default function Thread({
           clientId={clientId}
           variante="faixa"
           qualificacaoForcada={qualificacaoPreview}
+          handoffAtInicial={handoffAtInicial}
         />
       )}
 
@@ -1295,19 +1300,20 @@ export default function Thread({
 // (compatibilidade), usa direto.
 function MediaView({ url, type }: { url: string; type: string | null }) {
   const isHttp = /^https?:\/\//.test(url);
-  const [resolved, setResolved] = useState<string | null>(isHttp ? url : null);
+  // Nasce pronto quando a URL já foi assinada antes (lib/midia-url.ts).
+  const [resolved, setResolved] = useState<string | null>(
+    isHttp ? url : urlGuardadaDaMidia(url)
+  );
 
   useEffect(() => {
     // http já vem resolvido pelo estado inicial; só resolve caminho do Storage.
+    // As assinaturas dos balões que montam juntos saem em UMA chamada, e a URL
+    // fica guardada (R-23, lib/midia-url.ts).
     if (isHttp) return;
     let cancelled = false;
-    void (async () => {
-      const supabase = createClient();
-      const { data } = await supabase.storage
-        .from("whatsapp-media")
-        .createSignedUrl(url, 3600);
-      if (!cancelled) setResolved(data?.signedUrl ?? null);
-    })();
+    void urlAssinadaDaMidia(url).then((assinada) => {
+      if (!cancelled) setResolved(assinada);
+    });
     return () => {
       cancelled = true;
     };
@@ -1327,15 +1333,17 @@ function MediaView({ url, type }: { url: string; type: string | null }) {
       <img
         src={resolved}
         alt="Imagem"
+        loading="lazy"
+        decoding="async"
         className="mb-1 max-h-64 w-auto rounded-lg object-cover"
       />
     );
   }
   if (type === "audio") {
-    return <audio controls src={resolved} className="mb-1 w-56 max-w-full" />;
+    return <audio controls preload="none" src={resolved} className="mb-1 w-56 max-w-full" />;
   }
   if (type === "video") {
-    return <video controls src={resolved} className="mb-1 max-h-64 rounded-lg" />;
+    return <video controls preload="metadata" src={resolved} className="mb-1 max-h-64 rounded-lg" />;
   }
   return (
     <a

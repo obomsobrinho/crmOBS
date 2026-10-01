@@ -29,7 +29,7 @@ export async function PUT(
   ctx: RouteContext<"/api/clients/[id]/notify-target">
 ) {
   const { id } = await ctx.params;
-  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos" });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos", revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 

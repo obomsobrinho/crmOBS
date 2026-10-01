@@ -20,6 +20,7 @@ export default function AiSummary({
   variante = "painel",
   direita,
   qualificacaoForcada,
+  handoffAtInicial,
 }: {
   phone: string;
   clientId: string;
@@ -34,6 +35,13 @@ export default function AiSummary({
    * real nunca passa esta prop.
    */
   qualificacaoForcada?: Qualification;
+  /**
+   * `conversations.handoff_at` que o SERVIDOR já leu ao abrir a conversa (R-14,
+   * 01/10/2026). Quando vem (inclusive `null`, que é "sem pedido aberto"), a
+   * carga inicial não repete a consulta a `conversations`; reconectar e voltar
+   * o foco continuam relendo tudo. `undefined` = o servidor não leu: lê aqui.
+   */
+  handoffAtInicial?: string | null;
   /**
    * `painel` é o bloco da coluna da direita. `faixa` é a linha larga que fica
    * logo abaixo do cabeçalho da conversa (desenho de 18/09/2026): "O CLIENTE
@@ -50,10 +58,12 @@ export default function AiSummary({
   );
   // Handoff em aberto desta conversa. Vem junto porque é aqui que o pedido
   // pendente está descrito, e é aqui que faz sentido declarar que acabou.
-  const [handoffAt, setHandoffAt] = useState<string | null>(null);
+  const [handoffAt, setHandoffAt] = useState<string | null>(
+    handoffAtInicial ?? null
+  );
 
-  const load = useCallback(async () => {
-    const [{ data }, { data: conv }] = await Promise.all([
+  const load = useCallback(async (semHandoff = false) => {
+    const [{ data }, conv] = await Promise.all([
       supabase
         .from("conversation_qualifications")
         .select("action, summary, preferencia_horario, created_at")
@@ -62,14 +72,18 @@ export default function AiSummary({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase
-        .from("conversations")
-        .select("handoff_at")
-        .eq("client_id", clientId)
-        .eq("phone", phone)
-        .maybeSingle(),
+      (async () => {
+        if (semHandoff) return null;
+        const { data: c } = await supabase
+          .from("conversations")
+          .select("handoff_at")
+          .eq("client_id", clientId)
+          .eq("phone", phone)
+          .maybeSingle();
+        return c;
+      })(),
     ]);
-    setHandoffAt((conv?.handoff_at as string | null) ?? null);
+    if (!semHandoff) setHandoffAt((conv?.handoff_at as string | null) ?? null);
     if (!data) {
       setQual(null);
       return;
@@ -87,10 +101,14 @@ export default function AiSummary({
   // roda sem banco.
   useEffect(() => {
     if (qualificacaoForcada) return;
+    // Seed do servidor: o valor novo entra no estado (a prop muda junto com a
+    // conversa) e só a qualificação é buscada.
+    const semHandoff = handoffAtInicial !== undefined;
     void (async () => {
-      await load();
+      if (semHandoff) setHandoffAt(handoffAtInicial);
+      await load(semHandoff);
     })();
-  }, [load, qualificacaoForcada]);
+  }, [load, qualificacaoForcada, handoffAtInicial]);
 
   // TEMPO REAL (02/10/2026, R-02): canal do tenant, e SÓ esta conversa conta
   // (pelo `phone` do payload). Antes eram duas tabelas inteiras sem filtro e
@@ -105,7 +123,7 @@ export default function AiSummary({
     clientId: qualificacaoForcada ? null : clientId,
     tabelas: ["conversations", "conversation_qualifications"],
     modo: "aplicar",
-    revalidar: () => void load(),
+    revalidar: () => void load(false),
     aoEvento: (ev) => {
       if (foneDoEvento(ev) !== phone) return;
       if (ev.tabela === "conversations") {

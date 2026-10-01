@@ -83,6 +83,7 @@
 | 2026-10-01-migrations-versioned-in-repo.md | security | Accepted | Database migrations live in the repo; default privileges give anon nothing |
 | 2026-10-01-profile-photo-copied-to-bucket.md | data | Accepted | Contact profile photos are copied to our bucket |
 | 2026-10-02-painel-agrega-no-banco.md | dashboard | Accepted | Panel and subscription numbers aggregate in SQL (Max rows is 1000), classification stays in TS, SQL copy of "who replied" is declared and tested |
+| 2026-10-02-session-by-claims-and-cheap-navigation.md | data | Accepted | Session checked by local JWT claims (getClaims), sensitive writes re-check at Auth, tenant cache only for members, cheaper conversation opening |
 | undated-agent-enabled-vs-published-at.md | onboarding | Accepted (see also 2026-08-28-agent-switch-two-columns.md) | agent_enabled is the switch; agent_published_at is the first activation and is never cleared |
 | undated-agent-turns-metering.md | agent-ai | Accepted | agent_turns: one measurement row per AI turn, best-effort, no message content |
 | undated-asaas-billing-and-webhook.md | billing | Accepted | Asaas billing: subscribe, idempotent public webhook, event map, cash-register screen |

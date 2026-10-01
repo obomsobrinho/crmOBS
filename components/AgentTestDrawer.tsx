@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { FlaskConical, RotateCcw, X } from "lucide-react";
-import Playground, {
-  type ConfiguracaoEmEdicao,
-  type PlaygroundTurn,
-} from "./Playground";
+import dynamic from "next/dynamic";
+import type { ConfiguracaoEmEdicao, PlaygroundTurn } from "./Playground";
 import type { Handoff } from "./HandoffCard";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +14,11 @@ import {
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
+
+// A bancada (Playground, 1.000 linhas e o gravador de áudio) só baixa quando o
+// painel abre (R-30): o `SheetContent` não monta o que está dentro enquanto
+// fechado, e quem só edita campos nunca paga por ela.
+const Playground = dynamic(() => import("./Playground"));
 
 // Bancada de teste dentro do `/agente`, em painel lateral.
 //
