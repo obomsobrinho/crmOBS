@@ -19,6 +19,7 @@ import type { ChatRow } from "@/lib/types";
 export default function ConversationView({
   phone,
   name,
+  fotoPath = null,
   atendimentoIa,
   initialRows,
   firstMessageAt,
@@ -40,6 +41,8 @@ export default function ConversationView({
 }: {
   phone: string;
   name: string | null;
+  /** Foto de perfil guardada (lib/fotos.ts). */
+  fotoPath?: string | null;
   atendimentoIa: string | null;
   initialRows: ChatRow[];
   firstMessageAt: string | null;
@@ -341,6 +344,7 @@ export default function ConversationView({
     <FichaContato
       superficie="conversa"
       name={name}
+      fotoPath={fotoPath}
       phone={phone}
       firstMessageAt={firstMessageAt}
       messageCount={messageCount}
@@ -382,6 +386,7 @@ export default function ConversationView({
         <Thread
           phone={phone}
           name={name}
+      fotoPath={fotoPath}
           iaState={iaState}
           onToggleIa={toggleIa}
           initialRows={initialRows}

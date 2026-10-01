@@ -123,3 +123,11 @@ test("Novo cliente cadastra, não duplica, nasce com conversa vazia e não entra
     await apagarNovo();
   }
 });
+
+// FOTO DE PERFIL (F4): a rota só serve foto do próprio tenant.
+test("a foto de outro tenant não é servida", async ({ page }) => {
+  const outro = await page.request.get("/api/fotos/00000000-0000-0000-0000-000000000000/fotos/1-x.jpg");
+  expect(outro.status()).toBe(404);
+  const torto = await page.request.get(`/api/fotos/${clientId}/../segredo.jpg`);
+  expect([400, 404]).toContain(torto.status());
+});

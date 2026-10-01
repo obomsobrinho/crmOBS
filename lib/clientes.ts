@@ -15,6 +15,7 @@ export interface ContatoClienteRow {
   email: string | null;
   birth_date: string | null;
   created_at: string | null;
+  foto_path?: string | null;
 }
 
 /** Linha crua de `conversations` que a tela lê. */
@@ -48,6 +49,8 @@ export interface ClienteItem {
   campos: string[];
   email: string | null;
   birthDate: string | null;
+  /** Foto de perfil guardada (lib/fotos.ts). */
+  fotoPath?: string | null;
 }
 
 /**
@@ -108,6 +111,7 @@ export function montarClientes(
           .filter(Boolean),
         email: c.email,
         birthDate: c.birth_date,
+        fotoPath: c.foto_path ?? null,
       };
     })
     .sort((a, b) => ordem(b) - ordem(a));

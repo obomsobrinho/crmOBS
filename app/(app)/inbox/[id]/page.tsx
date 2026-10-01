@@ -68,6 +68,7 @@ export default async function ThreadPage({
     <ConversationView
       phone={phone}
       name={name}
+      fotoPath={contato?.foto_path ?? null}
       atendimentoIa={contato?.atendimento_ia ?? null}
       initialRows={initialRows}
       firstMessageAt={firstMessageAt}

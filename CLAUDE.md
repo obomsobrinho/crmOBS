@@ -155,6 +155,11 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   notas), que **fica fora de Conversas e do Pipeline até a primeira mensagem** (`buildInbox`).
   A primeira mensagem para quem nunca escreveu exige o aceite (conferido também no `/api/send`,
   409) e **pausa a IA como qualquer envio manual** (decisão do dono, 01/10/2026).
+  **FOTO DE PERFIL (01/10/2026, `lib/fotos.ts`):** a imagem é COPIADA para o bucket `whatsapp-media`
+  (`{client_id}/fotos/{id}-{hash}.ext`) porque o link do WhatsApp vence; colunas `foto_path`,
+  `foto_origem` (host + caminho do link, sem a assinatura do `?`, que muda a cada consulta) e
+  `foto_em`. Quem atualiza é `atualizarFotos` por `after()` nos layouts de Conversas e Clientes
+  (nunca o n8n); quem serve é `/api/fotos/[...path]`; quem desenha é `AvatarContato`.
 - **Tabelas próprias do CRM** (browser faz CRUD via RLS por tenant, não passam pelo n8n): `tags`
   + `conversation_tags` (rótulos por conversa), `conversation_notes` (notas internas, nunca vão
   ao WhatsApp; `author_user_id` = `auth.uid()`), `quick_replies` (mensagens prontas por tenant).

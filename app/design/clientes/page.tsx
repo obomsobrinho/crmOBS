@@ -42,7 +42,7 @@ export default async function DesignClientesPage({
 
   const todos: ContatoClienteRow[] = [
     c(1, "5535984774753", "Franck Antonny", { custom_fields: { Origem: "QR Code", Interesse: "Plano anual" } }),
-    c(2, "5511981234402", "Marina Souza", { email: "marina.souza@gmail.com", birth_date: "1988-03-14", custom_fields: { Empresa: "Souza Advocacia" } }),
+    c(2, "5511981234402", "Marina Souza", { email: "marina.souza@gmail.com", birth_date: "1988-03-14", custom_fields: { Empresa: "Souza Advocacia" }, foto_path: "preview/fotos/2-abc123.jpg" }),
     c(3, "553384266039", null, { atendimento_ia: "pause" }),
     c(4, "5531998127731", "João Pereira", { custom_fields: { Origem: "Instagram" } }),
     c(5, "5541993341200", "Pedro Albuquerque", { email: "pedro@albuquerque.com.br" }),
@@ -115,6 +115,7 @@ export default async function DesignClientesPage({
                 birthDate={aberto.birth_date}
                 entendimento={aberto.id === 1 ? "Quer o plano anual e prefere ser atendido na sexta à tarde." : null}
                 simular
+                fotoPath={aberto.foto_path ?? null}
                 contactExists
               />
             </AreaRolavel>

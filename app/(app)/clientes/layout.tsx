@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import ListaClientes from "@/components/ListaClientes";
+import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -30,7 +32,7 @@ export default async function ClientesLayout({
       supabase
         .from("dados_cliente")
         .select(
-          "id, telefone, nomewpp, display_name, atendimento_ia, custom_fields, email, birth_date, created_at"
+          "id, telefone, nomewpp, display_name, atendimento_ia, custom_fields, email, birth_date, created_at, foto_path"
         )
         .order("created_at", { ascending: false })
         .limit(TETO),
@@ -39,6 +41,9 @@ export default async function ClientesLayout({
         .select("id, phone, last_message_at, assigned_user_id"),
       supabase.from("conversation_tags").select("conversation_id, tags(name, color)"),
     ]);
+
+  // Fotos de perfil vencidas são conferidas DEPOIS de a tela sair (lib/fotos.ts).
+  if (client) after(() => atualizarFotos(client.id, client.evolution_instance));
 
   const itens = montarClientes(
     (contatos ?? []) as ContatoClienteRow[],

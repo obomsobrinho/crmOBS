@@ -3,9 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Search, User, UsersRound, X } from "lucide-react";
+import { Plus, Search, UsersRound, X } from "lucide-react";
 import NovoClienteDialog from "@/components/NovoClienteDialog";
-import { Avatar } from "@/components/ui/avatar";
+import AvatarContato from "@/components/AvatarContato";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/dissolver-rolagem";
 import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
-import { avatarPair, initials } from "@/lib/inbox";
 import { quemAtende, tagColor } from "@/lib/crm";
 import { agoraMs } from "@/lib/periodo";
 import {
@@ -338,9 +337,7 @@ function Linha({
           )}
         />
         <span className="flex min-w-0 items-center gap-2.5">
-          <Avatar size="md" style={avatarPair(it.phone)}>
-            {initials(it.name) ?? <User size={16} />}
-          </Avatar>
+          <AvatarContato size="md" phone={it.phone} name={it.name} fotoPath={it.fotoPath} />
           <span className="flex min-w-0 flex-col gap-px">
             <span data-slot="clientes-nome" className="truncate text-corpo font-semibold text-ink">
               {titulo}

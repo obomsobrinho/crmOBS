@@ -35,7 +35,7 @@ export default async function PipelinePage() {
         .limit(500),
       supabase
         .from("dados_cliente")
-        .select("telefone, nomewpp, atendimento_ia, display_name"),
+        .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
       supabase
         .from("conversation_qualifications")
         .select("phone, summary")

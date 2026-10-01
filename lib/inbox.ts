@@ -31,6 +31,7 @@ export interface ContatoRow {
   nomewpp: string | null;
   atendimento_ia: string | null;
   display_name?: string | null;
+  foto_path?: string | null;
 }
 
 // Monta a lista do inbox a partir das conversas (já ordenadas por
@@ -47,11 +48,13 @@ export function buildInbox(
   avisos: string | null = null
 ): { items: InboxItem[]; ia: Record<string, string | null> } {
   const nameByPhone = new Map<string, string | null>();
+  const fotoByPhone = new Map<string, string | null>();
   const ia: Record<string, string | null> = {};
   for (const c of contatos) {
     // display_name (editado no CRM) precede o nomewpp (pushName do WhatsApp).
     nameByPhone.set(c.telefone, cleanName(c.display_name) ?? cleanName(c.nomewpp));
     ia[c.telefone] = c.atendimento_ia ?? null;
+    if (c.foto_path) fotoByPhone.set(c.telefone, c.foto_path);
   }
   const items: InboxItem[] = convs
     // Sem mensagem nenhuma ainda não é conversa: é o contato cadastrado à mão
@@ -61,6 +64,7 @@ export function buildInbox(
     .map((c) => ({
     phone: c.phone,
     name: nameByPhone.get(c.phone) ?? null,
+    fotoPath: fotoByPhone.get(c.phone) ?? null,
     lastPreview: c.last_message_preview ?? "",
     lastFrom: c.last_message_from === "out" ? "out" : "in",
     lastMessageAt: c.last_message_at,

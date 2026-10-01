@@ -97,6 +97,7 @@ export default async function ClientePage({
           birthDate={contato.birth_date ?? null}
           entendimento={(qual as { summary: string | null } | null)?.summary ?? null}
           podeEnviar={!client?.access.blocked}
+          fotoPath={contato.foto_path ?? null}
           contactExists
         />
       </AreaRolavel>

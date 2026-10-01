@@ -40,7 +40,8 @@ import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
 import { quemAtende, type Qualification } from "@/lib/crm";
 import { FUSO, formatTime, prettyPhone } from "@/lib/format";
-import { initials, avatarPair, diaSP } from "@/lib/inbox";
+import { avatarPair, diaSP } from "@/lib/inbox";
+import AvatarContato from "@/components/AvatarContato";
 import type { Bubble, ChatRow } from "@/lib/types";
 import HandoffCard, { type Handoff } from "./HandoffCard";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
@@ -141,6 +142,7 @@ function dayLabel(iso: string): string {
 export default function Thread({
   phone,
   name,
+  fotoPath = null,
   iaState,
   onToggleIa,
   initialRows,
@@ -164,6 +166,8 @@ export default function Thread({
 }: {
   phone: string;
   name: string | null;
+  /** Foto de perfil guardada (lib/fotos.ts). */
+  fotoPath?: string | null;
   iaState: string | null;
   onToggleIa: () => void;
   initialRows: ChatRow[];
@@ -582,7 +586,6 @@ export default function Thread({
   }, [bubbles, handoffs]);
 
   const displayName = name || prettyPhone(phone);
-  const ini = initials(name);
   // Hora da última mensagem publicada, para o subcabeçalho. Vem dos balões (e
   // não de `rows`) porque uma linha pode render dois balões e o que interessa
   // é o que a pessoa realmente viu por último.
@@ -632,9 +635,7 @@ export default function Thread({
           >
             <ChevronLeft size={22} />
           </Link>
-          <Avatar size="lg" style={avatarPair(phone)}>
-            {ini ?? <User size={16} />}
-          </Avatar>
+          <AvatarContato size="lg" phone={phone} name={name} fotoPath={fotoPath} />
           <span className="flex min-w-0 flex-1 flex-col gap-px">
             {/* O NOME, na tipografia de título da casa e na TINTA PRINCIPAL.
               Ele vinha pintado com a cor do avatar do contato, e era o primeiro

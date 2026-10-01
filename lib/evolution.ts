@@ -237,3 +237,34 @@ export async function numeroNoWhatsApp(
     return null;
   }
 }
+
+/**
+ * O link atual da foto de perfil de um contato (`/chat/fetchProfilePictureUrl`).
+ * `null` no link = a pessoa não mostra foto (privacidade ou sem foto).
+ * `undefined` = não deu para saber (Evolution fora, formato diferente): quem
+ * chama não mexe em nada, para não apagar a foto de ninguém por falha nossa.
+ */
+export async function linkDaFotoDePerfil(
+  instanceName: string,
+  numero: string
+): Promise<string | null | undefined> {
+  try {
+    ensureEnv();
+    const res = await fetch(
+      `${BASE}/chat/fetchProfilePictureUrl/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ number: numero }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!res.ok) return undefined;
+    const data = (await res.json()) as { profilePictureUrl?: unknown } | null;
+    if (!data || typeof data !== "object") return undefined;
+    const url = data.profilePictureUrl;
+    return typeof url === "string" && url.startsWith("https://") ? url : null;
+  } catch {
+    return undefined;
+  }
+}

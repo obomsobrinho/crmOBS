@@ -1,9 +1,10 @@
 "use client";
 
+import AvatarContato from "@/components/AvatarContato";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, User } from "lucide-react";
+import { Search } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ import { createClient } from "@/lib/supabase/client";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
   buildInbox,
-  initials,
   avatarPair,
   dentroDaJanela,
   JANELAS,
@@ -216,7 +216,7 @@ export default function ContactSidebar({
           .limit(500),
         supabase
           .from("dados_cliente")
-          .select("telefone, nomewpp, atendimento_ia, display_name"),
+          .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
         supabase
           .from("conversation_qualifications")
           .select("phone, summary")
@@ -658,7 +658,6 @@ export default function ContactSidebar({
             // Ao abrir a conversa você a está lendo, então não mostra badge.
             const unread = active ? 0 : it.unread;
             const label = name || prettyPhone(phone);
-            const ini = initials(name);
             const cleanPreview = lastPreview.replace(/ \| /g, "  ");
 
             // O chip de estado da linha. A ordem é a da urgência, e só UM
@@ -791,9 +790,7 @@ export default function ContactSidebar({
                       avatar), e aí o `bottom-0` da marca caía 6px abaixo do
                       avatar, que era o "pendurado" que se via na tela. */}
                   <div className="relative shrink-0 self-start">
-                    <Avatar size="md" style={avatarPair(phone)}>
-                      {ini ?? <User size={16} />}
-                    </Avatar>
+                    <AvatarContato size="md" phone={phone} name={name} fotoPath={it.fotoPath} />
                     {/* QUEM ATENDE, no canto de baixo. Era um ponto âmbar aceso
                         em toda conversa pausada, e âmbar é cor de alerta: por
                         isso lia como "precisa de você" quando queria dizer só

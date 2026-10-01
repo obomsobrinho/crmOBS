@@ -37,7 +37,15 @@ teste com o que falta do P0 (fatia B da tela de Clientes, `docs/plano-clientes.m
 - ✅ **F3, fatia B de Clientes (código em 01/10/2026, D7 revista: a primeira mensagem PAUSA a IA; falta rodar o `clientes.serial` com o banco no ar):** "Novo cliente" (rota service_role, telefone com a máscara da F1),
   conversa vazia no cadastro (D6), iniciar conversa com os dois pesos de alerta, a primeira mensagem
   para quem nunca falou não pausa a IA (D7). Teste sem envio real.
-- **F4, foto de perfil (item 6):** depois de D3.
+- ✅ **F4, foto de perfil (item 6), código em 01/10/2026 (D3 = copiar a imagem):** `lib/fotos.ts` (regra
+  pura), `lib/fotos-servidor.ts` (`atualizarFotos`, por `after()` nas telas de Conversas e Clientes,
+  até 15 contatos por passada, conferidos a cada 7 dias, baixados de novo só quando o CAMINHO do link
+  muda), `/api/fotos/[...path]` (serve o arquivo do bucket privado com endereço fixo e cache longo,
+  só do próprio tenant) e `components/AvatarContato.tsx` (lista de conversas, cabeçalho da conversa,
+  lista e ficha de Clientes). Quem esconde a foto fica sem foto (a cópia é apagada).
+  ⚠️ **MIGRAÇÃO ANTES DO DEPLOY** (as telas passam a ler `foto_path`; sem a coluna, Conversas quebra):
+  `alter table public.dados_cliente add column foto_path text, add column foto_origem text,
+  add column foto_em timestamptz;` Pendente: o banco estava fora do ar quando o código ficou pronto.
 
 Com F1 a F3 o P0 fecha. F4 pode ficar para o começo do beta se o limite apertar.
 

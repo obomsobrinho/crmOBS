@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import ContactSidebar from "@/components/ContactSidebar";
+import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
@@ -24,7 +26,7 @@ async function getInbox(avisos: string | null): Promise<{
       .limit(500),
     supabase
       .from("dados_cliente")
-      .select("telefone, nomewpp, atendimento_ia, display_name"),
+      .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
   ]);
   return buildInbox(
     (convs ?? []) as ConvRow[],
@@ -41,6 +43,8 @@ export default async function InboxLayout({
   // O gate de auth/instância já roda no layout do route group (app).
   const client = await getMyClient();
   const { items: initial, ia: initialIa } = await getInbox(client?.avisos ?? null);
+  // Fotos de perfil vencidas são conferidas DEPOIS de a tela sair (lib/fotos.ts).
+  if (client) after(() => atualizarFotos(client.id, client.evolution_instance));
 
   return (
     <div className="flex min-h-0 flex-1 flex-col md:gap-3">

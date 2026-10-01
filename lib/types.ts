@@ -24,6 +24,8 @@ export interface Cliente {
   custom_fields?: Record<string, unknown> | null;
   email?: string | null;
   birth_date?: string | null; // AAAA-MM-DD
+  /** Foto de perfil guardada (lib/fotos.ts), caminho no bucket. */
+  foto_path?: string | null;
 }
 
 // Item da lista de conversas (inbox). Vem da tabela `conversations`, mantida
@@ -31,6 +33,8 @@ export interface Cliente {
 export interface InboxItem {
   phone: string;
   name: string | null;
+  /** Foto de perfil guardada (lib/fotos.ts). */
+  fotoPath?: string | null;
   lastPreview: string;
   lastFrom: "in" | "out";
   lastMessageAt: string;

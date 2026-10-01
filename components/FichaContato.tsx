@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MessagesSquare, TriangleAlert, User } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import { MessagesSquare, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -11,12 +10,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { prettyPhone, phoneDigits } from "@/lib/format";
-import { initials, avatarPair } from "@/lib/inbox";
 import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
 import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
+import AvatarContato from "./AvatarContato";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
 // ponto final, que numa legenda de rodapé vira ruído.
@@ -86,8 +85,11 @@ export default function FichaContato({
   diasSemContato = null,
   podeEnviar = true,
   simular = false,
+  fotoPath = null,
   contactExists,
 }: {
+  /** Foto de perfil guardada (lib/fotos.ts). */
+  fotoPath?: string | null;
   /** Conta bloqueada (modo leitura) não escreve. Só em `clientes`. */
   podeEnviar?: boolean;
   /** Preview `/design/clientes`: o diálogo da primeira mensagem não envia. */
@@ -119,7 +121,6 @@ export default function FichaContato({
   contactExists: boolean;
 }) {
   const displayName = name || prettyPhone(phone);
-  const ini = initials(name);
   const number = prettyPhone(phone);
   const [primeiraAberta, setPrimeiraAberta] = useState(false);
   // Nenhuma mensagem, em nenhum sentido: o contato cadastrado à mão (fatia B).
@@ -141,9 +142,7 @@ export default function FichaContato({
               continua REDONDO aqui de propósito: o cabeçalho da conversa já foi
               aplicado e ficou redondo, e duas formas de avatar na mesma tela é
               pior do que uma divergência assumida contra a prancha. */}
-          <Avatar size="lg" style={avatarPair(phone)}>
-            {ini ?? <User size={16} />}
-          </Avatar>
+          <AvatarContato size="lg" phone={phone} name={name} fotoPath={fotoPath} />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <div
               data-slot="painel-nome"
