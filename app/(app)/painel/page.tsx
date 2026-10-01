@@ -18,51 +18,39 @@ import {
   AreaRolavel,
   DISSOLVER_LISTA,
 } from "@/components/ui/dissolver-rolagem";
-import {
-  barras,
-  computeMetrics,
-  esperaLegivel,
-  primeirasMensagens,
-  type JanelaMsg,
-} from "@/lib/metrics";
+import { esperaLegivel } from "@/lib/metrics";
 import {
   agoraMs,
-  instanteMaisAntigoNecessario,
-  limites,
-  naJanela,
   ORDEM_PERIODOS,
   PERIODOS,
   type PeriodoKey,
 } from "@/lib/periodo";
 import { cleanName } from "@/lib/inbox";
 import {
-  barrasDeHora,
+  barrasDeHoraDoCubo,
   escolherVerbatim,
   rotuloHorario,
   VERBATIM_MIN_CHARS,
   type CandidatoVerbatim,
 } from "@/lib/painel";
 import { foraDaLista } from "@/lib/inbox-lista";
-import { dentroDoHorario, parteLocal } from "@/lib/valor";
 import {
-  frasesDeValor,
-  mesFechado,
-  resumoDeValor,
-  rotuloDoMes,
-  type ValorMsg,
-  type ValorQual,
-} from "@/lib/valor";
+  barrasDasSeries,
+  diasDoMes,
+  metricsDaJanela,
+  montarJanelas,
+  resumoDeValorAgregado,
+} from "@/lib/painel-agregado";
+import { carregarAgregadoDoPainel } from "@/lib/painel-dados";
+import { dentroDoHorario, parteLocal } from "@/lib/valor";
+import { frasesDeValor, mesFechado, rotuloDoMes } from "@/lib/valor";
 import type { BusinessHours } from "@/lib/agent-prompt";
 import { semNumeroDeAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
 
-/** Teto de linhas do acumulado. Ver a guarda de truncamento mais abaixo. */
-const TETO = 20000;
 /** As duas janelas do gráfico de movimento, em dias. */
 const DIAS_MOVIMENTO: Record<MovimentoKey, number> = { "14": 14, "30": 30 };
-
-const DIA_MS = 24 * 60 * 60 * 1000;
 
 // Painel, rodada 3 do desenho.
 //
@@ -84,36 +72,43 @@ export default async function PainelPage() {
   const supabase = await createClient();
   const mes = mesFechado();
 
-  const [{ data: linhas }, { data: todasQuals }, { data: cfg }, espera, { data: verbatimLinhas }] =
+  // O relógio vem de `lib/periodo`, e não de `Date.now()` escrito aqui: chamada
+  // impura no corpo de um Server Component é erro de lint.
+  const agora = agoraMs();
+
+  // Todas as janelas (os quatro períodos e o anterior de cada um, as duas do
+  // movimento e o mês fechado) pedidas numa chamada só (lib/painel-agregado).
+  const plano = montarJanelas(agora, DIAS_MOVIMENTO, {
+    inicioMs: Date.parse(mes.inicioISO),
+    fimMs: Date.parse(mes.fimISO),
+  });
+
+  const [agregado, { data: cfg }, espera, { data: verbatimLinhas }] =
     await Promise.all([
-      // Acumulado, SEM janela de data: é o "tudo que a IA já fez nesta conta", e
-      // é ele que trava a mão de quem ia cancelar. As janelas de período, o mês
-      // fechado e as duas do movimento são recortadas DELE em memória, em vez de
-      // virarem consultas próprias.
-      //
-      // ⚠️ NUNCA `.limit()` sem `order`. Uma versão anterior fazia exatamente
-      // isso numa consulta de 7 dias, e um tenant com mais de 5.000 mensagens na
-      // semana recebia um subconjunto arbitrário, com os números subestimando em
-      // silêncio.
-      //
-      // `nomewpp` vem junto agora: o verbatim precisa do nome do contato, e
-      // antes isso era uma quinta consulta só para uma linha.
-      // ⚠️ SEM O TEXTO (01/10/2026, docs/plano-carregamento.md, fase 6): as
-      // contas só olham SE a linha tem mensagem recebida e SE tem resposta, e
-      // `painel_linhas` devolve exatamente isso. Antes vinham até 20.000
-      // linhas com o texto inteiro. A frase do agente tem consulta própria.
-      supabase.rpc("painel_linhas", { p_client: client.id, p_limite: TETO }),
-      supabase
-        .from("conversation_qualifications")
-        .select("id, phone, action, summary, created_at")
-        .order("created_at", { ascending: false })
-        .limit(5000),
+      // ⚠️ SEM LINHAS (02/10/2026, R-04, docs/adr/2026-10-02-painel-agrega-no-banco.md).
+      // Antes a página baixava até 20.000 linhas e contava em memória, mas o
+      // "Max rows" do PostgREST é 1000: acima de 1.000 mensagens os números e o
+      // "desde o início" estavam errados em silêncio. Agora o banco devolve
+      // escalares por janela (`painel_janelas`) e séries pequenas por data e por
+      // dia da semana x minuto (`painel_series`); quem classifica horário,
+      // feriado, período e "quem respondeu" continua sendo o TS. O acumulado
+      // (janela 0) é "tudo que a IA já fez nesta conta", o que trava a mão de
+      // quem ia cancelar. Erro do banco levanta: zero por timeout é número errado.
+      carregarAgregadoDoPainel(supabase, {
+        clientId: client.id,
+        avisos: client.avisos,
+        agora,
+        janelas: plano.lista,
+        mes: { inicioMs: Date.parse(mes.inicioISO), fimMs: Date.parse(mes.fimISO) },
+      }),
       // O horário de atendimento vive em agent_config (é configuração da
       // empresa, editada na tela do agente). Sem ele, o resumo omite o número de
       // "fora do horário" em vez de estimar, e o gráfico de hora some junto.
+      // Só `hours` sai do jsonb (R-51): a persona e o resto da configuração não
+      // têm o que fazer aqui.
       supabase
         .from("clients")
-        .select("agent_config, prompt_mode")
+        .select("hours:agent_config->hours, prompt_mode")
         .eq("id", client.id)
         .maybeSingle(),
       // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
@@ -135,103 +130,35 @@ export default async function PainelPage() {
       }),
     ]);
 
-  // A linha sem texto vira a forma que as contas já leem: o que importa é se
-  // existe mensagem recebida e se existe resposta (`!!user_message`,
-  // `!!bot_message`), e o marcador "·" diz exatamente isso.
-  const todasMsgs = (
-    (linhas ?? []) as {
-      phone: string;
-      created_at: string;
-      message_type: string | null;
-      tem_user: boolean;
-      tem_bot: boolean;
-    }[]
-  ).map((l) => ({
-    phone: l.phone,
-    nomewpp: null as string | null,
-    created_at: l.created_at,
-    message_type: l.message_type,
-    user_message: l.tem_user ? "·" : null,
-    bot_message: l.tem_bot ? "·" : null,
-  }));
-
-  const hours =
-    (cfg?.agent_config as { hours?: BusinessHours } | null)?.hours ?? null;
+  const hours = (cfg?.hours as BusinessHours | null | undefined) ?? null;
 
   // O número que RECEBE os avisos do time não é cliente: fora de toda conta
-  // (lib/avisos.ts). Tirado aqui, na entrada, para nenhum bloco abaixo vê-lo.
-  const acumuladoMsgs = semNumeroDeAvisos(
-    (todasMsgs ?? []) as (ValorMsg & { nomewpp: string | null })[],
-    client.avisos,
-    (m) => m.phone
-  );
-  const acumuladoQuals = semNumeroDeAvisos(
-    (todasQuals ?? []) as (ValorQual & { id: number; summary: string | null })[],
-    client.avisos,
-    (q) => q.phone
-  );
+  // (lib/avisos.ts). O banco já o deixa fora das agregações (`p_fora`); aqui só
+  // a fila de pedidos abertos, que vem de outra tabela.
   const abertas = semNumeroDeAvisos(
     (espera.data ?? []) as { phone: string; handoff_at: string }[],
     client.avisos,
     (c) => c.phone
   );
 
-  // O relógio vem de `lib/periodo`, e não de `Date.now()` escrito aqui: chamada
-  // impura no corpo de um Server Component é erro de lint.
-  const agora = agoraMs();
-
-  // ── Guarda de truncamento ──────────────────────────────────────────────────
-  //
-  // ⚠️ O acumulado tem teto de linhas, ordenado do mais novo para o mais velho.
-  // Se ele bateu no teto E a linha mais antiga que veio já é mais nova do que o
-  // começo da janela ANTERIOR mais longa, essa janela está INCOMPLETA, e um selo
-  // calculado sobre janela incompleta mostraria variação inventada. Nesse caso o
-  // período anterior vira `null` e nenhum cartão mostra selo.
-  const maisAntiga = acumuladoMsgs[acumuladoMsgs.length - 1]?.created_at;
-  const truncado =
-    acumuladoMsgs.length >= TETO &&
-    (!maisAntiga ||
-      Date.parse(maisAntiga) > instanteMaisAntigoNecessario(agora));
-
-  const primeiras = primeirasMensagens(acumuladoMsgs as JanelaMsg[]);
   // Primeira mensagem da conta inteira. O gráfico de movimento usa isto para
   // marcar como trilho os dias que a conta ainda não teve, em vez de desenhar um
   // vale que conta uma queda que nunca houve.
-  const desdeMs = primeiras.size > 0 ? Math.min(...primeiras.values()) : null;
-
-  const recorte = (de: number, ate: number) => ({
-    msgs: (acumuladoMsgs as JanelaMsg[]).filter((m) =>
-      naJanela(Date.parse(m.created_at), de, ate)
-    ),
-    quals: acumuladoQuals.filter((q) =>
-      naJanela(Date.parse(q.created_at), de, ate)
-    ),
-  });
+  const desdeMs = agregado.janela(0).primeira_em;
 
   // ── As quatro janelas da operação ──────────────────────────────────────────
+  //
+  // Sem truncamento: o teto de linhas deixou de existir, então o período
+  // anterior é sempre calculado (antes ele virava `null` quando o acumulado
+  // batia no teto).
   const janelas = Object.fromEntries(
     ORDEM_PERIODOS.map((k) => {
-      const p = PERIODOS[k];
-      const lim = limites(p, agora);
-      const atual = recorte(lim.de, lim.ate);
-      const ant = recorte(lim.anteriorDe, lim.anteriorAte);
+      const par = plano.operacao[k];
       const janela: JanelaCalculada = {
         key: k,
-        metrics: computeMetrics({
-          ...atual,
-          primeiras,
-          de: lim.de,
-          ate: lim.ate,
-        }),
-        anterior: truncado
-          ? null
-          : computeMetrics({
-              ...ant,
-              primeiras,
-              de: lim.anteriorDe,
-              ate: lim.anteriorAte,
-            }),
-        barras: barras(atual.msgs, p.dias, agora),
+        metrics: metricsDaJanela(agregado.janela(par.atual)),
+        anterior: metricsDaJanela(agregado.janela(par.anterior)),
+        barras: barrasDasSeries(agregado.series, PERIODOS[k].dias, agora),
       };
       return [k, janela];
     })
@@ -245,19 +172,12 @@ export default async function PainelPage() {
   const movimento = Object.fromEntries(
     (Object.keys(DIAS_MOVIMENTO) as MovimentoKey[]).map((k) => {
       const dias = DIAS_MOVIMENTO[k];
-      const de = agora - dias * DIA_MS;
-      const anteriorDe = agora - dias * 2 * DIA_MS;
-      const atual = recorte(de, agora);
-      const ant = recorte(anteriorDe, de);
-      const m = computeMetrics({ ...atual, primeiras, de, ate: agora });
+      const par = plano.movimento[k];
       const j: MovimentoJanela = {
         dias,
-        barras: barras(atual.msgs, dias, agora),
-        conversas: m.conversas,
-        conversasAnterior: truncado
-          ? null
-          : computeMetrics({ ...ant, primeiras, de: anteriorDe, ate: de })
-              .conversas,
+        barras: barrasDasSeries(agregado.series, dias, agora),
+        conversas: agregado.janela(par.atual).conversas,
+        conversasAnterior: agregado.janela(par.anterior).conversas,
       };
       return [k, j];
     })
@@ -273,7 +193,7 @@ export default async function PainelPage() {
   //
   // A regra mora em lib/painel.ts e é OBJETIVA: a mais recente de uma conversa
   // que a IA atendeu sozinha, com reserva por comprimento. Nunca escolhida a
-  // dedo. Sai do acumulado que já está em memória, sem consulta nova.
+  // dedo. Vem de `painel_verbatim`, as poucas linhas que ela precisa.
   const candidatosVerbatim = (verbatimLinhas ?? []) as (CandidatoVerbatim & {
     conversa_com_humano: boolean;
   })[];
@@ -293,28 +213,25 @@ export default async function PainelPage() {
     ? dois(parteVerbatim.hora) + "h" + dois(parteVerbatim.minuto)
     : undefined;
 
-  // ── Manchete: mês fechado, recortado do acumulado ──────────────────────────
+  // ── Manchete: mês fechado e acumulado ──────────────────────────────────────
   //
-  // Comparação por instante (Date.parse) e não por string: o banco devolve
-  // "…+00:00" e mesFechado gera "…Z", e comparar esses dois como texto erra
-  // exatamente na linha da fronteira.
-  const inicioMs = Date.parse(mes.inicioISO);
-  const fimMs = Date.parse(mes.fimISO);
-  const noMes = (iso: string) => naJanela(Date.parse(iso), inicioMs, fimMs);
-  const msgsDoMes = acumuladoMsgs.filter((m) => noMes(m.created_at));
-
-  const resumo = resumoDeValor({
-    msgs: msgsDoMes,
-    quals: acumuladoQuals.filter((q) => noMes(q.created_at)),
+  // O mês fechado é uma janela própria do banco ([inicio, fim), em instantes) e
+  // as datas do mês, para fim de semana e feriado, são as do calendário de São
+  // Paulo (as fronteiras do mês caem na meia-noite de lá).
+  const resumo = resumoDeValorAgregado({
+    janela: agregado.janela(plano.mes ?? -1),
+    series: agregado.series,
     hours,
+    mes: diasDoMes(mes.ano, mes.mes),
   });
   const periodo = rotuloDoMes(mes.ano, mes.mes);
   const frases = frasesDeValor(resumo, periodo);
 
-  const acumulado = resumoDeValor({
-    msgs: acumuladoMsgs,
-    quals: acumuladoQuals,
+  const acumulado = resumoDeValorAgregado({
+    janela: agregado.janela(0),
+    series: agregado.series,
     hours,
+    mes: null,
   });
   const frasesAcumuladas = frasesDeValor(acumulado, "desde o início");
 
@@ -322,12 +239,13 @@ export default async function PainelPage() {
   // das partes roxas não fecha com o número. Quando o mês fechado está vazio, a
   // manchete cai no acumulado (regra que já existia no ValorResumo), e o gráfico
   // precisa cair junto. É por isso que a janela é escolhida aqui, e não lá
-  // dentro: o componente não pode ter uma segunda opinião sobre o período.
+  // dentro: o componente não pode ter uma segunda opinião sobre o período. As
+  // duas leem o MESMO cubo (dia da semana x minuto) do banco.
   const caiuNoAcumulado = frases.length === 0 && frasesAcumuladas.length > 0;
-  const horas = barrasDeHora({
-    msgs: caiuNoAcumulado ? acumuladoMsgs : msgsDoMes,
-    hours,
-  });
+  const horas = barrasDeHoraDoCubo(
+    caiuNoAcumulado ? agregado.series.cubo : agregado.series.cubo_mes,
+    hours
+  );
 
   // ⚠️ O painel NÃO é um cartão branco: é página sobre o canvas, com os cartões
   // flutuando (`Stat variant="elevado"`). É obrigatório no claro por um motivo

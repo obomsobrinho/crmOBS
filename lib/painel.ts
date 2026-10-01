@@ -101,6 +101,32 @@ export function barrasDeHora(input: HorasInput): BarraHora[] {
 }
 
 /**
+ * As mesmas 24 colunas de `barrasDeHora`, a partir do CUBO que o banco agrega
+ * (`painel_series`: respostas da IA por dia da semana e minuto do dia, 0 =
+ * domingo) em vez de linhas. Quem decide dentro/fora continua sendo
+ * `dentroDoHorario`, e é o MESMO cubo que alimenta a manchete
+ * (`resumoDeValorAgregado`), então a soma de `fora` fecha com ela por construção.
+ */
+export function barrasDeHoraDoCubo(
+  cubo: [number, number, number][],
+  hours: BusinessHours | null
+): BarraHora[] {
+  const colunas: BarraHora[] = Array.from({ length: 24 }, (_, hora) => ({
+    hora,
+    dentro: 0,
+    fora: 0,
+  }));
+  if (!hours) return colunas;
+  for (const [diaSemana, minutoDoDia, n] of cubo) {
+    const hora = Math.floor(minutoDoDia / 60);
+    const p = { ano: 0, mes: 0, dia: 0, hora, minuto: minutoDoDia % 60, diaSemana };
+    if (dentroDoHorario(p, hours)) colunas[hora].dentro += n;
+    else colunas[hora].fora += n;
+  }
+  return colunas;
+}
+
+/**
  * O horário da empresa em UMA linha, para a legenda do gráfico ("Segunda a
  * sexta: 08:00 às 18:00").
  *

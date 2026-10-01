@@ -290,7 +290,7 @@ const DIA_NOME = [
   "sábado",
 ];
 
-const UM_MINUTO = 60_000;
+export const UM_MINUTO = 60_000;
 
 /**
  * Calcula o resumo de valor. `msgs` e `quals` já vêm filtradas pelo período que
