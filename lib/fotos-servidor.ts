@@ -46,17 +46,12 @@ export async function atualizarFotos(clientId: string, instancia: string | null)
       .from("dados_cliente")
       .update({ foto_em: new Date().toISOString() })
       .eq("client_id", clientId)
-      .in("id", candidatos.map((c) => (c as { id: number }).id))
+      .in("id", candidatos.map((c) => c.id))
       .or(`foto_em.is.null,foto_em.lt.${corte}`)
       .select("id, telefone, foto_path, foto_origem");
     if (errPega || !pegos) return;
 
-    for (const c of pegos as {
-      id: number;
-      telefone: string;
-      foto_path: string | null;
-      foto_origem: string | null;
-    }[]) {
+    for (const c of pegos) {
       await conferirUma(svc, clientId, instancia, c);
     }
   } catch (e) {

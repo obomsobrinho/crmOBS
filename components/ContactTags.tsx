@@ -69,8 +69,8 @@ export default function ContactTags({
         .select("tag_id")
         .eq("conversation_id", conversationId),
     ]);
-    setAll((tags ?? []) as Tag[]);
-    setApplied(((links ?? []) as { tag_id: number }[]).map((l) => l.tag_id));
+    setAll(tags ?? []);
+    setApplied((links ?? []).map((l) => l.tag_id));
   }, [supabase, conversationId, ativo]);
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export default function ContactTags({
       .select("id, name, color")
       .maybeSingle();
     if (error || !data) return;
-    const tag = data as Tag;
+    const tag: Tag = data;
     setAll((t) => [...t, tag]);
     setNewName("");
     await apply(tag.id);

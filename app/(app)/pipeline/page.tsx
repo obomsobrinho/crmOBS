@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
-import { rowToStage, type StageRow } from "@/lib/pipeline";
+import { rowToStage } from "@/lib/pipeline";
 import {
   CONTAGENS_PIPELINE_VAZIAS,
   fontePipelineDoBanco,
@@ -23,7 +23,7 @@ export default async function PipelinePage() {
     .from("pipeline_stages")
     .select("id, key, name, position, is_canonical, is_default, archived, color")
     .order("position");
-  const stages = ((stagesRows ?? []) as StageRow[]).map(rowToStage);
+  const stages = (stagesRows ?? []).map(rowToStage);
 
   // A PRIMEIRA PÁGINA DE CADA COLUNA (10 cards) e os números, pela MESMA função
   // do banco que o navegador usa para as páginas seguintes

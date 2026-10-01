@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
 
 // Membro (login) de um tenant. Vem da RPC public.tenant_members(), que resolve
 // o e-mail em auth.users (o CRM roda como `authenticated` e não pode ler
@@ -11,11 +11,11 @@ export interface Member {
 }
 
 export async function fetchMembers(
-  supabase: SupabaseClient
+  supabase: Supa
 ): Promise<Member[]> {
   const { data, error } = await supabase.rpc("tenant_members");
   if (error || !data) return [];
-  return (data as { user_id: string; email: string; role: string }[]).map(
+  return data.map(
     (r) => ({ userId: r.user_id, email: r.email, role: r.role })
   );
 }

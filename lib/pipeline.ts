@@ -1,4 +1,5 @@
 import { diaIsoSP } from "./fuso";
+import type { Tables } from "./database.types";
 
 // Pipeline (funil) do tenant. Módulo puro (sem server-only / supabase): usado no
 // Server Component, no board (client) e no /design. A fonte de verdade dos
@@ -17,16 +18,13 @@ export interface Stage {
 }
 
 // Linha crua de pipeline_stages.
-export interface StageRow {
-  id: number;
-  key: string;
-  name: string;
-  position: number;
-  is_canonical: boolean;
-  is_default: boolean;
-  archived: boolean;
-  color: string;
-}
+export type StageRow = Pick<
+  Tables<"pipeline_stages">,
+  "id" | "key" | "name" | "position" | "is_canonical" | "is_default" | "archived" | "color"
+>;
+
+// O que o dono pode mudar num estágio (o resto é identidade ou do sistema).
+export type StagePatch = Partial<Pick<StageRow, "name" | "color" | "position" | "archived">>;
 
 export function rowToStage(r: StageRow): Stage {
   return {

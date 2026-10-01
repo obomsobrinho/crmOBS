@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { TablesUpdate } from "@/lib/database.types";
 import { publishBlockers } from "@/lib/onboarding";
 import { connectionState } from "@/lib/evolution";
 
@@ -101,7 +102,7 @@ export async function PUT(
   }
 
   // Desligar NÃO limpa agent_published_at (ver o comentário no topo).
-  const update: Record<string, unknown> = { agent_enabled: body.enabled };
+  const update: TablesUpdate<"clients"> = { agent_enabled: body.enabled };
   if (body.enabled && primeiraVez) {
     update.agent_published_at = new Date().toISOString();
   }

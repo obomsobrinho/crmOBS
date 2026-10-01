@@ -105,12 +105,12 @@ export const JANELA_DO_LOTE_MS = 10 * 60_000;
  * nada: não há mensagem nova, e o que o cliente disse sem resposta é o assunto.
  */
 export function semLoteAtual<
-  T extends { user_message: string | null; bot_message: string | null; created_at: string },
+  T extends { user_message: string | null; bot_message: string | null; created_at: string | null },
 >(linhas: T[], agora: number, mensagem: string): T[] {
   let i = 0;
   while (i < linhas.length) {
     const l = linhas[i];
-    const t = Date.parse(l.created_at);
+    const t = Date.parse(l.created_at ?? "");
     const texto = l.user_message?.trim() ?? "";
     const doLote =
       !!texto &&

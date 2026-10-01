@@ -52,20 +52,10 @@ export default async function MontagemPage() {
 
   if ((data?.prompt_mode as string | null) === "avancado") redirect("/agente");
 
-  const docs: KnowledgeDoc[] = (
-    (docsRows ?? []) as {
-      id: string;
-      title: string;
-      status: "processing" | "ready" | "error";
-      chunk_count: number;
-      byte_size: number | null;
-      error: string | null;
-      created_at: string;
-    }[]
-  ).map((d) => ({
+  const docs: KnowledgeDoc[] = (docsRows ?? []).map((d) => ({
     id: d.id,
     title: d.title,
-    status: d.status,
+    status: d.status as KnowledgeDoc["status"],
     chunkCount: d.chunk_count,
     byteSize: d.byte_size,
     error: d.error,
@@ -73,7 +63,7 @@ export default async function MontagemPage() {
   }));
 
   const stageNames: Record<string, string> = {};
-  for (const s of (stages ?? []) as { key: string; name: string }[]) {
+  for (const s of stages ?? []) {
     stageNames[s.key] = s.name;
   }
 

@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { DatabaseApp } from "@/lib/supabase/schema";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -9,12 +10,18 @@ if (!url || !anonKey) {
   );
 }
 
+type SupabaseBrowser = ReturnType<typeof criar>;
+
+function criar() {
+  return createBrowserClient<DatabaseApp>(url!, anonKey!);
+}
+
 // Singleton no browser: evita múltiplas instâncias do GoTrue e mantém a sessão
 // (persistida em cookies pelo @supabase/ssr) disponível para o Realtime.
-let client: ReturnType<typeof createBrowserClient> | undefined;
+let client: SupabaseBrowser | undefined;
 
 export function createClient() {
-  if (!client) client = createBrowserClient(url!, anonKey!);
+  if (!client) client = criar();
   return client;
 }
 
@@ -43,14 +50,14 @@ function realtimePronto(): Promise<void> {
   return pronto;
 }
 
-type Canal = ReturnType<ReturnType<typeof createBrowserClient>["channel"]>;
+type Canal = ReturnType<SupabaseBrowser["channel"]>;
 
 /**
  * Monta um canal de realtime DEPOIS de a sessão estar no realtime. Devolve a
  * função de limpeza (para o `return` do `useEffect`).
  */
 export function assinarComSessao(
-  montar: (sb: ReturnType<typeof createBrowserClient>) => Canal
+  montar: (sb: SupabaseBrowser) => Canal
 ): () => void {
   const sb = createClient();
   let canal: Canal | null = null;

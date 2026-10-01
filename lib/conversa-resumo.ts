@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
 
 // Total de mensagens e data da primeira de UMA conversa, para a ficha do
 // contato (`/inbox/[id]` e `/clientes/[id]`). Uma ida ao banco (R-14,
@@ -9,15 +9,14 @@ export interface ResumoConversa {
 }
 
 export async function resumoDaConversa(
-  supabase: SupabaseClient,
+  supabase: Supa,
   phone: string
 ): Promise<ResumoConversa> {
   const { data, error } = await supabase
     .rpc("chat_resumo_conversa", { p_phone: phone })
     .maybeSingle();
   if (!error && data) {
-    const r = data as { total: number | string; primeira: string | null };
-    return { total: Number(r.total), primeira: r.primeira };
+    return { total: Number(data.total), primeira: data.primeira };
   }
 
   // Função ainda não aplicada no banco: as duas consultas de antes. Sai quando a
@@ -37,6 +36,6 @@ export async function resumoDaConversa(
   ]);
   return {
     total: count ?? 0,
-    primeira: (primeira as { created_at: string } | null)?.created_at ?? null,
+    primeira: primeira?.created_at ?? null,
   };
 }

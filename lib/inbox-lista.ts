@@ -1,6 +1,7 @@
 import { nomeDoContato, diaSP, JANELAS, type JanelaKey } from "./inbox";
 import { grafiasDeDigitos } from "./avisos";
 import type { InboxItem } from "./types";
+import type { LinhaRpc } from "./supabase/schema";
 
 // LISTA DE CONVERSAS PAGINADA (01/10/2026, docs/plano-carregamento.md, fase 1).
 //
@@ -20,24 +21,21 @@ export const PAGINA_INBOX = 10;
 export type FiltroInbox = "all" | "unanswered" | "mine" | "needs";
 
 /** A linha que `inbox_pagina` devolve. */
-export interface LinhaInbox {
-  id: number;
-  phone: string;
-  last_message_at: string;
-  last_message_preview: string | null;
-  last_message_from: string | null;
-  unread_count: number | null;
-  assigned_user_id: string | null;
-  handoff_at: string | null;
-  stage: string | null;
-  display_name: string | null;
-  nomewpp: string | null;
-  atendimento_ia: string | null;
-  foto_path: string | null;
-  resumo: string | null;
-  trecho: string | null;
-  grupo: number;
-}
+export type LinhaInbox = LinhaRpc<
+  "inbox_pagina",
+  | "last_message_preview"
+  | "last_message_from"
+  | "unread_count"
+  | "assigned_user_id"
+  | "handoff_at"
+  | "stage"
+  | "display_name"
+  | "nomewpp"
+  | "atendimento_ia"
+  | "foto_path"
+  | "resumo"
+  | "trecho"
+>;
 
 /** O item da lista, com o que a linha precisa além do `InboxItem`. */
 export interface ItemLista extends InboxItem {

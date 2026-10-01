@@ -10,7 +10,6 @@ import { agoraMs } from "@/lib/periodo";
 import { createClient } from "@/lib/supabase/server";
 import { membrosDoTenant } from "@/lib/team-servidor";
 import { resumoDaConversa } from "@/lib/conversa-resumo";
-import type { Cliente } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +29,7 @@ export default async function ClientePage({
     .select("id, telefone, nomewpp, atendimento_ia, created_at, display_name, custom_fields, email, birth_date, foto_path")
     .eq("id", id)
     .maybeSingle();
-  const contato = data as Cliente | null;
+  const contato = data;
   if (!contato) notFound();
   const phone = contato.telefone;
 
@@ -78,9 +77,9 @@ export default async function ClientePage({
           messageCount={resumo.total}
           members={members}
           myUserId={client?.userId ?? ""}
-          conversationId={(conv as { id: number } | null)?.id ?? null}
+          conversationId={conv?.id ?? null}
           diasSemContato={diasSemContato(
-            (conv as { last_message_at: string | null } | null)?.last_message_at ?? null,
+            conv?.last_message_at ?? null,
             agoraMs()
           )}
           clientId={client?.id ?? ""}
@@ -88,7 +87,7 @@ export default async function ClientePage({
           customFields={contato.custom_fields ?? null}
           email={contato.email ?? null}
           birthDate={contato.birth_date ?? null}
-          entendimento={(qual as { summary: string | null } | null)?.summary ?? null}
+          entendimento={qual?.summary ?? null}
           podeEnviar={!client?.access.blocked}
           fotoPath={contato.foto_path ?? null}
           contactExists

@@ -13,6 +13,7 @@ import { anunciarIa } from "@/lib/ia-bus";
 import { useNomeDoContato } from "@/lib/use-nome-contato";
 import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
+import type { Json } from "@/lib/database.types";
 import type { ChatRow } from "@/lib/types";
 
 // Compõe a thread + o painel de contexto. Dono do estado da IA
@@ -63,7 +64,7 @@ export default function ConversationView({
   pendingInstruction: string | null;
   clientId: string;
   displayName: string | null;
-  customFields: Record<string, unknown> | null;
+  customFields: Json | null;
   contactEmail?: string | null;
   contactBirthDate?: string | null;
   contactExists: boolean;

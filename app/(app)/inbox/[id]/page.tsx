@@ -6,7 +6,6 @@ import { getMyClient } from "@/lib/auth";
 import { bestName, cleanName, nomeDoContato } from "@/lib/inbox";
 import { membrosDoTenant } from "@/lib/team-servidor";
 import { resumoDaConversa } from "@/lib/conversa-resumo";
-import type { ChatRow, Cliente } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -70,20 +69,15 @@ export default async function ThreadPage({
     ]);
   const totalMensagens = resumo.total;
 
-  const initialRows = ((rows ?? []) as ChatRow[]).reverse();
-  const contato = cliente as Cliente | null;
+  const initialRows = (rows ?? []).reverse();
+  const contato = cliente;
 
   if (initialRows.length === 0 && !contato) notFound();
 
   // display_name (CRM) precede o nomewpp (pushName do WhatsApp).
   const name = nomeDoContato(contato) ?? bestName(initialRows);
   const firstMessageAt = resumo.primeira ?? initialRows[0]?.created_at ?? null;
-  const convRow = conv as {
-    id: number;
-    assigned_user_id: string | null;
-    pending_instruction: string | null;
-    handoff_at: string | null;
-  } | null;
+  const convRow = conv;
 
   return (
     <ConversationView

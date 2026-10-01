@@ -1,6 +1,7 @@
 // Tipos e utilitários das entidades do CRM (tags, notas, respostas rápidas,
 // campos personalizados). Tabelas donas do CRM: o browser faz CRUD direto via
 // RLS por tenant (não passa pelo n8n).
+import type { Json } from "./database.types";
 
 export interface Tag {
   id: number;
@@ -113,7 +114,7 @@ export interface CustomField {
 }
 
 export function customFieldsToList(
-  cf: Record<string, unknown> | null | undefined
+  cf: Json | null | undefined
 ): CustomField[] {
   if (!cf) return [];
   return Object.entries(cf).map(([key, value]) => ({

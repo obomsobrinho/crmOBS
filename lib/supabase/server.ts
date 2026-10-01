@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import type { DatabaseApp } from "@/lib/supabase/schema";
 
 // Client autenticado por sessão (cookies) para Server Components e Route
 // Handlers. A RLS por tenant é aplicada com o JWT do usuário logado.
@@ -14,7 +15,7 @@ import { cookies } from "next/headers";
 export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
-  return createServerClient(
+  return createServerClient<DatabaseApp>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { graceUntilFrom } from "@/lib/billing";
 import { segredoConfere } from "@/lib/segredo";
+import type { Json } from "@/lib/database.types";
 
 // Webhook do Asaas: é ele que muda o estado da assinatura de um tenant.
 //
@@ -42,9 +43,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
 
+  let bruto: Json;
   let corpo: EventoAsaas;
   try {
-    corpo = (await req.json()) as EventoAsaas;
+    bruto = (await req.json()) as Json;
+    corpo = bruto as EventoAsaas;
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
@@ -95,7 +98,7 @@ export async function POST(req: NextRequest) {
       asaas_event_id: eventoId,
       event: evento,
       client_id: clientId,
-      payload: corpo as unknown as Record<string, unknown>,
+      payload: bruto,
     })
     .select("id")
     .maybeSingle();

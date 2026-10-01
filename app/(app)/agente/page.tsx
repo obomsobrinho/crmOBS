@@ -41,20 +41,10 @@ export default async function AgentePage() {
       .order("created_at", { ascending: false }),
   ]);
 
-  const docs: KnowledgeDoc[] = (
-    (docsRows ?? []) as {
-      id: string;
-      title: string;
-      status: "processing" | "ready" | "error";
-      chunk_count: number;
-      byte_size: number | null;
-      error: string | null;
-      created_at: string;
-    }[]
-  ).map((d) => ({
+  const docs: KnowledgeDoc[] = (docsRows ?? []).map((d) => ({
     id: d.id,
     title: d.title,
-    status: d.status,
+    status: d.status as KnowledgeDoc["status"],
     chunkCount: d.chunk_count,
     byteSize: d.byte_size,
     error: d.error,
@@ -62,13 +52,13 @@ export default async function AgentePage() {
   }));
 
   const stageNames: Record<string, string> = {};
-  for (const s of (stages ?? []) as { key: string; name: string }[]) {
+  for (const s of stages ?? []) {
     stageNames[s.key] = s.name;
   }
 
-  const persona = (data?.persona as string | null) ?? null;
+  const persona = data?.persona ?? null;
   const promptMode = (data?.prompt_mode as Mode | null) ?? "guiado";
-  const notifyGroup = (data?.notify_group_jid as string | null) ?? null;
+  const notifyGroup = data?.notify_group_jid ?? null;
 
   // Normaliza o agent_config guardado (pode ser null ou de outra versão).
   let initialConfig: AgentConfig | null = null;

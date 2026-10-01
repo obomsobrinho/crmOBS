@@ -17,6 +17,7 @@ import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
 import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
 import AvatarContato from "./AvatarContato";
+import type { Json } from "@/lib/database.types";
 import { useNomeDoContato } from "@/lib/use-nome-contato";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
@@ -121,7 +122,7 @@ export default function FichaContato({
    *  consultava por tenant. */
   clientId: string;
   editableName: string | null;
-  customFields: Record<string, unknown> | null;
+  customFields: Json | null;
   contactExists: boolean;
 }) {
   const nome = useNomeDoContato(phone, name, nomeBase);

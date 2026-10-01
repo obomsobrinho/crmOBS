@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Não deu para cadastrar agora." }, { status: 500 });
   }
   if (achados && achados.length > 0) {
-    const existente = achados[0] as { id: number; telefone: string };
+    const existente = achados[0];
     await garantirConversa(svc, client.id, existente.telefone);
     return NextResponse.json({ id: existente.id, existente: true });
   }
@@ -120,14 +120,14 @@ export async function POST(req: Request) {
         .eq("client_id", client.id)
         .eq("telefone", jid)
         .maybeSingle();
-      if (outro) return NextResponse.json({ id: (outro as { id: number }).id, existente: true });
+      if (outro) return NextResponse.json({ id: outro.id, existente: true });
     }
     console.error("novo cliente:", errCria.message);
     return NextResponse.json({ error: "Não deu para cadastrar agora." }, { status: 500 });
   }
 
   await garantirConversa(svc, client.id, jid);
-  return NextResponse.json({ id: (criado as { id: number }).id, existente: false });
+  return NextResponse.json({ id: criado.id, existente: false });
 }
 
 /**

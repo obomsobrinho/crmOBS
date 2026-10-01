@@ -1,4 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
+import type { LinhaRpc } from "@/lib/supabase/schema";
 import { nomeDoContato } from "./inbox";
 import { inicioDeDias } from "./inbox-lista";
 import {
@@ -59,22 +60,18 @@ export function paramsClientes(
 }
 
 /** A linha que `clientes_pagina` devolve. */
-interface LinhaCliente {
-  id: number;
-  telefone: string;
-  nomewpp: string | null;
-  display_name: string | null;
-  atendimento_ia: string | null;
-  custom_fields: Record<string, unknown> | null;
-  email: string | null;
-  birth_date: string | null;
-  foto_path: string | null;
-  conversa_id: number | null;
-  last_message_at: string | null;
-  assigned_user_id: string | null;
-  tags: { name: string; color: string | null }[] | null;
-  k: string;
-}
+type LinhaCliente = LinhaRpc<
+  "clientes_pagina",
+  | "nomewpp"
+  | "display_name"
+  | "atendimento_ia"
+  | "email"
+  | "birth_date"
+  | "foto_path"
+  | "conversa_id"
+  | "last_message_at"
+  | "assigned_user_id"
+>;
 
 function paraCliente(l: LinhaCliente): ClienteItem {
   return {
@@ -86,7 +83,8 @@ function paraCliente(l: LinhaCliente): ClienteItem {
     conversationId: l.conversa_id,
     pausada: l.atendimento_ia === "pause",
     temAtendente: !!l.assigned_user_id,
-    tags: l.tags ?? [],
+    // `tags` é jsonb: o SQL monta [{ name, color }] (ou null sem tags).
+    tags: (l.tags as ClienteItem["tags"] | null) ?? [],
     campos: Object.values(l.custom_fields ?? {})
       .map((v) => (v == null ? "" : String(v)))
       .filter(Boolean),
@@ -102,7 +100,7 @@ export interface FonteClientes {
   contagens(p: ParamsClientes): Promise<ContagensClientes>;
 }
 
-export function fonteClientesDoBanco(supabase: SupabaseClient, clientId: string): FonteClientes {
+export function fonteClientesDoBanco(supabase: Supa, clientId: string): FonteClientes {
   return {
     async pagina(p, depois, n = PAGINA_CLIENTES) {
       const { data, error } = await supabase.rpc("clientes_pagina", {
@@ -117,7 +115,7 @@ export function fonteClientesDoBanco(supabase: SupabaseClient, clientId: string)
         p_limite: n,
       });
       if (error) throw error;
-      return ((data ?? []) as LinhaCliente[]).map(paraCliente);
+      return (data ?? []).map(paraCliente);
     },
     async contagens(p) {
       const { data, error } = await supabase.rpc("clientes_contagens", {
@@ -127,7 +125,7 @@ export function fonteClientesDoBanco(supabase: SupabaseClient, clientId: string)
         p_frio_antes: p.frioAntes,
       });
       if (error) throw error;
-      const c = ((data ?? []) as Record<keyof ContagensClientes, number | string>[])[0];
+      const c = (data ?? [])[0];
       if (!c) return CONTAGENS_CLIENTES_VAZIAS;
       return {
         todos: Number(c.todos) || 0,

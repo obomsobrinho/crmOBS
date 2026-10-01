@@ -9,6 +9,7 @@ import {
   type AgentConfig,
 } from "@/lib/agent-prompt";
 import { createClient } from "@/lib/supabase/client";
+import type { Tables } from "@/lib/database.types";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { Button } from "@/components/ui/button";
@@ -32,14 +33,10 @@ import {
 // direto daqui seria um segundo caminho de escrita, e um clique errado
 // publicaria uma versão velha no WhatsApp de um cliente de verdade.
 
-interface Versao {
-  id: number;
-  persona: string;
-  config: AgentConfig | null;
-  prompt_mode: string;
-  published_at: string;
-  published_by: string | null;
-}
+type Versao = Pick<
+  Tables<"agent_publications">,
+  "id" | "persona" | "config" | "prompt_mode" | "published_at" | "published_by"
+>;
 
 function quando(iso: string): string {
   return diaMesHoraSP(iso);
@@ -101,7 +98,7 @@ export default function AgentPromptDrawer({
         .limit(20),
       fetchMembers(supabase),
     ]);
-    setVersoes((data ?? []) as Versao[]);
+    setVersoes(data ?? []);
     setMembros(Object.fromEntries(lista.map((m) => [m.userId, m])));
   }, [supabase]);
 
@@ -222,7 +219,7 @@ export default function AgentPromptDrawer({
                           className="gap-1.5"
                           onClick={() => {
                             onRestore({
-                              config: v.config,
+                              config: v.config as AgentConfig | null,
                               persona: v.persona,
                               mode:
                                 v.prompt_mode === "avancado" ? "avancado" : "guiado",
