@@ -139,7 +139,14 @@ export function encaixar(
  */
 export function inicioDaJanela(janela: JanelaKey, agora: number): string | null {
   const dias = JANELAS[janela].dias;
-  if (dias == null) return null;
+  return dias == null ? null : inicioDeDias(dias, agora);
+}
+
+/**
+ * Meia-noite de São Paulo do dia que abre uma janela de `dias` dias civis
+ * contando hoje (1 = hoje). Antes dela, a mensagem tem `dias` ou mais dias.
+ */
+export function inicioDeDias(dias: number, agora: number): string {
   const dia = diaSP(agora - (dias - 1) * 86_400_000);
   const ano = Math.floor(dia / 10000);
   const mes = Math.floor((dia % 10000) / 100);

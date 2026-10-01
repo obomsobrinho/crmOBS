@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Plus, Search, UsersRound, X } from "lucide-react";
 import NovoClienteDialog from "@/components/NovoClienteDialog";
 import AvatarContato from "@/components/AvatarContato";
@@ -17,51 +17,71 @@ import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { quemAtende, tagColor } from "@/lib/crm";
 import { agoraMs } from "@/lib/periodo";
+import { createClient } from "@/lib/supabase/client";
+import { foraDaLista } from "@/lib/inbox-lista";
+import { useDebounce } from "@/lib/use-debounce";
+import { usePaginada } from "@/lib/use-paginada";
+import {
+  PAGINA_CLIENTES,
+  fonteClientesDaMemoria,
+  fonteClientesDoBanco,
+  paramsClientes,
+  type ContagensClientes,
+  type FonteClientes,
+  type ParamsClientes,
+} from "@/lib/clientes-fonte";
 import {
   DADOS_DO_CADASTRO,
   LIMIAR_FRIO_DIAS,
   ROTULO_FILTRO,
-  casaBusca,
   diasSemContato,
   emConversa,
-  passaFiltro,
   preenchidos,
   textoUltimoContato,
   type ClienteItem,
   type FiltroClientes,
 } from "@/lib/clientes";
 
-// LISTA DE CLIENTES (30/09/2026, docs/plano-clientes.md, fatia A).
+// LISTA DE CLIENTES (30/09/2026, docs/plano-clientes.md; paginada em 01/10/2026,
+// docs/plano-carregamento.md, fase 3).
 //
-// Busca e filtros rodam AQUI, sobre a lista inteira que o servidor mandou: o
-// volume de um negócio pequeno é de dezenas a poucas centenas, e buscar dentro
-// dos campos personalizados (jsonb) no banco não compensa agora.
+// 10 por vez, mais ao rolar. Busca (com debounce) e filtros rodam no BANCO
+// (`clientes_pagina`), com a mesma regra de `casaBusca`/`passaFiltro`; as
+// contagens dos chips também (`clientes_contagens`). Antes a tela baixava até
+// 2.000 contatos com todas as conversas e todas as tags para filtrar aqui.
 //
-// ⚠️ Sem realtime nesta fatia: a lista re-busca ao voltar o foco (a mesma regra
-// das outras telas), que é o que cobre a pessoa que deixou a aba aberta.
+// ⚠️ Sem realtime: a lista revalida ao voltar o foco (no máximo a cada 10s), a
+// mesma regra das outras telas.
 export default function ListaClientes({
-  itens,
-  cortada = false,
+  inicial,
+  clientId,
+  previewTodos,
+  numeroAvisos = null,
   selecionadoId = null,
   hrefModelo = "/clientes/{id}",
   podeCadastrar = true,
   simular = false,
 }: {
+  /** A primeira página e as contagens, que o servidor já buscou. */
+  inicial: { itens: ClienteItem[]; contagens: ContagensClientes; temMais: boolean };
+  /** Tenant logado. Sem ele (preview /design) a lista roda sobre `previewTodos`. */
+  clientId?: string;
+  previewTodos?: ClienteItem[];
+  /** Destino dos avisos: nunca é cliente (lib/avisos.ts). */
+  numeroAvisos?: string | null;
   /** Conta bloqueada (modo leitura) não cadastra. */
   podeCadastrar?: boolean;
   /** Preview `/design/clientes`: o "Novo cliente" valida e não grava. */
   simular?: boolean;
-  itens: ClienteItem[];
-  /** A carga bateu no teto e a lista não é a base inteira. */
-  cortada?: boolean;
   /** Para o preview `/design/clientes`, que não tem rota por contato. */
   selecionadoId?: number | null;
   /** Endereço de cada linha, com `{id}` no lugar do id. O preview troca. */
   hrefModelo?: string;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState("");
+  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  const busca = useDebounce(q.trim(), 300);
   const [filtro, setFiltro] = useState<FiltroClientes>("todos");
   const [novoAberto, setNovoAberto] = useState(false);
   const [novoTelefone, setNovoTelefone] = useState("");
@@ -70,38 +90,56 @@ export default function ListaClientes({
     setNovoAberto(true);
   };
   const agora = useMemo(() => agoraMs(), []);
+  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+
+  const fonte = useMemo<FonteClientes>(
+    () =>
+      clientId
+        ? fonteClientesDoBanco(createClient(), clientId)
+        : fonteClientesDaMemoria(previewTodos ?? inicial.itens, agora),
+    [clientId, previewTodos, inicial.itens, agora]
+  );
+  const params = useMemo(
+    () => paramsClientes(filtro, busca, fora, agora),
+    [filtro, busca, fora, agora]
+  );
+
+  const [contagem, setContagem] = useState<ContagensClientes>(inicial.contagens);
+  const [contagemVista, setContagemVista] = useState(inicial.contagens);
+  if (inicial.contagens !== contagemVista) {
+    setContagemVista(inicial.contagens);
+    setContagem(inicial.contagens);
+  }
+  const recontar = useCallback(() => {
+    void fonte
+      .contagens(params)
+      .then(setContagem)
+      .catch((e) => console.error("contagens de clientes:", e));
+  }, [fonte, params]);
+
+  const {
+    itens,
+    temMais,
+    carregando,
+    fimRef,
+  } = usePaginada<ClienteItem, ParamsClientes>({
+    inicial: inicial.itens,
+    temMaisInicial: inicial.temMais,
+    params,
+    buscar: (p, depois, n) => fonte.pagina(p, depois, n),
+    chave: (c) => c.id,
+    tamanho: PAGINA_CLIENTES,
+    revalidarAoVoltar: !!clientId,
+    aoRevalidar: clientId ? recontar : undefined,
+  });
 
   // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
   // some (por CSS, como a lista de conversas), e quem volta é o "voltar".
   const abertoPelaRota = pathname.match(/^\/clientes\/(\d+)/)?.[1];
   const ativo = selecionadoId ?? (abertoPelaRota ? Number(abertoPelaRota) : null);
 
-  useEffect(() => {
-    const voltar = () => {
-      if (document.visibilityState === "visible") router.refresh();
-    };
-    document.addEventListener("visibilitychange", voltar);
-    return () => document.removeEventListener("visibilitychange", voltar);
-  }, [router]);
-
-  const contagem = useMemo(() => {
-    const c: Record<FiltroClientes, number> = { todos: 0, conversa: 0, frio: 0, nunca: 0, incompleto: 0 };
-    for (const it of itens) {
-      c.todos++;
-      if (passaFiltro(it, "conversa", agora)) c.conversa++;
-      if (passaFiltro(it, "frio", agora)) c.frio++;
-      if (passaFiltro(it, "nunca", agora)) c.nunca++;
-      if (passaFiltro(it, "incompleto", agora)) c.incompleto++;
-    }
-    return c;
-  }, [itens, agora]);
-
-  const linhas = useMemo(
-    () => itens.filter((it) => passaFiltro(it, filtro, agora) && casaBusca(it, q)),
-    [itens, filtro, q, agora]
-  );
-
-  const temBusca = q.trim().length > 0;
+  const linhas = itens;
+  const temBusca = busca.length > 0;
   const chipsVisiveis = (Object.keys(ROTULO_FILTRO) as FiltroClientes[]).filter(
     (k) => k === "todos" || k === filtro || contagem[k] > 0
   );
@@ -123,7 +161,7 @@ export default function ListaClientes({
               data-slot="clientes-total"
               className="text-apoio font-semibold tabular-nums text-ink-3"
             >
-              {itens.length}
+              {contagem.todos}
             </span>
             {podeCadastrar && (
               <Button
@@ -207,21 +245,15 @@ export default function ListaClientes({
         </div>
 
         <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-          {cortada && (
-            <p className="px-5 py-2 text-legenda text-ink-3">
-              Mostrando os 2.000 clientes mais recentes. Use a busca para achar os outros.
-            </p>
-          )}
-
-          {itens.length === 0 ? (
+          {contagem.todos === 0 && !carregando ? (
             <Vazio
               titulo="Ainda não há clientes"
               texto="Quem escrever para o seu WhatsApp aparece aqui sozinho, com telefone e nome."
             />
-          ) : linhas.length === 0 ? (
+          ) : linhas.length === 0 && !carregando ? (
             temBusca ? (
               <Vazio
-                titulo={`Nenhum cliente para “${q.trim()}”`}
+                titulo={`Nenhum cliente para “${busca}”`}
                 texto="A busca olha nome, telefone, e-mail, tags e os campos que você criou."
               >
                 {podeCadastrar && (
@@ -269,6 +301,22 @@ export default function ListaClientes({
                   href={hrefModelo.replace("{id}", String(it.id))}
                 />
               ))}
+              {/* O fim da lista: quando aparece, vem a próxima página. */}
+              {temMais && (
+                <li
+                  ref={(el) => {
+                    fimRef.current = el;
+                  }}
+                  data-slot="clientes-mais"
+                  aria-hidden
+                  className="h-px"
+                />
+              )}
+              {carregando && (
+                <li data-slot="clientes-carregando" className="px-5 py-3 text-legenda text-ink-3">
+                  Carregando…
+                </li>
+              )}
             </ul>
           )}
         </AreaRolavel>

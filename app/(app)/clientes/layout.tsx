@@ -4,59 +4,52 @@ import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import type { ClienteItem } from "@/lib/clientes";
 import {
-  montarClientes,
-  type ContatoClienteRow,
-  type ConversaClienteRow,
-  type TagClienteRow,
-} from "@/lib/clientes";
+  CONTAGENS_CLIENTES_VAZIAS,
+  PAGINA_CLIENTES,
+  fonteClientesDoBanco,
+  paramsClientes,
+} from "@/lib/clientes-fonte";
+import { foraDaLista } from "@/lib/inbox-lista";
+import { agoraMs } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
-
-// Teto de carga da lista. Passou disso, a tela DIZ que cortou (nunca esconde em
-// silêncio) e a busca continua valendo sobre o que veio.
-const TETO = 2000;
 
 // TELA DE CLIENTES (30/09/2026, docs/plano-clientes.md). Lista à esquerda e
 // ficha à direita, no molde do /inbox. Dono e atendente veem; conta bloqueada
 // vê em leitura (D5), por isso `getMyClient` e não `requireActiveTenant`.
+//
+// A PRIMEIRA PÁGINA (10 clientes) e as contagens dos chips saem daqui, pela
+// MESMA função do banco que o navegador usa para as páginas seguintes
+// (docs/plano-carregamento.md, fase 3).
 export default async function ClientesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const [client, { data: contatos }, { data: conversas }, { data: tags }] =
-    await Promise.all([
-      getMyClient(),
-      supabase
-        .from("dados_cliente")
-        .select(
-          "id, telefone, nomewpp, display_name, atendimento_ia, custom_fields, email, birth_date, created_at, foto_path"
-        )
-        .order("created_at", { ascending: false })
-        .limit(TETO),
-      supabase
-        .from("conversations")
-        .select("id, phone, last_message_at, assigned_user_id"),
-      supabase.from("conversation_tags").select("conversation_id, tags(name, color)"),
-    ]);
-
+  const client = await getMyClient();
   // Fotos de perfil vencidas são conferidas DEPOIS de a tela sair (lib/fotos.ts).
   if (client) after(() => atualizarFotos(client.id, client.evolution_instance));
 
-  const itens = montarClientes(
-    (contatos ?? []) as ContatoClienteRow[],
-    (conversas ?? []) as ConversaClienteRow[],
-    (tags ?? []) as unknown as TagClienteRow[],
-    client?.avisos ?? null
-  );
+  let inicial = { itens: [] as ClienteItem[], contagens: CONTAGENS_CLIENTES_VAZIAS, temMais: false };
+  if (client) {
+    const fonte = fonteClientesDoBanco(await createClient(), client.id);
+    const params = paramsClientes("todos", "", foraDaLista(client.avisos), agoraMs());
+    try {
+      const [itens, contagens] = await Promise.all([fonte.pagina(params, null), fonte.contagens(params)]);
+      inicial = { itens, contagens, temMais: itens.length === PAGINA_CLIENTES };
+    } catch (e) {
+      console.error("clientes, primeira página:", e);
+    }
+  }
 
   return (
     <div className="flex min-h-0 flex-1 md:gap-3">
       <ListaClientes
-        itens={itens}
-        cortada={(contatos ?? []).length >= TETO}
+        inicial={inicial}
+        clientId={client?.id}
+        numeroAvisos={client?.avisos ?? null}
         podeCadastrar={!client?.access.blocked}
       />
       <Card

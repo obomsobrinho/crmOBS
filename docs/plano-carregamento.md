@@ -45,7 +45,11 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
     sobras de grant do `anon` em `conversations`, `chat_messages`, `pipeline_stages` e
     `dados_cliente` saíram (`mt_fecha_backups_e_sobras_anon`). Conferido pela API pública: 42501.
   - `inbox_pagina`/`inbox_contagens` viraram plpgsql (plano guardado): 1,5 ms e 0,1 ms por chamada.
-- **3. Clientes:** 10 por vez, busca e filtros no servidor com debounce.
+- ✅ **3. Clientes:** `public.clientes_pagina`/`clientes_contagens` (plpgsql, `security invoker`;
+  busca em nome, e-mail, tags, campos e telefone com e sem o nono dígito, igual a `casaBusca`),
+  `lib/clientes-fonte.ts` (banco ou memória) e o gancho genérico `lib/use-paginada.ts` (primeira
+  página do servidor, marcador do fim, revalidar ao voltar). O teto de 2.000 e o aviso de lista
+  cortada saíram. Provado em `e2e/clientes.serial.spec.ts` (25 contatos semeados).
 - **4. Conversa aberta:** últimas 30 mensagens, as antigas ao rolar para cima, mensagem nova pela
   linha do realtime.
 - **5. Pipeline:** 10 cards por coluna, mais ao rolar a coluna, contagem por coluna no servidor.

@@ -51,6 +51,8 @@ export interface ClienteItem {
   birthDate: string | null;
   /** Foto de perfil guardada (lib/fotos.ts). */
   fotoPath?: string | null;
+  /** Chave de ordem que o banco devolve (o cursor da página seguinte). */
+  ordem?: string;
 }
 
 /**

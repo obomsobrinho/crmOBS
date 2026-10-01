@@ -131,3 +131,65 @@ test("a foto de outro tenant não é servida", async ({ page }) => {
   const torto = await page.request.get(`/api/fotos/${clientId}/../segredo.jpg`);
   expect([400, 404]).toContain(torto.status());
 });
+
+// FASE 3 do plano de carregamento: Clientes paginado (10 por vez), busca no
+// servidor com debounce. 25 contatos com número impossível, apagados no fim.
+test.describe("Clientes paginado", () => {
+  const PREF = "55000000040";
+  const tel = (n: number) => `${PREF}${String(n).padStart(2, "0")}@s.whatsapp.net`;
+  const apagar = async () => {
+    await servico().from("conversations").delete().like("phone", `${PREF}%`);
+    await servico().from("dados_cliente").delete().like("telefone", `${PREF}%`);
+  };
+  test.beforeAll(async () => {
+    await apagar();
+    const svc = servico();
+    const { error } = await svc.from("dados_cliente").insert(
+      Array.from({ length: 25 }, (_, i) => ({
+        client_id: clientId,
+        telefone: tel(i + 1),
+        display_name: `Cliente paginado ${String(i + 1).padStart(2, "0")}`,
+        atendimento_ia: "ativa",
+      }))
+    );
+    if (error) throw error;
+    const agora = Date.now();
+    const { error: e2 } = await svc.from("conversations").insert(
+      Array.from({ length: 25 }, (_, i) => ({
+        client_id: clientId,
+        phone: tel(i + 1),
+        last_message_at: new Date(agora - (i + 1) * 60_000).toISOString(),
+        last_message_from: "in",
+      }))
+    );
+    if (e2) throw e2;
+  });
+  test.afterAll(apagar);
+
+  test("abre com 10, rola de 10 em 10 na ordem, e a busca vai uma vez ao servidor", async ({ page }) => {
+    const chamadas = { pagina: 0 };
+    page.on("request", (r) => {
+      if (r.method() === "POST" && r.url().includes("/rest/v1/rpc/clientes_pagina")) chamadas.pagina++;
+    });
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto("/clientes");
+    const itens = page.locator('[data-slot="clientes-item"]');
+    await expect(itens).toHaveCount(10, { timeout: 30_000 });
+    expect(chamadas.pagina, "a primeira página veio do servidor").toBe(0);
+
+    const area = page.locator('[data-slot="clientes-lista"]').locator("xpath=..");
+    for (let i = 0; i < 6 && (await page.locator('[data-slot="clientes-mais"]').count()) > 0; i++) {
+      const antes = await itens.count();
+      await area.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+      await expect.poll(async () => (await itens.count()) > antes || (await page.locator('[data-slot="clientes-mais"]').count()) === 0, { timeout: 15_000 }).toBe(true);
+    }
+    const nomes = (await itens.locator('[data-slot="clientes-nome"]').allInnerTexts()).filter((n) => n.startsWith("Cliente paginado"));
+    expect(nomes).toEqual(Array.from({ length: 25 }, (_, i) => `Cliente paginado ${String(i + 1).padStart(2, "0")}`));
+
+    chamadas.pagina = 0;
+    await page.getByLabel("Buscar clientes").pressSequentially("paginado 17", { delay: 40 });
+    await expect(itens).toHaveCount(1, { timeout: 15_000 });
+    await expect(itens.first()).toContainText("Cliente paginado 17");
+    expect(chamadas.pagina, "uma busca, não uma por letra").toBe(1);
+  });
+});

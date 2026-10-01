@@ -4,6 +4,7 @@ import ListaClientes from "@/components/ListaClientes";
 import { Card } from "@/components/ui/card";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { agoraMs } from "@/lib/periodo";
+import { PAGINA_CLIENTES, fonteClientesDaMemoria, paramsClientes } from "@/lib/clientes-fonte";
 import { diasSemContato, montarClientes, type ContatoClienteRow, type ConversaClienteRow, type TagClienteRow } from "@/lib/clientes";
 
 // Preview da tela de CLIENTES (dev-only, liberado pelo proxy). Sem banco.
@@ -78,6 +79,14 @@ export default async function DesignClientesPage({
 
   const contatos = cenario === "vazia" ? [] : cenario === "nova" ? todos.filter((t) => [1, 3, 8].includes(t.id)) : todos;
   const itens = montarClientes(contatos, conversas, tags, null);
+  // A lista paginada (01/10/2026) roda aqui sobre a memória, com as mesmas
+  // funções de busca e filtro que o banco espelha.
+  const fontePreview = fonteClientesDaMemoria(itens, agora);
+  const paramsPreview = paramsClientes("todos", "", [], agora);
+  const [paginaPreview, contagensPreview] = await Promise.all([
+    fontePreview.pagina(paramsPreview, null),
+    fontePreview.contagens(paramsPreview),
+  ]);
   const aberto = contatos.find((t) => t.id === Number(sel)) ?? null;
   const base = `/design/clientes?cenario=${cenario}&sel={id}`;
 
@@ -85,7 +94,17 @@ export default async function DesignClientesPage({
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="O Bom Sobrinho" activeHref="/clientes" role="dono" />
       <div className="flex min-h-0 min-w-0 flex-1 md:gap-3">
-        <ListaClientes itens={itens} selecionadoId={aberto?.id ?? null} hrefModelo={base} simular />
+        <ListaClientes
+          inicial={{
+            itens: paginaPreview,
+            contagens: contagensPreview,
+            temMais: paginaPreview.length === PAGINA_CLIENTES,
+          }}
+          previewTodos={itens}
+          selecionadoId={aberto?.id ?? null}
+          hrefModelo={base}
+          simular
+        />
         <Card
           variant="pagina"
           className={

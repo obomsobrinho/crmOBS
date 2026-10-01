@@ -119,10 +119,23 @@ test.describe("Contato frio (lib/clientes.ts, fatia C)", () => {
   });
 });
 
+/** Rola a lista até não haver mais página para buscar. */
+async function rolarAteOFim(page: import("@playwright/test").Page) {
+  const area = page.locator('[data-slot="clientes-lista"]').locator("xpath=..");
+  for (let i = 0; i < 5 && (await page.locator('[data-slot="clientes-mais"]').count()) > 0; i++) {
+    await area.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+    await page.waitForTimeout(300);
+  }
+}
+
 test.describe("Tela de Clientes (/design/clientes)", () => {
   test("lista, busca, filtros e estados vazios", async ({ page }) => {
     await page.goto("/design/clientes");
     const itens = page.locator('[data-slot="clientes-item"]');
+    // PAGINADA (01/10/2026): abre com 10, e rolar traz o resto.
+    await expect(itens).toHaveCount(10);
+    await expect(page.locator('[data-slot="clientes-total"]')).toHaveText("17");
+    await rolarAteOFim(page);
     await expect(itens).toHaveCount(17);
     await expect(page.locator("[data-clientes-vazio]")).toContainText("Escolha um cliente");
 
@@ -141,6 +154,8 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await page.locator('[data-slot="clientes-chip"]', { hasText: "Cadastro incompleto" }).click();
     // Completos no dado falso (nome dado pelo time, nascimento e e-mail):
     // Marina, Helena e Juliana. Os outros 14 são incompletos.
+    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Cadastro incompleto" })).toContainText("14");
+    await rolarAteOFim(page);
     await expect(itens).toHaveCount(14);
 
     await page.goto("/design/clientes?cenario=vazia");
@@ -161,6 +176,8 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(itens.filter({ hasText: "Ana Clara" })).toHaveCount(0);
 
     await page.locator('[data-slot="clientes-chip"]', { hasText: "Todos" }).click();
+    await expect(itens).toHaveCount(10);
+    await rolarAteOFim(page);
     const ana = itens.filter({ hasText: "Ana Clara" });
     await expect(ana).toContainText("Nunca escreveu");
     await expect(ana).not.toHaveAttribute("data-frio", /.*/);
