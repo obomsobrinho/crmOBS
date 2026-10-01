@@ -1,0 +1,37 @@
+---
+paths:
+  - "lib/**/*.ts"
+  - "app/api/**"
+  - "app/**/page.tsx"
+  - "app/**/layout.tsx"
+  - "proxy.ts"
+---
+# Data access (Supabase, RLS, grants)
+
+Floor rules (pagination, tenant scope, service_role, SQL parity) are in `engineering.md`.
+
+## Clients and request scope
+- Browser: `lib/supabase/client.ts` (singleton, cookie session). Server Components and route handlers: `lib/supabase/server.ts`. `lib/supabase/service.ts` (service_role) is server-only.
+- `createClient()` (server) and `getMyClient()` (`lib/auth.ts`) are memoized per request with `React.cache`. Never add a parallel uncached path. Inside one request a value changed in `clients` is NOT visible through a second `getMyClient()`; read what you just wrote with your own query. `getMyClient()` exposes scalars only, never `persona`/`agent_config`.  (why: docs/adr/2026-09-11-memoize-server-supabase-client-per-request.md)
+- Resolve a contact's display name only through `lib/inbox.ts` (`cleanName`, `bestName`). `nomewpp = "Você"` (pushName on sent messages) is NOT a name.  (why: docs/adr/undated-nomewpp-voce-is-not-a-contact-name.md)
+
+## Roles, grants, isolation
+- Roles: CRM = `authenticated` (RLS), n8n = `service_role`, `anon` has nothing. List colleagues via `public.tenant_members()` (SECURITY DEFINER), never by reading `user_clients`.  (why: docs/adr/undated-tenant-isolation-pool-rls.md)
+- The browser writes only through per-COLUMN UPDATE grants. A new browser-written column needs an explicit column grant. `conversations.handoff_at` and `status` are NOT browser-writable.  (why: docs/adr/2026-08-22-conversations-column-grants.md)
+- Owner vs atendente cannot be separated by grant (same DB role): needs a service_role route or a trigger. `stage_source` and `pending_instruction` are open to any member and `pending_instruction` enters the system prompt as trusted guidance; owner decision pending, do not treat it as a trust boundary.  (why: docs/adr/2026-08-22-conversations-column-grants.md)
+- `dados_cliente` browser grants: `atendimento_ia`, `display_name`, `custom_fields`, `email`, `birth_date`. Never grant CPF (LGPD). n8n owns `nomewpp`.  (why: docs/adr/2026-09-30-contact-email-birthdate-grants-cpf-excluded.md)
+- Invite/remove member goes through `app/api/team/*` (service_role, owner only). `pipeline_stages` management is a browser write, owner only (RLS `role='dono'`); moving a card is any member.  (why: docs/adr/undated-tenant-isolation-pool-rls.md)
+- Phase 2 tables (`conversation_qualifications`, `knowledge_documents`, `knowledge_chunks`, buckets `knowledge`, `whatsapp-media`) are read by `authenticated` through tenant RLS and written by `service_role` only.
+- `feedback` is write-only from the browser: no SELECT policy, no SELECT grant. Read by SQL only; no read screen.  (why: docs/adr/2026-08-28-feedback-table-write-only.md)
+- `signup_attempts`: RLS on, no policy, revoked; service_role only.  (why: docs/adr/undated-signup-without-password-and-provision-tenant.md)
+
+## Contacts, photos, pipeline
+- Contacts created from the CRM go through `POST /api/contacts` (service_role). Store the JID Evolution returns, never the typed number. The empty `conversations` row stays hidden until the first message (`buildInbox`).  (why: docs/adr/2026-10-01-contacts-also-born-from-the-crm.md)
+- Profile photos are copied to `whatsapp-media` (`lib/fotos.ts`); compare `foto_origem` WITHOUT the query signature; updated by `atualizarFotos` via `after()`, served by `/api/fotos/[...path]`.  (why: docs/adr/2026-10-01-profile-photo-copied-to-bucket.md)
+- Pipeline: `stage_source` is `human`/`ia`; the AI never overwrites `human`; `nextIaStage` (`lib/pipeline.ts`) only advances canonical stages.  (why: docs/adr/undated-pipeline-stage-model.md)
+- `dados_cliente.atendimento_ia` is `text` (`'ativa'`/`'reativada'` on, `'pause'` off), never boolean. `chat_messages.active` is dead legacy: keep. Do not suggest changing either unless asked.  (why: docs/adr/undated-atendimento-ia-stays-text.md)
+- Who replied (AI / human / imported) is decided ONLY in `lib/mensagem.ts`; `imported` is not an AI reply; SQL uses `is distinct from`, not `<>`.  (why: docs/adr/2026-08-27-dashboard-imported-is-not-ai-reply.md)
+
+## Env (server-only, never `NEXT_PUBLIC`)
+`SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` (GLOBAL apikey), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`, `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `OPENAI_API_KEY`, `OPENAI_AGENT_MODEL` (optional, default `gpt-5.4-mini`). Billing envs in `billing.md`.
+- Knowledge base upload goes straight to Storage by signed URL (`knowledge/upload-url`) and processing is a separate call (`knowledge/process`), to fit the Vercel request body limit. Never stream the file through a route handler.

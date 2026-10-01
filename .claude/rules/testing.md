@@ -1,0 +1,23 @@
+---
+paths:
+  - "e2e/**"
+  - "playwright.config.ts"
+---
+# Testing (Playwright, `e2e/`)
+
+- Before closing any step run BOTH suites (no-login and login); use the `fechar-entrega` skill. `E2E_PORT=3000 npx playwright test --project=logado` reuses a running dev server.  (why: docs/adr/2026-08-27-run-both-e2e-suites-before-closing-a-step.md)
+- Projects: `sem-login` (`/design` screens, FAKE data: proves layout, text and writing rules, never behavior), `logado` (`*.auth.spec.ts`, real DB, test tenant), `atendente` (`*.att.spec.ts`), `logado-serial` (`*.serial.spec.ts`, one worker, depends on `logado`), `setup` (storageStates + seed), `mobile`. Paid opt-in: `ia`, `n8n`.  (why: docs/adr/2026-09-07-serial-project-for-absence-tests.md)
+- A test of "this must NOT happen" goes in `*.serial.spec.ts` (no concurrent writer on the tenant). It counts REQUESTS, not pixels. Never replace it with `routeWebSocket` blocking (`SUBSCRIBED` would never fire and the first-subscription guard would go unexercised).  (why: docs/adr/2026-09-07-serial-project-for-absence-tests.md, docs/adr/2026-08-31-realtime-subscribe-callback-and-focus-refetch.md)
+- Permission tests (absence of power) go in `*.att.spec.ts` with the attendant session and NEVER write to the DB. Use `/api/team/invite` for the 403 check, not `PUT agent-config`.  (why: docs/adr/2026-09-17-atendente-project-asserts-absence-of-power.md)
+- The login suite runs on the OBS tenant. Never pin its `prompt_mode` nor a conversation phone: take the first conversation in the list and handle both builder modes. The suite writes to the CRM but never sends a message nor wakes the agent.  (why: docs/adr/2026-09-17-e2e-tenant-is-obs.md)
+- Tests that need the list select "Tudo" in the period selector first (a parked tenant makes "Hoje" empty).  (why: docs/adr/2026-09-19-inbox-opens-on-today.md)
+- Conversation-dependent tests use the seed `e2e/semente.ts` (phone `5500000000001`, DDD 00, "Cliente de teste (e2e)"). Test conversations always use an impossible phone (DDD 00), which never notifies. Cleanup SQL is at the top of `e2e/semente.ts`.  (why: docs/adr/2026-09-26-e2e-seed-in-production-db.md)
+- `ia` (12 paid real-brain calls, FIXED config in the body, `dryRun`) and `n8n` run ONLY when named; never include them in `npm run test:e2e`. Run `test:e2e:ia` before deploying anything that touches the prompt base; run `test:e2e:n8n` (`e2e/atendimento.n8n.spec.ts`, real model, Whisper, vision) before asking the owner to test any attendance change.  (why: docs/adr/2026-09-11-ia-suite-paid-and-opt-in.md, docs/adr/2026-10-01-e2e-n8n-attendance-battery.md)
+- `ia` expectations: manipulation cases (4, 10) REQUIRE `pausar`; cases 1 and 5 accept `none` or `pausar`; `agendar` on a trap always fails.  (why: docs/adr/2026-09-11-ia-suite-paid-and-opt-in.md)
+- Date/time tests use a FIXED clock (`agoraTeste`, `dryRun` only; `e2e/horarios.ia.spec.ts`, including the 16h-at-10h control).  (why: docs/adr/2026-10-01-e2e-n8n-attendance-battery.md)
+- Test HTML5 drag by dispatching `dragstart`/`dragover`/`drop` with ONE shared `DataTransfer` and reloading to prove persistence; never `locator.dragTo()`.  (why: docs/adr/undated-html5-drag-not-testable-with-dragto.md)
+- Chart tests measure bar height and select the movement area by `data-slot="painel-area"`; keep the hour-chart equality test (purple sum = headline) in both suites.  (why: docs/adr/2026-08-27-dashboard-chart-columns-need-h-full.md, docs/adr/2026-08-29-dashboard-hour-chart-counts-ai-replies.md)
+- WhatsApp banner test intercepts `/api/clients/[id]/whatsapp-status` with `page.route` to force `close`.  (why: docs/adr/2026-09-11-whatsapp-down-banner-checked-in-browser.md)
+- Never claim "100%" without the right suite. A test that only checks status < 400 or counts columns is not proof (the 14-day chart rendered invisible with e2e green).
+- Known intermittents that pass alone: `pipeline.serial` (create/archive stage) and tests hitting Supabase Auth under load (password recovery).
+- Declared holes (reason inside each spec): blocked account to `/assinatura`, advanced mode to `/agente`, activation over a real connection (`e2e/montagem.auth.spec.ts`). No coverage: manual send, team invite, knowledge upload.  (why: docs/adr/2026-09-17-atendente-project-asserts-absence-of-power.md)

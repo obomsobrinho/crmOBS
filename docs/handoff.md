@@ -319,3 +319,17 @@ O briefing antigo de revisão (`Desktop/briefing-revisao-projeto.md`, 04/09) foi
 mantendo as etiquetas `[FEITO]`, `[DECIDIDO]`, `[IDEIA]` e `[VETADO]`.
 
 O design system como HTML autônomo (abre por `file://`) se regera com `npm run design:export`.
+
+## Status carried over from the old CLAUDE.md (01/10/2026)
+
+The old 1236-line CLAUDE.md was split into `.claude/rules/` (rules) and `docs/adr/` (the why). These are the status notes that were neither rule nor decision.
+
+- Beta MVP six steps state: (1) dashboard done, (2) agent steps done, (3) 4 gaps done, (4) design and mobile, (5) apply design, (6) tests. Billing parked. Phases 1, 2, 3, 3.5 summary (multi-login, RAG, pipeline, guardrail; B-6 removed; `msg1 | msg2` debt postponed).
+- Test counts: login suite 41 passing none skipped (29/09), no-login plus mobile 286, `ia` 12/12 (26/09). Known intermittents.
+- OBM persona recompiled 22/08 (10,494 -> 11,452 chars, md5 `0efa85000852f92b75140562127b3544`, backup `public._persona_backup_20260822`); OBS prompt backup `Desktop/prompt-avancado-OBS-2026-09-30.md`; OBS stays advanced. `LIMITS.persona` timeline 12,000 -> 14,000 (29/09) -> 16,000 (30/09).
+- Pending owner decisions: tightening `stage_source`/`pending_instruction` writes; QR auto-generation on opening step 4; pairing-code connection not proven with a real number; real-voice transcription never proven (bench).
+- n8n re-export status after 30/09 and 01/10 live edits.
+- Preview URLs: `/design/montagem?passo=conectar&conectado=1[&avisos=1]`, `/design?handoff=aberto|resolvido`.
+- Feedback: nobody is notified when a report arrives (accepted limitation).
+- Free beta of 5 to 10 testers; `account_type` marked by hand.
+- Plan docs: `docs/plano-avisos.md`, `plano-pedidos.md`, `plano-fechar-p0.md`, `plano-clientes.md`, `plano-carregamento.md`.
