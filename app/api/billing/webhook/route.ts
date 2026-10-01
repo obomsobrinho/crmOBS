@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { graceUntilFrom } from "@/lib/billing";
+import { segredoConfere } from "@/lib/segredo";
 
 // Webhook do Asaas: é ele que muda o estado da assinatura de um tenant.
 //
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     console.error("webhook do Asaas chamado sem ASAAS_WEBHOOK_TOKEN configurado");
     return NextResponse.json({ error: "não configurado" }, { status: 500 });
   }
-  if (req.headers.get("asaas-access-token") !== esperado) {
+  if (!segredoConfere(req.headers.get("asaas-access-token"), esperado)) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
 

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -26,13 +26,9 @@ import { compilePersona } from "@/lib/agent-prompt";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  const client = await getMyClient();
-  if (!client) {
-    return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  }
-  if (client.role !== "dono") {
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
-  }
+  const r = await sessaoDaRota({ dono: "acesso negado" });
+  if ("erro" in r) return r.erro;
+  const client = r.mine;
 
   let body: {
     message?: string;

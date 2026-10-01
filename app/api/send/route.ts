@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
+
+// Único bucket de que esta rota assina arquivo (o privado de mídia do WhatsApp).
+const BUCKET_MIDIA = "whatsapp-media";
 
 // Responder pelo CRM é ASSUMIR a conversa: pausa a resposta da IA e registra
 // quem assumiu. Best-effort e NUNCA lança: a mensagem já saiu, e falhar aqui não
@@ -62,19 +65,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const client = await getMyClient();
-  if (!client) {
-    return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  }
   // Gate de assinatura no servidor: conta bloqueada não manda mensagem. O layout
   // do app já barra as telas, mas a rota checa por conta própria (é ela que faz
   // o trabalho, e esconder botão no client não é bloqueio).
-  if (client.access.blocked) {
-    return NextResponse.json(
-      { error: client.access.message },
-      { status: 402 }
-    );
-  }
+  const r = await sessaoDaRota({ ativa: true });
+  if ("erro" in r) return r.erro;
+  const client = r.mine;
   if (!client.evolution_instance) {
     return NextResponse.json(
       { error: "cliente sem instância WhatsApp conectada" },
@@ -106,6 +102,24 @@ export async function POST(req: Request) {
     );
   }
 
+  // MÍDIA SÓ DO PRÓPRIO TENANT (R-09, 01/10/2026). Mais abaixo o servidor assina
+  // este caminho com service_role, então um caminho vindo do corpo sem conferência
+  // deixaria um membro do tenant A mandar a si mesmo um arquivo do tenant B (ou
+  // do bucket da base de conhecimento). Só vale o bucket whatsapp-media e o
+  // prefixo `{client_id}/` que a rota whatsapp-media/upload-url emite.
+  if (hasMedia) {
+    const caminho = media!.path!;
+    const bucketOk = media!.bucket === undefined || media!.bucket === BUCKET_MIDIA;
+    const caminhoOk =
+      typeof caminho === "string" &&
+      caminho.length <= 300 &&
+      caminho.startsWith(`${client.id}/`) &&
+      !caminho.split("/").some((parte) => parte === ".." || parte === "");
+    if (!bucketOk || !caminhoOk) {
+      return NextResponse.json({ error: "mídia inválida" }, { status: 400 });
+    }
+  }
+
   // PRIMEIRA MENSAGEM PARA QUEM NUNCA ESCREVEU (Clientes, fatia B, 01/10/2026).
   // Conversa sem nenhuma mensagem só existe para o contato cadastrado à mão, e
   // escrever primeiro é o que o WhatsApp pune com bloqueio. O aceite ("esta
@@ -133,10 +147,9 @@ export async function POST(req: Request) {
   // e grava chat_messages.media_url = path (permanente; o CRM re-assina ao exibir).
   let signedUrl: string | null = null;
   if (hasMedia) {
-    const bucket = media!.bucket ?? "whatsapp-media";
     const svc = createServiceClient();
     const { data: signed, error: signErr } = await svc.storage
-      .from(bucket)
+      .from(BUCKET_MIDIA)
       .createSignedUrl(media!.path!, 3600);
     if (signErr || !signed?.signedUrl) {
       return NextResponse.json(
@@ -161,7 +174,7 @@ export async function POST(req: Request) {
         // (assinada) e grava chat_messages.media_url = `path` (permanente).
         media: hasMedia
           ? {
-              bucket: media!.bucket ?? "whatsapp-media",
+              bucket: BUCKET_MIDIA,
               path: media!.path,
               url: signedUrl,
               type: media!.type ?? "document",

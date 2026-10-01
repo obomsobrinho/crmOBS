@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { publishBlockers } from "@/lib/onboarding";
 import { connectionState } from "@/lib/evolution";
@@ -46,15 +46,9 @@ export async function PUT(
 ) {
   const { id } = await ctx.params;
 
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.id !== id)
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
-  if (mine.role !== "dono")
-    return NextResponse.json(
-      { error: "só o dono pode publicar o agente" },
-      { status: 403 }
-    );
+  const r = await sessaoDaRota({ id, dono: "só o dono pode publicar o agente" });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
 
   let body: { enabled?: boolean };
   try {

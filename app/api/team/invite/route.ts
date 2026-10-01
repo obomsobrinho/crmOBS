@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   billableSeats,
@@ -18,13 +18,9 @@ import {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.role !== "dono")
-    return NextResponse.json(
-      { error: "só o dono pode convidar membros" },
-      { status: 403 }
-    );
+  const r = await sessaoDaRota({ dono: "só o dono pode convidar membros", ativa: true });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
 
   let body: { email?: string; role?: string };
   try {

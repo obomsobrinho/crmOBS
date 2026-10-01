@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildFallbackPersona } from "@/lib/agent-prompt";
 import {
@@ -33,10 +33,9 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.id !== id)
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
+  const r = await sessaoDaRota({ id, ativa: true });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
 
   const webhookUrl = process.env.N8N_BOT_WEBHOOK_URL;
   if (!webhookUrl) {
