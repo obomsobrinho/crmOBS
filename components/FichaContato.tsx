@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { MessagesSquare, User } from "lucide-react";
+import { MessagesSquare, TriangleAlert, User } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,7 @@ import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
+import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
 
 // "20 jul", não "20 de jul." O pt-BR devolve a forma longa com preposição e
 // ponto final, que numa legenda de rodapé vira ruído.
@@ -82,8 +84,14 @@ export default function FichaContato({
   birthDate = null,
   entendimento = null,
   diasSemContato = null,
+  podeEnviar = true,
+  simular = false,
   contactExists,
 }: {
+  /** Conta bloqueada (modo leitura) não escreve. Só em `clientes`. */
+  podeEnviar?: boolean;
+  /** Preview `/design/clientes`: o diálogo da primeira mensagem não envia. */
+  simular?: boolean;
   /** Onde a ficha está. `clientes` acrescenta o atalho da conversa e o Entendimento. */
   superficie?: "conversa" | "clientes";
   email?: string | null;
@@ -113,6 +121,9 @@ export default function FichaContato({
   const displayName = name || prettyPhone(phone);
   const ini = initials(name);
   const number = prettyPhone(phone);
+  const [primeiraAberta, setPrimeiraAberta] = useState(false);
+  // Nenhuma mensagem, em nenhum sentido: o contato cadastrado à mão (fatia B).
+  const nuncaEscreveu = messageCount === 0;
 
   return (
     <div className="flex flex-col pb-4">
@@ -183,7 +194,35 @@ export default function FichaContato({
           />
         </div>
 
-        {superficie === "clientes" && conversationId != null && (
+        {/* OS DOIS PESOS DO DESENHO: quem já conversou abre a conversa sem
+            fricção; quem nunca escreveu passa pelo aviso de bloqueio. */}
+        {superficie === "clientes" && nuncaEscreveu && (
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            {podeEnviar && (
+              <Button
+                variant="outline"
+                size="control"
+                data-slot="ficha-primeira-mensagem"
+                onClick={() => setPrimeiraAberta(true)}
+              >
+                <TriangleAlert size={14} className="text-warn-ink" />
+                Enviar primeira mensagem
+              </Button>
+            )}
+            <span data-slot="ficha-nunca" className="text-legenda text-ink-3">
+              Este número nunca escreveu para você
+            </span>
+            <PrimeiraMensagemDialog
+              aberto={primeiraAberta}
+              onFechar={() => setPrimeiraAberta(false)}
+              nome={displayName}
+              phone={phone}
+              simular={simular}
+            />
+          </div>
+        )}
+
+        {superficie === "clientes" && !nuncaEscreveu && conversationId != null && (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <Button asChild variant="outline" size="control">
               <Link

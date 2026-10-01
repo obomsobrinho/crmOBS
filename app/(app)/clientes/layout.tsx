@@ -49,7 +49,11 @@ export default async function ClientesLayout({
 
   return (
     <div className="flex min-h-0 flex-1 md:gap-3">
-      <ListaClientes itens={itens} cortada={(contatos ?? []).length >= TETO} />
+      <ListaClientes
+        itens={itens}
+        cortada={(contatos ?? []).length >= TETO}
+        podeCadastrar={!client?.access.blocked}
+      />
       <Card
         asChild
         variant="pagina"

@@ -157,18 +157,20 @@ function variantesSemNove(d: string): string[] {
  */
 export const LIMIAR_FRIO_DIAS = 60;
 
-export type FiltroClientes = "todos" | "conversa" | "frio" | "incompleto";
+export type FiltroClientes = "todos" | "conversa" | "frio" | "nunca" | "incompleto";
 
 export const ROTULO_FILTRO: Record<FiltroClientes, string> = {
   todos: "Todos",
   conversa: "Em conversa",
   frio: `Sem contato há ${LIMIAR_FRIO_DIAS}+ dias`,
+  nunca: "Nunca escreveram",
   incompleto: "Cadastro incompleto",
 };
 
 export function passaFiltro(c: ClienteItem, f: FiltroClientes, agora: number): boolean {
   if (f === "conversa") return emConversa(c.lastMessageAt, agora);
   if (f === "frio") return estadoContato(c.lastMessageAt, agora) === "frio";
+  if (f === "nunca") return estadoContato(c.lastMessageAt, agora) === "nunca";
   if (f === "incompleto") return !cadastroCompleto(c);
   return true;
 }
@@ -259,4 +261,50 @@ export function estadoContato(lastMessageAt: string | null, agora: number): Esta
 /** Dias sem contato quando o contato está frio; `null` nos outros estados. */
 export function diasSemContato(lastMessageAt: string | null, agora: number): number | null {
   return estadoContato(lastMessageAt, agora) === "frio" ? diasDesde(lastMessageAt!, agora) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Novo cliente (fatia B, 01/10/2026).
+// ---------------------------------------------------------------------------
+
+/**
+ * O telefone digitado no "Novo cliente" (com a máscara de `mascaraTelefoneBR`)
+ * virando os dígitos com o 55. Só Brasil: o 55 é automático no produto.
+ * Celular tem 9 dígitos começando por 9; fixo tem 8. DDD 00 passa de propósito:
+ * é o número impossível da suíte de testes (`telefoneImpossivel`), que nunca
+ * chega a ninguém.
+ */
+export function telefoneDoCadastro(
+  texto: string
+): { ok: true; digitos: string } | { ok: false; motivo: string } {
+  let d = texto.replace(/\D/g, "");
+  if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  if (d.length !== 10 && d.length !== 11) {
+    return { ok: false, motivo: "Digite o DDD e o número, como (11) 91234-5678." };
+  }
+  const ddd = d.slice(0, 2);
+  if (ddd !== "00" && (ddd[0] === "0" || ddd[1] === "0")) {
+    return { ok: false, motivo: "Esse DDD não existe." };
+  }
+  if (d.length === 11 && d[2] !== "9" && ddd !== "00") {
+    return { ok: false, motivo: "Celular com 9 dígitos começa com 9." };
+  }
+  return { ok: true, digitos: `55${d}` };
+}
+
+/** O endereço de WhatsApp de uma pessoa, no formato que o n8n grava. */
+export function jidDePessoa(digitos: string): string {
+  return `${digitos.replace(/\D/g, "")}@s.whatsapp.net`;
+}
+
+/**
+ * As grafias com que o mesmo número pode estar gravado: com e sem o nono dígito,
+ * com e sem o sufixo do WhatsApp. É o que impede o "Novo cliente" de duplicar
+ * quem já escreveu (o WhatsApp entrega números antigos sem o 9).
+ */
+export function grafiasDoTelefone(digitos: string): string[] {
+  const chave = chaveTelefone(digitos);
+  const nums = new Set([digitos, chave]);
+  if (chave.length === 12 && chave.startsWith("55")) nums.add(`${chave.slice(0, 4)}9${chave.slice(4)}`);
+  return [...nums].flatMap((n) => [n, jidDePessoa(n)]);
 }

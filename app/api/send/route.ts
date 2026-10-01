@@ -87,6 +87,8 @@ export async function POST(req: Request) {
     text?: string;
     /** "Eu respondo" (27/09/2026): o pedido de ajuda que esta resposta resolve. */
     pedidoId?: number;
+    /** "Esta pessoa sabe que eu vou escrever" (Clientes, fatia B, 01/10/2026). */
+    aceite?: boolean;
     media?: { bucket?: string; path?: string; type?: string; mime?: string; filename?: string };
   };
   try {
@@ -102,6 +104,27 @@ export async function POST(req: Request) {
       { error: "phone e (text ou media) são obrigatórios" },
       { status: 400 }
     );
+  }
+
+  // PRIMEIRA MENSAGEM PARA QUEM NUNCA ESCREVEU (Clientes, fatia B, 01/10/2026).
+  // Conversa sem nenhuma mensagem só existe para o contato cadastrado à mão, e
+  // escrever primeiro é o que o WhatsApp pune com bloqueio. O aceite ("esta
+  // pessoa sabe que eu vou escrever") é conferido AQUI, e não só no diálogo:
+  // a caixa de escrita da conversa também alcança esse contato pela URL.
+  // Fora isso é um envio manual comum, e PAUSA a IA como todos (decisão do
+  // dono, 01/10/2026: quem escreveu assumiu; religar é na chave).
+  if (body.aceite !== true) {
+    const { count, error: errConta } = await createServiceClient()
+      .from("chat_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", client.id)
+      .eq("phone", phone);
+    if (!errConta && (count ?? 0) === 0) {
+      return NextResponse.json(
+        { error: "Esta pessoa nunca escreveu para você. Confirme que ela espera o seu contato.", primeiraMensagem: true },
+        { status: 409 }
+      );
+    }
   }
 
   // O bucket whatsapp-media é privado. Para a Evolution baixar o arquivo, o

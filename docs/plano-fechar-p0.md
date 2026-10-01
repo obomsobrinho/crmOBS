@@ -34,7 +34,7 @@ teste com o que falta do P0 (fatia B da tela de Clientes, `docs/plano-clientes.m
 - ✅ **F2, página de pedidos refeita (itens 1 e 2), feita em 30/09/2026:** Abertos e Resolvidos, lista mais detalhe ao lado,
   sem chat. As ações continuam passando pelas MESMAS rotas (`/orientar`, `/resolve`); nenhum caminho
   novo.
-- **F3, fatia B de Clientes:** "Novo cliente" (rota service_role, telefone com a máscara da F1),
+- ✅ **F3, fatia B de Clientes (código em 01/10/2026, D7 revista: a primeira mensagem PAUSA a IA; falta rodar o `clientes.serial` com o banco no ar):** "Novo cliente" (rota service_role, telefone com a máscara da F1),
   conversa vazia no cadastro (D6), iniciar conversa com os dois pesos de alerta, a primeira mensagem
   para quem nunca falou não pausa a IA (D7). Teste sem envio real.
 - **F4, foto de perfil (item 6):** depois de D3.

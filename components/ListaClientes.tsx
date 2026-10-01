@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Search, User, UsersRound, X } from "lucide-react";
+import { Plus, Search, User, UsersRound, X } from "lucide-react";
+import NovoClienteDialog from "@/components/NovoClienteDialog";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -44,7 +45,13 @@ export default function ListaClientes({
   cortada = false,
   selecionadoId = null,
   hrefModelo = "/clientes/{id}",
+  podeCadastrar = true,
+  simular = false,
 }: {
+  /** Conta bloqueada (modo leitura) não cadastra. */
+  podeCadastrar?: boolean;
+  /** Preview `/design/clientes`: o "Novo cliente" valida e não grava. */
+  simular?: boolean;
   itens: ClienteItem[];
   /** A carga bateu no teto e a lista não é a base inteira. */
   cortada?: boolean;
@@ -57,6 +64,12 @@ export default function ListaClientes({
   const pathname = usePathname();
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<FiltroClientes>("todos");
+  const [novoAberto, setNovoAberto] = useState(false);
+  const [novoTelefone, setNovoTelefone] = useState("");
+  const abrirNovo = (telefone = "") => {
+    setNovoTelefone(telefone);
+    setNovoAberto(true);
+  };
   const agora = useMemo(() => agoraMs(), []);
 
   // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
@@ -73,11 +86,12 @@ export default function ListaClientes({
   }, [router]);
 
   const contagem = useMemo(() => {
-    const c: Record<FiltroClientes, number> = { todos: 0, conversa: 0, frio: 0, incompleto: 0 };
+    const c: Record<FiltroClientes, number> = { todos: 0, conversa: 0, frio: 0, nunca: 0, incompleto: 0 };
     for (const it of itens) {
       c.todos++;
       if (passaFiltro(it, "conversa", agora)) c.conversa++;
       if (passaFiltro(it, "frio", agora)) c.frio++;
+      if (passaFiltro(it, "nunca", agora)) c.nunca++;
       if (passaFiltro(it, "incompleto", agora)) c.incompleto++;
     }
     return c;
@@ -112,6 +126,18 @@ export default function ListaClientes({
             >
               {itens.length}
             </span>
+            {podeCadastrar && (
+              <Button
+                variant="outline"
+                size="control"
+                data-slot="clientes-novo"
+                onClick={() => abrirNovo()}
+                className="ml-auto"
+              >
+                <Plus size={14} />
+                Novo cliente
+              </Button>
+            )}
           </div>
 
           <div className="mt-3 flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line md:max-w-[420px]">
@@ -198,11 +224,29 @@ export default function ListaClientes({
               <Vazio
                 titulo={`Nenhum cliente para “${q.trim()}”`}
                 texto="A busca olha nome, telefone, e-mail, tags e os campos que você criou."
-              />
+              >
+                {podeCadastrar && (
+                  <Button
+                    variant="outline"
+                    size="control"
+                    data-slot="clientes-vazio-novo"
+                    className="mt-2"
+                    onClick={() => abrirNovo(/\d{8,}/.test(q.replace(/\D/g, "")) ? q : "")}
+                  >
+                    <Plus size={14} />
+                    Cadastrar novo cliente
+                  </Button>
+                )}
+              </Vazio>
             ) : filtro === "conversa" ? (
               <Vazio
                 titulo="Ninguém em conversa hoje"
                 texto="Quem escrever hoje aparece aqui."
+              />
+            ) : filtro === "nunca" ? (
+              <Vazio
+                titulo="Todo mundo já escreveu"
+                texto="Quem você cadastrar e ainda não tiver escrito aparece aqui."
               />
             ) : filtro === "frio" ? (
               <Vazio
@@ -229,6 +273,12 @@ export default function ListaClientes({
             </ul>
           )}
         </AreaRolavel>
+        <NovoClienteDialog
+          aberto={novoAberto}
+          onFechar={() => setNovoAberto(false)}
+          telefoneInicial={novoTelefone}
+          simular={simular}
+        />
       </section>
     </Card>
   );
@@ -371,7 +421,15 @@ function Linha({
   );
 }
 
-function Vazio({ titulo, texto }: { titulo: string; texto: string }) {
+function Vazio({
+  titulo,
+  texto,
+  children,
+}: {
+  titulo: string;
+  texto: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div data-slot="clientes-vazio" className="flex flex-col items-center gap-2 px-6 py-16 text-center">
       <UsersRound size={28} className="text-ink-faint" />
@@ -379,6 +437,7 @@ function Vazio({ titulo, texto }: { titulo: string; texto: string }) {
       <p className="max-w-[360px] text-apoio text-ink-2" style={{ textWrap: "pretty" }}>
         {texto}
       </p>
+      {children}
     </div>
   );
 }

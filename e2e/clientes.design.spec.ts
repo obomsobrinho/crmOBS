@@ -6,11 +6,14 @@ import {
   diasSemContato,
   emConversa,
   estadoContato,
+  grafiasDoTelefone,
   montarClientes,
   telaParaIso,
+  telefoneDoCadastro,
   textoUltimoContato,
   type ContatoClienteRow,
 } from "../lib/clientes";
+import { buildInbox, type ConvRow } from "../lib/inbox";
 
 // TELA DE CLIENTES, fatia A (30/09/2026, docs/plano-clientes.md).
 //
@@ -226,4 +229,120 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(page.locator('[data-slot="painel-completude"]')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
+});
+
+// FATIA B (01/10/2026): criar contato e a primeira mensagem para quem nunca
+// escreveu. O preview SIMULA (não grava, não envia); a rota é provada no
+// clientes.serial, com o número impossível.
+test.describe("Novo cliente (lib/clientes.ts, fatia B)", () => {
+  test("telefone: DDD e número, 55 automático, celular começa com 9", () => {
+    expect(telefoneDoCadastro("(11) 91234-5678")).toEqual({ ok: true, digitos: "5511912345678" });
+    expect(telefoneDoCadastro("+55 35 8477-4753")).toEqual({ ok: true, digitos: "553584774753" });
+    expect(telefoneDoCadastro("(00) 00000-0001")).toEqual({ ok: true, digitos: "5500000000001" });
+    expect(telefoneDoCadastro("91234-5678").ok).toBe(false);
+    expect(telefoneDoCadastro("(11) 81234-5678").ok).toBe(false);
+    expect(telefoneDoCadastro("(01) 91234-5678").ok).toBe(false);
+  });
+
+  test("as grafias cobrem o nono dígito e o sufixo do WhatsApp", () => {
+    const g = grafiasDoTelefone("5535984774753");
+    expect(g).toContain("553584774753@s.whatsapp.net");
+    expect(g).toContain("5535984774753@s.whatsapp.net");
+    expect(g).toContain("553584774753");
+    expect(grafiasDoTelefone("553584774753")).toContain("5535984774753@s.whatsapp.net");
+  });
+});
+
+test.describe("Novo cliente e primeira mensagem (/design/clientes)", () => {
+  test("Novo cliente: máscara, telefone obrigatório e motivo na tela", async ({ page }) => {
+    await page.goto("/design/clientes");
+    await page.locator('[data-slot="clientes-novo"]').click();
+    const dialogo = page.locator('[data-slot="novo-cliente"]');
+    await expect(dialogo).toContainText("Cadastrar não envia nada");
+    const salvar = dialogo.locator('[data-slot="novo-cliente-salvar"]');
+    await expect(salvar).toBeDisabled();
+
+    const tel = dialogo.locator('[data-campo="telefone"]');
+    await tel.fill("1181234567");
+    await expect(tel).toHaveValue("(11) 8123-4567");
+    await tel.fill("11912345");
+    await salvar.click();
+    await expect(dialogo.locator('[data-slot="novo-cliente-motivo"]')).toContainText("DDD e o número");
+    await tel.fill("11912345678");
+    await expect(tel).toHaveValue("(11) 91234-5678");
+    await dialogo.locator('[data-campo="email"]').fill("sem-arroba");
+    await salvar.click();
+    await expect(dialogo.locator('[data-slot="novo-cliente-motivo"]')).toHaveCount(1);
+    await expect(dialogo.locator('[data-slot="novo-cliente-motivo"]')).toHaveText("E-mail inválido.");
+    await dialogo.locator('[data-campo="email"]').fill("ana@exemplo.com");
+    await dialogo.locator('[data-campo="nascimento"]').fill("02011990");
+    await expect(dialogo.locator('[data-campo="nascimento"]')).toHaveValue("02/01/1990");
+    await salvar.click();
+    await expect(dialogo).toBeHidden();
+  });
+
+  test("busca por número sem resultado oferece cadastrar com o número preenchido", async ({ page }) => {
+    await page.goto("/design/clientes");
+    await page.getByLabel("Buscar clientes").fill("11 97777-0000");
+    await page.locator('[data-slot="clientes-vazio-novo"]').click();
+    await expect(page.locator('[data-slot="novo-cliente"] [data-campo="telefone"]')).toHaveValue("(11) 97777-0000");
+  });
+
+  test("filtro 'Nunca escreveram' e o peso de cada ação na ficha", async ({ page }) => {
+    await page.goto("/design/clientes");
+    await page.locator('[data-slot="clientes-chip"]', { hasText: "Nunca escreveram" }).click();
+    await expect(page.locator('[data-slot="clientes-item"]')).toHaveCount(1);
+    await expect(page.locator('[data-slot="clientes-item"]')).toContainText("Ana Clara");
+
+    // Quem nunca escreveu: aviso, sem "Abrir conversa".
+    await page.goto("/design/clientes?sel=17");
+    await expect(page.locator('[data-slot="ficha-nunca"]')).toHaveText("Este número nunca escreveu para você");
+    await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toHaveCount(0);
+    await page.locator('[data-slot="ficha-primeira-mensagem"]').click();
+    const dialogo = page.locator('[data-slot="primeira-mensagem"]');
+    await expect(dialogo).toContainText("pode bloquear o seu número");
+    await expect(dialogo).toContainText("a IA fica pausada");
+    const enviar = dialogo.locator('[data-slot="primeira-enviar"]');
+    await dialogo.getByLabel("Primeira mensagem").fill("Oi Ana, aqui é da loja, como combinamos.");
+    // Sem o aceite, não envia.
+    await expect(enviar).toBeDisabled();
+    await dialogo.locator('[data-slot="primeira-aceite"]').click();
+    await expect(enviar).toBeEnabled();
+    await enviar.click();
+    await expect(dialogo).toBeHidden();
+
+    // Quem já conversou: sem fricção, sem o aviso.
+    await page.goto("/design/clientes?sel=2");
+    await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toBeVisible();
+    await expect(page.locator('[data-slot="ficha-primeira-mensagem"]')).toHaveCount(0);
+  });
+
+  test("diálogos sem travessão e cabendo no celular", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/design/clientes?sel=17");
+    await page.locator('[data-slot="ficha-primeira-mensagem"]').click();
+    const primeira = page.locator('[data-slot="primeira-mensagem"]');
+    expect(await primeira.innerText()).not.toMatch(/[—–]/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
+    await page.keyboard.press("Escape");
+    await page.goto("/design/clientes");
+    await page.locator('[data-slot="clientes-novo"]').click();
+    const novo = page.locator('[data-slot="novo-cliente"]');
+    expect(await novo.innerText()).not.toMatch(/[—–]/);
+    const caixa = await novo.boundingBox();
+    expect(caixa!.x).toBeGreaterThanOrEqual(0);
+    expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(375);
+  });
+});
+
+test("conversa vazia do cadastro não aparece em Conversas nem no Pipeline (buildInbox)", () => {
+  const base = { last_message_preview: null, last_message_from: null, unread_count: 0, assigned_user_id: null, handoff_at: null };
+  const { items } = buildInbox(
+    [
+      { ...base, phone: "5511900000001@s.whatsapp.net", last_message_at: "2026-09-30T12:00:00Z" },
+      { ...base, phone: "5511900000002@s.whatsapp.net", last_message_at: null as unknown as string },
+    ] as unknown as ConvRow[],
+    []
+  );
+  expect(items.map((i) => i.phone)).toEqual(["5511900000001@s.whatsapp.net"]);
 });

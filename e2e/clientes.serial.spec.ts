@@ -60,3 +60,66 @@ test("o menu leva a Clientes", async ({ page }) => {
   await expect(page).toHaveURL(/\/clientes$/);
   await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
 });
+
+// FATIA B (01/10/2026): criar contato pela rota service_role, com outro número
+// impossível (DDD 00), e a primeira mensagem recusada sem o aceite. O envio de
+// verdade NÃO é exercido: seria WhatsApp real.
+const FONE_NOVO = "5500000000002";
+
+async function apagarNovo() {
+  const svc = servico();
+  for (const fone of [FONE_NOVO, `${FONE_NOVO}@s.whatsapp.net`]) {
+    await svc.from("conversations").delete().eq("client_id", clientId).eq("phone", fone);
+    await svc.from("dados_cliente").delete().eq("client_id", clientId).eq("telefone", fone);
+  }
+}
+
+test("Novo cliente cadastra, não duplica, nasce com conversa vazia e não entra em Conversas", async ({ page }) => {
+  await apagarNovo();
+  try {
+    await page.goto("/clientes");
+    await page.locator('[data-slot="clientes-novo"]').click();
+    const dialogo = page.locator('[data-slot="novo-cliente"]');
+    await dialogo.locator('[data-campo="telefone"]').fill("00000000002");
+    await dialogo.locator('[data-campo="nome"]').fill("Novo cliente (e2e)");
+    await dialogo.locator('[data-slot="novo-cliente-salvar"]').click();
+    await expect(page).toHaveURL(/\/clientes\/\d+$/, { timeout: 30_000 });
+    await expect(page.locator('[data-slot="ficha-nunca"]')).toBeVisible();
+    await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toHaveCount(0);
+
+    const svc = servico();
+    const { data: contato } = await svc
+      .from("dados_cliente")
+      .select("id, telefone, display_name, atendimento_ia")
+      .eq("client_id", clientId)
+      .eq("telefone", `${FONE_NOVO}@s.whatsapp.net`)
+      .single();
+    expect(contato?.display_name).toBe("Novo cliente (e2e)");
+    expect(contato?.atendimento_ia).toBe("ativa");
+    const { data: conversa, error } = await svc
+      .from("conversations")
+      .select("id, last_message_at")
+      .eq("client_id", clientId)
+      .eq("phone", `${FONE_NOVO}@s.whatsapp.net`)
+      .single();
+    expect(error).toBeNull();
+    expect(conversa?.last_message_at).toBeNull();
+
+    // O mesmo número de novo abre quem já existe.
+    const segunda = await page.request.post("/api/contacts", { data: { telefone: "(00) 00000-0002" } });
+    expect(await segunda.json()).toEqual({ id: contato!.id, existente: true });
+
+    // Sem o aceite, a primeira mensagem é recusada antes de chegar ao n8n.
+    const envio = await page.request.post("/api/send", {
+      data: { phone: `${FONE_NOVO}@s.whatsapp.net`, text: "oi" },
+    });
+    expect(envio.status()).toBe(409);
+
+    // Conversa vazia não é conversa: fora da lista.
+    await page.goto("/inbox");
+    await page.locator('[data-slot="inbox-periodo-opcao"]', { hasText: "Tudo" }).click();
+    await expect(page.getByText("Novo cliente (e2e)")).toHaveCount(0);
+  } finally {
+    await apagarNovo();
+  }
+});

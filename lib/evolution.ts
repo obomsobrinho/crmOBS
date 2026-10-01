@@ -203,3 +203,37 @@ export async function ownerNumber(instanceName: string): Promise<string | null> 
     return null;
   }
 }
+
+/**
+ * O endereço REAL desse número no WhatsApp (`/chat/whatsappNumbers`). Existe
+ * para o "Novo cliente" (01/10/2026): número antigo de celular chega pelo
+ * WhatsApp SEM o nono dígito, e gravar a grafia digitada faria a resposta da
+ * pessoa nascer como OUTRO contato (o n8n acha o lead pelo `remoteJid` exato).
+ * `{ existe: false }` = o número não tem WhatsApp. `null` = não deu para saber
+ * (Evolution fora, formato diferente): quem chama segue com a grafia digitada.
+ */
+export async function numeroNoWhatsApp(
+  instanceName: string,
+  digitos: string
+): Promise<{ existe: boolean; jid: string | null } | null> {
+  try {
+    ensureEnv();
+    const res = await fetch(
+      `${BASE}/chat/whatsappNumbers/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({ numbers: [digitos] }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as unknown;
+    const linha = Array.isArray(data) ? (data[0] as { exists?: unknown; jid?: unknown } | undefined) : undefined;
+    if (!linha || typeof linha.exists !== "boolean") return null;
+    const jid = typeof linha.jid === "string" && linha.jid.endsWith("@s.whatsapp.net") ? linha.jid : null;
+    return { existe: linha.exists, jid };
+  } catch {
+    return null;
+  }
+}

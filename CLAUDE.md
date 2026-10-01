@@ -148,6 +148,13 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   ficha do painel da conversa: **`components/FichaContato.tsx`** (era `ContextPanel`), com a prop
   `superficie` (`conversa`/`clientes`) e mais nada de diferente. Regra pura em `lib/clientes.ts`;
   plano e fatias em `docs/plano-clientes.md`.
+  ⚠️ **CONTATO TAMBÉM NASCE PELO CRM (01/10/2026, "Novo cliente"):** `POST /api/contacts`
+  (service_role; o browser segue sem INSERT). **O telefone gravado é o JID que a Evolution devolve**
+  (`/chat/whatsappNumbers`), nunca a grafia digitada: o n8n acha o lead pelo `remoteJid` exato e
+  número antigo chega sem o nono dígito. Nasce junto uma linha VAZIA em `conversations` (tags e
+  notas), que **fica fora de Conversas e do Pipeline até a primeira mensagem** (`buildInbox`).
+  A primeira mensagem para quem nunca escreveu exige o aceite (conferido também no `/api/send`,
+  409) e **pausa a IA como qualquer envio manual** (decisão do dono, 01/10/2026).
 - **Tabelas próprias do CRM** (browser faz CRUD via RLS por tenant, não passam pelo n8n): `tags`
   + `conversation_tags` (rótulos por conversa), `conversation_notes` (notas internas, nunca vão
   ao WhatsApp; `author_user_id` = `auth.uid()`), `quick_replies` (mensagens prontas por tenant).

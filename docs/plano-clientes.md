@@ -20,10 +20,12 @@ Briefing: `Desktop/briefing-clientes-claude-design/LEIA-PRIMEIRO.md`.
    conversas e os contatos dele em 29/09/2026.
 7. **D6 (fatia B, 30/09/2026) = criar a conversa vazia no cadastro**: a rota de criação também cria a
    linha de `conversations`, para tags e notas funcionarem desde o primeiro minuto.
-8. **D7 (fatia B, 30/09/2026) = a primeira mensagem para quem nunca falou NÃO pausa a IA**: quem abre
-   a conversa quer que a IA atenda quando o cliente responder. É exceção só desse envio (o "Enviar
-   primeira mensagem" do contato que nunca escreveu); responder numa conversa existente continua
-   pausando, pela regra "um humano assumiu".
+8. **D7 REVISTA EM 01/10/2026: a primeira mensagem PAUSA a IA, como todo envio manual.** A versão de
+   30/09 dizia o contrário, e exigiria mexer no n8n ("CRM Envio Manual" pausa sempre). O dono:
+   "entrei em contato, deixa a pessoa mandar msg, e a IA começa pausada e depois ele tem que ativar
+   manual". Quem escreveu assumiu; religar é na chave da conversa. O diálogo diz isso antes de enviar.
+   Ideia do dono para depois (não construir agora): passar à IA uma orientação de prospecção e ELA
+   iniciar a conversa.
 
 ## O problema
 
@@ -116,7 +118,22 @@ navegador também.
   número de avisos não aparece.
 - Depois de rodar, apagar a semente pelo SQL do topo de `e2e/semente.ts`.
 
-## Fatia B: criar contato e iniciar conversa
+## Fatia B: criar contato e iniciar conversa (✅ código em 01/10/2026; falta a prova com banco)
+
+**Como ficou:**
+- `POST /api/contacts` (service_role): telefone obrigatório (`telefoneDoCadastro`, só Brasil, 55
+  automático), nome, nascimento e e-mail opcionais. **O telefone gravado é o do WhatsApp**
+  (`numeroNoWhatsApp`, `/chat/whatsappNumbers` da Evolution): número antigo chega sem o nono
+  dígito, e o n8n acha o contato pelo `remoteJid` exato; gravar a grafia digitada faria a resposta
+  nascer como outro contato. Número sem WhatsApp é recusado (422). Já cadastrado (qualquer grafia,
+  `grafiasDoTelefone`) devolve o existente e a tela abre a ficha. O número de avisos é recusado.
+- Conversa vazia nasce junto (D6) e **não aparece em Conversas nem no Pipeline** até a primeira
+  mensagem (`buildInbox` tira `last_message_at` nulo; as consultas ordenam com `nullsFirst: false`
+  para a conversa vazia não ocupar o teto de 500).
+- Filtro "Nunca escreveram" (sem mensagem nenhuma) e, na ficha, "Enviar primeira mensagem" no lugar
+  de "Abrir conversa". O aceite é conferido no `POST /api/send` também (409 sem ele quando a conversa
+  não tem mensagem nenhuma), porque a caixa da conversa alcança o contato pela URL.
+- Conta bloqueada não vê "Novo cliente" nem "Enviar primeira mensagem" (e as rotas respondem 402).
 
 - **"Novo cliente"**: só o telefone é obrigatório (máscara +55). Cria a linha em `dados_cliente` por
   **rota service_role** (`POST /api/contacts`): o browser não tem INSERT na tabela, e é assim que

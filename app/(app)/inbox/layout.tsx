@@ -20,7 +20,7 @@ async function getInbox(avisos: string | null): Promise<{
       .select(
         "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, handoff_at"
       )
-      .order("last_message_at", { ascending: false })
+      .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(500),
     supabase
       .from("dados_cliente")

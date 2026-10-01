@@ -54,7 +54,10 @@ export function buildInbox(
     ia[c.telefone] = c.atendimento_ia ?? null;
   }
   const items: InboxItem[] = convs
-    .filter((c) => !ehNumeroDeAvisos(c.phone, avisos))
+    // Sem mensagem nenhuma ainda não é conversa: é o contato cadastrado à mão
+    // na tela de Clientes (a linha nasce vazia para tags e notas, D6). Ele
+    // entra em Conversas e no Pipeline na primeira mensagem.
+    .filter((c) => !!c.last_message_at && !ehNumeroDeAvisos(c.phone, avisos))
     .map((c) => ({
     phone: c.phone,
     name: nameByPhone.get(c.phone) ?? null,

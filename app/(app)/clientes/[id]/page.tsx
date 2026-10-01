@@ -96,6 +96,7 @@ export default async function ClientePage({
           email={contato.email ?? null}
           birthDate={contato.birth_date ?? null}
           entendimento={(qual as { summary: string | null } | null)?.summary ?? null}
+          podeEnviar={!client?.access.blocked}
           contactExists
         />
       </AreaRolavel>

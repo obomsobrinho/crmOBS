@@ -57,7 +57,7 @@ export default async function DesignClientesPage({
     c(14, "5547991875502", "Lucas Tavares"),
     c(15, "553532210090", null, { nomewpp: "Ótica Central" }),
     c(16, "5511966200187", "Carlos Mendes", { email: "carlos.mendes@outlook.com" }),
-    // Nunca escreveu: sem conversa. NÃO é frio (fatia C), é outro estado.
+    // Nunca escreveu (cadastrado à mão, fatia B). NÃO é frio, é outro estado.
     c(17, "5511955118890", "Ana Clara Ribeiro", { email: "anaclara.r@gmail.com" }),
   ];
   const ultimos = [0.005, 2, 0.01, 3, 5, 8, 10, 1, 25, 40, 70, 75, 100, 120, 135, 150];
@@ -85,7 +85,7 @@ export default async function DesignClientesPage({
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="O Bom Sobrinho" activeHref="/clientes" role="dono" />
       <div className="flex min-h-0 min-w-0 flex-1 md:gap-3">
-        <ListaClientes itens={itens} selecionadoId={aberto?.id ?? null} hrefModelo={base} />
+        <ListaClientes itens={itens} selecionadoId={aberto?.id ?? null} hrefModelo={base} simular />
         <Card
           variant="pagina"
           className={
@@ -100,8 +100,8 @@ export default async function DesignClientesPage({
                 superficie="clientes"
                 name={aberto.display_name ?? aberto.nomewpp}
                 phone={aberto.telefone}
-                firstMessageAt={iso(60 * D)}
-                messageCount={aberto.id * 3 + 2}
+                firstMessageAt={aberto.id === 17 ? null : iso(60 * D)}
+                messageCount={aberto.id === 17 ? 0 : aberto.id * 3 + 2}
                 members={[]}
                 myUserId=""
                 conversationId={aberto.id === 17 ? null : 100 + aberto.id}
@@ -114,6 +114,7 @@ export default async function DesignClientesPage({
                 email={aberto.email}
                 birthDate={aberto.birth_date}
                 entendimento={aberto.id === 1 ? "Quer o plano anual e prefere ser atendido na sexta à tarde." : null}
+                simular
                 contactExists
               />
             </AreaRolavel>
