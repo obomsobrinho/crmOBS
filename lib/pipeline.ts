@@ -44,6 +44,8 @@ export function rowToStage(r: StageRow): Stage {
 // Card do board = uma conversa. Junta o item do inbox com o resumo da IA (última
 // qualificação) e o estado da IA (pausada = precisa de você).
 export interface PipelineCard {
+  /** `conversations.id`: desempata a ordem e é o cursor da página seguinte. */
+  id?: number;
   phone: string;
   name: string | null;
   lastPreview: string;
@@ -239,17 +241,34 @@ export function resumoDaColuna(
   agora = Date.now()
 ): string | null {
   if (cards.length === 0) return null;
-  const partes: string[] = [];
-  const esperando = cards.filter((c) => c.handoffAt).length;
-  if (esperando > 0)
-    partes.push(
-      esperando === 1 ? "1 esperando você" : `${esperando} esperando você`
-    );
   const antigo = cards
     .map((c) => Date.parse(c.lastMessageAt))
     .filter((n) => !Number.isNaN(n))
     .sort((a, b) => a - b)[0];
-  const idade = antigo ? idadeEmDias(new Date(antigo).toISOString(), agora) : null;
+  return resumoDosNumeros(
+    {
+      esperando: cards.filter((c) => c.handoffAt).length,
+      maisAntigo: antigo ? new Date(antigo).toISOString() : null,
+    },
+    agora
+  );
+}
+
+/**
+ * O mesmo subtítulo a partir dos NÚMEROS da coluna, que vêm do banco (com a
+ * coluna paginada, os cards na tela não são a coluna inteira).
+ */
+export function resumoDosNumeros(
+  n: { esperando: number; maisAntigo: string | null },
+  agora = Date.now()
+): string | null {
+  const partes: string[] = [];
+  const esperando = n.esperando;
+  if (esperando > 0)
+    partes.push(
+      esperando === 1 ? "1 esperando você" : `${esperando} esperando você`
+    );
+  const idade = n.maisAntigo ? idadeEmDias(n.maisAntigo, agora) : null;
   if (idade && idade !== "hoje") partes.push(`mais antigo há ${idade}`);
   return partes.length ? partes.join(" · ") : null;
 }

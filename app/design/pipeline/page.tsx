@@ -1,5 +1,6 @@
 import NavRail from "@/components/NavRail";
 import PipelineBoard from "@/components/PipelineBoard";
+import { fontePipelineDaMemoria, paramsPipeline, primeirasColunas } from "@/lib/pipeline-fonte";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 
@@ -70,7 +71,14 @@ const CARDS: PipelineCard[] = [
   card({ phone: "553384486180@s.whatsapp.net", name: "Beatriz Lima", stage: "fechado", lastFrom: "out", lastPreview: "Obrigada!", paused: true, summary: "Cliente perguntou o valor do plano anual e ficou de responder.", lastMessageAt: T(9, 20, 5) }),
 ];
 
-export default function DesignPipelinePage() {
+export default async function DesignPipelinePage() {
+  // Paginado por coluna (01/10/2026): a primeira página de cada coluna sai da
+  // memória pela mesma regra do banco, como o servidor faria.
+  const todos = CARDS.map((c, i) => ({ ...c, id: i + 1 }));
+  const inicial = await primeirasColunas(
+    fontePipelineDaMemoria(todos),
+    paramsPipeline(STAGES, { busca: "", atendente: "all", soEsperando: false, fora: [] })
+  );
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pipeline" role="dono" />
@@ -79,7 +87,8 @@ export default function DesignPipelinePage() {
           clientId="cc"
           myRole="dono"
           initialStages={STAGES}
-          initialCards={CARDS}
+          inicial={inicial}
+          previewCards={todos}
           preview
           previewMembers={MEMBERS}
         />

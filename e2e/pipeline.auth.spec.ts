@@ -93,15 +93,21 @@ test.describe("Pipeline", () => {
       "um tenant provisionado nasce com o funil inicial"
     ).toBeGreaterThan(0);
 
-    // O numeral do cabeçalho é a soma do que está NA TELA, não o total do banco:
-    // ele acompanha busca e filtro. Se divergir da contagem real de cards, a
-    // tela está mentindo sobre o próprio conteúdo.
-    const naTela = await page.locator(CARD).count();
+    // O numeral do cabeçalho é a SOMA DOS NÚMEROS DAS COLUNAS (do banco, com
+    // busca e filtro aplicados), e não o que está na tela: com a coluna
+    // paginada (01/10/2026) a tela tem só as primeiras 10 de cada. Se a soma
+    // divergir, a tela está mentindo sobre o próprio funil.
+    const numeros = await page
+      .locator(COLUNA)
+      .locator("span.ml-auto.tabular-nums")
+      .allInnerTexts();
+    const soma = numeros.reduce((n, t) => n + Number(t.trim() || 0), 0);
     const cabecalho = await page
       .locator("h1", { hasText: "Pipeline" })
       .locator("xpath=following-sibling::span[1]")
       .innerText();
-    expect(Number(cabecalho.trim())).toBe(naTela);
+    expect(Number(cabecalho.trim())).toBe(soma);
+    expect(await page.locator(CARD).count()).toBeLessThanOrEqual(soma);
   });
 
   test("buscar filtra os cards sem mexer nas colunas", async ({ page }) => {

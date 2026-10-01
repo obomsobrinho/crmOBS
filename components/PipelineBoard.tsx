@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   KanbanSquare,
@@ -19,21 +19,23 @@ import {
 } from "lucide-react";
 import { assinarComSessao, createClient } from "@/lib/supabase/client";
 import { formatEspera, prettyPhone } from "@/lib/format";
+import { initials, avatarPair } from "@/lib/inbox";
+import { foraDaLista } from "@/lib/inbox-lista";
+import { useDebounce } from "@/lib/use-debounce";
 import {
-  buildInbox,
-  initials,
-  avatarPair,
-  type ConvRow,
-  type ContatoRow,
-} from "@/lib/inbox";
+  PAGINA_PIPELINE,
+  compararCards,
+  fontePipelineDaMemoria,
+  fontePipelineDoBanco,
+  paramsPipeline,
+  type ContagensPipeline,
+  type FontePipeline,
+} from "@/lib/pipeline-fonte";
 import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import QuemAtendeBadge, { quemAtendeTexto } from "./QuemAtendeBadge";
 import {
-  buildCards,
-  lastQualByPhone,
   rowToStage,
-  stageColumns,
   stageColor,
   slugifyStage,
   STAGE_COLOR_KEYS,
@@ -42,7 +44,7 @@ import {
   type StageRow,
   idadeEmDias,
   origemDoCard,
-  resumoDaColuna,
+  resumoDosNumeros,
 } from "@/lib/pipeline";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
@@ -70,6 +72,77 @@ import {
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
+/** Os cards já carregados de uma coluna. */
+export interface ColunaCarregada {
+  cards: PipelineCard[];
+  temMais: boolean;
+  carregando: boolean;
+}
+
+/**
+ * Tira o card de onde estiver e o põe na coluna dele, na ordem. Com mais
+ * páginas por carregar na coluna, só entra se cair dentro do que já está na
+ * tela (abaixo, ele chega pela rolagem). `card` nulo: saiu do recorte.
+ */
+function encaixarCard(
+  cs: Record<string, ColunaCarregada>,
+  phone: string,
+  card: PipelineCard | null
+): Record<string, ColunaCarregada> {
+  const out: Record<string, ColunaCarregada> = {};
+  for (const [k, c] of Object.entries(cs)) {
+    out[k] = c.cards.some((x) => x.phone === phone)
+      ? { ...c, cards: c.cards.filter((x) => x.phone !== phone) }
+      : c;
+  }
+  if (!card || !card.stage || !out[card.stage]) return out;
+  const col = out[card.stage];
+  const ultimo = col.cards[col.cards.length - 1];
+  if (col.temMais && ultimo && compararCards(card, ultimo) > 0) return out;
+  const pos = col.cards.findIndex((x) => compararCards(card, x) < 0);
+  const lista = pos < 0 ? [...col.cards, card] : [...col.cards.slice(0, pos), card, ...col.cards.slice(pos)];
+  out[card.stage] = { ...col, cards: lista };
+  return out;
+}
+
+function moverNosNumeros(
+  ct: ContagensPipeline,
+  de: string | null,
+  para: string,
+  esperando: boolean
+): ContagensPipeline {
+  const pc = { ...ct.porColuna };
+  const ajusta = (k: string, d: number) => {
+    const n = pc[k] ?? { total: 0, esperando: 0, maisAntigo: null };
+    pc[k] = { ...n, total: Math.max(0, n.total + d), esperando: Math.max(0, n.esperando + (esperando ? d : 0)) };
+  };
+  if (de) ajusta(de, -1);
+  ajusta(para, 1);
+  return { ...ct, porColuna: pc };
+}
+
+/** O marcador do fim de uma coluna: avisa quando aparece. */
+function FimDaColuna({ onVisivel }: { onVisivel: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cb = useRef(onVisivel);
+  useEffect(() => {
+    cb.current = onVisivel;
+  });
+  useEffect(() => {
+    const alvo = ref.current;
+    if (!alvo) return;
+    const obs = new IntersectionObserver(
+      (es) => {
+        if (es.some((e) => e.isIntersecting)) cb.current();
+      },
+      { rootMargin: "200px 0px" }
+    );
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, []);
+  return <div ref={ref} data-slot="pipeline-mais" aria-hidden className="h-px shrink-0" />;
+}
+
 const STAGE_SELECT =
   "id, key, name, position, is_canonical, is_default, archived, color";
 
@@ -77,7 +150,8 @@ export default function PipelineBoard({
   clientId,
   myRole,
   initialStages,
-  initialCards,
+  inicial,
+  previewCards,
   preview = false,
   previewMembers = [],
   numeroAvisos = null,
@@ -85,7 +159,10 @@ export default function PipelineBoard({
   clientId: string;
   myRole: string | null;
   initialStages: Stage[];
-  initialCards: PipelineCard[];
+  /** As primeiras páginas de cada coluna e os números, que o servidor já buscou. */
+  inicial: { colunas: Record<string, ColunaCarregada>; contagens: ContagensPipeline };
+  /** Preview /design: todos os cards na memória, paginados pela mesma regra. */
+  previewCards?: PipelineCard[];
   /** No /design (sem login) usa mocks e simula as ações em memória. */
   preview?: boolean;
   previewMembers?: Member[];
@@ -97,7 +174,19 @@ export default function PipelineBoard({
   const supabase = useMemo(() => (preview ? null : createClient()), [preview]);
 
   const [stages, setStages] = useState<Stage[]>(initialStages);
-  const [cards, setCards] = useState<PipelineCard[]>(initialCards);
+  // PIPELINE PAGINADO POR COLUNA (01/10/2026, docs/plano-carregamento.md, fase
+  // 5): cada coluna tem os próprios cards (10 por vez, mais ao rolar a coluna) e
+  // os números vêm do banco. Antes eram até 500 conversas, todos os contatos e
+  // 300 resumos, recarregados a cada mudança em qualquer conversa.
+  const [colunas, setColunas] = useState<Record<string, ColunaCarregada>>(inicial.colunas);
+  const [contagens, setContagens] = useState<ContagensPipeline>(inicial.contagens);
+  const fonte = useMemo<FontePipeline>(
+    () => (supabase ? fontePipelineDoBanco(supabase, clientId) : fontePipelineDaMemoria(previewCards ?? [])),
+    [supabase, clientId, previewCards]
+  );
+  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+  /** Todos os cards na tela, de todas as colunas (para achar um pelo telefone). */
+  const cards = useMemo(() => Object.values(colunas).flatMap((c) => c.cards), [colunas]);
   const [membersById, setMembersById] = useState<Record<string, Member>>(
     Object.fromEntries(previewMembers.map((m) => [m.userId, m]))
   );
@@ -117,46 +206,145 @@ export default function PipelineBoard({
   const [movendo, setMovendo] = useState<PipelineCard | null>(null);
   const [buscaAberta, setBuscaAberta] = useState(false);
 
-  // Recarrega os cards a partir das mesmas 3 tabelas do inbox.
-  const refetchCards = useCallback(async () => {
-    if (!supabase) return;
-    const [{ data: convs }, { data: contatos }, { data: quals }] =
-      await Promise.all([
-        supabase
-          .from("conversations")
-          .select(
-            // handoff_at e stage_source entraram com o desenho de 18/09/2026:
-            // o primeiro vira "Sua vez" no card e o subtítulo da coluna, o
-            // segundo vira a linha de origem no pé do card.
-            "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage, handoff_at, stage_source"
-          )
-          .order("last_message_at", { ascending: false, nullsFirst: false })
-          .limit(500),
-        supabase
-          .from("dados_cliente")
-          .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
-        supabase
-          .from("conversation_qualifications")
-          .select("phone, summary")
-          .order("created_at", { ascending: false })
-          .limit(300),
+  // O recorte (estágios ativos, busca com debounce, filtros) e um ref dele
+  // para o realtime e a rolagem lerem o valor atual.
+  const busca = useDebounce(search.trim(), 300);
+  const params = useMemo(
+    () => paramsPipeline(stages, { busca, atendente: attFilter, soEsperando, fora }),
+    [stages, busca, attFilter, soEsperando, fora]
+  );
+  const paramsRef = useRef(params);
+  const colunasRef = useRef(colunas);
+  useEffect(() => {
+    paramsRef.current = params;
+    colunasRef.current = colunas;
+  });
+  const versaoRef = useRef(0);
+
+  const recontar = useCallback(async () => {
+    const p = paramsRef.current;
+    if (!p) return;
+    try {
+      setContagens(await fonte.contagens(p));
+    } catch (e) {
+      console.error("números do pipeline:", e);
+    }
+  }, [fonte]);
+
+  /** Primeira página de TODAS as colunas (recorte novo, estágios mudaram, voltou à aba). */
+  const recarregarTudo = useCallback(async () => {
+    const p = paramsRef.current;
+    if (!p) return;
+    const v = ++versaoRef.current;
+    try {
+      const [listas] = await Promise.all([
+        Promise.all(p.ativos.map((k) => fonte.coluna(p, k, null))),
+        recontar(),
       ]);
-    const { items, ia } = buildInbox(
-      (convs ?? []) as ConvRow[],
-      (contatos ?? []) as ContatoRow[],
-      numeroAvisos
-    );
-    const qual = lastQualByPhone(
-      (quals ?? []) as { phone: string; summary: string | null }[]
-    );
-    const source: Record<string, "human" | "ia" | null> = {};
-    for (const c of (convs ?? []) as { phone: string; stage_source?: string | null }[])
-      source[c.phone] =
-        c.stage_source === "human" || c.stage_source === "ia"
-          ? c.stage_source
-          : null;
-    setCards(buildCards(items, ia, qual, source));
-  }, [supabase, numeroAvisos]);
+      if (v !== versaoRef.current) return;
+      setColunas(
+        Object.fromEntries(
+          p.ativos.map((k, i) => [k, { cards: listas[i], temMais: listas[i].length === PAGINA_PIPELINE, carregando: false }])
+        )
+      );
+    } catch (e) {
+      console.error("pipeline:", e);
+    }
+  }, [fonte, recontar]);
+
+  /** A próxima página de UMA coluna (o marcador do fim dela apareceu). */
+  const carregarMais = useCallback(
+    async (key: string) => {
+      const p = paramsRef.current;
+      const col = colunasRef.current[key];
+      if (!p || !col || !col.temMais || col.carregando || col.cards.length === 0) return;
+      const v = versaoRef.current;
+      setColunas((cs) => ({ ...cs, [key]: { ...cs[key], carregando: true } }));
+      try {
+        const mais = await fonte.coluna(p, key, col.cards[col.cards.length - 1]);
+        if (v !== versaoRef.current) return;
+        setColunas((cs) => {
+          const atual = cs[key];
+          const vistos = new Set(atual.cards.map((c) => c.phone));
+          return {
+            ...cs,
+            [key]: {
+              cards: [...atual.cards, ...mais.filter((c) => !vistos.has(c.phone))],
+              temMais: mais.length === PAGINA_PIPELINE,
+              carregando: false,
+            },
+          };
+        });
+      } catch (e) {
+        console.error("mais cards:", e);
+        setColunas((cs) => ({ ...cs, [key]: { ...cs[key], carregando: false } }));
+      }
+    },
+    [fonte]
+  );
+
+  // Trocou o recorte: primeira página de cada coluna. A primeira renderização
+  // veio do servidor.
+  const primeiraRef = useRef(true);
+  useEffect(() => {
+    if (primeiraRef.current) {
+      primeiraRef.current = false;
+      return;
+    }
+    void recarregarTudo();
+  }, [params, recarregarTudo]);
+
+  // REALTIME LINHA A LINHA: o evento anota QUAL conversa mudou; um debounce
+  // junta a rajada; busca-se SÓ o card dele, que sai de onde estava e entra na
+  // coluna certa. Aba escondida não busca: revalida tudo ao voltar.
+  const pendentesRef = useRef<Set<string>>(new Set());
+  const atrasadaRef = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const processarPendentes = useCallback(async () => {
+    const fones = [...pendentesRef.current];
+    pendentesRef.current.clear();
+    const p = paramsRef.current;
+    if (!p || fones.length === 0) return;
+    const v = versaoRef.current;
+    try {
+      const achados = await Promise.all(fones.map((f) => fonte.card(p, f).then((c) => [f, c] as const)));
+      if (v !== versaoRef.current) return;
+      setColunas((cs) => achados.reduce((acc, [f, c]) => encaixarCard(acc, f, c), cs));
+      void recontar();
+    } catch (e) {
+      console.error("card do pipeline:", e);
+    }
+  }, [fonte, recontar]);
+  const anotar = useCallback(
+    (phone: string | null | undefined) => {
+      if (!phone) return;
+      if (document.visibilityState !== "visible") {
+        atrasadaRef.current = true;
+        return;
+      }
+      pendentesRef.current.add(phone);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => void processarPendentes(), 500);
+    },
+    [processarPendentes]
+  );
+  useEffect(() => {
+    if (!supabase) return;
+    let ultima = Date.now();
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!atrasadaRef.current && Date.now() - ultima < 10_000) return;
+      ultima = Date.now();
+      atrasadaRef.current = false;
+      void recarregarTudo();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [supabase, recarregarTudo]);
 
   const refetchStages = useCallback(async () => {
     if (!supabase) return;
@@ -167,39 +355,28 @@ export default function PipelineBoard({
     if (data) setStages((data as StageRow[]).map(rowToStage));
   }, [supabase]);
 
-  // Realtime: conversas/contatos/qualificações mudam os cards; pipeline_stages
-  // muda as colunas.
+  // Realtime: conversas, contatos e resumos mudam UM card; pipeline_stages muda
+  // as colunas (e aí o recorte muda, e as colunas recarregam). Só o tenant.
   useEffect(() => {
     if (!supabase) return;
+    const filtro = `client_id=eq.${clientId}`;
+    type Linha = { phone?: string; telefone?: string } | null;
+    const fone = (pl: { new?: unknown; old?: unknown }) =>
+      (pl.new as Linha)?.phone ?? (pl.new as Linha)?.telefone ?? (pl.old as Linha)?.phone ?? (pl.old as Linha)?.telefone;
     const channelSair = assinarComSessao((sb) =>
       sb
-      .channel("pipeline")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => void refetchCards()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "dados_cliente" },
-        () => void refetchCards()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversation_qualifications" },
-        () => void refetchCards()
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "pipeline_stages" },
-        () => void refetchStages()
-      )
-      .subscribe()
+        .channel(`pipeline-${clientId}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
+        .on("postgres_changes", { event: "*", schema: "public", table: "dados_cliente", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversation_qualifications", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
+        .on("postgres_changes", { event: "*", schema: "public", table: "pipeline_stages", filter: filtro }, () => void refetchStages())
+        .subscribe()
     );
     return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       channelSair();
     };
-  }, [supabase, refetchCards, refetchStages]);
+  }, [supabase, clientId, anotar, refetchStages]);
 
   // Membros do time (para nomear o atendente de cada card).
   useEffect(() => {
@@ -217,35 +394,21 @@ export default function PipelineBoard({
     [stages]
   );
 
-  const filteredCards = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return cards.filter((c) => {
-      if (soEsperando && !c.handoffAt) return false;
-      if (attFilter === "none" && c.assignedUserId) return false;
-      if (attFilter !== "all" && attFilter !== "none" && c.assignedUserId !== attFilter)
-        return false;
-      if (q) {
-        const name = (c.name ?? "").toLowerCase();
-        if (!name.includes(q) && !c.phone.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [cards, search, attFilter, soEsperando]);
+  // Quantos esperam você no funil INTEIRO (do banco, sem filtro): o número no
+  // botão não pode encolher porque alguém filtrou por atendente.
+  const esperandoCount = contagens.esperandoGeral;
 
-  // Conta sobre TODOS os cards, não sobre os filtrados: o número no botão diz
-  // quantas conversas esperam você no funil inteiro, e ele não pode encolher
-  // porque alguém filtrou por atendente.
-  const esperandoCount = useMemo(
-    () => cards.filter((c) => c.handoffAt).length,
-    [cards]
-  );
-
+  // As colunas visíveis, cada uma com os cards que já carregaram dela.
   const columns = useMemo(() => {
-    const cols = stageColumns(stages, filteredCards);
-    return stageFilter === "all"
-      ? cols
-      : cols.filter((c) => c.stage.key === stageFilter);
-  }, [stages, filteredCards, stageFilter]);
+    const cols = activeStages.map((stage) => ({
+      stage,
+      cards: colunas[stage.key]?.cards ?? [],
+    }));
+    return stageFilter === "all" ? cols : cols.filter((c) => c.stage.key === stageFilter);
+  }, [activeStages, colunas, stageFilter]);
+
+  const numerosDe = (key: string) =>
+    contagens.porColuna[key] ?? { total: 0, esperando: 0, maisAntigo: null };
 
   // O estágio que o celular mostra: o escolhido, se ainda existir, senão o
   // primeiro. Derivado, e não sincronizado por efeito, para arquivar um
@@ -267,10 +430,7 @@ export default function PipelineBoard({
     [activeStages]
   );
 
-  const shownCount = useMemo(
-    () => columns.reduce((n, c) => n + c.cards.length, 0),
-    [columns]
-  );
+  const shownCount = columns.reduce((n, c) => n + numerosDe(c.stage.key).total, 0);
 
   // Move o card para outro estágio (arrastar-soltar). Marca stage_source=human
   // (a IA nunca sobrescreve um estágio definido por humano).
@@ -285,10 +445,12 @@ export default function PipelineBoard({
           : defaultKey;
       if (currentKey === toKey) return;
 
-      const prev = cards;
-      setCards((list) =>
-        list.map((c) => (c.phone === phone ? { ...c, stage: toKey } : c))
-      );
+      const prev = colunas;
+      const prevNumeros = contagens;
+      // Otimista: sai da coluna de origem, entra na de destino na ordem, e os
+      // números das duas acompanham.
+      setColunas((cs) => encaixarCard(cs, phone, { ...card, stage: toKey }));
+      setContagens((ct) => moverNosNumeros(ct, currentKey, toKey, !!card.handoffAt));
       if (!supabase) return; // preview: só memória
       const { error: err } = await supabase
         .from("conversations")
@@ -300,11 +462,12 @@ export default function PipelineBoard({
         .eq("client_id", clientId)
         .eq("phone", phone);
       if (err) {
-        setCards(prev); // reverte
+        setColunas(prev); // reverte
+        setContagens(prevNumeros);
         setError("não foi possível mover o card. Tente de novo.");
       }
     },
-    [cards, activeStages, supabase, clientId]
+    [cards, colunas, contagens, activeStages, supabase, clientId]
   );
 
   // ---- Gestão de estágios (dono) ----
@@ -585,11 +748,8 @@ export default function PipelineBoard({
               // tela que ele estava vendo não mudava nada. Ligar leva direto à
               // primeira coluna com alguém esperando, que é o que ele quer ver.
               if (ligando) {
-                const alvo = stageColumns(
-                  stages,
-                  filteredCards.filter((c) => c.handoffAt)
-                ).find((col) => col.cards.length > 0);
-                if (alvo) setEstagioCel(alvo.stage.key);
+                const alvo = activeStages.find((st) => numerosDe(st.key).esperando > 0);
+                if (alvo) setEstagioCel(alvo.key);
               }
             }}
             aria-pressed={soEsperando}
@@ -640,7 +800,7 @@ export default function PipelineBoard({
           data-slot="pipeline-faixa"
           className="flex shrink-0 gap-2 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none] md:hidden"
         >
-          {columns.map(({ stage, cards: cc }) => {
+          {columns.map(({ stage }) => {
             const ativo = stage.key === estagioVisivel;
             return (
               <button
@@ -662,7 +822,7 @@ export default function PipelineBoard({
                   aria-hidden
                 />
                 {stage.name}
-                <span className="tabular-nums opacity-75">{cc.length}</span>
+                <span className="tabular-nums opacity-75">{numerosDe(stage.key).total}</span>
               </button>
             );
           })}
@@ -730,7 +890,7 @@ export default function PipelineBoard({
                     {stage.name}
                   </span>
                   <span className="ml-auto text-legenda tabular-nums text-ink-3">
-                    {colCards.length}
+                    {numerosDe(stage.key).total}
                   </span>
                 </div>
                 {/* Subtítulo da coluna (desenho de 18/09/2026): quantos esperam
@@ -739,7 +899,7 @@ export default function PipelineBoard({
                     que a tela existe para responder. Some sozinho quando não há o
                     que dizer, em vez de virar uma linha vazia em toda coluna. */}
                 {(() => {
-                  const resumo = resumoDaColuna(colCards);
+                  const resumo = resumoDosNumeros(numerosDe(stage.key));
                   return resumo ? (
                     <div
                       data-slot="pipeline-coluna-resumo"
@@ -777,6 +937,13 @@ export default function PipelineBoard({
                     onMover={() => setMovendo(c)}
                   />
                 ))}
+                {/* O fim da coluna: quando aparece, vem a próxima página DELA. */}
+                {colunas[stage.key]?.temMais && (
+                  <FimDaColuna onVisivel={() => void carregarMais(stage.key)} />
+                )}
+                {colunas[stage.key]?.carregando && (
+                  <div className="px-2 py-2 text-center text-legenda text-ink-3">Carregando…</div>
+                )}
               </AreaRolavel>
             </div>
           );

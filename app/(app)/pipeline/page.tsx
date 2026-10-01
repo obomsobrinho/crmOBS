@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
-import { buildInbox, type ConvRow, type ContatoRow } from "@/lib/inbox";
+import { rowToStage, type StageRow } from "@/lib/pipeline";
 import {
-  buildCards,
-  lastQualByPhone,
-  rowToStage,
-  type StageRow,
-} from "@/lib/pipeline";
+  CONTAGENS_PIPELINE_VAZIAS,
+  fontePipelineDoBanco,
+  paramsPipeline,
+  primeirasColunas,
+} from "@/lib/pipeline-fonte";
+import { foraDaLista } from "@/lib/inbox-lista";
 import PipelineBoard from "@/components/PipelineBoard";
 
 export const dynamic = "force-dynamic";
@@ -18,53 +19,40 @@ export default async function PipelinePage() {
   const client = await requireActiveTenant();
   const supabase = await createClient();
 
-  const [{ data: stages }, { data: convs }, { data: contatos }, { data: quals }] =
-    await Promise.all([
-      supabase
-        .from("pipeline_stages")
-        .select(
-          "id, key, name, position, is_canonical, is_default, archived, color"
-        )
-        .order("position"),
-      supabase
-        .from("conversations")
-        .select(
-          "phone, last_message_at, last_message_preview, last_message_from, unread_count, assigned_user_id, stage, handoff_at, stage_source"
-        )
-        .order("last_message_at", { ascending: false, nullsFirst: false })
-        .limit(500),
-      supabase
-        .from("dados_cliente")
-        .select("telefone, nomewpp, atendimento_ia, display_name, foto_path"),
-      supabase
-        .from("conversation_qualifications")
-        .select("phone, summary")
-        .order("created_at", { ascending: false })
-        .limit(300),
-    ]);
+  const { data: stagesRows } = await supabase
+    .from("pipeline_stages")
+    .select("id, key, name, position, is_canonical, is_default, archived, color")
+    .order("position");
+  const stages = ((stagesRows ?? []) as StageRow[]).map(rowToStage);
 
-  const { items, ia } = buildInbox(
-    (convs ?? []) as ConvRow[],
-    (contatos ?? []) as ContatoRow[],
-    client.avisos
-  );
-  const qual = lastQualByPhone(
-    (quals ?? []) as { phone: string; summary: string | null }[]
-  );
-  // Quem pôs cada card na coluna em que está. Vem da MESMA consulta, então não
-  // custa viagem nenhuma.
-  const source: Record<string, "human" | "ia" | null> = {};
-  for (const c of (convs ?? []) as { phone: string; stage_source?: string | null }[])
-    source[c.phone] =
-      c.stage_source === "human" || c.stage_source === "ia" ? c.stage_source : null;
+  // A PRIMEIRA PÁGINA DE CADA COLUNA (10 cards) e os números, pela MESMA função
+  // do banco que o navegador usa para as páginas seguintes
+  // (docs/plano-carregamento.md, fase 5).
+  let inicial: Awaited<ReturnType<typeof primeirasColunas>> = {
+    colunas: {},
+    contagens: CONTAGENS_PIPELINE_VAZIAS,
+  };
+  try {
+    inicial = await primeirasColunas(
+      fontePipelineDoBanco(supabase, client.id),
+      paramsPipeline(stages, {
+        busca: "",
+        atendente: "all",
+        soEsperando: false,
+        fora: foraDaLista(client.avisos),
+      })
+    );
+  } catch (e) {
+    console.error("pipeline, primeira página:", e);
+  }
 
   return (
     <PipelineBoard
       clientId={client?.id ?? ""}
       myRole={client?.role ?? null}
       numeroAvisos={client.avisos}
-      initialStages={((stages ?? []) as StageRow[]).map(rowToStage)}
-      initialCards={buildCards(items, ia, qual, source)}
+      initialStages={stages}
+      inicial={inicial}
     />
   );
 }

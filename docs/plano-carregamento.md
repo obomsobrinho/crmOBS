@@ -52,7 +52,12 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
   cortada saíram. Provado em `e2e/clientes.serial.spec.ts` (25 contatos semeados).
 - **4. Conversa aberta:** últimas 30 mensagens, as antigas ao rolar para cima, mensagem nova pela
   linha do realtime.
-- **5. Pipeline:** 10 cards por coluna, mais ao rolar a coluna, contagem por coluna no servidor.
+- ✅ **5. Pipeline:** `public.pipeline_coluna`/`pipeline_contagens` (coluna efetiva = a de
+  `stageColumns`), `lib/pipeline-fonte.ts`; cada coluna com os próprios 10 cards e o marcador do
+  fim; números e subtítulo da coluna do banco (`resumoDosNumeros`); mover é otimista entre colunas;
+  realtime busca SÓ o card. ⚠️ Achado: `pipeline_stages` e `conversation_notes` nunca estiveram na
+  publicação do realtime; o Supabase recusava a assinatura e derrubava o canal INTEIRO (o realtime do
+  Pipeline nunca funcionou, e o das notas também não). As duas entraram, com replica FULL.
 - **6. Painel:** números calculados no banco (hoje ele baixa tudo e conta no servidor).
 
 ⚠️ **A ordem da lista existe em dois lugares:** no `order by` de `inbox_pagina` e em

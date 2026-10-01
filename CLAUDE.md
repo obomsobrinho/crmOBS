@@ -262,6 +262,9 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   montado no primeiro carregamento entrava ANTES da sessão, como anônimo, e ficava mudo para sempre
   (foi assim que o contador do menu parou de acompanhar o banco sem ninguém ver). E canal novo
   filtra pelo tenant (`client_id=eq.`), nunca escuta a tabela inteira.
+  ⚠️ **Tabela escutada pelo realtime PRECISA estar na publicação `supabase_realtime`**: uma tabela
+  fora dela faz o Supabase recusar o canal INTEIRO, não só aquela escuta (foi assim que o Pipeline
+  ficou sem realtime até 01/10/2026). Ao escutar tabela nova, conferir `pg_publication_tables`.
   ⚠️ **`anon` não tem grant em NADA do `public`** (01/10/2026: um backup de persona estava legível
   pela chave pública). Tabela nova nasce com RLS e sem grant a `anon`.
 - **A lista de conversas abre em HOJE (19/09/2026, decisão do dono).** Seletor de três posições na
