@@ -1,0 +1,11 @@
+-- A ContactSidebar se inscreve em conversation_qualifications desde que o resumo
+-- do handoff passou a aparecer na lista, mas a tabela nunca esteve na publicacao
+-- supabase_realtime. O handler existia e jamais disparava: o resumo so aparecia
+-- recarregando a pagina.
+--
+-- REPLICA IDENTITY fica no default (PK), diferente das outras tres publicadas,
+-- que sao FULL. E suficiente porque conversation_qualifications e append-only:
+-- quem escreve e o /api/agent, uma linha por turno, e a lista so precisa do
+-- INSERT. Se um dia existir update ou delete, ai sim precisa de FULL, senao a
+-- RLS do realtime nao consegue avaliar a linha antiga e o evento e descartado.
+alter publication supabase_realtime add table public.conversation_qualifications;

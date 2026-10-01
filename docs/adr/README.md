@@ -1,4 +1,4 @@
-# ADR index (docs/adr/, 95 files)
+# ADR index (docs/adr/, 96 files)
 
 | File | Area | Status | Title |
 |---|---|---|---|
@@ -79,6 +79,7 @@
 | 2026-10-01-n8n-send-failure-continues.md | n8n | Accepted | A failing send must not stop the rest of the execution |
 | 2026-10-01-n8n-sliding-wait-debounce.md | n8n | Accepted | Sliding wait in the n8n debounce |
 | 2026-10-01-production-loading-and-realtime-rules.md | realtime | Accepted | Production loading: paginate, server-side search, row-level realtime, session-bound channels |
+| 2026-10-01-migrations-versioned-in-repo.md | security | Accepted | Database migrations live in the repo; default privileges give anon nothing |
 | 2026-10-01-profile-photo-copied-to-bucket.md | data | Accepted | Contact profile photos are copied to our bucket |
 | undated-agent-enabled-vs-published-at.md | onboarding | Accepted (see also 2026-08-28-agent-switch-two-columns.md) | agent_enabled is the switch; agent_published_at is the first activation and is never cleared |
 | undated-agent-turns-metering.md | agent-ai | Accepted | agent_turns: one measurement row per AI turn, best-effort, no message content |

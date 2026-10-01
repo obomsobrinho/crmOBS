@@ -5,10 +5,15 @@ paths:
   - "app/**/page.tsx"
   - "app/**/layout.tsx"
   - "proxy.ts"
+  - "supabase/**"
 ---
 # Data access (Supabase, RLS, grants)
 
 Floor rules (pagination, tenant scope, service_role, SQL parity) are in `engineering.md`.
+
+## Schema changes are versioned
+- Every DB change (DDL, grants, policies, functions, publication changes) is a migration file in `supabase/migrations/<YYYYMMDDHHMMSS>_<name>.sql`, committed in the SAME delivery as the code that needs it. Never DDL by hand in the SQL editor. The repo is the record; `supabase/README.md` says how files are created and applied.  (why: docs/adr/2026-10-01-migrations-versioned-in-repo.md)
+- Every new table or function states its privileges in its own migration: `revoke ... from anon` and an explicit `grant` to whoever uses it (functions: `revoke execute ... from anon, public`). Default privileges no longer hand `anon` anything, but never rely on defaults.  (why: docs/adr/2026-10-01-migrations-versioned-in-repo.md)
 
 ## Clients and request scope
 - Browser: `lib/supabase/client.ts` (singleton, cookie session). Server Components and route handlers: `lib/supabase/server.ts`. `lib/supabase/service.ts` (service_role) is server-only.
