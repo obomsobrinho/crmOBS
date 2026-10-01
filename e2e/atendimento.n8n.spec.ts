@@ -25,6 +25,9 @@ const SEM_TRANSCRICAO = "[Áudio enviado. Não foi possível transcrever.]";
 
 let clientId = "";
 let seq = 0;
+// Instante do primeiro envio do cenário: só conta resposta que chegou DEPOIS dele
+// (o cenário de agendamento grava respostas antigas para montar a conversa).
+let desde = 0;
 
 type Linha = {
   id: number;
@@ -44,6 +47,7 @@ async function limpar() {
 }
 
 async function enviar(message: Record<string, unknown>, messageType: string, id?: string) {
+  if (!desde) desde = Date.now() - 2000;
   const corpo = {
     event: "messages.upsert",
     instance: INSTANCIA,
@@ -74,7 +78,8 @@ async function linhas(): Promise<Linha[]> {
   return (data ?? []) as Linha[];
 }
 
-const respostas = (l: Linha[]) => l.filter((x) => x.bot_message?.trim());
+const respostas = (l: Linha[]) =>
+  l.filter((x) => x.bot_message?.trim() && Date.parse(x.created_at) >= desde);
 const recebidas = (l: Linha[]) => l.filter((x) => x.user_message?.trim() || x.media_url);
 
 /** Espera a primeira resposta da IA e depois mais um tempo, para pegar uma SEGUNDA que não devia existir. */
@@ -100,9 +105,17 @@ test.beforeAll(async () => {
 });
 
 test.beforeEach(async () => {
+  desde = 0;
   await limpar();
   // Folga para o Redis da espera (chaves com 120s) não misturar cenários.
   await espera(3000);
+});
+
+test.afterEach(async () => {
+  // Um cenário que falhou cedo pode ter um turno ainda rodando no n8n: espera
+  // ele terminar antes de o próximo limpar a conversa, senão a resposta
+  // atrasada cai dentro do cenário seguinte.
+  if (test.info().status !== test.info().expectedStatus) await espera(45_000);
 });
 
 test.afterAll(async () => {
@@ -224,7 +237,13 @@ test("conversa marcada é agendar e NÃO abre pedido de ajuda", async () => {
     const { data: h } = await svc.from("handoffs").select("id").eq("client_id", clientId).like("phone", `${FONE_TESTE}%`);
     expect(h ?? [], "agendar não abre pedido").toHaveLength(0);
   } finally {
-    await svc.from("clients").update({ notify_group_jid: antes?.notify_group_jid ?? null }).eq("id", clientId);
+    // ⚠️ O supabase-js DEVOLVE o erro em vez de lançar: sem conferir, uma falha
+    // aqui deixaria o tenant de teste com o destino de avisos trocado em silêncio.
+    const { error } = await svc
+      .from("clients")
+      .update({ notify_group_jid: antes?.notify_group_jid ?? null })
+      .eq("id", clientId);
+    if (error) throw new Error(`NÃO devolveu o destino de avisos: ${error.message}`);
   }
 });
 

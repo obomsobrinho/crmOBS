@@ -946,6 +946,22 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   automático deu erro e parou TODO atendimento por ~3 min na aplicação).
   E o `Notifica grupo` virou "📅 Conversa marcada", com `executeOnce` (disparava uma vez por parte da
   resposta) e quebras de linha reais (o `\n` aparecia escrito).
+- ⚠️ **ENVIO QUE FALHA NÃO PARA O RESTO (01/10/2026).** O `Evolution send` sem `onError` parava a
+  execução no primeiro envio que falhasse: a segunda parte da resposta e o "Conversa marcada" nunca
+  saíam. Agora é `continueRegularOutput`. Foi a bateria de ponta a ponta que mostrou (com o número
+  impossível o envio sempre falha, e o aviso nunca era alcançado).
+- ✅ **BATERIA DE PONTA A PONTA DO ATENDIMENTO (`npm run test:e2e:n8n`, `e2e/atendimento.n8n.spec.ts`,
+  01/10/2026, pedido do dono: "só me mande testar depois de estar 100%").** Manda à mão o que a
+  Evolution mandaria ao webhook do n8n de PRODUÇÃO, com o telefone impossível, e confere banco e tela:
+  lote misto (texto, áudio REAL do WhatsApp em `e2e/fixtures/audio-whatsapp.ogg`, texto e imagem: 4
+  linhas na ordem, mídia de cada uma, áudio tocando na tela, UMA resposta), áudio chegando no fim da
+  espera, reação no meio, documento, pedido de ajuda, agendar sem pedido (troca o destino de avisos
+  por um número impossível e devolve no fim), IA pausada e mensagem duplicada. Paga (modelo, Whisper e
+  visão de verdade): só roda pedida pelo nome, como a `ia`. ⚠️ **Rodar antes de mandar o dono testar
+  qualquer mudança no atendimento** (n8n, `processTurn`, base do prompt).
+  Junto, `e2e/horarios.ia.spec.ts` prova datas e horários nos dois modos com HORA FIXA (`agoraTeste`,
+  só em dryRun), inclusive o controle de dia (16h às 10h é hoje). E a conta "já passou ou não" virou
+  CÓDIGO (`lib/horarios.ts`): o modelo errava para os dois lados quando comparava sozinho.
 - ⚠️ **O domínio mudou em 17/09/2026 e derrubou o canal em silêncio.** `crm-obs.vercel.app`
   passou a responder **404** ("deployment could not be found"), e os DOIS nós que chamam o app
   (`Atendente` e `Sobe mídia recebida`) apontavam para lá. O agente ficou mudo e as mensagens do

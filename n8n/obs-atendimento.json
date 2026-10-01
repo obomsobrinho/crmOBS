@@ -1219,7 +1219,8 @@
           "id": "NhrloDUqGVTkh9Xq",
           "name": "Evo Global"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
