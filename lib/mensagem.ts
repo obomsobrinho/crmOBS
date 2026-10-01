@@ -19,7 +19,7 @@
 // porque o "Max rows" do PostgREST corta qualquer conjunto de linhas em 1000, e
 // por isso a regra existe TAMBÉM em SQL, nestes lugares e só nestes:
 //   - public.painel_janelas e public.painel_series
-//     (supabase/migrations/20261002200100_painel_agregados_janelas_series.sql)
+//     (supabase/migrations/20261001225553_painel_agregados_janelas_series.sql)
 //   - public.painel_verbatim (mesma migration)
 //   - as cinco consultas de docs/instrumentacao-beta.md
 // A tradução, que as três funções repetem igual:
