@@ -152,3 +152,125 @@ export function casaBuscaPedido(
   const dq = q.replace(/\D/g, "");
   return dq.length >= 2 && p.phone.replace(/\D/g, "").includes(dq);
 }
+
+// ---------------------------------------------------------------------------
+// PAGINAÇÃO (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
+// A página lê `public.pedidos_pagina` (10 por vez, busca no banco) por UMA fonte
+// (`lib/pedidos-fonte.ts`). Aqui moram as peças puras: a linha do banco virando
+// pedido, a ORDEM e o encaixe da linha que o realtime acabou de mexer.
+//
+// ⚠️ A ordem existe em dois lugares: aqui (`ordemAbertos`, `ordemResolvidos`) e
+// no `order by` de `pedidos_pagina`. Mudou uma, muda a outra. A busca também:
+// `casaBuscaPedido` e o `where` do SQL são a mesma regra.
+// ---------------------------------------------------------------------------
+
+export const PAGINA_PEDIDOS = 10;
+
+/** A linha que `pedidos_pagina` devolve. `posicao` e `total` só vêm nos abertos. */
+export interface LinhaPedidoBanco {
+  id: number;
+  phone: string;
+  opened_at: string;
+  summary: string | null;
+  instruction: string | null;
+  closed_at: string | null;
+  closed_how: string | null;
+  closed_by: string | null;
+  nomewpp: string | null;
+  display_name: string | null;
+  posicao: number | string | null;
+  total: number | string | null;
+}
+
+export type PedidoItem = PedidoAberto | PedidoResolvido;
+
+export function ehAberto(p: PedidoItem): p is PedidoAberto {
+  return "posicao" in p;
+}
+
+export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
+  const nome = cleanName(l.display_name) ?? cleanName(l.nomewpp);
+  if (l.closed_at == null) {
+    return {
+      id: l.id,
+      phone: l.phone,
+      openedAt: l.opened_at,
+      summary: l.summary,
+      nome,
+      posicao: Number(l.posicao) || 1,
+      total: Number(l.total) || 1,
+    };
+  }
+  return {
+    id: l.id,
+    phone: l.phone,
+    openedAt: l.opened_at,
+    closedAt: l.closed_at,
+    summary: l.summary,
+    nome,
+    como: l.closed_how === "ia" || l.closed_how === "resolvido" ? l.closed_how : null,
+    orientacao: l.instruction?.trim() || null,
+    porQuem: l.closed_by,
+  };
+}
+
+/** Abertos: do mais antigo para o mais novo (a mesma do SQL). */
+export function ordemAbertos(a: PedidoAberto, b: PedidoAberto): number {
+  return Date.parse(a.openedAt) - Date.parse(b.openedAt) || a.id - b.id;
+}
+
+/** Resolvidos: do mais recente para o mais antigo (a mesma do SQL). */
+export function ordemResolvidos(a: PedidoResolvido, b: PedidoResolvido): number {
+  return Date.parse(b.closedAt) - Date.parse(a.closedAt) || b.id - a.id;
+}
+
+function inserirOrdenado<T>(lista: T[], item: T, cmp: (a: T, b: T) => number, temMais: boolean): T[] {
+  const ultimo = lista[lista.length - 1];
+  // Abaixo do último da tela ele chega pela rolagem; inserir agora o faria
+  // aparecer duas vezes e deixaria um buraco no meio.
+  if (temMais && ultimo && cmp(item, ultimo) > 0) return lista;
+  const pos = lista.findIndex((i) => cmp(item, i) < 0);
+  return pos < 0 ? [...lista, item] : [...lista.slice(0, pos), item, ...lista.slice(pos)];
+}
+
+/**
+ * Troca a fila ABERTA de uma conversa pelo que o banco devolveu agora (posição
+ * e total refeitos). O realtime mexe numa linha, mas "1 de 2" muda nas duas.
+ * Quem não casa com a busca de agora fica de fora.
+ */
+export function encaixarAbertosDaConversa(
+  lista: PedidoItem[],
+  phone: string,
+  novos: PedidoAberto[],
+  busca: string,
+  temMais: boolean
+): PedidoItem[] {
+  let acc = lista.filter((p) => p.phone !== phone);
+  const ordenados = novos.filter((p) => casaBuscaPedido(p, busca)).sort(ordemAbertos);
+  for (const n of ordenados) {
+    acc = inserirOrdenado(acc, n, (a, b) => ordemAbertos(a as PedidoAberto, b as PedidoAberto), temMais);
+  }
+  return acc;
+}
+
+/**
+ * Encaixa (ou tira) UM pedido na lista de resolvidos. `item` nulo, aberto, fora
+ * da busca ou fora da janela de 30 dias = sai da lista.
+ */
+export function encaixarResolvido(
+  lista: PedidoItem[],
+  id: number,
+  item: PedidoItem | null,
+  busca: string,
+  temMais: boolean,
+  agora: number
+): PedidoItem[] {
+  const sem = lista.filter((p) => p.id !== id);
+  const vale =
+    item != null &&
+    !ehAberto(item) &&
+    Date.parse(item.closedAt) >= Date.parse(inicioDosResolvidos(agora)) &&
+    casaBuscaPedido(item, busca);
+  if (!vale) return sem;
+  return inserirOrdenado(sem, item, (a, b) => ordemResolvidos(a as PedidoResolvido, b as PedidoResolvido), temMais);
+}

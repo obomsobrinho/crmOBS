@@ -73,6 +73,7 @@
 | 2026-09-30-n8n-audio-broken-error-outputs.md | n8n | Accepted | Audio was silently broken; media nodes get error outputs |
 | 2026-09-30-n8n-one-row-per-received-message.md | n8n | Accepted | One chat_messages row per received message |
 | 2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md | product | Accepted (rebuilt 2026-09-30, `docs/plano-fechar-p0.md`, `components/P | /pedidos: the detail is the request sheet, never a chat |
+| 2026-10-02-pedidos-paginated-single-source.md | data | Accepted | /pedidos paginates 10 at a time from one source (`lib/pedidos-fonte.ts`, SQL `pedidos_pagina`), realtime patches one conversation queue |
 | 2026-09-30-schedule-does-not-open-help-request.md | agent-ai | Accepted | Scheduling does not open a help request |
 | 2026-10-01-contacts-also-born-from-the-crm.md | inbox | Accepted | Contacts can be created from the CRM ("Novo cliente") |
 | 2026-10-01-e2e-n8n-attendance-battery.md | testing | Accepted | End-to-end attendance battery against production n8n |
