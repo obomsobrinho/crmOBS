@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { CabecalhoBloco } from "./ContactFields";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { FUSO, formatEspera, prettyPhone } from "@/lib/format";
 import { avatarPair, initials } from "@/lib/inbox";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
@@ -156,55 +157,32 @@ export default function Pedidos({
   }, [supabase]);
 
   // Tempo real nas regras da casa (CLAUDE.md, "Realtime cai", e
-  // docs/plano-carregamento.md): só o tenant, uma rajada de eventos vira UMA
-  // busca, aba escondida não busca (anota e busca ao voltar), primeira
-  // assinatura PULADA (a lista acabou de vir do servidor) e re-busca a cada
-  // reassinatura e ao voltar o foco (no máximo a cada 10s).
-  const primeira = useRef(true);
+  // docs/plano-carregamento.md): canal do tenant compartilhado
+  // (`useCanalTenant`, 02/10/2026), uma rajada de eventos vira UMA busca, aba
+  // escondida não busca (o canal anota e busca ao voltar), primeira assinatura
+  // PULADA e re-busca a cada reassinatura e ao voltar o foco (no máximo a cada
+  // 10s). ⚠️ O evento ainda refaz a lista inteira: encaixar a linha do payload e
+  // paginar os resolvidos é a frente de /pedidos (RT-03), não esta.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!supabase || !clientId) return;
-    let atrasada = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let ultima = Date.now();
-    const agendar = () => {
-      if (document.visibilityState !== "visible") {
-        atrasada = true;
-        return;
-      }
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void refetch(), 500);
-    };
-    const canalSair = assinarComSessao((sb) =>
-      sb
-      .channel(`pedidos-${clientId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "handoffs", filter: `client_id=eq.${clientId}` }, agendar)
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") return;
-        if (primeira.current) {
-          primeira.current = false;
-          return;
-        }
-        agendar();
-      })
-    );
-    const aoVoltar = () => {
-      if (document.visibilityState !== "visible") return;
-      if (!atrasada && Date.now() - ultima < 10_000) return;
-      ultima = Date.now();
-      atrasada = false;
-      void refetch();
-    };
-    document.addEventListener("visibilitychange", aoVoltar);
-    window.addEventListener("focus", aoVoltar);
     const relogio = setInterval(() => setAgora(Date.now()), 60_000);
     return () => {
-      if (timer) clearTimeout(timer);
-      canalSair();
-      document.removeEventListener("visibilitychange", aoVoltar);
-      window.removeEventListener("focus", aoVoltar);
+      if (timerRef.current) clearTimeout(timerRef.current);
       clearInterval(relogio);
     };
-  }, [supabase, clientId, refetch]);
+  }, [supabase, clientId]);
+  const agendar = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => void refetch(), 500);
+  }, [refetch]);
+  useCanalTenant({
+    clientId,
+    ativo: !!supabase,
+    tabelas: ["handoffs"],
+    aoEvento: agendar,
+    revalidar: () => void refetch(),
+  });
 
   /** O pedido saiu dos abertos: vira resolvido na tela, com o que aconteceu. */
   function concluir(p: PedidoAberto, r: Resultado, como: "ia" | "resolvido", orientacao: string | null) {

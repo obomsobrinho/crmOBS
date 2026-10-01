@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
 import { CabecalhoBloco } from "./ContactFields";
@@ -32,11 +33,13 @@ const VISIVEIS = 3;
 //    sendo o de baixo. Um "+ nova" que abrisse uma SEGUNDA caixa de texto aqui
 //    desfaria a decisão de propósito.
 export default function ContactNotes({
+  clientId,
   conversationId,
   myUserId,
   members,
   foraDaConversa = false,
 }: {
+  clientId: string;
   conversationId: number | null;
   myUserId: string;
   members: Member[];
@@ -44,11 +47,6 @@ export default function ContactNotes({
   foraDaConversa?: boolean;
 }) {
   const supabase = createClient();
-  // Sufixo por instância no nome do canal: no celular o painel do contato
-  // monta DUAS vezes (a coluna escondida por CSS e a folha de baixo), e o
-  // Supabase devolve o MESMO canal para o mesmo nome, que já está inscrito e
-  // derruba a página ao receber outro `.on()`.
-  const instancia = useId();
   const [notes, setNotes] = useState<ConversationNote[]>([]);
   const [todas, setTodas] = useState(false);
 
@@ -90,28 +88,39 @@ export default function ContactNotes({
     })();
   }, [load]);
 
-  // Nota escrita na aba "Nota interna" do rodapé cai aqui na hora.
-  useEffect(() => {
-    if (conversationId == null) return;
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`notes-${conversationId}-${instancia}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "conversation_notes",
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        () => void load()
-      )
-      .subscribe()
-    );
-    return () => {
-      channelSair();
-    };
-  }, [supabase, conversationId, load, instancia]);
+  // Nota escrita na aba "Nota interna" do rodapé cai aqui na hora. Canal do
+  // tenant (02/10/2026, R-21/R-22): só as notas DESTA conversa, e o evento
+  // encaixa a linha (por id) em vez de reler todas. A lista só é relida ao
+  // reconectar ou ao voltar o foco. Dois painéis montados ao mesmo tempo (celular)
+  // dividem o mesmo canal sem problema, e é por isso que o sufixo por instância
+  // no nome do canal não existe mais aqui.
+  useCanalTenant({
+    clientId,
+    tabelas: ["conversation_notes"],
+    modo: "aplicar",
+    ativo: conversationId != null,
+    revalidar: () => void load(),
+    aoEvento: (ev) => {
+      const r = ev.tipo === "DELETE" ? ev.antigo : ev.novo;
+      if (!r || r.conversation_id !== conversationId) return;
+      const id = r.id as number;
+      if (ev.tipo === "DELETE") {
+        setNotes((cur) => cur.filter((n) => n.id !== id));
+        return;
+      }
+      const nota: ConversationNote = {
+        id,
+        body: r.body as string,
+        authorUserId: (r.author_user_id as string | null) ?? null,
+        createdAt: r.created_at as string,
+      };
+      setNotes((cur) =>
+        (cur.some((n) => n.id === id) ? cur.map((n) => (n.id === id ? nota : n)) : [nota, ...cur]).sort(
+          (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
+        )
+      );
+    },
+  });
 
   async function remove(id: number) {
     setNotes((n) => n.filter((x) => x.id !== id));

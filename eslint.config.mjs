@@ -42,6 +42,11 @@ const projectRules = [
       "Never subscribe without a status callback; refetch on SUBSCRIBED after the first (docs/adr/2026-08-31-realtime-subscribe-callback-and-focus-refetch.md).",
   },
   {
+    selector: "CallExpression[callee.property.name='channel']",
+    message:
+      "Never open a realtime channel by hand: use useCanalTenant / useCanalConversa (lib/use-canal-ao-vivo.ts). It owns the session, the status callback, the focus refetch and the hidden tab.",
+  },
+  {
     selector: "Literal[value=/[\\u2013\\u2014]/]",
     message: "No em dash or en dash in user-visible text or prompts. Use comma, colon or parentheses.",
   },

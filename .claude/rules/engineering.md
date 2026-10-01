@@ -11,7 +11,7 @@ Scoped rules (`data`, `realtime`, `ui`, ...) add detail; this file is the floor.
 
 ## Realtime
 - A realtime event updates ONLY the changed row. Never refetch the whole list on an event. A hidden tab does not fetch.  (why: docs/adr/2026-10-01-production-loading-and-realtime-rules.md)
-- Never `.subscribe()` without a status callback; refetch on every `SUBSCRIBED` after the first and on focus return. Subscribe through `assinarComSessao` (`lib/supabase/client.ts`) and filter by tenant.  (why: docs/adr/2026-08-31-realtime-subscribe-callback-and-focus-refetch.md)
+- Never `.subscribe()` without a status callback; refetch on every `SUBSCRIBED` after the first and on focus return. Subscribe only through `useCanalTenant` / `useCanalConversa` (`lib/use-canal-ao-vivo.ts`, which owns all of that) and filter by tenant.  (why: docs/adr/2026-08-31-realtime-subscribe-callback-and-focus-refetch.md)
 - Listening to a table not in the `supabase_realtime` publication is a silent dead handler (and refuses the whole channel). Detail in `realtime.md`.
 
 ## Reuse the base layer
