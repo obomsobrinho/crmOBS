@@ -7,7 +7,8 @@ import FichaContato from "./FichaContato";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { anunciarIa } from "@/lib/ia-bus";
 import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
@@ -103,33 +104,6 @@ export default function ConversationView({
     setInstruction(pendingInstruction);
   }
 
-  // Realtime da atribuição desta conversa (outro atendente pode assumir).
-  useEffect(() => {
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`conv-assign-${phone}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "conversations",
-          filter: `phone=eq.${phone}`,
-        },
-        (payload: { new: Record<string, unknown> }) => {
-          const row = payload.new as { assigned_user_id?: string | null };
-          if (row && "assigned_user_id" in row) {
-            setAssigned(row.assigned_user_id ?? null);
-          }
-        }
-      )
-      .subscribe()
-    );
-    return () => {
-      channelSair();
-    };
-  }, [phone, supabase]);
-
   // Assumir / transferir / soltar a conversa. A RLS libera UPDATE de
   // conversations ao tenant, então filtrar por telefone atinge só a linha dele.
   //
@@ -195,32 +169,45 @@ export default function ConversationView({
     })();
   }, [phone, supabase]);
 
-  // Realtime do estado da IA deste contato.
-  useEffect(() => {
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`cliente-${phone}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "dados_cliente",
-          filter: `telefone=eq.${phone}`,
-        },
-        (payload: { new: Record<string, unknown> }) => {
-          const row = payload.new as { atendimento_ia?: string | null };
-          if (row && "atendimento_ia" in row) {
-            setIaState(row.atendimento_ia ?? null);
-          }
-        }
-      )
-      .subscribe()
-    );
-    return () => {
-      channelSair();
-    };
-  }, [phone, supabase]);
+  // Realtime desta conversa (outro atendente pode assumir; a IA pode ser ligada
+  // ou desligada em outra aba). Canal do tenant, compartilhado com o resto da
+  // tela (02/10/2026, R-03/R-22): só importa a linha deste telefone, e o evento
+  // encaixa o valor no estado sem consulta. Reconectou ou voltou o foco: busca
+  // as duas colunas desta linha, porque a chave da IA e o responsável decidem
+  // quem responde e não podem ficar velhos depois de uma queda.
+  const revalidarLinha = useCallback(async () => {
+    const [{ data: conv }, { data: cli }] = await Promise.all([
+      supabase
+        .from("conversations")
+        .select("assigned_user_id")
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .maybeSingle(),
+      supabase
+        .from("dados_cliente")
+        .select("atendimento_ia")
+        .eq("client_id", clientId)
+        .eq("telefone", phone)
+        .maybeSingle(),
+    ]);
+    if (conv) setAssigned((conv.assigned_user_id as string | null) ?? null);
+    if (cli) setIaState((cli.atendimento_ia as string | null) ?? null);
+  }, [supabase, clientId, phone]);
+
+  useCanalTenant({
+    clientId,
+    tabelas: ["conversations", "dados_cliente"],
+    modo: "aplicar",
+    revalidar: () => void revalidarLinha(),
+    aoEvento: (ev) => {
+      if (foneDoEvento(ev) !== phone || !ev.novo || ev.tipo === "DELETE") return;
+      if (ev.tabela === "conversations" && "assigned_user_id" in ev.novo) {
+        setAssigned((ev.novo.assigned_user_id as string | null) ?? null);
+      } else if (ev.tabela === "dados_cliente" && "atendimento_ia" in ev.novo) {
+        setIaState((ev.novo.atendimento_ia as string | null) ?? null);
+      }
+    },
+  });
 
   // Nota interna e orientação da IA vêm das abas da caixa de escrita. Estavam
   // as duas na coluna da direita, cada uma com a sua própria caixa de texto,

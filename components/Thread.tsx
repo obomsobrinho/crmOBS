@@ -34,7 +34,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { foneDoEvento, useCanalConversa, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import AiSummary from "./AiSummary";
 import FundoRede from "./FundoRede";
 import { respostaHumana } from "@/lib/mensagem";
@@ -47,6 +48,10 @@ import type { Bubble, ChatRow } from "@/lib/types";
 import HandoffCard, { type Handoff } from "./HandoffCard";
 import MessageComposer, { type OutgoingMedia } from "./MessageComposer";
 import { memberName, memberInitials, type Member } from "@/lib/team";
+
+// As colunas de `ChatRow` (lib/types.ts), sem `select("*")` em leitura de lista.
+const COLUNAS_MENSAGEM =
+  "id, phone, nomewpp, user_message, bot_message, message_type, active, created_at, media_url, media_type";
 
 type Pending = {
   tempId: string;
@@ -291,20 +296,41 @@ export default function Thread({
     void (async () => {
       await carregarHandoffs();
     })();
-    const canalSair = assinarComSessao((sb) =>
-      sb
-      .channel(`handoffs-${phone}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "handoffs", filter: `phone=eq.${phone}` },
-        () => void carregarHandoffs()
-      )
-      .subscribe()
-    );
-    return () => {
-      canalSair();
-    };
-  }, [carregarHandoffs, supabase, phone, handoffsPreview]);
+  }, [carregarHandoffs, handoffsPreview]);
+
+  // TEMPO REAL (02/10/2026, R-21/R-22): canal do tenant, só os pedidos DESTA
+  // conversa, e o evento encaixa a linha (por id) em vez de reler a lista. A
+  // lista só é relida ao reconectar ou ao voltar o foco.
+  useCanalTenant({
+    clientId,
+    tabelas: ["handoffs"],
+    modo: "aplicar",
+    ativo: !handoffsPreview,
+    revalidar: () => void carregarHandoffs(),
+    aoEvento: (ev) => {
+      if (foneDoEvento(ev) !== phone) return;
+      if (ev.tipo === "DELETE") {
+        const id = ev.antigo?.id as number | undefined;
+        if (id != null) setHandoffs((cur) => cur.filter((h) => h.id !== id));
+        return;
+      }
+      const r = ev.novo;
+      if (!r) return;
+      const novo: Handoff = {
+        id: r.id as number,
+        openedAt: r.opened_at as string,
+        summary: (r.summary as string | null) ?? null,
+        instruction: (r.instruction as string | null) ?? null,
+        closedAt: (r.closed_at as string | null) ?? null,
+        closedHow: (r.closed_how as Handoff["closedHow"]) ?? null,
+      };
+      setHandoffs((cur) =>
+        cur.some((h) => h.id === novo.id)
+          ? cur.map((h) => (h.id === novo.id ? novo : h))
+          : [...cur, novo]
+      );
+    },
+  });
 
   // A FILA: pedidos abertos do mais antigo para o mais novo. A caixa de escrita
   // mostra o primeiro; resolvido ele, vem o próximo.
@@ -326,9 +352,19 @@ export default function Thread({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, pedidoId }),
       });
-      if (res.ok) await carregarHandoffs();
+      // Fecha na tela já; o evento do realtime traz a linha de verdade (sem
+      // reler a lista, que era a segunda consulta por clique).
+      if (res.ok) {
+        setHandoffs((cur) =>
+          cur.map((h) =>
+            h.id === pedidoId && !h.closedAt
+              ? { ...h, closedAt: new Date().toISOString(), closedHow: "resolvido" }
+              : h
+          )
+        );
+      }
     },
-    [phone, carregarHandoffs]
+    [phone]
   );
 
   /**
@@ -356,7 +392,7 @@ export default function Thread({
   const recarregarRecentes = useCallback(async () => {
     const { data } = await supabase
       .from("chat_messages")
-      .select("*")
+      .select(COLUNAS_MENSAGEM)
       .eq("phone", phone)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
@@ -372,7 +408,7 @@ export default function Thread({
     try {
       const { data, error } = await supabase
         .from("chat_messages")
-        .select("*")
+        .select(COLUNAS_MENSAGEM)
         .eq("phone", phone)
         .or(`created_at.lt.${primeira.created_at},and(created_at.eq.${primeira.created_at},id.lt.${primeira.id})`)
         .order("created_at", { ascending: false })
@@ -415,45 +451,26 @@ export default function Thread({
     return () => obs.disconnect();
   }, [temAntigas, carregarAntigas, rows.length]);
 
-  // Realtime: mudanças nesta conversa.
-  useEffect(() => {
-    let primeira = true;
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`thread-${phone}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "chat_messages",
-          filter: `phone=eq.${phone}`,
-        },
-        (pl: { eventType?: string; new?: unknown; old?: unknown }) => {
-          // A LINHA que mudou entra direto, sem baixar a conversa de novo.
-          if (pl.eventType === "DELETE") {
-            const id = (pl.old as { id?: number } | null)?.id;
-            if (id != null) setRows((cur) => cur.filter((r) => r.id !== id));
-            return;
-          }
-          if (pl.new) mesclar([pl.new as ChatRow]);
-        }
-      )
-      .subscribe((status: string) => {
-        // Reassinatura (o realtime caiu e voltou): pode ter chegado mensagem no
-        // meio. A primeira assinatura é pulada: a conversa acabou de vir.
-        if (status !== "SUBSCRIBED") return;
-        if (primeira) {
-          primeira = false;
-          return;
-        }
-        void recarregarRecentes();
-      })
-    );
-    return () => {
-      channelSair();
-    };
-  }, [phone, mesclar, recarregarRecentes]);
+  // Realtime: mudanças nesta conversa (canal próprio por telefone, filtrado no
+  // servidor: é a tabela de maior volume). Reassinatura (o realtime caiu e
+  // voltou) ou voltar o foco: pode ter chegado mensagem no meio, então busca as
+  // recentes e JUNTA. A primeira assinatura é pulada: a conversa acabou de vir.
+  useCanalConversa({
+    nome: "thread",
+    tabela: "chat_messages",
+    filtro: `phone=eq.${phone}`,
+    modo: "aplicar",
+    revalidar: () => void recarregarRecentes(),
+    aoEvento: (ev) => {
+      // A LINHA que mudou entra direto, sem baixar a conversa de novo.
+      if (ev.tipo === "DELETE") {
+        const id = ev.antigo?.id as number | undefined;
+        if (id != null) setRows((cur) => cur.filter((r) => r.id !== id));
+        return;
+      }
+      if (ev.novo) mesclar([ev.novo as unknown as ChatRow]);
+    },
+  });
 
   const bubbles = useMemo(() => {
     const base = rowsToBubbles(rows);

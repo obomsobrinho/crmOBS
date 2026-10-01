@@ -22,7 +22,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
   avatarPair,
@@ -350,10 +351,9 @@ export default function ContactSidebar({
   //    um lote (4 mensagens e a resposta viram uma busca por conversa);
   // 3. a busca é da LINHA, com o recorte de agora, e ela é encaixada no lugar
   //    (`encaixar`) sem tocar no resto;
-  // 4. aba escondida não busca nada: anota que ficou para trás e revalida
-  //    quando a pessoa voltar.
+  // 4. aba escondida não busca nada: o canal (`useCanalTenant`) anota que ficou
+  //    para trás e revalida quando a pessoa voltar.
   const pendentesRef = useRef<Set<string>>(new Set());
-  const atrasadaRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const processarPendentes = useCallback(async () => {
@@ -379,10 +379,6 @@ export default function ContactSidebar({
   const anotar = useCallback(
     (phone: string | null | undefined) => {
       if (!phone) return;
-      if (document.visibilityState !== "visible") {
-        atrasadaRef.current = true;
-        return;
-      }
       pendentesRef.current.add(phone);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void processarPendentes(), 500);
@@ -390,66 +386,23 @@ export default function ContactSidebar({
     [processarPendentes]
   );
 
-  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO (31/08/2026). `SUBSCRIBED`
-  // chega de novo a cada reassinatura automática do supabase-js, e é exatamente
-  // aí que a lista pode estar velha: entre a queda e a volta ninguém recebeu
-  // evento. A PRIMEIRA assinatura é pulada de propósito, porque nessa hora a
-  // lista acabou de vir do servidor.
-  useEffect(() => {
-    if (!clientId) return;
-    let primeira = true;
-    const filtro = `client_id=eq.${clientId}`;
-    type Linha = { phone?: string; telefone?: string } | null;
-    const fone = (pl: { new?: unknown; old?: unknown }) =>
-      (pl.new as Linha)?.phone ??
-      (pl.new as Linha)?.telefone ??
-      (pl.old as Linha)?.phone ??
-      (pl.old as Linha)?.telefone;
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`inbox-list-${clientId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-      .on("postgres_changes", { event: "*", schema: "public", table: "dados_cliente", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversation_qualifications", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") return;
-        if (primeira) {
-          primeira = false;
-          return;
-        }
-        if (document.visibilityState === "visible") void revalidar(paramsRef.current);
-        else atrasadaRef.current = true;
-      })
-    );
-    return () => {
+  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO (31/08/2026). A regra
+  // inteira (pular a primeira `SUBSCRIBED`, revalidar nas seguintes e ao voltar
+  // para a aba, no máximo a cada 10s) mora em `useCanalTenant`, que é por onde
+  // toda assinatura passa desde 02/10/2026. Daqui sai só o que é da lista: qual
+  // linha buscar e como revalidar o recorte inteiro.
+  useEffect(
+    () => () => {
       if (timerRef.current) clearTimeout(timerRef.current);
-      channelSair();
-    };
-  }, [clientId, supabase, anotar, revalidar]);
-
-  // Rede de segurança do de cima: VOLTAR PARA A ABA revalida o que está na tela.
-  // Cobre o socket derrubado pelo sistema operacional enquanto a máquina dormia
-  // (a queda demora a ser percebida) e a aba que ficou escondida acumulando
-  // mudança. Foco e `visibilitychange` chegam juntos: um só a cada 10s, menos
-  // quando a aba ficou para trás de verdade.
-  useEffect(() => {
-    if (!clientId) return;
-    let ultima = 0;
-    const aoVoltar = () => {
-      if (document.visibilityState !== "visible") return;
-      const agora = Date.now();
-      if (!atrasadaRef.current && agora - ultima < 10_000) return;
-      ultima = agora;
-      atrasadaRef.current = false;
-      void revalidar(paramsRef.current);
-    };
-    document.addEventListener("visibilitychange", aoVoltar);
-    window.addEventListener("focus", aoVoltar);
-    return () => {
-      document.removeEventListener("visibilitychange", aoVoltar);
-      window.removeEventListener("focus", aoVoltar);
-    };
-  }, [clientId, revalidar]);
+    },
+    []
+  );
+  useCanalTenant({
+    clientId,
+    tabelas: ["conversations", "dados_cliente", "conversation_qualifications"],
+    aoEvento: (ev) => anotar(foneDoEvento(ev)),
+    revalidar: () => void revalidar(paramsRef.current),
+  });
 
   // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime também vai
   // chegar, mas depois de ir ao Postgres e voltar; aqui a correção é imediata.

@@ -17,7 +17,8 @@ import {
   ArrowRightLeft,
   Check,
 } from "lucide-react";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, prettyPhone } from "@/lib/format";
 import { initials, avatarPair } from "@/lib/inbox";
 import { foraDaLista } from "@/lib/inbox-lista";
@@ -296,9 +297,9 @@ export default function PipelineBoard({
 
   // REALTIME LINHA A LINHA: o evento anota QUAL conversa mudou; um debounce
   // junta a rajada; busca-se SÓ o card dele, que sai de onde estava e entra na
-  // coluna certa. Aba escondida não busca: revalida tudo ao voltar.
+  // coluna certa. Aba escondida não busca: o canal (`useCanalTenant`) anota e
+  // revalida tudo ao voltar, ao reconectar e ao voltar o foco.
   const pendentesRef = useRef<Set<string>>(new Set());
-  const atrasadaRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const processarPendentes = useCallback(async () => {
     const fones = [...pendentesRef.current];
@@ -318,34 +319,12 @@ export default function PipelineBoard({
   const anotar = useCallback(
     (phone: string | null | undefined) => {
       if (!phone) return;
-      if (document.visibilityState !== "visible") {
-        atrasadaRef.current = true;
-        return;
-      }
       pendentesRef.current.add(phone);
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void processarPendentes(), 500);
     },
     [processarPendentes]
   );
-  useEffect(() => {
-    if (!supabase) return;
-    let ultima = Date.now();
-    const aoVoltar = () => {
-      if (document.visibilityState !== "visible") return;
-      if (!atrasadaRef.current && Date.now() - ultima < 10_000) return;
-      ultima = Date.now();
-      atrasadaRef.current = false;
-      void recarregarTudo();
-    };
-    document.addEventListener("visibilitychange", aoVoltar);
-    window.addEventListener("focus", aoVoltar);
-    return () => {
-      document.removeEventListener("visibilitychange", aoVoltar);
-      window.removeEventListener("focus", aoVoltar);
-    };
-  }, [supabase, recarregarTudo]);
-
   const refetchStages = useCallback(async () => {
     if (!supabase) return;
     const { data } = await supabase
@@ -356,27 +335,36 @@ export default function PipelineBoard({
   }, [supabase]);
 
   // Realtime: conversas, contatos e resumos mudam UM card; pipeline_stages muda
-  // as colunas (e aí o recorte muda, e as colunas recarregam). Só o tenant.
-  useEffect(() => {
-    if (!supabase) return;
-    const filtro = `client_id=eq.${clientId}`;
-    type Linha = { phone?: string; telefone?: string } | null;
-    const fone = (pl: { new?: unknown; old?: unknown }) =>
-      (pl.new as Linha)?.phone ?? (pl.new as Linha)?.telefone ?? (pl.old as Linha)?.phone ?? (pl.old as Linha)?.telefone;
-    const channelSair = assinarComSessao((sb) =>
-      sb
-        .channel(`pipeline-${clientId}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "conversations", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-        .on("postgres_changes", { event: "*", schema: "public", table: "dados_cliente", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "conversation_qualifications", filter: filtro }, (pl: { new?: unknown; old?: unknown }) => anotar(fone(pl)))
-        .on("postgres_changes", { event: "*", schema: "public", table: "pipeline_stages", filter: filtro }, () => void refetchStages())
-        .subscribe()
-    );
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      channelSair();
-    };
-  }, [supabase, clientId, anotar, refetchStages]);
+  // UMA coluna (a linha do payload entra no lugar, sem reler a lista). Canal do
+  // tenant compartilhado (02/10/2026, R-03/R-22). Reconectou, voltou o foco ou a
+  // aba ficou para trás: recarrega as colunas e as etapas.
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+  useCanalTenant({
+    clientId,
+    ativo: !!supabase,
+    tabelas: ["conversations", "dados_cliente", "conversation_qualifications", "pipeline_stages"],
+    revalidar: () => {
+      void recarregarTudo();
+      void refetchStages();
+    },
+    aoEvento: (ev) => {
+      if (ev.tabela !== "pipeline_stages") return anotar(foneDoEvento(ev));
+      if (ev.tipo === "DELETE") {
+        const id = ev.antigo?.id as number | undefined;
+        if (id != null) setStages((cur) => cur.filter((st) => st.id !== id));
+        return;
+      }
+      if (!ev.novo) return;
+      const nova = rowToStage(ev.novo as unknown as StageRow);
+      setStages((cur) =>
+        cur.some((st) => st.id === nova.id)
+          ? cur.map((st) => (st.id === nova.id ? nova : st))
+          : [...cur, nova]
+      );
+    },
+  });
 
   // Membros do time (para nomear o atendente de cada card).
   useEffect(() => {

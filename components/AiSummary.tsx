@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Sparkles, Clock } from "lucide-react";
-import { assinarComSessao, createClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
+import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { qualReasonLabel, type Qualification, type QualAction } from "@/lib/crm";
 import { cn } from "@/lib/utils";
 
@@ -82,35 +83,47 @@ export default function AiSummary({
   }, [supabase, clientId, phone]);
 
 
+  // Carga inicial. Com qualificacao injetada nao ha o que buscar: o preview
+  // roda sem banco.
   useEffect(() => {
-    // Com qualificacao injetada nao ha o que buscar nem o que escutar: o
-    // preview roda sem banco, e assinar realtime ali so geraria canal morto.
     if (qualificacaoForcada) return;
     void (async () => {
       await load();
     })();
-    const channelSair = assinarComSessao((sb) =>
-      sb
-      .channel(`qual-${phone}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversation_qualifications" },
-        () => void load()
-      )
-      // `conversations` também: o handoff é aberto pelo /api/agent e fechado pela
-      // rota de resolver, os dois fora desta tela, então sem isto o bloco só
-      // atualizaria ao trocar de conversa.
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "conversations" },
-        () => void load()
-      )
-      .subscribe()
-    );
-    return () => {
-      channelSair();
-    };
-  }, [load, supabase, phone, qualificacaoForcada]);
+  }, [load, qualificacaoForcada]);
+
+  // TEMPO REAL (02/10/2026, R-02): canal do tenant, e SÓ esta conversa conta
+  // (pelo `phone` do payload). Antes eram duas tabelas inteiras sem filtro e
+  // duas consultas a cada mudança de QUALQUER conversa, em aba escondida também.
+  // Agora o evento encaixa o que traz no estado, sem consulta nenhuma:
+  // - `conversations`: o handoff é aberto pelo /api/agent e fechado pela rota de
+  //   resolver, os dois fora desta tela, e a linha traz `handoff_at`;
+  // - `conversation_qualifications` (só INSERT, é append-only): a linha nova é a
+  //   mais recente, e traz as colunas que a faixa mostra.
+  // `load` só roda ao reconectar ou ao voltar o foco.
+  useCanalTenant({
+    clientId: qualificacaoForcada ? null : clientId,
+    tabelas: ["conversations", "conversation_qualifications"],
+    modo: "aplicar",
+    revalidar: () => void load(),
+    aoEvento: (ev) => {
+      if (foneDoEvento(ev) !== phone) return;
+      if (ev.tabela === "conversations") {
+        if (ev.tipo === "DELETE") return setHandoffAt(null);
+        if (ev.novo && "handoff_at" in ev.novo) {
+          setHandoffAt((ev.novo.handoff_at as string | null) ?? null);
+        }
+        return;
+      }
+      if (ev.tipo !== "INSERT" || !ev.novo) return;
+      setQual({
+        action: (ev.novo.action as QualAction) ?? "none",
+        summary: (ev.novo.summary as string | null) ?? "",
+        preferenciaHorario: (ev.novo.preferencia_horario as string | null) ?? "",
+        createdAt: (ev.novo.created_at as string) ?? "",
+      });
+    },
+  });
 
   const pedido = qual ? qualReasonLabel(qual.action) : "";
   const horario = qual?.preferenciaHorario ?? "";

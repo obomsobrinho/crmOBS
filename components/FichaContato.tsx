@@ -300,6 +300,7 @@ export default function FichaContato({
       />
 
       <ContactNotes
+        clientId={clientId}
         foraDaConversa={superficie === "clientes"}
         conversationId={conversationId}
         myUserId={myUserId}
