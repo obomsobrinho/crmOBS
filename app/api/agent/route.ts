@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
+import { segredoConfere } from "@/lib/segredo";
 
 // Cérebro do agente, chamado pelo n8n (que virou só o cano). STATELESS por turno.
 // Recebe { client_id, phone, instance, message, nomewpp? }, e a orquestração
@@ -19,7 +20,7 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const secret = process.env.N8N_LOOKUP_SECRET;
-  if (!secret || req.headers.get("x-lookup-secret") !== secret) {
+  if (!segredoConfere(req.headers.get("x-lookup-secret"), secret)) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
 

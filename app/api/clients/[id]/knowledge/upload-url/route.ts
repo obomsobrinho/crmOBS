@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { KNOWLEDGE_MAX_BYTES, KNOWLEDGE_MAX_LABEL } from "@/lib/crm";
 import { EMBEDDING_MODEL } from "@/lib/rag";
@@ -23,15 +23,8 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.id !== id)
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
-  if (mine.role !== "dono")
-    return NextResponse.json(
-      { error: "só o dono gerencia a base de conhecimento" },
-      { status: 403 }
-    );
+  const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento" });
+  if ("erro" in r) return r.erro;
 
   // Sem a chave, o /process não conseguiria embedar; falha cedo.
   if (!process.env.OPENAI_API_KEY) {

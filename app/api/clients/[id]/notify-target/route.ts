@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient, type MyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchGroups, ownerNumber } from "@/lib/evolution";
 import {
@@ -20,24 +20,6 @@ import {
 // Só o dono configura. Write via service_role: a RLS de `clients` não dá UPDATE
 // a `authenticated` (um update do browser afetaria 0 linhas em silêncio).
 
-async function dono(
-  id: string
-): Promise<{ mine: MyClient } | { erro: NextResponse }> {
-  const mine = await getMyClient();
-  if (!mine)
-    return { erro: NextResponse.json({ error: "não autenticado" }, { status: 401 }) };
-  if (mine.id !== id)
-    return { erro: NextResponse.json({ error: "acesso negado" }, { status: 403 }) };
-  if (mine.role !== "dono")
-    return {
-      erro: NextResponse.json(
-        { error: "só o dono pode configurar os avisos" },
-        { status: 403 }
-      ),
-    };
-  return { mine };
-}
-
 /**
  * Grava o destino. Corpo: `{ numero }` ou `{ grupo }`; sem nenhum dos dois,
  * limpa (volta a null).
@@ -47,7 +29,7 @@ export async function PUT(
   ctx: RouteContext<"/api/clients/[id]/notify-target">
 ) {
   const { id } = await ctx.params;
-  const r = await dono(id);
+  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos" });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
@@ -128,7 +110,7 @@ export async function GET(
   ctx: RouteContext<"/api/clients/[id]/notify-target">
 ) {
   const { id } = await ctx.params;
-  const r = await dono(id);
+  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos" });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 

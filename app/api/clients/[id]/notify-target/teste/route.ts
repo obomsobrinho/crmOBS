@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { sendText } from "@/lib/evolution";
 import { TEXTO_TESTE_AVISO } from "@/lib/avisos";
@@ -14,15 +14,9 @@ export async function POST(
   ctx: RouteContext<"/api/clients/[id]/notify-target/teste">
 ) {
   const { id } = await ctx.params;
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.id !== id)
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
-  if (mine.role !== "dono")
-    return NextResponse.json(
-      { error: "só o dono pode testar os avisos" },
-      { status: 403 }
-    );
+  const r = await sessaoDaRota({ id, dono: "só o dono pode testar os avisos" });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
   if (!mine.evolution_instance) {
     return NextResponse.json(
       { error: "conecte o WhatsApp antes de mandar o teste." },

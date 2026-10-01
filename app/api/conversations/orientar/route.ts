@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -27,13 +27,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 //
 // Qualquer MEMBRO do tenant orienta, como no Resolvido.
 export async function POST(req: Request) {
-  const client = await getMyClient();
-  if (!client) {
-    return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  }
-  if (client.access.blocked) {
-    return NextResponse.json({ error: client.access.message }, { status: 402 });
-  }
+  const r = await sessaoDaRota({ ativa: true });
+  if ("erro" in r) return r.erro;
+  const client = r.mine;
 
   let body: { phone?: string; instruction?: string; pedidoId?: number };
   try {

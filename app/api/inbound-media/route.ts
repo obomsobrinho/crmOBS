@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { segredoConfere } from "@/lib/segredo";
 
 // Chamado pelo n8n quando chega mídia do contato. Sobe o base64 (que a Evolution
 // entrega no webhook) pro bucket privado whatsapp-media e devolve o caminho, que
@@ -43,7 +44,7 @@ function extFor(mime: string, filename: string): string {
 
 export async function POST(req: NextRequest) {
   const secret = process.env.N8N_LOOKUP_SECRET;
-  if (!secret || req.headers.get("x-lookup-secret") !== secret) {
+  if (!segredoConfere(req.headers.get("x-lookup-secret"), secret)) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
 

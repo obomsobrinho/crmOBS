@@ -29,7 +29,7 @@ import {
   SheetDescription,
   SheetClose,
 } from "@/components/ui/sheet";
-import { CabecalhoBloco, MOLDURA_LISTA } from "@/components/agente/ui";
+import { CabecalhoBloco, ConfirmModal, MOLDURA_LISTA } from "@/components/agente/ui";
 import { cn } from "@/lib/utils";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.csv,.txt,.md";
@@ -65,6 +65,9 @@ export default function KnowledgeManager({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [painelAberto, setPainelAberto] = useState(false);
+  // Documento esperando a confirmação de exclusão (R-43): apagar leva junto os
+  // trechos que o agente usa para responder, e não tem volta.
+  const [aExcluir, setAExcluir] = useState<KnowledgeDoc | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function updateDoc(id: string, patch: Partial<KnowledgeDoc>) {
@@ -266,7 +269,7 @@ export default function KnowledgeManager({
         <Button
           variant="danger-ghost"
           size="icon-control"
-          onClick={() => remove(doc.id)}
+          onClick={() => setAExcluir(doc)}
           title="Remover"
           aria-label={`Remover ${doc.title}`}
         >
@@ -288,6 +291,21 @@ export default function KnowledgeManager({
       <ul className="space-y-2">{docs.map((d) => linhaDoc(d, "cartao"))}</ul>
     );
   }
+
+  const confirmarExclusao = (
+    <ConfirmModal
+      aberto={aExcluir !== null}
+      title="Remover este documento?"
+      body={`"${aExcluir?.title ?? ""}" sai da base e o agente deixa de usá-lo nas respostas. Isso não tem volta.`}
+      confirmLabel="Remover"
+      onCancel={() => setAExcluir(null)}
+      onConfirm={() => {
+        const doc = aExcluir;
+        setAExcluir(null);
+        if (doc) void remove(doc.id);
+      }}
+    />
+  );
 
   const painel = (
     <Sheet open={painelAberto} onOpenChange={setPainelAberto}>
@@ -381,6 +399,7 @@ export default function KnowledgeManager({
           </div>
         </div>
         {painel}
+        {confirmarExclusao}
       </div>
     );
   }
@@ -409,6 +428,7 @@ export default function KnowledgeManager({
       <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
         {lista()}
       </AreaRolavel>
+      {confirmarExclusao}
     </div>
   );
 }

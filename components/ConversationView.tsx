@@ -262,16 +262,15 @@ export default function ConversationView({
   // cliente (consumo único em /api/agent) e segue sozinha.
   const instruct = useCallback(
     async (text: string) => {
-      const { error } = await supabase
-        .from("conversations")
-        .update({
-          pending_instruction: text,
-          pending_instruction_at: new Date().toISOString(),
-          pending_instruction_by: myUserId,
-        })
-        .eq("client_id", clientId)
-        .eq("phone", phone);
-      if (error) return;
+      // A orientação entra no prompt como texto confiável do time, então o
+      // browser não escreve mais a coluna: vai pela rota, que confere sessão,
+      // tenant e tamanho (R-40, 01/10/2026).
+      const gravou = await fetch("/api/conversations/instrucao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone, instruction: text }),
+      }).catch(() => null);
+      if (!gravou?.ok) return;
       await supabase
         .from("dados_cliente")
         .update({ atendimento_ia: "reativada" })
@@ -292,23 +291,19 @@ export default function ConversationView({
         .eq("phone", phone);
       if (assignErr) setAssigned(prevAssigned); // reverte
     },
-    [supabase, clientId, phone, myUserId, assigned]
+    [supabase, clientId, phone, assigned]
   );
 
   const cancelInstruction = useCallback(async () => {
     const prev = instruction;
     setInstruction(null); // otimista
-    const { error } = await supabase
-      .from("conversations")
-      .update({
-        pending_instruction: null,
-        pending_instruction_at: null,
-        pending_instruction_by: null,
-      })
-      .eq("client_id", clientId)
-      .eq("phone", phone);
-    if (error) setInstruction(prev); // reverte
-  }, [supabase, clientId, phone, instruction]);
+    const cancelou = await fetch("/api/conversations/instrucao", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    }).catch(() => null);
+    if (!cancelou?.ok) setInstruction(prev); // reverte
+  }, [phone, instruction]);
 
   const toggleIa = useCallback(async () => {
     // Conta bloqueada não liga nem desliga a IA. A guarda fica aqui (e não só no

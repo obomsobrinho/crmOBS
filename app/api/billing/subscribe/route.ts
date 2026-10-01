@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { PLANS, planFor, type PlanKey } from "@/lib/billing";
 import {
@@ -25,14 +25,9 @@ import {
 const CPF_CNPJ_RE = /^\d{11}$|^\d{14}$/;
 
 export async function POST(req: NextRequest) {
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.role !== "dono") {
-    return NextResponse.json(
-      { error: "só o dono pode contratar ou trocar o plano" },
-      { status: 403 }
-    );
-  }
+  const r = await sessaoDaRota({ dono: "só o dono pode contratar ou trocar o plano" });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
 
   let body: { plan?: string; cpfCnpj?: string; name?: string; email?: string };
   try {
@@ -178,14 +173,9 @@ export async function POST(req: NextRequest) {
 
 // Cancelamento self-service (decisão do dono do produto: botão, não ligação).
 export async function DELETE(req: NextRequest) {
-  const mine = await getMyClient();
-  if (!mine) return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  if (mine.role !== "dono") {
-    return NextResponse.json(
-      { error: "só o dono pode cancelar a assinatura" },
-      { status: 403 }
-    );
-  }
+  const r = await sessaoDaRota({ dono: "só o dono pode cancelar a assinatura" });
+  if ("erro" in r) return r.erro;
+  const { mine } = r;
 
   let motivo = "";
   try {

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 
 // Transcreve o áudio gravado na bancada de teste (26/09/2026). Dono-only, como o
 // `/api/playground`.
@@ -22,13 +22,8 @@ export const maxDuration = 60;
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  const client = await getMyClient();
-  if (!client) {
-    return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  }
-  if (client.role !== "dono") {
-    return NextResponse.json({ error: "acesso negado" }, { status: 403 });
-  }
+  const r = await sessaoDaRota({ dono: "acesso negado" });
+  if ("erro" in r) return r.erro;
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

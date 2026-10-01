@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { numeroNoWhatsApp } from "@/lib/evolution";
 import { ehNumeroDeAvisos, telefoneImpossivel } from "@/lib/avisos";
@@ -30,14 +30,10 @@ import {
 //    primeira mensagem. Ela não aparece em Conversas nem no Pipeline enquanto
 //    não houver mensagem (`buildInbox`).
 export async function POST(req: Request) {
-  const client = await getMyClient();
-  if (!client) {
-    return NextResponse.json({ error: "não autenticado" }, { status: 401 });
-  }
   // Conta bloqueada fica em modo leitura, e cadastrar é trabalho.
-  if (client.access.blocked) {
-    return NextResponse.json({ error: client.access.message }, { status: 402 });
-  }
+  const r = await sessaoDaRota({ ativa: true });
+  if ("erro" in r) return r.erro;
+  const client = r.mine;
 
   let body: { telefone?: unknown; nome?: unknown; email?: unknown; nascimento?: unknown };
   try {
