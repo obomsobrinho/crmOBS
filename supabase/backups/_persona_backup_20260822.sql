@@ -1,5 +1,5 @@
 -- Export of public._persona_backup_20260822 (R-54), taken read-only on 2026-10-01
--- before the table is dropped by 20261001160300_drop_persona_backups.sql.
+-- before the table is dropped by 20261001193828_drop_persona_backups.sql.
 -- 2 rows: persona of every tenant right before the OBM recompilation of 2026-08-22.
 -- Prompt text only, no secrets.
 -- Integrity (md5 of persona): Loja Teste a234c35b47ad0b0fe19931f581d20efb (9675 chars),

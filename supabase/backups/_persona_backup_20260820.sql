@@ -1,5 +1,5 @@
 -- Export of public._persona_backup_20260820 (R-54), taken read-only on 2026-10-01
--- before the table is dropped by 20261001160300_drop_persona_backups.sql.
+-- before the table is dropped by 20261001193828_drop_persona_backups.sql.
 -- 1 row: the OBM persona as it was on 2026-08-20. Prompt text only, no secrets.
 -- Integrity: md5(persona) = a17c50af5da2d3450d8e8c7228487e2c, length 9721.
 -- Restore: run this file (it recreates the table; nothing here is applied automatically).
