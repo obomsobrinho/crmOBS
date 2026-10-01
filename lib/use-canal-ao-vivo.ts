@@ -162,6 +162,7 @@ function montarCanal(
   return assinarComSessao((sb) => {
     // eslint-disable-next-line no-restricted-syntax -- este módulo é o único lugar que abre canal
     const base = sb.channel(nome);
+    // eslint-disable-next-line no-restricted-syntax -- o `.on` do realtime tem overloads por evento que o tipo local simplifica
     let c = base as unknown as CanalSolto;
     for (const e of escutas) {
       c = c.on(

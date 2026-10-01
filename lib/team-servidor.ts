@@ -1,6 +1,6 @@
 import "server-only";
 import { revalidateTag, unstable_cache } from "next/cache";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchMembers, type Member } from "@/lib/team";
 
@@ -26,7 +26,7 @@ const TTL_SEGUNDOS = 300;
 const tagMembros = (clientId: string) => `membros-${clientId}`;
 
 export async function membrosDoTenant(
-  supabase: SupabaseClient,
+  supabase: Supa,
   clientId: string
 ): Promise<Member[]> {
   try {
@@ -38,7 +38,7 @@ export async function membrosDoTenant(
         );
         // Lançar (e não devolver []) para o erro NÃO ser guardado no cache.
         if (error || !data) throw new Error(error?.message ?? "sem dados");
-        return (data as { user_id: string; email: string; role: string }[]).map(
+        return data.map(
           (r) => ({ userId: r.user_id, email: r.email, role: r.role })
         );
       },

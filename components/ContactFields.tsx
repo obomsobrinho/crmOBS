@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
+import type { Json } from "@/lib/database.types";
 import { anunciarContato } from "@/lib/contato-bus";
 import {
   customFieldsToList,
@@ -54,7 +55,7 @@ export default function ContactFields({
 }: {
   phone: string;
   initialDisplayName: string | null;
-  initialCustomFields: Record<string, unknown> | null;
+  initialCustomFields: Json | null;
   /** Nascimento e e-mail entraram com a tela de Clientes (30/09/2026, D1 = B).
    *  CPF ficou de fora de propósito (LGPD). */
   initialEmail?: string | null;

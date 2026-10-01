@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       { status: 404 }
     );
   }
-  if ((target as { role: string }).role === "dono") {
+  if (target.role === "dono") {
     const { count } = await svc
       .from("user_clients")
       .select("user_id", { count: "exact", head: true })

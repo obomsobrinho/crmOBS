@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
     .eq("ip", ip)
     .gte("created_at", new Date(agora - DIA_MS).toISOString());
 
-  const marcas = ((recentes ?? []) as { created_at: string }[]).map((r) =>
+  const marcas = (recentes ?? []).map((r) =>
     Date.parse(r.created_at)
   );
   const naUltimaHora = marcas.filter((t) => t >= agora - HORA_MS).length;

@@ -47,6 +47,12 @@ const projectRules = [
       "Never open a realtime channel by hand: use useCanalTenant / useCanalConversa (lib/use-canal-ao-vivo.ts). It owns the session, the status callback, the focus refetch and the hidden tab.",
   },
   {
+    selector:
+      "TSAsExpression[expression.type='TSAsExpression'][expression.typeAnnotation.type='TSUnknownKeyword']",
+    message:
+      "No `as unknown as`: derive the type from lib/database.types.ts (Tables, Pick, lib/supabase/schema.ts). A real library typing gap gets a disable with the reason (docs/adr/2026-10-02-generated-supabase-types.md).",
+  },
+  {
     selector: "Literal[value=/[\\u2013\\u2014]/]",
     message: "No em dash or en dash in user-visible text or prompts. Use comma, colon or parentheses.",
   },

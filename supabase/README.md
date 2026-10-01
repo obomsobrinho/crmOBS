@@ -30,3 +30,11 @@ replaces the browser write).
 
 ## Checking drift
 `list_migrations` (Supabase MCP) must list the same versions as the files here.
+
+## Generated types (`lib/database.types.ts`)
+The three Supabase clients are typed with `Database` from `lib/database.types.ts`.
+Regenerate it in the SAME delivery as every migration: ask the Supabase MCP
+`generate_typescript_types` (read-only) and overwrite the file with its `types`
+output, then run `npm run typecheck`. Note: the generator marks every RPC
+`Returns` column as non-null even when the SQL function can return NULL, so a
+nullable RPC column must be widened at the call site (see `lib/types.ts`).

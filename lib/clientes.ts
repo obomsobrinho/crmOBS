@@ -1,3 +1,4 @@
+import type { Tables } from "./database.types";
 import { diaSP, nomeDoContato } from "./inbox";
 import { chaveTelefone, ehNumeroDeAvisos, grafiasDeDigitos } from "./avisos";
 
@@ -5,18 +6,19 @@ import { chaveTelefone, ehNumeroDeAvisos, grafiasDeDigitos } from "./avisos";
 // lista, busca e recorta. Servidor e navegador usam as MESMAS funções.
 
 /** Linha crua de `dados_cliente` que a tela lê. */
-export interface ContatoClienteRow {
-  id: number;
-  telefone: string;
-  nomewpp: string | null;
-  display_name: string | null;
-  atendimento_ia: string | null;
-  custom_fields: Record<string, unknown> | null;
-  email: string | null;
-  birth_date: string | null;
-  created_at: string | null;
-  foto_path?: string | null;
-}
+export type ContatoClienteRow = Pick<
+  Tables<"dados_cliente">,
+  | "id"
+  | "telefone"
+  | "nomewpp"
+  | "display_name"
+  | "atendimento_ia"
+  | "custom_fields"
+  | "email"
+  | "birth_date"
+  | "created_at"
+> &
+  Partial<Pick<Tables<"dados_cliente">, "foto_path">>;
 
 /** Linha crua de `conversations` que a tela lê. */
 export interface ConversaClienteRow {

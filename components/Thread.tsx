@@ -80,7 +80,7 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
         side: "in",
         author: "cliente",
         content: r.user_message ?? "",
-        created_at: r.created_at,
+        created_at: r.created_at ?? "",
         mediaUrl: isManual ? null : media,
         mediaType: isManual ? null : mediaType,
       });
@@ -92,7 +92,7 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
         side: "out",
         author: "voce",
         content: "",
-        created_at: r.created_at,
+        created_at: r.created_at ?? "",
         mediaUrl: media,
         mediaType,
       });
@@ -120,7 +120,7 @@ function rowsToBubbles(rows: ChatRow[]): Bubble[] {
           side: "out",
           author,
           content,
-          created_at: r.created_at,
+          created_at: r.created_at ?? "",
           // mídia enviada só entra quando a linha não tem mensagem recebida.
           mediaUrl: i === 0 && !r.user_message ? media : null,
           mediaType: i === 0 && !r.user_message ? mediaType : null,
@@ -148,8 +148,8 @@ function dayLabel(iso: string): string {
 
 /** A ordem da conversa: chegada no WhatsApp, e o id desempata. */
 function ordemDasLinhas(a: ChatRow, b: ChatRow): number {
-  const ta = Date.parse(a.created_at);
-  const tb = Date.parse(b.created_at);
+  const ta = Date.parse(a.created_at ?? "");
+  const tb = Date.parse(b.created_at ?? "");
   return ta !== tb ? ta - tb : a.id - b.id;
 }
 
@@ -277,20 +277,13 @@ export default function Thread({
       .eq("phone", phone)
       .order("opened_at", { ascending: true });
     setHandoffs(
-      ((data ?? []) as {
-        id: number;
-        opened_at: string;
-        summary: string | null;
-        instruction: string | null;
-        closed_at: string | null;
-        closed_how: "ia" | "resolvido" | null;
-      }[]).map((r) => ({
+      (data ?? []).map((r) => ({
         id: r.id,
         openedAt: r.opened_at,
         summary: r.summary,
         instruction: r.instruction,
         closedAt: r.closed_at,
-        closedHow: r.closed_how,
+        closedHow: r.closed_how as Handoff["closedHow"],
       }))
     );
   }, [supabase, clientId, phone, handoffsPreview]);
@@ -401,7 +394,7 @@ export default function Thread({
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(PAGINA_MENSAGENS);
-    if (data) mesclar((data as ChatRow[]).reverse());
+    if (data) mesclar(data.reverse());
   }, [phone, supabase, mesclar]);
 
   /** As 30 anteriores à primeira da tela. */
@@ -419,7 +412,7 @@ export default function Thread({
         .order("id", { ascending: false })
         .limit(PAGINA_MENSAGENS);
       if (error) throw error;
-      const antigas = ((data ?? []) as ChatRow[]).reverse();
+      const antigas = (data ?? []).reverse();
       const el = viewportRef.current;
       if (el) restaurarRef.current = el.scrollHeight - el.scrollTop;
       setTemAntigas(antigas.length === PAGINA_MENSAGENS);
@@ -472,7 +465,7 @@ export default function Thread({
         if (id != null) setRows((cur) => cur.filter((r) => r.id !== id));
         return;
       }
-      if (ev.novo) mesclar([ev.novo as unknown as ChatRow]);
+      if (ev.novo) mesclar([ev.novo as ChatRow]);
     },
   });
 
@@ -664,7 +657,7 @@ export default function Thread({
     // conversa dormiu uma noite.
     let ultimaResposta = "";
     for (const b of bubbles) {
-      soltarAte(Date.parse(b.created_at));
+      soltarAte(Date.parse(b.created_at ?? ""));
       const day = new Date(b.created_at).toDateString();
       if (day !== lastDay) {
         lastDay = day;

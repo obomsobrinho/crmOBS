@@ -136,7 +136,7 @@ export default async function PainelPage() {
   // (lib/avisos.ts). O banco já o deixa fora das agregações (`p_fora`); aqui só
   // a fila de pedidos abertos, que vem de outra tabela.
   const abertas = semNumeroDeAvisos(
-    (espera.data ?? []) as { phone: string; handoff_at: string }[],
+    (espera.data ?? []),
     client.avisos,
     (c) => c.phone
   );

@@ -1,32 +1,35 @@
-// Schema real usado pelo n8n + Evolution.
+import type { Tables } from "./database.types";
 
 // Uma linha = uma troca: user_message (cliente) + bot_message (IA ou humano).
-export interface ChatRow {
-  id: number;
-  phone: string; // JID do WhatsApp, ex.: 553584774753@s.whatsapp.net
-  nomewpp: string | null;
-  user_message: string | null;
-  bot_message: string | null;
-  message_type: string | null; // 'text' (IA) | 'manual' (humano) | ...
-  active: boolean | null;
-  created_at: string;
-  media_url?: string | null; // arquivo (Supabase Storage) quando há mídia
-  media_type?: string | null; // image | audio | video | document
-}
+// Derivada do banco (lib/database.types.ts). phone = JID do WhatsApp; message_type
+// = 'text' (IA) | 'manual' (humano) | ...; media_type = image | audio | video |
+// document. created_at é anulável NO BANCO (o n8n escreve a tabela).
+export type ChatRow = Pick<
+  Tables<"chat_messages">,
+  | "id"
+  | "phone"
+  | "nomewpp"
+  | "user_message"
+  | "bot_message"
+  | "message_type"
+  | "active"
+  | "created_at"
+> &
+  Partial<Pick<Tables<"chat_messages">, "media_url" | "media_type">>;
 
-export interface Cliente {
-  id: number;
-  telefone: string; // JID do WhatsApp (unique)
-  nomewpp: string | null;
-  atendimento_ia: string | null; // 'ativa' | 'pausada' | ...
-  created_at: string;
-  display_name?: string | null; // nome editado no CRM (precede nomewpp)
-  custom_fields?: Record<string, unknown> | null;
-  email?: string | null;
-  birth_date?: string | null; // AAAA-MM-DD
-  /** Foto de perfil guardada (lib/fotos.ts), caminho no bucket. */
-  foto_path?: string | null;
-}
+// Contato (dados_cliente). telefone = JID (unique); atendimento_ia = 'ativa' |
+// 'pausada' | ...; display_name = nome editado no CRM (precede nomewpp);
+// birth_date = AAAA-MM-DD; foto_path = foto guardada (lib/fotos.ts).
+export type Cliente = Pick<
+  Tables<"dados_cliente">,
+  "id" | "telefone" | "nomewpp" | "atendimento_ia" | "created_at"
+> &
+  Partial<
+    Pick<
+      Tables<"dados_cliente">,
+      "display_name" | "custom_fields" | "email" | "birth_date" | "foto_path"
+    >
+  >;
 
 // Item da lista de conversas (inbox). Vem da tabela `conversations`, mantida
 // por trigger a partir de chat_messages.

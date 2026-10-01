@@ -42,6 +42,7 @@ import {
   STAGE_COLOR_KEYS,
   type PipelineCard,
   type Stage,
+  type StagePatch,
   type StageRow,
   idadeEmDias,
   origemDoCard,
@@ -331,7 +332,7 @@ export default function PipelineBoard({
       .from("pipeline_stages")
       .select(STAGE_SELECT)
       .order("position");
-    if (data) setStages((data as StageRow[]).map(rowToStage));
+    if (data) setStages(data.map(rowToStage));
   }, [supabase]);
 
   // Realtime: conversas, contatos e resumos mudam UM card; pipeline_stages muda
@@ -357,7 +358,7 @@ export default function PipelineBoard({
         return;
       }
       if (!ev.novo) return;
-      const nova = rowToStage(ev.novo as unknown as StageRow);
+      const nova = rowToStage(ev.novo as StageRow);
       setStages((cur) =>
         cur.some((st) => st.id === nova.id)
           ? cur.map((st) => (st.id === nova.id ? nova : st))
@@ -531,7 +532,7 @@ export default function PipelineBoard({
   );
 
   const patchStage = useCallback(
-    async (id: number, patch: Partial<StageRow>) => {
+    async (id: number, patch: StagePatch) => {
       if (!supabase) {
         setStages((s) =>
           s.map((st) =>
@@ -1169,7 +1170,7 @@ function StageManager({
   stages: Stage[];
   onClose: () => void;
   onAdd: (name: string) => void;
-  onPatch: (id: number, patch: Partial<StageRow>) => void;
+  onPatch: (id: number, patch: StagePatch) => void;
   onDelete: (id: number) => void;
   /** Caminho de teclado: sobe ou desce um lugar. */
   onMove: (id: number, dir: -1 | 1) => void;
@@ -1327,7 +1328,7 @@ function StageRowItem({
   canUp: boolean;
   canDown: boolean;
   onMove: (id: number, dir: -1 | 1) => void;
-  onPatch: (id: number, patch: Partial<StageRow>) => void;
+  onPatch: (id: number, patch: StagePatch) => void;
   arrastando: boolean;
   alvo: boolean;
   onDragStart: () => void;

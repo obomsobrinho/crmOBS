@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { TablesUpdate } from "@/lib/database.types";
 import { buildFallbackPersona } from "@/lib/agent-prompt";
 import {
   connectInstance,
@@ -125,7 +126,7 @@ export async function POST(
     .eq("id", id)
     .maybeSingle();
 
-  const update: Record<string, unknown> = {};
+  const update: TablesUpdate<"clients"> = {};
   if (mine.evolution_instance !== instanceName) {
     update.evolution_instance = instanceName;
   }

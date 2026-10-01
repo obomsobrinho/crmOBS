@@ -69,12 +69,7 @@ export default function ContactNotes({
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false });
     setNotes(
-      ((data ?? []) as {
-        id: number;
-        body: string;
-        author_user_id: string | null;
-        created_at: string;
-      }[]).map((n) => ({
+      (data ?? []).map((n) => ({
         id: n.id,
         body: n.body,
         authorUserId: n.author_user_id,

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
+import type { Json, TablesUpdate } from "@/lib/database.types";
+import { paraJson } from "@/lib/json";
 import { compilePersona, normalizeHours } from "@/lib/agent-prompt";
 
 // Salva a configuração do agente do tenant logado.
@@ -60,7 +62,7 @@ export async function PUT(
     );
   }
 
-  let update: Record<string, unknown>;
+  let update: TablesUpdate<"clients">;
   // Seções que a base tomou de volta no modo avançado. Vai na resposta para a
   // tela poder AVISAR em vez de o texto do tenant sumir em silêncio.
   let removidos: string[] = [];
@@ -71,9 +73,9 @@ export async function PUT(
   // horário é dado da empresa, não do prompt.
   if (body.mode === "horario") {
     const hours = normalizeHours(body.hours);
-    const anterior = (current?.agent_config as Record<string, unknown> | null) ?? {};
+    const anterior = (current?.agent_config as Record<string, Json | undefined> | null) ?? {};
     update = {
-      agent_config: { ...anterior, hours },
+      agent_config: { ...anterior, hours: paraJson(hours) },
       agent_config_updated_at: new Date().toISOString(),
     };
   } else if (body.mode === "guiado") {
@@ -106,7 +108,7 @@ export async function PUT(
     }
 
     update = {
-      agent_config: result.config,
+      agent_config: result.config ? paraJson(result.config) : undefined,
       persona,
       prompt_mode: "guiado",
       agent_config_updated_at: new Date().toISOString(),
@@ -171,9 +173,9 @@ export async function PUT(
     try {
       const { error: pubErr } = await svc.from("agent_publications").insert({
         client_id: id,
-        config: (update.agent_config as unknown) ?? null,
+        config: update.agent_config ?? null,
         persona,
-        prompt_mode: (update.prompt_mode as string) ?? "guiado",
+        prompt_mode: update.prompt_mode ?? "guiado",
         published_by: mine.userId,
       });
       if (pubErr) console.error("falha ao registrar a versão:", pubErr.message);

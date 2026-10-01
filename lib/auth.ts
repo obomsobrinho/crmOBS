@@ -104,24 +104,10 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
   ]);
   if (!data) return null;
 
-  const client = data as {
-    id: string;
-    name: string;
-    evolution_instance: string | null;
-    imported_at: string | null;
-    subscription_status: string;
-    trial_ends_at: string | null;
-    grace_until: string | null;
-    billing_plan: string | null;
-    agent_config_updated_at: string | null;
-    agent_published_at: string | null;
-    agent_enabled: boolean | null;
-    onboarding_tested_at: string | null;
-    notify_group_jid: string | null;
-  };
+  const client = data;
 
   const membership =
-    (memberships as { client_id: string; role: string }[] | null)?.find(
+    memberships?.find(
       (m) => m.client_id === client.id
     ) ?? null;
 
@@ -130,7 +116,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     name: client.name,
     evolution_instance: client.evolution_instance,
     imported_at: client.imported_at,
-    role: (membership as { role: string } | null)?.role ?? null,
+    role: membership?.role ?? null,
     userId,
     subscriptionStatus: client.subscription_status,
     trialEndsAt: client.trial_ends_at,

@@ -1,9 +1,8 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
 import { foraDaLista } from "@/lib/inbox-lista";
 import {
   agregadoDe,
   type AgregadoDoPainel,
-  type JanelaAgregada,
   type LimitesDeJanela,
   type SeriesAgregadas,
 } from "@/lib/painel-agregado";
@@ -24,7 +23,7 @@ const iso = (ms: number) => new Date(ms).toISOString();
  * estourou o tempo é número errado em silêncio, que era o defeito.
  */
 export async function carregarAgregadoDoPainel(
-  supabase: SupabaseClient,
+  supabase: Supa,
   o: {
     clientId: string;
     /** `client.avisos`: o número de avisos do time fica fora de toda conta. */
@@ -58,7 +57,7 @@ export async function carregarAgregadoDoPainel(
   if (janelas.error) throw new Error(`painel_janelas: ${janelas.error.message}`);
   if (series.error) throw new Error(`painel_series: ${series.error.message}`);
   return agregadoDe(
-    (janelas.data ?? []) as JanelaAgregada[],
-    (series.data ?? null) as SeriesAgregadas | null
+    janelas.data ?? [],
+    series.data as SeriesAgregadas | null
   );
 }

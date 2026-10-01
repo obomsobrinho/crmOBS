@@ -349,14 +349,14 @@ export async function processTurn(
       .eq("phone", phone)
       .is("closed_at", null)
       .order("opened_at", { ascending: true });
-    abertos = (fila ?? []) as { id: number; summary: string | null }[];
-    const pend = (conv?.pending_instruction as string | null) ?? null;
+    abertos = fila ?? [];
+    const pend = conv?.pending_instruction ?? null;
     instruction = retomada
       ? retomada.instruction.trim()
       : pend && pend.trim()
         ? pend.trim()
         : null;
-    handoffAt = (conv?.handoff_at as string | null) ?? null;
+    handoffAt = conv?.handoff_at ?? null;
   }
 
   // Retrieval da base de conhecimento (RAG). Best-effort e só leitura, então
@@ -379,7 +379,7 @@ export async function processTurn(
         p_query_embedding: toVector(queryVec),
         p_match_count: 5,
       });
-      const rows = ((matches ?? []) as { content: string; similarity: number }[]).filter(
+      const rows = (matches ?? []).filter(
         (m) => typeof m.content === "string" && m.content.trim() !== ""
       );
       knowledge = rows.map((m) => m.content);
@@ -849,12 +849,7 @@ async function loadCanonical(
     .from("pipeline_stages")
     .select("key, position, is_canonical, archived")
     .eq("client_id", clientId);
-  return ((stages ?? []) as {
-    key: string;
-    position: number;
-    is_canonical: boolean;
-    archived: boolean;
-  }[])
+  return (stages ?? [])
     .filter((s) => s.is_canonical && !s.archived)
     .map((s) => ({ key: s.key, position: s.position }));
 }

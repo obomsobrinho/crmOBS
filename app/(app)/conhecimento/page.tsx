@@ -19,20 +19,10 @@ export default async function ConhecimentoPage() {
     .eq("client_id", client.id)
     .order("created_at", { ascending: false });
 
-  const docs: KnowledgeDoc[] = (
-    (data ?? []) as {
-      id: string;
-      title: string;
-      status: "processing" | "ready" | "error";
-      chunk_count: number;
-      byte_size: number | null;
-      error: string | null;
-      created_at: string;
-    }[]
-  ).map((d) => ({
+  const docs: KnowledgeDoc[] = (data ?? []).map((d) => ({
     id: d.id,
     title: d.title,
-    status: d.status,
+    status: d.status as KnowledgeDoc["status"],
     chunkCount: d.chunk_count,
     byteSize: d.byte_size,
     error: d.error,

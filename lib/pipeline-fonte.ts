@@ -1,4 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
+import type { LinhaRpc } from "@/lib/supabase/schema";
 import { nomeDoContato } from "./inbox";
 import { normalizar } from "./clientes";
 import type { PipelineCard, Stage } from "./pipeline";
@@ -46,23 +47,20 @@ export function paramsPipeline(
   return { padrao, ativos: ativos.map((s) => s.key), ...filtros };
 }
 
-interface LinhaCard {
-  id: number;
-  phone: string;
-  last_message_at: string;
-  last_message_preview: string | null;
-  last_message_from: string | null;
-  unread_count: number | null;
-  assigned_user_id: string | null;
-  coluna: string;
-  stage_source: string | null;
-  handoff_at: string | null;
-  display_name: string | null;
-  nomewpp: string | null;
-  atendimento_ia: string | null;
-  foto_path: string | null;
-  resumo: string | null;
-}
+type LinhaCard = LinhaRpc<
+  "pipeline_coluna",
+  | "last_message_preview"
+  | "last_message_from"
+  | "unread_count"
+  | "assigned_user_id"
+  | "stage_source"
+  | "handoff_at"
+  | "display_name"
+  | "nomewpp"
+  | "atendimento_ia"
+  | "foto_path"
+  | "resumo"
+>;
 
 function paraCard(l: LinhaCard): PipelineCard {
   return {
@@ -109,7 +107,7 @@ function argsBase(clientId: string, p: ParamsPipeline) {
   };
 }
 
-export function fontePipelineDoBanco(supabase: SupabaseClient, clientId: string): FontePipeline {
+export function fontePipelineDoBanco(supabase: Supa, clientId: string): FontePipeline {
   return {
     async coluna(p, coluna, depois, n = PAGINA_PIPELINE) {
       const { data, error } = await supabase.rpc("pipeline_coluna", {
@@ -120,7 +118,7 @@ export function fontePipelineDoBanco(supabase: SupabaseClient, clientId: string)
         p_limite: n,
       });
       if (error) throw error;
-      return ((data ?? []) as LinhaCard[]).map(paraCard);
+      return (data ?? []).map(paraCard);
     },
     async card(p, phone) {
       const { data, error } = await supabase.rpc("pipeline_coluna", {
@@ -130,14 +128,14 @@ export function fontePipelineDoBanco(supabase: SupabaseClient, clientId: string)
         p_limite: 1,
       });
       if (error) throw error;
-      const l = ((data ?? []) as LinhaCard[])[0];
+      const l = (data ?? [])[0];
       return l ? paraCard(l) : null;
     },
     async contagens(p) {
       const { data, error } = await supabase.rpc("pipeline_contagens", argsBase(clientId, p));
       if (error) throw error;
       const out: ContagensPipeline = { porColuna: {}, esperandoGeral: 0 };
-      for (const r of (data ?? []) as { coluna: string; total: number; esperando: number; mais_antigo: string | null }[]) {
+      for (const r of data ?? []) {
         if (r.coluna === "*") out.esperandoGeral = Number(r.esperando) || 0;
         else out.porColuna[r.coluna] = { total: Number(r.total) || 0, esperando: Number(r.esperando) || 0, maisAntigo: r.mais_antigo };
       }

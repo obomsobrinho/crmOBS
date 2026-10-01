@@ -57,6 +57,7 @@ export async function extractText(
       const mammoth = (await import("mammoth")).default;
       // Cast por causa do Buffer genérico do @types/node vs o tipo do mammoth.
       const { value } = await mammoth.extractRawText(
+        // eslint-disable-next-line no-restricted-syntax -- lacuna de tipos de biblioteca (Buffer do @types/node), não de banco
         { buffer } as unknown as Parameters<typeof mammoth.extractRawText>[0]
       );
       return value;
@@ -65,6 +66,7 @@ export async function extractText(
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
       // Cast pelo mesmo motivo do mammoth (Buffer genérico do @types/node).
+      // eslint-disable-next-line no-restricted-syntax -- lacuna de tipos de biblioteca (Buffer do @types/node), não de banco
       await wb.xlsx.load(buffer as unknown as Parameters<typeof wb.xlsx.load>[0]);
       const lines: string[] = [];
       wb.eachSheet((sheet) => {

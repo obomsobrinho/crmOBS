@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
 import {
   CONTAGENS_VAZIAS,
   PAGINA_INBOX,
@@ -8,7 +8,6 @@ import {
   type Cursor,
   type FiltroInbox,
   type ItemLista,
-  type LinhaInbox,
 } from "./inbox-lista";
 import { normalizar } from "./clientes";
 
@@ -45,7 +44,7 @@ function argsPagina(clientId: string, p: ParamsLista) {
   };
 }
 
-export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FonteInbox {
+export function fonteDoBanco(supabase: Supa, clientId: string): FonteInbox {
   return {
     async pagina(p, cursor, limite = PAGINA_INBOX) {
       const { data, error } = await supabase.rpc("inbox_pagina", {
@@ -56,7 +55,7 @@ export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FonteI
         p_limite: limite,
       });
       if (error) throw error;
-      return ((data ?? []) as LinhaInbox[]).map(paraItem);
+      return (data ?? []).map(paraItem);
     },
     async linha(p, phone) {
       const { data, error } = await supabase.rpc("inbox_pagina", {
@@ -65,7 +64,7 @@ export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FonteI
         p_limite: 1,
       });
       if (error) throw error;
-      const l = ((data ?? []) as LinhaInbox[])[0];
+      const l = (data ?? [])[0];
       return l ? paraItem(l) : null;
     },
     async contagens(p) {
@@ -76,7 +75,7 @@ export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FonteI
         p_fora: p.fora,
       });
       if (error) throw error;
-      const c = ((data ?? []) as Contagens[])[0];
+      const c = (data ?? [])[0];
       return c ? normalizarContagens(c) : CONTAGENS_VAZIAS;
     },
   };

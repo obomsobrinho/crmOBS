@@ -6,6 +6,7 @@
 // (orientar, resolve e send), todas por `fecharPedido` (lib/handoffs.ts).
 
 import { nomeDoContato } from "./inbox";
+import type { LinhaRpc } from "./supabase/schema";
 import { semNumeroDeAvisos } from "./avisos";
 
 export interface PedidoLinha {
@@ -167,20 +168,18 @@ export function casaBuscaPedido(
 export const PAGINA_PEDIDOS = 10;
 
 /** A linha que `pedidos_pagina` devolve. `posicao` e `total` só vêm nos abertos. */
-export interface LinhaPedidoBanco {
-  id: number;
-  phone: string;
-  opened_at: string;
-  summary: string | null;
-  instruction: string | null;
-  closed_at: string | null;
-  closed_how: string | null;
-  closed_by: string | null;
-  nomewpp: string | null;
-  display_name: string | null;
-  posicao: number | string | null;
-  total: number | string | null;
-}
+export type LinhaPedidoBanco = LinhaRpc<
+  "pedidos_pagina",
+  | "summary"
+  | "instruction"
+  | "closed_at"
+  | "closed_how"
+  | "closed_by"
+  | "nomewpp"
+  | "display_name"
+  | "posicao"
+  | "total"
+>;
 
 export type PedidoItem = PedidoAberto | PedidoResolvido;
 

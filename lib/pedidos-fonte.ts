@@ -1,4 +1,5 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Supa } from "@/lib/supabase/tipos";
+import type { ArgsRpc } from "@/lib/supabase/schema";
 import {
   PAGINA_PEDIDOS,
   casaBuscaPedido,
@@ -10,7 +11,6 @@ import {
   ordemResolvidos,
   paraPedido,
   type ContatoLinha,
-  type LinhaPedidoBanco,
   type PedidoAberto,
   type PedidoItem,
   type PedidoLinha,
@@ -53,11 +53,11 @@ export interface FontePedidos {
   contagens(fora: string[]): Promise<ContagensPedidos>;
 }
 
-export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FontePedidos {
-  async function chamar(args: Record<string, unknown>): Promise<PedidoItem[]> {
+export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
+  async function chamar(args: ArgsRpc<"pedidos_pagina", "p_client">): Promise<PedidoItem[]> {
     const { data, error } = await supabase.rpc("pedidos_pagina", { p_client: clientId, ...args });
     if (error) throw error;
-    return ((data ?? []) as LinhaPedidoBanco[]).map(paraPedido);
+    return (data ?? []).map(paraPedido);
   }
   return {
     pagina(p, depois, n = PAGINA_PEDIDOS) {
@@ -86,7 +86,7 @@ export function fonteDoBanco(supabase: SupabaseClient, clientId: string): FonteP
         p_desde: inicioDosResolvidos(Date.now()),
       });
       if (error) throw error;
-      const c = ((data ?? []) as Record<keyof ContagensPedidos, number | string>[])[0];
+      const c = (data ?? [])[0];
       return c
         ? { abertos: Number(c.abertos) || 0, resolvidos: Number(c.resolvidos) || 0 }
         : CONTAGENS_PEDIDOS_VAZIAS;
