@@ -12,23 +12,36 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { CabecalhoBloco } from "./ContactFields";
 import { createClient } from "@/lib/supabase/client";
-import { useCanalTenant } from "@/lib/use-canal-ao-vivo";
+import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { FUSO, formatEspera, prettyPhone } from "@/lib/format";
 import { avatarPair, initials } from "@/lib/inbox";
+import { foraDaLista } from "@/lib/inbox-lista";
+import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
 import { memberName, type Member } from "@/lib/team";
+import { useDebounce } from "@/lib/use-debounce";
+import { usePaginada } from "@/lib/use-paginada";
 import {
   DIAS_DE_RESOLVIDOS,
-  casaBuscaPedido,
-  inicioDosResolvidos,
-  montarFila,
-  montarResolvidos,
+  PAGINA_PEDIDOS,
+  ehAberto,
+  encaixarAbertosDaConversa,
+  encaixarResolvido,
   type ContatoLinha,
   type PedidoAberto,
+  type PedidoItem,
   type PedidoLinha,
   type PedidoResolvido,
   type PedidoResolvidoLinha,
 } from "@/lib/pedidos";
+import {
+  fonteDaMemoria,
+  fonteDoBanco,
+  type AbaPedidos,
+  type ContagensPedidos,
+  type FontePedidos,
+  type ParamsPedidos,
+} from "@/lib/pedidos-fonte";
 import { cn } from "@/lib/utils";
 
 // PEDIDOS DE AJUDA (refeita em 30/09/2026, docs/plano-fechar-p0.md, itens 1 e 2).
@@ -67,20 +80,30 @@ function quando(iso: string): string {
   return `${dia}, ${hora}`;
 }
 
+// PAGINAÇÃO E REALTIME (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
+// A lista da aba ativa vem de UMA fonte (`lib/pedidos-fonte.ts`, a mesma da
+// página do servidor): 10 por vez, mais ao rolar, busca no banco depois de 300ms
+// parado. Trocar de aba troca o recorte (primeira página dela). O realtime não
+// refaz lista: um evento de `handoffs` busca SÓ a fila da conversa que mexeu (ou
+// o pedido que fechou) e encaixa no lugar; os números das abas são agregado.
 export default function Pedidos({
-  initialAbertos,
-  initialResolvidos,
-  initialContatos,
+  inicial,
   members,
   clientId,
   numeroAvisos,
   readOnly = false,
-  abrirId = null,
+  previewDados,
   preview = false,
 }: {
-  initialAbertos: PedidoLinha[];
-  initialResolvidos: PedidoResolvidoLinha[];
-  initialContatos: ContatoLinha[];
+  /** O que o servidor já buscou: a primeira página da aba que abre, os números e o `?abrir=`. */
+  inicial: {
+    aba: AbaPedidos;
+    itens: PedidoItem[];
+    temMais: boolean;
+    contagens: ContagensPedidos;
+    /** `?abrir=` do link do aviso: o pedido que já nasce selecionado. */
+    abrir: PedidoItem | null;
+  };
   /** Para nomear quem resolveu. */
   members: Member[];
   /** Tenant logado: o realtime escuta só ele. Ausente no /design. */
@@ -89,120 +112,197 @@ export default function Pedidos({
   numeroAvisos: string | null;
   /** Conta bloqueada: vê a fila e o histórico, não age (as rotas já respondem 402). */
   readOnly?: boolean;
-  /** `?abrir=` do link do aviso: o pedido que já nasce selecionado. */
-  abrirId?: number | null;
+  /** /design: as linhas falsas de onde a fonte de memória tira os pedidos. */
+  previewDados?: {
+    abertos: PedidoLinha[];
+    resolvidos: PedidoResolvidoLinha[];
+    contatos: ContatoLinha[];
+  };
   /** /design: sem banco, e as ações só simulam. */
   preview?: boolean;
 }) {
-  const supabase = useMemo(() => (preview ? null : createClient()), [preview]);
-  const [abertosRaw, setAbertosRaw] = useState(initialAbertos);
-  const [resolvidosRaw, setResolvidosRaw] = useState(initialResolvidos);
-  const [contatos, setContatos] = useState(initialContatos);
-  const [aba, setAba] = useState<Aba>(
-    abrirId != null && !initialAbertos.some((p) => p.id === abrirId) &&
-      initialResolvidos.some((p) => p.id === abrirId)
-      ? "resolvidos"
-      : "abertos"
+  const [dadosPreview, setDadosPreview] = useState(previewDados);
+  const fonte = useMemo<FontePedidos>(
+    () =>
+      clientId && !preview
+        ? fonteDoBanco(createClient(), clientId)
+        : fonteDaMemoria(
+            dadosPreview?.abertos ?? [],
+            dadosPreview?.resolvidos ?? [],
+            dadosPreview?.contatos ?? [],
+            numeroAvisos
+          ),
+    [clientId, preview, dadosPreview, numeroAvisos]
   );
-  const [selecionado, setSelecionado] = useState<number | null>(abrirId);
+  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+
+  const [aba, setAba] = useState<Aba>(inicial.aba);
+  const [selecionado, setSelecionado] = useState<PedidoItem | null>(inicial.abrir);
   const [q, setQ] = useState("");
+  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  const busca = useDebounce(q.trim(), 300);
   const [resultado, setResultado] = useState<Resultado | null>(null);
-  // "Agora" do cálculo da espera, fixado a cada carga e a cada minuto: ler
-  // `Date.now()` no render é impuro, e a espera é grossa (minutos, horas).
+  const [contagens, setContagens] = useState(inicial.contagens);
+  // "Agora" do cálculo da espera, fixado a cada minuto: ler `Date.now()` no
+  // render é impuro, e a espera é grossa (minutos, horas).
   const [agora, setAgora] = useState(() => Date.now());
 
-  const abertos = useMemo(
-    () => montarFila(abertosRaw, contatos, numeroAvisos),
-    [abertosRaw, contatos, numeroAvisos]
-  );
-  const resolvidos = useMemo(
-    () => montarResolvidos(resolvidosRaw, contatos, numeroAvisos),
-    [resolvidosRaw, contatos, numeroAvisos]
-  );
+  const params = useMemo<ParamsPedidos>(() => ({ aba, busca, fora }), [aba, busca, fora]);
+  const { itens, setItens, temMais, carregando, fimRef, revalidar } = usePaginada<PedidoItem, ParamsPedidos>({
+    inicial: inicial.itens,
+    temMaisInicial: inicial.temMais,
+    params,
+    buscar: (p, depois, n) => fonte.pagina(p, depois, n),
+    chave: (p) => p.id,
+    tamanho: PAGINA_PEDIDOS,
+    // Voltar o foco é com o canal (`useCanalTenant`), que também recontar.
+    revalidarAoVoltar: false,
+  });
+  // Trocou de aba e a primeira página dela ainda não chegou: o que está na
+  // lista é da outra, e não pode aparecer.
+  const linhas = useMemo(() => itens.filter((p) => ehAberto(p) === (aba === "abertos")), [itens, aba]);
+
   const nomeDeQuem = useMemo(() => {
     const m = new Map(members.map((x) => [x.userId, memberName(x.email)]));
     return (id: string | null) => (id ? m.get(id) ?? null : null);
   }, [members]);
 
-  const lista = aba === "abertos" ? abertos : resolvidos;
-  const linhas = lista.filter((p) => casaBuscaPedido(p, q));
-  const aberto = abertos.find((p) => p.id === selecionado) ?? null;
-  const resolvido = resolvidos.find((p) => p.id === selecionado) ?? null;
+  // O detalhe segue a linha da lista quando ela existe (o realtime a atualiza);
+  // se a busca a tirou da lista, a ficha continua com o que estava na tela.
+  const atual = selecionado ? (itens.find((p) => p.id === selecionado.id) ?? selecionado) : null;
+  const aberto = atual && ehAberto(atual) ? atual : null;
+  const resolvido = atual && !ehAberto(atual) ? atual : null;
 
-  const refetch = useCallback(async () => {
-    if (!supabase) return;
-    const agoraMs = Date.now();
-    const [{ data: hs }, { data: rs }] = await Promise.all([
-      supabase
-        .from("handoffs")
-        .select("id, phone, opened_at, summary")
-        .is("closed_at", null)
-        .order("opened_at", { ascending: true }),
-      supabase
-        .from("handoffs")
-        .select("id, phone, opened_at, summary, instruction, closed_at, closed_how, closed_by")
-        .not("closed_at", "is", null)
-        .gte("closed_at", inicioDosResolvidos(agoraMs))
-        .order("closed_at", { ascending: false }),
-    ]);
-    // Nomes só dos telefones da fila e do histórico, nunca a base inteira.
-    const fones = [...new Set([...(hs ?? []), ...(rs ?? [])].map((h) => (h as { phone: string }).phone))];
-    const { data: cs } = fones.length
-      ? await supabase.from("dados_cliente").select("telefone, nomewpp, display_name").in("telefone", fones)
-      : { data: [] };
-    setAbertosRaw((hs ?? []) as PedidoLinha[]);
-    setResolvidosRaw((rs ?? []) as PedidoResolvidoLinha[]);
-    setContatos((cs ?? []) as ContatoLinha[]);
-    setAgora(agoraMs);
-  }, [supabase]);
+  const recontar = useCallback(async () => {
+    try {
+      setContagens(await fonte.contagens(fora));
+    } catch (e) {
+      console.error("contagens de pedidos:", e);
+    }
+  }, [fonte, fora]);
 
-  // Tempo real nas regras da casa (CLAUDE.md, "Realtime cai", e
-  // docs/plano-carregamento.md): canal do tenant compartilhado
-  // (`useCanalTenant`, 02/10/2026), uma rajada de eventos vira UMA busca, aba
-  // escondida não busca (o canal anota e busca ao voltar), primeira assinatura
-  // PULADA e re-busca a cada reassinatura e ao voltar o foco (no máximo a cada
-  // 10s). ⚠️ O evento ainda refaz a lista inteira: encaixar a linha do payload e
-  // paginar os resolvidos é a frente de /pedidos (RT-03), não esta.
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // O que o realtime precisa saber sem refazer o canal a cada render.
+  const vivo = useRef({ aba, busca, temMais, selecionado });
   useEffect(() => {
-    if (!supabase || !clientId) return;
+    vivo.current = { aba, busca, temMais, selecionado };
+  });
+
+  /**
+   * Encaixa na lista o que mudou numa conversa: a fila aberta dela (posição e
+   * total refeitos) quando a aba é a dos abertos, ou os pedidos que fecharam
+   * quando é a dos resolvidos. UMA consulta pequena por conversa, nunca a lista.
+   */
+  const sincronizar = useCallback(
+    async (phone: string, ids: number[]) => {
+      const v = vivo.current;
+      try {
+        if (v.aba === "abertos") {
+          const novos = await fonte.abertosDoFone(fora, phone);
+          setItens((cur) => encaixarAbertosDaConversa(cur, phone, novos, v.busca, v.temMais));
+        } else {
+          const lidos = await Promise.all(ids.map((id) => fonte.porId(fora, id).then((i) => [id, i] as const)));
+          setItens((cur) =>
+            lidos.reduce((acc, [id, i]) => encaixarResolvido(acc, id, i, v.busca, v.temMais, Date.now()), cur)
+          );
+        }
+        if (v.selecionado && v.selecionado.phone === phone) {
+          const novo = await fonte.porId(fora, v.selecionado.id);
+          if (novo) setSelecionado(novo);
+        }
+        void recontar();
+      } catch (e) {
+        console.error("pedido do realtime:", e);
+      }
+    },
+    [fonte, fora, setItens, recontar]
+  );
+
+  // Uma rajada de eventos vira UMA busca por conversa, depois de 400ms parado.
+  const pendentesRef = useRef(new Map<string, Set<number>>());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const descarregar = useCallback(() => {
+    const todos = [...pendentesRef.current.entries()];
+    pendentesRef.current.clear();
+    for (const [phone, ids] of todos) void sincronizar(phone, [...ids]);
+  }, [sincronizar]);
+  useEffect(() => {
+    if (!clientId || preview) return;
     const relogio = setInterval(() => setAgora(Date.now()), 60_000);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       clearInterval(relogio);
     };
-  }, [supabase, clientId]);
-  const agendar = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => void refetch(), 500);
-  }, [refetch]);
+  }, [clientId, preview]);
+
+  // Tempo real: o canal do tenant (`useCanalTenant`) cuida do status, da volta
+  // do foco e da aba escondida; daqui sai só o que é desta tela. Revalidar
+  // (reassinatura, volta ao foco) é o ÚNICO lugar que relê a lista inteira.
   useCanalTenant({
     clientId,
-    ativo: !!supabase,
+    ativo: !!clientId && !preview,
     tabelas: ["handoffs"],
-    aoEvento: agendar,
-    revalidar: () => void refetch(),
+    aoEvento: (ev) => {
+      const fone = foneDoEvento(ev);
+      if (!fone || ehNumeroDeAvisos(fone, numeroAvisos)) return;
+      const ids = pendentesRef.current.get(fone) ?? new Set<number>();
+      const id = Number((ev.novo ?? ev.antigo)?.id);
+      // Pedido que fechou (ou sumiu) pode ser da aba dos resolvidos.
+      if (Number.isFinite(id) && (ev.tipo === "DELETE" || ev.novo?.closed_at != null)) ids.add(id);
+      pendentesRef.current.set(fone, ids);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(descarregar, 400);
+    },
+    revalidar: () => {
+      void revalidar();
+      void recontar();
+    },
   });
 
   /** O pedido saiu dos abertos: vira resolvido na tela, com o que aconteceu. */
   function concluir(p: PedidoAberto, r: Resultado, como: "ia" | "resolvido", orientacao: string | null) {
     setResultado(r);
-    setAbertosRaw((ps) => ps.filter((x) => x.id !== p.id));
-    setResolvidosRaw((rs) => [
-      {
-        id: p.id,
-        phone: p.phone,
-        opened_at: p.openedAt,
-        summary: p.summary,
-        instruction: orientacao,
-        closed_at: new Date().toISOString(),
-        closed_how: como,
-        closed_by: null,
-      },
-      ...rs.filter((x) => x.id !== p.id),
-    ]);
+    const fechado: PedidoResolvido = {
+      id: p.id,
+      phone: p.phone,
+      openedAt: p.openedAt,
+      closedAt: new Date().toISOString(),
+      summary: p.summary,
+      nome: p.nome,
+      como,
+      orientacao,
+      porQuem: null,
+    };
+    setItens((cur) => {
+      const sem = cur.filter((x) => x.id !== p.id);
+      return aba === "resolvidos" ? [fechado, ...sem] : sem;
+    });
+    setContagens((c) => ({ abertos: Math.max(0, c.abertos - 1), resolvidos: c.resolvidos + 1 }));
     setSelecionado(null);
-    if (!preview) void refetch();
+    if (preview) {
+      // O preview não tem banco: a fonte de memória é que precisa saber.
+      setDadosPreview((d) =>
+        d && {
+          ...d,
+          abertos: d.abertos.filter((x) => x.id !== p.id),
+          resolvidos: [
+            {
+              id: p.id,
+              phone: p.phone,
+              opened_at: p.openedAt,
+              summary: p.summary,
+              instruction: orientacao,
+              closed_at: fechado.closedAt,
+              closed_how: como,
+              closed_by: null,
+            },
+            ...d.resolvidos,
+          ],
+        }
+      );
+    } else {
+      // O realtime também vai chegar; aqui a fila da conversa é refeita já.
+      void sincronizar(p.phone, [p.id]);
+    }
   }
 
   async function orientar(p: PedidoAberto, texto: string) {
@@ -279,7 +379,7 @@ export default function Pedidos({
                 <TabsList variant="painel" className="bg-canvas" aria-label="Pedidos">
                   <TabsTrigger value="abertos" variant="painel" data-slot="pedidos-aba">
                     Abertos
-                    <span className="ml-1.5 tabular-nums opacity-75">{abertos.length}</span>
+                    <span className="ml-1.5 tabular-nums opacity-75">{contagens.abertos}</span>
                   </TabsTrigger>
                   <TabsTrigger value="resolvidos" variant="painel" data-slot="pedidos-aba">
                     Resolvidos
@@ -321,7 +421,11 @@ export default function Pedidos({
           )}
 
           <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-            {lista.length === 0 ? (
+            {linhas.length === 0 && carregando ? (
+              <p data-slot="pedidos-carregando" className="px-5 py-10 text-center text-apoio text-ink-3">
+                Carregando…
+              </p>
+            ) : linhas.length === 0 && busca === "" ? (
               <div
                 data-slot="pedidos-vazio"
                 className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center"
@@ -338,7 +442,7 @@ export default function Pedidos({
               </div>
             ) : linhas.length === 0 ? (
               <p data-slot="pedidos-vazio" className="px-5 py-10 text-center text-apoio text-ink-3">
-                Nenhum pedido para “{q.trim()}”.
+                Nenhum pedido para “{busca}”.
               </p>
             ) : (
               <ul data-slot="pedidos-lista">
@@ -347,13 +451,29 @@ export default function Pedidos({
                     key={p.id}
                     p={p}
                     agora={agora}
-                    ativa={p.id === selecionado}
+                    ativa={p.id === selecionado?.id}
                     onSelecionar={() => {
                       setResultado(null);
-                      setSelecionado(p.id);
+                      setSelecionado(p);
                     }}
                   />
                 ))}
+                {/* O fim da lista: quando aparece, vem a próxima página. */}
+                {temMais && (
+                  <li
+                    ref={(el) => {
+                      fimRef.current = el;
+                    }}
+                    data-slot="pedidos-mais"
+                    aria-hidden
+                    className="h-px"
+                  />
+                )}
+                {carregando && (
+                  <li data-slot="pedidos-carregando" className="px-5 py-3 text-legenda text-ink-3">
+                    Carregando…
+                  </li>
+                )}
               </ul>
             )}
           </AreaRolavel>
@@ -429,13 +549,14 @@ function LinhaPedido({
 
   return (
     <li ref={ref} data-slot="pedido-linha" data-pedido={p.id}>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="none"
         onClick={onSelecionar}
         aria-current={ativa ? "true" : undefined}
         className={cn(
-          "relative flex w-full items-start gap-3 border-b border-line-soft py-3 pl-4 pr-4 text-left transition-colors md:pl-5",
-          ativa ? "bg-[var(--sel-bg)]" : "hover:bg-[var(--active-bg)]"
+          "relative w-full items-start gap-3 border-b border-line-soft py-3 pl-4 pr-4 text-left md:pl-5",
+          ativa && "bg-[var(--sel-bg)] hover:bg-[var(--sel-bg)]"
         )}
       >
         <span
@@ -469,7 +590,7 @@ function LinhaPedido({
         >
           {ehAberto ? `há ${formatEspera(p.openedAt, agora)}` : quando(p.closedAt)}
         </span>
-      </button>
+      </Button>
     </li>
   );
 }
