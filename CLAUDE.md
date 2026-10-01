@@ -935,6 +935,17 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
   já vêm no `message` do pedido (senão a IA lia cada uma duas vezes), `HISTORY_ROWS` subiu para 24,
   e a frase real do agente no Painel monta a pergunta com as mensagens entre as duas respostas.
   ⚠️ Ordem de deploy: APP antes do n8n. Provado com lote simulado no telefone impossível.
+- ⚠️ **ESPERA DESLIZANTE (01/10/2026, "duas respostas para o mesmo lote").** O debounce esperava 15s
+  da PRIMEIRA mensagem e liberava; áudio que ainda estava sendo transcrito entrava depois e abria
+  um segundo turno. Agora `Marca chegada` (Redis `chegou:{tel}`, logo na entrada) e `Marca pronto`
+  + `Marca última` (`pronto:{tel}` e `ultima:{tel}`, depois de gravar) contam o que chegou e o que já
+  está pronto; depois dos 15s, `Ainda chegando?` repete `Espera 4s` enquanto faltar mensagem ficar
+  pronta ou a última tiver menos de 5s, com teto de 8 voltas (~47s). `Lock counter` passou a 120s de
+  TTL, senão o lock vencia no meio da espera longa. Os nós de marca são `continueRegularOutput`: falha
+  de Redis nunca derruba o atendimento. ⚠️ O `set` do Redis exige `keyType: "string"` explícito (o
+  automático deu erro e parou TODO atendimento por ~3 min na aplicação).
+  E o `Notifica grupo` virou "📅 Conversa marcada", com `executeOnce` (disparava uma vez por parte da
+  resposta) e quebras de linha reais (o `\n` aparecia escrito).
 - ⚠️ **O domínio mudou em 17/09/2026 e derrubou o canal em silêncio.** `crm-obs.vercel.app`
   passou a responder **404** ("deployment could not be found"), e os DOIS nós que chamam o app
   (`Atendente` e `Sobe mídia recebida`) apontavam para lá. O agente ficou mudo e as mensagens do

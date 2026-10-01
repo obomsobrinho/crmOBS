@@ -977,7 +977,7 @@
         "operation": "incr",
         "key": "=lockcount:{{ $('Dados').item.json.Telefone }}",
         "expire": true,
-        "ttl": 20
+        "ttl": 120
       },
       "id": "b45e67ee-c2c6-430d-aec2-f5d544a8a1be",
       "name": "Lock counter",
@@ -1305,8 +1305,10 @@
         "resource": "messages-api",
         "instanceName": "={{ $('Dados').item.json.instance }}",
         "remoteJid": "={{ $('Resolve tenant').first().json.notify_group_jid }}",
-        "messageText": "=🚨 Novo Lead: wa.me/{{ $('Dados').item.json.Telefone.split('@')[0] }} 🚨\\n\\n*Cliente:* {{ $('Dados').item.json.NomeWpp }}\\n\\n*Caso:* {{ $('Atendente').item.json.output.summary }}\\n\\n*Horário preferido:* {{ $('Atendente').item.json.output.preferencia_horario }}",
-        "options_message": {}
+        "messageText": "=📅 *Conversa marcada*\n\n*Cliente:* {{ $('Dados').item.json.NomeWpp }}\nwa.me/{{ $('Dados').item.json.Telefone.split('@')[0] }}\n\n*Quando:* {{ $('Atendente').item.json.output.preferencia_horario }}\n*Assunto:* {{ $('Atendente').item.json.output.summary }}\n\nAbrir no CRM:\nhttps://atendimento.obomsobrinho.com.br/inbox/{{ encodeURIComponent($('Dados').item.json.Telefone) }}",
+        "options_message": {
+          "linkPreview": false
+        }
       },
       "id": "ddc1dc85-c3b5-496c-bf6a-b26330ec9573",
       "name": "Notifica grupo",
@@ -1322,7 +1324,8 @@
           "name": "Evo Global"
         }
       },
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "executeOnce": true
     },
     {
       "parameters": {
@@ -1904,6 +1907,197 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "1a8a100e-474f-464c-a0b7-8221b3564aff",
+      "name": "Marca chegada",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        3704,
+        -160
+      ],
+      "parameters": {
+        "operation": "incr",
+        "key": "=chegou:{{ $('Dados').item.json.Telefone }}",
+        "expire": true,
+        "ttl": 120
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "982ce914-12e3-4f58-87af-c040be03209d",
+      "name": "Marca pronto",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5104,
+        460
+      ],
+      "parameters": {
+        "operation": "incr",
+        "key": "=pronto:{{ $('Dados').item.json.Telefone }}",
+        "expire": true,
+        "ttl": 120
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b5b82bf3-2ace-4ace-96cd-93627ed6e7ab",
+      "name": "Marca última",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5104,
+        620
+      ],
+      "parameters": {
+        "operation": "set",
+        "key": "=ultima:{{ $('Dados').item.json.Telefone }}",
+        "value": "={{ $now.toMillis() }}",
+        "expire": true,
+        "ttl": 120,
+        "keyType": "string"
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "d931723d-34d6-4b37-ad0c-ce57c1fe576c",
+      "name": "Lê chegou",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5600,
+        320
+      ],
+      "parameters": {
+        "operation": "get",
+        "propertyName": "chegou",
+        "key": "=chegou:{{ $('Dados').item.json.Telefone }}",
+        "options": {}
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "e9ac7816-8cdc-42e5-9a8d-98a903b6c8e7",
+      "name": "Lê pronto",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5700,
+        420
+      ],
+      "parameters": {
+        "operation": "get",
+        "propertyName": "pronto",
+        "key": "=pronto:{{ $('Dados').item.json.Telefone }}",
+        "options": {}
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "1a63f6e8-5e93-49c4-9fa5-cfe2978f7722",
+      "name": "Lê última",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5800,
+        520
+      ],
+      "parameters": {
+        "operation": "get",
+        "propertyName": "ultima",
+        "key": "=ultima:{{ $('Dados').item.json.Telefone }}",
+        "options": {}
+      },
+      "credentials": {
+        "redis": {
+          "id": "h4zxICRho8hftpbU",
+          "name": "redisn8n"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "id": "80160b5e-eb52-45f3-ad59-143f848dd344",
+      "name": "Ainda chegando?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5900,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "ac1",
+              "leftValue": "={{ $runIndex < 8 && (Number($('Lê chegou').item.json.chegou || 0) > Number($('Lê pronto').item.json.pronto || 0) || (Date.now() - Number($('Lê última').item.json.ultima || 0)) < 5000) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "aaff91f8-c622-448e-b0d6-5adc367b1779",
+      "name": "Espera 4s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6000,
+        480
+      ],
+      "parameters": {
+        "amount": 4
+      },
+      "webhookId": "3dbd5ec8-bc4a-4b16-939b-a945836b62ce"
     }
   ],
   "connections": {
@@ -1962,7 +2156,7 @@
       "main": [
         [
           {
-            "node": "Sobe mídia recebida",
+            "node": "Marca chegada",
             "type": "main",
             "index": 0
           }
@@ -2226,7 +2420,7 @@
       "main": [
         [
           {
-            "node": "Get lista",
+            "node": "Lê chegou",
             "type": "main",
             "index": 0
           }
@@ -2544,7 +2738,102 @@
       "main": [
         [
           {
+            "node": "Marca pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca chegada": {
+      "main": [
+        [
+          {
+            "node": "Sobe mídia recebida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca pronto": {
+      "main": [
+        [
+          {
+            "node": "Marca última",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca última": {
+      "main": [
+        [
+          {
             "node": "Lock counter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lê chegou": {
+      "main": [
+        [
+          {
+            "node": "Lê pronto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lê pronto": {
+      "main": [
+        [
+          {
+            "node": "Lê última",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lê última": {
+      "main": [
+        [
+          {
+            "node": "Ainda chegando?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ainda chegando?": {
+      "main": [
+        [
+          {
+            "node": "Espera 4s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get lista",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Espera 4s": {
+      "main": [
+        [
+          {
+            "node": "Lê chegou",
             "type": "main",
             "index": 0
           }
