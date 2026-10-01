@@ -89,6 +89,19 @@ agente de IA atende no WhatsApp de cada um. Detalhes de setup/onboarding no `REA
     a base maior deixou a persona da OBM acima dele (a bancada e o Salvar recusavam). **`agentName`/`companyName` são OPCIONAIS
     ali de propósito:** tenant em modo avançado pode não ter `agent_config` (a OBM não tem), e um
     rabo que dependesse de dado do tenant não seria invariante; sem os nomes o texto fica genérico.
+  - ⚠️ **DATAS E HORÁRIOS NA BASE (30/09/2026, teste do dono às 22h).** A regra de usar o `### AGORA`
+    só existia no guiado, e a OBS (avançado) perguntou "hoje às 18h?" às 22h, ofereceu "16h" sem o
+    dia, trocou o 18h combinado por "amanhã de manhã" e repetiu a transcrição do áudio ao pé da
+    letra. Três linhas entraram na `CONDUÇÃO` (valem nos dois modos), e a `ORIENTAÇÃO DO OPERADOR`
+    (`operatorBlock`, `lib/agent.ts`) passou a receber a hora e a dizer o dia, porque vem depois e
+    manda seguir a orientação (sem isso: 0 de 3; com: 6 de 6, e 6 de 6 nos outros dois casos).
+    Junto, `LIMITS.persona` foi a **16.000** (aviso em 13.600): a OBS estava a 332 do teto, e passar
+    dele faz o tenant servir o texto salvo em silêncio. Backup do prompt avançado da OBS em
+    `Desktop/prompt-avancado-OBS-2026-09-30.md`; ela segue no avançado (o guiado guarda 2.000
+    caracteres de detalhes e perderia o fluxo e os exemplos dela).
+  - ⚠️ **AGENDAR NÃO ABRE PEDIDO (30/09/2026, achado do dono).** Só `pausar` (e o guardrail, que
+    degrada para `pausar`) entra na fila de pedidos. Conversa marcada é avisada pelo "Notifica grupo"
+    do n8n, e se o horário não servir o dono entra em contato.
   - **Modo avançado = liberdade com rabo colado.** O tenant escreve o que quiser e o servidor
     **sempre recola** o rabo: `buildAdvancedPersona` roda `stripBaseTail` (que remove do texto dele
     qualquer seção da base, para não duplicar) e concatena `buildBaseTail`. A rota devolve `removed`

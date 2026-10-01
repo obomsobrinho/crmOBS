@@ -64,7 +64,13 @@ export function agoraBlock(now: Date = new Date()): string {
 // Orientação do operador (handoff coach): um humano do time disse o que a IA
 // deve fazer no próximo turno. É instrução prioritária e confiável (vem do time,
 // não do cliente). Injetada no system para a IA retomar sozinha a conversa.
-export function operatorBlock(instruction: string): string {
+export function operatorBlock(instruction: string, now: Date = new Date()): string {
+  const hora = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(now);
   return [
     "### ORIENTAÇÃO DO OPERADOR",
     "Um atendente humano do time revisou esta conversa e te orientou sobre o que fazer AGORA. Trate isto como instrução prioritária e confiável (vem do time, não do cliente). Siga a orientação JÁ nesta resposta, mesmo que seja a primeira da conversa ou que o cliente ainda não tenha tocado no assunto (não deixe para depois), com suas próprias palavras e no seu tom, sem dizer que recebeu uma orientação e sem citar o time. Continue seguindo o formato de saída de sempre.",
@@ -72,6 +78,11 @@ export function operatorBlock(instruction: string): string {
     // ao próprio cliente "como esse cliente é indicação". A orientação é um
     // bilhete do time SOBRE o cliente; a resposta é PARA ele.
     "A orientação foi escrita pelo time falando DO cliente (\"este cliente\", \"ele\", \"ela\"). Você está falando COM o cliente: nunca se refira a ele em terceira pessoa e nunca copie a frase da orientação. Converta para a segunda pessoa. Exemplo: a orientação \"este cliente é indicação, ofereça 10% de desconto\" vira algo como \"como você veio por indicação, consigo te oferecer 10% de desconto\".",
+    // ⚠️ 30/09/2026, achado do dono às 22h: a orientação "tenho disponibilidade
+    // às 16h" virou "Tenho disponibilidade às 16h. Você consegue?", sem o dia
+    // (0 de 3 medido). A regra de datas da base não bastou, porque esta seção vem
+    // depois e manda seguir a orientação; por isso ela é repetida aqui.
+    `Agora são ${hora}. Se a orientação fala de um horário sem dizer o dia, diga o dia ao cliente: horário que já passou hoje é amanhã (ou o próximo dia de atendimento), e aí não diga \"hoje\" nem \"agora\". Exemplo, às 22:00: a orientação \"tenho disponibilidade às 16h\" vira \"tenho disponibilidade amanhã às 16h\".`,
     `Orientação: ${instruction.trim()}`,
   ].join("\n");
 }
@@ -192,7 +203,7 @@ export async function runAgent(params: {
   // A orientação do operador vai por último (recência): é o que a IA deve
   // priorizar neste turno.
   if (params.operatorInstruction && params.operatorInstruction.trim()) {
-    parts.push(operatorBlock(params.operatorInstruction));
+    parts.push(operatorBlock(params.operatorInstruction, params.now));
   }
   const system = parts.join("\n\n");
   const messages = [

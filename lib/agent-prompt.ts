@@ -55,9 +55,14 @@ export const LIMITS = {
   // Era 12.000. Subiu 2.000 em 29/09/2026 junto com a CONDUÇÃO DA CONVERSA
   // (+1.477 no rabo da base, +~170 no FLUXO do guiado): o teto conta o prompt inteiro, e sem isso a base
   // nova comia o espaço do texto do tenant (a persona da OBM passou do teto).
-  persona: 14000,
+  // Subiu de novo, para 16.000, em 30/09/2026: as regras de data e horário da
+  // CONDUÇÃO (+~470) deixaram a OBS a 332 caracteres do teto (13.668) e a
+  // prévia do /agente já acima do aviso. Passar do teto não é erro visível: o
+  // tenant volta a servir o texto salvo (`personaOrigem: salva`), então folga
+  // aqui é segurança, não luxo.
+  persona: 16000,
   /**
-   * Aviso de tamanho: 85% do teto de `persona` (14.000).
+   * Aviso de tamanho: 85% do teto de `persona` (16.000).
    *
    * Era 9.500, calibrado quando o esqueleto fixo tinha ~5 KB. O esqueleto passou
    * de 7.900 (o rabo da base cresceu) e o aviso começou a disparar com o
@@ -69,7 +74,7 @@ export const LIMITS = {
    * ele responde é "estou perto do limite?", que continua valendo nos dois modos
    * (no avançado não existe esqueleto guiado para descontar).
    */
-  personaWarn: 11900,
+  personaWarn: 13600,
 } as const;
 
 // Base do aviso de handoff quando o tenant não cadastrou o dele. Genérica de
@@ -645,6 +650,14 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     "- Antes de oferecer algo (conversa com o time, horário, próximo passo), confira se faz sentido AGORA. Se o caso depende de algo que ainda não aconteceu (um exame, um documento, um retorno de alguém), o próximo passo vem depois disso, e é isso que você diz.",
     "- Não repita uma oferta que a pessoa ignorou ou recusou. Antes de oferecer, releia as suas mensagens anteriores: se você já ofereceu isso e a pessoa seguiu falando de outra coisa, ela não aceitou, e oferecer de novo soa como robô. Isso vale também quando você chama o time.",
     "- Quando a pessoa agradece ou encerra, feche curto e cordial e, se houver, lembre o próximo passo concreto que apareceu na conversa. Não ofereça o que ela não pediu nem abra assunto novo. Agradecimento e despedida são action none. Exemplo: a pessoa ainda vai fazer um exame e agradece. Errado: \"Por nada. Se quiser, posso ver um horário com o time.\" Certo: \"Por nada! Assim que tiver o resultado, me manda por aqui que o time segue com o seu caso.\"",
+    // Achados do dono no teste de 30/09/2026, às 22h: a IA perguntou "hoje às
+    // 18h?", ofereceu "16h" sem dizer o dia, trocou o 18h combinado por "amanhã
+    // de manhã" quando a pessoa escreveu "amanhã na", e repetiu ao pé da letra a
+    // transcrição de um áudio ("o horário que você dependia"). A regra de usar o
+    // AGORA só existia no modo guiado; aqui ela vale para os dois.
+    "- Datas e horários: use a seção AGORA. Horário de hoje que já passou não se oferece nem se aceita: vira o próximo dia de atendimento. Diga sempre o dia com a hora (\"amanhã às 18h\"), também ao seguir orientação do time. Às 22h, errado: \"Hoje às 18h?\" Certo: \"Amanhã às 18h?\"",
+    "- Não troque nem repergunte o que já foi combinado (dia, hora): pergunte só o que falta. Mensagem curta ou cortada completa o combinado: se já disse 18h e escreve \"amanhã na\", é \"amanhã às 18h\", nunca \"amanhã de manhã\".",
+    "- Diga com as suas palavras o que entendeu; não copie frases da pessoa, menos ainda de áudio transcrito.",
   ].join("\n");
 
   // Decisão do dono em 11/09/2026: TODA tentativa de manipulação abre handoff.

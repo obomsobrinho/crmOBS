@@ -474,9 +474,13 @@ export async function processTurn(
   // cumprindo a orientação que acabou de fechar o pedido, sem mensagem nova do
   // cliente. Num assunto sério ela ainda devolve `pausar`, e como a fila tinha
   // acabado de esvaziar, o mesmo assunto voltava como pedido novo na hora.
+  // ⚠️ SÓ PEDIDO DE AJUDA ENTRA NA FILA (30/09/2026, achado do dono: "agendou
+  // mas abriu um handoff"). Conversa marcada (`agendar`) não é a IA precisando
+  // do time: quem avisa é o "Notifica grupo" do n8n, e se o horário não servir o
+  // dono entra em contato. Antes, todo `agendar` virava pedido aberto também.
   const entraNaFila =
     !retomada &&
-    output.action !== "none" &&
+    output.action === "pausar" &&
     (semPedido || (novo && !guardrail.blocked));
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
@@ -516,11 +520,10 @@ export async function processTurn(
           .maybeSingle();
         if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
 
-        // AVISO NO WHATSAPP DO TIME (29/09/2026). Só em pedido de ajuda
-        // (`pausar`): a reunião marcada (`agendar`) também entra na fila, mas
-        // quem avisa dela é o nó "Notifica grupo" do n8n, para o MESMO destino,
-        // e avisar aqui também daria aviso em dobro.
-        if (output.action === "pausar") {
+        // AVISO NO WHATSAPP DO TIME (29/09/2026). Só pedido de ajuda entra na
+        // fila; a reunião marcada (`agendar`) é avisada pelo "Notifica grupo"
+        // do n8n, para o MESMO destino.
+        {
           avisoAgendado = agendarAviso({
             clientId,
             phone,
@@ -552,8 +555,7 @@ export async function processTurn(
     ragMatches,
     stageWouldMove,
     guardrail,
-    handoffOpened:
-      output.action === "pausar" || output.action === "agendar" || guardrail.blocked,
+    handoffOpened: output.action === "pausar" || guardrail.blocked,
     pedidoNaFila: entraNaFila,
     ...(avisoAgendado ? { avisoAgendado: true } : {}),
   };
