@@ -27,6 +27,8 @@ import {
 } from "./agente/campos";
 import { AvisoCache, Banner, ConfirmModal } from "./agente/ui";
 import { useAgentConfig, type Mode } from "./agente/useAgentConfig";
+import { Aviso } from "@/components/ui/aviso";
+import { PromptPreview } from "@/components/PromptPreview";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,7 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { useDissolverRolagem } from "@/components/ui/dissolver-rolagem";
+import { AreaRolavel, useDissolverRolagem } from "@/components/ui/dissolver-rolagem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -269,9 +271,8 @@ export default function AgentConfigForm({
 
       <Sheet open={modelosAbertos} onOpenChange={setModelosAbertos}>
         <SheetContent lado="baixo" aria-describedby={undefined}>
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
           <SheetTitle className="px-5 pb-1 pt-3 text-cartao">Usar um modelo</SheetTitle>
-          <div className="overflow-y-auto p-2">
+          <AreaRolavel className="p-2">
             <SeletorDePreset
               apresentacao="lista"
               onEscolher={(p) => {
@@ -279,25 +280,21 @@ export default function AgentConfigForm({
                 form.choosePreset(p);
               }}
             />
-          </div>
+          </AreaRolavel>
         </SheetContent>
       </Sheet>
 
       {blockers.length > 0 && !agentEnabled && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
+        <Aviso className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <TriangleAlert size={15} className="shrink-0" />
           <span>Antes de ativar o agente, falta: {blockers.join(", ")}.</span>
-        </div>
+        </Aviso>
       )}
 
       {form.error && (
-        <div
-          data-slot="erro-agente"
-          role="alert"
-          className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink"
-        >
+        <Aviso tom="danger" data-slot="erro-agente" role="alert">
           {form.error}
-        </div>
+        </Aviso>
       )}
       {form.hadManual && form.mode === "guiado" && (
         <Banner>
@@ -472,14 +469,15 @@ export default function AgentConfigForm({
             </div>
             {/* Hook e nao <AreaRolavel>: aquele renderiza <div>, e aqui o
                 elemento precisa ser <pre> para preservar o texto do prompt. */}
-            <pre
+            <PromptPreview
+              tom="apagado"
+              rolavel
               ref={raboRef}
               style={raboStyle}
               onScroll={raboOnScroll}
-              className="max-h-64 overflow-y-auto rounded-xl border border-line bg-[var(--input-bg)] p-3.5 font-sans text-legenda leading-[19px] break-words whitespace-pre-wrap text-ink-3"
             >
               {form.baseTail}
-            </pre>
+            </PromptPreview>
           </div>
         </div>
       )}

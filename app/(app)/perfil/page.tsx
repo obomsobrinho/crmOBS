@@ -10,8 +10,11 @@ import { dataLongaSP } from "@/lib/fuso";
 
 export const dynamic = "force-dynamic";
 
+/** Campo sem valor (02/10/2026): a palavra, e não um traço, que a regra de escrita proíbe. */
+const NAO_INFORMADO = "Não informado";
+
 function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return NAO_INFORMADO;
   return dataLongaSP(iso);
 }
 
@@ -23,13 +26,13 @@ export default async function PerfilPage() {
   } = await supabase.auth.getUser();
 
   const rows: { label: string; value: string }[] = [
-    { label: "Empresa", value: client?.name ?? "—" },
-    { label: "E-mail", value: user?.email ?? "—" },
-    { label: "Instância WhatsApp", value: client?.evolution_instance ?? "—" },
+    { label: "Empresa", value: client?.name ?? NAO_INFORMADO },
+    { label: "E-mail", value: user?.email ?? NAO_INFORMADO },
+    { label: "Instância WhatsApp", value: client?.evolution_instance ?? NAO_INFORMADO },
     { label: "Conta criada em", value: fmtDate(user?.created_at) },
     {
       label: "Assinatura",
-      value: client ? statusLabel(client.subscriptionStatus) : "—",
+      value: client ? statusLabel(client.subscriptionStatus) : NAO_INFORMADO,
     },
   ];
 

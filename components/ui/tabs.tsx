@@ -68,6 +68,19 @@ const listaVariants = cva("flex items-center gap-1", {
        */
       painel:
         "w-fit gap-[2px] rounded-[10px] border border-line bg-raised p-[3px]",
+      /**
+       * `faixa`: a faixa de chips do CELULAR (os estágios do pipeline), que
+       * rola de lado e tem a borda de baixo. Quem usa esconde no desktop
+       * (`md:hidden`) por className.
+       */
+      faixa:
+        "shrink-0 gap-2 overflow-x-auto border-b border-line px-4 py-2.5 [scrollbar-width:none]",
+      /**
+       * `segmentos`: duas ou três abas lado a lado dentro de uma bandeja
+       * (conversa e diagnóstico da bancada, no celular). Quem usa diz as colunas.
+       */
+      segmentos:
+        "grid shrink-0 gap-1 rounded-lg border border-line bg-[var(--chip-bg)] p-1",
     },
   },
   defaultVariants: { variant: "sublinhado" },
@@ -89,7 +102,7 @@ function TabsList({
 }
 
 const gatilhoVariants = cva(
-  "group/aba flex transition-colors [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "group/aba flex cursor-pointer transition-colors disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -102,6 +115,16 @@ const gatilhoVariants = cva(
           "items-center rounded-[7px] px-3 py-[5px] text-apoio font-medium",
           "text-ink-2 hover:bg-bloco hover:text-ink",
           "data-[state=active]:bg-bloco data-[state=active]:font-semibold data-[state=active]:text-ink",
+        ],
+        /** `chip`: a aba em pílula da faixa do celular; a ativa vira tinta cheia. */
+        chip: [
+          "h-10 items-center gap-2 rounded-full border border-line bg-[var(--chip-bg)] px-3.5 text-apoio text-ink-2",
+          "data-[state=active]:border-[var(--chip-ativo-bg)] data-[state=active]:bg-[var(--chip-ativo-bg)] data-[state=active]:font-semibold data-[state=active]:text-[var(--chip-ativo-fg)]",
+        ],
+        /** `segmento`: a aba de uma bandeja `segmentos`; a ativa vira tinta cheia. */
+        segmento: [
+          "h-10 items-center justify-center rounded-md text-apoio font-semibold text-ink-2",
+          "data-[state=active]:bg-[var(--chip-ativo-bg)] data-[state=active]:text-[var(--chip-ativo-fg)]",
         ],
         /**
          * `acao`: a aba desenhada como BOTÃO (composer, 18/09/2026). Existe

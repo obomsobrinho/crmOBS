@@ -155,7 +155,7 @@ export function RodapeDaBancada({
                     <Button
                       size="none"
                       onClick={sendMessage}
-                      disabled={sending}
+                      carregando={sending}
                       className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
                       aria-label="Enviar"
                     >
@@ -165,7 +165,7 @@ export function RodapeDaBancada({
                     <Button
                       size="none"
                       onClick={() => void iniciarGravacao()}
-                      disabled={sending}
+                      carregando={sending}
                       className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
                       aria-label="Gravar áudio"
                     >

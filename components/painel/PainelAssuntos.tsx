@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { ChevronDown, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   AreaRolavel,
   DISSOLVER_LISTA,
@@ -116,11 +117,12 @@ export default function PainelAssuntos({
             const estaAberto = aberto === i;
             return (
               <div key={it.titulo} className={estaAberto ? "bg-bloco" : ""}>
-                <button
-                  type="button"
+                <Button
+                  variant="nu"
+                  size="none"
                   onClick={() => setAberto(estaAberto ? null : i)}
                   aria-expanded={estaAberto}
-                  className="painel-pressiona block w-full px-6 py-3 text-left transition-colors hover:bg-bloco"
+                  className="painel-pressiona block w-full px-6 py-3 text-left hover:bg-bloco"
                 >
                   {/* Linha de cima: o assunto à esquerda, contagem e seta à
                       direita. A VARIAÇÃO desceu para a linha da barra, como na
@@ -134,7 +136,7 @@ export default function PainelAssuntos({
                       {it.titulo}
                     </span>
                     <span className="flex shrink-0 items-baseline gap-2">
-                      <span className="font-display text-[15px] font-semibold tabular-nums text-ink">
+                      <span className="font-display text-corpo font-semibold tabular-nums text-ink">
                         {it.contagem}
                       </span>
                       <ChevronDown
@@ -178,7 +180,7 @@ export default function PainelAssuntos({
                       {it.variacao}
                     </span>
                   </span>
-                </button>
+                </Button>
 
                 {estaAberto && (
                   <div className="px-6 pb-4">

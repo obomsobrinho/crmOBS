@@ -90,6 +90,7 @@ function SheetContent({
   className,
   tamanho,
   lado,
+  children,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> &
   VariantProps<typeof conteudoVariants>) {
@@ -103,7 +104,18 @@ function SheetContent({
         data-slot="sheet-content"
         className={cn(conteudoVariants({ lado, tamanho, className }))}
         {...props}
-      />
+      >
+        {/* A alça da folha de baixo mora AQUI, uma vez só (02/10/2026): eram
+            cinco cópias da mesma div, uma delas sem o `shrink-0`. */}
+        {lado === "baixo" && (
+          <div
+            data-slot="sheet-alca"
+            className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong"
+            aria-hidden
+          />
+        )}
+        {children}
+      </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
 }
@@ -140,9 +152,16 @@ function SheetDescription({
 }
 
 function SheetClose({
+  className,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close {...props} data-slot="sheet-close" />;
+  return (
+    <DialogPrimitive.Close
+      className={cn("cursor-pointer disabled:cursor-not-allowed", className)}
+      {...props}
+      data-slot="sheet-close"
+    />
+  );
 }
 
 export {

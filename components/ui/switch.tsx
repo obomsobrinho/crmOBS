@@ -28,7 +28,7 @@ function Switch({
   return (
     <SwitchPrimitive.Root
       className={cn(
-        "group/switch disabled:cursor-not-allowed disabled:opacity-50",
+        "group/switch cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -100,6 +100,14 @@ function SwitchTrack({
  * `calc(100%-2px)`: são os valores que a chave usa hoje, e a conta do shadcn
  * daria 12px, movendo o polegar um pixel a menos.
  */
+const bolaClasses = (className?: string) =>
+  cn(
+    "pointer-events-none block h-3 w-3 rounded-full transition-transform duration-[var(--dur-fast)] ease-[var(--ease-out)]",
+    "data-[state=unchecked]:translate-x-[1px] data-[state=unchecked]:bg-[var(--ink-3)]",
+    "data-[state=checked]:translate-x-[13px] data-[state=checked]:bg-white",
+    className,
+  );
+
 function SwitchThumb({
   className,
   checked,
@@ -109,15 +117,32 @@ function SwitchThumb({
     <SwitchPrimitive.Thumb
       data-slot="switch-thumb"
       data-state={checked ? "checked" : "unchecked"}
-      className={cn(
-        "pointer-events-none block h-3 w-3 rounded-full transition-transform duration-[var(--dur-fast)] ease-[var(--ease-out)]",
-        "data-[state=unchecked]:translate-x-[1px] data-[state=unchecked]:bg-[var(--ink-3)]",
-        "data-[state=checked]:translate-x-[13px] data-[state=checked]:bg-white",
-        className,
-      )}
+      className={bolaClasses(className)}
       {...props}
     />
   );
 }
 
-export { Switch, SwitchTrack, SwitchThumb };
+/**
+ * A MESMA bola, sem o Root do Radix em volta (02/10/2026). O `SwitchThumb` lê o
+ * contexto do `Switch` e quebra fora dele; onde o alvo é outra coisa (o item do
+ * menu "IA nesta conversa", que é um `DropdownMenuItem`), a bola precisa ser um
+ * span comum. Antes ela era copiada à mão, e um ajuste na geometria da chave
+ * não chegaria lá. As duas leem a mesma lista de classes.
+ */
+function SwitchBola({
+  className,
+  checked,
+  ...props
+}: React.ComponentProps<"span"> & { checked: boolean }) {
+  return (
+    <span
+      data-slot="switch-thumb"
+      data-state={checked ? "checked" : "unchecked"}
+      className={bolaClasses(className)}
+      {...props}
+    />
+  );
+}
+
+export { Switch, SwitchTrack, SwitchThumb, SwitchBola };

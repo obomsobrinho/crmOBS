@@ -428,6 +428,47 @@
   --av-8-bg: #fadfd6;
   --av-8-fg: #8a3418;
 
+  /* ── Rótulos: a paleta ÚNICA de tags e estágios do funil (02/10/2026) ──
+     Oito matizes que o usuário escolhe, NENHUM verde, âmbar ou vermelho (são
+     cores de estado). Cada um tem os papéis da casa: `fill` (bolinha, amostra),
+     `on` (tinta sobre o fill), `ink` (texto) e `surface` (fundo tingido).
+     Contraste medido (WCAG AA): `on`/`fill` de 4,6:1 a 6,3:1; `ink`/`surface` de
+     5,2:1 a 9,2:1; `fill` sobre `--raised` de 4,6:1 a 6,3:1. O valor guardado no
+     banco é só a chave; `lib/rotulos.ts` mapeia as chaves antigas (verde,
+     âmbar, vermelho, laranja) para o matiz permitido mais próximo. */
+  --rotulo-gray-fill: #64748b;
+  --rotulo-gray-on: #ffffff;
+  --rotulo-gray-ink: #334155;
+  --rotulo-gray-surface: #f0f1f3;
+  --rotulo-blue-fill: #2563eb;
+  --rotulo-blue-on: #ffffff;
+  --rotulo-blue-ink: #1d4ed8;
+  --rotulo-blue-surface: #e9effd;
+  --rotulo-cyan-fill: #0e7490;
+  --rotulo-cyan-on: #ffffff;
+  --rotulo-cyan-ink: #155e75;
+  --rotulo-cyan-surface: #e7f1f4;
+  --rotulo-indigo-fill: #4f46e5;
+  --rotulo-indigo-on: #ffffff;
+  --rotulo-indigo-ink: #4338ca;
+  --rotulo-indigo-surface: #ededfc;
+  --rotulo-violet-fill: #9333ea;
+  --rotulo-violet-on: #ffffff;
+  --rotulo-violet-ink: #7e22ce;
+  --rotulo-violet-surface: #f4ebfd;
+  --rotulo-fuchsia-fill: #a21caf;
+  --rotulo-fuchsia-on: #ffffff;
+  --rotulo-fuchsia-ink: #86198f;
+  --rotulo-fuchsia-surface: #f6e8f7;
+  --rotulo-pink-fill: #db2777;
+  --rotulo-pink-on: #ffffff;
+  --rotulo-pink-ink: #be185d;
+  --rotulo-pink-surface: #fbe9f1;
+  --rotulo-stone-fill: #78716c;
+  --rotulo-stone-on: #ffffff;
+  --rotulo-stone-ink: #57534e;
+  --rotulo-stone-surface: #f2f1f0;
+
   /* ── Chip neutro: contador de conversas e filtros da lista ──
      No escuro é o carvão da marca (#242424); no claro, a superfície recuada.
      Existe para tirar da tela o azul quase preto, que virava buraco. */
@@ -649,6 +690,42 @@
   --av-8-bg: #3a1d12;
   --av-8-fg: #f0a98d;
 
+  /* Rótulos no escuro (a paleta e o porquê estão no bloco claro). Contraste
+     medido: `on`/`fill` de 6,6:1 a 11,0:1; `ink`/`surface` de 7,1:1 a 9,3:1;
+     `fill` sobre `--raised` de 6,0:1 a 9,9:1. */
+  --rotulo-gray-fill: #94a3b8;
+  --rotulo-gray-on: #0a0a0a;
+  --rotulo-gray-ink: #cbd5e1;
+  --rotulo-gray-surface: #2b2d31;
+  --rotulo-blue-fill: #60a5fa;
+  --rotulo-blue-on: #0a0a0a;
+  --rotulo-blue-ink: #93c5fd;
+  --rotulo-blue-surface: #232e3b;
+  --rotulo-cyan-fill: #22d3ee;
+  --rotulo-cyan-on: #0a0a0a;
+  --rotulo-cyan-ink: #67e8f9;
+  --rotulo-cyan-surface: #193539;
+  --rotulo-indigo-fill: #818cf8;
+  --rotulo-indigo-on: #0a0a0a;
+  --rotulo-indigo-ink: #a5b4fc;
+  --rotulo-indigo-surface: #282a3b;
+  --rotulo-violet-fill: #c084fc;
+  --rotulo-violet-on: #0a0a0a;
+  --rotulo-violet-ink: #d8b4fe;
+  --rotulo-violet-surface: #32283c;
+  --rotulo-fuchsia-fill: #e879f9;
+  --rotulo-fuchsia-on: #0a0a0a;
+  --rotulo-fuchsia-ink: #f0abfc;
+  --rotulo-fuchsia-surface: #38273b;
+  --rotulo-pink-fill: #f472b6;
+  --rotulo-pink-on: #0a0a0a;
+  --rotulo-pink-ink: #f9a8d4;
+  --rotulo-pink-surface: #3a2630;
+  --rotulo-stone-fill: #a8a29e;
+  --rotulo-stone-on: #0a0a0a;
+  --rotulo-stone-ink: #d6d3d1;
+  --rotulo-stone-surface: #2e2d2d;
+
   color-scheme: dark;
 }
 
@@ -714,7 +791,9 @@ h3 {
 }
 
 /* Tailwind v4 não põe cursor:pointer em <button> por padrão. Restaura em
-   tudo que é clicável (exceto desabilitado).
+   tudo que é clicável (exceto desabilitado). REGRA DA CASA (02/10/2026): tudo
+   que é clicável mostra o cursor de clique. A base (`components/ui/*`) também
+   declara `cursor-pointer` por classe, e `e2e/cursor.design.spec.ts` trava.
    ⚠️ Mora em `@layer base` de propósito, e a razão é cascata de CAMADA, não
    especificidade: o Tailwind v4 emite os utilitários dentro de `@layer
    utilities`, e regra SEM camada vence qualquer regra em camada, por mais
@@ -727,12 +806,29 @@ h3 {
   :where(
     button:not(:disabled),
     [role="button"]:not(:disabled),
+    [role="tab"]:not(:disabled),
     [role="switch"]:not(:disabled),
+    [role="checkbox"]:not(:disabled),
+    [role="radio"]:not(:disabled),
+    [role="menuitem"]:not([data-disabled]),
+    [role="menuitemcheckbox"]:not([data-disabled]),
+    [role="option"]:not([data-disabled]),
     a[href],
     label[for],
+    label:has(input:not(:disabled), [role="checkbox"]:not(:disabled), [role="switch"]:not(:disabled)),
     summary
   ) {
     cursor: pointer;
+  }
+  /* O recusado mostra "não pode" (02/10/2026): a mesma regra do Button da base,
+     para o <button disabled> e o item desabilitado que não vêm dela. */
+  :where(
+    button:disabled,
+    [role="button"][aria-disabled="true"],
+    [role="menuitem"][data-disabled],
+    [role="option"][data-disabled]
+  ) {
+    cursor: not-allowed;
   }
 }
 

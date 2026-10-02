@@ -12,7 +12,7 @@ import {
   PanelRight,
 } from "lucide-react";
 import Link from "next/link";
-import { Avatar } from "@/components/ui/avatar";
+import AvatarMembro from "@/components/AvatarMembro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
+import { Switch, SwitchBola, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -31,8 +31,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
-import { avatarPair } from "@/lib/inbox";
-import { memberName, memberInitials, type Member } from "@/lib/team";
+import { memberName, type Member } from "@/lib/team";
 import type { QuemAtende } from "@/lib/crm";
 import AvatarContato from "@/components/AvatarContato";
 
@@ -220,9 +219,7 @@ export function ThreadHeader({
                       onSelect={() => onAssign(m.userId)}
                       className="min-h-11"
                     >
-                      <Avatar size="2xs" style={avatarPair(m.email)}>
-                        {memberInitials(m.email).slice(0, 1)}
-                      </Avatar>
+                      <AvatarMembro size="2xs" email={m.email} />
                       <span className="min-w-0 flex-1 truncate">
                         {m.userId === myUserId ? "Você" : memberName(m.email)}
                       </span>
@@ -258,13 +255,10 @@ export function ThreadHeader({
                   <Bot size={15} className="shrink-0" />
                   <span className="flex-1">IA nesta conversa</span>
                   <SwitchTrack checked={!iaPausada}>
-                    {/* Polegar desenhado à mão: o `SwitchThumb` do Radix exige
-                        o Root do Switch em volta, e aqui o alvo é o item do
-                        menu (foi esse o erro que derrubava a folha Mais). */}
-                    <span
-                      data-state={iaPausada ? "unchecked" : "checked"}
-                      className="pointer-events-none block h-3 w-3 rounded-full transition-transform data-[state=checked]:translate-x-[13px] data-[state=checked]:bg-white data-[state=unchecked]:translate-x-[1px] data-[state=unchecked]:bg-[var(--ink-3)]"
-                    />
+                    {/* `SwitchBola`, e não o `SwitchThumb` do Radix: ele exige o
+                        Root do Switch em volta, e aqui o alvo é o item do menu
+                        (foi esse o erro que derrubava a folha Mais). */}
+                    <SwitchBola checked={!iaPausada} />
                   </SwitchTrack>
                 </DropdownMenuItem>
               )}
@@ -328,12 +322,7 @@ export function ThreadHeader({
                         >
                           {attendant ? (
                             <>
-                              <Avatar
-                                size="2xs"
-                                style={avatarPair(attendant.email)}
-                              >
-                                {memberInitials(attendant.email).slice(0, 1)}
-                              </Avatar>
+                              <AvatarMembro size="2xs" email={attendant.email} />
                               <span className="hidden 2xl:inline">
                                 {attendant.userId === myUserId
                                   ? "Você"
@@ -366,9 +355,7 @@ export function ThreadHeader({
                       key={m.userId}
                       onSelect={() => onAssign(m.userId)}
                     >
-                      <Avatar size="2xs" style={avatarPair(m.email)}>
-                        {memberInitials(m.email).slice(0, 1)}
-                      </Avatar>
+                      <AvatarMembro size="2xs" email={m.email} />
                       <span className="min-w-0 flex-1 truncate">
                         {m.userId === myUserId ? "Você" : memberName(m.email)}
                       </span>

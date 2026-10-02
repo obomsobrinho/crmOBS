@@ -1,6 +1,7 @@
 import NavRail from "@/components/NavRail";
 import AvisoMontagem from "@/components/AvisoMontagem";
 import AgentPowerToggle from "@/components/AgentPowerToggle";
+import { Aviso } from "@/components/ui/aviso";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { publishBlockers } from "@/lib/onboarding";
@@ -55,9 +56,9 @@ export default function DesignOnboardingPage() {
               blocked
             />
           </div>
-          <div className="rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
+          <Aviso>
             Antes de ativar o agente, falta: {publishBlockers(INPUT).join(", ")}.
-          </div>
+          </Aviso>
         </div>
       </div>
     </div>

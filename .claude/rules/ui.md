@@ -37,3 +37,8 @@ Base-layer reuse, `AreaRolavel`, `carregando`, tokens and no-dash are in `engine
 - Menu (`components/NavRail.tsx`): Painel first, Pedidos, Conversas, Pipeline, Agente (owner), Equipe. "Em breve" = Agenda and Follow-up; Campanhas does not come back.  (why: docs/adr/2026-08-26-beta-mvp-scope-and-menu.md)
 - Mobile: bottom bar has Pedidos where Pipeline was; Pipeline lives in "Mais".  (why: docs/adr/2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md)
 - `Stat` has an `elevado` variant because `--s-bloco` equals `--canvas` in the light theme: a `bloco` card on the canvas would be invisible. Use `elevado` there.
+
+## Cursors and label colors
+- Everything clickable shows `cursor: pointer`, set in the base layer (`components/ui/*`, reset in `app/globals.css`), not per screen. Disabled is `not-allowed` (or `progress` for `carregando`). A product element with `onClick` that is not a `button`/`a` is a smell: use a `Button` variant. `e2e/cursor.design.spec.ts` checks the computed cursor on every `/design` route.  (why: docs/adr/2026-10-02-base-layer-cursors-and-label-palette.md)
+- Tag and funnel-stage colors come from ONE palette (`lib/rotulos.ts`, `chaveDoRotulo`, eight hues, never green/amber/red, tokens per theme). Stored colors are mapped at render; never rewrite the DB for this.  (why: docs/adr/2026-10-02-base-layer-cursors-and-label-palette.md)
+- `ink-faint` is never text, with one documented exception: the empty-state XX mark. Everything else that was ink-faint text is `ink-3`.  (why: docs/adr/2026-10-02-base-layer-cursors-and-label-palette.md)

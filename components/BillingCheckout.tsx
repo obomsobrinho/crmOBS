@@ -200,6 +200,7 @@ export default function BillingCheckout({
               // Seleção única desenhada com <button>, e não com RadioGroup: a
               // troca seria de composição, não de vocabulário, e a decisão desta
               // rodada é não redesenhar. `aria-pressed` é o que faltava.
+              // eslint-disable-next-line no-restricted-syntax -- cartão de escolha única com moldura e preço próprios; nenhuma variante do Button o reproduz
               <button
                 key={k}
                 type="button"

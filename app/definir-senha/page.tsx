@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -66,9 +67,9 @@ export default function DefinirSenhaPage() {
         </div>
 
         {ready === false && (
-          <p className="rounded-lg bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
+          <Aviso forma="plana">
             Sua sessão expirou. Abra novamente o link do convite no seu e-mail.
-          </p>
+          </Aviso>
         )}
 
         <div className="space-y-1.5">

@@ -56,7 +56,7 @@ export default function ContactTags({
   const [applied, setApplied] = useState<number[]>([]);
   const [open, setOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState(TAG_COLOR_KEYS[0]);
+  const [newColor, setNewColor] = useState<string>("violet");
 
   const ativo = conversationId != null;
 

@@ -3,6 +3,8 @@
 import { Check } from "lucide-react";
 import { prettyPhone } from "@/lib/format";
 import { stageColor, type PipelineCard, type Stage } from "@/lib/pipeline";
+import { Button } from "@/components/ui/button";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 
 /** A folha de mover (celular): escolhe o estágio de destino do card. */
@@ -28,7 +30,6 @@ export function MoverSheet({
           do dono (PENDENTE 3 do plano do mobile). */}
       <Sheet open={movendo !== null} onOpenChange={(v) => !v && onFechar()}>
         <SheetContent lado="baixo" aria-describedby="mover-sub">
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
           <div className="border-b border-line px-4 pb-3 pt-3">
             <SheetTitle className="text-cartao">
               Mover {movendo ? movendo.name || prettyPhone(movendo.phone) : ""}
@@ -37,16 +38,16 @@ export function MoverSheet({
               Vira &quot;Movido pelo time&quot;, e a IA não desfaz.
             </p>
           </div>
-          {/* eslint-disable-next-line no-restricted-syntax -- a folha de baixo rola sem máscara hoje; dissolver mudaria o pixel desta refatoração */}
-          <div className="flex flex-col overflow-y-auto p-2">
+          {/* A lista de estágios cresce com o funil: rola, e dissolve nas bordas. */}
+          <AreaRolavel className="flex flex-col p-2">
             {movendo &&
               activeStages.map((s) => {
                 const atual = estagioDoCard(movendo) === s.key;
                 return (
-                  // eslint-disable-next-line no-restricted-syntax -- linha da lista com data-slot do e2e (o Button ignora data-slot de fora) e sem variante equivalente
-                  <button
+                  <Button
                     key={s.key}
-                    type="button"
+                    variant="linha"
+                    size="linha"
                     data-slot="mover-estagio"
                     disabled={atual}
                     onClick={() => {
@@ -54,7 +55,9 @@ export function MoverSheet({
                       onFechar();
                       onMover(phone, s.key);
                     }}
-                    className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-[var(--active-bg)] disabled:cursor-default disabled:hover:bg-transparent"
+                    // O estágio atual não é recusa, é "você já está aqui": sem
+                    // o fade de desabilitado e sem realce de hover.
+                    className="disabled:cursor-default disabled:opacity-100 disabled:hover:bg-transparent"
                   >
                     <span
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -67,10 +70,10 @@ export function MoverSheet({
                         <Check size={13} /> atual
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
-          </div>
+          </AreaRolavel>
         </SheetContent>
       </Sheet>
     </>

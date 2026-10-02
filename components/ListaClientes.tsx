@@ -8,6 +8,7 @@ import { Plus, Search, UsersRound, X } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
 import {
   AreaRolavel,
@@ -226,18 +227,12 @@ export default function ListaClientes({
               return (
                 <Button
                   key={k}
-                  variant="outline"
-                  size="chrome"
+                  variant="chip"
+                  size="chip"
                   data-slot="clientes-chip"
                   data-ativo={on ? "sim" : undefined}
                   aria-pressed={on}
                   onClick={() => setFiltro(k)}
-                  className={cn(
-                    "shrink-0 gap-1.5 rounded-md px-2.5",
-                    on
-                      ? "border-[var(--chip-ativo-bg)] bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)] hover:bg-[var(--chip-ativo-bg)]"
-                      : "border-line bg-[var(--chip-bg)] text-ink-2 hover:bg-[var(--chip-bg)] hover:text-ink"
-                  )}
                 >
                   {ROTULO_FILTRO[k]}
                   <span className="font-bold tabular-nums opacity-75">{contagem[k]}</span>
@@ -494,13 +489,13 @@ function Vazio({
   children?: React.ReactNode;
 }) {
   return (
-    <div data-slot="clientes-vazio" className="flex flex-col items-center gap-2 px-6 py-16 text-center">
-      <UsersRound size={28} className="text-ink-faint" />
-      <p className="text-cartao text-ink">{titulo}</p>
-      <p className="max-w-[360px] text-apoio text-ink-2" style={{ textWrap: "pretty" }}>
-        {texto}
-      </p>
+    <EstadoVazio
+      data-slot="clientes-vazio"
+      icone={UsersRound}
+      titulo={titulo}
+      texto={texto}
+    >
       {children}
-    </div>
+    </EstadoVazio>
   );
 }

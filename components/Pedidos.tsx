@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, HandHelping, MessagesSquare, Search, User } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import { ArrowLeft, HandHelping, MessagesSquare, Search } from "lucide-react";
+import AvatarContato from "@/components/AvatarContato";
+import { Aviso } from "@/components/ui/aviso";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +16,6 @@ import { CabecalhoBloco } from "./ContactFields";
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { FUSO, formatEspera, prettyPhone } from "@/lib/format";
-import { avatarPair, initials } from "@/lib/inbox";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
@@ -268,6 +269,7 @@ export default function Pedidos({
       closedAt: new Date().toISOString(),
       summary: p.summary,
       nome: p.nome,
+      fotoPath: p.fotoPath,
       como,
       orientacao,
       porQuem: null,
@@ -426,20 +428,18 @@ export default function Pedidos({
                 Carregando…
               </p>
             ) : linhas.length === 0 && busca === "" ? (
-              <div
+              <EstadoVazio
                 data-slot="pedidos-vazio"
-                className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center"
-              >
-                <HandHelping size={28} className="text-ink-faint" aria-hidden />
-                <p className="text-corpo font-semibold">
-                  {aba === "abertos" ? "Nenhum pedido esperando." : "Nenhum pedido resolvido ainda."}
-                </p>
-                <p className="max-w-sm text-apoio text-ink-3">
-                  {aba === "abertos"
+                icone={HandHelping}
+                titulo={
+                  aba === "abertos" ? "Nenhum pedido esperando." : "Nenhum pedido resolvido ainda."
+                }
+                texto={
+                  aba === "abertos"
                     ? "Quando a IA pedir ajuda, o pedido aparece aqui e no WhatsApp de avisos."
-                    : `Os pedidos resolvidos nos últimos ${DIAS_DE_RESOLVIDOS} dias ficam aqui, com o que foi feito.`}
-                </p>
-              </div>
+                    : `Os pedidos resolvidos nos últimos ${DIAS_DE_RESOLVIDOS} dias ficam aqui, com o que foi feito.`
+                }
+              />
             ) : linhas.length === 0 ? (
               <p data-slot="pedidos-vazio" className="px-5 py-10 text-center text-apoio text-ink-3">
                 Nenhum pedido para “{busca}”.
@@ -509,15 +509,12 @@ export default function Pedidos({
               onVoltar={() => setSelecionado(null)}
             />
           ) : (
-            <div
+            <EstadoVazio
               data-slot="pedido-nenhum"
-              className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center"
-            >
-              <HandHelping size={28} className="text-ink-faint" aria-hidden />
-              <p className="max-w-[260px] text-apoio text-ink-2" style={{ textWrap: "pretty" }}>
-                Escolha um pedido na lista para ver o que foi pedido e o que fazer.
-              </p>
-            </div>
+              tamanho="detalhe"
+              icone={HandHelping}
+              texto="Escolha um pedido na lista para ver o que foi pedido e o que fazer."
+            />
           )}
         </aside>
       </Card>
@@ -653,9 +650,7 @@ function FichaPedido({
       <AreaRolavel className="min-h-0 flex-1">
         <div className="flex flex-col gap-4 p-4">
           <div className="flex items-center gap-2.5">
-            <Avatar size="lg" style={avatarPair(p.phone)}>
-              {initials(p.nome) ?? <User size={16} />}
-            </Avatar>
+            <AvatarContato size="lg" phone={p.phone} name={p.nome} fotoPath={p.fotoPath} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-corpo font-semibold text-ink">{quem}</span>
               {p.nome && <span className="truncate text-legenda text-ink-3">{prettyPhone(p.phone)}</span>}
@@ -708,13 +703,13 @@ function FichaPedido({
           {!ehAberto && p.orientacao && (
             <div className="flex flex-col gap-2">
               <CabecalhoBloco rotulo="Orientação dada" />
-              <p
+              <Aviso
                 data-slot="pedido-orientacao"
-                className="rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-ink"
+                className="text-ink"
                 style={{ textWrap: "pretty" }}
               >
                 {p.orientacao}
-              </p>
+              </Aviso>
             </div>
           )}
 

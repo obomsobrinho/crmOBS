@@ -22,6 +22,7 @@ const linhaBanco = (o: Record<string, unknown>) => ({
   closed_by: null,
   nomewpp: null,
   display_name: null,
+  foto_path: null,
   posicao: 1,
   total: 1,
   ...o,
@@ -79,7 +80,9 @@ test.describe("Fila de pedidos (lib/pedidos.ts)", () => {
 test.describe("Paginação de pedidos (lib/pedidos.ts, peças puras)", () => {
   test("a linha do banco vira pedido, com o nome limpo e a posição do banco", () => {
     const a = paraPedido(linhaBanco({ nomewpp: "Você", display_name: "Ana", posicao: "2", total: "3" })) as PedidoAberto;
-    expect(a).toMatchObject({ nome: "Ana", posicao: 2, total: 3, openedAt: "2026-09-29T10:00:00Z" });
+    expect(a).toMatchObject({ nome: "Ana", posicao: 2, total: 3, openedAt: "2026-09-29T10:00:00Z", fotoPath: null });
+    // A foto do contato (R-26) vem na mesma linha, sem consulta nova.
+    expect(paraPedido(linhaBanco({ foto_path: "t/55.jpg" }))).toMatchObject({ fotoPath: "t/55.jpg" });
     const r = paraPedido(
       linhaBanco({ closed_at: "2026-09-29T11:00:00Z", closed_how: "ia", instruction: " ok ", posicao: null, total: null })
     ) as PedidoResolvido;

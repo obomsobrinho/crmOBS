@@ -15,16 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import AvatarMembro from "@/components/AvatarMembro";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchMembers,
   memberName,
-  memberInitials,
   roleLabel,
   type Member,
 } from "@/lib/team";
-import { avatarPair } from "@/lib/inbox";
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   AreaRolavel,
@@ -216,9 +214,7 @@ export default function TeamManager({
                   i > 0 ? "border-t border-line" : ""
                 }`}
               >
-                <Avatar size="md" style={avatarPair(m.email)}>
-                  {memberInitials(m.email)}
-                </Avatar>
+                <AvatarMembro size="md" email={m.email} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-apoio font-medium capitalize">

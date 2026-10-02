@@ -1,12 +1,12 @@
 "use client";
 
-import { User, Bot, ArrowRightLeft } from "lucide-react";
+import { Bot, ArrowRightLeft } from "lucide-react";
 import { formatEspera, prettyPhone } from "@/lib/format";
-import { initials, avatarPair } from "@/lib/inbox";
-import { memberName, memberInitials, type Member } from "@/lib/team";
+import { memberName, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { idadeEmDias, origemDoCard, type PipelineCard } from "@/lib/pipeline";
-import { Avatar } from "@/components/ui/avatar";
+import AvatarContato from "../AvatarContato";
+import AvatarMembro from "../AvatarMembro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import QuemAtendeBadge, { quemAtendeTexto } from "../QuemAtendeBadge";
@@ -24,7 +24,6 @@ export function CardItem({
   onMover?: () => void;
 }) {
   const label = card.name || prettyPhone(card.phone);
-  const ini = initials(card.name);
   const preview = card.lastPreview.replace(/ | /g, "  ");
   // "Pessoa atendendo" não desenha marca própria: o avatar do responsável, que
   // já aparece no card, diz quem é e com nome.
@@ -56,9 +55,12 @@ export function CardItem({
     >
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">
-          <Avatar size="xs" style={avatarPair(card.phone)}>
-            {ini ?? <User size={14} />}
-          </Avatar>
+          <AvatarContato
+            size="xs"
+            phone={card.phone}
+            name={card.name}
+            fotoPath={card.fotoPath}
+          />
           {/* Mesma regra (`quemAtende`, lib/crm) E mesmo desenho
               (`QuemAtendeBadge`) da lista de conversas, para as duas telas não
               discordarem sobre o mesmo contato nem no dado nem no pixel. */}
@@ -133,9 +135,7 @@ export function CardItem({
             title={`Atendente: ${memberName(member.email)}`}
             className="flex shrink-0 items-center gap-1 text-legenda text-ink-3"
           >
-            <Avatar size="3xs" style={avatarPair(member.email)}>
-              {memberInitials(member.email).slice(0, 1)}
-            </Avatar>
+            <AvatarMembro size="3xs" email={member.email} />
             {memberName(member.email)}
           </span>
         )}

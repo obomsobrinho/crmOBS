@@ -372,7 +372,6 @@ export default function ConversationView({
           // cima da folha que a pessoa só queria LER.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
           <SheetTitle className="sr-only">Dados do contato</SheetTitle>
           <ScrollArea fade={DISSOLVER_LISTA} className="min-h-0 flex-1">
             {painelContato}

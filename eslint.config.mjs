@@ -9,8 +9,9 @@ import nextTs from "eslint-config-next/typescript";
 // --max-warnings 0 on every file Claude edits, so a touched file must be clean.
 const projectRules = [
   {
+    // `<input type="file">` is exempt: it is the hidden target of a Button.
     selector:
-      "JSXOpeningElement[name.name=/^(button|input|textarea|select)$/]",
+      "JSXOpeningElement[name.name=/^(button|input|textarea|select)$/]:not(:has(JSXAttribute[name.name='type'][value.value='file']))",
     message:
       "Use the base layer (components/ui: Button, Input, Textarea, Select). See docs/design-system/camada-base.md.",
   },
@@ -25,6 +26,14 @@ const projectRules = [
       "JSXAttribute[name.name='className'] TemplateElement[value.raw=/overflow-(y-)?auto/]",
     message:
       "Scrollable areas use <AreaRolavel> or ScrollArea with fade (components/ui/dissolver-rolagem.tsx).",
+  },
+  {
+    // Cursor rule (02/10/2026): everything clickable is a real interactive
+    // element (Button, a, label for), so the base gives it the pointer cursor.
+    selector:
+      "JSXOpeningElement[name.name=/^(div|span|li|ul|tr|td|th|p|section|article|header|footer|main|nav|aside|img|svg|h[1-6])$/]:not(:has(JSXAttribute[name.name='role'])) > JSXAttribute[name.name='onClick']",
+    message:
+      "onClick on a non-interactive element: use Button (components/ui), a link or a label for, so the cursor and the keyboard are right (.claude/rules/ui.md).",
   },
   {
     selector: "CallExpression[callee.property.name='select'] > Literal[value='*']",

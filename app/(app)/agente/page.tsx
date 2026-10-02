@@ -82,6 +82,7 @@ export default async function AgentePage() {
   return (
     <Card
       variant="pagina"
+      // eslint-disable-next-line no-restricted-syntax -- exceção documentada: o rodapé é `sticky`, então esta rolagem não tem máscara (.claude/rules/ui.md)
       className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 pt-6 max-md:px-4 max-md:pt-2"
     >
       <AgentConfigForm
