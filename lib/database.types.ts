@@ -1098,6 +1098,7 @@ export type Database = {
           closed_by: string
           closed_how: string
           display_name: string
+          foto_path: string
           id: number
           instruction: string
           nomewpp: string

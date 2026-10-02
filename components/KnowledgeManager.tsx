@@ -17,7 +17,9 @@ import {
   KNOWLEDGE_MAX_LABEL,
   type KnowledgeDoc,
 } from "@/lib/crm";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import {
   AreaRolavel,
   DISSOLVER_LISTA,
@@ -195,24 +197,18 @@ export default function KnowledgeManager({
   );
 
   const avisoChave = !keyConfigured && (
-    <div className="flex items-start gap-2 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
-      <CircleAlert size={15} className="mt-0.5 shrink-0" />
-      <span>
-        O processamento de documentos ainda não está ativo no servidor. O envio
-        fica disponível quando a chave do modelo estiver configurada.
-      </span>
-    </div>
+    <Aviso icone={CircleAlert}>
+      O processamento de documentos ainda não está ativo no servidor. O envio
+      fica disponível quando a chave do modelo estiver configurada.
+    </Aviso>
   );
 
-  const avisoErro = error && (
-    <div className="rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
-      {error}
-    </div>
-  );
+  const avisoErro = error && <Aviso tom="danger">{error}</Aviso>;
 
   // Era um <label> envolvendo o input; virou <button> porque agora existe um
   // input só, na raiz, e dois gatilhos apontando para ele.
   const areaArraste = (
+    // eslint-disable-next-line no-restricted-syntax -- área de soltar arquivo (tracejada, ocupa a largura); nenhuma variante do Button a reproduz
     <button
       type="button"
       onClick={escolherArquivo}
@@ -282,9 +278,7 @@ export default function KnowledgeManager({
   function lista() {
     if (docs.length === 0) {
       return (
-        <p className="py-4 text-center text-apoio text-ink-3">
-          Nenhum documento ainda.
-        </p>
+        <EstadoVazio tamanho="compacto" texto="Nenhum documento ainda." className="px-0" />
       );
     }
     return (
@@ -373,9 +367,11 @@ export default function KnowledgeManager({
           className={cn(MOLDURA_LISTA, "flex flex-1 flex-col")}
         >
           {docs.length === 0 ? (
-            <p className="flex flex-1 items-center justify-center px-4 py-6 text-center text-apoio text-ink-3">
-              Nenhum documento ainda.
-            </p>
+            <EstadoVazio
+              tamanho="compacto"
+              texto="Nenhum documento ainda."
+              className="flex-1 justify-center py-6"
+            />
           ) : (
             <ul className="flex-1 divide-y divide-line">
               {docs.slice(0, RESUMO).map((d) => linhaDoc(d, "linha"))}

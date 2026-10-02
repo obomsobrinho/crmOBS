@@ -13,6 +13,7 @@ import type { Tables } from "@/lib/database.types";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { Button } from "@/components/ui/button";
+import { PromptPreview } from "@/components/PromptPreview";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import {
   Sheet,
@@ -155,9 +156,9 @@ export default function AgentPromptDrawer({
             entao o degrau e o padrao. */}
         <AreaRolavel className="min-h-0 flex-1 p-5">
           {/* 12px é o piso da interface, e o prompt não abre exceção. */}
-          <pre className="rounded-xl border border-line bg-[var(--input-bg)] p-3.5 font-sans text-legenda leading-[19px] break-words whitespace-pre-wrap text-ink-2">
+          <PromptPreview>
             {texto || "Preencha os campos para gerar o prompt."}
-          </pre>
+          </PromptPreview>
 
           <p
             className={`mt-2 text-legenda ${

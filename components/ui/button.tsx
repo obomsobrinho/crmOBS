@@ -41,7 +41,7 @@ const buttonVariants = cva(
   //
   // `flex`, e não o `inline-flex` do shadcn: os botões da tela usam `flex` hoje,
   // sem exceção, e trocar o display muda a caixa de quem mora em linha.
-  "flex shrink-0 items-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "flex shrink-0 cursor-pointer items-center transition-colors disabled:cursor-not-allowed disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -65,6 +65,23 @@ const buttonVariants = cva(
         alternavel:
           "border border-line text-ink hover:bg-[var(--active-bg)] aria-pressed:border-brand-line aria-pressed:bg-brand-surface aria-pressed:text-brand-ink",
         /**
+         * CHIP DE FILTRO (02/10/2026): o recorte de uma lista (Conversas,
+         * Clientes). Também liga e desliga pelo `aria-pressed`: ativo vira tinta
+         * cheia (par `--chip-ativo-bg`/`--chip-ativo-fg`). Eram três cópias da
+         * mesma sopa de classe, e a cópia da lista de conversas carregava um
+         * comentário sobre sobrescrever o hover do `outline`: aqui o hover só
+         * muda a tinta do chip apagado, então a armadilha não existe.
+         */
+        chip:
+          "border border-line bg-[var(--chip-bg)] text-ink-2 not-aria-pressed:hover:text-ink aria-pressed:border-[var(--chip-ativo-bg)] aria-pressed:bg-[var(--chip-ativo-bg)] aria-pressed:text-[var(--chip-ativo-fg)]",
+        /**
+         * O chip do recorte URGENTE ("Esperando"): âmbar é ESTADO, e o ativo
+         * inverte dentro do próprio matiz (par `fill`/`on`), para o recorte não
+         * perder a cor justo quando está ligado.
+         */
+        "chip-alerta":
+          "border border-warn-line bg-warn-surface text-warn-ink aria-pressed:border-[var(--warn-fill)] aria-pressed:bg-[var(--warn-fill)] aria-pressed:text-[var(--warn-on)]",
+        /**
          * Sem moldura, com realce de fundo no hover. É o ghost da ÁREA DE
          * CONTEÚDO (conversa, painel do contato).
          */
@@ -77,6 +94,31 @@ const buttonVariants = cva(
         rail: "text-ink-2 hover:bg-[var(--rail-hover)] hover:text-ink",
         /** Ação de texto na cor da marca (`ink`, nunca `fill`, que é fundo). */
         "brand-ghost": "text-brand-ink hover:bg-[var(--active-bg)]",
+        /**
+         * LINHA de uma lista de ações (folha "Mais" do celular, escolher
+         * estágio, escolher modelo): tinta cheia e realce de fundo no hover. A
+         * geometria vem do `size` `linha` ou `linha-alta`.
+         */
+        linha: "text-ink hover:bg-[var(--active-bg)]",
+        /** A linha da ação que sai ou apaga: o hover assume o vermelho de estado. */
+        "linha-perigo":
+          "text-ink hover:bg-danger-surface hover:text-danger-ink",
+        /**
+         * Ação em forma de LINK (02/10/2026): texto na cor da marca, sublinhado
+         * no hover. Para "Conectar com QR code" e afins, que não são botão de
+         * verdade nem navegam para outra página.
+         */
+        link: "text-brand-ink hover:underline",
+        /** O mesmo link em tinta discreta, para dentro de um parágrafo de apoio. */
+        "link-discreto": "text-ink-2 underline-offset-2 hover:underline",
+        /**
+         * SEM APARÊNCIA: nenhuma cor e nenhum realce. É para a linha que
+         * desenha a própria aparência (cabeçalho de acordeão, linha de uma
+         * lista com estado de selecionada, item da barra de baixo). Existe para
+         * ela continuar sendo um Button (cursor, carregando, teclado) em vez de
+         * um `<button>` cru; quem usa responde pelas cores.
+         */
+        nu: "",
         /**
          * Ação destrutiva discreta: nasce apagada e só se assume no hover.
          * O realce usa o par `surface`/`ink` do vermelho, nunca `fill`: no tema
@@ -98,6 +140,15 @@ const buttonVariants = cva(
         /** 28px. Moldura. */
         chrome:
           "h-[var(--h-chrome)] gap-2 rounded-lg px-2 text-legenda font-semibold",
+        /** 48px: a linha de uma lista de ações dentro de uma folha. */
+        linha: "h-12 gap-3 rounded-lg px-3 text-left text-corpo",
+        /** A linha com título e descrição empilhados: 48px no mínimo. */
+        "linha-alta":
+          "min-h-12 flex-col items-stretch justify-center rounded-lg px-3 py-2 text-left text-corpo",
+        /** Ação em forma de link: o rótulo de apoio com um ícone ao lado. */
+        link: "gap-1 text-apoio font-medium",
+        /** 28px, raio de 8px e respiro de 10px: a medida do chip de filtro. */
+        chip: "h-[var(--h-chrome)] gap-1.5 rounded-md px-2.5 text-legenda font-semibold",
         /**
          * 36px quadrado: a AÇÃO PRINCIPAL quando ela é só ícone.
          *

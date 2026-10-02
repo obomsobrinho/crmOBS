@@ -251,15 +251,15 @@ export function SeletorDePreset({
           Substitui tom, objetivos, limites e detalhes
         </p>
         {AGENT_PRESETS.map((p) => (
-          <button
+          <Button
             key={p.id}
-            type="button"
+            variant="linha"
+            size="linha-alta"
             onClick={() => onEscolher(p)}
-            className="flex min-h-12 flex-col justify-center rounded-lg px-3 py-2 text-left hover:bg-[var(--active-bg)]"
           >
             <span className="text-corpo text-ink">{p.label}</span>
             <span className="text-legenda text-ink-3">{p.description}</span>
-          </button>
+          </Button>
         ))}
       </div>
     );

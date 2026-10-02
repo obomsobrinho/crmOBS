@@ -231,13 +231,13 @@ function Amostra({
         )}
       </div>
       <p className="mt-1.5 truncate text-legenda text-ink-2">{rotulo}</p>
-      <p className="truncate font-mono text-[11px] text-ink-3">{token}</p>
+      <p className="truncate font-mono text-legenda text-ink-3">{token}</p>
       {/* `data-token` existe para o HTML EXPORTADO conseguir recalcular este
           valor sozinho. Sem ele, o export congelaria o número do tema em que a
           foto foi tirada e mentiria ao trocar de tema. */}
       <p
         data-token={token}
-        className="truncate font-mono text-[11px] text-ink-faint"
+        className="truncate font-mono text-legenda text-ink-3"
       >
         {valor || "sem valor"}
       </p>
@@ -260,13 +260,13 @@ function AmostraTinta({
       <p className="text-corpo font-semibold" style={{ color: `var(${token})` }}>
         {rotulo}
       </p>
-      <p className="mt-1 truncate font-mono text-[11px] text-ink-3">{token}</p>
+      <p className="mt-1 truncate font-mono text-legenda text-ink-3">{token}</p>
       {/* `data-token` existe para o HTML EXPORTADO conseguir recalcular este
           valor sozinho. Sem ele, o export congelaria o número do tema em que a
           foto foi tirada e mentiria ao trocar de tema. */}
       <p
         data-token={token}
-        className="truncate font-mono text-[11px] text-ink-faint"
+        className="truncate font-mono text-legenda text-ink-3"
       >
         {valor || "sem valor"}
       </p>
@@ -484,10 +484,10 @@ export default function DesignSistemaPage() {
                   <p className="mt-2 text-legenda text-danger-ink">
                     nunca como texto
                   </p>
-                  <p className="truncate font-mono text-[11px] text-ink-3">
+                  <p className="truncate font-mono text-legenda text-ink-3">
                     --ink-faint
                   </p>
-                  <p className="truncate font-mono text-[11px] text-ink-faint">
+                  <p className="truncate font-mono text-legenda text-ink-3">
                     {v["--ink-faint"] || "sem valor"}
                   </p>
                 </div>
@@ -528,7 +528,7 @@ export default function DesignSistemaPage() {
                 <div className="brand-grad flex h-14 w-40 items-center justify-center rounded-xl text-apoio font-semibold">
                   .brand-grad
                 </div>
-                <p className="font-mono text-[11px] text-ink-3">
+                <p className="font-mono text-legenda text-ink-3">
                   {v["--brand-grad-start"] || "sem valor"} →{" "}
                   {v["--brand-grad-end"] || "sem valor"}
                 </p>
@@ -768,10 +768,10 @@ export default function DesignSistemaPage() {
                       style={{ borderRadius: `var(${token})` }}
                     />
                     <p className="mt-1.5 text-legenda text-ink-2">{classe}</p>
-                    <p data-token={token} className="font-mono text-[11px] text-ink-3">
+                    <p data-token={token} className="font-mono text-legenda text-ink-3">
                       {v[token] || "sem valor"}
                     </p>
-                    <p className="text-[11px] text-ink-faint">{uso}</p>
+                    <p className="text-legenda text-ink-3">{uso}</p>
                   </div>
                 ))}
               </div>
@@ -797,7 +797,7 @@ export default function DesignSistemaPage() {
                     >
                       {nome}
                     </div>
-                    <span data-token={token} className="font-mono text-[11px] text-ink-3">
+                    <span data-token={token} className="font-mono text-legenda text-ink-3">
                       {v[token] || "sem valor"}
                     </span>
                     <span className="text-legenda text-ink-3">{uso}</span>
@@ -837,7 +837,7 @@ export default function DesignSistemaPage() {
                   <p className="text-apoio font-semibold text-ink">
                     Curva de interface
                   </p>
-                  <p className="font-mono text-[11px] text-ink-3">
+                  <p className="font-mono text-legenda text-ink-3">
                     --ease-out: {v["--ease-out"] || "sem valor"}
                   </p>
                 </div>
@@ -845,7 +845,7 @@ export default function DesignSistemaPage() {
                   <p className="text-apoio font-semibold text-ink">
                     Curva de dado
                   </p>
-                  <p className="font-mono text-[11px] text-ink-3">
+                  <p className="font-mono text-legenda text-ink-3">
                     --ease-dado: {v["--ease-dado"] || "sem valor"}
                   </p>
                 </div>
@@ -863,10 +863,10 @@ export default function DesignSistemaPage() {
                   ] as const
                 ).map((t) => (
                   <div key={t} className="min-w-0">
-                    <p className="truncate font-mono text-[11px] text-ink-2">
+                    <p className="truncate font-mono text-legenda text-ink-2">
                       {t}
                     </p>
-                    <p data-token={t} className="font-mono text-[11px] text-ink-faint">
+                    <p data-token={t} className="font-mono text-legenda text-ink-3">
                       {v[t] || "sem valor"}
                     </p>
                   </div>
@@ -1127,7 +1127,7 @@ export default function DesignSistemaPage() {
                     >
                       <AvatarFallback>M{i + 1}</AvatarFallback>
                     </Avatar>
-                    <p className="mt-1 text-[11px] text-ink-3">{s}</p>
+                    <p className="mt-1 text-legenda text-ink-3">{s}</p>
                   </div>
                 ))}
               </div>

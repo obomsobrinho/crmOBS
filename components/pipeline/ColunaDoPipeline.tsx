@@ -5,6 +5,7 @@ import { stageColor, resumoDosNumeros, type PipelineCard, type Stage } from "@/l
 import type { ContagensPipeline } from "@/lib/pipeline-fonte";
 import type { Member } from "@/lib/team";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { CardItem } from "./CardItem";
 import { FimDaColuna } from "./FimDaColuna";
 import type { ColunaCarregada } from "./colunas";
@@ -122,9 +123,7 @@ export function ColunaDoPipeline({
         {colCards.length === 0 && (
           // "Nenhuma conversa aqui" e não "Vazio": vazio descreve a caixa,
           // a frase descreve o funil, e é o funil que a pessoa está lendo.
-          <div className="px-2 py-6 text-center text-legenda text-ink-3">
-            Nenhuma conversa aqui
-          </div>
+          <EstadoVazio tamanho="compacto" texto="Nenhuma conversa aqui" />
         )}
         {colCards.map((c) => (
           <CardItem

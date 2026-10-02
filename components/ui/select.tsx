@@ -43,7 +43,7 @@ function SelectValue({
 const gatilhoVariants = cva(
   // `[&>span]:truncate`: o Value do Radix é um span, e sem isto um nome de
   // atendente comprido estica o gatilho e empurra o resto do cabeçalho.
-  "flex shrink-0 items-center justify-between gap-2 rounded-lg border border-line bg-[var(--input-bg)] text-ink transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-ink-3 [&>span]:truncate [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "flex shrink-0 cursor-pointer items-center justify-between gap-2 rounded-lg border border-line bg-[var(--input-bg)] text-ink transition-colors disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-ink-3 [&>span]:truncate [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       size: {

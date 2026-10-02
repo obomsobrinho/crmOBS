@@ -31,7 +31,7 @@ export function MediaView({ url, type }: { url: string; type: string | null }) {
 
   if (!resolved) {
     return (
-      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio text-ink-2">
+      <div className="mb-1 flex items-center gap-1.5 rounded-lg bg-ink/5 px-2.5 py-2 text-apoio text-ink-2">
         <FileText size={15} /> carregando mídia…
       </div>
     );
@@ -60,7 +60,7 @@ export function MediaView({ url, type }: { url: string; type: string | null }) {
       href={resolved}
       target="_blank"
       rel="noopener noreferrer"
-      className="mb-1 flex items-center gap-1.5 rounded-lg bg-black/5 px-2.5 py-2 text-apoio font-medium underline"
+      className="mb-1 flex items-center gap-1.5 rounded-lg bg-ink/5 px-2.5 py-2 text-apoio font-medium underline"
     >
       <FileText size={15} /> Abrir arquivo
     </a>

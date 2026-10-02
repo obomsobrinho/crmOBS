@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useCelular } from "@/lib/useCelular";
@@ -126,9 +127,8 @@ export default function ChangePassword({ email }: { email: string }) {
       {celular && (
         <Sheet open={aberto} onOpenChange={(v) => (v ? setAberto(true) : fechar())}>
           <SheetContent lado="baixo" aria-describedby={undefined}>
-            <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-line-strong" aria-hidden />
             <SheetTitle className="sr-only">Trocar minha senha</SheetTitle>
-            <div className="overflow-y-auto p-4">{formulario}</div>
+            <AreaRolavel className="p-4">{formulario}</AreaRolavel>
           </SheetContent>
         </Sheet>
       )}

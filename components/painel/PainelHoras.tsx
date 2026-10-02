@@ -125,7 +125,7 @@ export default function PainelHoras({
         {colunas.map((c) => (
           <span
             key={c.hora}
-            className="min-w-0 flex-1 text-center text-legenda text-ink-faint"
+            className="min-w-0 flex-1 text-center text-legenda text-ink-3"
           >
             {EIXO.includes(c.hora) ? `${c.hora}h` : ""}
           </span>

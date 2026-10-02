@@ -2,6 +2,7 @@
 // campos personalizados). Tabelas donas do CRM: o browser faz CRUD direto via
 // RLS por tenant (não passa pelo n8n).
 import type { Json } from "./database.types";
+import { ROTULO_CHAVES, fillDoRotulo } from "./rotulos";
 
 export interface Tag {
   id: number;
@@ -91,19 +92,12 @@ export function formatBytes(n: number | null): string {
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// Paleta fixa de cores das tags (chave guardada em tags.color).
-export const TAG_COLORS: Record<string, string> = {
-  purple: "#7c4dff",
-  green: "#16a34a",
-  amber: "#b45309",
-  red: "#dc2626",
-  blue: "#3b82f6",
-  gray: "#6b7280",
-};
-export const TAG_COLOR_KEYS = Object.keys(TAG_COLORS);
+// A cor de uma tag vem da paleta ÚNICA de rótulos (lib/rotulos.ts, a mesma dos
+// estágios do funil; chave guardada em tags.color, traduzida só ao desenhar).
+export const TAG_COLOR_KEYS: readonly string[] = ROTULO_CHAVES;
 
 export function tagColor(color: string): string {
-  return TAG_COLORS[color] ?? TAG_COLORS.gray;
+  return fillDoRotulo(color);
 }
 
 // Campos personalizados: guardados como objeto jsonb (chave -> valor). A UI

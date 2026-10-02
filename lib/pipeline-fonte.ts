@@ -67,6 +67,7 @@ function paraCard(l: LinhaCard): PipelineCard {
     id: l.id,
     phone: l.phone,
     name: nomeDoContato(l),
+    fotoPath: l.foto_path,
     lastPreview: l.last_message_preview ?? "",
     lastFrom: l.last_message_from === "out" ? "out" : "in",
     lastMessageAt: l.last_message_at,

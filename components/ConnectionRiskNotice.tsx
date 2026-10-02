@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 // Transparência sobre a conexão, na tela onde a decisão é tomada.
 //
@@ -24,15 +25,16 @@ export default function ConnectionRiskNotice() {
     <div data-slot="aviso-risco" className="w-full max-w-md space-y-2 px-1 text-apoio text-ink-3">
       <p>
         Use um número dedicado ao atendimento, nunca o seu pessoal.{" "}
-        <button
-          type="button"
+        <Button
+          variant="link-discreto"
+          size="none"
           onClick={() => setAberto((v) => !v)}
           aria-expanded={aberto}
-          className="inline-flex items-center gap-0.5 font-medium text-ink-2 underline-offset-2 hover:underline"
+          className="inline-flex gap-0.5 font-medium"
         >
           Entenda os riscos
           {aberto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
+        </Button>
       </p>
 
       {aberto && (

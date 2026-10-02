@@ -19,7 +19,8 @@ import { cn } from "@/lib/utils";
  * `inline-flex` a todos mudaria a caixa de metade deles.
  */
 const badgeVariants = cva(
-  "[&_svg]:pointer-events-none [&_svg]:shrink-0",
+  // `asChild` sobre <button> ou <a>: o chip clicável mostra o cursor de clique.
+  "[a&,button&]:cursor-pointer [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {

@@ -1,4 +1,5 @@
 import { diaIsoSP } from "./fuso";
+import { ROTULO_CHAVES, fillDoRotulo } from "./rotulos";
 import type { Tables } from "./database.types";
 
 // Pipeline (funil) do tenant. Módulo puro (sem server-only / supabase): usado no
@@ -46,6 +47,8 @@ export interface PipelineCard {
   id?: number;
   phone: string;
   name: string | null;
+  /** Foto guardada do contato (lib/fotos.ts); vem na linha da RPC, sem consulta nova. */
+  fotoPath?: string | null;
   lastPreview: string;
   lastFrom: "in" | "out";
   lastMessageAt: string;
@@ -84,20 +87,13 @@ export function stageColumns(
   return active.map((s) => ({ stage: s, cards: buckets.get(s.key)! }));
 }
 
-// Paleta das colunas (sólida, mesma família da identidade). Chave -> cor.
-export const STAGE_COLORS: Record<string, string> = {
-  gray: "#8b84a6",
-  blue: "#3b82f6",
-  violet: "#7c4dff",
-  amber: "#f59e0b",
-  green: "#14b8a6",
-  pink: "#e0498a",
-  orange: "#f97316",
-};
-export const STAGE_COLOR_KEYS = Object.keys(STAGE_COLORS);
+// A cor de um estágio vem da paleta ÚNICA de rótulos (lib/rotulos.ts, a mesma
+// das tags): a chave guardada no banco é traduzida na hora de desenhar, e o
+// seletor oferece só os matizes permitidos.
+export const STAGE_COLOR_KEYS: readonly string[] = ROTULO_CHAVES;
 
 export function stageColor(color: string): string {
-  return STAGE_COLORS[color] ?? STAGE_COLORS.gray;
+  return fillDoRotulo(color);
 }
 
 // ---- Movimento automático do card pela IA (/api/agent) ----

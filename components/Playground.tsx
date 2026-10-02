@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Handoff } from "./HandoffCard";
 import FundoRede from "./FundoRede";
 import { cn } from "@/lib/utils";
@@ -95,36 +96,26 @@ export default function Playground({
       {/* CELULAR (plano do mobile, fase 4): conversa e diagnóstico não cabem
           lado a lado nem empilhados (a conversa ficaria com dois dedos de
           altura), então viram duas ABAS. No desktop continuam lado a lado. */}
-      <div
-        role="tablist"
-        aria-label="Bancada"
-        className={cn(
-          "mb-3 grid shrink-0 grid-cols-2 gap-1 rounded-lg border border-line bg-[var(--chip-bg)] p-1 md:hidden",
-          !diagnostico && "hidden"
-        )}
+      <Tabs
+        value={abaCel}
+        onValueChange={(v) => setAbaCel(v as "conversa" | "diagnostico")}
+        className="shrink-0"
       >
-        {([
-          ["conversa", "Conversa"],
-          ["diagnostico", "Diagnóstico"],
-        ] as const).map(([k, rotulo]) => (
-          // eslint-disable-next-line no-restricted-syntax -- aba em segmento com tokens de chip próprios; nenhuma variante do Button a reproduz igual
-          <button
-            key={k}
-            type="button"
-            role="tab"
-            aria-selected={abaCel === k}
-            onClick={() => setAbaCel(k)}
-            className={cn(
-              "h-10 rounded-md text-apoio font-semibold transition-colors",
-              abaCel === k
-                ? "bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)]"
-                : "text-ink-2"
-            )}
-          >
-            {rotulo}
-          </button>
-        ))}
-      </div>
+        <TabsList
+          variant="segmentos"
+          aria-label="Bancada"
+          className={cn("mb-3 grid-cols-2 md:hidden", !diagnostico && "hidden")}
+        >
+          {([
+            ["conversa", "Conversa"],
+            ["diagnostico", "Diagnóstico"],
+          ] as const).map(([k, rotulo]) => (
+            <TabsTrigger key={k} value={k} variant="segmento">
+              {rotulo}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
       {/* O botão Resetar ficava aqui, numa linha própria acima da conversa, e era
           ele que abria o vão grande embaixo do cabeçalho do painel. Subiu para o
           cabeçalho do `AgentTestDrawer`, que reseta remontando este componente

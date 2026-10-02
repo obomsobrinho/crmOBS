@@ -5,10 +5,11 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
-import { Avatar } from "@/components/ui/avatar";
+import AvatarMembro from "@/components/AvatarMembro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,7 +27,6 @@ import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
-  avatarPair,
   JANELAS,
   JANELA_PADRAO,
   ORDEM_JANELAS,
@@ -49,7 +49,7 @@ import {
 } from "@/lib/inbox-fonte";
 import { useDebounce } from "@/lib/use-debounce";
 import { agoraMs } from "@/lib/periodo";
-import { fetchMembers, memberName, memberInitials, type Member } from "@/lib/team";
+import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { ouvirIa } from "@/lib/ia-bus";
 import QuemAtendeBadge, { quemAtendeTexto } from "./QuemAtendeBadge";
@@ -552,35 +552,16 @@ export default function ContactSidebar({
               return (
                 <Button
                   key={k}
-                  variant="outline"
-                  size="chrome"
+                  // ⚠️ O ATIVO SE DISTINGUE POR COR, NÃO POR PESO (variante
+                  // `chip` do Button, pelo `aria-pressed`): cada um inverte
+                  // dentro do PRÓPRIO matiz. O urgente vira âmbar cheio, o
+                  // resto vira tinta cheia.
+                  variant={urgente ? "chip-alerta" : "chip"}
+                  size="chip"
                   data-slot="inbox-chip"
                   data-ativo={ativo ? "sim" : undefined}
                   aria-pressed={ativo}
                   onClick={() => setFilter(k)}
-                  className={cn(
-                    // 8px de raio e 10px de respiro lateral, medidos na prancha.
-                    "shrink-0 gap-1.5 rounded-md px-2.5",
-                    ativo
-                      ? // ⚠️ O ATIVO SE DISTINGUE POR COR, NÃO POR PESO. Antes
-                        // era `font-semibold` mais uma borda um degrau mais
-                        // forte, e a diferença sumia a um metro da tela. Cada
-                        // um inverte dentro do PRÓPRIO matiz: o urgente vira
-                        // âmbar cheio (par `fill`/`on`), o resto vira tinta
-                        // cheia (par `--chip-ativo-bg`/`--chip-ativo-fg`).
-                        // Manter o âmbar aqui é o que impede o recorte
-                        // "Esperando" de perder a cor justo quando está ligado.
-                        urgente
-                        ? "border-[var(--warn-fill)] bg-[var(--warn-fill)] text-[var(--warn-on)] hover:bg-[var(--warn-fill)]"
-                        : "border-[var(--chip-ativo-bg)] bg-[var(--chip-ativo-bg)] text-[var(--chip-ativo-fg)] hover:bg-[var(--chip-ativo-bg)]"
-                      : urgente
-                        ? "border-warn-line bg-warn-surface text-warn-ink hover:bg-warn-surface"
-                        : // `hover:bg-` repetido de propósito: a variante
-                          // `outline` traz `hover:bg-[var(--active-bg)]`, que
-                          // CLAREIA o chip neutro em vez de escurecer. Quem
-                          // muda no hover é só a tinta.
-                          "border-line bg-[var(--chip-bg)] text-ink-2 hover:bg-[var(--chip-bg)] hover:text-ink"
-                  )}
                 >
                   {CHIP_ROTULO[k]}
                   <span className="font-bold tabular-nums opacity-75">
@@ -600,23 +581,27 @@ export default function ContactSidebar({
         className="min-h-0 flex-1"
       >
         {results.length === 0 && !carregando && (
-          <div className="p-4 text-apoio text-ink-3">
-            {busca
-              ? "Nada encontrado."
-              : filter === "needs"
-                ? "Nenhuma conversa precisa de você."
-                : filter === "unanswered"
-                  ? "Nenhuma conversa esperando resposta."
-                  : filter === "mine"
-                    ? "Nenhuma conversa atribuída a você."
-                    : // ⚠️ Com recorte de tempo ligado, "Nenhuma conversa ainda"
-                      // seria mentira: numa conta com 48 conversas, o vazio é do
-                      // RECORTE, não da conta. E a frase diz onde está o resto,
-                      // senão a pessoa conclui que perdeu o histórico.
-                      janela !== "tudo" && contagens.existe_alguma
-                      ? `Nada em ${JANELAS[janela].rotulo.toLowerCase()}. Veja em Tudo.`
-                      : "Nenhuma conversa ainda."}
-          </div>
+          <EstadoVazio
+            tamanho="compacto"
+            className="items-start text-left"
+            texto={
+              busca
+                ? "Nada encontrado."
+                : filter === "needs"
+                  ? "Nenhuma conversa precisa de você."
+                  : filter === "unanswered"
+                    ? "Nenhuma conversa esperando resposta."
+                    : filter === "mine"
+                      ? "Nenhuma conversa atribuída a você."
+                      : // ⚠️ Com recorte de tempo ligado, "Nenhuma conversa ainda"
+                        // seria mentira: numa conta com 48 conversas, o vazio é do
+                        // RECORTE, não da conta. E a frase diz onde está o resto,
+                        // senão a pessoa conclui que perdeu o histórico.
+                        janela !== "tudo" && contagens.existe_alguma
+                        ? `Nada em ${JANELAS[janela].rotulo.toLowerCase()}. Veja em Tudo.`
+                        : "Nenhuma conversa ainda."
+            }
+          />
         )}
         <ul>
           {results.map(({ it, snippet }, indice) => {
@@ -798,8 +783,9 @@ export default function ContactSidebar({
                     {att && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Avatar
+                          <AvatarMembro
                             size="3xs"
+                            email={att.email}
                             tabIndex={0}
                             // ⚠️ Era `ring-surface`, e `--color-surface` foi
                             // apagado na faxina de 30/08/2026: a classe não é
@@ -812,10 +798,7 @@ export default function ContactSidebar({
                               "absolute -right-1 -top-1 ring-2",
                               active ? "ring-[var(--sel-bg)]" : "ring-raised"
                             )}
-                            style={avatarPair(att.email)}
-                          >
-                            {memberInitials(att.email).slice(0, 1)}
-                          </Avatar>
+                          />
                         </TooltipTrigger>
                         <TooltipContent side="right">
                           Atendente: {memberName(att.email)}

@@ -3,6 +3,7 @@ import { CreditCard, ShieldAlert } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton";
 import BrandMark from "@/components/BrandMark";
 import { dataLongaSP } from "@/lib/fuso";
+import { Aviso } from "@/components/ui/aviso";
 import { Card } from "@/components/ui/card";
 import {
   billableSeats,
@@ -110,25 +111,21 @@ export default function SubscriptionPanel({
         </div>
 
         {access.blocked && (
-          <p className="rounded-lg bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
+          <Aviso tom="danger" forma="plana">
             O atendimento automático e o envio de mensagens estão parados
             enquanto a conta não estiver em dia. Suas conversas e configurações
             continuam salvas.
-          </p>
+          </Aviso>
         )}
 
         {!access.blocked && access.warn && (
-          <p className="rounded-lg bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
-            {access.warn}
-          </p>
+          <Aviso forma="plana">{access.warn}</Aviso>
         )}
 
         {/* Atendente além do incluído: virou adicional pago. Ninguém é removido
             automaticamente, então o aviso é o que resolve. */}
         {assentos.extra > 0 && (
-          <p className="rounded-lg bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
-            {assentos.message}
-          </p>
+          <Aviso forma="plana">{assentos.message}</Aviso>
         )}
 
         <div className="overflow-hidden rounded-xl border border-line bg-bloco">

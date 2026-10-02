@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -59,11 +60,7 @@ export default function LoginPage({
         </div>
 
         {linkFalhou && (
-          <p
-            role="alert"
-            data-slot="aviso-link"
-            className="rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink"
-          >
+          <Aviso role="alert" data-slot="aviso-link">
             {/* ⚠️ "o MAIS RECENTE" (29/09/2026, achado do dono): pedir um link
                 novo invalida os anteriores, e clicar num e-mail antigo prendia
                 a pessoa num ciclo de pedir link e cair aqui de novo. */}
@@ -73,7 +70,7 @@ export default function LoginPage({
               Esqueci minha senha
             </Link>{" "}
             e abra só o e-mail mais recente: cada link novo cancela os anteriores.
-          </p>
+          </Aviso>
         )}
 
         <div className="space-y-1.5">

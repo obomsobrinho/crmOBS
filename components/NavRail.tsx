@@ -598,7 +598,7 @@ function BarraAbas({
                     "absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-legenda font-semibold leading-none tabular-nums",
                     a.badgeTom === "espera"
                       ? "bg-[var(--warn-fill)] text-[var(--warn-on)]"
-                      : "bg-brand text-white"
+                      : "bg-brand text-primary-foreground"
                   )}
                 >
                   {a.badge > 99 ? "99+" : a.badge}
@@ -617,15 +617,20 @@ function BarraAbas({
             {corpo}
           </Link>
         ) : (
-          <button key={a.label} type="button" className={cls} onClick={() => setMaisAberto(true)}>
+          <Button
+            key={a.label}
+            variant="nu"
+            size="none"
+            className={cls}
+            onClick={() => setMaisAberto(true)}
+          >
             {corpo}
-          </button>
+          </Button>
         );
       })}
 
       <Sheet open={maisAberto} onOpenChange={setMaisAberto}>
         <SheetContent lado="baixo" aria-describedby={undefined}>
-          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-line-strong" aria-hidden />
           <div className="flex items-center gap-3 border-b border-line px-4 py-3">
             <Avatar size="sm" className="bg-bloco text-ink-2 ring-1 ring-line">
               {clientName.slice(0, 2).toUpperCase()}
@@ -644,47 +649,38 @@ function BarraAbas({
             {itensMais.map((n) => {
               const Icone = n.icon;
               return (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  onClick={() => setMaisAberto(false)}
-                  className="flex h-12 items-center gap-3 rounded-lg px-3 text-corpo text-ink hover:bg-[var(--active-bg)]"
-                >
-                  <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
-                  <span className="flex-1">{n.label}</span>
-                  <ChevronRight size={18} className="text-ink-3" />
-                </Link>
+                <Button key={n.href} asChild variant="linha" size="linha">
+                  <Link href={n.href} onClick={() => setMaisAberto(false)}>
+                    <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
+                    <span className="flex-1">{n.label}</span>
+                    <ChevronRight size={18} className="text-ink-3" />
+                  </Link>
+                </Button>
               );
             })}
-            <Link
-              href="/perfil"
-              onClick={() => setMaisAberto(false)}
-              className="flex h-12 items-center gap-3 rounded-lg px-3 text-corpo text-ink hover:bg-[var(--active-bg)]"
-            >
-              <User size={20} strokeWidth={1.8} className="text-ink-2" />
-              <span className="flex-1">Perfil</span>
-              <ChevronRight size={18} className="text-ink-3" />
-            </Link>
+            <Button asChild variant="linha" size="linha">
+              <Link href="/perfil" onClick={() => setMaisAberto(false)}>
+                <User size={20} strokeWidth={1.8} className="text-ink-2" />
+                <span className="flex-1">Perfil</span>
+                <ChevronRight size={18} className="text-ink-3" />
+              </Link>
+            </Button>
             <ThemeToggle linha />
-            <button
-              type="button"
+            <Button
+              variant="linha"
+              size="linha"
               onClick={() => {
                 setMaisAberto(false);
                 onFeedback();
               }}
-              className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-[var(--active-bg)]"
             >
               <MessageSquarePlus size={20} strokeWidth={1.8} className="text-ink-2" />
               Enviar feedback
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="flex h-12 items-center gap-3 rounded-lg px-3 text-left text-corpo text-ink hover:bg-danger-surface hover:text-danger-ink"
-            >
+            </Button>
+            <Button variant="linha-perigo" size="linha" onClick={onLogout}>
               <LogOut size={20} strokeWidth={1.8} className="text-ink-2" />
               Sair
-            </button>
+            </Button>
             <p className="mt-2 border-t border-line px-3 pb-1 pt-3 text-rotulo uppercase text-ink-3">
               Em breve
             </p>

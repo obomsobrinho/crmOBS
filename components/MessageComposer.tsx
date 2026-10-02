@@ -16,6 +16,7 @@ import {
   LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -246,9 +247,9 @@ export default function MessageComposer({
       className="shrink-0 bg-msg px-5 pb-[18px] pt-3 max-md:px-2 max-md:pb-[max(8px,env(safe-area-inset-bottom))] max-md:pt-2"
     >
       {attachError && (
-        <div className="mx-auto mb-2 w-full max-w-[960px] rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink">
+        <Aviso tom="danger" className="mx-auto mb-2 w-full max-w-[960px]">
           {attachError}
-        </div>
+        </Aviso>
       )}
 
       {/* A CAIXA NO ESTILO DA DO CLAUDE, nos dois tamanhos de tela (23/09/2026:
@@ -375,15 +376,12 @@ export default function MessageComposer({
                   variant="outline"
                   size="none"
                   onClick={() => fileRef.current?.click()}
-                  disabled={uploading || !onSendMedia}
+                  carregando={uploading}
+                  disabled={!onSendMedia}
                   aria-label="Anexar"
                   className="size-9 justify-center rounded-full text-ink-2 max-md:size-10"
                 >
-                  {uploading ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <Plus size={18} />
-                  )}
+                  <Plus size={18} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top">

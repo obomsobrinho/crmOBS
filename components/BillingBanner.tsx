@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, Eye } from "lucide-react";
 import type { AccessState } from "@/lib/billing";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 
 // Estado da conta em cima de toda página do app.
@@ -17,7 +18,7 @@ export default function BillingBanner({
 }) {
   if (access.blocked) {
     return (
-      <div className="shrink-0 rounded-xl border border-danger-line bg-danger-surface px-4 py-3 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2">
+      <Aviso tom="danger" forma="faixa" className="block py-3">
         <div className="flex items-start gap-2.5">
           <Eye size={17} className="mt-0.5 shrink-0 text-danger-ink" />
           <div className="min-w-0 flex-1">
@@ -36,13 +37,13 @@ export default function BillingBanner({
             </Link>
           </Button>
         </div>
-      </div>
+      </Aviso>
     );
   }
 
   if (access.warn) {
     return (
-      <div className="flex shrink-0 items-center gap-2.5 rounded-xl border border-warn-line bg-warn-surface px-4 py-2.5 max-md:rounded-none max-md:border-x-0 max-md:border-t-0 max-md:py-2">
+      <Aviso forma="faixa">
         <AlertTriangle size={16} className="shrink-0 text-warn-ink" />
         <p className="min-w-0 flex-1 truncate text-apoio text-warn-ink">
           {access.warn}
@@ -53,7 +54,7 @@ export default function BillingBanner({
         >
           Ver assinatura
         </Link>
-      </div>
+      </Aviso>
     );
   }
 

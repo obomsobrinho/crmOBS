@@ -10,7 +10,7 @@ import { cardVariants } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useCelular } from "@/lib/useCelular";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CircleCheck } from "lucide-react";
 
 type Phase = "idle" | "loading" | "waiting" | "connected" | "error";
 
@@ -196,7 +196,7 @@ export default function ConnectWhatsApp({
 
         {phase === "connected" ? (
           <div className="space-y-2 py-8 text-center">
-            <div className="text-3xl">✅</div>
+            <CircleCheck size={32} className="mx-auto text-human-ink" aria-hidden />
             <p className="font-medium text-human-ink">Tudo pronto!</p>
             {/* Dizer que o passado não vem é o que evita a pessoa procurar
                 conversas antigas e achar que perdeu alguma coisa. */}
@@ -288,20 +288,20 @@ export default function ConnectWhatsApp({
                 <div className={cn("space-y-3", passo ? "max-sm:order-last" : "order-last")}>
                   {/* A troca de modo muda só o jeito de ligar: a conexão, o
                       polling e o que vem depois são os mesmos. */}
-                  <button
-                    type="button"
+                  <Button
+                    variant="link"
+                    size="link"
                     data-slot="trocar-modo-conexao"
                     onClick={() => {
                       setModo(modo === "numero" ? "qr" : "numero");
                       setError(null);
                     }}
-                    className="flex items-center gap-1 text-apoio font-medium text-brand-ink hover:underline"
                   >
                     {modo === "numero"
                       ? "Conectar com QR code"
                       : "Conectar com número de telefone"}
                     <ChevronRight size={15} aria-hidden />
-                  </button>
+                  </Button>
                   {/* Transparência sobre a conexão, dentro do cartão: é a nota
                       de rodapé dos passos, não um bloco à parte. */}
                   <div className="[&>div]:max-w-none [&>div]:px-0">

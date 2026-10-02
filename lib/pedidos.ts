@@ -20,6 +20,7 @@ export interface ContatoLinha {
   telefone: string;
   nomewpp: string | null;
   display_name?: string | null;
+  foto_path?: string | null;
 }
 
 export interface PedidoAberto {
@@ -29,6 +30,8 @@ export interface PedidoAberto {
   summary: string | null;
   /** Nome do contato, ou null (a tela mostra o telefone). */
   nome: string | null;
+  /** Foto guardada do contato (lib/fotos.ts), ou null (a tela mostra iniciais). */
+  fotoPath: string | null;
   /** Posição na fila DA CONVERSA (1 = o mais antigo dela). */
   posicao: number;
   /** Quantos pedidos abertos a conversa tem. */
@@ -47,8 +50,10 @@ export function montarFila(
   avisos: string | null
 ): PedidoAberto[] {
   const nomes = new Map<string, string | null>();
+  const fotos = new Map<string, string | null>();
   for (const c of contatos) {
     nomes.set(c.telefone, nomeDoContato(c));
+    fotos.set(c.telefone, c.foto_path ?? null);
   }
   const ordenados = semNumeroDeAvisos(pedidos, avisos, (p) => p.phone).sort(
     (a, b) => Date.parse(a.opened_at) - Date.parse(b.opened_at) || a.id - b.id
@@ -65,6 +70,7 @@ export function montarFila(
       openedAt: p.opened_at,
       summary: p.summary,
       nome: nomes.get(p.phone) ?? null,
+      fotoPath: fotos.get(p.phone) ?? null,
       posicao,
       total: total.get(p.phone) ?? 1,
     };
@@ -101,6 +107,7 @@ export interface PedidoResolvido {
   closedAt: string;
   summary: string | null;
   nome: string | null;
+  fotoPath: string | null;
   /** `ia` = orientado e a IA respondeu; `resolvido` = alguém do time fechou. */
   como: "ia" | "resolvido" | null;
   /** A orientação que o time deu, quando foi por ela. */
@@ -120,8 +127,10 @@ export function montarResolvidos(
   avisos: string | null
 ): PedidoResolvido[] {
   const nomes = new Map<string, string | null>();
+  const fotos = new Map<string, string | null>();
   for (const c of contatos) {
     nomes.set(c.telefone, nomeDoContato(c));
+    fotos.set(c.telefone, c.foto_path ?? null);
   }
   return semNumeroDeAvisos(linhas, avisos, (p) => p.phone)
     .sort((a, b) => Date.parse(b.closed_at) - Date.parse(a.closed_at) || b.id - a.id)
@@ -132,6 +141,7 @@ export function montarResolvidos(
       closedAt: p.closed_at,
       summary: p.summary,
       nome: nomes.get(p.phone) ?? null,
+      fotoPath: fotos.get(p.phone) ?? null,
       como: p.closed_how === "ia" || p.closed_how === "resolvido" ? p.closed_how : null,
       orientacao: p.instruction?.trim() || null,
       porQuem: p.closed_by,
@@ -177,6 +187,7 @@ export type LinhaPedidoBanco = LinhaRpc<
   | "closed_by"
   | "nomewpp"
   | "display_name"
+  | "foto_path"
   | "posicao"
   | "total"
 >;
@@ -196,6 +207,7 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
       openedAt: l.opened_at,
       summary: l.summary,
       nome,
+      fotoPath: l.foto_path ?? null,
       posicao: Number(l.posicao) || 1,
       total: Number(l.total) || 1,
     };
@@ -207,6 +219,7 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
     closedAt: l.closed_at,
     summary: l.summary,
     nome,
+    fotoPath: l.foto_path ?? null,
     como: l.closed_how === "ia" || l.closed_how === "resolvido" ? l.closed_how : null,
     orientacao: l.instruction?.trim() || null,
     porQuem: l.closed_by,

@@ -8,6 +8,7 @@ import {
   type Stage,
   type StagePatch,
 } from "@/lib/pipeline";
+import { chaveDoRotulo } from "@/lib/rotulos";
 import { Button } from "@/components/ui/button";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import {
@@ -261,7 +262,7 @@ function StageRowItem({
         aria-label="Trocar cor"
         title="Trocar cor"
         onClick={() => {
-          const i = STAGE_COLOR_KEYS.indexOf(stage.color);
+          const i = STAGE_COLOR_KEYS.indexOf(chaveDoRotulo(stage.color));
           const next = STAGE_COLOR_KEYS[(i + 1) % STAGE_COLOR_KEYS.length];
           onPatch(stage.id, { color: next });
         }}

@@ -48,6 +48,26 @@ test("mover pelo botão do card leva o card para o estágio escolhido", async ({
   ).toBeVisible();
 });
 
+// R-27 (02/10/2026): a folha de baixo desenha a alça UMA vez (no `SheetContent`,
+// não em cada tela) e a lista de estágios dentro dela dissolve nas bordas, como
+// toda área rolável (antes era um `overflow-y-auto` cru, cortando seco).
+test("a folha de mover tem uma alça e a lista de estágios é área rolável da casa", async ({
+  page,
+}) => {
+  await page.goto("/design/pipeline");
+  await page.waitForLoadState("networkidle"); // clique antes de hidratar se perde
+  const card = page
+    .locator('[data-slot="pipeline-coluna"]:visible [data-slot="pipeline-card"]')
+    .first();
+  await card.locator('[data-slot="pipeline-mover"]').click();
+  const folha = page.locator('[data-slot="sheet-content"]');
+  await expect(folha).toBeVisible();
+  await expect(folha.locator('[data-slot="sheet-alca"]')).toHaveCount(1);
+  await expect(
+    folha.locator('[data-slot="area-rolavel"]').locator('[data-slot="mover-estagio"]').first()
+  ).toBeVisible();
+});
+
 test("gerenciar estágios abre em tela cheia", async ({ page }) => {
   await page.goto("/design/pipeline");
   await page.waitForLoadState("networkidle"); // clique antes de hidratar se perde

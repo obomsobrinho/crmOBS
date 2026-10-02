@@ -24,6 +24,7 @@ import { Banner, CabecalhoBloco, ConfirmModal } from "./agente/ui";
 import AvisosCampo from "./agente/AvisosCampo";
 import { useAgentConfig } from "./agente/useAgentConfig";
 import { gravarRascunho, lerRascunho, limparRascunho } from "./agente/rascunho";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PASSOS_MONTAGEM, type PassoMontagem } from "@/lib/onboarding";
@@ -121,6 +122,9 @@ export default function MontagemWizard({
   );
 
   const [ativando, setAtivando] = useState(false);
+  // Gravando o passo ou ativando: o botão principal gira e "Terminar depois"
+  // espera (sair no meio da gravação perderia o passo).
+  const ocupado = form.saving || ativando;
   const [erroAtivar, setErroAtivar] = useState<string | null>(null);
   // Conectado NESTA tela, visto pelo polling do `ConnectWhatsApp`. É estado de
   // tela, e não de banco: `evolution_instance` preenchida só diz que a
@@ -336,13 +340,9 @@ export default function MontagemWizard({
         </div>
 
         {form.error && (
-          <div
-            data-slot="erro-agente"
-            role="alert"
-            className="mt-4 rounded-lg border border-danger-line bg-danger-surface px-3 py-2 text-apoio text-danger-ink"
-          >
+          <Aviso tom="danger" data-slot="erro-agente" role="alert" className="mt-4">
             {form.error}
-          </div>
+          </Aviso>
         )}
 
         <div
@@ -550,7 +550,7 @@ export default function MontagemWizard({
             variant="ghost"
             size="field"
             onClick={sair}
-            disabled={form.saving || ativando}
+            disabled={ocupado}
             className="max-sm:hidden"
           >
             {rotuloSaida}
@@ -563,7 +563,7 @@ export default function MontagemWizard({
               não mostra dica. */}
           <Button
             size="field"
-            carregando={form.saving || ativando}
+            carregando={ocupado}
             disabled={ultimo && !podeAtivar}
             aria-describedby={
               ultimo && !conectado

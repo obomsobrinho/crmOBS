@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -214,11 +215,12 @@ export function Recolhivel({
   const Icone = aberto ? ChevronDown : ChevronRight;
   return (
     <div className="border-t border-line pt-4">
-      <button
-        type="button"
+      <Button
+        variant="nu"
+        size="none"
         onClick={onToggle}
         aria-expanded={aberto}
-        className="flex w-full items-center gap-2 text-left"
+        className="w-full gap-2 text-left"
       >
         <Icone size={14} className="shrink-0 text-ink-faint" />
         <h3 className="shrink-0 text-rotulo uppercase text-ink-3">{titulo}</h3>
@@ -230,7 +232,7 @@ export function Recolhivel({
         <span className="ml-auto shrink-0 text-legenda text-ink-3">
           {aberto ? "fechar" : "abrir"}
         </span>
-      </button>
+      </Button>
       {manterMontado ? (
         <div className={aberto ? "mt-3" : "hidden"}>{children}</div>
       ) : (
@@ -327,10 +329,7 @@ export function AvisoCache({
 
 export function Banner({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-warn-line bg-warn-surface px-3 py-2 text-apoio text-warn-ink">
-      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-      <span>{children}</span>
-    </div>
+    <Aviso icone={AlertTriangle}>{children}</Aviso>
   );
 }
 
