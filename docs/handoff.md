@@ -159,7 +159,7 @@ para o cadastro LOCAL voltar a funcionar, trocar por `http://localhost:3001/**`.
   respondido. Staging (projeto Supabase de testes) é o caminho de longo prazo, depois do beta.
 - Gerar o QR sozinho ao abrir o passo 4 (hoje pede clique, porque cria a instância na Evolution).
 - Tela de Clientes antes ou depois do beta: nunca decidido.
-- `docs/arquitetura/` é dele e fica FORA do git, de propósito.
+- Os mapas do sistema (`mapa-do-sistema`, `nucleo-atendimento`) são do dono e ficam FORA do git, em `Desktop/arquitetura-crm/` (02/10/2026).
 
 **Só o teste com chip prova:** responder pelo CRM (chega no celular e pausa a IA), áudio do cliente,
 mídia nos dois sentidos, mensagem chegando em tempo real, conexão pelo número (código de pareamento

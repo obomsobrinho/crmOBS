@@ -71,7 +71,7 @@ API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground
 - **`docs/handoff.md` first** (map and state: what to read, where the beta stands, what was in progress, the traps).
 - `docs/proximos-passos.md` = SOURCE OF TRUTH for product decisions and roadmap (read before prioritizing or scoping). `docs/estrategia-2026-07.md` = market research (its old prescriptions are superseded; `proximos-passos` wins).
 - `docs/instrumentacao-beta.md` = the five beta SQL queries (no UI, by decision; "AI reply" in SQL must equal `lib/mensagem.ts`).
-- `docs/design-system/` = tokens, base layer and the reasoning. `docs/adr/` = one decision per file (the "why" behind every rule line; index in `docs/adr/README.md`). `docs/plano-*.md` = feature plans. `docs/arquitetura/` = system maps.
+- `docs/design-system/` = tokens, base layer and the reasoning. `docs/adr/` = one decision per file (the "why" behind every rule line; index in `docs/adr/README.md`). `docs/plano-*.md` = feature plans. System maps (owner's, outside git): `Desktop/arquitetura-crm/`.
 - `.claude/rules/`: `engineering.md` (always) plus `data`, `realtime`, `ui`, `agent-ai`, `n8n`, `testing`, `billing`, `dashboard`, `onboarding` (loaded when matching files are read).
 - Next 16 differs from your training data: read `node_modules/next/dist/docs/` first.
 
