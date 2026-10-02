@@ -24,7 +24,7 @@ const EIXO = [0, 6, 12, 18, 23];
 export default function PainelHoras({
   colunas,
   rotuloDentro,
-  rotulo = "Em que horas as mensagens chegaram",
+  rotulo = "Em que horas a IA respondeu",
   escopo,
 }: {
   colunas: BarraHora[];
@@ -33,8 +33,9 @@ export default function PainelHoras({
   /**
    * O título do gráfico.
    *
-   * ⚠️ O PADRÃO É O DA PRANCHA ("as mensagens chegaram"), por pedido do dono em
-   * 30/08/2026, e ele NÃO descreve o que a barra mede hoje: `barrasDeHora`
+   * ⚠️ "a IA respondeu", e NÃO o "as mensagens chegaram" da prancha (decisão
+   * do dono em 02/10/2026, revendo a de 30/08): o título diz o que a barra
+   * mede. `barrasDeHora`
    * conta RESPOSTA DA IA, que é o que faz a soma das partes roxas fechar
    * exatamente com o número da manchete. Contar chegada daria outro conjunto
    * (mensagem que chega às 23h e é respondida no dia seguinte entra num e não
@@ -51,8 +52,12 @@ export default function PainelHoras({
 
   return (
     <div data-slot="painel-horas" className="min-w-0">
-      <div className="mb-2.5 flex items-baseline justify-between gap-3">
-        <span className="text-apoio font-semibold text-ink-2">{rotulo}</span>
+      {/* O título nunca quebra: espremido pelo escopo, virava quatro linhas de
+          uma palavra (02/10/2026). Quem quebra é a linha, e o escopo desce. */}
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="whitespace-nowrap text-apoio font-semibold text-ink-2">
+          {rotulo}
+        </span>
         {escopo && (
           <span className="shrink-0 text-legenda text-ink-3">{escopo}</span>
         )}
