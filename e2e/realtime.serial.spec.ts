@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { servico, tenantDeTeste } from "./semente";
+import { FONE_TESTE, semearConversa, servico, tenantDeTeste } from "./semente";
 
 // A LISTA DE CONVERSAS CONTRA O BANCO DE VERDADE (refeito em 01/10/2026,
 // docs/plano-carregamento.md, fase 1): paginada de 10 em 10, busca no servidor
@@ -208,4 +208,170 @@ test("o contador do menu conta uma vez por rajada, e nunca em aba escondida", as
     document.dispatchEvent(new Event("visibilitychange"));
   });
   await expect.poll(() => heads, { timeout: 10_000 }).toBe(1);
+});
+
+// A CONVERSA ABERTA (auditoria F1/F13, 02/10/2026). `/inbox/[id]` tem vários
+// assinantes do canal do tenant (faixa "O cliente quer", responsável, chave da
+// IA, pedidos, notas, lista, contadores). Os testes abaixo travam o que o hook
+// único prometeu: evento de OUTRA conversa não consulta a tabela por conta da
+// conversa aberta, evento da conversa aberta encaixa o payload sem consulta, e
+// aba escondida não busca (ao voltar, uma revalidação por assinante).
+//
+// A "outra conversa" é um segundo número impossível (DDD 00) criado aqui e
+// apagado no fim; a conversa aberta é a da semente (`FONE_TESTE`).
+const OUTRO = "5500000000601";
+const RESUMO = "Quer saber o valor (e2e realtime)";
+
+async function apagarOutro() {
+  const svc = servico();
+  await svc.from("conversations").delete().eq("phone", OUTRO);
+  await svc.from("dados_cliente").delete().eq("telefone", OUTRO);
+}
+
+// Só o que a conversa aberta consulta: as duas tabelas da faixa e do
+// responsável, por GET. O HEAD de `conversations` é o contador do menu, que
+// conta por desenho (uma vez por rajada), e as RPCs `inbox_*` são da lista.
+function contarConversa(page: Page) {
+  const c = { qualificacoes: 0, conversas: 0, lista: 0, heads: 0 };
+  page.on("request", (r) => {
+    const u = r.url();
+    if (r.method() === "HEAD") {
+      if (u.includes("/rest/v1/conversations")) c.heads++;
+      return;
+    }
+    if (u.includes("/rest/v1/conversation_qualifications")) c.qualificacoes++;
+    else if (u.includes("/rest/v1/conversations")) c.conversas++;
+    else if (u.includes("/rest/v1/rpc/inbox_")) c.lista++;
+  });
+  return c;
+}
+
+const faixa = (page: Page) => page.locator('[data-slot="conversa-entendimento"]');
+const rotuloDaFaixa = (page: Page) => faixa(page).getByText("O cliente quer");
+
+async function abrirConversaDeTeste(page: Page) {
+  await page.goto(`/inbox/${encodeURIComponent(FONE_TESTE)}`);
+  await expect(rotuloDaFaixa(page)).toBeVisible({ timeout: 30_000 });
+  await page.waitForLoadState("networkidle");
+  // O realtime precisa estar assinado e a janela de 10s do foco, vencida.
+  await page.waitForTimeout(3_000);
+}
+
+async function esconder(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+async function mostrar(page: Page) {
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "visible" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+}
+
+test.describe("conversa aberta", () => {
+  test.beforeAll(async () => {
+    const svc = servico();
+    await apagarOutro();
+    await semearConversa(svc, clientId);
+    // A faixa só existe com resumo, pedido ou handoff: uma qualificação própria
+    // (apagada no fim) garante que ela está lá nos dois estados do teste 2.
+    await svc.from("conversation_qualifications").delete().eq("phone", FONE_TESTE).eq("summary", RESUMO);
+    const { error: e0 } = await svc
+      .from("conversation_qualifications")
+      .insert({ client_id: clientId, phone: FONE_TESTE, action: "none", summary: RESUMO });
+    if (e0) throw e0;
+    const { error: e1 } = await svc
+      .from("dados_cliente")
+      .insert({ client_id: clientId, telefone: OUTRO, display_name: "Outra conversa (e2e)", atendimento_ia: "ativa" });
+    if (e1) throw e1;
+    const { error: e2 } = await svc.from("conversations").insert({
+      client_id: clientId,
+      phone: OUTRO,
+      last_message_at: new Date().toISOString(),
+      last_message_preview: "mensagem inicial",
+      last_message_from: "in",
+    });
+    if (e2) throw e2;
+  });
+
+  test.beforeEach(async () => {
+    await servico()
+      .from("conversations")
+      .update({ handoff_at: null })
+      .eq("client_id", clientId)
+      .eq("phone", FONE_TESTE);
+  });
+
+  test.afterAll(async () => {
+    await apagarOutro();
+    await servico().from("conversation_qualifications").delete().eq("phone", FONE_TESTE).eq("summary", RESUMO);
+    await semearConversa(servico(), clientId);
+  });
+
+  test("update de OUTRA conversa não faz a conversa aberta consultar nada", async ({ page }) => {
+    const c = contarConversa(page);
+    await abrirConversaDeTeste(page);
+    c.qualificacoes = c.conversas = c.lista = c.heads = 0;
+    await servico()
+      .from("conversations")
+      .update({ last_message_at: new Date().toISOString(), last_message_preview: "outra conversa mexeu" })
+      .eq("client_id", clientId)
+      .eq("phone", OUTRO);
+    await page.waitForTimeout(4_000);
+    expect(c.qualificacoes, "faixa e conversa aberta encaixam o payload, sem GET").toBe(0);
+    expect(c.conversas, "responsável e faixa não consultam `conversations` por evento alheio").toBe(0);
+  });
+
+  test("handoff_at da conversa aberta muda a faixa SEM nenhuma requisição REST", async ({ page }) => {
+    const c = contarConversa(page);
+    await abrirConversaDeTeste(page);
+    await expect(rotuloDaFaixa(page)).toHaveClass(/text-brand-ink/);
+    c.qualificacoes = c.conversas = c.lista = c.heads = 0;
+    const svc = servico();
+    await svc
+      .from("conversations")
+      .update({ handoff_at: new Date(Date.now() - 3600_000).toISOString() })
+      .eq("client_id", clientId)
+      .eq("phone", FONE_TESTE);
+    await expect(rotuloDaFaixa(page)).toHaveClass(/text-warn-ink/, { timeout: 15_000 });
+    await svc.from("conversations").update({ handoff_at: null }).eq("client_id", clientId).eq("phone", FONE_TESTE);
+    await expect(rotuloDaFaixa(page)).toHaveClass(/text-brand-ink/, { timeout: 15_000 });
+    await page.waitForTimeout(2_000);
+    expect(c.qualificacoes, "faixa muda pelo payload").toBe(0);
+    expect(c.conversas, "faixa muda pelo payload").toBe(0);
+  });
+
+  test("aba escondida não busca; ao voltar, no máximo uma revalidação por assinante", async ({ page }) => {
+    const c = contarConversa(page);
+    await abrirConversaDeTeste(page);
+    await esconder(page);
+    c.qualificacoes = c.conversas = c.lista = c.heads = 0;
+    await servico()
+      .from("conversations")
+      .update({ handoff_at: new Date(Date.now() - 3600_000).toISOString(), last_message_preview: "com a aba escondida" })
+      .eq("client_id", clientId)
+      .eq("phone", FONE_TESTE);
+    // Escondida por tempo bastante para vencer a janela de 10s desde a abertura:
+    // quem não ficou para trás só revalida ao voltar se a janela passou.
+    await page.waitForTimeout(9_000);
+    expect(c.qualificacoes + c.conversas + c.lista + c.heads, "aba escondida não busca nada").toBe(0);
+
+    await mostrar(page);
+    await expect(rotuloDaFaixa(page)).toHaveClass(/text-warn-ink/, { timeout: 15_000 });
+    await page.waitForTimeout(3_000);
+    // Um GET por assinante: a faixa (qualificação + conversa) e o responsável
+    // (conversa), e a lista (uma RPC de recorte e uma de contagens).
+    expect(c.qualificacoes, "a faixa revalida uma vez").toBeLessThanOrEqual(1);
+    expect(c.conversas, "faixa e responsável, uma vez cada").toBeLessThanOrEqual(2);
+    expect(c.lista, "lista: recorte e contagens, uma vez cada").toBeLessThanOrEqual(2);
+    expect(c.heads, "contadores do menu, uma vez cada").toBeLessThanOrEqual(3);
+    const antes = { ...c };
+    // Voltar de novo logo em seguida cai na janela de 10s: nada novo.
+    await esconder(page);
+    await mostrar(page);
+    await page.waitForTimeout(2_000);
+    expect(c).toEqual(antes);
+  });
 });
