@@ -4,6 +4,8 @@ import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Selo, NumeroAnimado } from "@/components/painel/pecas";
 import { calcularDelta } from "@/lib/delta";
+import { diaIsoSP } from "@/lib/fuso";
+import { numeroBR } from "@/lib/format";
 import type { Barra } from "@/lib/metrics";
 
 // "Movimento": quantas conversas por dia, com o número grande à esquerda e a
@@ -80,8 +82,12 @@ export default function PainelMovimento({
   const dados = j.barras;
 
   const total = (b: Barra) => b.ia + b.time;
-  const existe = (b: Barra) =>
-    desdeMs === null || instanteDoDia(b.chave) >= desdeMs;
+  // ⚠️ POR DIA, NUNCA POR INSTANTE (02/10/2026). Comparar o meio-dia do dia com
+  // o instante da primeira mensagem marcava como "antes desta conta" o PRÓPRIO
+  // primeiro dia sempre que a conta começou depois das 9h em São Paulo, e a
+  // linha sumia justo no dia com movimento. O dia da primeira mensagem existe.
+  const primeiroDia = desdeMs === null ? null : diaIsoSP(new Date(desdeMs));
+  const existe = (b: Barra) => primeiroDia === null || b.chave >= primeiroDia;
 
   const reais = dados.filter(existe);
   const maior = Math.max(1, ...reais.map(total));
@@ -308,7 +314,7 @@ export default function PainelMovimento({
             ? `pico de ${total(pico)} na ${nomeDoDia(pico.chave)}, ${legivel(pico.chave)}`
             : "sem pico no período"}
           {" · "}
-          média de {media.toLocaleString("pt-BR")} por dia
+          média de {numeroBR(media)} por dia
           {menor && ` · menor dia ${total(menor)}, ${nomeDoDia(menor.chave)}`}
         </p>
         {/* A divisão IA contra time saiu do gráfico e virou texto.
@@ -321,11 +327,11 @@ export default function PainelMovimento({
             nenhum consumidor. */}
         <p className="text-legenda text-ink-3">
           <span className="font-semibold text-brand-ink">
-            {somaIa.toLocaleString("pt-BR")}
+            {numeroBR(somaIa)}
           </span>{" "}
           respondidas pela IA ·{" "}
           <span className="font-semibold text-ink-2">
-            {somaTime.toLocaleString("pt-BR")}
+            {numeroBR(somaTime)}
           </span>{" "}
           pelo time
         </p>

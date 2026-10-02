@@ -7,6 +7,13 @@ import { FUSO } from "./fuso";
 // Reexporta: o fuso mora em lib/fuso.ts, quem já importava daqui continua igual.
 export { FUSO };
 
+const NUMERO_BR = new Intl.NumberFormat("pt-BR");
+
+/** Número na tela no formato brasileiro (1.234 e 2,5). Um formatador só, reaproveitado. */
+export function numeroBR(n: number): string {
+  return NUMERO_BR.format(n);
+}
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
