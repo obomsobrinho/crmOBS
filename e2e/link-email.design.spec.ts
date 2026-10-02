@@ -38,8 +38,11 @@ test("o login diz que o link venceu, e aponta para uma senha nova", async ({
   const aviso = page.locator('[data-slot="aviso-link"]');
   await expect(aviso).toContainText("expirou ou já foi usado");
   await expect(
-    aviso.getByRole("link", { name: "Esqueci minha senha" })
-  ).toHaveAttribute("href", "/recuperar-senha");
+    aviso.getByRole("link", { name: "Receber um link novo para criar a senha" })
+  ).toHaveAttribute("href", "/recuperar-senha?modo=criar");
+  // Quem foi convidado e nunca criou senha não "esqueceu" nada (02/10/2026).
+  await page.goto("/recuperar-senha?modo=criar");
+  await expect(page.getByRole("heading", { name: "Criar sua senha" })).toBeVisible();
 
   await page.goto("/login");
   await expect(page.locator('[data-slot="aviso-link"]')).toHaveCount(0);

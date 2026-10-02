@@ -64,10 +64,16 @@ export default function LoginPage({
             {/* ⚠️ "o MAIS RECENTE" (29/09/2026, achado do dono): pedir um link
                 novo invalida os anteriores, e clicar num e-mail antigo prendia
                 a pessoa num ciclo de pedir link e cair aqui de novo. */}
-            Esse link expirou ou já foi usado. Se ainda não criou sua senha,
-            peça um novo em{" "}
-            <Link href="/recuperar-senha" className="font-semibold underline">
-              Esqueci minha senha
+            {/* ⚠️ "Esqueci minha senha" CONFUNDIA quem foi convidado e nunca
+                criou senha (achado do dono, 29/09/2026; resolvido em 02/10). O
+                caminho é o mesmo (link novo pelo Supabase Auth, cai em
+                /definir-senha), mas a tela diz "criar", não "recuperar". */}
+            Esse link expirou ou já foi usado.{" "}
+            <Link
+              href="/recuperar-senha?modo=criar"
+              className="font-semibold underline"
+            >
+              Receber um link novo para criar a senha
             </Link>{" "}
             e abra só o e-mail mais recente: cada link novo cancela os anteriores.
           </Aviso>

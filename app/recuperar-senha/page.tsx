@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { MailCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -16,7 +16,14 @@ import { Input } from "@/components/ui/input";
 //
 // A resposta é sempre a mesma, com e-mail cadastrado ou não: senão a tela vira
 // um verificador de quem tem conta aqui.
-export default function RecuperarSenhaPage() {
+export default function RecuperarSenhaPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ modo?: string }>;
+}) {
+  // `?modo=criar` vem do aviso de link vencido no /login: quem foi convidado e
+  // nunca criou senha não "esqueceu" nada. Mesmo caminho, outras palavras.
+  const criar = use(searchParams).modo === "criar";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [enviado, setEnviado] = useState(false);
@@ -46,8 +53,9 @@ export default function RecuperarSenhaPage() {
             <div>
               <h1 className="text-titulo">Link enviado</h1>
               <p className="text-apoio text-ink-2">
-                Se existir uma conta com esse e-mail, o link para criar uma nova
-                senha chega em instantes. Confira também o spam.
+                Se existir uma conta com esse e-mail, o link para criar{" "}
+                {criar ? "sua" : "uma nova"} senha chega em instantes. Abra só o
+                e-mail mais recente e confira também o spam.
               </p>
             </div>
           </div>
@@ -55,11 +63,12 @@ export default function RecuperarSenhaPage() {
           <>
             <div>
               <h1 className="text-titulo">
-                Recuperar senha
+                {criar ? "Criar sua senha" : "Recuperar senha"}
               </h1>
               <p className="text-apoio text-ink-2">
-                Informe seu e-mail e mandamos um link para você criar uma nova
-                senha.
+                {criar
+                  ? "Informe o e-mail em que você recebeu o convite e mandamos um link novo para você criar a senha."
+                  : "Informe seu e-mail e mandamos um link para você criar uma nova senha."}
               </p>
             </div>
 
