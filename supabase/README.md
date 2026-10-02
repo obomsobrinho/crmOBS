@@ -25,7 +25,7 @@ not in the repo. Read-only queries are fine.
 
 ## Order matters
 Files that depend on deployed code say so in their header (for example
-`20261001160400_revoke_pending_instruction_update.sql` must wait for the route that
+`20261002173045_revoke_pending_instruction_update.sql` must wait for the route that
 replaces the browser write).
 
 ## Checking drift
