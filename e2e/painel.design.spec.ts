@@ -369,7 +369,7 @@ test.describe("Painel: movimento", () => {
     // eixo encurtaria e o vale desapareceria.
     const secao = page.locator('[data-slot="painel-movimento"]');
     await expect(
-      secao.locator(".painel-balao").filter({ hasText: /\b0 conversas/ })
+      secao.locator(".painel-balao").filter({ hasText: /\b0 respostas/ })
     ).toHaveCount(1);
   });
 

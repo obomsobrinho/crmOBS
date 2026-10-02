@@ -148,7 +148,7 @@ export default function PainelMovimento({
               separa o título de um CARTÃO do rótulo de uma SEÇÃO da página. */}
           <h2 className="font-display text-cartao text-ink">Movimento</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
-            Conversas por dia
+            Respostas por dia
             {j.conversasAnterior !== null &&
               ` · ${j.conversasAnterior} no período anterior`}
           </p>
@@ -304,7 +304,7 @@ export default function PainelMovimento({
                       </span>
                       <span className="text-ink-3">
                         {" "}
-                        · {t} {t === 1 ? "conversa" : "conversas"}
+                        · {t} {t === 1 ? "resposta" : "respostas"}
                       </span>
                     </>
                   )}
