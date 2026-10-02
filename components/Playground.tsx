@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowUp, Mic, Pause, Play, Trash2 } from "lucide-react";
-import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
-import type { AgentConfig } from "@/lib/agent-prompt";
-import { Button } from "@/components/ui/button";
-import {
-  AreaRolavel,
-  DISSOLVER_BALAO,
-} from "@/components/ui/dissolver-rolagem";
-import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
+import type { Handoff } from "./HandoffCard";
 import FundoRede from "./FundoRede";
-import HandoffCard, { type Handoff } from "./HandoffCard";
-import MessageComposer from "./MessageComposer";
 import { cn } from "@/lib/utils";
+import {
+  ClassificationPanel,
+  HandoffPanel,
+  SummaryPanel,
+} from "./playground/DiagnosticoPanels";
+import { RodapeDaBancada } from "./playground/RodapeDaBancada";
+import { TurnosDaBancada } from "./playground/TurnosDaBancada";
+import type { ConfiguracaoEmEdicao, PlaygroundTurn } from "./playground/tipos";
+import { useConversaDeTeste } from "./playground/useConversaDeTeste";
+
+export type { ConfiguracaoEmEdicao, PlaygroundTurn };
 
 // Bancada de teste do agente (dono-only). Fala direto com o cérebro REAL via
 // /api/playground (dryRun): nada é enviado no WhatsApp, nada é gravado, o card
@@ -27,86 +29,6 @@ import { cn } from "@/lib/utils";
 // este componente não desenha título nem descrição: quem faz isso é quem o
 // hospeda.
 
-export interface PlaygroundTurn {
-  /**
-   * `marco` = linha que atravessa a conversa (pedido fechado ou "o time
-   * assumiu"); não vai ao agente. `time` = resposta do time pela caixa de
-   * escrita, como no atendimento.
-   */
-  role: "user" | "assistant" | "marco" | "time";
-  /** O que vai no histórico do agente. No áudio, é a transcrição. */
-  content: string;
-  diag?: TurnDiagnostics;
-  /**
-   * Resposta do agente em BALÕES separados, como chega no WhatsApp (o n8n manda
-   * cada item de `messages` como uma mensagem). Revelados um de cada vez, com o
-   * "digitando" entre eles. `content` continua sendo a junção, porque o
-   * histórico que o agente lê trata o turno como um bloco só.
-   */
-  partes?: string[];
-  /** Mensagem de voz gravada na bancada. */
-  audio?: { url: string; segundos: number; transcrevendo?: boolean };
-  /** Só em `marco`: o pedido de ajuda que fechou. */
-  pedido?: Handoff;
-  /** Só em `marco` sem pedido: o texto do selo ("O time assumiu a conversa"). */
-  rotulo?: string;
-}
-
-/** O que o agente lê: a conversa, sem as linhas de pedido fechado. */
-function historico(turns: PlaygroundTurn[]) {
-  // A resposta do time entra como fala do atendimento, igual ao chat_messages
-  // (a linha manual é bot_message e o agente a lê como "assistant").
-  return turns
-    .filter((t) => t.role !== "marco")
-    .map((t) => ({ role: t.role === "time" ? "assistant" : t.role, content: t.content }));
-}
-
-/** Pausa entre um balão e o próximo, pelo tamanho do texto: nem instantâneo
- *  (lê como formulário), nem lento a ponto de parecer travado. */
-function pausaDigitando(texto: string): number {
-  return Math.min(1800, Math.max(700, texto.length * 22));
-}
-
-const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function mmss(s: number): string {
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
-
-/** Teto da gravação. Dois minutos de opus ficam longe do limite de corpo. */
-const GRAVACAO_MAX_S = 120;
-
-// As mesmas peles do balão da tela de Conversas (`PELE` em Thread.tsx): o
-// cliente é o balão recebido, o agente é o da IA.
-const PELE_CLIENTE =
-  "border-line-soft bg-[var(--bubble-in-bg)] text-[var(--bubble-in-fg)] shadow-[var(--bubble-shadow)]";
-const PELE_IA = "border-brand-line bg-[var(--bubble-ia-bg)] text-[var(--bubble-ia-fg)]";
-// O time respondendo (`voce` no Thread): do lado do atendimento, junto da IA.
-const PELE_TIME =
-  "border-human-line bg-[var(--bubble-you-bg)] text-[var(--bubble-you-fg)]";
-
-/**
- * Configuração que a pessoa está EDITANDO no formulário, enviada em cada turno.
- * Sem ela a bancada testa a configuração salva (comportamento antigo).
- *
- * Vai CRUA, e não compilada: quem monta a persona é o servidor, que recola o
- * rabo invariante da base. Persona final vinda do browser poderia chegar sem o
- * contrato de saída, e aí o teste mentiria sobre o agente real.
- */
-export type ConfiguracaoEmEdicao =
-  | { mode: "guiado"; config: AgentConfig }
-  | { mode: "avancado"; persona: string; handoffNotice: string };
-
-interface ApiResult {
-  output: {
-    messages: string[];
-    action: string;
-    summary: string;
-    preferencia_horario: string;
-    pedido_novo?: boolean;
-  };
-  diagnostics: TurnDiagnostics;
-}
 
 export default function Playground({
   stageNames,
@@ -138,355 +60,35 @@ export default function Playground({
    */
   diagnostico?: boolean;
 }) {
-  const [turns, setTurns] = useState<PlaygroundTurn[]>(initialTurns);
-  const [input, setInput] = useState("");
-  // PEDIDOS DE AJUDA NA CONVERSA DE TESTE (29/09/2026, pedido do dono: "gap de
-  // primeira impressão"). Quando a IA pede ajuda, o pedido aparece aqui como no
-  // atendimento de verdade, e a pessoa orienta e vê a IA responder. Fila do mais
-  // antigo para o mais novo, igual à caixa de escrita da tela de Conversas.
-  const [pedidos, setPedidos] = useState<Handoff[]>(initialPedidos);
-  const fila = pedidos.filter((p) => !p.closedAt);
-  const pedidoAtual = fila[0] ?? null;
-  // Respondeu como time: a IA pausa, como no atendimento (quem responde assume).
-  const [iaPausada, setIaPausada] = useState(false);
-  const [sending, setSending] = useState(false);
-  // "Digitando…": o agente está pensando ou ainda vai mandar outro balão.
-  const [pensando, setPensando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [abaCel, setAbaCel] = useState<"conversa" | "diagnostico">("conversa");
-  const [simStage, setSimStage] = useState<string | null>(initialStage);
-  const [simStageSource, setSimStageSource] = useState<string | null>(
-    initialStage ? "ia" : null
-  );
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  const lastDiag = (() => {
-    for (let i = turns.length - 1; i >= 0; i--)
-      if (turns[i].role === "assistant") return turns[i].diag ?? null;
-    return null;
-  })();
-
-  // Colado no fim enquanto a pessoa não subir para reler.
-  const coladoRef = useRef(true);
-  const scrollDown = () => {
-    coladoRef.current = true;
-    requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  };
-
-  // ⚠️ A ÚLTIMA MENSAGEM SEMPRE À VISTA (29/09/2026, pedido do dono). O
-  // `scrollDown` dos gestos não bastava: a caixa do pedido de ajuda é mais alta
-  // que a do cliente e encolhe a conversa DEPOIS da rolagem, e os balões chegam
-  // um a um. Então qualquer mudança de tamanho (da área ou do conteúdo) volta
-  // ao fim, desde que a pessoa não tenha subido para reler.
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const aoFim = () => {
-      if (coladoRef.current) el.scrollTop = el.scrollHeight;
-    };
-    const aoRolar = () => {
-      coladoRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    };
-    const tamanho = new ResizeObserver(aoFim);
-    tamanho.observe(el);
-    const conteudo = new MutationObserver(aoFim);
-    conteudo.observe(el, { childList: true, subtree: true, characterData: true });
-    el.addEventListener("scroll", aoRolar, { passive: true });
-    return () => {
-      tamanho.disconnect();
-      conteudo.disconnect();
-      el.removeEventListener("scroll", aoRolar);
-    };
-  }, []);
-
-  async function callApi(payload: {
-    message: string;
-    history: { role: string; content: string }[];
-    retomada?: { instruction: string } | null;
-    pedidosAbertos?: string[];
-  }): Promise<ApiResult> {
-    const res = await fetch("/api/playground", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...payload,
-        currentStage: simStage,
-        stageSource: simStageSource,
-        // Espalhado por último e só quando existe: sem configuração em edição o
-        // corpo fica idêntico ao de antes e o servidor usa a persona salva.
-        ...(configuracao ?? {}),
-      }),
-    });
-    const data = (await res.json()) as ApiResult & {
-      error?: string;
-      fields?: Record<string, string>;
-    };
-    if (!res.ok) {
-      // Config incompleta volta com os campos que faltam. Dizer "configuração
-      // incompleta" e parar aí obrigaria a pessoa a caçar o campo na mão.
-      const faltando = data.fields ? Object.values(data.fields).join(", ") : "";
-      throw new Error(
-        faltando
-          ? `${data.error || "configuração incompleta"}: ${faltando}`
-          : data.error || "falha ao falar com o agente"
-      );
-    }
-    return data;
-  }
-
-  function applyStage(diag: TurnDiagnostics) {
-    if (diag.stageWouldMove) {
-      setSimStage(diag.stageWouldMove);
-      setSimStageSource("ia");
-    }
-  }
-
-  /**
-   * Pede a resposta ao agente e a revela como no WhatsApp: "digitando" enquanto
-   * o modelo pensa, e cada item de `messages` num balão próprio, com uma pausa
-   * de digitação entre eles. Lança se o agente falhar, para quem chamou desfazer
-   * a mensagem do cliente.
-   */
-  async function responder(
-    message: string,
-    history: { role: string; content: string }[],
-    retomada: { instruction: string } | null = null,
-    abertos: Handoff[] = fila
-  ) {
-    setPensando(true);
-    scrollDown();
-    let res: ApiResult;
-    try {
-      res = await callApi({
-        message,
-        history,
-        retomada,
-        pedidosAbertos: abertos.map((p) => p.summary ?? "").filter(Boolean),
-      });
-    } finally {
-      setPensando(false);
-    }
-    const { output, diagnostics } = res;
-    // O servidor decide pela MESMA regra do atendimento (`pedidoNaFila`).
-    if (diagnostics.pedidoNaFila) {
-      setPedidos((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          openedAt: new Date().toISOString(),
-          summary: output.summary || diagnostics.summary || null,
-          instruction: null,
-          closedAt: null,
-          closedHow: null,
-        },
-      ]);
-    }
-    const content = output.messages.join("\n");
-    const partes = output.messages.filter((m) => m.trim());
-    applyStage(diagnostics);
-    setTurns((prev) => [
-      ...prev,
-      { role: "assistant", content, diag: diagnostics, partes: partes.slice(0, 1) },
-    ]);
-    scrollDown();
-    for (let i = 1; i < partes.length; i++) {
-      setPensando(true);
-      scrollDown();
-      await esperar(pausaDigitando(partes[i]));
-      setPensando(false);
-      setTurns((prev) => {
-        const ultimo = prev[prev.length - 1];
-        return [...prev.slice(0, -1), { ...ultimo, partes: partes.slice(0, i + 1) }];
-      });
-      scrollDown();
-    }
-  }
-
-  async function sendMessage() {
-    const text = input.trim();
-    if (!text || sending) return;
-    setError(null);
-    const history = historico(turns);
-    setTurns((prev) => [...prev, { role: "user", content: text }]);
-    setInput("");
-    scrollDown();
-    // IA pausada (o time assumiu): a mensagem chega e ninguém responde por ela.
-    if (iaPausada) return;
-    setSending(true);
-    try {
-      await responder(text, history);
-    } catch (e) {
-      // Desfaz a mensagem otimista e devolve o texto para o campo.
-      setTurns((prev) => prev.slice(0, -1));
-      setInput(text);
-      setError(e instanceof Error ? e.message : "erro inesperado");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // ── ÁUDIO (26/09/2026, pedido do dono) ──
-  // Grava no navegador, transcreve no servidor e manda o TEXTO ao agente, que é
-  // exatamente o que o n8n faz com áudio do WhatsApp (nó "Whisper"). A
-  // transcrição aparece embaixo do balão: é o que o agente "ouviu", e sem isso
-  // uma resposta estranha pareceria defeito do agente quando foi do áudio.
-  const [gravando, setGravando] = useState(false);
-  const [segundos, setSegundos] = useState(0);
-  const gravadorRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const pedacosRef = useRef<Blob[]>([]);
-  const relogioRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const descartarRef = useRef(false);
-  const segundosRef = useRef(0);
-
-  function soltarMicrofone() {
-    if (relogioRef.current) clearInterval(relogioRef.current);
-    relogioRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }
-
-  // Fechar o painel no meio de uma gravação não pode deixar o microfone aceso.
-  useEffect(() => () => soltarMicrofone(), []);
-
-  async function iniciarGravacao() {
-    if (sending || gravando) return;
-    setError(null);
-    if (
-      typeof MediaRecorder === "undefined" ||
-      !navigator.mediaDevices?.getUserMedia
-    ) {
-      setError("Este navegador não grava áudio.");
-      return;
-    }
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError("Sem permissão para usar o microfone.");
-      return;
-    }
-    // Chrome grava webm, Safari grava mp4; a OpenAI aceita os dois.
-    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"].find(
-      (m) => MediaRecorder.isTypeSupported(m)
-    );
-    const gravador = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    streamRef.current = stream;
-    gravadorRef.current = gravador;
-    pedacosRef.current = [];
-    descartarRef.current = false;
-    segundosRef.current = 0;
-    gravador.ondataavailable = (e) => {
-      if (e.data.size > 0) pedacosRef.current.push(e.data);
-    };
-    gravador.onstop = () => {
-      soltarMicrofone();
-      setGravando(false);
-      if (descartarRef.current) return;
-      const tipo = gravador.mimeType || mime || "audio/webm";
-      const blob = new Blob(pedacosRef.current, { type: tipo });
-      void enviarAudio(blob, Math.max(1, segundosRef.current));
-    };
-    gravador.start();
-    setSegundos(0);
-    setGravando(true);
-    relogioRef.current = setInterval(() => {
-      segundosRef.current += 1;
-      setSegundos(segundosRef.current);
-      if (segundosRef.current >= GRAVACAO_MAX_S) gravador.stop();
-    }, 1000);
-  }
-
-  function pararGravacao(enviar: boolean) {
-    descartarRef.current = !enviar;
-    if (gravadorRef.current?.state === "recording") gravadorRef.current.stop();
-  }
-
-  async function enviarAudio(blob: Blob, duracao: number) {
-    setSending(true);
-    const history = historico(turns);
-    const url = URL.createObjectURL(blob);
-    setTurns((prev) => [
-      ...prev,
-      { role: "user", content: "", audio: { url, segundos: duracao, transcrevendo: true } },
-    ]);
-    scrollDown();
-    try {
-      const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
-      const form = new FormData();
-      form.append("audio", blob, `audio.${ext}`);
-      const res = await fetch("/api/playground/transcrever", { method: "POST", body: form });
-      const data = (await res.json()) as { texto?: string; error?: string };
-      if (!res.ok || !data.texto) {
-        throw new Error(data.error ?? "não foi possível transcrever o áudio");
-      }
-      const texto = data.texto;
-      setTurns((prev) => {
-        const ultimo = prev[prev.length - 1];
-        return [
-          ...prev.slice(0, -1),
-          { ...ultimo, content: texto, audio: { url, segundos: duracao } },
-        ];
-      });
-      await responder(texto, history);
-    } catch (e) {
-      setTurns((prev) => prev.slice(0, -1));
-      URL.revokeObjectURL(url);
-      setError(e instanceof Error ? e.message : "erro inesperado");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // Fecha o pedido da vez: vira a linha de histórico na conversa, no ponto em
-  // que fechou, como no atendimento.
-  function fecharPedido(p: Handoff, como: "ia" | "resolvido", instrucao: string | null) {
-    const fechado: Handoff = {
-      ...p,
-      instruction: instrucao,
-      closedAt: new Date().toISOString(),
-      closedHow: como,
-    };
-    setPedidos((prev) => prev.map((x) => (x.id === p.id ? fechado : x)));
-    setTurns((prev) => [...prev, { role: "marco", content: "", pedido: fechado }]);
-    scrollDown();
-  }
-
-  // ORIENTAR (o mesmo gesto da tela de Conversas): o pedido fecha e a IA
-  // responde NA HORA, sem mensagem nova do cliente (turno de retomada).
-  async function orientarPedido(texto: string) {
-    if (!texto.trim() || sending || !pedidoAtual) return;
-    setError(null);
-    setSending(true);
-    const history = historico(turns);
-    const restantes = fila.slice(1);
-    fecharPedido(pedidoAtual, "ia", texto.trim());
-    try {
-      await responder("", history, { instruction: texto.trim() }, restantes);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "erro inesperado");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  // RESPONDER COMO TIME (o modo Responder da caixa): o pedido fecha como
-  // "resolvido pelo time", o time assume e a IA pausa, como no atendimento.
-  function responderComoTime(texto: string) {
-    const t = texto.trim();
-    if (!t) return;
-    if (pedidoAtual) fecharPedido(pedidoAtual, "resolvido", null);
-    setTurns((prev) => [
-      ...prev,
-      ...(iaPausada ? [] : [{ role: "marco" as const, content: "", rotulo: "O time assumiu a conversa" }]),
-      { role: "time", content: t },
-    ]);
-    setIaPausada(true);
-    scrollDown();
-  }
+  const {
+    turns,
+    input,
+    setInput,
+    fila,
+    pedidoAtual,
+    iaPausada,
+    setIaPausada,
+    sending,
+    pensando,
+    error,
+    simStage,
+    lastDiag,
+    scrollRef,
+    sendMessage,
+    gravando,
+    segundos,
+    iniciarGravacao,
+    pararGravacao,
+    fecharPedido,
+    orientarPedido,
+    responderComoTime,
+  } = useConversaDeTeste({
+    initialTurns,
+    initialPedidos,
+    initialStage,
+    configuracao,
+  });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -505,6 +107,7 @@ export default function Playground({
           ["conversa", "Conversa"],
           ["diagnostico", "Diagnóstico"],
         ] as const).map(([k, rotulo]) => (
+          // eslint-disable-next-line no-restricted-syntax -- aba em segmento com tokens de chip próprios; nenhuma variante do Button a reproduz igual
           <button
             key={k}
             type="button"
@@ -543,260 +146,25 @@ export default function Playground({
           )}
         >
           <FundoRede />
-          {/* A bancada tem os mesmos baloes da conversa, entao o mesmo degrau. */}
-          <AreaRolavel
-            ref={scrollRef}
-            tamanho={DISSOLVER_BALAO}
-            className="relative flex-1 space-y-3 p-4"
-          >
-            {turns.length === 0 ? (
-              <div className="flex h-full items-center justify-center px-6 text-center text-apoio text-ink-3">
-                Mande uma mensagem ou um áudio, como um cliente faria.
-              </div>
-            ) : (
-              turns.map((t, i) => {
-                if (t.role === "marco" && t.pedido) {
-                  return <HandoffCard key={i} h={t.pedido} />;
-                }
-                if (t.role === "marco") {
-                  // O mesmo selo "passagem de bastão" da tela de Conversas.
-                  return (
-                    <div key={i} className="flex items-center gap-3 py-1" data-slot="conversa-marco">
-                      <span className="h-px flex-1 bg-human-line" aria-hidden />
-                      <span className="inline-flex h-[26px] shrink-0 items-center gap-2 rounded-md border border-human-line bg-human-surface px-2.5">
-                        <span className="h-1.5 w-1.5 rounded-full bg-human" aria-hidden />
-                        <span className="whitespace-nowrap text-rotulo uppercase text-human-ink">
-                          {t.rotulo}
-                        </span>
-                      </span>
-                      <span className="h-px flex-1 bg-human-line" aria-hidden />
-                    </div>
-                  );
-                }
-                if (t.role === "time") {
-                  return (
-                    <div key={i} className="flex flex-col items-start gap-1.5">
-                      <div
-                        className={cn(
-                          "msg-in max-w-[80%] whitespace-pre-wrap break-words rounded-[4px_16px_16px_16px] border px-3 py-2 text-corpo",
-                          PELE_TIME
-                        )}
-                      >
-                        {t.content}
-                      </div>
-                    </div>
-                  );
-                }
-                // Handoff silencioso: a IA não envia nada, só abre o handoff.
-                if (t.role === "assistant" && !t.content.trim()) {
-                  return (
-                    <div key={i} className="flex justify-center">
-                      <div className="rounded-full bg-warn-surface px-3 py-1 text-legenda text-warn-ink">
-                        A IA passou esta conversa para você.
-                      </div>
-                    </div>
-                  );
-                }
-                if (t.audio) {
-                  return (
-                    <div key={i} className="msg-in flex flex-col items-end gap-1">
-                      <BalaoAudio url={t.audio.url} segundos={t.audio.segundos} />
-                      {/* O que o agente "ouviu". Sem isso uma resposta torta
-                          pareceria defeito dele quando o erro foi do áudio. */}
-                      <p
-                        data-slot="transcricao"
-                        className="max-w-[80%] text-right text-legenda text-ink-3"
-                      >
-                        {t.audio.transcrevendo
-                          ? "Transcrevendo o áudio…"
-                          : `Transcrição: “${t.content}”`}
-                      </p>
-                    </div>
-                  );
-                }
-                // Um balão por mensagem, como chega no WhatsApp. Turno antigo
-                // (ou vindo do coach) sem `partes` cai no texto inteiro.
-                const baloes =
-                  t.role === "assistant" && t.partes ? t.partes : [t.content];
-                return (
-                  <div
-                    key={i}
-                    className={cn(
-                      "flex flex-col gap-1.5",
-                      t.role === "user" ? "items-end" : "items-start"
-                    )}
-                  >
-                    {baloes.map((texto, j) => (
-                      // As peles do Thread: quem testa é o CLIENTE (balão
-                      // recebido, branco com relevo) e o agente é a IA (roxo
-                      // claro). O canto recortado aponta para quem falou.
-                      <div
-                        key={j}
-                        className={cn(
-                          "msg-in max-w-[80%] whitespace-pre-wrap break-words border px-3 py-2 text-corpo",
-                          t.role === "user"
-                            ? cn("rounded-[16px_4px_16px_16px]", PELE_CLIENTE)
-                            : cn("rounded-[4px_16px_16px_16px]", PELE_IA)
-                        )}
-                      >
-                        {texto}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })
-            )}
-            {pensando && (
-              <div className="flex justify-start">
-                <div
-                  data-slot="digitando"
-                  role="status"
-                  aria-label="Digitando"
-                  className={cn(
-                    "digitando msg-in flex items-center gap-1 rounded-[4px_16px_16px_16px] border px-3.5 py-3",
-                    PELE_IA
-                  )}
-                >
-                  <span className="size-1.5 rounded-full bg-current" />
-                  <span className="size-1.5 rounded-full bg-current" />
-                  <span className="size-1.5 rounded-full bg-current" />
-                </div>
-              </div>
-            )}
-          </AreaRolavel>
-          {/* ⚠️ COM PEDIDO ABERTO, A CAIXA É A DA TELA DE CONVERSAS (29/09/2026,
-              decisão do dono: "mostrar de um jeito na montagem e de outro quando
-              funcionar não é bom"). É o PRÓPRIO `MessageComposer` com a prop
-              `pedido`, e não uma cópia: abre em Orientar a IA, troca para
-              Responder, e tem o Resolvido ao lado. Enquanto o pedido espera, o
-              cliente de teste não escreve, exatamente como a caixa do time não
-              escreve pelo cliente. */}
-          {pedidoAtual ? (
-            <div className="relative shrink-0">
-              <MessageComposer
-                key={`pedido-${pedidoAtual.id}`}
-                clientId=""
-                onSend={responderComoTime}
-                atende={{ quem: iaPausada ? "voce" : "ia" }}
-                pedido={{
-                  handoff: pedidoAtual,
-                  posicao: 1,
-                  total: fila.length,
-                  onOrientar: orientarPedido,
-                  onResolvido: () => fecharPedido(pedidoAtual, "resolvido", null),
-                }}
-              />
-              {error && <p className="px-4 pb-2 text-legenda text-danger-ink">{error}</p>}
-            </div>
-          ) : (
-          <>
-          {/* DEVOLVER PARA A IA (29/09/2026, decisão do dono): responder como time
-              pausa a IA, e sem saída isso encerrava o teste. É o gesto da chave
-              da IA no cabeçalho da tela de Conversas; a bancada não tem esse
-              cabeçalho, então o botão mora junto do aviso, onde a pessoa está
-              olhando quando a IA para de responder. */}
-          {iaPausada && (
-            <div
-              data-slot="ia-pausada-teste"
-              className="relative mx-3 mt-2 flex items-center gap-3 rounded-lg border border-human-line bg-human-surface px-3 py-2"
-            >
-              <span className="size-1.5 shrink-0 rounded-full bg-human" aria-hidden />
-              <p className="min-w-0 flex-1 text-legenda text-human-ink">
-                Você assumiu esta conversa, e a IA não responde enquanto você atende.
-                Devolva para ela para continuar o teste.
-              </p>
-              <Button
-                variant="outline"
-                size="chrome"
-                onClick={() => setIaPausada(false)}
-                className="shrink-0 border-human-line text-human-ink"
-              >
-                Devolver para a IA
-              </Button>
-            </div>
-          )}
-          {/* A caixa de escrita no molde da tela de Conversas (`MessageComposer`):
-              moldura de 16px com relevo sobre o fundo da conversa, campo limpo
-              que cresce com o texto e o botão redondo à direita. Aqui não há os
-              modos de nota e orientação, só o de responder, então a moldura é
-              da cor da marca e não muda. */}
-          <div className="relative shrink-0 px-3 pb-3 pt-2">
-            <div className="rounded-[16px] border border-brand-line bg-raised shadow-[var(--panel-shadow)]">
-              {gravando ? (
-                // Gravando: o campo dá lugar à barra do WhatsApp, com o tempo
-                // correndo, descartar à esquerda e enviar à direita.
-                <div data-slot="gravando" className="flex items-center gap-2 p-2">
-                  <Button
-                    variant="ghost"
-                    size="none"
-                    onClick={() => pararGravacao(false)}
-                    className="size-9 justify-center rounded-full text-ink-2 max-md:size-10"
-                    aria-label="Descartar áudio"
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                  <span className="gravando size-2.5 rounded-full bg-danger" aria-hidden />
-                  <span className="flex-1 text-corpo tabular-nums text-ink-2">
-                    Gravando {mmss(segundos)}
-                  </span>
-                  <Button
-                    size="none"
-                    onClick={() => pararGravacao(true)}
-                    className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
-                    aria-label="Enviar áudio"
-                  >
-                    <ArrowUp size={18} />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-end gap-2 p-2">
-                  <Textarea
-                    variant="limpo"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void sendMessage();
-                      }
-                    }}
-                    rows={1}
-                    aria-label="Mensagem de teste"
-                    placeholder="Escreva uma mensagem"
-                    className="max-h-[132px] min-h-9 min-w-0 flex-1 px-2 py-2 text-corpo [field-sizing:content]"
-                  />
-                  {/* Como no WhatsApp: campo vazio mostra o microfone, com texto
-                      vira enviar. */}
-                  {input.trim() ? (
-                    <Button
-                      size="none"
-                      onClick={sendMessage}
-                      disabled={sending}
-                      className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
-                      aria-label="Enviar"
-                    >
-                      <ArrowUp size={18} />
-                    </Button>
-                  ) : (
-                    <Button
-                      size="none"
-                      onClick={() => void iniciarGravacao()}
-                      disabled={sending}
-                      className="size-9 shrink-0 justify-center rounded-full max-md:size-10"
-                      aria-label="Gravar áudio"
-                    >
-                      <Mic size={17} />
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-            {error && (
-              <p className="mt-1.5 px-1 text-legenda text-danger-ink">{error}</p>
-            )}
-          </div>
-          </>
-          )}
+          <TurnosDaBancada turns={turns} pensando={pensando} scrollRef={scrollRef} />
+          <RodapeDaBancada
+            pedidoAtual={pedidoAtual}
+            fila={fila}
+            error={error}
+            iaPausada={iaPausada}
+            setIaPausada={setIaPausada}
+            responderComoTime={responderComoTime}
+            orientarPedido={orientarPedido}
+            fecharPedido={fecharPedido}
+            gravando={gravando}
+            segundos={segundos}
+            pararGravacao={pararGravacao}
+            iniciarGravacao={iniciarGravacao}
+            input={input}
+            setInput={setInput}
+            sendMessage={sendMessage}
+            sending={sending}
+          />
         </div>
 
         {/* DIREITA: Diagnóstico do turno, em coluna única. Eram duas colunas
@@ -819,209 +187,6 @@ export default function Playground({
         </AreaRolavel>
         )}
       </div>
-    </div>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-line bg-bloco p-4">
-      <div className="mb-2.5 text-rotulo uppercase text-ink-3">{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function actionLabel(action: string): string {
-  if (action === "agendar") return "Marcar conversa com o time";
-  if (action === "pausar") return "Pediu uma pessoa do time";
-  return "Segue a conversa";
-}
-
-// Só leitura (29/09/2026): orientar mora na CONVERSA de teste, no molde da
-// caixa da tela de Conversas. Aqui fica o que a IA decidiu e por quê.
-function HandoffPanel({ diag }: { diag: TurnDiagnostics | null }) {
-  const open = !!diag?.handoffOpened;
-  return (
-    <Panel title="Handoff">
-      <div className="space-y-2.5">
-        {open ? (
-          <div className="rounded-lg bg-warn-surface px-3 py-2.5">
-            <div className="text-legenda font-semibold text-warn-ink">
-              {diag!.guardrail.blocked
-                ? "O guardrail segurou a resposta"
-                : "A IA abriu handoff"}
-            </div>
-            <p className="mt-1 text-apoio leading-snug text-ink">
-              {diag!.guardrail.blocked
-                ? diag!.guardrail.reason
-                : diag!.summary || actionLabel(diag!.action)}
-            </p>
-            {diag!.guardrail.blocked && diag!.guardrail.draft && (
-              <p className="mt-1.5 text-legenda leading-snug italic text-ink-2">
-                Ia dizer: {diag!.guardrail.draft}
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="rounded-lg bg-raised px-3 py-2.5 text-apoio text-ink-2">
-            {diag
-              ? "Nenhum handoff neste turno. A IA seguiu sozinha."
-              : "Nenhum pedido de ajuda. Quando a IA precisar do time, o pedido aparece na conversa para você orientar."}
-          </div>
-        )}
-      </div>
-    </Panel>
-  );
-}
-
-function ClassificationPanel({
-  diag,
-  simStage,
-  stageNames,
-}: {
-  diag: TurnDiagnostics | null;
-  simStage: string | null;
-  stageNames: Record<string, string>;
-}) {
-  const P = "aguardando";
-  const stageLabel = (key: string | null) =>
-    key ? stageNames[key] ?? key : null;
-  return (
-    <Panel title="Classificação">
-      <div className="space-y-3 text-apoio">
-        <Field label="Ação" value={diag ? actionLabel(diag.action) : P} />
-        <Field
-          label="Guardrail"
-          value={
-            !diag
-              ? P
-              : diag.guardrail.blocked
-                ? `Segurou: ${diag.guardrail.reason}`
-                : "Passou sem bloqueio"
-          }
-        />
-        <Field
-          label="Estágio que moveria"
-          value={diag ? stageLabel(diag.stageWouldMove) ?? "não move o card" : P}
-        />
-        <Field
-          label="Estágio atual (simulado)"
-          value={stageLabel(simStage) ?? "inicial"}
-        />
-        <div>
-          <div className="text-rotulo uppercase text-ink-3">
-            Base de conhecimento
-          </div>
-          {!diag ? (
-            <div className="text-apoio text-ink-2">aguardando o 1º turno</div>
-          ) : !diag.ragSearched ? (
-            <div className="text-apoio text-ink-2">
-              Sem base cadastrada neste tenant.
-            </div>
-          ) : diag.ragMatches.length === 0 ? (
-            <div className="text-apoio text-ink-2">
-              Buscou, nada relevante voltou.
-            </div>
-          ) : (
-            <ul className="mt-1 space-y-1">
-              {diag.ragMatches.map((m, i) => (
-                <li
-                  key={i}
-                  className="flex items-baseline gap-2 rounded-lg bg-raised px-2.5 py-1.5"
-                  title={m.preview}
-                >
-                  <span className="shrink-0 text-legenda font-semibold tabular-nums text-human-ink">
-                    {(m.similarity * 100).toFixed(0)}%
-                  </span>
-                  <span className="line-clamp-1 text-legenda leading-snug text-ink-2">
-                    {m.preview}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function SummaryPanel({ diag }: { diag: TurnDiagnostics | null }) {
-  return (
-    <Panel title="Resumo">
-      <div className="space-y-3 text-apoio">
-        <Field
-          label="Resumo do caso"
-          value={diag ? diag.summary || "sem resumo" : "aguardando"}
-        />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-          <Field
-            label="Preferência de horário"
-            value={
-              !diag ? "aguardando" : diag.preferenciaHorario || "não informado"
-            }
-          />
-          <Field
-            label="Latência"
-            value={
-              !diag
-                ? "aguardando"
-                : diag.latencyMs < 1000
-                  ? `${diag.latencyMs} ms`
-                  : `${(diag.latencyMs / 1000).toFixed(1)} s`
-            }
-          />
-        </div>
-      </div>
-    </Panel>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-rotulo uppercase text-ink-3">{label}</div>
-      <div className="text-apoio font-medium text-ink">{value}</div>
-    </div>
-  );
-}
-
-/** Balão de mensagem de voz, do lado de quem mandou. Toca o próprio áudio. */
-function BalaoAudio({ url, segundos }: { url: string; segundos: number }) {
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [tocando, setTocando] = useState(false);
-  return (
-    <div
-      data-slot="balao-audio"
-      className={cn(
-        "flex items-center gap-2.5 rounded-[16px_4px_16px_16px] border py-2 pr-3.5 pl-2",
-        PELE_CLIENTE
-      )}
-    >
-      <button
-        type="button"
-        onClick={() => {
-          const a = audioRef.current;
-          if (!a) return;
-          if (a.paused) void a.play();
-          else a.pause();
-        }}
-        className="flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground"
-        aria-label={tocando ? "Pausar áudio" : "Ouvir áudio"}
-      >
-        {tocando ? <Pause size={14} /> : <Play size={14} />}
-      </button>
-      <Mic size={14} aria-hidden />
-      <span className="text-apoio tabular-nums">{mmss(segundos)}</span>
-      <audio
-        ref={audioRef}
-        src={url}
-        onPlay={() => setTocando(true)}
-        onPause={() => setTocando(false)}
-        onEnded={() => setTocando(false)}
-        className="hidden"
-      />
     </div>
   );
 }
