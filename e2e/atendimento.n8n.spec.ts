@@ -17,7 +17,10 @@ import { FONE_TESTE, NOME_TESTE, servico, tenantDeTeste } from "./semente";
 //
 // Paga (modelo, Whisper e visão de verdade): só roda com `npm run test:e2e:n8n`.
 
-const WEBHOOK = process.env.E2E_N8N_WEBHOOK || "https://n8n.obomsobrinho.com.br/webhook/agente_obm";
+// ⚠️ O caminho do webhook é SEGREDO desde 02/10/2026 (R-01 da auditoria): vem
+// só de `E2E_N8N_WEBHOOK` no `.env.e2e.local`, nunca escrito aqui.
+const WEBHOOK = process.env.E2E_N8N_WEBHOOK ?? "";
+test.skip(!WEBHOOK, "defina E2E_N8N_WEBHOOK no .env.e2e.local (caminho secreto do webhook do atendimento)");
 const INSTANCIA = process.env.E2E_N8N_INSTANCIA || "OBM";
 const JID = `${FONE_TESTE}@s.whatsapp.net`;
 const AUDIO = fs.readFileSync("e2e/fixtures/audio-whatsapp.ogg").toString("base64");

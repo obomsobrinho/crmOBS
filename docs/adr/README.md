@@ -79,6 +79,7 @@
 | 2026-10-01-e2e-n8n-attendance-battery.md | testing | Accepted | End-to-end attendance battery against production n8n |
 | 2026-10-01-n8n-send-failure-continues.md | n8n | Accepted | A failing send must not stop the rest of the execution |
 | 2026-10-01-n8n-sliding-wait-debounce.md | n8n | Accepted | Sliding wait in the n8n debounce |
+| 2026-10-02-n8n-webhooks-secret-path-and-header-auth.md | n8n | Accepted | Secret UUID paths on the three n8n webhooks and header auth on the two CRM flows |
 | 2026-10-01-production-loading-and-realtime-rules.md | realtime | Accepted | Production loading: paginate, server-side search, row-level realtime, session-bound channels |
 | 2026-10-01-migrations-versioned-in-repo.md | security | Accepted | Database migrations live in the repo; default privileges give anon nothing |
 | 2026-10-01-profile-photo-copied-to-bucket.md | data | Accepted | Contact profile photos are copied to our bucket |

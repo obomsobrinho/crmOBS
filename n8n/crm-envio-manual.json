@@ -14,11 +14,18 @@
       ],
       "parameters": {
         "httpMethod": "POST",
-        "path": "crm-envio-manual",
+        "path": "{{N8N_WEBHOOK_PATH_ENVIO_MANUAL}}",
         "responseMode": "onReceived",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
-      "webhookId": "2530da5d-6d18-4849-b69d-36cb3b714c4e"
+      "webhookId": "{{N8N_WEBHOOK_ID_ENVIO_MANUAL}}",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aIvOInuQrtqMm5PO",
+          "name": "CRM webhook secret"
+        }
+      }
     },
     {
       "id": "evo-send",

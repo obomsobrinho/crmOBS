@@ -6,7 +6,7 @@
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "agente_obm",
+        "path": "{{N8N_WEBHOOK_PATH_ATENDIMENTO}}",
         "options": {}
       },
       "id": "4eb7ab57-2cf1-4954-b51c-13ecc21552b5",
@@ -17,7 +17,7 @@
         2400,
         -32
       ],
-      "webhookId": "7ecd43ed-123c-4fef-b86d-f9ce39e55d64"
+      "webhookId": "{{N8N_WEBHOOK_ID_ATENDIMENTO}}"
     },
     {
       "parameters": {

@@ -1,22 +1,21 @@
 // Offline, deterministic repo checks (audit F13, 02/10/2026). No network, no
 // database, no paid call. `npm run checar`; also run by e2e/checagens.design.spec.ts.
 //
-// ERRORS (exit 1):
+// ERRORS (exit 1; the n8n check is strict, so `--estrito` is accepted but redundant):
 //  1. supabase/migrations: file name `<14-digit UTC>_<snake>.sql`, unique and
 //     strictly increasing timestamps, and every migration after 20261001160000
 //     opens with a `--` comment header and has no em or en dash.
 //  2. Every `docs/...md` path cited in .claude/rules/*.md and CLAUDE.md exists
 //     (a "why:" that points nowhere is a rule nobody can audit).
-// WARNINGS (printed, exit 0 unless `--estrito`):
-//  3. Every `n8n-nodes-base.webhook` node in n8n/*.json has authentication
-//     other than none and a uuid path (audit SEC-01, waits for the owner's OK to
-//     change the live workflows).
+//  3. n8n webhooks (audit R-01): every `n8n-nodes-base.webhook` node in n8n/*.json
+//     has a `{{N8N_WEBHOOK_PATH_*}}` placeholder path (a real path is a secret) and
+//     a placeholder `webhookId`; the app-called ones (not `Webhook EVO`, which
+//     Evolution calls) have `authentication: headerAuth`.
 import fs from "node:fs";
 import path from "node:path";
 
 const raiz = path.resolve(import.meta.dirname, "..");
 const erros = [];
-const avisos = [];
 const ler = (p) => fs.readFileSync(path.join(raiz, p), "utf8");
 const lista = (dir, ext) =>
   fs.existsSync(path.join(raiz, dir))
@@ -54,7 +53,9 @@ for (const arq of fontes) {
 }
 
 // 3. n8n webhooks
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const PATH_OK = /^{{N8N_WEBHOOK_PATH_[A-Z_]+}}$/;
+const ID_OK = /^{{N8N_WEBHOOK_ID_[A-Z_]+}}$/;
+const SEM_AUTH = new Set(["Webhook EVO"]);
 for (const f of lista("n8n", ".json")) {
   let json;
   try {
@@ -65,14 +66,12 @@ for (const f of lista("n8n", ".json")) {
   }
   for (const n of json.nodes ?? []) {
     if (n.type !== "n8n-nodes-base.webhook") continue;
-    const auth = n.parameters?.authentication ?? "none";
-    if (auth === "none") avisos.push(`n8n/${f}: webhook "${n.name}" has no authentication`);
-    if (!UUID.test(String(n.parameters?.path ?? ""))) avisos.push(`n8n/${f}: webhook "${n.name}" path is not a uuid`);
+    if (!PATH_OK.test(String(n.parameters?.path ?? ""))) erros.push(`n8n/${f}: webhook "${n.name}" path must be a {{N8N_WEBHOOK_PATH_*}} placeholder`);
+    if (n.webhookId !== undefined && !ID_OK.test(String(n.webhookId))) erros.push(`n8n/${f}: webhook "${n.name}" webhookId must be a {{N8N_WEBHOOK_ID_*}} placeholder`);
+    if (!SEM_AUTH.has(n.name) && n.parameters?.authentication !== "headerAuth") erros.push(`n8n/${f}: webhook "${n.name}" must have authentication headerAuth`);
   }
 }
 
-for (const a of avisos) console.warn(`aviso: ${a}`);
 for (const e of erros) console.error(`erro: ${e}`);
-const estrito = process.argv.includes("--estrito");
-console.log(`checagens: ${erros.length} erro(s), ${avisos.length} aviso(s)`);
-process.exit(erros.length || (estrito && avisos.length) ? 1 : 0);
+console.log(`checagens: ${erros.length} erro(s)`);
+process.exit(erros.length ? 1 : 0);

@@ -1,29 +1,46 @@
 {
+  "id": "QbWUBuzXjvIEnQZN",
   "name": "CRM Envio IA",
-  "active": false,
+  "active": true,
   "nodes": [
     {
       "id": "webhook-ia",
       "name": "Webhook IA",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "parameters": {
         "httpMethod": "POST",
-        "path": "crm-envio-ia",
+        "path": "{{N8N_WEBHOOK_PATH_ENVIO_IA}}",
         "responseMode": "lastNode",
-        "options": {}
-      }
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aIvOInuQrtqMm5PO",
+          "name": "CRM webhook secret"
+        }
+      },
+      "webhookId": "{{N8N_WEBHOOK_ID_ENVIO_IA}}"
     },
     {
       "id": "split-ia",
       "name": "Split messages",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "parameters": {
         "fieldToSplitOut": "body.messages",
-        "options": { "destinationFieldName": "msg" }
+        "options": {
+          "destinationFieldName": "msg"
+        }
       }
     },
     {
@@ -31,16 +48,25 @@
       "name": "Evolution send",
       "type": "n8n-nodes-evolution-api.evolutionApi",
       "typeVersion": 1,
-      "position": [440, 0],
+      "position": [
+        440,
+        0
+      ],
       "parameters": {
         "resource": "messages-api",
         "instanceName": "={{ $('Webhook IA').first().json.body.instance }}",
         "remoteJid": "={{ $('Webhook IA').first().json.body.phone }}",
         "messageText": "={{ $json.msg }}",
-        "options_message": { "delay": 0, "linkPreview": false }
+        "options_message": {
+          "delay": 0,
+          "linkPreview": false
+        }
       },
       "credentials": {
-        "evolutionApi": { "id": "NhrloDUqGVTkh9Xq", "name": "Evo Global" }
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
       }
     },
     {
@@ -48,29 +74,80 @@
       "name": "Salva IA (chat_messages)",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [660, 0],
+      "position": [
+        660,
+        0
+      ],
       "executeOnce": true,
       "parameters": {
         "tableId": "chat_messages",
         "fieldsUi": {
           "fieldValues": [
-            { "fieldId": "phone", "fieldValue": "={{ $('Webhook IA').first().json.body.phone }}" },
-            { "fieldId": "bot_message", "fieldValue": "={{ $('Webhook IA').first().json.body.messages.join(' | ') }}" },
-            { "fieldId": "message_type", "fieldValue": "text" },
-            { "fieldId": "created_at", "fieldValue": "={{ $now }}" },
-            { "fieldId": "client_id", "fieldValue": "={{ $('Webhook IA').first().json.body.client_id }}" }
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Webhook IA').first().json.body.phone }}"
+            },
+            {
+              "fieldId": "bot_message",
+              "fieldValue": "={{ $('Webhook IA').first().json.body.messages.join(' | ') }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "text"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Webhook IA').first().json.body.client_id }}"
+            }
           ]
         }
       },
       "credentials": {
-        "supabaseApi": { "id": "KfaFJK3xoVfTJGUL", "name": "Supabase account" }
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
       }
     }
   ],
   "connections": {
-    "Webhook IA": { "main": [[{ "node": "Split messages", "type": "main", "index": 0 }]] },
-    "Split messages": { "main": [[{ "node": "Evolution send", "type": "main", "index": 0 }]] },
-    "Evolution send": { "main": [[{ "node": "Salva IA (chat_messages)", "type": "main", "index": 0 }]] }
+    "Webhook IA": {
+      "main": [
+        [
+          {
+            "node": "Split messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split messages": {
+      "main": [
+        [
+          {
+            "node": "Evolution send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution send": {
+      "main": [
+        [
+          {
+            "node": "Salva IA (chat_messages)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
   "settings": {
     "executionOrder": "v1",

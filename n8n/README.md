@@ -1,6 +1,6 @@
 # Workflows do n8n versionados
 
-Cópia dos dois workflows que o CRM depende, exportados pela API do n8n em **17/09/2026**.
+Cópia dos tres workflows que o CRM depende, exportados pela API do n8n em **17/09/2026**.
 Servem para **diff** (o que mudou no canal entre duas datas) e **rollback** (restaurar um
 workflow que alguém quebrou). Não são fonte de verdade: quem atende é o workflow **ativo** no n8n.
 
@@ -25,6 +25,11 @@ workflow que alguém quebrou). Não são fonte de verdade: quem atende é o work
    Ficaram `id`, `name`, `active`, `nodes`, `connections`, `settings` e `meta`.
 4. Um telefone pessoal escrito no texto do `Sticky README` (nota de comentário dentro do
    workflow, sem efeito na execução) foi substituído por `[telefone pessoal removido]`.
+
+5. **Caminho e `webhookId` dos webhooks** (UUID secreto desde 02/10/2026, tipo senha) viraram
+   `{{N8N_WEBHOOK_PATH_ATENDIMENTO}}`, `{{N8N_WEBHOOK_PATH_ENVIO_MANUAL}}`, `{{N8N_WEBHOOK_PATH_ENVIO_IA}}` e
+   `{{N8N_WEBHOOK_ID_*}}`. `Webhook CRM` e `Webhook IA` exigem header auth (`x-webhook-secret`,
+   credencial `CRM webhook secret`); `Webhook EVO` não (a Evolução chama).
 
 **Credenciais não vão no export** por construção: o JSON guarda só `id` e `name` da credencial
 (`Evo Global`, `Supabase account`, `postgresn8n`, `redisn8n`, `OpenAI account`). Quem importa
@@ -67,8 +72,14 @@ porque mexer nele é mudar texto que o dono lê todo dia.
    lista de workflows).
 2. Abra os nós `Atendente` e `Sobe mídia recebida`, header `x-lookup-secret`, e troque
    `{{N8N_LOOKUP_SECRET}}` pelo valor real. Nunca cole o valor no repositório nem no chat.
-3. Confira as credenciais dos nós Evolution, Supabase, Postgres, Redis e OpenAI.
-4. **Só então** ative. Regra do projeto: nunca ativar workflow no n8n sem confirmação explícita do
+3. Em cada nó webhook, troque `{{N8N_WEBHOOK_PATH_*}}` pelo UUID real, que é o último segmento da
+   env correspondente (`N8N_BOT_WEBHOOK_URL` para o atendimento, `N8N_SEND_WEBHOOK_URL` para o envio
+   manual, `N8N_IA_SEND_WEBHOOK_URL` para o envio IA) e apague o `{{N8N_WEBHOOK_ID_*}}` (o n8n gera
+   outro). Em `Webhook CRM` e `Webhook IA`, selecione a credencial `CRM webhook secret` (header
+   `x-webhook-secret`, valor de `N8N_WEBHOOK_SECRET`). Os valores moram só na Vercel, no
+   `.env.local` e na credencial do n8n.
+4. Confira as credenciais dos nós Evolution, Supabase, Postgres, Redis e OpenAI.
+5. **Só então** ative. Regra do projeto: nunca ativar workflow no n8n sem confirmação explícita do
    dono. O `active: true` no JSON é registro do estado exportado, não instrução.
 
 Dois nós do OBS Atendimento estão **desativados de propósito** desde 20/08/2026 e devem
@@ -79,7 +90,7 @@ continuar assim ao restaurar: `Pausa IA (handoff)` e `Pausa IA (agendado)` (moti
 
 Só leitura, pela API REST do n8n (`GET /api/v1/workflows/{id}` com o header `X-N8N-API-KEY`),
 mantendo só as chaves listadas acima e trocando o segredo pelo marcador. Antes de commitar,
-`git grep` do valor real de `N8N_LOOKUP_SECRET` e de `EVOLUTION_API_KEY` tem que devolver zero.
+o valor real de `N8N_LOOKUP_SECRET`, `EVOLUTION_API_KEY`, `N8N_WEBHOOK_SECRET` e os UUIDs dos três webhooks tem que dar zero fora dos `.env` (detalhe na skill `exportar-n8n`).
 
 ⚠️ A nota `Sticky README` dentro do workflow está **desatualizada** (fala em número fixo no nó
 `Rotas` e em "v2"). É comentário do n8n, exportado como está; o que vale é o `CLAUDE.md`.
