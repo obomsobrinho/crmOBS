@@ -313,7 +313,12 @@ export function resumoDeValor(input: ValorInput): ValorResumo {
     string,
     { humano: boolean; primeiraUser: number | null; primeiraBot: number | null }
   >();
-  const picos = new Map<string, number>();
+  // Contagem por (dia da semana, hora) e o instante da mensagem mais recente da
+  // célula. O instante é o DESEMPATE do pico, explícito e independente da ordem
+  // das linhas (02/10/2026): em produção as linhas chegavam da mais nova para a
+  // mais velha, então no empate vencia a célula com a mensagem mais recente, e é
+  // isso que `painel_series` (ultima_em_ms) e lib/painel-agregado.ts reproduzem.
+  const picos = new Map<string, { n: number; ult: number }>();
 
   for (const m of input.msgs) {
     // Linha do histórico importado não entra em NADA: é o que a empresa fazia
@@ -348,7 +353,11 @@ export function resumoDeValor(input: ValorInput): ValorResumo {
       // Pico é sobre DEMANDA (mensagem que chega), não sobre resposta: ele
       // mostra quando o cliente procura a empresa.
       const chave = `${p.diaSemana}:${p.hora}`;
-      picos.set(chave, (picos.get(chave) ?? 0) + 1);
+      const atual = picos.get(chave);
+      picos.set(chave, {
+        n: (atual?.n ?? 0) + 1,
+        ult: Math.max(atual?.ult ?? -Infinity, t),
+      });
     }
 
     // Fora do horário e fim de semana contam a linha em que a IA RESPONDEU.
@@ -376,10 +385,12 @@ export function resumoDeValor(input: ValorInput): ValorResumo {
   }
 
   let pico: PicoValor | null = null;
-  for (const [chave, n] of picos) {
-    if (!pico || n > pico.mensagens) {
+  let picoUlt = -Infinity;
+  for (const [chave, { n, ult }] of picos) {
+    if (!pico || n > pico.mensagens || (n === pico.mensagens && ult > picoUlt)) {
       const [d, h] = chave.split(":").map(Number);
       pico = { diaSemana: d, hora: h, mensagens: n };
+      picoUlt = ult;
     }
   }
 

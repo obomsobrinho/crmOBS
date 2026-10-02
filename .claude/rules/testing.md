@@ -23,3 +23,4 @@ paths:
 - Offline repo checks (`scripts/checagens.mjs`, `npm run checar`) run inside `sem-login` through `e2e/checagens.design.spec.ts`; see `engineering.md` (Machine checks).
 - Known intermittents that pass alone: `pipeline.serial` (create/archive stage) and tests hitting Supabase Auth under load (password recovery).
 - Declared holes (reason inside each spec): blocked account to `/assinatura`, advanced mode to `/agente`, activation over a real connection (`e2e/montagem.auth.spec.ts`). No coverage: manual send, team invite, knowledge upload.  (why: docs/adr/2026-09-17-atendente-project-asserts-absence-of-power.md)
+- Never run the login suites (`logado`, `atendente`, `logado-serial`) from two places at once: they share the test tenant, and a parallel run (another agent, a worktree) made the pipeline search, the login setup and "recuperar senha" fail on 01/10/2026 with no code defect. Subagents never run login suites; the orchestrator runs them after merging.
