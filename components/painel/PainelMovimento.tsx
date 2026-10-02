@@ -263,22 +263,36 @@ export default function PainelMovimento({
             posição é POR DIA, sem tween, então não existe arrasto atrás do
             mouse. Ficam por cima do SVG, que é `aria-hidden`. */}
         <div className="absolute inset-0 flex">
-          {pontos.map((p) => {
+          {pontos.map((p, i) => {
             const t = total(p.barra);
             const inexistente = !existe(p.barra);
+            // ⚠️ ONDE O PONTO CAI DENTRO DA FAIXA (02/10/2026). A faixa de hover
+            // tem largura 1/n, mas a linha liga os pontos de BORDA A BORDA (o
+            // primeiro dia em x=0, o último em x=W). No meio da faixa, a bolinha
+            // ficava fora da linha. Esta é a posição do ponto x = i/(n-1)
+            // medida dentro da faixa i, em porcentagem da faixa.
+            const n = pontos.length;
+            const ancora = n > 1 ? (i / (n - 1) - i / n) * n * 100 : 50;
             return (
               <div
                 key={p.barra.chave}
                 className="painel-dia relative min-w-0 flex-1"
               >
-                <div className="painel-guia absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-line-strong" />
+                <div
+                  className="painel-guia absolute inset-y-0 w-px -translate-x-1/2 bg-line-strong"
+                  style={{ left: `${ancora}%` }}
+                />
                 {!inexistente && (
                   <div
-                    className="painel-guia absolute left-1/2 h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-[3px] ring-[var(--raised)]"
-                    style={{ top: `${(p.y / H) * 100}%` }}
+                    className="painel-guia absolute h-[9px] w-[9px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-[3px] ring-[var(--raised)]"
+                    style={{ left: `${ancora}%`, top: `${(p.y / H) * 100}%` }}
                   />
                 )}
-                <div className="painel-balao absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 whitespace-nowrap rounded-lg border border-line-strong bg-raised px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
+                {/* O balão acompanha o ponto e desliza para dentro nas pontas, para o
+                    overflow do cartão não cortar o primeiro e o último dia. */}
+                <div
+                  style={{ left: `${ancora}%`, translate: `-${ancora}% 0` }}
+                  className="painel-balao absolute bottom-full z-10 mb-1 whitespace-nowrap rounded-lg border border-line-strong bg-raised px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
                   {inexistente ? (
                     <span className="text-ink-3">
                       {legivel(p.barra.chave)} · antes desta conta
