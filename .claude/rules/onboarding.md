@@ -14,6 +14,7 @@ paths:
   - "components/Montagem*.tsx"
   - "components/AvisoMontagem.tsx"
   - "components/ConnectWhatsApp.tsx"
+  - "components/AcoesConexao.tsx"
   - "components/ConnectionRiskNotice.tsx"
   - "lib/onboarding.ts"
   - "lib/evolution.ts"
@@ -44,7 +45,8 @@ paths:
 
 ## Connect
 - `ConnectWhatsApp` is ONE component with two frames (`enquadramento` `pagina`/`passo`, `onConectado`); never duplicate QR, pairing code or polling.  (why: docs/adr/2026-09-24-connect-by-pairing-code-and-risk-notice.md)
-- `POST connect-whatsapp` with `{ number }` returns `pairingCode` (default on mobile). An `open` instance is NEVER dropped (route returns `connected`); an instance stuck in `connecting` gets `logout` first.  (why: docs/adr/2026-09-24-connect-by-pairing-code-and-risk-notice.md)
+- `POST connect-whatsapp` with `{ number }` returns `pairingCode` (default on mobile). An `open` instance is dropped ONLY by the explicit owner action (`POST disconnect-whatsapp`, below); `connect-whatsapp` itself returns `connected` for it. An instance stuck in `connecting` gets `logout` first.  (why: docs/adr/2026-09-24-connect-by-pairing-code-and-risk-notice.md)
+- Disconnect and switch number: `POST /api/clients/[id]/disconnect-whatsapp` (`sessaoDaRota`, owner only, blocked 402) does `logout` on the SAME instance and sets `agent_enabled = false` (`agent_published_at` stays). Never delete the instance (`evolution_instance` is how n8n finds the tenant); history stays. UI is `AcoesConexao` behind `ConfirmModal`, in `/connect` and `ConexaoCampo` on `/agente`; the QR flow stays only in `ConnectWhatsApp`. After a switch the screen reminds to check `notify_group_jid`. Tests mock nothing and never touch Evolution: `estadoForcado`/`preview` in `/design`.  (why: docs/adr/2026-10-03-disconnect-and-switch-whatsapp-number.md)
 - Risk notice (`components/ConnectionRiskNotice.tsx`): never promise protection against blocking, never "não pague a API da Meta" (an e2e enforces it). Keep it short: dedicated number and block risk, the rest behind "Saiba mais".  (why: docs/adr/2026-09-24-connect-by-pairing-code-and-risk-notice.md)
 - `/connect` never imports history; new instances are created with `syncFullHistory: false` (`lib/evolution.ts`). Do not recreate an import route.  (why: docs/adr/2026-09-23-connect-does-not-import-history.md)
 

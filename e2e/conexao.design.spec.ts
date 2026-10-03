@@ -49,3 +49,74 @@ test.describe("Aviso de WhatsApp caído (/design/conexao)", () => {
     expect(junto).not.toMatch(/consulta|paciente|agendamento/i);
   });
 });
+
+// Desconectar e trocar de número (03/10/2026), com `estadoForcado` e `preview`:
+// sem login e SEM Evolution. O que se prova é o diálogo (que diz a consequência),
+// a confirmação e o que a tela faz depois. A rota em si nunca é chamada aqui.
+test.describe("Desconectar e trocar número (/design/conexao)", () => {
+  test("aberto mostra as duas ações; caído só o caminho de volta", async ({ page }) => {
+    await page.goto("/design/conexao");
+    const aberto = page.locator('[data-preview-conexao="open"] [data-slot="conexao-agente"]');
+    await expect(aberto).toContainText("Conectado");
+    await expect(aberto.getByRole("button", { name: "Trocar número" })).toBeVisible();
+    await expect(aberto.getByRole("button", { name: "Desconectar" })).toBeVisible();
+
+    const caido = page.locator('[data-preview-conexao="close"] [data-slot="conexao-agente"]');
+    await expect(caido).toContainText("Desconectado");
+    await expect(caido.getByRole("link", { name: "Conectar" })).toHaveAttribute(
+      "href",
+      "/connect"
+    );
+    await expect(caido.getByRole("button")).toHaveCount(0);
+  });
+
+  test("o diálogo diz a consequência, cancelar não muda nada", async ({ page }) => {
+    await page.goto("/design/conexao");
+    const aberto = page.locator('[data-preview-conexao="open"] [data-slot="conexao-agente"]');
+    await aberto.getByRole("button", { name: "Trocar número" }).click();
+    const dialogo = page.getByRole("dialog");
+    await expect(dialogo).toContainText("Trocar o número do WhatsApp?");
+    await expect(dialogo).toContainText("o agente fica Desativado");
+    await expect(dialogo).toContainText("continuam aqui, como histórico");
+    await expect(dialogo).toContainText("destino dos avisos");
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await expect(dialogo).toHaveCount(0);
+    await expect(aberto).toContainText("Conectado");
+  });
+
+  test("desconectar confirma e o bloco passa a mostrar o caminho de volta", async ({ page }) => {
+    await page.goto("/design/conexao");
+    const aberto = page.locator('[data-preview-conexao="open"] [data-slot="conexao-agente"]');
+    await aberto.getByRole("button", { name: "Desconectar" }).click();
+    const dialogo = page.getByRole("dialog");
+    await expect(dialogo).toContainText("Desconectar o WhatsApp?");
+    await dialogo.getByRole("button", { name: "Desconectar" }).click();
+    await expect(aberto).toContainText("Desconectado");
+    await expect(aberto.getByRole("link", { name: "Conectar" })).toBeVisible();
+  });
+
+  test("textos sem travessão", async ({ page }) => {
+    await page.goto("/design/conexao");
+    await page
+      .locator('[data-preview-conexao="open"]')
+      .getByRole("button", { name: "Trocar número" })
+      .click();
+    const junto = (await page.locator("body").innerText()) + (await page.getByRole("dialog").innerText());
+    expect(junto).not.toMatch(/[—–]/);
+  });
+
+  test("a tela do Agente mostra a conexão", async ({ page }) => {
+    await page.goto("/design/agente");
+    const bloco = page.locator('[data-slot="conexao-agente"]');
+    await expect(bloco).toContainText("Conectado");
+    await expect(bloco.getByRole("button", { name: "Desconectar" })).toBeVisible();
+  });
+
+  // A rota é só do dono e exige sessão: sem login nunca chega na Evolution.
+  test("a rota de desconectar recusa quem não tem sessão", async ({ request }) => {
+    const res = await request.post(
+      "/api/clients/00000000-0000-0000-0000-000000000000/disconnect-whatsapp"
+    );
+    expect(res.status()).toBe(401);
+  });
+});

@@ -81,10 +81,12 @@ export async function connectInstance(instanceName: string, number?: string) {
 }
 
 /**
- * Derruba a sessão da instância. ⚠️ Só para instância que NÃO está conectada:
- * a Evolution só gera código de pareamento a partir do estado fechado, e uma
- * instância parada em "connecting" (QR pedido e não lido) precisa voltar a
- * fechado antes. Chamar isto numa instância aberta desconectaria o WhatsApp.
+ * Derruba a sessão da instância (a instância e o webhook continuam existindo,
+ * só o aparelho sai). A Evolution só gera código de pareamento a partir do
+ * estado fechado, e uma instância parada em "connecting" (QR pedido e não lido)
+ * precisa voltar a fechado antes.
+ * ⚠️ Numa instância ABERTA isto desconecta o WhatsApp de quem atende: só a rota
+ * `disconnect-whatsapp` (ação explícita do dono) faz isso de propósito.
  */
 export async function logoutInstance(instanceName: string) {
   ensureEnv();
@@ -92,6 +94,43 @@ export async function logoutInstance(instanceName: string) {
     method: "DELETE",
     headers: headers(),
   });
+}
+
+/**
+ * Reaponta o webhook da instância para o n8n (`POST /webhook/set/{instance}`,
+ * Evolution v2, corpo `{ webhook: {...} }`). Usado ao RECONECTAR uma instância
+ * que já existia (troca de número): o `createInstance` só grava o webhook na
+ * criação, e uma instância antiga pode ter ficado com a URL de outra época.
+ * Devolve `true` só com 2xx; quem chama trata `false` como "segue" (o webhook
+ * da instância continua o que era).
+ */
+export async function setWebhook(
+  instanceName: string,
+  webhookUrl: string
+): Promise<boolean> {
+  try {
+    ensureEnv();
+    const res = await fetch(
+      `${BASE}/webhook/set/${encodeURIComponent(instanceName)}`,
+      {
+        method: "POST",
+        headers: headers(),
+        body: JSON.stringify({
+          webhook: {
+            enabled: true,
+            url: webhookUrl,
+            byEvents: false,
+            base64: false,
+            events: EVENTS,
+          },
+        }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function connectionState(instanceName: string) {

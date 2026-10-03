@@ -104,6 +104,7 @@ export default async function AgentePage() {
         // avançado antes da primeira ativação. Quem cai aqui nesse estado veio de
         // link direto, porque `/` e o aviso mandam para `/montagem`.
         jaPublicou={!!client!.agentPublishedAt}
+        temInstancia={!!client!.evolution_instance}
         blockers={publishBlockers({
           hasInstance: !!client!.evolution_instance,
           agentConfigured: client!.montagem.feito.configurar,

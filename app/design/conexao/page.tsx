@@ -1,4 +1,5 @@
 import WhatsAppBanner, { type EstadoWhatsApp } from "@/components/WhatsAppBanner";
+import ConexaoCampo from "@/components/agente/ConexaoCampo";
 
 // Preview do aviso de WhatsApp caído (dev-only, liberado pelo proxy). Os quatro
 // estados com `estadoForcado`, sem Evolution no meio: queda real não dá para
@@ -31,6 +32,26 @@ export default function DesignConexaoPage() {
             <h2 className="text-rotulo uppercase text-ink-3">{legenda}</h2>
             <WhatsAppBanner
               clientId="00000000-0000-0000-0000-000000000000"
+              estadoForcado={estado}
+            />
+          </section>
+        ))}
+      </div>
+
+      {/* Desconectar e trocar de número (03/10/2026): o bloco que mora na tela
+          do Agente, com o WhatsApp aberto (ações) e caído (só o caminho de volta). */}
+      <h2 className="mb-1 mt-10 text-titulo">Conexão na tela do Agente</h2>
+      <div className="flex max-w-xl flex-col gap-6">
+        {(["open", "close"] as const).map((estado) => (
+          <section
+            key={estado}
+            data-preview-conexao={estado}
+            className="flex flex-col gap-2"
+          >
+            <h3 className="text-rotulo uppercase text-ink-3">{estado}</h3>
+            <ConexaoCampo
+              clientId="00000000-0000-0000-0000-000000000000"
+              temInstancia
               estadoForcado={estado}
             />
           </section>

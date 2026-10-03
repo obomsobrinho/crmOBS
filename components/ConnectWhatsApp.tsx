@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import LogoutButton from "./LogoutButton";
 import ConnectionRiskNotice from "./ConnectionRiskNotice";
+import AcoesConexao, { type AcaoConexao } from "./AcoesConexao";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { cardVariants } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,7 +15,10 @@ import { cn } from "@/lib/utils";
 import { useCelular } from "@/lib/useCelular";
 import { ChevronRight, CircleCheck } from "lucide-react";
 
-type Phase = "idle" | "loading" | "waiting" | "connected" | "error";
+// `conectado` = a tela abriu com o WhatsApp JÁ ligado (nada foi pedido aqui):
+// mostra as ações de desconectar e trocar de número. `connected` = acabou de
+// conectar agora.
+type Phase = "idle" | "loading" | "waiting" | "connected" | "conectado" | "error";
 
 /**
  * Máscara de celular brasileiro, "(31) 99999-8888", aplicada enquanto digita.
@@ -70,6 +76,13 @@ export default function ConnectWhatsApp({
   const [codigo, setCodigo] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef = useRef(false);
+  // Só vira true quando a PESSOA pediu QR ou código nesta tela. Abrir /connect com
+  // o WhatsApp já aberto não é conexão nova: não redireciona, oferece trocar.
+  const pediuRef = useRef(false);
+  // Depois de desconectar ou trocar aqui: guia o fim do fluxo (destino dos avisos).
+  // O ref espelha o estado para o `onConnected` (que não pode depender dele).
+  const [aposAcao, setAposAcao] = useState<AcaoConexao | null>(null);
+  const aposAcaoRef = useRef<AcaoConexao | null>(null);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -89,6 +102,9 @@ export default function ConnectWhatsApp({
     // que chega dali em diante, que é o que a API Oficial também faz. A rota
     // de importação foi APAGADA junto, para não existir caminho de volta.
     setPhase("connected");
+    // Depois de trocar de número a pessoa precisa LER o lembrete do destino dos
+    // avisos: sem redirecionar.
+    if (aposAcaoRef.current && !onConectado) return;
     setTimeout(() => {
       // Dentro do assistente quem decide o que vem depois é o assistente: ele
       // mostra a ativação sem trocar de rota, senão o rascunho da montagem e o
@@ -98,6 +114,7 @@ export default function ConnectWhatsApp({
         return;
       }
       router.replace("/inbox");
+      // eslint-disable-next-line no-restricted-syntax -- conectar muda o estado do tenant (instância) lido nos Server Components do app
       router.refresh();
       // 2,5s e não 1s: a tela agora tem uma frase para ler (o histórico não
       // vem), e em 1s ela sumia antes de alguém terminar a primeira linha.
@@ -110,16 +127,24 @@ export default function ConnectWhatsApp({
       try {
         const res = await fetch(`/api/clients/${clientId}/whatsapp-status`);
         const data = (await res.json()) as { state?: string };
-        if (data.state === "open") onConnected();
+        if (data.state !== "open") return;
+        // No assistente (`passo`) já aberto segue como sempre. Na tela própria,
+        // já aberto sem ninguém ter pedido nada é só o estado atual.
+        if (pediuRef.current || enquadramento === "passo") onConnected();
+        else {
+          stopPolling();
+          setPhase("conectado");
+        }
       } catch {
         // silencioso; próxima tentativa segue
       }
     }, 3000);
-  }, [clientId, onConnected, stopPolling]);
+  }, [clientId, onConnected, stopPolling, enquadramento]);
 
   const connect = useCallback(
     async (numero?: string) => {
       setError(null);
+      pediuRef.current = true;
       setPhase("loading");
       setQr(null);
       setCodigo(null);
@@ -154,6 +179,25 @@ export default function ConnectWhatsApp({
       }
     },
     [clientId, startPolling, onConnected]
+  );
+
+  // Depois de derrubar o número aqui (desconectar ou trocar): volta ao começo do
+  // fluxo, que é o MESMO de uma primeira conexão (QR ou código). O polling só
+  // volta quando a pessoa pedir a conexão, para um estado `open` que ainda não
+  // caiu na Evolution não puxar a tela de volta para "conectado".
+  const aoDesconectar = useCallback(
+    (acao: AcaoConexao) => {
+      stopPolling();
+      doneRef.current = false;
+      pediuRef.current = false;
+      aposAcaoRef.current = acao;
+      setAposAcao(acao);
+      setQr(null);
+      setCodigo(null);
+      setError(null);
+      setPhase("idle");
+    },
+    [stopPolling]
   );
 
   // Se já existe instância, começa checando se ela já está conectada.
@@ -194,7 +238,24 @@ export default function ConnectWhatsApp({
           </div>
         )}
 
-        {phase === "connected" ? (
+        {phase === "conectado" ? (
+          <div data-slot="whatsapp-conectado" className="space-y-4 py-4 text-left">
+            <div className="flex items-start gap-3">
+              <CircleCheck size={22} className="mt-0.5 shrink-0 text-human-ink" aria-hidden />
+              <div className="min-w-0">
+                <p className="font-medium text-human-ink">WhatsApp conectado</p>
+                <p className="text-apoio text-ink-2">
+                  Para usar outro número ou parar de receber mensagens aqui,
+                  desconecte este. As conversas e os contatos ficam no CRM.
+                </p>
+              </div>
+            </div>
+            <AcoesConexao clientId={clientId} onFeito={aoDesconectar} />
+            <Button asChild variant="link" size="link">
+              <Link href="/">Voltar ao CRM</Link>
+            </Button>
+          </div>
+        ) : phase === "connected" ? (
           <div className="space-y-2 py-8 text-center">
             <CircleCheck size={32} className="mx-auto text-human-ink" aria-hidden />
             <p className="font-medium text-human-ink">Tudo pronto!</p>
@@ -206,8 +267,29 @@ export default function ConnectWhatsApp({
             <p className="text-apoio text-ink-2">
               {passo
                 ? "Número conectado. O agente continua desligado até você ativar."
-                : "As conversas aparecem aqui a partir de agora. O histórico continua no seu celular."}
+                : aposAcao
+                  ? "Número conectado. As conversas antigas continuam aqui e o agente segue Desativado até você ligar."
+                  : "As conversas aparecem aqui a partir de agora. O histórico continua no seu celular."}
             </p>
+            {/* Trocar de número deixa o destino dos avisos para trás: um grupo do
+                número antigo pode não existir no novo, e o destino nunca pode ser
+                o número do próprio agente. */}
+            {aposAcao && !passo && (
+              <div data-slot="conferir-avisos" className="space-y-3 pt-2 text-left">
+                <Aviso>
+                  Confira o destino dos avisos: ele não pode ser o número do
+                  agente, e um grupo do número anterior pode não existir neste.
+                </Aviso>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild size="field">
+                    <Link href="/agente">Conferir destino dos avisos</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="field">
+                    <Link href="/inbox">Ir para as conversas</Link>
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           // ⚠️ REFEITO EM 26/09/2026 NO MOLDE DO WHATSAPP WEB (pedido do dono,
@@ -220,6 +302,13 @@ export default function ConnectWhatsApp({
           // passos em cima e, encostados embaixo, o aviso do número dedicado e a
           // troca de modo, onde o WhatsApp Web põe "Precisa de ajuda?".
           <>
+            {aposAcao && (
+              <Aviso data-slot="whatsapp-desconectado">
+                {aposAcao === "trocar"
+                  ? "Número anterior desconectado. Conecte o novo abaixo."
+                  : "WhatsApp desconectado. O agente está Desativado até você conectar um número."}
+              </Aviso>
+            )}
             <div
               className={cn(
                 "flex flex-col gap-6 text-left",

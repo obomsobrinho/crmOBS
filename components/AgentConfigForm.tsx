@@ -19,6 +19,9 @@ import type { KnowledgeDoc } from "@/lib/crm";
 import AgentPromptDrawer from "./AgentPromptDrawer";
 import AgentPowerToggle from "./AgentPowerToggle";
 import AgentTestDrawer from "./AgentTestDrawer";
+import ConexaoCampo from "./agente/ConexaoCampo";
+import type { EstadoWhatsApp } from "./WhatsAppBanner";
+import { numeroBR } from "@/lib/format";
 import {
   CamposOQuePodeFazer,
   CamposOQueSabe,
@@ -103,6 +106,8 @@ export default function AgentConfigForm({
   agentEnabled,
   jaPublicou,
   blockers,
+  temInstancia = false,
+  estadoWhatsAppForcado,
   preview = false,
 }: {
   clientId: string;
@@ -129,6 +134,10 @@ export default function AgentConfigForm({
   jaPublicou: boolean;
   /** O que falta para a primeira ativação (lib/onboarding.publishBlockers). */
   blockers: string[];
+  /** Já existe instância na Evolution (`evolution_instance`): mostra a conexão. */
+  temInstancia?: boolean;
+  /** /design: estado do WhatsApp sem consultar nada. */
+  estadoWhatsAppForcado?: EstadoWhatsApp;
   /** /design: desativa o fetch de salvar. */
   preview?: boolean;
 }) {
@@ -291,6 +300,12 @@ export default function AgentConfigForm({
         </Aviso>
       )}
 
+      <ConexaoCampo
+        clientId={clientId}
+        temInstancia={temInstancia}
+        estadoForcado={estadoWhatsAppForcado}
+      />
+
       {form.error && (
         <Aviso tom="danger" data-slot="erro-agente" role="alert">
           {form.error}
@@ -448,7 +463,7 @@ export default function AgentConfigForm({
             className="resize-none font-mono text-legenda leading-[19px]"
           />
           <div className="-mt-4 text-right text-legenda tabular-nums text-ink-3">
-            {form.rawPersona.length.toLocaleString("pt-BR")} caracteres
+            {numeroBR(form.rawPersona.length)} caracteres
           </div>
 
           {/* O aviso de cache vive junto do campo que o resolve, e no avançado

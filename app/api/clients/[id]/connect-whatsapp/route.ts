@@ -10,6 +10,7 @@ import {
   extractPairingCode,
   extractQrBase64,
   logoutInstance,
+  setWebhook,
 } from "@/lib/evolution";
 
 /**
@@ -90,6 +91,10 @@ export async function POST(
         }
         if (estado === "connecting") await logoutInstance(instanceName);
       }
+      // Instância que já existia (reconexão ou troca de número): reaponta o
+      // webhook para o n8n, sem depender do que ficou gravado na criação. Falhar
+      // aqui não impede a conexão.
+      await setWebhook(instanceName, webhookUrl);
       const connectRes = await connectInstance(instanceName, number ?? undefined);
       if (!connectRes.ok) {
         const detail = await connectRes.text();

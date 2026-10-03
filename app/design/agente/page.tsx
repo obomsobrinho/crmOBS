@@ -110,6 +110,8 @@ export default async function DesignAgentePage({
           // /design/montagem, porque virou outra ROTA do produto.
           jaPublicou={jaPublicou}
           blockers={jaPublicou ? [] : ["configurar o agente"]}
+          temInstancia
+          estadoWhatsAppForcado="open"
           preview
         />
       </Card>
