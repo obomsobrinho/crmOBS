@@ -4,6 +4,7 @@ import { headersN8n } from "@/lib/n8n";
 import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
+import { telefoneImpossivel } from "@/lib/avisos";
 
 // ORIENTAR UM PEDIDO DE AJUDA É RESOLVÊ-LO, E A IA RESPONDE NA HORA
 // (27/09/2026, pedido do dono testando com o chip: "se eu já orientei, esse
@@ -123,6 +124,8 @@ async function responderAgora(
   if (!webhookUrl) return { ok: false, motivo: "envio_nao_configurado" };
   if (!apiKey) return { ok: false, motivo: "modelo_nao_configurado" };
   if (!instance) return { ok: false, motivo: "sem_whatsapp" };
+  // Telefone de teste nunca vai à Evolution (03/10/2026, `telefoneImpossivel`).
+  if (telefoneImpossivel(phone)) return { ok: false, motivo: "telefone_de_teste" };
 
   let messages: string[];
   try {

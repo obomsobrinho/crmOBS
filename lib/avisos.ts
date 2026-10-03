@@ -136,6 +136,13 @@ export const TEXTO_TESTE_AVISO =
  * pedido de ajuda de verdade no cérebro. ⚠️ Sem esta trava a suíte mandaria
  * WhatsApp REAL ao destino de avisos do tenant de teste a cada rodada. Nenhum
  * cliente de verdade tem esse número, então não há aviso real perdido.
+ *
+ * ⚠️ É TAMBÉM a regra única de "telefone de teste nunca vai à Evolution"
+ * (03/10/2026): o número da OBM foi restringido pelo WhatsApp (403) depois de
+ * rodadas da bateria n8n mandando resposta real a este número. Todo ponto do
+ * app que chama a Evolution para um contato pula quando isto é `true`; o n8n
+ * repete a mesma regra nos nós `Telefone real?`
+ * (docs/adr/2026-10-03-test-phone-never-reaches-evolution.md).
  */
 export function telefoneImpossivel(phone: string): boolean {
   return /^5500/.test(phone.replace(/\D/g, ""));

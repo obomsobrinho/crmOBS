@@ -8,8 +8,10 @@ import { FONE_TESTE, NOME_TESTE, servico, tenantDeTeste } from "./semente";
 // Cada cenário manda à MÃO o que a Evolution mandaria (o webhook de verdade do
 // n8n de produção), com o telefone impossível (DDD 00), e confere o resultado no
 // banco e na tela de Conversas: n8n -> cérebro real -> Supabase -> CRM. A
-// resposta da IA tenta sair pelo WhatsApp e a Evolution recusa (o número não
-// existe), então NINGUÉM recebe nada.
+// resposta da IA NÃO sai pelo WhatsApp: os nós `Telefone real?` do n8n pulam
+// toda chamada da Evolution para 5500... (03/10/2026, o número de teste foi
+// restringido pelo WhatsApp com 403 depois de rodadas mandando de verdade;
+// docs/adr/2026-10-03-test-phone-never-reaches-evolution.md).
 //
 // ⚠️ O cenário de agendamento troca o destino de avisos do tenant de teste por
 // um número impossível enquanto roda, e devolve o original no fim (senão o aviso

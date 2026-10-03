@@ -2124,6 +2124,108 @@
         }
       },
       "onError": "continueRegularOutput"
+    },
+    {
+      "id": "87d6b1df-2504-48b6-9eff-8a3754d4ff3e",
+      "name": "Telefone real? (envio)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7600,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Dados').item.json.Telefone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "e9d13258-df37-4859-ae91-ad41073612b8",
+      "name": "Telefone real? (agendado)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7840,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Dados').item.json.Telefone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "7b89c832-d5c6-4066-a4f9-a1469e5c4ce7",
+      "name": "Telefone real? (falha)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        6900,
+        560
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Dados').item.json.Telefone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -2526,7 +2628,7 @@
         ],
         [
           {
-            "node": "Evolution send",
+            "node": "Telefone real? (envio)",
             "type": "main",
             "index": 0
           }
@@ -2559,7 +2661,7 @@
       "main": [
         [
           {
-            "node": "Notifica grupo",
+            "node": "Telefone real? (agendado)",
             "type": "main",
             "index": 0
           }
@@ -2705,7 +2807,7 @@
       "main": [
         [
           {
-            "node": "Fallback ao cliente",
+            "node": "Telefone real? (falha)",
             "type": "main",
             "index": 0
           }
@@ -2878,6 +2980,46 @@
         [
           {
             "node": "Pronto sem turno",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (envio)": {
+      "main": [
+        [
+          {
+            "node": "Evolution send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "1s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (agendado)": {
+      "main": [
+        [
+          {
+            "node": "Notifica grupo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (falha)": {
+      "main": [
+        [
+          {
+            "node": "Fallback ao cliente",
             "type": "main",
             "index": 0
           }

@@ -3,6 +3,7 @@ import { sessaoDaRota } from "@/lib/rota";
 import { headersN8n } from "@/lib/n8n";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
+import { telefoneImpossivel } from "@/lib/avisos";
 
 // Único bucket de que esta rota assina arquivo (o privado de mídia do WhatsApp).
 const BUCKET_MIDIA = "whatsapp-media";
@@ -100,6 +101,16 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "phone e (text ou media) são obrigatórios" },
       { status: 400 }
+    );
+  }
+
+  // TELEFONE DE TESTE NUNCA VAI À EVOLUTION (03/10/2026): o número de teste
+  // da OBM foi restringido (403) depois de rodadas mandando WhatsApp real ao
+  // telefone impossível da suíte. O n8n tem a mesma trava; esta é a do app.
+  if (telefoneImpossivel(phone)) {
+    return NextResponse.json(
+      { error: "Número de teste não recebe WhatsApp." },
+      { status: 422 }
     );
   }
 

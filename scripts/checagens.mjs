@@ -11,6 +11,9 @@
 //     has a `{{N8N_WEBHOOK_PATH_*}}` placeholder path (a real path is a secret) and
 //     a placeholder `webhookId`; the app-called ones (not `Webhook EVO`, which
 //     Evolution calls) have `authentication: headerAuth`.
+//  4. n8n Evolution sends (03/10/2026): every `n8n-nodes-evolution-api.evolutionApi`
+//     node is reached ONLY through the TRUE output of an IF named `Telefone real?...`
+//     whose condition drops phones starting with 5500 (DDD 00, the test phone).
 import fs from "node:fs";
 import path from "node:path";
 
@@ -69,6 +72,52 @@ for (const f of lista("n8n", ".json")) {
     if (!PATH_OK.test(String(n.parameters?.path ?? ""))) erros.push(`n8n/${f}: webhook "${n.name}" path must be a {{N8N_WEBHOOK_PATH_*}} placeholder`);
     if (n.webhookId !== undefined && !ID_OK.test(String(n.webhookId))) erros.push(`n8n/${f}: webhook "${n.name}" webhookId must be a {{N8N_WEBHOOK_ID_*}} placeholder`);
     if (!SEM_AUTH.has(n.name) && n.parameters?.authentication !== "headerAuth") erros.push(`n8n/${f}: webhook "${n.name}" must have authentication headerAuth`);
+  }
+}
+
+// 4. n8n Evolution sends behind the test-phone IF
+const EVOLUTION = "n8n-nodes-evolution-api.evolutionApi";
+for (const f of lista("n8n", ".json")) {
+  let json;
+  try {
+    json = JSON.parse(ler(`n8n/${f}`));
+  } catch {
+    continue;
+  }
+  const porNome = new Map((json.nodes ?? []).map((n) => [n.name, n]));
+  const entradas = new Map();
+  for (const [origem, saidas] of Object.entries(json.connections ?? {})) {
+    (saidas.main ?? []).forEach((alvos, saida) => {
+      for (const a of alvos ?? []) {
+        if (!entradas.has(a.node)) entradas.set(a.node, []);
+        entradas.get(a.node).push({ origem, saida });
+      }
+    });
+  }
+  const guarda = (nome) => {
+    const n = porNome.get(nome);
+    return (
+      n?.type === "n8n-nodes-base.if" &&
+      !n.disabled &&
+      nome.startsWith("Telefone real?") &&
+      JSON.stringify(n.parameters ?? {}).includes("startsWith('5500')")
+    );
+  };
+  // Upstream walk: a node is safe when every path into it, back to the trigger,
+  // crosses the TRUE output of a guard (a guard's FALSE output is never safe).
+  const seguro = (nome, vistos = new Set()) => {
+    if (vistos.has(nome)) return true;
+    vistos.add(nome);
+    const ent = entradas.get(nome) ?? [];
+    if (!ent.length) return false;
+    return ent.every(({ origem, saida }) => {
+      if (guarda(origem)) return saida === 0;
+      return seguro(origem, vistos);
+    });
+  };
+  for (const n of json.nodes ?? []) {
+    if (n.type !== EVOLUTION || n.disabled) continue;
+    if (!seguro(n.name)) erros.push(`n8n/${f}: Evolution node "${n.name}" must be reached only through the TRUE output of a "Telefone real?" IF (test phone never reaches Evolution)`);
   }
 }
 

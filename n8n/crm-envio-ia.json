@@ -112,6 +112,40 @@
           "name": "Supabase account"
         }
       }
+    },
+    {
+      "id": "e2060da0-6028-474b-9788-d03e0301622e",
+      "name": "Telefone real?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        330,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Webhook IA').first().json.body.phone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -130,7 +164,7 @@
       "main": [
         [
           {
-            "node": "Evolution send",
+            "node": "Telefone real?",
             "type": "main",
             "index": 0
           }
@@ -139,6 +173,24 @@
     },
     "Evolution send": {
       "main": [
+        [
+          {
+            "node": "Salva IA (chat_messages)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real?": {
+      "main": [
+        [
+          {
+            "node": "Evolution send",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Salva IA (chat_messages)",

@@ -455,6 +455,74 @@
           "name": "Evo Global"
         }
       }
+    },
+    {
+      "id": "86a3d05a-f565-4acf-b578-f596c9476af5",
+      "name": "Telefone real? (texto)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        200,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Webhook CRM').item.json.body.phone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "4d9c75e2-dbcd-495d-83a7-1ef82b84bac3",
+      "name": "Telefone real? (mídia)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        300,
+        -240
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real",
+              "leftValue": "={{ !String($('Webhook CRM').item.json.body.phone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -495,14 +563,14 @@
       "main": [
         [
           {
-            "node": "Tipo de mídia",
+            "node": "Telefone real? (mídia)",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Evolution send",
+            "node": "Telefone real? (texto)",
             "type": "main",
             "index": 0
           }
@@ -594,6 +662,42 @@
     },
     "Envia documento": {
       "main": [
+        [
+          {
+            "node": "Salva manual mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (texto)": {
+      "main": [
+        [
+          {
+            "node": "Evolution send",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Salva manual (chat_messages)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (mídia)": {
+      "main": [
+        [
+          {
+            "node": "Tipo de mídia",
+            "type": "main",
+            "index": 0
+          }
+        ],
         [
           {
             "node": "Salva manual mídia",
