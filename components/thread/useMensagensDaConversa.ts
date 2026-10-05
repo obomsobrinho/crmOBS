@@ -55,6 +55,8 @@ export function useMensagensDaConversa({
   // mensagem que a pessoa lia não sair do lugar.
   const restaurarRef = useRef<number | null>(null);
   const [pending, setPending] = useState<Pending[]>([]);
+  // A pessoa está segurando o polegar da barra de rolagem desta conversa.
+  const [arrastando, setArrastando] = useState(false);
 
   // Ressincroniza ao navegar entre conversas (o componente é reaproveitado).
   //
@@ -138,11 +140,39 @@ export function useMensagensDaConversa({
     }
   }, [rows, viewportRef]);
 
+  // ⚠️ SEGURAR O POLEGAR NÃO CARREGA NADA (05/10/2026, achado do dono: "clico e
+  // seguro a barrinha, ela fica parada enquanto o chat continua subindo"). O
+  // arraste do Radix converte a posição do mouse em `scrollTop` com o tamanho
+  // que ele mediu ANTES da página nova chegar; a conversa devolvia a mensagem à
+  // vista, o próximo movimento do mouse desfazia, o topo reaparecia e vinha outra
+  // página, em cadeia. Com o mouse parado no topo o polegar ficava quieto e o chat
+  // trocava de conteúdo sob ele. Enquanto o arraste dura o conteúdo não muda; ao
+  // soltar, se o topo está à vista, as anteriores vêm e a posição é mantida.
+  useEffect(() => {
+    const raiz = viewportRef.current?.closest('[data-slot="scroll-area"]');
+    if (!raiz) return;
+    const aoPressionar = (e: PointerEvent) => {
+      const alvo = e.target as Element | null;
+      if (alvo?.closest('[data-slot="scroll-area-scrollbar"]') && raiz.contains(alvo)) {
+        setArrastando(true);
+      }
+    };
+    const aoSoltar = () => setArrastando(false);
+    document.addEventListener("pointerdown", aoPressionar, true);
+    window.addEventListener("pointerup", aoSoltar, true);
+    window.addEventListener("pointercancel", aoSoltar, true);
+    return () => {
+      document.removeEventListener("pointerdown", aoPressionar, true);
+      window.removeEventListener("pointerup", aoSoltar, true);
+      window.removeEventListener("pointercancel", aoSoltar, true);
+    };
+  }, [viewportRef]);
+
   // O marcador do TOPO: quando aparece, vêm as anteriores.
   useEffect(() => {
     const alvo = topoRef.current;
     const raiz = viewportRef.current;
-    if (!alvo || !raiz || !temAntigas) return;
+    if (!alvo || !raiz || !temAntigas || arrastando) return;
     const obs = new IntersectionObserver(
       (es) => {
         if (es.some((e) => e.isIntersecting)) void carregarAntigas();
@@ -151,7 +181,7 @@ export function useMensagensDaConversa({
     );
     obs.observe(alvo);
     return () => obs.disconnect();
-  }, [temAntigas, carregarAntigas, rows.length, viewportRef]);
+  }, [temAntigas, carregarAntigas, rows.length, viewportRef, arrastando]);
 
   // Realtime: mudanças nesta conversa (canal próprio por telefone, filtrado no
   // servidor: é a tabela de maior volume). Reassinatura (o realtime caiu e

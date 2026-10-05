@@ -19,6 +19,7 @@ Base-layer reuse, `AreaRolavel`, `carregando`, tokens and no-dash are in `engine
 ## Scroll and surface
 - Every scrollable dissolves at its edges: `<AreaRolavel>` or the `fade` prop of `ScrollArea`; `useDissolverRolagem` only for other tags or `temMais`. Degrees: `DISSOLVER_PADRAO` 32, `DISSOLVER_LISTA` 72, `DISSOLVER_BALAO` 80. Exception: a scroll area with a `sticky` child gets no mask (`/agente`). `e2e/rolagem.design.spec.ts` fails on any unmasked scrollable.  (why: docs/design-system/fundamentos-superficie.md)
 - No scroll shadow. One signal per fact; the dissolution must be LARGER than the item it dissolves. `SetaMais` only where scrolling is the navigation (conversation, conversation list).  (why: docs/design-system/fundamentos-superficie.md)
+- A list that grows at the top (paginated conversation) never loads while the scrollbar thumb is held, and `ScrollArea` recomputes the thumb on content resize itself (Radix does it 10ms late and the thumb jumps). Test the thumb against `scrollTop` with `/design?mensagens=150` (`e2e/rolagem-barra.design.spec.ts`).  (why: docs/adr/2026-10-05-conversation-scrollbar-thumb-follows-content.md)
 - `.fundo-rede` (`components/FundoRede.tsx`) is the ONLY texture: behind the message area, dissolved on four edges, 960px column.  (why: docs/design-system/fundamentos-superficie.md)
 - Card surface is `bg-raised`; card padding 24px (`p-6`), exceptions: dashboard headline and a block inside a card (16px).  (why: docs/design-system/fundamentos-geometria.md)
 

@@ -42,6 +42,17 @@ const OPEN: ChatRow[] = [
   row({ id: 8, bot_message: "excelente, combinado!", message_type: "manual", created_at: T(17, 19) }),
 ];
 
+function mensagensLongas(n: number): ChatRow[] {
+  const base = new Date(2026, 6, 20, 8, 0).getTime();
+  return Array.from({ length: n }, (_, i) => {
+    const texto = `Mensagem de teste ${i + 1}. ${"Texto para dar altura ao balão. ".repeat(1 + ((i * 7) % 5))}`;
+    const created_at = new Date(base + i * 60_000).toISOString();
+    return i % 2 === 0
+      ? row({ id: 1000 + i, nomewpp: "Franck Antonny", user_message: texto, created_at })
+      : row({ id: 1000 + i, bot_message: texto, message_type: "text", created_at });
+  });
+}
+
 const ME = "00000000-0000-0000-0000-000000000001";
 const MEMBERS: Member[] = [
   { userId: ME, email: "ana@obm.com", role: "dono" },
@@ -98,14 +109,21 @@ const LIST: InboxItem[] = [
 export default async function DesignPreview({
   searchParams,
 }: {
-  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string }>;
+  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string; mensagens?: string }>;
 }) {
   // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
   // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
   // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
-  const { entendimento, lista, handoff } = await searchParams;
+  const { entendimento, lista, handoff, mensagens } = await searchParams;
+  // `?mensagens=N` (05/10/2026): conversa longa, para medir a rolagem (a barra
+  // da conversa saltava com a roda do mouse). Mensagens de tamanhos variados,
+  // minuto a minuto, antes das fixas.
+  const extras = Math.min(Math.max(Number(mensagens) || 0, 0), 500);
+  // Abre com as 30 mais recentes, como a rota real; as anteriores o teste serve
+  // pela rede (a pagina de /design nao tem banco).
+  const linhasConversa = extras ? [...mensagensLongas(extras).slice(-30), ...OPEN] : OPEN;
   // `?handoff=aberto|resolvido` (27/09/2026): a FILA de pedidos de ajuda. Aberto
   // são dois pedidos (a caixa de escrita em modo pedido, "1 de 2"); resolvido
   // são os dois fechados, como linhas de histórico na conversa.
@@ -207,7 +225,8 @@ export default async function DesignPreview({
               // lado, que já pintava este contato como "Você assumiu · IA
               // pausada" (ver `initialIa` acima).
               atendimentoIa="pause"
-              initialRows={OPEN}
+              initialRows={linhasConversa}
+              temAntigas={extras > 30}
               firstMessageAt={T(9, 0, 20)}
               messageCount={68}
               assignedUserId={ME}

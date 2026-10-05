@@ -91,6 +91,39 @@ function ScrollArea({
     [children]
   );
 
+  // ⚠️ O POLEGAR NÃO PODE SALTAR QUANDO O CONTEÚDO CRESCE (05/10/2026, achado do
+  // dono na conversa paginada: "girando a roda a barrinha fica saltando"). O
+  // Radix mede o tamanho do conteúdo num ResizeObserver com debounce de 10ms, mas
+  // reposiciona o polegar a cada evento de rolagem. Quando chega uma página de
+  // mensagens em cima e o `scrollTop` é corrigido, o evento chega ANTES da medida
+  // nova e o polegar é desenhado com a conta velha (medido: 321px onde o certo
+  // era 181) por alguns quadros. Aqui o polegar é recalculado no mesmo quadro em
+  // que o conteúdo muda, antes de pintar; o Radix alcança o mesmo valor depois.
+  const viewportEl = dissolver.ref;
+  React.useEffect(() => {
+    const vp = viewportEl.current;
+    const conteudo = vp?.firstElementChild;
+    if (!vp || !conteudo) return;
+    const sincronizar = () => {
+      const polegar = vp
+        .closest<HTMLElement>('[data-slot="scroll-area"]')
+        ?.querySelector<HTMLElement>('[data-slot="scroll-area-thumb"]');
+      const trilho = polegar?.parentElement;
+      if (!polegar || !trilho) return;
+      const rolavel = vp.scrollHeight - vp.clientHeight;
+      if (rolavel <= 0 || trilho.clientHeight <= 0) return;
+      // A mesma conta do Radix (`getThumbSize`, `getThumbOffsetFromScroll`): o
+      // polegar tem no mínimo 18px e anda em proporção ao `scrollTop`.
+      const tamanho = Math.max(trilho.clientHeight * (vp.clientHeight / vp.scrollHeight), 18);
+      const posicao = (vp.scrollTop / rolavel) * (trilho.clientHeight - tamanho);
+      trilho.style.setProperty("--radix-scroll-area-thumb-height", `${tamanho}px`);
+      polegar.style.transform = `translate3d(0, ${posicao}px, 0)`;
+    };
+    const observador = new ResizeObserver(sincronizar);
+    observador.observe(conteudo);
+    return () => observador.disconnect();
+  }, [viewportEl]);
+
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
