@@ -41,6 +41,13 @@ O número de teste (instância OBM) foi restringido pelo WhatsApp em 03/10 (Evol
 conseguiu recuperar. Banco de teste limpo em 05/10 (0 mensagens, 0 conversas, 0 contatos). A OBM
 ganhou horário comercial (seg a sex 8 às 18) no prompt avançado e em `agent_config.hours`.
 
+**RODADA em 05/10 (relatório: claude.ai/artifact/4rsVNF5yLaw7UjwhShBYYa).** 31 casos x 3, cérebro direto
+(`runAgent` + guardrail, sem servidor e sem WhatsApp). Contexto, momento, interpretação e fidelidade passaram;
+4 brechas de calendário (agenda sábado, "17h já passou" às 16h, "amanhã cedo" às 23h50, "de tarde" vira hoje).
+Culpa: modelo (gpt-5.5 acerta, prompt simplificado falha igual). Calendário dos próximos 8 dias calculado pelo
+código e injetado no turno resolve no mini (30/30). Pedido sem o cliente digitar NÃO reproduziu no cérebro.
+Aguardando decisões do dono (calendário no código, trava no agendar, feriados, modelo, suíte fixa).
+
 **Prioridade 1, decidida pelo dono: bateria de DIAGNÓSTICO do atendimento.** Objetivo: ter certeza
 de que o atendimento está correto e saber de quem é a culpa de cada brecha (modelo, prompt ou desenho
 do agente), com poucos casos e não com milhares de mensagens. Decisões já tomadas:
