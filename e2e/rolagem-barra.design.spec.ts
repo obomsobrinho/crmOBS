@@ -145,7 +145,7 @@ async function abrirPaginada(page: Page) {
     await route.fulfill({ json: linhas });
   });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await page.goto(`/design?mensagens=${TOTAL}`);
+  await page.goto(`/design?mensagens=${TOTAL}&paginada=1`);
   const vp = page.locator('main [data-slot="scroll-area-viewport"]').first();
   await expect
     .poll(() => vp.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight))

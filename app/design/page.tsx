@@ -109,21 +109,24 @@ const LIST: InboxItem[] = [
 export default async function DesignPreview({
   searchParams,
 }: {
-  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string; mensagens?: string }>;
+  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string; mensagens?: string; paginada?: string }>;
 }) {
   // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
   // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
   // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
-  const { entendimento, lista, handoff, mensagens } = await searchParams;
+  const { entendimento, lista, handoff, mensagens, paginada } = await searchParams;
   // `?mensagens=N` (05/10/2026): conversa longa, para medir a rolagem (a barra
   // da conversa saltava com a roda do mouse). Mensagens de tamanhos variados,
   // minuto a minuto, antes das fixas.
   const extras = Math.min(Math.max(Number(mensagens) || 0, 0), 500);
   // Abre com as 30 mais recentes, como a rota real; as anteriores o teste serve
   // pela rede (a pagina de /design nao tem banco).
-  const linhasConversa = extras ? [...mensagensLongas(extras).slice(-30), ...OPEN] : OPEN;
+  // Sem `?paginada=1` abre tudo de uma vez (nao ha banco para buscar as antigas).
+  const linhasConversa = extras
+    ? [...(paginada ? mensagensLongas(extras).slice(-30) : mensagensLongas(extras)), ...OPEN]
+    : OPEN;
   // `?handoff=aberto|resolvido` (27/09/2026): a FILA de pedidos de ajuda. Aberto
   // são dois pedidos (a caixa de escrita em modo pedido, "1 de 2"); resolvido
   // são os dois fechados, como linhas de histórico na conversa.
@@ -226,7 +229,7 @@ export default async function DesignPreview({
               // pausada" (ver `initialIa` acima).
               atendimentoIa="pause"
               initialRows={linhasConversa}
-              temAntigas={extras > 30}
+              temAntigas={!!paginada && extras > 30}
               firstMessageAt={T(9, 0, 20)}
               messageCount={68}
               assignedUserId={ME}
