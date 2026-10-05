@@ -33,7 +33,47 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### 01/10/2026, madrugada: FAZER PRIMEIRO NA PRÓXIMA SESSÃO
+### 05/10/2026: FAZER PRIMEIRO NA PRÓXIMA SESSÃO
+
+**Onde estamos.** Auditoria de 01 e 02/10 fechada e no ar (13 frentes; relatório visual em
+claude.ai/artifact/7bCGT53nePjp3vNofciazy). Regras novas em `.claude/rules/`, ADRs em `docs/adr/`.
+O número de teste (instância OBM) foi restringido pelo WhatsApp em 03/10 (Evolution 403) e o dono
+conseguiu recuperar. Banco de teste limpo em 05/10 (0 mensagens, 0 conversas, 0 contatos). A OBM
+ganhou horário comercial (seg a sex 8 às 18) no prompt avançado e em `agent_config.hours`.
+
+**Prioridade 1, decidida pelo dono: bateria de DIAGNÓSTICO do atendimento.** Objetivo: ter certeza
+de que o atendimento está correto e saber de quem é a culpa de cada brecha (modelo, prompt ou desenho
+do agente), com poucos casos e não com milhares de mensagens. Decisões já tomadas:
+- Cerca de 25 casos por dimensão (período e horário, contexto da conversa, momento da conversa,
+  interpretação do pedido, fidelidade à base), com relógio FIXO (`agoraTeste`) e histórico escrito à
+  mão; configuração FIXA no corpo (como as armadilhas), não o tenant real.
+- Brechas reais que viram os primeiros casos (relato do dono): "amanhã" dito às 21h virou pergunta
+  "seria hoje às 18h?"; handoff aberto sem o cliente digitar nada; confusão de horário em geral.
+- Assertivas por máquina (action, menciona ou não a data/hora certa, pergunta de esclarecimento) e um
+  modelo juiz só de apoio, nunca reprovando sozinho. Cada caso roda 3 vezes (erro intermitente é achado).
+- Três variações para o diagnóstico: A = prompt e modelo de hoje; B = mesmo prompt em outro modelo
+  (escolha do agente, olhando o que o mercado usa; justificar); C = mesmo modelo com prompt simplificado
+  (`personaOverride`). Falha nas 3 = desenho; só some em C = prompt; só some em B = modelo.
+  Começar só com A (cerca de 75 chamadas) e abrir B e C nos casos que falharem.
+- Relatório por caso (prompt montado, histórico, data injetada, resposta, veredito) no scratchpad.
+- ENTREGA FINAL: relatório em HTML (Artifact) fácil de ler, com brechas, decisões para o dono, e uma
+  reflexão honesta sobre a ARQUITETURA do agente (hoje: um turno de LLM com persona + histórico + RAG +
+  guardrail em TypeScript). Avaliar se faz sentido outro desenho: ferramentas/function calling, estado
+  explícito da conversa (o que já foi combinado: data, hora), roteador de intenção antes da resposta,
+  frameworks de agente (inclusive em Python), ou se o problema não pede isso.
+- ⚠️ Nada de teste que mande WhatsApp de verdade (ver abaixo).
+
+**Pendências com prompt pronto para outro agente (o dono roda):**
+1. **Teste nunca envia WhatsApp:** guarda no n8n e no app para pular toda chamada da Evolution quando o
+   telefone começa com 5500 (DDD 00), regra, ADR e checagem em `scripts/checagens.mjs`. Motivo provável
+   da restrição de 03/10: a bateria `test:e2e:n8n` enviava respostas reais ao número inexistente.
+   NÃO rodar `test:e2e:n8n` até isso estar feito.
+2. **Trocar o número de WhatsApp conectado** (desconectar e conectar outro sem criar conta). Perguntar
+   ao dono antes: quem pode trocar e o que acontece com o histórico e com o agente.
+3. **Barra de rolagem da conversa** salta na roda do mouse e fica parada no arraste (paginação da
+   conversa mexendo no scrollTop contra o thumb do Radix ScrollArea).
+
+### 01/10/2026, madrugada (histórico)
 
 O Supabase parou de responder a esta máquina por volta das 01:50 (login e banco; 25 minutos de
 tentativas) e a sessão terminou sem duas conferências:
