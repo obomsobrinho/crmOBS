@@ -6,7 +6,7 @@ import { SEGMENTOS } from "./bateria/casos-segmentos";
 
 // BATERIA DE DIAGNÓSTICO DO ATENDIMENTO (05/10/2026), cérebro real em dryRun.
 //
-// 70 casos: 30 da OBM (prompt avançado congelado de 05/10) e 40 de quatro
+// 72 casos: 31 da OBM (prompt avançado congelado de 05/10) e 41 de quatro
 // segmentos no guiado (odonto, advocacia, loja, pizzaria). Cobrem período e
 // horário, contexto, momento da conversa, interpretação do pedido e fidelidade
 // à base. Rodar ANTES de mudar a base do prompt, o modelo ou o calendário.

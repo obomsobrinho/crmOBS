@@ -19,3 +19,6 @@ Owner report on `/inbox/[id]`: spinning the mouse wheel made the scrollbar thumb
 
 ## Evidence
 Per-frame probe before the fix: `st=3599 sh=8035 th=329 esp=178`, then drag chain `sh` 8035, 11563, 15091, 18597 with the thumb at 6px. After: no jump (error 0), drag holds `scrollHeight` constant and loads exactly one page on release.
+
+## Addendum 2026-10-06
+The owner saw the thumb in the middle with the conversation at its start (short conversation, no paging). It did not reproduce headless in /design nor on the real conversation, but the old sync only ran on content resize and wrote the size into a CSS variable Radix also writes, so any missed Radix measure left both stale. Measured in a hidden browser tab (where ResizeObserver and frames pause): thumb 25px and frozen where 74px was right. Now the sync also runs on every scroll (in the next animation frame, after Radix's handler) and on viewport resize, and sets the thumb `height` directly, which Radix's React style never rewrites. `e2e/rolagem-barra.design.spec.ts` gained the short-conversation case (size and position at open, start and middle).

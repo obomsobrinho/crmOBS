@@ -99,6 +99,16 @@ function ScrollArea({
   // nova e o polegar é desenhado com a conta velha (medido: 321px onde o certo
   // era 181) por alguns quadros. Aqui o polegar é recalculado no mesmo quadro em
   // que o conteúdo muda, antes de pintar; o Radix alcança o mesmo valor depois.
+  //
+  // ⚠️ 06/10/2026, o dono de novo: no INÍCIO de uma conversa curta, o polegar
+  // estava no meio e pequeno. Medido em /design: conteúdo de 1349px numa janela
+  // de 316 (polegar certo: 74px), polegar com 25px e parado no lugar enquanto o
+  // conteúdo rolava. A medida velha não era só do Radix: esta conta também só
+  // rodava quando o CONTEÚDO mudava de tamanho, e o tamanho ficava num CSS var
+  // que o Radix também escreve. Agora a conta roda em toda rolagem (num quadro
+  // depois do handler do Radix, para a nossa valer) e em toda mudança de tamanho
+  // do conteúdo e da janela, e o tamanho vai direto no `height` do polegar, que
+  // o React do Radix nunca reescreve (o `style` dele aponta para a var e não muda).
   const viewportEl = dissolver.ref;
   React.useEffect(() => {
     const vp = viewportEl.current;
@@ -115,13 +125,25 @@ function ScrollArea({
       // A mesma conta do Radix (`getThumbSize`, `getThumbOffsetFromScroll`): o
       // polegar tem no mínimo 18px e anda em proporção ao `scrollTop`.
       const tamanho = Math.max(trilho.clientHeight * (vp.clientHeight / vp.scrollHeight), 18);
-      const posicao = (vp.scrollTop / rolavel) * (trilho.clientHeight - tamanho);
-      trilho.style.setProperty("--radix-scroll-area-thumb-height", `${tamanho}px`);
+      const posicao = (Math.min(vp.scrollTop, rolavel) / rolavel) * (trilho.clientHeight - tamanho);
+      polegar.style.height = `${tamanho}px`;
       polegar.style.transform = `translate3d(0, ${posicao}px, 0)`;
+    };
+    let quadro = 0;
+    const aoRolar = () => {
+      cancelAnimationFrame(quadro);
+      quadro = requestAnimationFrame(sincronizar);
     };
     const observador = new ResizeObserver(sincronizar);
     observador.observe(conteudo);
-    return () => observador.disconnect();
+    observador.observe(vp);
+    vp.addEventListener("scroll", aoRolar, { passive: true });
+    sincronizar();
+    return () => {
+      observador.disconnect();
+      vp.removeEventListener("scroll", aoRolar);
+      cancelAnimationFrame(quadro);
+    };
   }, [viewportEl]);
 
   return (

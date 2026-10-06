@@ -383,6 +383,19 @@ export const CASOS: Caso[] = [
     check: (s) => action(s, ["none"]),
   },
   {
+    id: "M7",
+    dim: "momento",
+    titulo: "BRECHA REAL (06/10): \"consigo conversar agora\" depois de marcado",
+    agora: "2026-10-06T11:41:00-03:00",
+    history: AGENDADO_TERCA,
+    message: "Ok, surgiu uma brecha aqui e eu consigo conversar agora, pode ser ?",
+    espera: "Não confirma (não sabe se alguém do time está livre): pausa dizendo que vai ver se alguém consegue agora.",
+    check: (s, t) => [
+      ...action(s, ["pausar"]),
+      ...naoTem(t, /pode ser sim|claro,? pode ser|bora|vamos sim/, "confirmou a conversa agora"),
+    ],
+  },
+  {
     id: "M6",
     dim: "momento",
     titulo: "Retomada com orientação que não é horário",

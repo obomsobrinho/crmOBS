@@ -208,3 +208,44 @@ test("segurando o polegar nada muda sob ele; ao soltar, as anteriores vêm e a p
   await expect.poll(() => vp.evaluate((el) => el.scrollHeight)).toBeGreaterThan(alturaAntes + 1000);
   await expect.poll(() => vp.evaluate((el) => el.scrollTop)).toBeGreaterThan(1000);
 });
+
+// CONVERSA CURTA, SEM PAGINAÇÃO (06/10/2026, o dono de novo): no início da
+// conversa o polegar aparecia no meio. Mede tamanho E posição do polegar contra
+// a conta, abrindo a conversa, no topo, no meio e no fim.
+test("conversa curta: o polegar tem o tamanho certo e acompanha do início ao fim", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/design");
+  const vp = page.locator('main [data-slot="scroll-area-viewport"]').first();
+  await expect.poll(() => vp.evaluate((el) => el.scrollHeight > el.clientHeight + 50)).toBe(true);
+  await page.waitForTimeout(800);
+  const conferir = async (onde: string) => {
+    const m = await page.evaluate(() => {
+      const v = document.querySelector<HTMLElement>('main [data-slot="scroll-area-viewport"]')!;
+      const t = document.querySelector<HTMLElement>('main [data-slot="scroll-area-thumb"]');
+      if (!t) return null;
+      const tr = t.parentElement!.getBoundingClientRect();
+      const r = t.getBoundingClientRect();
+      const tamanho = Math.max(tr.height * (v.clientHeight / v.scrollHeight), 18);
+      const rolavel = v.scrollHeight - v.clientHeight;
+      return {
+        altura: r.height,
+        alturaCerta: tamanho,
+        topo: r.top - tr.top,
+        topoCerto: (v.scrollTop / rolavel) * (tr.height - tamanho),
+      };
+    });
+    expect(m, `${onde}: polegar não existe`).not.toBeNull();
+    expect(Math.abs(m!.altura - m!.alturaCerta), `${onde}: ${JSON.stringify(m)}`).toBeLessThan(2);
+    expect(Math.abs(m!.topo - m!.topoCerto), `${onde}: ${JSON.stringify(m)}`).toBeLessThan(2);
+  };
+  await conferir("ao abrir");
+  const caixa = (await vp.boundingBox())!;
+  await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+  for (let i = 0; i < 30; i++) await page.mouse.wheel(0, -200);
+  await expect.poll(() => vp.evaluate((el) => el.scrollTop)).toBe(0);
+  await page.waitForTimeout(300);
+  await conferir("no início");
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(300);
+  await conferir("no meio");
+});

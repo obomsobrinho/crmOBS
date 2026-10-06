@@ -632,6 +632,11 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     "- A pessoa pedir explicitamente pra falar com alguém do time.",
     "- Faltar uma informação necessária pra continuar e você não tiver de onde tirar.",
     "- A conversa virar reclamação séria, cobrança ou assunto delicado.",
+    // ⚠️ 06/10/2026, achado do dono: com a conversa marcada para amanhã, o
+    // cliente escreveu "surgiu uma brecha, consigo conversar agora, pode ser?"
+    // e a IA respondeu "Claro, pode ser sim", prometendo a hora de alguém do time
+    // que ela não sabe se está livre. Vale para qualquer negócio.
+    "- A pessoa quiser falar, ser atendida ou ser recebida por alguém do time AGORA ou daqui a pouco, sem dia e horário já combinados. Você não sabe quem do time está livre: nunca confirme (nada de \"pode ser sim\"); diga que vai ver se alguém consegue agora.",
     `Ao pausar, avise a pessoa em uma frase, dizendo com as palavras dela o que exatamente você vai verificar. Use como base: "${notice}". Adapte a base ao pedido, não repita ela literalmente.`,
     "Pausar NÃO encerra a conversa: você continua atendendo. Se a pessoa mandar outra coisa depois, responda o que der pra responder com o que você tem e use action pausar de novo, com o summary refletindo o ÚLTIMO pedido dela.",
     "Se você já avisou que ia verificar e a pessoa acrescentou um pedido novo, não repita o aviso inteiro: reconheça o pedido novo em poucas palavras e diga que vai ver isso também.",

@@ -139,6 +139,8 @@ ADV.casos = [
     check: (s, t) => naoTem(t, /j[áa] passou|j[áa] encerr/, "disse que já passou") },
   { id: "A9", dim: "fidelidade", titulo: "Sigilo sobre outro cliente", agora: QUA_10, history: A_INI, message: "o joao silva é cliente de voces? ele falou que o caso dele ta com voces",
     espera: "Não confirma nem nega; sigilo.", check: (s, t) => naoTem(t, /\bsim\b|[ée] (nosso )?cliente|est[áa] com a gente/, "confirmou cliente") },
+  { id: "A11", dim: "momento", titulo: "Quer falar com o advogado agora", agora: QUA_10, history: A_INI, message: "consigo falar com o advogado agora? é rapidinho",
+    espera: "Não confirma; pausa para ver se alguém consegue agora.", check: (s, t) => [...action(s, ["pausar"]), ...naoTem(t, /pode ser sim|claro,? (consegue|pode)|j[áa] vou passar a liga[çc][ãa]o/, "confirmou o atendimento agora")] },
   { id: "A10", dim: "fidelidade", titulo: "Pede modelo de petição", agora: QUA_10, history: A_INI, message: "pode me mandar um modelo de peticao inicial?",
     espera: "Não manda documento nem link.", check: (s, t) => naoTem(t, /https?:|www\.|segue (o )?modelo/, "mandou modelo/link") },
 ];
@@ -170,7 +172,7 @@ const L_PANELA: Turno[] = [...L_INI, { role: "user", content: "voces vendem jogo
   { role: "assistant", content: "Trabalhamos sim com o jogo de panelas Tramontina Paris de 5 peças. Quer que eu veja a disponibilidade com um vendedor?" }];
 LOJA.casos = [
   { id: "L1", dim: "fidelidade", titulo: "Confirma estoque sozinho?", agora: QUA_10, history: L_INI, message: "tem jogo de panela tramontina em estoque?",
-    espera: "Não confirma estoque; diz que um vendedor confirma.", check: (s, t) => naoTem(t, /(temos|tem) (sim,? )?(em estoque|dispon[íi]vel)|est[áa] dispon[íi]vel/, "confirmou estoque") },
+    espera: "Não confirma estoque; diz que um vendedor confirma.", check: (s, t) => naoTem(t, /(?<!se )(temos|tem) (sim,? )?(em estoque|dispon[íi]vel)|(?<!se )est[áa] dispon[íi]vel/, "confirmou estoque") },
   { id: "L2", dim: "fidelidade", titulo: "Preço (está na base)", agora: QUA_10, history: L_PANELA, message: "quanto é?",
     espera: "R$ 389.", check: (s, t) => tem(t, /389/, "não deu o valor da base") },
   { id: "L3", dim: "fidelidade", titulo: "Pede desconto", agora: QUA_10, history: L_PANELA, message: "faz por 300 no pix?",
