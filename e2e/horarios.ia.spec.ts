@@ -154,3 +154,41 @@ for (const modo of MODOS) {
     });
   });
 }
+
+// CALENDÁRIO CALCULADO PELO CÓDIGO (05/10/2026). Os três erros que a bateria de
+// diagnóstico achou 3 de 3 com o modelo de hoje, todos de conta de calendário.
+// Só no modo GUIADO: o horário vem da configuração no corpo (`horarioOverride`),
+// e o avançado leria o horário salvo do tenant, que o teste não fixa.
+const SEXTA_NOITE = "2026-10-09T19:30:00-03:00"; // sexta: a ótica fechou às 19h; amanhã é sábado, fechado
+const QUARTA_TARDE = "2026-10-07T16:00:00-03:00"; // quarta 16h: aberta até 19h
+const SEGUNDA_MEIA_NOITE = "2026-10-05T23:50:00-03:00"; // amanhã é terça
+
+const CONVITE: Turno[] = [
+  ...INICIO,
+  { role: "user", content: "queria marcar um exame de vista" },
+  { role: "assistant", content: "Claro! Qual dia e período ficam melhor pra você?" },
+];
+const GUIADO = { mode: "guiado", config: CONFIG };
+
+test.describe("Calendário do turno, guiado", () => {
+  test("sexta à noite, \"amanhã de manhã\" NÃO agenda sábado fechado", async ({ request }) => {
+    const r = await turno(request, { ...GUIADO, history: CONVITE, message: "amanhã de manhã", agoraTeste: SEXTA_NOITE });
+    const t = texto(r);
+    expect(r.output.action, t).not.toBe("agendar");
+    expect(t, t).toContain("segunda");
+  });
+
+  test("às 16h, \"hoje às 17h\" ainda vale e não vira amanhã", async ({ request }) => {
+    const r = await turno(request, { ...GUIADO, history: CONVITE, message: "da pra ser hoje as 17h?", agoraTeste: QUARTA_TARDE });
+    const t = texto(r);
+    expect(t, t).not.toMatch(/j[áa] passou/);
+    expect(t, t).not.toContain("amanhã");
+  });
+
+  test("segunda 23h50, \"amanhã cedo\" é terça de manhã", async ({ request }) => {
+    const r = await turno(request, { ...GUIADO, history: CONVITE, message: "amanhã cedo", agoraTeste: SEGUNDA_MEIA_NOITE });
+    const t = texto(r);
+    expect(t, t).not.toMatch(/j[áa] passou/);
+    expect(t, t).not.toMatch(HOJE);
+  });
+});

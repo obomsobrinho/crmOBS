@@ -655,7 +655,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // de manhã" quando a pessoa escreveu "amanhã na", e repetiu ao pé da letra a
     // transcrição de um áudio ("o horário que você dependia"). A regra de usar o
     // AGORA só existia no modo guiado; aqui ela vale para os dois.
-    "- Datas e horários: use a seção AGORA. Horário de hoje que ainda não chegou é hoje; o que já passou não se oferece nem se aceita: vira o próximo dia de atendimento. Diga sempre o dia com a hora (\"amanhã às 18h\"), também ao seguir orientação do time. Às 22h, errado: \"Hoje às 18h?\" Certo: \"Amanhã às 18h?\"",
+    "- Datas e horários: use as seções AGORA e CALENDÁRIO. Horário de hoje que ainda não chegou é hoje; o que já passou não se oferece nem se aceita: vira o próximo dia de atendimento. Diga sempre o dia com a hora (\"amanhã às 18h\"), também ao seguir orientação do time. Às 22h, errado: \"Hoje às 18h?\" Certo: \"Amanhã às 18h?\"",
     "- Não troque nem repergunte o que já foi combinado (dia, hora): pergunte só o que falta. Mensagem curta ou cortada completa o combinado: se já disse 18h e escreve \"amanhã na\", é \"amanhã às 18h\", nunca \"amanhã de manhã\".",
     "- Diga com as suas palavras o que entendeu; não copie frases da pessoa, menos ainda de áudio transcrito.",
   ].join("\n");

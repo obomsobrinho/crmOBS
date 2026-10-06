@@ -104,16 +104,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // TELEFONE DE TESTE NUNCA VAI À EVOLUTION (03/10/2026): o número de teste
-  // da OBM foi restringido (403) depois de rodadas mandando WhatsApp real ao
-  // telefone impossível da suíte. O n8n tem a mesma trava; esta é a do app.
-  if (telefoneImpossivel(phone)) {
-    return NextResponse.json(
-      { error: "Número de teste não recebe WhatsApp." },
-      { status: 422 }
-    );
-  }
-
   // MÍDIA SÓ DO PRÓPRIO TENANT (R-09, 01/10/2026). Mais abaixo o servidor assina
   // este caminho com service_role, então um caminho vindo do corpo sem conferência
   // deixaria um membro do tenant A mandar a si mesmo um arquivo do tenant B (ou
@@ -151,6 +141,20 @@ export async function POST(req: Request) {
         { status: 409 }
       );
     }
+  }
+
+  // TELEFONE DE TESTE NUNCA VAI À EVOLUTION (03/10/2026): o número de teste
+  // da OBM foi restringido (403) depois de rodadas mandando WhatsApp real ao
+  // telefone impossível da suíte. O n8n tem a mesma trava; esta é a do app.
+  // ⚠️ Vem DEPOIS das conferências de mídia e de aceite: todas só recusam, e
+  // nesta ordem os testes dessas recusas (e2e/rotas.auth.spec.ts,
+  // e2e/clientes.serial.spec.ts) seguem provando cada uma com o telefone de
+  // teste, em vez de bater aqui antes.
+  if (telefoneImpossivel(phone)) {
+    return NextResponse.json(
+      { error: "Número de teste não recebe WhatsApp." },
+      { status: 422 }
+    );
   }
 
   // O bucket whatsapp-media é privado. Para a Evolution baixar o arquivo, o

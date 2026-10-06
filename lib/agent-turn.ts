@@ -1,6 +1,7 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildFallbackPersona, compilePersona } from "@/lib/agent-prompt";
+import { buildFallbackPersona, compilePersona, type BusinessHours } from "@/lib/agent-prompt";
+import { horarioCadastrado } from "@/lib/horarios";
 import {
   runAgent,
   type AgentOutput,
@@ -90,6 +91,12 @@ export interface ProcessTurnParams {
    * ignorada: o atendimento sempre usa o relógio de verdade.
    */
   agoraTeste?: string | null;
+  /**
+   * Horário da configuração EM EDIÇÃO (bancada no modo guiado), SÓ em `dryRun`,
+   * pelo mesmo motivo do `personaOverride`: testar o horário que a pessoa está
+   * mexendo sem salvar. `undefined` = usa o cadastrado no tenant.
+   */
+  horarioOverride?: BusinessHours | null;
   /**
    * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
    * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
@@ -407,6 +414,13 @@ export async function processTurn(
     now: dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
       ? new Date(params.agoraTeste)
       : undefined,
+    // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
+    // com datas (`horarioCadastrado`). O avançado também tem horário salvo
+    // (`agent_config.hours`, gravado à parte do prompt).
+    hours:
+      dryRun && params.horarioOverride !== undefined
+        ? params.horarioOverride
+        : horarioCadastrado(client.agent_config),
   });
   const raw = run.output;
 

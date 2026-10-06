@@ -3,7 +3,8 @@ import { sessaoDaRota } from "@/lib/rota";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
-import { compilePersona } from "@/lib/agent-prompt";
+import { compilePersona, type BusinessHours } from "@/lib/agent-prompt";
+import { horarioCadastrado } from "@/lib/horarios";
 
 // Bancada de teste (playground), dono-only. Fala direto com o cérebro REAL
 // (processTurn, o mesmo do /api/agent) em modo dryRun: não persiste nada (nem
@@ -70,6 +71,9 @@ export async function POST(req: NextRequest) {
   // Persona da configuração em edição. Ausente = testa a que está salva, que é o
   // comportamento antigo e segue valendo.
   let personaOverride: string | null = null;
+  // Horário em edição, que alimenta o `### CALENDÁRIO`. Só o guiado tem horário
+  // no formulário; o avançado usa o salvo (undefined = o do tenant).
+  let horarioOverride: BusinessHours | null | undefined = undefined;
   // ⚠️ MESMO despacho do save e do turno (`compilePersona`). Se a bancada
   // compilasse por conta própria, ela testaria um texto que o agente nunca vai
   // receber, que é o oposto do que ela existe para provar.
@@ -88,6 +92,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
     }
     personaOverride = r.persona;
+    horarioOverride = horarioCadastrado(r.config);
   } else if (body.mode === "avancado") {
     // `buildAdvancedPersona` faz as duas coisas que importam: tira do texto dele
     // qualquer seção da base (para não duplicar) e RECOLA o rabo invariante. Sem
@@ -138,6 +143,7 @@ export async function POST(req: NextRequest) {
       pedidosAbertos: Array.isArray(body.pedidosAbertos) ? body.pedidosAbertos : [],
       personaOverride,
       agoraTeste: typeof body.agoraTeste === "string" ? body.agoraTeste : null,
+      horarioOverride,
     });
 
     // Marca `onboarding_tested_at` na primeira conversa que der certo.

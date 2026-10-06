@@ -7,7 +7,8 @@
 // não" é aritmética, então quem faz é o código, e o prompt recebe a conclusão
 // pronta ("16h já passou hoje: diga amanhã às 16h").
 
-import { FUSO } from "./fuso";
+import { DAY_LABEL, DAY_ORDER, normalizeHours, type BusinessHours, type DayKey } from "./agent-prompt";
+import { diaIsoSP, FUSO } from "./fuso";
 
 /** Minutos desde a meia-noite em São Paulo. */
 export function minutosAgoraSP(now: Date): number {
@@ -83,4 +84,106 @@ export function diaDosHorarios(texto: string, now: Date): string | null {
   return horas
     .map((m) => `${m <= agora ? "amanhã" : "hoje"} às ${horaTexto(m)}`)
     .join(", ");
+}
+
+// ————————————————————————————————————————————————————————————————
+// CALENDÁRIO DOS PRÓXIMOS DIAS, CONTADO EM CÓDIGO (05/10/2026)
+// ————————————————————————————————————————————————————————————————
+//
+// A bateria de diagnóstico de 05/10/2026 (31 casos x 3, cérebro real) achou o
+// mesmo erro nos dois sentidos, sempre de CONTA: agendou "amanhã de manhã" numa
+// sexta às 19h (amanhã é sábado, fechado), disse às 16h que 17h "já passou", e
+// se perdeu no "amanhã cedo" às 23h50. Com o prompt simplificado o modelo errou
+// igual; com o modelo maior acertou. Com este bloco, o modelo de hoje passou nos
+// 30 casos checáveis, 3 de 3. O princípio é o de `notaDeHorarios`: o modelo
+// conversa, o código faz a conta de dia da semana, expediente e "já passou".
+
+/** Dias cobertos pelo bloco: hoje mais 7, para "semana que vem" cair dentro. */
+export const DIAS_DO_CALENDARIO = 8;
+
+// getUTCDay() (0 = domingo) para a chave do formulário.
+const CHAVE_POR_DIA: DayKey[] = ["dom", "seg", "ter", "qua", "qui", "sex", "sab"];
+
+function minutos(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
+
+/**
+ * O horário CADASTRADO pelo tenant, ou `null` quando não há nenhum.
+ *
+ * ⚠️ `null` é estado válido e NÃO vira o horário padrão: `normalizeHours`
+ * completa dia faltante com `DEFAULT_HOURS`, e servir ao modelo "aberto 8h às
+ * 18h" que ninguém cadastrou seria inventar expediente. Sem horário (ou com
+ * todos os dias fechados, que no guiado também omite a seção), o calendário sai
+ * só com as datas.
+ */
+export function horarioCadastrado(agentConfig: unknown): BusinessHours | null {
+  const bruto = (agentConfig as { hours?: unknown } | null)?.hours;
+  if (!bruto || typeof bruto !== "object") return null;
+  const h = normalizeHours(bruto);
+  return DAY_ORDER.some((d) => h[d].open) ? h : null;
+}
+
+/**
+ * Bloco `### CALENDÁRIO` do turno: uma linha por dia, de hoje a 7 dias, com o
+ * dia da semana, a data e (quando há horário cadastrado) a situação já
+ * resolvida: fechado, aberto, ainda não abriu, já encerrou. Vai DEPOIS do AGORA
+ * (`runAgent`), porque muda a cada minuto e não pode mexer no prefixo do cache.
+ */
+export function calendarioBlock(now: Date, hours: BusinessHours | null): string {
+  const [y, m, d] = diaIsoSP(now).split("-").map(Number);
+  const agora = minutosAgoraSP(now);
+  const linhas: string[] = [];
+  // Primeiro horário de abertura daqui para a frente, quando está fechado
+  // agora. Sem ele o agente dizia "hoje está fechado" e parava, sem dizer
+  // quando abre (segunda rodada da bateria, 05/10/2026).
+  let proxima: string | null = null;
+  let abertoAgora = false;
+  for (let i = 0; i < DIAS_DO_CALENDARIO; i++) {
+    // Meio-dia UTC: somar dias nunca escorrega de data.
+    const dia = new Date(Date.UTC(y, m - 1, d + i, 12));
+    const chave = CHAVE_POR_DIA[dia.getUTCDay()];
+    const data = `${String(dia.getUTCDate()).padStart(2, "0")}/${String(dia.getUTCMonth() + 1).padStart(2, "0")}`;
+    const nome = `${DAY_LABEL[chave]} ${data}`;
+    const rotulo = i === 0 ? `hoje (${nome})` : i === 1 ? `amanhã (${nome})` : nome;
+    if (!hours) {
+      linhas.push(`- ${rotulo}`);
+      continue;
+    }
+    const h = hours[chave];
+    const de = minutos(h.from);
+    const ate = minutos(h.to);
+    // Expediente que vira a noite (ex.: 18:00 às 02:00) termina no dia seguinte.
+    const viraNoite = ate <= de;
+    const faixa = `${horaTexto(de)} às ${horaTexto(ate)}${viraNoite ? " do dia seguinte" : ""}`;
+    // Madrugada dentro do expediente de ONTEM que virou a noite (ex.: ontem
+    // 18:00 às 02:00, agora 01:00): está aberto, e dizer "não abriu" ou
+    // "fechado" mandaria o cliente embora com a casa funcionando.
+    const ontem = hours[CHAVE_POR_DIA[(dia.getUTCDay() + 6) % 7]];
+    const fimDeOntem = minutos(ontem.to);
+    const ontemAberto =
+      i === 0 && ontem.open && fimDeOntem <= minutos(ontem.from) && agora < fimDeOntem;
+    let situacao: string;
+    if (ontemAberto)
+      situacao = `ABERTO AGORA (expediente de ontem), até ${horaTexto(fimDeOntem)}${h.open ? `; o de hoje abre às ${horaTexto(de)}` : ""}`;
+    else if (!h.open) situacao = "FECHADO, não atende";
+    else if (i > 0) situacao = `aberto das ${faixa}`;
+    else if (agora < de) situacao = `ainda NÃO abriu: abre hoje às ${horaTexto(de)} e vai até ${horaTexto(ate)}${viraNoite ? " do dia seguinte" : ""}`;
+    else if (!viraNoite && agora >= ate) situacao = `expediente de hoje JÁ ENCERROU às ${horaTexto(ate)}: nada mais hoje`;
+    else situacao = `ABERTO AGORA, até ${horaTexto(ate)}${viraNoite ? " do dia seguinte" : ""}: horário de hoje depois de ${horaTexto(agora)} ainda vale`;
+    if (i === 0) abertoAgora = situacao.startsWith("ABERTO AGORA");
+    if (!abertoAgora && proxima === null && h.open && (i > 0 || agora < de))
+      proxima = `${rotulo} às ${horaTexto(de)}`;
+    linhas.push(`- ${rotulo}: ${situacao}`);
+  }
+  if (proxima) linhas.push(`- Fechado agora. Próxima abertura: ${proxima}. Ao dizer que está fechado, diga também quando abre.`);
+  return [
+    "### CALENDÁRIO",
+    hours
+      ? "Os próximos dias, com o expediente da empresa já calculado pelo sistema. Confie nesta lista para saber que dia é \"amanhã\", se está aberto agora e se um dia ou horário pode ser combinado: nunca combine em dia FECHADO nem em horário que já passou, ofereça o próximo dia aberto."
+      : "Os próximos dias, calculados pelo sistema. Confie nesta lista para saber que dia da semana é \"amanhã\" ou uma data.",
+    ...linhas,
+    "Ao combinar ou citar um dia, diga o dia da semana junto (\"quinta de manhã\", \"amanhã, sexta, às 15h\").",
+  ].join("\n");
 }

@@ -1,6 +1,7 @@
 import "server-only";
 import { FUSO } from "./fuso";
-import { diaDosHorarios, notaDeHorarios } from "./horarios";
+import { calendarioBlock, diaDosHorarios, notaDeHorarios } from "./horarios";
+import type { BusinessHours } from "./agent-prompt";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -185,6 +186,11 @@ export async function runAgent(params: {
   pedidosResolvidos?: string[];
   model?: string;
   now?: Date;
+  /**
+   * Horário CADASTRADO do tenant (`horarioCadastrado`), ou null. Alimenta o
+   * `### CALENDÁRIO`: sem horário, o bloco sai só com as datas.
+   */
+  hours?: BusinessHours | null;
 }): Promise<AgentRun> {
   const { persona, history, message, apiKey } = params;
   const model = params.model || AGENT_MODEL;
@@ -194,6 +200,9 @@ export async function runAgent(params: {
     parts.push(knowledgeBlock(params.knowledge));
   }
   parts.push(agoraBlock(params.now));
+  // O calendário vem colado no AGORA: o modelo errava a conta de dia da semana,
+  // expediente e "já passou" (bateria de 05/10/2026), então ela chega pronta.
+  parts.push(calendarioBlock(params.now ?? new Date(), params.hours ?? null));
   // Depois do AGORA, junto do que muda a cada turno: não mexe no prefixo que o
   // cache de prompt reaproveita (persona).
   if (params.pedidosResolvidos && params.pedidosResolvidos.length > 0) {
