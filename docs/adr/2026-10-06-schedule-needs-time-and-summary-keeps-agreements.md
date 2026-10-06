@@ -17,3 +17,9 @@ Owner test on 2026-10-06 with a real chip (OBM tenant, advanced prompt):
 ## Consequences
 - Every tenant, guided or advanced, asks for the time before a meeting counts as scheduled. A tenant prompt that says "dia e período" no longer overrides it.
 - The battery (`npm run test:e2e:bateria`, 73 cases) changed P4, P9, C3 and O7 to expect the time question, dropped the OBM "de tarde" pending case (it passes now) and added M8 (the summary of 2026-10-06). First run: 73 passed, 2 only on retry. `test:e2e:ia` 28/28.
+
+## Addendum 2026-10-06 (evening), owner decisions
+- "À tarde" is 13:00 to 17:00 in whole hours, and only what has not started yet: at 13:00 "agora à tarde" offers 14h, 15h, 16h and 17h. Code computes it (`TARDE`, `horariosDaTarde`, `lib/horarios.ts`) inside the registered hours, and the `### CALENDÁRIO` block states today's and tomorrow's afternoon. The agent always asks the time offering those hours, saying which day; it never opens a help request just because the slot is today ("hoje à tarde" or "agora à tarde" is a period, not "now"). Morning and evening have no range defined by the owner yet.
+- A closed business offering to check the next open day with the team (and opening a request) is accepted.
+- When a help trigger happens (base or tenant `escalateWhen`), `pausar` in that same reply, without collecting more data first: a pizzeria with "quando a pessoa quiser fechar um pedido" asked "entrega ou retirada?" before passing (2 of 4).
+- The base text of the day was tightened to keep the guided demo under the size warning (13,487 of 13,600); the OBM advanced prompt assembles to 14,702 of 16,000.

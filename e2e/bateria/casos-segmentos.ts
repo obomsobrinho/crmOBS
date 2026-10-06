@@ -80,9 +80,9 @@ ODONTO.casos = [
   { id: "O5", dim: "periodo", titulo: "Sábado 11h: \"consigo ir hoje?\" (aberto até 12h)", agora: SAB_11, history: O_INI, message: "consigo passar hoje ainda pra uma avaliação?",
     espera: "Não diz que não abre sábado. Hoje ainda abre até 12h; pode oferecer hoje ou confirmar com o time.", check: (s, t) => naoTem(t, /n[ãa]o (abrimos|atendemos|funcionamos)( aos| no| de)? s[áa]bado/, "disse que não abre sábado") },
   { id: "O6", dim: "periodo", titulo: "Sábado 14h: \"hoje ainda?\" (fechou às 12h)", agora: SAB_14, history: O_INI, message: "da pra ir hoje ainda?",
-    // Pausar também passa (06/10/2026): ela diz que encerrou e se oferece para ver
-    // um horário de segunda com o time. O que reprova é aceitar hoje ou não
-    // dizer quando abre. Se o dono quiser que isso nunca vire pedido, muda aqui.
+    // Pausar também passa (decisão do dono, 06/10/2026): ela diz que encerrou e
+    // se oferece para ver um horário de segunda com o time. O que reprova é
+    // aceitar hoje ou não dizer quando abre.
     espera: "Hoje já encerrou; sugere segunda.", check: (s, t) => [...action(s, ["none", "pausar"]), ...tem(t, /segunda/, "não sugeriu segunda")] },
   { id: "O7", dim: "periodo", titulo: "Sexta 19h: \"amanhã de manhã\" (sábado ABRE)", agora: SEX_19,
     history: [...O_INI, { role: "user", content: "quero marcar uma avaliação" }, { role: "assistant", content: "Claro! Qual dia e período ficam melhor pra você?" }],

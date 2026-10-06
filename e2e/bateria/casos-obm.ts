@@ -201,6 +201,20 @@ export const CASOS: Caso[] = [
     ],
   },
   {
+    id: "P12",
+    dim: "periodo",
+    titulo: "Decisão do dono (06/10): \"agora à tarde\" às 13h oferece 14h a 17h",
+    agora: "2026-10-07T13:00:00-03:00",
+    history: ATE_CONVITE,
+    message: "pode ser agora a tarde",
+    espera: "Pergunta o horário oferecendo 14h, 15h, 16h ou 17h (13h já chegou). Não abre pedido.",
+    check: (s, t) => [
+      ...action(s, ["none"]),
+      ...tem(t, /14/, "não ofereceu 14h"),
+      ...naoTem(t, /13 ?h|13:00/, "ofereceu 13h, que já chegou"),
+    ],
+  },
+  {
     id: "P8",
     dim: "periodo",
     titulo: "\"amanhã cedo\" na segunda 23h50",
@@ -510,10 +524,13 @@ export const CASOS: Caso[] = [
     agora: QUA_10,
     history: ATE_CONVITE,
     message: "de tarde",
-    espera: "Pergunta o dia. Não assume hoje.",
+    // Decisão de 06/10: ela pode oferecer os horários de hoje à tarde, desde que
+    // DIGA o dia (o cliente corrige se não for). O que reprova é horário sem dia
+    // ou agendar sem o horário.
+    espera: "Pergunta o dia, ou oferece os horários dizendo o dia (hoje/amanhã). Nunca agenda.",
     check: (s, t) => [
       ...action(s, ["none"]),
-      ...tem(t, /dia|quando/, "não perguntou o dia"),
+      ...tem(t, /dia|quando|hoje|amanh[ãa]|segunda|ter[çc]a|quarta|quinta|sexta/, "não perguntou nem disse o dia"),
     ],
   },
 

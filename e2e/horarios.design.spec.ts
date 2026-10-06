@@ -5,6 +5,7 @@ import {
   diaDosHorarios,
   DIAS_DO_CALENDARIO,
   horarioCadastrado,
+  horariosDaTarde,
   horariosCitados,
   minutosAgoraSP,
   notaDeHorarios,
@@ -121,5 +122,30 @@ test.describe("Calendário do turno (lib/horarios.ts)", () => {
   test("sem travessão no texto que vai ao modelo", () => {
     const b = calendarioBlock(new Date("2026-10-07T23:30:00-03:00"), COMERCIAL);
     expect(b).not.toMatch(/[–—]/);
+  });
+});
+
+// "À TARDE" (decisão do dono, 06/10/2026): das 13h às 17h em horário cheio, e só
+// o que ainda não chegou. Às 13h, "agora à tarde" vale 14h, 15h, 16h e 17h.
+test.describe("A tarde do calendário (lib/horarios.ts)", () => {
+  test("às 13h valem 14h a 17h; às 10h, 13h a 17h; depois das 17h, nada", () => {
+    const dia = COMERCIAL.qua;
+    expect(horariosDaTarde(13 * 60, dia)).toEqual([14, 15, 16, 17]);
+    expect(horariosDaTarde(13 * 60 + 20, dia)).toEqual([14, 15, 16, 17]);
+    expect(horariosDaTarde(10 * 60, dia)).toEqual([13, 14, 15, 16, 17]);
+    expect(horariosDaTarde(17 * 60, dia)).toEqual([]);
+    // Dia que fecha às 16h: 16h e 17h ficam fora (começariam no fechamento ou depois).
+    expect(horariosDaTarde(null, { open: true, from: "08:00", to: "16:00" })).toEqual([13, 14, 15]);
+    expect(horariosDaTarde(null, COMERCIAL.sab)).toEqual([]);
+    expect(horariosDaTarde(null, null)).toEqual([13, 14, 15, 16, 17]);
+  });
+
+  test("o bloco diz a tarde de hoje e a de amanhã, já resolvidas", () => {
+    const quarta13 = calendarioBlock(new Date("2026-10-07T13:00:00-03:00"), COMERCIAL);
+    expect(quarta13).toContain("Hoje à tarde: ainda valem 14h, 15h, 16h e 17h");
+    expect(quarta13).toContain("Amanhã à tarde: 13h, 14h, 15h, 16h e 17h");
+    const sexta19 = calendarioBlock(new Date("2026-10-09T19:00:00-03:00"), COMERCIAL);
+    expect(sexta19).toContain("Hoje à tarde: não vale mais");
+    expect(sexta19).toContain("Amanhã à tarde: não atende");
   });
 });

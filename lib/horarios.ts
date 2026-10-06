@@ -126,13 +126,51 @@ export function horarioCadastrado(agentConfig: unknown): BusinessHours | null {
 }
 
 /**
+ * "À TARDE" (decisão do dono, 06/10/2026): das 13h às 17h, em horário cheio. Se
+ * a pessoa diz "hoje à tarde" às 13h, valem 14h, 15h, 16h e 17h: só o que ainda
+ * não chegou. A conta é do código; a IA recebe a lista pronta e pergunta qual
+ * horário fica melhor. Manhã e noite ainda não têm faixa definida pelo dono.
+ */
+export const TARDE = { de: 13, ate: 17 } as const;
+
+/**
+ * Os horários cheios da tarde que valem num dia: dentro de `TARDE`, depois de
+ * agora (só hoje) e dentro do expediente cadastrado (hora de início antes do
+ * fechamento). Dia fechado: nenhum. Sem horário cadastrado: só a faixa e o
+ * relógio.
+ */
+export function horariosDaTarde(
+  agoraMin: number | null,
+  dia: { open: boolean; from: string; to: string } | null
+): number[] {
+  if (dia && !dia.open) return [];
+  const out: number[] = [];
+  for (let h = TARDE.de; h <= TARDE.ate; h++) {
+    const m = h * 60;
+    if (agoraMin !== null && m <= agoraMin) continue;
+    if (dia) {
+      const de = minutos(dia.from);
+      const ate = minutos(dia.to);
+      if (ate > de && (m < de || m >= ate)) continue;
+    }
+    out.push(h);
+  }
+  return out;
+}
+
+function listaDeHoras(hs: number[]): string {
+  const t = hs.map((h) => `${h}h`);
+  return t.length <= 1 ? t.join("") : `${t.slice(0, -1).join(", ")} e ${t[t.length - 1]}`;
+}
+
+/**
  * Bloco `### CALENDÁRIO` do turno: uma linha por dia, de hoje a 7 dias, com o
  * dia da semana, a data e (quando há horário cadastrado) a situação já
  * resolvida: fechado, aberto, ainda não abriu, já encerrou. Vai DEPOIS do AGORA
  * (`runAgent`), porque muda a cada minuto e não pode mexer no prefixo do cache.
  */
 export function calendarioBlock(now: Date, hours: BusinessHours | null): string {
-  const [y, m, d] = diaIsoSP(now).split("-").map(Number);
+  const [y, m, d0] = diaIsoSP(now).split("-").map(Number);
   const agora = minutosAgoraSP(now);
   const linhas: string[] = [];
   // Primeiro horário de abertura daqui para a frente, quando está fechado
@@ -142,7 +180,7 @@ export function calendarioBlock(now: Date, hours: BusinessHours | null): string 
   let abertoAgora = false;
   for (let i = 0; i < DIAS_DO_CALENDARIO; i++) {
     // Meio-dia UTC: somar dias nunca escorrega de data.
-    const dia = new Date(Date.UTC(y, m - 1, d + i, 12));
+    const dia = new Date(Date.UTC(y, m - 1, d0 + i, 12));
     const chave = CHAVE_POR_DIA[dia.getUTCDay()];
     const data = `${String(dia.getUTCDate()).padStart(2, "0")}/${String(dia.getUTCMonth() + 1).padStart(2, "0")}`;
     const nome = `${DAY_LABEL[chave]} ${data}`;
@@ -178,6 +216,19 @@ export function calendarioBlock(now: Date, hours: BusinessHours | null): string 
     linhas.push(`- ${rotulo}: ${situacao}`);
   }
   if (proxima) linhas.push(`- Fechado agora. Próxima abertura: ${proxima}. Ao dizer que está fechado, diga também quando abre.`);
+  // A tarde de hoje e de amanhã, já resolvidas (decisão do dono, 06/10/2026).
+  const diaDe = (i: number) => {
+    if (!hours) return null;
+    const d = new Date(Date.UTC(y, m - 1, d0 + i, 12));
+    return hours[CHAVE_POR_DIA[d.getUTCDay()]];
+  };
+  const tardeHoje = horariosDaTarde(agora, diaDe(0));
+  const tardeAmanha = horariosDaTarde(null, diaDe(1));
+  linhas.push(
+    `- "À tarde" = das ${TARDE.de}h às ${TARDE.ate}h, em horário cheio. Hoje à tarde: ${
+      tardeHoje.length ? `ainda valem ${listaDeHoras(tardeHoje)}` : "não vale mais"
+    }. Amanhã à tarde: ${tardeAmanha.length ? listaDeHoras(tardeAmanha) : "não atende"}.`
+  );
   return [
     "### CALENDÁRIO",
     hours

@@ -644,7 +644,11 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // cliente escreveu "surgiu uma brecha, consigo conversar agora, pode ser?"
     // e a IA respondeu "Claro, pode ser sim", prometendo a hora de alguém do time
     // que ela não sabe se está livre. Vale para qualquer negócio.
-    "- A pessoa quiser falar, ser atendida ou ser recebida por alguém do time AGORA ou daqui a pouco, sem dia e horário já combinados. Você não sabe quem do time está livre: nunca confirme (nada de \"pode ser sim\"); diga que vai ver se alguém consegue agora.",
+    "- A pessoa quiser falar com alguém do time AGORA ou daqui a pouco, sem horário combinado: você não sabe quem está livre, nunca confirme (nada de \"pode ser sim\"); diga que vai ver se alguém consegue. \"Hoje à tarde\" ou \"agora à tarde\" é período, não agora.",
+    // ⚠️ 06/10/2026: com o gatilho da empresa "quando a pessoa quiser fechar um
+    // pedido", a IA de uma pizzaria pedia "entrega ou retirada?" antes de passar
+    // (2 de 4 na bateria). Coletar dado depois do gatilho atrasa o time.
+    "Quando um desses casos acontece, use pausar JÁ nesta resposta: não colete mais dados antes (o time pergunta o que faltar).",
     `Ao pausar, avise a pessoa em uma frase, dizendo com as palavras dela o que exatamente você vai verificar. Use como base: "${notice}". Adapte a base ao pedido, não repita ela literalmente.`,
     "Pausar NÃO encerra a conversa: você continua atendendo. Se a pessoa mandar outra coisa depois, responda o que der pra responder com o que você tem e use action pausar de novo, com o summary refletindo o ÚLTIMO pedido dela.",
     "Se você já avisou que ia verificar e a pessoa acrescentou um pedido novo, não repita o aviso inteiro: reconheça o pedido novo em poucas palavras e diga que vai ver isso também.",
@@ -702,11 +706,11 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
       ? // ⚠️ 06/10/2026, decisão do dono: "amanhã à tarde" não marca nada; a IA
         // pergunta o horário. Mora AQUI, no contrato da base, porque vale para
         // todo tenant e passa por cima do texto de cada um ("dia e período").
-        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário, "pausar" quando a conversa precisa de alguém do time. Se a pessoa disse só o dia ou só um período ("amanhã à tarde", "quinta de manhã"), ainda NÃO é agendar: pergunte que horário fica melhor pra ela e use none. Vale também ao remarcar, mesmo que uma conversa anterior tenha sido marcada só com o período.'
+        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário (também ao remarcar), "pausar" quando a conversa precisa de alguém do time. Só dia ou só período ("amanhã à tarde") ainda é none: ofereça os horários do período que o CALENDÁRIO lista, dizendo o dia (sem dia, pergunte o dia).'
       : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca conversas.',
     "- summary: vazio quando action for none. Em " +
       (allowAgendar ? "agendar ou pausar" : "pausar") +
-      ", escreva direto o que a pessoa precisa agora e o contexto útil pra quem vai continuar. Sem floreio. O pedido é o que a pessoa pediu ou disse, nunca o que você sugeriu. Inclua também o que já ficou combinado na conversa (dia e horário marcados) e o que não aconteceu como combinado, dizendo quando tinha sido combinado.",
+      ", escreva direto o que a pessoa precisa agora e o contexto útil pra quem vai continuar. Sem floreio. O pedido é o que a pessoa pediu ou disse, nunca o que você sugeriu. Inclua o que já foi combinado (dia e horário) e o que, combinado, não aconteceu, com quando foi combinado.",
     allowAgendar
       ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça às 15h".'
       : "- preferencia_horario: nunca preencha.",
