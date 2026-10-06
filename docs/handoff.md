@@ -46,7 +46,11 @@ ganhou horário comercial (seg a sex 8 às 18) no prompt avançado e em `agent_c
 4 brechas de calendário (agenda sábado, "17h já passou" às 16h, "amanhã cedo" às 23h50, "de tarde" vira hoje).
 Culpa: modelo (gpt-5.5 acerta, prompt simplificado falha igual). Calendário dos próximos 8 dias calculado pelo
 código e injetado no turno resolve no mini (30/30). Pedido sem o cliente digitar NÃO reproduziu no cérebro.
-Aguardando decisões do dono (calendário no código, trava no agendar, feriados, modelo, suíte fixa).
+Segunda rodada no guiado (odonto, advocacia, loja, pizzaria): mesmo padrão. **Calendário no código FEITO**
+(edcf88f, `calendarioBlock`): erros de aberto/fechado nos segmentos caíram de ~12 para 1 em 120; OBM 28/30;
+`test:e2e:ia` 27/27. Pendentes do dono: trava no agendar, feriados, exemplo "terça à tarde" do prompt da OBM
+(agenda "de tarde" sem dia, 2/3), guardrail barrando valor que o próprio cliente escreveu, suíte fixa.
+Harness da bateria fica no scratchpad da sessão (não está no repo).
 
 **Prioridade 1, decidida pelo dono: bateria de DIAGNÓSTICO do atendimento.** Objetivo: ter certeza
 de que o atendimento está correto e saber de quem é a culpa de cada brecha (modelo, prompt ou desenho
