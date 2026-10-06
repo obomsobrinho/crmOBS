@@ -44,6 +44,12 @@ const N8N_PEDIDO =
   process.env.E2E_N8N === "1" ||
   process.argv.some((a) => a === "n8n" || a === "--project=n8n");
 if (N8N_PEDIDO) process.env.E2E_N8N = "1";
+// O projeto `bateria` (05/10/2026): os 70 casos de diagnóstico do atendimento
+// contra o cérebro real (`*.bateria.spec.ts`). Mesma regra: paga, só pelo nome.
+const BATERIA_PEDIDA =
+  process.env.E2E_BATERIA === "1" ||
+  process.argv.some((a) => a === "bateria" || a === "--project=bateria");
+if (BATERIA_PEDIDA) process.env.E2E_BATERIA = "1";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -162,6 +168,23 @@ export default defineConfig({
             testMatch: /.*.n8n.spec.ts/,
             workers: 1,
             timeout: 240_000,
+            use: {
+              ...devices["Desktop Chrome"],
+              storageState: "e2e/.auth/dono.json",
+            },
+            dependencies: ["setup"],
+          },
+        ]
+      : []),
+    // Os 70 casos de diagnóstico do atendimento. `retries: 1` pelo mesmo motivo
+    // do `ia`: o modelo varia, e só duas falhas seguidas contam.
+    ...(BATERIA_PEDIDA
+      ? [
+          {
+            name: "bateria",
+            testMatch: /.*\.bateria\.spec\.ts/,
+            retries: 1,
+            workers: 3,
             use: {
               ...devices["Desktop Chrome"],
               storageState: "e2e/.auth/dono.json",

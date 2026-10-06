@@ -50,9 +50,7 @@ Segunda rodada no guiado (odonto, advocacia, loja, pizzaria): mesmo padrão. **C
 (edcf88f, `calendarioBlock`): erros de aberto/fechado nos segmentos caíram de ~12 para 1 em 120; OBM 28/30;
 `test:e2e:ia` 27/27. Decidido pelo dono em 05/10: trava no agendar e feriados NÃO, a agenda (Google
 Calendar) resolve. Pendentes: exemplo "terça à tarde" do prompt da OBM (agenda "de tarde" sem dia, 2/3,
-mudança é do dono); guardrail barrando valor que o próprio cliente escreveu (recomendado NÃO mexer: aceitar
-número do cliente deixaria passar "faço por 300"; aguardando o dono); suíte fixa da bateria (explicado,
-aguardando o dono).
+mudança é do dono); guardrail barrando valor do cliente: dono decidiu NÃO mexer. Suíte fixa FEITA: `npm run test:e2e:bateria` (70 casos, 69 ok e 1 pendente do dono).
 Harness da bateria fica no scratchpad da sessão (não está no repo).
 
 **Prioridade 1, decidida pelo dono: bateria de DIAGNÓSTICO do atendimento.** Objetivo: ter certeza

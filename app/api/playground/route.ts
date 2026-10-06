@@ -52,6 +52,12 @@ export async function POST(req: NextRequest) {
     handoffNotice?: string;
     /** Hora fixa do turno (ISO), para a bateria de testes de data e horário. */
     agoraTeste?: string;
+    /**
+     * Horário fixo no modo avançado (o guiado traz o seu em `config.hours`).
+     * Existe para a bateria (`e2e/bateria/`) não depender do horário salvo no
+     * tenant. A rota é sempre dryRun, então nunca chega ao atendimento.
+     */
+    hours?: unknown;
   };
   try {
     body = await req.json();
@@ -94,6 +100,7 @@ export async function POST(req: NextRequest) {
     personaOverride = r.persona;
     horarioOverride = horarioCadastrado(r.config);
   } else if (body.mode === "avancado") {
+    if (body.hours !== undefined) horarioOverride = horarioCadastrado({ hours: body.hours });
     // `buildAdvancedPersona` faz as duas coisas que importam: tira do texto dele
     // qualquer seção da base (para não duplicar) e RECOLA o rabo invariante. Sem
     // recolar, o teste rodaria sem contrato de saída e não provaria nada.
