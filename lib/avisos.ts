@@ -115,12 +115,18 @@ export function textoDoAviso(a: {
   nome: string | null;
   phone: string;
   resumo: string;
+  /** Rótulo do motivo (`rotuloDoMotivo`, lib/motivos.ts), já pronto: este
+   *  módulo não importa nada. null/ausente = a linha some. */
+  motivo?: string | null;
   abrir: string | null;
 }): string {
   const digitos = a.phone.replace(/\D/g, "");
   const blocos = [
     "🙋 *A IA pediu sua ajuda*",
     [`*Cliente:* ${a.nome ?? formatarNumero(digitos)}`, `wa.me/${digitos}`].join("\n"),
+    // O motivo vem antes do pedido: é o que o time lê primeiro para decidir se
+    // abre agora (06/10/2026, P1 item 4).
+    ...(a.motivo?.trim() ? [`*Motivo:* ${a.motivo.trim()}`] : []),
     `*Pedido:* ${a.resumo.trim() || "sem resumo"}`,
   ];
   if (a.abrir) blocos.push(`Abrir no CRM:\n${a.abrir}`);

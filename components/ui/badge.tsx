@@ -44,6 +44,13 @@ const badgeVariants = cva(
           "flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--warn-fill)] px-1.5 text-legenda font-semibold tabular-nums text-[var(--warn-on)]",
         /** Separador de dia no meio da conversa. */
         dia: "rounded-full bg-bloco px-3 py-1 text-legenda font-semibold tracking-wide uppercase text-ink-2",
+        /**
+         * Motivo do pedido de ajuda (06/10/2026, lib/motivos.ts). Neutro de
+         * propósito: motivo não é bom nem ruim, então nada de verde, âmbar ou
+         * vermelho (que são estado).
+         */
+        motivo:
+          "inline-flex shrink-0 items-center rounded-full border border-line-soft bg-bloco px-2 py-0.5 text-legenda text-ink-2",
         /** Tag do contato. */
         tag: "flex items-center gap-1.5 rounded-full border border-line py-0.5 text-legenda",
         /**

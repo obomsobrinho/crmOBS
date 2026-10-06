@@ -9,6 +9,8 @@ export interface Handoff {
   instruction: string | null;
   closedAt: string | null;
   closedHow: "ia" | "resolvido" | null;
+  /** Por que a IA chamou o time (lib/motivos.ts); null = pedido antigo. */
+  motivo?: string | null;
 }
 
 /**

@@ -28,7 +28,7 @@ export function useHandoffsDaConversa({
     if (handoffsPreview) return;
     const { data } = await supabase
       .from("handoffs")
-      .select("id, opened_at, summary, instruction, closed_at, closed_how")
+      .select("id, opened_at, summary, instruction, closed_at, closed_how, motivo")
       .eq("client_id", clientId)
       .eq("phone", phone)
       .order("opened_at", { ascending: true });
@@ -40,6 +40,7 @@ export function useHandoffsDaConversa({
         instruction: r.instruction,
         closedAt: r.closed_at,
         closedHow: r.closed_how as Handoff["closedHow"],
+        motivo: r.motivo,
       }))
     );
   }, [supabase, clientId, phone, handoffsPreview]);
@@ -76,6 +77,7 @@ export function useHandoffsDaConversa({
         instruction: (r.instruction as string | null) ?? null,
         closedAt: (r.closed_at as string | null) ?? null,
         closedHow: (r.closed_how as Handoff["closedHow"]) ?? null,
+        motivo: (r.motivo as string | null) ?? null,
       };
       setHandoffs((cur) =>
         cur.some((h) => h.id === novo.id)

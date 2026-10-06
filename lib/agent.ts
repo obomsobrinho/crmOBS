@@ -2,6 +2,7 @@ import "server-only";
 import { FUSO } from "./fuso";
 import { calendarioBlock, diaDosHorarios, notaDeHorarios } from "./horarios";
 import type { BusinessHours } from "./agent-prompt";
+import { MOTIVOS_DO_MODELO, motivosParaPrompt } from "./motivos";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -26,6 +27,12 @@ export interface AgentOutput {
    * o pedido aberto). Só o `processTurn` lê; o n8n ignora.
    */
   pedido_novo: boolean;
+  /**
+   * POR QUE a IA chamou o time (06/10/2026, `lib/motivos.ts`). Só vale com
+   * `pausar`; vazio no resto. Quem grava (e troca por `seguranca` quando o
+   * guardrail barra) é o `processTurn`; o n8n ignora.
+   */
+  motivo: string;
 }
 
 export interface ChatTurn {
@@ -136,8 +143,13 @@ const OUTPUT_SCHEMA = {
       description:
         "Só vale quando action for agendar ou pausar (com none, false). false SOMENTE quando o cliente repete ou cobra um pedido que JÁ ESTÁ listado em PEDIDOS DE AJUDA EM ABERTO, sobre o MESMO assunto daquele pedido. Qualquer assunto diferente de todos os listados é true, mesmo que o cliente já tenha comentado dele antes na conversa. Na dúvida, true: pedido repetido o time fecha em um clique, pedido engolido ninguém vê.",
     },
+    motivo: {
+      type: "string",
+      enum: [...MOTIVOS_DO_MODELO.map((m) => m.chave), ""],
+      description: `Por que você está chamando o time. Só quando action for pausar; vazio ("") no resto. ${motivosParaPrompt()}.`,
+    },
   },
-  required: ["messages", "action", "summary", "preferencia_horario", "pedido_novo"],
+  required: ["messages", "action", "summary", "preferencia_horario", "pedido_novo", "motivo"],
   additionalProperties: false,
 } as const;
 
@@ -306,6 +318,7 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
     preferencia_horario:
       typeof raw.preferencia_horario === "string" ? raw.preferencia_horario : "",
     pedido_novo: raw.pedido_novo === true,
+    motivo: typeof raw.motivo === "string" ? raw.motivo : "",
   };
 }
 

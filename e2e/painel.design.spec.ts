@@ -17,12 +17,16 @@ async function tema(
   await page.goto("/design/painel");
 }
 
-/** Clica numa aba do seletor de período e espera a troca acontecer. */
+/**
+ * Clica numa aba do seletor de período DA OPERAÇÃO e espera a troca acontecer.
+ * Escopo no bloco: desde 06/10/2026 o "Por que a IA te chamou" tem o próprio
+ * seletor com as mesmas abas (cada bloco manda no próprio período).
+ */
 async function periodo(
   page: import("@playwright/test").Page,
   rotulo: "Dia" | "Semana" | "Quinzena" | "Mês"
 ) {
-  const aba = page.getByRole("tab", { name: rotulo, exact: true });
+  const aba = page.locator('[data-slot="painel-operacao"]').getByRole("tab", { name: rotulo, exact: true });
   await aba.click();
   await expect(aba).toHaveAttribute("aria-selected", "true");
 }
@@ -192,7 +196,9 @@ test.describe("Painel: filtro de período", () => {
   test("os quatro períodos existem e trocam os números", async ({ page }) => {
     await page.goto("/design/painel");
     for (const r of ["Dia", "Semana", "Quinzena", "Mês"] as const) {
-      await expect(page.getByRole("tab", { name: r, exact: true })).toBeVisible();
+      await expect(
+        page.locator('[data-slot="painel-operacao"]').getByRole("tab", { name: r, exact: true })
+      ).toBeVisible();
     }
 
     const autonomia = page

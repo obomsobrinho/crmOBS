@@ -69,6 +69,8 @@ export function applyGuardrail(
     summary: `Resposta retida pelo guardrail: ${reason}.`,
     preferencia_horario: "",
     pedido_novo: output.pedido_novo,
+    // `motivoDoPedido` (lib/motivos.ts) troca por "seguranca" ao gravar.
+    motivo: "seguranca",
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

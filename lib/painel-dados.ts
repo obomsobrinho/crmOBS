@@ -61,3 +61,31 @@ export async function carregarAgregadoDoPainel(
     series.data as SeriesAgregadas | null
   );
 }
+
+/**
+ * "Por que a IA te chamou" (06/10/2026, P1 item 4): pedidos de ajuda que
+ * ABRIRAM em cada janela, por motivo, contados no banco (`painel_motivos`, no
+ * máximo janelas x 10 linhas pequenas). Mesma regra das outras: o número de
+ * avisos fica fora, e erro do banco levanta em vez de virar zero. A posição da
+ * janela na lista vira o índice (1 = a primeira).
+ */
+export async function carregarMotivosDoPainel(
+  supabase: Supa,
+  o: { clientId: string; avisos: string | null | undefined; janelas: LimitesDeJanela[] }
+): Promise<{ janela: number; motivo: string | null; n: number }[]> {
+  if (o.janelas.length === 0) return [];
+  const { data, error } = await supabase.rpc("painel_motivos", {
+    p_client: o.clientId,
+    p_fora: foraDaLista(o.avisos),
+    p_de: o.janelas.map((j) => iso(j.de)),
+    p_ate: o.janelas.map((j) => iso(j.ate)),
+  });
+  if (error) throw new Error(`painel_motivos: ${error.message}`);
+  // O gerador tipa toda coluna de RPC como não nula; `motivo` volta NULL para
+  // os pedidos de antes do motivo existir.
+  return (data ?? []).map((r) => ({
+    janela: Number(r.janela),
+    motivo: r.motivo ?? null,
+    n: Number(r.n) || 0,
+  }));
+}

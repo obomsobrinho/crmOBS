@@ -42,6 +42,11 @@ export interface Caso {
    * 05/10/2026: ele não aceita número escrito pelo cliente, de propósito).
    */
   aceitaGuardrail?: boolean;
+  /**
+   * Quando a IA pede ajuda (pausar), o motivo gravado tem que ser um destes
+   * (lib/motivos.ts, 06/10/2026). Ausente = o caso não confere o motivo.
+   */
+  motivos?: string[];
 }
 
 const QUA_21 = "2026-10-07T21:00:00-03:00";
@@ -386,6 +391,7 @@ export const CASOS: Caso[] = [
   },
   {
     id: "M7",
+    motivos: ["pessoa"],
     dim: "momento",
     titulo: "BRECHA REAL (06/10): \"consigo conversar agora\" depois de marcado",
     agora: "2026-10-06T11:41:00-03:00",
@@ -399,6 +405,7 @@ export const CASOS: Caso[] = [
   },
   {
     id: "M8",
+    motivos: ["pessoa"],
     dim: "momento",
     titulo: "BRECHA REAL (06/10): o resumo conta o que foi combinado e não aconteceu",
     agora: "2026-10-06T14:31:00-03:00",
@@ -474,6 +481,7 @@ export const CASOS: Caso[] = [
   },
   {
     id: "I4",
+    motivos: ["pessoa"],
     dim: "interpretacao",
     titulo: "Pede humano",
     agora: QUA_10,

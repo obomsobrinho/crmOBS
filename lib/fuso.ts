@@ -50,3 +50,17 @@ export function diaMesHoraSP(instante: string | number): string {
     timeZone: FUSO,
   });
 }
+
+/**
+ * "30 set, 14:05": dia, mês abreviado sem ponto e hora. É o "quando" da página
+ * de Pedidos (abertura e fechamento de cada pedido).
+ */
+export function diaMesCurtoHoraSP(iso: string): string {
+  const d = new Date(iso);
+  const dia = d
+    .toLocaleDateString("pt-BR", { day: "numeric", month: "short", timeZone: FUSO })
+    .replace(" de ", " ")
+    .replace(".", "");
+  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
+  return `${dia}, ${hora}`;
+}

@@ -2,6 +2,7 @@ import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildFallbackPersona, compilePersona, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
+import { motivoDoPedido, rotuloDoMotivo } from "@/lib/motivos";
 import {
   runAgent,
   type AgentOutput,
@@ -511,6 +512,10 @@ export async function processTurn(
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
   let stageWouldMove: string | null = null;
   let avisoAgendado = false;
+  // POR QUE a IA chamou o time (lib/motivos.ts). Só existe quando a ação é
+  // pausar; o guardrail que barrou ganha de tudo ("seguranca").
+  const motivo =
+    output.action === "pausar" ? motivoDoPedido(output.motivo, guardrail.blocked) : null;
   if (output.action !== "none") {
     if (dryRun) {
       const canonical = await loadCanonical(svc, clientId);
@@ -540,7 +545,7 @@ export async function processTurn(
         // O id volta porque o link do aviso abre ESTE pedido na página.
         const { data: novoPedido, error: rErr } = await svc
           .from("handoffs")
-          .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary })
+          .insert({ client_id: clientId, phone, opened_at: abertoEm, summary: output.summary, motivo })
           .select("id")
           .maybeSingle();
         if (rErr) console.error("falha ao registrar o handoff:", rErr.message);
@@ -554,6 +559,7 @@ export async function processTurn(
             phone,
             pedidoId: (novoPedido?.id as number | undefined) ?? null,
             resumo: output.summary,
+            motivo,
             instancia: (client.evolution_instance as string | null) ?? null,
             destino: avisos,
           });
@@ -576,6 +582,7 @@ export async function processTurn(
     action: output.action,
     summary: output.summary,
     preferenciaHorario: output.preferencia_horario,
+    motivo,
     ragSearched,
     ragMatches,
     stageWouldMove,
@@ -632,6 +639,7 @@ function agendarAviso(a: {
   phone: string;
   pedidoId: number | null;
   resumo: string;
+  motivo: string | null;
   instancia: string | null;
   destino: string | null;
 }): boolean {
@@ -658,6 +666,7 @@ function agendarAviso(a: {
             nome,
             phone: a.phone,
             resumo: a.resumo,
+            motivo: a.motivo ? rotuloDoMotivo(a.motivo) : null,
             abrir: linkDoPedido(a.pedidoId),
           })
         );
@@ -741,6 +750,7 @@ function silentTurn(
       summary: "",
       preferencia_horario: "",
       pedido_novo: false,
+      motivo: "",
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e

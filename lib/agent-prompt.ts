@@ -7,6 +7,8 @@
 // então `buildPersona` compila para dentro desse campo e o efeito é imediato,
 // sem tocar no workflow de produção.
 
+import { chavesDosMotivos } from "./motivos";
+
 export type Tone = "formal" | "profissional" | "amigavel" | "descontraido";
 // "agendar" = marcar uma conversa com o time (rótulo na UI). O valor interno é
 // mantido como "agendar" porque é o que o n8n (action) espera. NÃO é agenda.
@@ -457,6 +459,7 @@ export function buildPersona(cfg: AgentConfig): string {
       action: "none" | "agendar" | "pausar";
       summary: string;
       preferencia_horario: string;
+      motivo?: string;
     }
   ) => `Pessoa: "${pessoa}"\nSaída: ${JSON.stringify(out)}`;
 
@@ -526,6 +529,7 @@ export function buildPersona(cfg: AgentConfig): string {
       action: "pausar",
       summary: "Pessoa pediu para falar com um humano.",
       preferencia_horario: "",
+      motivo: "pessoa",
     }),
     // O aviso nomeia O QUE vai ser verificado. É o que diferencia "vou passar
     // pro time" (que não diz nada à pessoa) de uma resposta de gente.
@@ -534,6 +538,7 @@ export function buildPersona(cfg: AgentConfig): string {
       action: "pausar",
       summary: "Pessoa quer saber se tem horário disponível hoje.",
       preferencia_horario: "",
+      motivo: "falta_info",
     })
   );
   const exemplos = exemplosLines.join("\n");
@@ -697,7 +702,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
       ? // ⚠️ 06/10/2026, decisão do dono: "amanhã à tarde" não marca nada; a IA
         // pergunta o horário. Mora AQUI, no contrato da base, porque vale para
         // todo tenant e passa por cima do texto de cada um ("dia e período").
-        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário, "pausar" quando a conversa precisa de alguém do time. Se a pessoa disse só o dia ou só um período ("amanhã à tarde", "quinta de manhã"), ainda NÃO é agendar: pergunte que horário fica melhor pra ela e use none.'
+        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário, "pausar" quando a conversa precisa de alguém do time. Se a pessoa disse só o dia ou só um período ("amanhã à tarde", "quinta de manhã"), ainda NÃO é agendar: pergunte que horário fica melhor pra ela e use none. Vale também ao remarcar, mesmo que uma conversa anterior tenha sido marcada só com o período.'
       : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca conversas.',
     "- summary: vazio quando action for none. Em " +
       (allowAgendar ? "agendar ou pausar" : "pausar") +
@@ -705,6 +710,12 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     allowAgendar
       ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça às 15h".'
       : "- preferencia_horario: nunca preencha.",
+    // Motivo do pedido de ajuda (06/10/2026, P1 item 4): o cliente vê no Painel
+    // por que a IA o chamou. A lista é de `lib/motivos.ts`.
+    // Só a lista de chaves: o que cada uma quer dizer vai na descrição do campo
+    // no formato da resposta (lib/agent.ts), que o modelo também recebe. Escrever
+    // de novo aqui custava ~550 caracteres do teto de cada tenant.
+    `- motivo: só quando action for pausar, por que você está chamando o time (${chavesDosMotivos()}). Vazio ("") no resto.`,
   ].join("\n");
 
   return [precedencia, quandoHumano, conducao, antiManip, output].join("\n\n");
@@ -833,6 +844,10 @@ export function buildFallbackPersona(companyName: string): string {
     '- action: "none" nas primeiras mensagens, "pausar" assim que entender o que a pessoa precisa.',
     "- summary: vazio quando action for none. Em pausar, escreva o que a pessoa precisa.",
     "- preferencia_horario: nunca preencha.",
+    // Só a lista de chaves: o que cada uma quer dizer vai na descrição do campo
+    // no formato da resposta (lib/agent.ts), que o modelo também recebe. Escrever
+    // de novo aqui custava ~550 caracteres do teto de cada tenant.
+    `- motivo: só quando action for pausar, por que você está chamando o time (${chavesDosMotivos()}). Vazio ("") no resto.`,
   ].join("\n");
 }
 

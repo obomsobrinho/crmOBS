@@ -174,7 +174,10 @@ test.describe("Painel com dados reais", () => {
     await expect(page.getByRole("heading", { name: "Movimento" })).toBeVisible();
     // Dois seletores, um por bloco: não existe mais seletor global. O da
     // operação prova que os quatro períodos foram calculados no servidor.
-    await expect(page.getByRole("tablist", { name: "Período" })).toBeVisible();
+    // Escopo na operação: o "Por que a IA te chamou" tem o próprio seletor (06/10/2026).
+    await expect(
+      page.locator('[data-slot="painel-operacao"]').getByRole("tablist", { name: "Período" })
+    ).toBeVisible();
     await expect(
       page.getByRole("tablist", { name: "Janela do movimento" })
     ).toBeVisible();

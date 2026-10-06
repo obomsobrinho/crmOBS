@@ -13,6 +13,8 @@ import {
   PainelUltimaResposta,
 } from "@/components/PainelBlocos";
 import PainelAssuntos from "@/components/painel/PainelAssuntos";
+import PainelMotivos, { type MotivosDoPeriodo } from "@/components/painel/PainelMotivos";
+import { contagemPorMotivo } from "@/lib/motivos";
 import ValorResumo from "@/components/ValorResumo";
 import {
   AreaRolavel,
@@ -41,7 +43,7 @@ import {
   montarJanelas,
   resumoDeValorAgregado,
 } from "@/lib/painel-agregado";
-import { carregarAgregadoDoPainel } from "@/lib/painel-dados";
+import { carregarAgregadoDoPainel, carregarMotivosDoPainel } from "@/lib/painel-dados";
 import { dentroDoHorario, parteLocal } from "@/lib/valor";
 import { frasesDeValor, mesFechado, rotuloDoMes } from "@/lib/valor";
 import type { BusinessHours } from "@/lib/agent-prompt";
@@ -83,7 +85,11 @@ export default async function PainelPage() {
     fimMs: Date.parse(mes.fimISO),
   });
 
-  const [agregado, { data: cfg }, espera, { data: verbatimLinhas }] =
+  // As janelas ATUAIS dos quatro períodos, para o bloco de motivos (o anterior
+  // não entra: o bloco não compara, só conta).
+  const janelasDosMotivos = ORDEM_PERIODOS.map((k) => plano.lista[plano.operacao[k].atual - 1]);
+
+  const [agregado, { data: cfg }, espera, { data: verbatimLinhas }, motivosLinhas] =
     await Promise.all([
       // ⚠️ SEM LINHAS (02/10/2026, R-04, docs/adr/2026-10-02-painel-agrega-no-banco.md).
       // Antes a página baixava até 20.000 linhas e contava em memória, mas o
@@ -128,7 +134,17 @@ export default async function PainelPage() {
         p_min: VERBATIM_MIN_CHARS,
         p_fora: foraDaLista(client.avisos),
       }),
+      // Pedidos de ajuda por motivo (06/10/2026, P1 item 4), contados no banco.
+      carregarMotivosDoPainel(supabase, {
+        clientId: client.id,
+        avisos: client.avisos,
+        janelas: janelasDosMotivos,
+      }),
     ]);
+
+  const motivos = Object.fromEntries(
+    ORDEM_PERIODOS.map((k, i) => [k, contagemPorMotivo(motivosLinhas.filter((l) => l.janela === i + 1))])
+  ) as Record<PeriodoKey, MotivosDoPeriodo>;
 
   const hours = (cfg?.hours as BusinessHours | null | undefined) ?? null;
 
@@ -333,6 +349,10 @@ export default async function PainelPage() {
             esperaMs={esperaMs}
             espera={esperaTexto}
           />
+          {/* No celular a coluna vira `contents` e cada filho entra na grade pela
+              ordem: o primeiro (fila) e o último (assuntos) já têm a sua; este,
+              do meio, vai logo depois do movimento. */}
+          <PainelMotivos porPeriodo={motivos} className="max-md:order-4" />
           {/* ⚠️ Sem `itens`, e por isso sai o estado vazio honesto: não existe
               coluna que classifique o ASSUNTO de um turno. Quando existir, a
               página passa a lista e o placeholder some sozinho. */}

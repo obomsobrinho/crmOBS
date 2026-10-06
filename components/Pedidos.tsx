@@ -9,13 +9,16 @@ import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { CabecalhoBloco } from "./ContactFields";
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
-import { FUSO, formatEspera, prettyPhone } from "@/lib/format";
+import { formatEspera, prettyPhone } from "@/lib/format";
+import { diaMesCurtoHoraSP } from "@/lib/fuso";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
@@ -28,6 +31,7 @@ import {
   ehAberto,
   encaixarAbertosDaConversa,
   encaixarResolvido,
+  casaMotivo,
   type ContatoLinha,
   type PedidoAberto,
   type PedidoItem,
@@ -43,6 +47,7 @@ import {
   type FontePedidos,
   type ParamsPedidos,
 } from "@/lib/pedidos-fonte";
+import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
 import { cn } from "@/lib/utils";
 
 // PEDIDOS DE AJUDA (refeita em 30/09/2026, docs/plano-fechar-p0.md, itens 1 e 2).
@@ -70,16 +75,8 @@ async function postar(url: string, corpo: unknown): Promise<Response | null> {
   }
 }
 
-/** "30 set, 14:05", sempre no fuso de São Paulo. */
-function quando(iso: string): string {
-  const d = new Date(iso);
-  const dia = d
-    .toLocaleDateString("pt-BR", { day: "numeric", month: "short", timeZone: FUSO })
-    .replace(" de ", " ")
-    .replace(".", "");
-  const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
-  return `${dia}, ${hora}`;
-}
+/** "30 set, 14:05", sempre no fuso de São Paulo (lib/fuso.ts). */
+const quando = diaMesCurtoHoraSP;
 
 // PAGINAÇÃO E REALTIME (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
 // A lista da aba ativa vem de UMA fonte (`lib/pedidos-fonte.ts`, a mesma da
@@ -140,6 +137,9 @@ export default function Pedidos({
   const [aba, setAba] = useState<Aba>(inicial.aba);
   const [selecionado, setSelecionado] = useState<PedidoItem | null>(inicial.abrir);
   const [q, setQ] = useState("");
+  // Filtro por motivo (06/10/2026, lib/motivos.ts): vai ao SERVIDOR como a
+  // busca, e os números das abas seguem ele.
+  const [motivo, setMotivo] = useState<string | null>(null);
   // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
   const busca = useDebounce(q.trim(), 300);
   const [resultado, setResultado] = useState<Resultado | null>(null);
@@ -148,7 +148,7 @@ export default function Pedidos({
   // render é impuro, e a espera é grossa (minutos, horas).
   const [agora, setAgora] = useState(() => Date.now());
 
-  const params = useMemo<ParamsPedidos>(() => ({ aba, busca, fora }), [aba, busca, fora]);
+  const params = useMemo<ParamsPedidos>(() => ({ aba, busca, fora, motivo }), [aba, busca, fora, motivo]);
   const { itens, setItens, temMais, carregando, fimRef, revalidar } = usePaginada<PedidoItem, ParamsPedidos>({
     inicial: inicial.itens,
     temMaisInicial: inicial.temMais,
@@ -176,16 +176,26 @@ export default function Pedidos({
 
   const recontar = useCallback(async () => {
     try {
-      setContagens(await fonte.contagens(fora));
+      setContagens(await fonte.contagens(fora, motivo));
     } catch (e) {
       console.error("contagens de pedidos:", e);
     }
-  }, [fonte, fora]);
+  }, [fonte, fora, motivo]);
+
+  /** Trocou o filtro: a lista recarrega (params) e os números das abas acompanham. */
+  function trocarMotivo(v: string) {
+    const novo = ehMotivo(v) ? v : null;
+    setMotivo(novo);
+    fonte
+      .contagens(fora, novo)
+      .then(setContagens)
+      .catch((e) => console.error("contagens de pedidos:", e));
+  }
 
   // O que o realtime precisa saber sem refazer o canal a cada render.
-  const vivo = useRef({ aba, busca, temMais, selecionado });
+  const vivo = useRef({ aba, busca, motivo, temMais, selecionado });
   useEffect(() => {
-    vivo.current = { aba, busca, temMais, selecionado };
+    vivo.current = { aba, busca, motivo, temMais, selecionado };
   });
 
   /**
@@ -198,12 +208,16 @@ export default function Pedidos({
       const v = vivo.current;
       try {
         if (v.aba === "abertos") {
-          const novos = await fonte.abertosDoFone(fora, phone);
+          const novos = (await fonte.abertosDoFone(fora, phone)).filter((p) => casaMotivo(p, v.motivo));
           setItens((cur) => encaixarAbertosDaConversa(cur, phone, novos, v.busca, v.temMais));
         } else {
           const lidos = await Promise.all(ids.map((id) => fonte.porId(fora, id).then((i) => [id, i] as const)));
           setItens((cur) =>
-            lidos.reduce((acc, [id, i]) => encaixarResolvido(acc, id, i, v.busca, v.temMais, Date.now()), cur)
+            lidos.reduce(
+              (acc, [id, i]) =>
+                encaixarResolvido(acc, id, i && casaMotivo(i, v.motivo) ? i : null, v.busca, v.temMais, Date.now()),
+              cur
+            )
           );
         }
         if (v.selecionado && v.selecionado.phone === phone) {
@@ -268,6 +282,7 @@ export default function Pedidos({
       openedAt: p.openedAt,
       closedAt: new Date().toISOString(),
       summary: p.summary,
+      motivo: p.motivo,
       nome: p.nome,
       fotoPath: p.fotoPath,
       como,
@@ -405,6 +420,19 @@ export default function Pedidos({
                 className="text-apoio"
               />
             </div>
+            <Select value={motivo ?? "todos"} onValueChange={trocarMotivo}>
+              <SelectTrigger aria-label="Filtrar por motivo" data-filtro="motivo" className="mt-2 md:w-[260px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os motivos</SelectItem>
+                {MOTIVOS.map((m) => (
+                  <SelectItem key={m.chave} value={m.chave}>
+                    {m.rotulo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {resultado && (
@@ -426,6 +454,10 @@ export default function Pedidos({
             {linhas.length === 0 && carregando ? (
               <p data-slot="pedidos-carregando" className="px-5 py-10 text-center text-apoio text-ink-3">
                 Carregando…
+              </p>
+            ) : linhas.length === 0 && busca === "" && motivo ? (
+              <p data-slot="pedidos-vazio" className="px-5 py-10 text-center text-apoio text-ink-3">
+                Nenhum pedido com o motivo “{rotuloDoMotivo(motivo)}”.
               </p>
             ) : linhas.length === 0 && busca === "" ? (
               <EstadoVazio
@@ -575,6 +607,11 @@ function LinhaPedido({
           <span className="mt-0.5 line-clamp-2 text-apoio text-ink-2">
             {p.summary?.trim() || "A IA não soube responder e passou para o time."}
           </span>
+          {p.motivo && (
+            <Badge variant="motivo" data-motivo={p.motivo} className="mt-1.5">
+              {rotuloDoMotivo(p.motivo)}
+            </Badge>
+          )}
         </span>
         <span
           data-slot="pedido-espera"
@@ -671,6 +708,9 @@ function FichaPedido({
           </div>
 
           <div className="flex flex-col">
+            <Par rotulo="Motivo">
+              <span data-slot="pedido-motivo">{rotuloDoMotivo(p.motivo)}</span>
+            </Par>
             <Par rotulo="Aberto em">{quando(p.openedAt)}</Par>
             {ehAberto ? (
               <>

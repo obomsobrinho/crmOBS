@@ -1,6 +1,7 @@
 "use client";
 
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
+import { rotuloDoMotivo } from "@/lib/motivos";
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -134,6 +135,8 @@ export function SummaryPanel({ diag }: { diag: TurnDiagnostics | null }) {
           label="Resumo do caso"
           value={diag ? diag.summary || "sem resumo" : "aguardando"}
         />
+        {/* Motivo do pedido de ajuda (06/10/2026): só existe quando ela pede. */}
+        {diag?.motivo && <Field label="Motivo do pedido" value={rotuloDoMotivo(diag.motivo)} />}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Field
             label="Preferência de horário"

@@ -108,3 +108,23 @@ test("Orientar pela página fecha como IA e guarda a orientação", async ({ pag
     .poll(() => estadoDaConversa(servico(), clientId))
     .toMatchObject({ handoffAt: null });
 });
+
+// MOTIVO DO PEDIDO (06/10/2026, P1 item 4): a etiqueta na linha e o filtro, que
+// vai ao banco (`pedidos_pagina` com `p_motivo`), na sessão do dono.
+test("o motivo aparece na linha e o filtro por motivo vai ao banco", async ({ page }) => {
+  const id = await abrirPedido("Quer saber o valor do serviço (motivo e2e)");
+  await servico().from("handoffs").update({ motivo: "preco" }).eq("id", id);
+  const linha = await linhaDoPedido(page, id);
+  await expect(linha).toContainText("Preço ou orçamento");
+  await page.getByLabel("Filtrar por motivo").click();
+  await page.getByRole("option", { name: "Reclamação" }).click();
+  await expect(page.locator(`[data-pedido="${id}"]`)).toHaveCount(0);
+  await page.getByLabel("Filtrar por motivo").click();
+  await page.getByRole("option", { name: "Preço ou orçamento" }).click();
+  await expect(page.locator(`[data-pedido="${id}"]`)).toBeVisible();
+  // Nenhuma linha de outro motivo na lista filtrada.
+  const motivos = await page.locator('[data-slot="pedido-linha"] [data-motivo]').evaluateAll((els) =>
+    els.map((e) => e.getAttribute("data-motivo"))
+  );
+  expect(motivos.every((m) => m === "preco")).toBe(true);
+});

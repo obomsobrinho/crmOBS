@@ -27,8 +27,8 @@ export default async function DesignPedidosPage({
       ? []
       : [
           // Fora de ordem de propósito: quem ordena é a página.
-          { id: 3, phone: "5511955554444", opened_at: iso(12 * 60_000), summary: "Quer saber se dá para parcelar em 10 vezes" },
-          { id: 1, phone: "5511912345678", opened_at: iso(6 * H), summary: "Pediu o valor da troca da lente com antirreflexo" },
+          { id: 3, phone: "5511955554444", opened_at: iso(12 * 60_000), summary: "Quer saber se dá para parcelar em 10 vezes", motivo: "falta_info" },
+          { id: 1, phone: "5511912345678", opened_at: iso(6 * H), summary: "Pediu o valor da troca da lente com antirreflexo", motivo: "preco" },
           { id: 2, phone: "5511912345678", opened_at: iso(40 * 60_000), summary: "Perguntou se a loja abre no feriado" },
         ];
   const contatos: ContatoLinha[] = [
@@ -45,7 +45,7 @@ export default async function DesignPedidosPage({
             closed_at: iso(27 * H), closed_how: "ia", closed_by: "u1",
           },
           {
-            id: 6, phone: "5511912345678", opened_at: iso(50 * H), summary: "Pediu para falar com uma pessoa sobre a garantia",
+            id: 6, phone: "5511912345678", opened_at: iso(50 * H), summary: "Pediu para falar com uma pessoa sobre a garantia", motivo: "pessoa",
             instruction: null, closed_at: iso(48 * H), closed_how: "resolvido", closed_by: "u1",
           },
         ];

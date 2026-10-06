@@ -14,6 +14,8 @@ export interface PedidoLinha {
   phone: string;
   opened_at: string;
   summary: string | null;
+  /** Chave de lib/motivos.ts; null = pedido de antes do motivo existir. */
+  motivo?: string | null;
 }
 
 export interface ContatoLinha {
@@ -28,6 +30,8 @@ export interface PedidoAberto {
   phone: string;
   openedAt: string;
   summary: string | null;
+  /** Por que a IA chamou o time (lib/motivos.ts); null = "Sem motivo". */
+  motivo: string | null;
   /** Nome do contato, ou null (a tela mostra o telefone). */
   nome: string | null;
   /** Foto guardada do contato (lib/fotos.ts), ou null (a tela mostra iniciais). */
@@ -69,6 +73,7 @@ export function montarFila(
       phone: p.phone,
       openedAt: p.opened_at,
       summary: p.summary,
+      motivo: p.motivo ?? null,
       nome: nomes.get(p.phone) ?? null,
       fotoPath: fotos.get(p.phone) ?? null,
       posicao,
@@ -98,6 +103,7 @@ export interface PedidoResolvidoLinha {
   closed_at: string;
   closed_how: string | null;
   closed_by: string | null;
+  motivo?: string | null;
 }
 
 export interface PedidoResolvido {
@@ -106,6 +112,8 @@ export interface PedidoResolvido {
   openedAt: string;
   closedAt: string;
   summary: string | null;
+  /** Por que a IA chamou o time (lib/motivos.ts); null = "Sem motivo". */
+  motivo: string | null;
   nome: string | null;
   fotoPath: string | null;
   /** `ia` = orientado e a IA respondeu; `resolvido` = alguém do time fechou. */
@@ -140,6 +148,7 @@ export function montarResolvidos(
       openedAt: p.opened_at,
       closedAt: p.closed_at,
       summary: p.summary,
+      motivo: p.motivo ?? null,
       nome: nomes.get(p.phone) ?? null,
       fotoPath: fotos.get(p.phone) ?? null,
       como: p.closed_how === "ia" || p.closed_how === "resolvido" ? p.closed_how : null,
@@ -162,6 +171,14 @@ export function casaBuscaPedido(
   if (normalizar([p.nome, p.summary].filter(Boolean).join(" ")).includes(nq)) return true;
   const dq = q.replace(/\D/g, "");
   return dq.length >= 2 && p.phone.replace(/\D/g, "").includes(dq);
+}
+
+/**
+ * Filtro por motivo (06/10/2026, lib/motivos.ts). `null` = todos. É o mesmo
+ * `p_motivo` de `pedidos_pagina`/`pedidos_contagens`: mudou um, muda o outro.
+ */
+export function casaMotivo(p: { motivo: string | null }, motivo: string | null | undefined): boolean {
+  return !motivo || p.motivo === motivo;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,6 +205,7 @@ export type LinhaPedidoBanco = LinhaRpc<
   | "nomewpp"
   | "display_name"
   | "foto_path"
+  | "motivo"
   | "posicao"
   | "total"
 >;
@@ -206,6 +224,7 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
       phone: l.phone,
       openedAt: l.opened_at,
       summary: l.summary,
+      motivo: l.motivo ?? null,
       nome,
       fotoPath: l.foto_path ?? null,
       posicao: Number(l.posicao) || 1,
@@ -218,6 +237,7 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
     openedAt: l.opened_at,
     closedAt: l.closed_at,
     summary: l.summary,
+    motivo: l.motivo ?? null,
     nome,
     fotoPath: l.foto_path ?? null,
     como: l.closed_how === "ia" || l.closed_how === "resolvido" ? l.closed_how : null,

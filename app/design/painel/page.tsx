@@ -19,6 +19,8 @@ import PainelAssuntos, {
   type AssuntoEmAlta,
 } from "@/components/painel/PainelAssuntos";
 import ValorResumo from "@/components/ValorResumo";
+import PainelMotivos, { type MotivosDoPeriodo } from "@/components/painel/PainelMotivos";
+import { contagemPorMotivo } from "@/lib/motivos";
 import { barras, type DashboardMetrics, type JanelaMsg } from "@/lib/metrics";
 import {
   limites,
@@ -43,6 +45,32 @@ import type { BarraHora } from "@/lib/painel";
 // A seção "estados finos", no fim, NÃO faz parte da tela: ela existe para o
 // preview provar, sem dado real, que conta nova não vê parede de zeros nem
 // número inventado.
+// "Por que a IA te chamou" (06/10/2026): contagem de MENTIRA por motivo, nos
+// quatro períodos, pela mesma `contagemPorMotivo` da página real.
+const MOTIVOS_MOCK: Record<"dia" | "semana" | "quinzena" | "mes", MotivosDoPeriodo> = {
+  dia: contagemPorMotivo([]),
+  semana: contagemPorMotivo([
+    { motivo: "preco", n: 5 },
+    { motivo: "pessoa", n: 3 },
+    { motivo: "falta_info", n: 2 },
+    { motivo: "reclamacao", n: 1 },
+  ]),
+  quinzena: contagemPorMotivo([
+    { motivo: "preco", n: 9 },
+    { motivo: "pessoa", n: 6 },
+    { motivo: "falta_info", n: 4 },
+    { motivo: "fechar", n: 2 },
+    { motivo: null, n: 3 },
+  ]),
+  mes: contagemPorMotivo([
+    { motivo: "preco", n: 22 },
+    { motivo: "pessoa", n: 9 },
+    { motivo: "falta_info", n: 6 },
+    { motivo: "reclamacao", n: 3 },
+    { motivo: null, n: 7 },
+  ]),
+};
+
 export const dynamic = "force-dynamic";
 
 const AGORA = Date.now();
@@ -405,6 +433,7 @@ export default function DesignPainelPage() {
               esperaMs={12 * 60 * 1000}
               espera="há 12 minutos"
             />
+            <PainelMotivos porPeriodo={MOTIVOS_MOCK} className="max-md:order-4" />
             <PainelAssuntos
               itens={ASSUNTOS}
               periodo="7 dias"

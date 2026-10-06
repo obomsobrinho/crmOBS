@@ -3,6 +3,7 @@ import type { ArgsRpc } from "@/lib/supabase/schema";
 import {
   PAGINA_PEDIDOS,
   casaBuscaPedido,
+  casaMotivo,
   ehAberto,
   inicioDosResolvidos,
   montarFila,
@@ -34,6 +35,8 @@ export interface ParamsPedidos {
   busca: string;
   /** Grafias do número de avisos, só dígitos (`foraDaLista`): nunca é pedido. */
   fora: string[];
+  /** Filtro por motivo (chave de lib/motivos.ts); ausente/null = todos. */
+  motivo?: string | null;
 }
 
 export interface ContagensPedidos {
@@ -50,7 +53,8 @@ export interface FontePedidos {
   porId(fora: string[], id: number): Promise<PedidoItem | null>;
   /** A fila aberta de UMA conversa, com posição e total refeitos. */
   abertosDoFone(fora: string[], phone: string): Promise<PedidoAberto[]>;
-  contagens(fora: string[]): Promise<ContagensPedidos>;
+  /** Os números das abas, seguindo o filtro de motivo (senão a aba mentiria). */
+  contagens(fora: string[], motivo?: string | null): Promise<ContagensPedidos>;
 }
 
 export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
@@ -70,6 +74,7 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
         p_cursor_em: depois ? (ehAberto(depois) ? depois.openedAt : depois.closedAt) : null,
         p_cursor_id: depois?.id ?? null,
         p_limite: n,
+        p_motivo: p.motivo ?? null,
       });
     },
     async porId(fora, id) {
@@ -79,11 +84,12 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
       const l = await chamar({ p_aba: "abertos", p_fora: fora, p_telefone: phone, p_limite: 50 });
       return l.filter(ehAberto);
     },
-    async contagens(fora) {
+    async contagens(fora, motivo) {
       const { data, error } = await supabase.rpc("pedidos_contagens", {
         p_client: clientId,
         p_fora: fora,
         p_desde: inicioDosResolvidos(Date.now()),
+        p_motivo: motivo ?? null,
       });
       if (error) throw error;
       const c = (data ?? [])[0];
@@ -108,8 +114,8 @@ export function fonteDaMemoria(
   const resolvidos = montarResolvidos(resolvidosRaw, contatos, avisos);
   return {
     async pagina(p, depois, n = PAGINA_PEDIDOS) {
-      const lista: PedidoItem[] = (p.aba === "abertos" ? abertos : resolvidos).filter((x) =>
-        casaBuscaPedido(x, p.busca)
+      const lista: PedidoItem[] = (p.aba === "abertos" ? abertos : resolvidos).filter(
+        (x) => casaBuscaPedido(x, p.busca) && casaMotivo(x, p.motivo)
       );
       if (!depois) return lista.slice(0, n);
       const ini = lista.findIndex((x) =>
@@ -125,8 +131,11 @@ export function fonteDaMemoria(
     async abertosDoFone(_fora, phone) {
       return abertos.filter((x) => x.phone === phone);
     },
-    async contagens() {
-      return { abertos: abertos.length, resolvidos: resolvidos.length };
+    async contagens(_fora, motivo) {
+      return {
+        abertos: abertos.filter((x) => casaMotivo(x, motivo)).length,
+        resolvidos: resolvidos.filter((x) => casaMotivo(x, motivo)).length,
+      };
     },
   };
 }

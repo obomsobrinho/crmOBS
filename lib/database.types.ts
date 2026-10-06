@@ -595,6 +595,7 @@ export type Database = {
           closed_how: string | null
           id: number
           instruction: string | null
+          motivo: string | null
           opened_at: string
           phone: string
           summary: string | null
@@ -606,6 +607,7 @@ export type Database = {
           closed_how?: string | null
           id?: never
           instruction?: string | null
+          motivo?: string | null
           opened_at?: string
           phone: string
           summary?: string | null
@@ -617,6 +619,7 @@ export type Database = {
           closed_how?: string | null
           id?: never
           instruction?: string | null
+          motivo?: string | null
           opened_at?: string
           phone?: string
           summary?: string | null
@@ -1050,6 +1053,19 @@ export type Database = {
           tem_user: boolean
         }[]
       }
+      painel_motivos: {
+        Args: {
+          p_ate?: string[]
+          p_client: string
+          p_de?: string[]
+          p_fora?: string[]
+        }
+        Returns: {
+          janela: number
+          motivo: string
+          n: number
+        }[]
+      }
       painel_series: {
         Args: {
           p_ate: string
@@ -1074,7 +1090,12 @@ export type Database = {
         }[]
       }
       pedidos_contagens: {
-        Args: { p_client: string; p_desde?: string; p_fora?: string[] }
+        Args: {
+          p_client: string
+          p_desde?: string
+          p_fora?: string[]
+          p_motivo?: string
+        }
         Returns: {
           abertos: number
           resolvidos: number
@@ -1091,6 +1112,7 @@ export type Database = {
           p_fora?: string[]
           p_id?: number
           p_limite?: number
+          p_motivo?: string
           p_telefone?: string
         }
         Returns: {
@@ -1101,6 +1123,7 @@ export type Database = {
           foto_path: string
           id: number
           instruction: string
+          motivo: string
           nomewpp: string
           opened_at: string
           phone: string

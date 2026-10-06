@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { formatEspera } from "@/lib/format";
+import { rotuloDoMotivo } from "@/lib/motivos";
 import type { Handoff } from "./HandoffCard";
 
 export type OutgoingMedia = {
@@ -316,7 +317,15 @@ export default function MessageComposer({
             <LifeBuoy size={16} className="mt-0.5 shrink-0 text-warn-ink" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-legenda text-warn-ink">
-                <span className="font-semibold">A IA pediu sua ajuda</span>
+                <span className="font-semibold">
+                  A IA pediu sua ajuda
+                  {pedido.handoff.motivo && (
+                    <span data-slot="pedido-motivo" className="font-normal">
+                      {" "}
+                      · {rotuloDoMotivo(pedido.handoff.motivo)}
+                    </span>
+                  )}
+                </span>
                 <span data-slot="pedido-posicao" suppressHydrationWarning>
                   {pedido.total > 1 ? `${pedido.posicao} de ${pedido.total} · ` : ""}há{" "}
                   {formatEspera(pedido.handoff.openedAt)}

@@ -35,7 +35,7 @@ const HORARIO_OBM = {
 
 interface Resposta {
   output: Saida;
-  diagnostics: { guardrail: { blocked: boolean; reason: string | null } };
+  diagnostics: { guardrail: { blocked: boolean; reason: string | null }; motivo?: string | null };
 }
 
 async function rodar(request: APIRequestContext, c: Caso, corpo: Record<string, unknown>) {
@@ -55,7 +55,13 @@ async function rodar(request: APIRequestContext, c: Caso, corpo: Record<string, 
     ? c.aceitaGuardrail
       ? []
       : [`guardrail bloqueou: ${r.diagnostics.guardrail.reason}`]
-    : c.check(r.output, texto);
+    : [
+        ...c.check(r.output, texto),
+        // O motivo gravado (lib/motivos.ts), só quando ela pediu ajuda.
+        ...(c.motivos && r.output.action === "pausar" && !c.motivos.includes(r.diagnostics.motivo ?? "")
+          ? [`motivo=${r.diagnostics.motivo ?? "nenhum"}, esperado ${c.motivos.join("|")}`]
+          : []),
+      ];
   expect(
     falhas,
     `${c.titulo}\nesperado: ${c.espera}\naction=${r.output.action}; resposta: ${r.output.messages.join(" / ")}`

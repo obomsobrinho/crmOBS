@@ -23,6 +23,7 @@ const linhaBanco = (o: Record<string, unknown>) => ({
   nomewpp: null,
   display_name: null,
   foto_path: null,
+  motivo: null,
   posicao: 1,
   total: 1,
   ...o,

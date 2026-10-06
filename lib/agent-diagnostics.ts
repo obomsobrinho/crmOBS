@@ -39,6 +39,8 @@ export interface TurnDiagnostics {
   action: string; // espelha output.action
   summary: string; // espelha output.summary
   preferenciaHorario: string; // espelha output.preferencia_horario
+  /** Motivo do pedido de ajuda (lib/motivos.ts); null fora de pausar. */
+  motivo?: string | null;
   ragSearched: boolean; // havia base e a pergunta foi embedada
   ragMatches: RagMatchDiag[]; // trechos recuperados, com similaridade
   stageWouldMove: string | null; // estágio (key) que a IA moveria; null = não move
