@@ -119,7 +119,7 @@ const OUTPUT_SCHEMA = {
       type: "string",
       enum: ["none", "agendar", "pausar"],
       description:
-        "none = seguir a conversa. agendar = a pessoa combinou dia e período com o time. pausar = a pessoa quer falar com um humano ou o assunto saiu do escopo.",
+        "none = seguir a conversa. agendar = a pessoa combinou dia e horário com o time. pausar = a pessoa quer falar com um humano ou o assunto saiu do escopo.",
     },
     summary: {
       type: "string",
@@ -129,7 +129,7 @@ const OUTPUT_SCHEMA = {
     preferencia_horario: {
       type: "string",
       description:
-        "Dia e período preferidos pela pessoa (ex.: quarta de manhã). Só quando action for agendar.",
+        "Dia e horário combinados com a pessoa (ex.: quarta às 15h). Só quando action for agendar.",
     },
     pedido_novo: {
       type: "boolean",

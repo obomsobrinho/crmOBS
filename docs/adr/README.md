@@ -89,6 +89,7 @@
 | 2026-10-03-test-phone-never-reaches-evolution.md | n8n, testing | Accepted | A test phone (DDD 00) never reaches Evolution: IF before every Evolution node in n8n, telefoneImpossivel in the app, checar fails the export otherwise |
 | 2026-10-03-disconnect-and-switch-whatsapp-number.md | onboarding, WhatsApp | Accepted | Owner-only explicit logout of an open instance (agent goes Desativado, history stays), switch number on the same instance via the existing connect flow, webhook re-pointed, notices destination to be rechecked |
 | 2026-10-05-turn-calendar-computed-in-code.md | agent, prompt | Accepted | Every turn gets a code-computed CALENDÁRIO (today plus 7, weekday, open/closed/already closed) from the registered hours only; the model never does calendar arithmetic |
+| 2026-10-06-schedule-needs-time-and-summary-keeps-agreements.md | agent, prompt | Accepted | A meeting is agendar only with day AND time (period alone: ask the time), listed in PRECEDÊNCIA; the help summary keeps what was agreed and what did not happen |
 | undated-agent-enabled-vs-published-at.md | onboarding | Accepted (see also 2026-08-28-agent-switch-two-columns.md) | agent_enabled is the switch; agent_published_at is the first activation and is never cleared |
 | undated-agent-turns-metering.md | agent-ai | Accepted | agent_turns: one measurement row per AI turn, best-effort, no message content |
 | undated-asaas-billing-and-webhook.md | billing | Accepted | Asaas billing: subscribe, idempotent public webhook, event map, cash-register screen |

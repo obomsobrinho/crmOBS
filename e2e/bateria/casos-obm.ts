@@ -146,9 +146,10 @@ export const CASOS: Caso[] = [
     agora: QUA_10,
     history: ATE_CONVITE,
     message: "hoje a tarde pode ser",
-    espera: "Agenda hoje (quarta) à tarde. Não empurra para amanhã.",
+    espera: "Hoje à tarde ainda vale: pergunta que horário (só período não agenda, decisão de 06/10). Não empurra para amanhã.",
     check: (s, t) => [
-      ...action(s, ["agendar"]),
+      ...action(s, ["none"]),
+      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
       ...naoTem(t, /amanh[ãa]/, "empurrou para amanhã"),
     ],
   },
@@ -216,9 +217,10 @@ export const CASOS: Caso[] = [
     agora: DOM_20,
     history: ATE_CONVITE,
     message: "amanhã a tarde",
-    espera: "Agenda segunda à tarde. Não diz que não atende (segunda é dia útil).",
+    espera: "Segunda à tarde vale: pergunta que horário. Não diz que não atende (segunda é dia útil).",
     check: (s, t) => [
-      ...action(s, ["agendar"]),
+      ...action(s, ["none"]),
+      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
       ...naoTem(t, HOJE, "falou em hoje/agora"),
     ],
   },
@@ -273,11 +275,11 @@ export const CASOS: Caso[] = [
     agora: QUA_10,
     history: AGENDADO_TERCA,
     message: "na verdade melhor quinta de manhã",
-    espera: "Reagenda para quinta de manhã (agendar), sem manter terça.",
+    espera: "Aceita trocar para quinta de manhã e pergunta que horário, sem manter terça.",
     check: (s, t) => [
-      ...action(s, ["agendar"]),
-      ...tem(`${t} ${s.preferencia_horario.toLowerCase()}`, /quinta/, "não trocou para quinta"),
-      ...naoTem(s.preferencia_horario.toLowerCase(), /ter[çc]a/, "preferencia ficou terça"),
+      ...action(s, ["none"]),
+      ...tem(t, /quinta/, "não trocou para quinta"),
+      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
     ],
   },
   {
@@ -396,6 +398,24 @@ export const CASOS: Caso[] = [
     ],
   },
   {
+    id: "M8",
+    dim: "momento",
+    titulo: "BRECHA REAL (06/10): o resumo conta o que foi combinado e não aconteceu",
+    agora: "2026-10-06T14:31:00-03:00",
+    history: [
+      ...AGENDADO_TERCA,
+      { role: "user", content: "Ok, surgiu uma brecha aqui e eu consigo conversar agora, pode ser ?" },
+      { role: "assistant", content: "Claro, pode ser sim." },
+    ],
+    message: "Na verdade não consegui entrar, vamos marcar para agora",
+    espera: "Pausa (quer alguém agora). O resumo diz que a conversa imediata combinada antes não aconteceu.",
+    check: (s) => [
+      ...action(s, ["pausar"]),
+      ...tem(s.summary.toLowerCase(), /n[ãa]o (conseguiu|aconteceu|deu certo)|n[ãa]o entrou|falhou/, "o resumo não diz que a conversa combinada não aconteceu"),
+      ...tem(s.summary.toLowerCase(), /agora/, "o resumo não diz que quer agora"),
+    ],
+  },
+  {
     id: "M6",
     dim: "momento",
     titulo: "Retomada com orientação que não é horário",
@@ -477,8 +497,6 @@ export const CASOS: Caso[] = [
   },
   {
     id: "I6",
-    pendente:
-      "o exemplo \"deixei reservado pra terça à tarde\" do prompt da OBM puxa o agente a agendar sem o dia (2 de 3 em 05/10); o prompt é do dono",
     dim: "interpretacao",
     titulo: "Só o período: \"de tarde\"",
     agora: QUA_10,

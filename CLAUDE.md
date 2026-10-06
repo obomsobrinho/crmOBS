@@ -64,7 +64,7 @@ API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground
 
 ## How to run
 - Dev: `npm run dev` (port 3001 via `.claude/launch.json`). Types/build: `npm run build`. Lint: `npm run lint`.
-- E2E (Playwright, `e2e/`, details in `e2e/README.md`, credentials in `.env.e2e.local`, outside git): `npm run test:e2e -- --project=sem-login` (fake `/design` screens); `npm run test:e2e:login` (setup + `logado` + `atendente` + `logado-serial`, real DB on the OBS tenant); `npm run test:e2e:ia` (12 paid real-brain traps, only when named); `npm run test:e2e:n8n` (paid end-to-end attendance battery against production n8n, only when named); `npm run test:e2e:bateria` (72 paid diagnostic attendance cases, only when named). Also a `mobile` project.
+- E2E (Playwright, `e2e/`, details in `e2e/README.md`, credentials in `.env.e2e.local`, outside git): `npm run test:e2e -- --project=sem-login` (fake `/design` screens); `npm run test:e2e:login` (setup + `logado` + `atendente` + `logado-serial`, real DB on the OBS tenant); `npm run test:e2e:ia` (12 paid real-brain traps, only when named); `npm run test:e2e:n8n` (paid end-to-end attendance battery against production n8n, only when named); `npm run test:e2e:bateria` (73 paid diagnostic attendance cases, only when named). Also a `mobile` project.
 - Close a delivery with the `fechar-entrega` skill (types, lint, build, the right suites). Beta metrics: skill `consultas-beta`.
 
 ## Where to read more

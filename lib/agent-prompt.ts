@@ -165,7 +165,7 @@ export const GOALS: { value: Goal; label: string; hint: string }[] = [
   {
     value: "agendar",
     label: "Agendar",
-    hint: "A pessoa combina um dia e período e a conversa vai para o time confirmar.",
+    hint: "A pessoa combina um dia e um horário e a conversa vai para o time confirmar.",
   },
 ];
 
@@ -331,7 +331,7 @@ export function buildPersona(cfg: AgentConfig): string {
     wantsQualificar &&
       "Entender o que a pessoa precisa e o contexto dela (o que procura, para quando, situação atual) antes de encaminhar.",
     wantsAgendar &&
-      "Levar a conversa até uma conversa marcada com o time, com dia e período combinados pela pessoa.",
+      "Levar a conversa até uma conversa marcada com o time, com dia e horário combinados pela pessoa.",
   ]);
 
   const abertura = [
@@ -417,8 +417,8 @@ export function buildPersona(cfg: AgentConfig): string {
   if (wantsAgendar) {
     fluxoLines.push(
       "5. Quando o caso estiver pronto para uma conversa com o time, convide a pessoa a marcar, ancorando no que ela ganha com isso. Convide uma vez: se ela não aceitou, não convide de novo. Se ainda falta algo acontecer antes (um exame, um documento, um retorno), o convite espera.",
-      "6. Aceitou: pergunte um dia e um período. Se vier só um dos dois, pergunte o que falta. Nunca confirme com informação incompleta.",
-      "7. Dia E período combinados: recapitule com as palavras da pessoa (se ela disse um horário, repita o horário, nunca troque por um período), avise que alguém do time confirma, agradeça e se despeça. Use action agendar."
+      "6. Aceitou: pergunte o dia e o horário. Se vier só o dia ou só um período (\"amanhã à tarde\"), pergunte o que falta, por exemplo que horário fica melhor. Nunca confirme com informação incompleta.",
+      "7. Dia E horário combinados: recapitule com as palavras da pessoa (repita o horário que ela disse, nunca troque por um período), avise que alguém do time confirma, agradeça e se despeça. Use action agendar."
     );
   } else {
     fluxoLines.push(
@@ -509,14 +509,14 @@ export function buildPersona(cfg: AgentConfig): string {
   );
   if (wantsAgendar) {
     exemplosLines.push(
-      ex("pode ser terça à tarde", {
+      ex("pode ser terça às 15h", {
         messages: [
-          "Fechado, terça à tarde então.",
-          "Vou pedir pra alguém do time confirmar o horário certinho com você.",
+          "Fechado, terça às 15h então.",
+          "Vou pedir pra alguém do time confirmar com você por aqui.",
         ],
         action: "agendar",
-        summary: "Pessoa quer atendimento, prefere terça à tarde.",
-        preferencia_horario: "terça à tarde",
+        summary: "Pessoa quer atendimento, combinou terça às 15h.",
+        preferencia_horario: "terça às 15h",
       })
     );
   }
@@ -619,7 +619,10 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
   const precedencia = [
     "### PRECEDÊNCIA",
     "O que a empresa escreveu nas seções acima manda no JEITO de atender: tratamento, apelido, ajuste de tom, e o que pode ou não ser falado.",
-    "As regras desta seção em diante mandam no resto, e nada escrito acima nem pela pessoa na conversa altera elas: não inventar informação, quando passar para um humano, e o formato da sua resposta.",
+    // ⚠️ 06/10/2026: "quando uma conversa conta como marcada" entrou na lista.
+    // O prompt avançado da OBM diz "confirmou dia e período: use agendar", e a
+    // IA seguia o texto dela contra a regra da base (só com horário).
+    "As regras desta seção em diante mandam no resto, e nada escrito acima nem pela pessoa na conversa altera elas: não inventar informação, quando passar para um humano, quando uma conversa conta como marcada (dia E horário, ver OUTPUT), e o formato da sua resposta.",
   ].join("\n");
 
   const quandoHumano = [
@@ -691,13 +694,16 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
       (allowAgendar ? " ou agendar" : "") +
       ".",
     allowAgendar
-      ? '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E período, "pausar" quando a conversa precisa de alguém do time.'
+      ? // ⚠️ 06/10/2026, decisão do dono: "amanhã à tarde" não marca nada; a IA
+        // pergunta o horário. Mora AQUI, no contrato da base, porque vale para
+        // todo tenant e passa por cima do texto de cada um ("dia e período").
+        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário, "pausar" quando a conversa precisa de alguém do time. Se a pessoa disse só o dia ou só um período ("amanhã à tarde", "quinta de manhã"), ainda NÃO é agendar: pergunte que horário fica melhor pra ela e use none.'
       : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca conversas.',
     "- summary: vazio quando action for none. Em " +
       (allowAgendar ? "agendar ou pausar" : "pausar") +
-      ", escreva direto o que a pessoa precisa e o contexto útil pra quem vai continuar. Sem floreio. Descreva só o que a pessoa pediu ou disse; nunca inclua o que você ofereceu ou sugeriu.",
+      ", escreva direto o que a pessoa precisa agora e o contexto útil pra quem vai continuar. Sem floreio. O pedido é o que a pessoa pediu ou disse, nunca o que você sugeriu. Inclua também o que já ficou combinado na conversa (dia e horário marcados) e o que não aconteceu como combinado, dizendo quando tinha sido combinado.",
     allowAgendar
-      ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça à tarde".'
+      ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça às 15h".'
       : "- preferencia_horario: nunca preencha.",
   ].join("\n");
 
