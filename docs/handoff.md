@@ -48,8 +48,11 @@ Culpa: modelo (gpt-5.5 acerta, prompt simplificado falha igual). Calendário dos
 código e injetado no turno resolve no mini (30/30). Pedido sem o cliente digitar NÃO reproduziu no cérebro.
 Segunda rodada no guiado (odonto, advocacia, loja, pizzaria): mesmo padrão. **Calendário no código FEITO**
 (edcf88f, `calendarioBlock`): erros de aberto/fechado nos segmentos caíram de ~12 para 1 em 120; OBM 28/30;
-`test:e2e:ia` 27/27. Pendentes do dono: trava no agendar, feriados, exemplo "terça à tarde" do prompt da OBM
-(agenda "de tarde" sem dia, 2/3), guardrail barrando valor que o próprio cliente escreveu, suíte fixa.
+`test:e2e:ia` 27/27. Decidido pelo dono em 05/10: trava no agendar e feriados NÃO, a agenda (Google
+Calendar) resolve. Pendentes: exemplo "terça à tarde" do prompt da OBM (agenda "de tarde" sem dia, 2/3,
+mudança é do dono); guardrail barrando valor que o próprio cliente escreveu (recomendado NÃO mexer: aceitar
+número do cliente deixaria passar "faço por 300"; aguardando o dono); suíte fixa da bateria (explicado,
+aguardando o dono).
 Harness da bateria fica no scratchpad da sessão (não está no repo).
 
 **Prioridade 1, decidida pelo dono: bateria de DIAGNÓSTICO do atendimento.** Objetivo: ter certeza

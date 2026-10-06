@@ -24,6 +24,6 @@ It is the principle already used for operator guidance (`notaDeHorarios`, docs/a
 
 ## Consequences
 - About ten lines more per turn, no model change.
-- Holidays are not in the calendar. The agent schedules on a holiday because nobody tells it. Adding national holidays or per-tenant closed dates is an owner decision, pending.
-- A code-level lock on `agendar` (refuse a closed day or a passed hour) and storing the agreed slot as a real date are the next layer if a slip still appears; not built.
+- Holidays are not in the calendar. The agent schedules on a holiday because nobody tells it. Owner decision (2026-10-05): not built now; the Google Calendar integration (P2, `docs/proximos-passos.md`) covers it.
+- A code-level lock on `agendar` (refuse a closed day or a passed hour) is NOT built. Owner decision (2026-10-05): the real agenda (Google Calendar, with agent tools) resolves it.
 - Proof: offline `e2e/horarios.design.spec.ts` (the block itself) and the paid `e2e/horarios.ia.spec.ts` ("Calendário do turno, guiado": the three failures above, guided mode with fixed hours in the body).
