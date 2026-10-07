@@ -126,33 +126,48 @@ export function horarioCadastrado(agentConfig: unknown): BusinessHours | null {
 }
 
 /**
- * "À TARDE" (decisão do dono, 06/10/2026): das 13h às 17h, em horário cheio. Se
- * a pessoa diz "hoje à tarde" às 13h, valem 14h, 15h, 16h e 17h: só o que ainda
- * não chegou. A conta é do código; a IA recebe a lista pronta e pergunta qual
- * horário fica melhor. Manhã e noite ainda não têm faixa definida pelo dono.
+ * PERÍODOS DO DIA, TIRADOS DO EXPEDIENTE DE CADA EMPRESA (decisão do dono,
+ * 06/10/2026: "tem que olhar de acordo com as configurações da empresa, deve ser
+ * algo automático e não engessado").
+ *
+ * As faixas são fixas (tarde das 13h às 17h foi o dono quem disse; a manhã vai
+ * até as 11h porque a tarde começa às 13h; a noite começa às 18h, quando a tarde
+ * acaba), mas o que é OFERECIDO é a faixa cortada pelo horário cadastrado de cada
+ * dia: hora cheia a partir da abertura e antes do fechamento. Por isso a OBM (8h
+ * às 18h) tem manhã 8h a 11h e tarde 13h a 17h, e nenhuma noite; a pizzaria (18h
+ * às 23h) só tem noite, 18h a 22h. Hoje, só o que ainda não chegou: às 13h, "agora
+ * à tarde" vale 14h a 17h. Sem horário cadastrado não há lista: inventar
+ * expediente é pior que perguntar.
  */
-export const TARDE = { de: 13, ate: 17 } as const;
+export const PERIODOS_DO_DIA = [
+  { chave: "manha", nome: "manhã", de: 0, ate: 11 },
+  { chave: "tarde", nome: "tarde", de: 13, ate: 17 },
+  { chave: "noite", nome: "noite", de: 18, ate: 23 },
+] as const;
+
+export type PeriodoDoDia = (typeof PERIODOS_DO_DIA)[number]["chave"];
 
 /**
- * Os horários cheios da tarde que valem num dia: dentro de `TARDE`, depois de
- * agora (só hoje) e dentro do expediente cadastrado (hora de início antes do
- * fechamento). Dia fechado: nenhum. Sem horário cadastrado: só a faixa e o
- * relógio.
+ * As horas cheias de um período que valem num dia: dentro da faixa, dentro do
+ * expediente (início a partir da abertura e antes do fechamento; o que vira a
+ * noite vale até a meia-noite) e, hoje, depois de agora. Dia fechado ou sem
+ * horário cadastrado: nenhuma.
  */
-export function horariosDaTarde(
+export function horariosDoPeriodo(
+  periodo: PeriodoDoDia,
   agoraMin: number | null,
   dia: { open: boolean; from: string; to: string } | null
 ): number[] {
-  if (dia && !dia.open) return [];
+  if (!dia || !dia.open) return [];
+  const faixa = PERIODOS_DO_DIA.find((p) => p.chave === periodo)!;
+  const de = minutos(dia.from);
+  const ate = minutos(dia.to);
+  const fim = ate > de ? ate : 24 * 60;
   const out: number[] = [];
-  for (let h = TARDE.de; h <= TARDE.ate; h++) {
+  for (let h = faixa.de; h <= faixa.ate; h++) {
     const m = h * 60;
+    if (m < de || m >= fim) continue;
     if (agoraMin !== null && m <= agoraMin) continue;
-    if (dia) {
-      const de = minutos(dia.from);
-      const ate = minutos(dia.to);
-      if (ate > de && (m < de || m >= ate)) continue;
-    }
     out.push(h);
   }
   return out;
@@ -216,19 +231,21 @@ export function calendarioBlock(now: Date, hours: BusinessHours | null): string 
     linhas.push(`- ${rotulo}: ${situacao}`);
   }
   if (proxima) linhas.push(`- Fechado agora. Próxima abertura: ${proxima}. Ao dizer que está fechado, diga também quando abre.`);
-  // A tarde de hoje e de amanhã, já resolvidas (decisão do dono, 06/10/2026).
-  const diaDe = (i: number) => {
-    if (!hours) return null;
-    const d = new Date(Date.UTC(y, m - 1, d0 + i, 12));
-    return hours[CHAVE_POR_DIA[d.getUTCDay()]];
-  };
-  const tardeHoje = horariosDaTarde(agora, diaDe(0));
-  const tardeAmanha = horariosDaTarde(null, diaDe(1));
-  linhas.push(
-    `- "À tarde" = das ${TARDE.de}h às ${TARDE.ate}h, em horário cheio. Hoje à tarde: ${
-      tardeHoje.length ? `ainda valem ${listaDeHoras(tardeHoje)}` : "não vale mais"
-    }. Amanhã à tarde: ${tardeAmanha.length ? listaDeHoras(tardeAmanha) : "não atende"}.`
-  );
+  // Os horários por período de hoje e de amanhã, já resolvidos pelo expediente
+  // (decisão do dono, 06/10/2026). Sem horário cadastrado, a linha não existe.
+  if (hours) {
+    const diaDe = (i: number) => hours[CHAVE_POR_DIA[new Date(Date.UTC(y, m - 1, d0 + i, 12)).getUTCDay()]];
+    const doDia = (i: number) =>
+      PERIODOS_DO_DIA.map((p) => ({ p, hs: horariosDoPeriodo(p.chave, i === 0 ? agora : null, diaDe(i)) }))
+        .filter((x) => x.hs.length > 0)
+        .map((x) => `${x.p.nome} ${listaDeHoras(x.hs)}`)
+        .join("; ");
+    linhas.push(
+      `- Horários para oferecer quando a pessoa diz só o período (hora cheia, dentro do expediente). Hoje: ${
+        doDia(0) || "nenhum"
+      }. Amanhã: ${doDia(1) || "nenhum"}. Período que não aparece aqui não é atendido. Remarcar também precisa do horário: ofereça estes horários mesmo que a conversa anterior tenha sido marcada só com o período.`
+    );
+  }
   return [
     "### CALENDÁRIO",
     hours

@@ -154,7 +154,7 @@ export const CASOS: Caso[] = [
     espera: "Hoje à tarde ainda vale: pergunta que horário (só período não agenda, decisão de 06/10). Não empurra para amanhã.",
     check: (s, t) => [
       ...action(s, ["none"]),
-      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
+      ...tem(t, /hor[áa]rio|que horas|qual hora|\b\d{1,2} ?h\b/, "não perguntou o horário"),
       ...naoTem(t, /amanh[ãa]/, "empurrou para amanhã"),
     ],
   },
@@ -211,7 +211,22 @@ export const CASOS: Caso[] = [
     check: (s, t) => [
       ...action(s, ["none"]),
       ...tem(t, /14/, "não ofereceu 14h"),
-      ...naoTem(t, /13 ?h|13:00/, "ofereceu 13h, que já chegou"),
+      ...naoTem(t, /\b13 ?h|13:00/, "ofereceu 13h, que já chegou"),
+    ],
+  },
+  {
+    id: "P13",
+    dim: "periodo",
+    titulo: "Decisão do dono (06/10): \"amanhã de manhã\" oferece os horários da manhã do expediente",
+    agora: QUA_10,
+    history: ATE_CONVITE,
+    message: "amanhã de manhã",
+    espera: "Pergunta o horário oferecendo 8h, 9h, 10h ou 11h de quinta (amanhã). Não agenda sem horário.",
+    check: (s, t) => [
+      ...action(s, ["none"]),
+      ...tem(t, /\b8 ?h|\b9 ?h|10 ?h|11 ?h/, "não ofereceu horário da manhã"),
+      ...tem(t, /amanh[ãa]|quinta/, "não disse o dia"),
+      ...naoTem(t, /1[2-9] ?h/, "ofereceu horário fora da manhã"),
     ],
   },
   {
@@ -239,7 +254,7 @@ export const CASOS: Caso[] = [
     espera: "Segunda à tarde vale: pergunta que horário. Não diz que não atende (segunda é dia útil).",
     check: (s, t) => [
       ...action(s, ["none"]),
-      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
+      ...tem(t, /hor[áa]rio|que horas|qual hora|\b\d{1,2} ?h\b/, "não perguntou o horário"),
       ...naoTem(t, HOJE, "falou em hoje/agora"),
     ],
   },
@@ -298,7 +313,7 @@ export const CASOS: Caso[] = [
     check: (s, t) => [
       ...action(s, ["none"]),
       ...tem(t, /quinta/, "não trocou para quinta"),
-      ...tem(t, /hor[áa]rio|que horas|qual hora/, "não perguntou o horário"),
+      ...tem(t, /hor[áa]rio|que horas|qual hora|\b\d{1,2} ?h\b/, "não perguntou o horário"),
     ],
   },
   {

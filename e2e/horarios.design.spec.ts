@@ -5,7 +5,7 @@ import {
   diaDosHorarios,
   DIAS_DO_CALENDARIO,
   horarioCadastrado,
-  horariosDaTarde,
+  horariosDoPeriodo,
   horariosCitados,
   minutosAgoraSP,
   notaDeHorarios,
@@ -125,27 +125,43 @@ test.describe("Calendário do turno (lib/horarios.ts)", () => {
   });
 });
 
-// "À TARDE" (decisão do dono, 06/10/2026): das 13h às 17h em horário cheio, e só
-// o que ainda não chegou. Às 13h, "agora à tarde" vale 14h, 15h, 16h e 17h.
-test.describe("A tarde do calendário (lib/horarios.ts)", () => {
-  test("às 13h valem 14h a 17h; às 10h, 13h a 17h; depois das 17h, nada", () => {
+// PERÍODOS DO DIA PELO EXPEDIENTE (decisões do dono, 06/10/2026): tarde das 13h
+// às 17h, manhã até as 11h, noite a partir das 18h, sempre cortados pelo horário
+// cadastrado e, hoje, só o que ainda não chegou. Nada sem horário cadastrado.
+test.describe("Períodos do dia pelo expediente (lib/horarios.ts)", () => {
+  test("a OBM (8h às 18h): manhã 8h a 11h, tarde 13h a 17h, nenhuma noite", () => {
     const dia = COMERCIAL.qua;
-    expect(horariosDaTarde(13 * 60, dia)).toEqual([14, 15, 16, 17]);
-    expect(horariosDaTarde(13 * 60 + 20, dia)).toEqual([14, 15, 16, 17]);
-    expect(horariosDaTarde(10 * 60, dia)).toEqual([13, 14, 15, 16, 17]);
-    expect(horariosDaTarde(17 * 60, dia)).toEqual([]);
-    // Dia que fecha às 16h: 16h e 17h ficam fora (começariam no fechamento ou depois).
-    expect(horariosDaTarde(null, { open: true, from: "08:00", to: "16:00" })).toEqual([13, 14, 15]);
-    expect(horariosDaTarde(null, COMERCIAL.sab)).toEqual([]);
-    expect(horariosDaTarde(null, null)).toEqual([13, 14, 15, 16, 17]);
+    expect(horariosDoPeriodo("manha", null, dia)).toEqual([8, 9, 10, 11]);
+    expect(horariosDoPeriodo("tarde", null, dia)).toEqual([13, 14, 15, 16, 17]);
+    expect(horariosDoPeriodo("noite", null, dia)).toEqual([]);
   });
 
-  test("o bloco diz a tarde de hoje e a de amanhã, já resolvidas", () => {
+  test("hoje, só o que ainda não chegou: às 13h a tarde vale 14h a 17h", () => {
+    const dia = COMERCIAL.qua;
+    expect(horariosDoPeriodo("tarde", 13 * 60, dia)).toEqual([14, 15, 16, 17]);
+    expect(horariosDoPeriodo("tarde", 13 * 60 + 20, dia)).toEqual([14, 15, 16, 17]);
+    expect(horariosDoPeriodo("tarde", 10 * 60, dia)).toEqual([13, 14, 15, 16, 17]);
+    expect(horariosDoPeriodo("manha", 10 * 60, dia)).toEqual([11]);
+    expect(horariosDoPeriodo("tarde", 17 * 60, dia)).toEqual([]);
+  });
+
+  test("outros expedientes: fecha às 16h, abre às 9h, pizzaria só à noite, fechado, sem horário", () => {
+    expect(horariosDoPeriodo("tarde", null, { open: true, from: "08:00", to: "16:00" })).toEqual([13, 14, 15]);
+    expect(horariosDoPeriodo("manha", null, { open: true, from: "09:30", to: "18:00" })).toEqual([10, 11]);
+    const pizzaria = { open: true, from: "18:00", to: "23:00" };
+    expect(horariosDoPeriodo("noite", null, pizzaria)).toEqual([18, 19, 20, 21, 22]);
+    expect(horariosDoPeriodo("tarde", null, pizzaria)).toEqual([]);
+    expect(horariosDoPeriodo("noite", null, { open: true, from: "18:00", to: "02:00" })).toEqual([18, 19, 20, 21, 22, 23]);
+    expect(horariosDoPeriodo("tarde", null, COMERCIAL.sab)).toEqual([]);
+    expect(horariosDoPeriodo("tarde", null, null)).toEqual([]);
+  });
+
+  test("o bloco diz os períodos de hoje e de amanhã; sem horário cadastrado, não diz", () => {
     const quarta13 = calendarioBlock(new Date("2026-10-07T13:00:00-03:00"), COMERCIAL);
-    expect(quarta13).toContain("Hoje à tarde: ainda valem 14h, 15h, 16h e 17h");
-    expect(quarta13).toContain("Amanhã à tarde: 13h, 14h, 15h, 16h e 17h");
+    expect(quarta13).toContain("Hoje: tarde 14h, 15h, 16h e 17h. Amanhã: manhã 8h, 9h, 10h e 11h; tarde 13h, 14h, 15h, 16h e 17h.");
+    expect(quarta13).not.toContain("noite");
     const sexta19 = calendarioBlock(new Date("2026-10-09T19:00:00-03:00"), COMERCIAL);
-    expect(sexta19).toContain("Hoje à tarde: não vale mais");
-    expect(sexta19).toContain("Amanhã à tarde: não atende");
+    expect(sexta19).toContain("Hoje: nenhum. Amanhã: nenhum.");
+    expect(calendarioBlock(new Date("2026-10-07T13:00:00-03:00"), null)).not.toContain("Horários para oferecer");
   });
 });

@@ -298,7 +298,7 @@ test.describe("jornadas com o cérebro real", () => {
     expect(texto).toMatch(/desconto/i);
     // ⚠️ E fala COM o cliente, não SOBRE ele (26/09/2026): o agente chegou a dizer
     // "como esse cliente é indicação" ao próprio cliente, copiando a orientação.
-    expect(texto).not.toMatch(/(esse|este|o) cliente/i);
+    expect(texto).not.toMatch(/\b(esse|este|o) cliente\b/i);
     // Consumo único: na mensagem seguinte ela não vale mais.
     await expect.poll(() => estadoDaConversa(svc, clientId)).toMatchObject({ orientacao: null });
   });

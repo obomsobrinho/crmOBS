@@ -121,6 +121,26 @@ for (const f of lista("n8n", ".json")) {
   }
 }
 
+// CARACTERE DE CONTROLE EM TEXTO (07/10/2026): um `\b` de regex escrito por
+// script virou o caractere backspace (0x08) e a expressão passou a nunca casar,
+// então o teste "aprovava" sem conferir nada (achado em e2e/atendimento.serial
+// e nos casos novos da bateria). Nenhum arquivo de texto do repo tem motivo
+// para ter controle além de tab, quebra de linha e retorno de carro.
+const TEXTO = /\.(ts|tsx|mjs|js|md|sql|json|css)$/;
+const PULAR = new Set(["node_modules", ".next", ".git", "test-results", "playwright-report"]);
+const varrer = (dir) => {
+  for (const ent of fs.readdirSync(path.join(raiz, dir), { withFileTypes: true })) {
+    if (PULAR.has(ent.name)) continue;
+    const rel = dir === "." ? ent.name : `${dir}/${ent.name}`;
+    if (ent.isDirectory()) varrer(rel);
+    else if (TEXTO.test(ent.name) && /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(ler(rel)))
+      erros.push(`${rel}: control character in a text file (a regex \\b written by a script becomes backspace)`);
+  }
+};
+for (const d of ["app", "components", "lib", "e2e", "scripts", "docs", "supabase", ".claude/rules"]) {
+  if (fs.existsSync(path.join(raiz, d))) varrer(d);
+}
+
 for (const e of erros) console.error(`erro: ${e}`);
 console.log(`checagens: ${erros.length} erro(s)`);
 process.exit(erros.length ? 1 : 0);
