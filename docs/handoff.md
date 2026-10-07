@@ -33,6 +33,15 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
+### 07/10/2026: PRÓXIMO PASSO (fazer primeiro)
+
+Tudo de 05 a 07/10 está commitado e no ar (calendário no código, motivo do pedido, tarde/manhã/noite
+pelo expediente, bateria fixa `npm run test:e2e:bateria`). Próximo no plano: **P1 item 5, orientação
+vira regra permanente do agente** (`docs/proximos-passos.md`): começar por um plano curto para o dono
+aprovar (onde a sugestão "salvar como regra" aparece, onde a regra mora, como o dono revisa e apaga).
+Pendência de qualidade, se o dono quiser antes: o caso M8 da bateria (o resumo do pedido diz que a
+conversa combinada antes não aconteceu) acerta 3 de 5.
+
 ### 05/10/2026: FAZER PRIMEIRO NA PRÓXIMA SESSÃO
 
 **Onde estamos.** Auditoria de 01 e 02/10 fechada e no ar (13 frentes; relatório visual em
