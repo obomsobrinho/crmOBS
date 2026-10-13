@@ -142,7 +142,7 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
-    // database.types.ts is generated (it still lists the legacy closed_how column).
+    // database.types.ts is generated, never linted by these rules.
     ignores: ["components/ui/**", "app/design/**", "lib/database.types.ts"],
     rules: {
       "no-restricted-syntax": ["warn", ...conjunto()],

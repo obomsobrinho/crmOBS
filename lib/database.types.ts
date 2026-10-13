@@ -593,7 +593,6 @@ export type Database = {
           client_id: string
           closed_at: string | null
           closed_by: string | null
-          closed_how: string | null
           id: number
           instruction: string | null
           motivo: string | null
@@ -607,7 +606,6 @@ export type Database = {
           client_id: string
           closed_at?: string | null
           closed_by?: string | null
-          closed_how?: string | null
           id?: never
           instruction?: string | null
           motivo?: string | null
@@ -621,7 +619,6 @@ export type Database = {
           client_id?: string
           closed_at?: string | null
           closed_by?: string | null
-          closed_how?: string | null
           id?: never
           instruction?: string | null
           motivo?: string | null

@@ -33,13 +33,10 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
-### 13/10/2026: PASSO PÓS-DEPLOY DO REDESENHO DE PEDIDOS (pendente)
+### 13/10/2026: REDESENHO DE PEDIDOS NO AR (f250af2)
 
-Depois que o código da solução gravada (`handoffs.solucao`, `lib/solucoes.ts`) estiver no ar:
-apagar o gatilho de transição `handoffs_solucao_do_legado` e a coluna `handoffs.closed_how`
-(aprovado pelo dono em 08/10), numa migração nova, e regerar `lib/database.types.ts`. Até lá o
-gatilho cobre o app antigo e o lint avisa qualquer uso novo de `closed_how` (`eslint.config.mjs`).
-ADR: `docs/adr/2026-10-08-help-request-resolution-is-stored.md`.
+Solução gravada, detalhe em seções com a fonte e pedido aberto atualizado pelo cliente estão em produção. `test:e2e:n8n` 11/11 na versão publicada, zero envio Evolution para 5500. O legado `closed_how` (coluna, check e gatilho de transição) foi apagado em `20261013151634_remove_closed_how_legado.sql`; o lint segue barrando o nome.
+PRÓXIMO: P1 item 5 (orientação vira regra permanente): botão no detalhe do pedido, regra no prompt junto das regras (no avançado, seção própria no fim), texto editável antes de salvar, conta no `LIMITS.persona`, valor da regra reconhecido pelo guardrail, registro em `agent_publications`.
 
 ### 07/10/2026: PRÓXIMO PASSO (fazer primeiro)
 
