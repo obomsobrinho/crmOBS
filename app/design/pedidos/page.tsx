@@ -19,9 +19,9 @@ const H = 3_600_000;
 export default async function DesignPedidosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vazio?: string; abrir?: string; muitos?: string }>;
+  searchParams: Promise<{ vazio?: string; abrir?: string; muitos?: string; papel?: string; regra?: string }>;
 }) {
-  const { vazio, abrir, muitos } = await searchParams;
+  const { vazio, abrir, muitos, papel, regra } = await searchParams;
   const agora = agoraMs();
   const iso = (msAtras: number) => new Date(agora - msAtras).toISOString();
 
@@ -132,7 +132,9 @@ export default async function DesignPedidosPage({
   }
 
   // A mesma fonte do navegador, sobre as linhas falsas (só a primeira página).
-  const fonte = fonteDaMemoria(pedidos, resolvidos, contatos, null, mensagens);
+  // `?regra=1`: a orientação do pedido 7 já virou regra (mostra "Salva como regra").
+  const regrasSalvas: Record<number, string> = regra === "1" ? { 7: iso(26 * H) } : {};
+  const fonte = fonteDaMemoria(pedidos, resolvidos, contatos, null, mensagens, regrasSalvas);
   const idDoLink = Number(abrir);
   const pedidoDoLink = Number.isInteger(idDoLink) && idDoLink > 0 ? await fonte.porId([], idDoLink) : null;
   const aba = pedidoDoLink && !ehAberto(pedidoDoLink) ? "resolvidos" : "abertos";
@@ -142,7 +144,7 @@ export default async function DesignPedidosPage({
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pedidos" role="dono" />
       <Pedidos
-        key={`${vazio}-${abrir}-${muitos}`}
+        key={`${vazio}-${abrir}-${muitos}-${papel}-${regra}`}
         inicial={{
           aba,
           itens,
@@ -150,9 +152,11 @@ export default async function DesignPedidosPage({
           contagens: await fonte.contagens([]),
           abrir: pedidoDoLink,
         }}
-        previewDados={{ abertos: pedidos, resolvidos, contatos, mensagens }}
+        previewDados={{ abertos: pedidos, resolvidos, contatos, mensagens, regrasSalvas }}
         members={[{ userId: "u1", email: "franck@exemplo.com", role: "dono" }]}
         numeroAvisos={null}
+        // `?papel=atendente` prova que o atendente não vê "Salvar como regra".
+        dono={papel !== "atendente"}
         preview
       />
     </div>

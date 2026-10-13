@@ -69,18 +69,36 @@ const DOCS: KnowledgeDoc[] = [
   },
 ];
 
+// Regras salvas pelo time (P1 item 5): a lista que o /agente revisa e apaga.
+// Só com `?regras=1`: o mock guiado está a ~100 caracteres do aviso de tamanho
+// (13.600), e o teste do aviso (ajustes.design) usa a tela padrão.
+const REGRAS = [
+  "Frete grátis nas compras acima de R$ 200.",
+  "Aos sábados, a entrega é só até as 13h.",
+];
+
+// Prompt escrito à mão para `?modo=avancado` (a lista de regras mora embaixo dele).
+const PROMPT_AVANCADO = [
+  "### IDENTIDADE",
+  "Você é a Alê, atendente da Ótica Vision no WhatsApp.",
+  "",
+  "### A EMPRESA",
+  "Ótica no centro da cidade, com exame de vista gratuito e armações de várias marcas.",
+].join("\n");
+
 export default async function DesignAgentePage({
   searchParams,
 }: {
   // Next 16: os parâmetros de busca chegam como Promise.
-  searchParams: Promise<{ estado?: string }>;
+  searchParams: Promise<{ estado?: string; modo?: string; regras?: string }>;
 }) {
   // `?estado=montagem` mostra a tela para quem AINDA NÃO publicou. Esse estado
   // ficou raro depois que a montagem virou rota própria (só chega aqui quem
   // digita `/agente` antes de ativar, tipicamente para entrar no modo avançado),
   // mas é justamente por ser raro que ele precisa de preview: é o único lugar
   // onde o rodapé promete o contrário do de sempre.
-  const { estado } = await searchParams;
+  const { estado, modo, regras } = await searchParams;
+  const avancado = modo === "avancado";
   const jaPublicou = estado !== "montagem";
 
   return (
@@ -96,9 +114,11 @@ export default async function DesignAgentePage({
       >
         <AgentConfigForm
           clientId="preview"
-          initialMode="guiado"
+          key={`${modo}-${regras}`}
+          initialMode={avancado ? "avancado" : "guiado"}
           initialConfig={MOCK}
-          initialPersona={null}
+          initialPersona={avancado ? PROMPT_AVANCADO : null}
+          initialRegrasSalvas={regras === "1" ? REGRAS : []}
           hasManualPersona={false}
           initialNotifyJid="120363000000000001@g.us"
           stageNames={{ aguardando_humano: "Aguardando atendimento" }}

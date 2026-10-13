@@ -1,6 +1,6 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildFallbackPersona, compilePersona, type BusinessHours } from "@/lib/agent-prompt";
+import { buildFallbackPersona, compilarDoTenant, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
 import { motivoDoPedido, rotuloDoMotivo } from "@/lib/motivos";
 import { atualizacaoDoPedido, entraNaFila } from "@/lib/fila-de-pedidos";
@@ -145,6 +145,7 @@ function personaDoTenant(client: {
   persona?: unknown;
   agent_config?: unknown;
   prompt_mode?: unknown;
+  regras_salvas?: unknown;
   name?: unknown;
 }): { persona: string; origem: PersonaOrigem } {
   const salva = texto(client.persona);
@@ -152,15 +153,14 @@ function personaDoTenant(client: {
   // default. Duas cópias do mesmo literal é uma para esquecer de mudar.
   const empresa = texto(client.name) ?? "";
   try {
-    const cfg = client.agent_config as { handoffNotice?: string } | null;
-    const r =
-      client.prompt_mode === "avancado"
-        ? compilePersona({
-            mode: "avancado",
-            persona: salva,
-            handoffNotice: cfg?.handoffNotice,
-          })
-        : compilePersona({ mode: "guiado", config: client.agent_config });
+    // O MESMO despacho da rota das regras (`compilarDoTenant`), com as regras
+    // salvas pelo time (`clients.regras_salvas`) nos dois modos.
+    const r = compilarDoTenant({
+      persona: salva,
+      agent_config: client.agent_config,
+      prompt_mode: client.prompt_mode,
+      regras_salvas: client.regras_salvas,
+    });
     if (r.ok) return { persona: r.persona, origem: "montada" };
     // ⚠️ "longo" NÃO cai para a salva: quem salva recusa acima do limite, mas no
     // atendimento trocar o prompt de hoje por um de meses atrás é pior que servir
@@ -192,7 +192,7 @@ export async function processTurn(
   const { data: client, error: clientErr } = await svc
     .from("clients")
     .select(
-      "persona, agent_config, prompt_mode, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance"
+      "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance"
     )
     .eq("id", clientId)
     .maybeSingle();

@@ -35,9 +35,11 @@ export interface PlaygroundTurn {
  * rabo invariante da base. Persona final vinda do browser poderia chegar sem o
  * contrato de saída, e aí o teste mentiria sobre o agente real.
  */
+// `regrasSalvas`: as regras salvas pelo time que a tela mostra (P1 item 5). Vão
+// cruas no corpo e o servidor normaliza; elas não são campo do formulário.
 export type ConfiguracaoEmEdicao =
-  | { mode: "guiado"; config: AgentConfig }
-  | { mode: "avancado"; persona: string; handoffNotice: string };
+  | { mode: "guiado"; config: AgentConfig; regrasSalvas?: string[] }
+  | { mode: "avancado"; persona: string; handoffNotice: string; regrasSalvas?: string[] };
 
 export interface ApiResult {
   output: {

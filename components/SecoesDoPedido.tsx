@@ -38,7 +38,7 @@ import { cn } from "@/lib/utils";
 // no servidor) encaixa a LINHA que chegou pelo payload, zero consulta; reconectar
 // ou voltar o foco relê só este pedido.
 
-type Estado = { carregando: boolean; erro: boolean; historia: HistoriaDoPedido };
+type Estado = { carregando: boolean; erro: boolean; historia: HistoriaDoPedido; regraSalvaEm: string | null };
 
 export default function SecoesDoPedido({
   p,
@@ -47,7 +47,14 @@ export default function SecoesDoPedido({
   preview,
   numeroAvisos,
   agora,
+  acaoDaOrientacao,
 }: {
+  /**
+   * "Salvar como regra" (P1 item 5), embaixo do texto da orientação; o pai decide
+   * quem vê. Chamado só depois de a história carregar, com `regraSalvaEm` lido
+   * JUNTO dela (`FontePedidos.historia`): sem segundo pedido, sem piscar.
+   */
+  acaoDaOrientacao?: (regraSalvaEm: string | null) => React.ReactNode;
   p: PedidoItem;
   fonte: FontePedidos;
   clientId?: string;
@@ -61,13 +68,18 @@ export default function SecoesDoPedido({
   const janela = useMemo(() => janelaDoPedido(p), [p.openedAt, closedAt]);
   // O número de avisos nunca é conversa (lib/avisos.ts): nada a buscar.
   const ehAvisos = ehNumeroDeAvisos(p.phone, numeroAvisos);
-  const [estado, setEstado] = useState<Estado>({ carregando: !ehAvisos, erro: false, historia: HISTORIA_VAZIA });
+  const [estado, setEstado] = useState<Estado>({
+    carregando: !ehAvisos,
+    erro: false,
+    historia: HISTORIA_VAZIA,
+    regraSalvaEm: null,
+  });
 
   const carregar = useCallback(async () => {
     if (ehAvisos) return;
     try {
-      const historia = await fonte.historia(p);
-      setEstado({ carregando: false, erro: false, historia });
+      const { regraSalvaEm, ...historia } = await fonte.historia(p);
+      setEstado({ carregando: false, erro: false, historia, regraSalvaEm });
     } catch (e) {
       console.error("mensagens do pedido:", e);
       setEstado((s) => ({ ...s, carregando: false, erro: true }));
@@ -145,6 +157,7 @@ export default function SecoesDoPedido({
           <p data-slot="pedido-orientacao" className="whitespace-pre-wrap break-words text-corpo text-ink" style={{ textWrap: "pretty" }}>
             {orientacao}
           </p>
+          {!estado.carregando && acaoDaOrientacao?.(estado.regraSalvaEm)}
         </Secao>
       )}
       {secoes.respostas.map((r) => (

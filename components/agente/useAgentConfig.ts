@@ -11,6 +11,7 @@ import {
   type AgentConfig,
 } from "@/lib/agent-prompt";
 import type { AgentPreset } from "@/lib/agent-presets";
+import { formatTime } from "@/lib/format";
 import type { ConfiguracaoEmEdicao } from "@/components/Playground";
 
 export type Mode = "guiado" | "avancado";
@@ -37,6 +38,12 @@ export interface UseAgentConfigArgs {
   /** Nome sugerido p/ o campo "empresa" na 1ª configuração (sem agent_config). */
   prefillCompanyName?: string | null;
   hasManualPersona: boolean;
+  /**
+   * Regras salvas pelo time (`clients.regras_salvas`, P1 item 5). NÃO são
+   * campo do formulário: só mudam pela rota `agent-rules`, e o Salvar mantém as
+   * do banco. Aqui entram na prévia do prompt e na bancada.
+   */
+  initialRegrasSalvas?: string[];
   /** /design e mocks: desativa o fetch de salvar. */
   preview?: boolean;
 }
@@ -48,8 +55,10 @@ export function useAgentConfig({
   initialPersona,
   prefillCompanyName,
   hasManualPersona,
+  initialRegrasSalvas,
   preview = false,
 }: UseAgentConfigArgs) {
+  const [regrasSalvas, setRegrasSalvas] = useState<string[]>(initialRegrasSalvas ?? []);
   const [mode, setMode] = useState<Mode>(initialMode);
   const [cfg, setCfg] = useState<AgentConfig>(
     initialConfig ??
@@ -96,13 +105,13 @@ export function useAgentConfig({
     { dontDo: "", escalateWhen: "" }
   );
 
-  const guidedPersona = useMemo(() => buildPersona(cfg), [cfg]);
+  const guidedPersona = useMemo(() => buildPersona(cfg, regrasSalvas), [cfg, regrasSalvas]);
   // No avançado o preview mostra o resultado REAL (texto dele mais o rabo da
   // base), que é o que o n8n vai ler. Mostrar só o texto dele esconderia metade
   // do prompt.
   const advancedPersona = useMemo(
-    () => buildAdvancedPersona(rawPersona, { handoffNotice: cfg.handoffNotice }),
-    [rawPersona, cfg.handoffNotice]
+    () => buildAdvancedPersona(rawPersona, { handoffNotice: cfg.handoffNotice, regrasSalvas }),
+    [rawPersona, cfg.handoffNotice, regrasSalvas]
   );
   const previewPersona = mode === "guiado" ? guidedPersona : advancedPersona;
   const baseTail = useMemo(
@@ -279,12 +288,8 @@ export function useAgentConfig({
         return { ok: false, campos: data.fields ?? {} };
       }
 
-      setSavedAt(
-        new Date().toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })
-      );
+      // Hora de São Paulo pelo formatador único (lib/format.ts), nunca a da máquina.
+      setSavedAt(formatTime(new Date().toISOString()));
       if (mode === "guiado") setHadManual(false);
       setSaving(false);
       // Sem router.refresh(): a persona já vale no n8n na hora, e a tela mantém
@@ -322,11 +327,12 @@ export function useAgentConfig({
   // invariante da base é justamente o que não pode depender do browser.
   const configuracao: ConfiguracaoEmEdicao =
     mode === "guiado"
-      ? { mode: "guiado", config: cfg }
+      ? { mode: "guiado", config: cfg, regrasSalvas }
       : {
           mode: "avancado",
           persona: rawPersona,
           handoffNotice: cfg.handoffNotice,
+          regrasSalvas,
         };
 
   return {
@@ -357,6 +363,8 @@ export function useAgentConfig({
     previewPersona,
     baseTail,
     configuracao,
+    regrasSalvas,
+    setRegrasSalvas,
     save,
     restaurar,
   };

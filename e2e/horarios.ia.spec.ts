@@ -55,8 +55,8 @@ buildPersona(CONFIG);
 type Turno = { role: "user" | "assistant"; content: string };
 type Modo = { nome: string; corpo: Record<string, unknown> };
 const MODOS: Modo[] = [
-  { nome: "avançado (OBS)", corpo: { mode: "avancado", persona: PERSONA_OBS } },
-  { nome: "guiado", corpo: { mode: "guiado", config: CONFIG } },
+  { nome: "avançado (OBS)", corpo: { mode: "avancado", persona: PERSONA_OBS, regrasSalvas: [] } },
+  { nome: "guiado", corpo: { mode: "guiado", config: CONFIG, regrasSalvas: [] } },
 ];
 
 interface Resposta {
@@ -168,7 +168,7 @@ const CONVITE: Turno[] = [
   { role: "user", content: "queria marcar um exame de vista" },
   { role: "assistant", content: "Claro! Qual dia e período ficam melhor pra você?" },
 ];
-const GUIADO = { mode: "guiado", config: CONFIG };
+const GUIADO = { mode: "guiado", config: CONFIG, regrasSalvas: [] };
 
 test.describe("Calendário do turno, guiado", () => {
   test("sexta à noite, \"amanhã de manhã\" NÃO agenda sábado fechado", async ({ request }) => {

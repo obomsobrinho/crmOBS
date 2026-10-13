@@ -55,6 +55,7 @@ export default async function PedidosPage({
       clientId={client.id}
       numeroAvisos={client.avisos}
       readOnly={client.access.blocked}
+      dono={client.role === "dono"}
     />
   );
 }

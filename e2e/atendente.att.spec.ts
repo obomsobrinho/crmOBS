@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { servico, tenantDeTeste } from "./semente";
 
 // Permissões do ATENDENTE, com a sessão gravada por `auth.setup.ts` em
 // `e2e/.auth/atendente.json`. Este arquivo fecha os buracos que ficaram
@@ -37,6 +38,21 @@ test.describe("Atendente", () => {
     });
     expect(res.status()).toBe(403);
     expect((await res.json()).error).toContain("só o dono");
+  });
+
+  test("não salva regra do agente (P1 item 5)", async ({ page }) => {
+    // O id do tenant vem do service no PROCESSO do teste (nunca do browser), e a
+    // frase do 403 separa "papel errado" de "tenant errado" ("acesso negado").
+    // Corpo com texto VAZIO de propósito: se a guarda de papel falhasse, a rota
+    // responderia 400 antes de qualquer escrita. Nada aqui escreve no banco.
+    const { clientId } = await tenantDeTeste(servico());
+    for (const method of ["post", "delete"] as const) {
+      const res = await page.request[method](`/api/clients/${clientId}/agent-rules`, { data: { texto: "" } });
+      expect(res.status()).toBe(403);
+      expect((await res.json()).error).toContain("só o dono");
+    }
+    // O botão escondido para o atendente é provado no /design (`?papel=atendente`,
+    // e2e/regras-salvas.design.spec.ts).
   });
 
   test("não gerencia o funil", async ({ page }) => {

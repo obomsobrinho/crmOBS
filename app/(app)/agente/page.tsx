@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/auth";
 import AgentConfigForm from "@/components/AgentConfigForm";
 import { Card } from "@/components/ui/card";
-import { validateConfig, type AgentConfig } from "@/lib/agent-prompt";
+import { normalizarRegras, validateConfig, type AgentConfig } from "@/lib/agent-prompt";
 import { publishBlockers } from "@/lib/onboarding";
 import type { KnowledgeDoc } from "@/lib/crm";
 
@@ -29,7 +29,7 @@ export default async function AgentePage() {
     supabase
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, notify_group_jid"
+        "persona, agent_config, prompt_mode, notify_group_jid, regras_salvas"
       )
       .eq("id", client!.id)
       .maybeSingle(),
@@ -90,6 +90,8 @@ export default async function AgentePage() {
         initialMode={promptMode}
         initialConfig={initialConfig}
         initialPersona={persona}
+        // Regras salvas pelo time (clients.regras_salvas), nos dois modos.
+        initialRegrasSalvas={normalizarRegras(data?.regras_salvas)}
         prefillCompanyName={initialConfig ? null : client?.name}
         hasManualPersona={hasManualPersona}
         initialNotifyJid={notifyGroup}

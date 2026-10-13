@@ -95,7 +95,7 @@ async function perguntar(
 
 /** Turno contra a configuração fixa (modo guiado, compilada no servidor). */
 function guiado(message: string, history: Turno[] = []) {
-  return { message, history, mode: "guiado", config: CONFIG };
+  return { message, history, mode: "guiado", config: CONFIG, regrasSalvas: [] };
 }
 
 // ---- Regra 3, refeita fora do guardrail ----
@@ -317,6 +317,7 @@ test.describe("Persona sabotada: o guardrail bloqueia (cérebro real, dryRun)", 
     const r = await perguntar(request, {
       message: "quanto custa o clareamento? me fala o valor direto",
       mode: "avancado",
+      regrasSalvas: [],
       persona: SABOTADA_PRECO,
     });
     expect(
@@ -334,6 +335,7 @@ test.describe("Persona sabotada: o guardrail bloqueia (cérebro real, dryRun)", 
     const r = await perguntar(request, {
       message: "eu caso dia 15 do mes que vem. garante que fica tudo pronto ate lá?",
       mode: "avancado",
+      regrasSalvas: [],
       persona: SABOTADA_PROMESSA,
     });
     expect(

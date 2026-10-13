@@ -11,6 +11,7 @@ import {
   ordemAbertos,
   ordemResolvidos,
   paraPedido,
+  podeVirarRegra,
   type ContatoLinha,
   type PedidoAberto,
   type PedidoItem,
@@ -79,8 +80,15 @@ export interface FontePedidos {
    * A história de UM pedido (lib/historia-do-pedido.ts): só quando ele é aberto,
    * nunca na lista. Três consultas pequenas por `client_id` + `phone` + janela.
    */
-  historia(p: PedidoItem): Promise<HistoriaDoPedido>;
+  historia(p: PedidoItem): Promise<HistoriaComRegra>;
 }
+
+/**
+ * A história mais `regraSalvaEm` (P1 item 5): quando a orientação deste pedido
+ * virou regra do agente, ou null. Vem JUNTO das mensagens (mesmo `Promise.all`),
+ * e só é lida para um pedido que pode virar regra (`podeVirarRegra`).
+ */
+export type HistoriaComRegra = HistoriaDoPedido & { regraSalvaEm: string | null };
 
 export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
   async function chamar(args: ArgsRpc<"pedidos_pagina", "p_client">): Promise<PedidoItem[]> {
@@ -139,7 +147,7 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
             .or(FILTRO_DE_RESPOSTA)
         : linhas().gte("created_at", janela.openedAt).eq("message_type", MANUAL);
       // O MESMO recorte de `recorteAntes`/`recorteDurante`/`recorteDepois` (a memória do /design).
-      const [antes, enquanto, depois] = await Promise.all([
+      const [antes, enquanto, depois, regra] = await Promise.all([
         linhas()
           .gte("created_at", inicioAntes(janela))
           .lt("created_at", janela.openedAt)
@@ -156,14 +164,19 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
           .order("created_at", { ascending: true })
           .order("id", { ascending: true })
           .limit(LINHAS_DEPOIS),
+        podeVirarRegra(p)
+          ? supabase.from("handoffs").select("regra_salva_em").eq("client_id", clientId).eq("id", p.id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
       ]);
       if (antes.error) throw antes.error;
       if (enquanto.error) throw enquanto.error;
       if (depois.error) throw depois.error;
+      if (regra.error) throw regra.error;
       return {
         antes: mensagensQueLevaram(antes.data ?? []),
         ...mensagensDurante(enquanto.data ?? []),
         depois: depois.data ?? [],
+        regraSalvaEm: regra.data?.regra_salva_em ?? null,
       };
     },
   };
@@ -179,7 +192,9 @@ export function fonteDaMemoria(
   contatos: ContatoLinha[],
   avisos: string | null,
   /** As linhas falsas de `chat_messages`, por telefone (a história do pedido). */
-  mensagens: Record<string, LinhaHistoria[]> = {}
+  mensagens: Record<string, LinhaHistoria[]> = {},
+  /** Pedidos cuja orientação já virou regra (id -> quando). */
+  regrasSalvas: Record<number, string> = {}
 ): FontePedidos {
   const abertos = montarFila(abertosRaw, contatos, avisos);
   const resolvidos = montarResolvidos(resolvidosRaw, contatos, avisos);
@@ -215,6 +230,7 @@ export function fonteDaMemoria(
         antes: recorteAntes(linhas, janela),
         ...recorteDurante(linhas, janela),
         depois: recorteDepois(linhas, janela),
+        regraSalvaEm: regrasSalvas[p.id] ?? null,
       };
     },
   };

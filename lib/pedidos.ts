@@ -8,7 +8,7 @@
 import { nomeDoContato } from "./inbox";
 import type { LinhaRpc } from "./supabase/schema";
 import { semNumeroDeAvisos } from "./avisos";
-import { solucaoDoBanco, type Solucao } from "./solucoes";
+import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "./solucoes";
 
 export interface PedidoLinha {
   id: number;
@@ -257,6 +257,15 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
     orientacao: l.instruction?.trim() || null,
     porQuem: l.closed_by,
   };
+}
+
+/**
+ * A orientação deste pedido pode virar regra do agente? (P1 item 5.) Só um
+ * pedido RESOLVIDO pela orientação do time (`orientou_ia`) e com o texto dela.
+ * A rota `agent-rules` marca o pedido com o MESMO critério, no `where`.
+ */
+export function podeVirarRegra(p: PedidoItem): p is PedidoResolvido & { orientacao: string } {
+  return !ehAberto(p) && p.solucao === SOLUCAO_DA_PORTA.orientar && !!p.orientacao;
 }
 
 /** Abertos: do mais antigo para o mais novo (a mesma do SQL). */

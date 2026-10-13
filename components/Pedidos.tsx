@@ -6,6 +6,7 @@ import { ArrowLeft, HandHelping, MessagesSquare, Search } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
 import SecoesDoPedido from "@/components/SecoesDoPedido";
 import SolucaoBadge from "@/components/SolucaoBadge";
+import SalvarComoRegra from "@/components/SalvarComoRegra";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import {
   encaixarAbertosDaConversa,
   encaixarResolvido,
   casaMotivo,
+  podeVirarRegra,
   type ContatoLinha,
   type PedidoAberto,
   type PedidoItem,
@@ -94,6 +96,7 @@ export default function Pedidos({
   clientId,
   numeroAvisos,
   readOnly = false,
+  dono = false,
   previewDados,
   preview = false,
 }: {
@@ -114,6 +117,11 @@ export default function Pedidos({
   numeroAvisos: string | null;
   /** Conta bloqueada: vê a fila e o histórico, não age (as rotas já respondem 402). */
   readOnly?: boolean;
+  /**
+   * Papel `dono`: só ele vê "Salvar como regra" (P1 item 5). A rota
+   * `agent-rules` barra o atendente de novo; esconder não é barrar.
+   */
+  dono?: boolean;
   /** /design: as linhas falsas de onde a fonte de memória tira os pedidos. */
   previewDados?: {
     abertos: PedidoLinha[];
@@ -121,6 +129,8 @@ export default function Pedidos({
     contatos: ContatoLinha[];
     /** Linhas falsas de `chat_messages` por telefone (a história de cada pedido). */
     mensagens?: Record<string, LinhaHistoria[]>;
+    /** Pedidos cuja orientação já virou regra (id -> quando). */
+    regrasSalvas?: Record<number, string>;
   };
   /** /design: sem banco, e as ações só simulam. */
   preview?: boolean;
@@ -135,7 +145,8 @@ export default function Pedidos({
             dadosPreview?.resolvidos ?? [],
             dadosPreview?.contatos ?? [],
             numeroAvisos,
-            dadosPreview?.mensagens ?? {}
+            dadosPreview?.mensagens ?? {},
+            dadosPreview?.regrasSalvas ?? {}
           ),
     [clientId, preview, dadosPreview, numeroAvisos]
   );
@@ -568,6 +579,7 @@ export default function Pedidos({
               preview={preview}
               numeroAvisos={numeroAvisos}
               quemResolveu={nomeDeQuem(resolvido.porQuem)}
+              podeSalvarRegra={dono && !readOnly}
               onVoltar={() => setSelecionado(null)}
             />
           ) : (
@@ -681,6 +693,7 @@ function FichaPedido({
   preview,
   numeroAvisos,
   quemResolveu = null,
+  podeSalvarRegra = false,
   onVoltar,
   onOrientar,
   onResolvido,
@@ -693,6 +706,8 @@ function FichaPedido({
   preview: boolean;
   numeroAvisos: string | null;
   quemResolveu?: string | null;
+  /** Dono numa conta ativa: a orientação do pedido resolvido pode virar regra. */
+  podeSalvarRegra?: boolean;
   onVoltar: () => void;
   onOrientar?: (t: string) => Promise<void>;
   onResolvido?: () => Promise<void>;
@@ -799,6 +814,19 @@ function FichaPedido({
               preview={preview}
               numeroAvisos={numeroAvisos}
               agora={agora}
+              acaoDaOrientacao={
+                podeSalvarRegra && podeVirarRegra(p)
+                  ? (regraSalvaEm) => (
+                      <SalvarComoRegra
+                        pedidoId={p.id}
+                        orientacao={p.orientacao}
+                        clientId={clientId}
+                        salvaEm={regraSalvaEm}
+                        preview={preview}
+                      />
+                    )
+                  : undefined
+              }
             />
 
             {comAcoes && (

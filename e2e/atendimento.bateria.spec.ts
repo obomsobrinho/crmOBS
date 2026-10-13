@@ -82,7 +82,7 @@ function caso(c: Caso, corpo: () => Record<string, unknown>) {
 
 test.describe("Bateria: OBM, prompt avançado", () => {
   for (const c of CASOS)
-    caso(c, () => ({ mode: "avancado", persona: PERSONA_OBM, hours: HORARIO_OBM }));
+    caso(c, () => ({ mode: "avancado", persona: PERSONA_OBM, hours: HORARIO_OBM, regrasSalvas: [] }));
 });
 
 for (const seg of SEGMENTOS) {
@@ -93,6 +93,6 @@ for (const seg of SEGMENTOS) {
     details: [seg.over.details, ...seg.kb].filter(Boolean).join("\n"),
   };
   test.describe(`Bateria: ${seg.over.companyName} (${seg.expediente})`, () => {
-    for (const c of seg.casos) caso(c, () => ({ mode: "guiado", config }));
+    for (const c of seg.casos) caso(c, () => ({ mode: "guiado", config, regrasSalvas: [] }));
   });
 }

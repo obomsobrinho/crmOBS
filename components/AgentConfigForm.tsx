@@ -29,6 +29,7 @@ import {
   SeletorDePreset,
 } from "./agente/campos";
 import { AvisoCache, Banner, ConfirmModal } from "./agente/ui";
+import RegrasSalvas from "./agente/RegrasSalvas";
 import { useAgentConfig, type Mode } from "./agente/useAgentConfig";
 import { Aviso } from "@/components/ui/aviso";
 import { PromptPreview } from "@/components/PromptPreview";
@@ -108,6 +109,7 @@ export default function AgentConfigForm({
   blockers,
   temInstancia = false,
   estadoWhatsAppForcado,
+  initialRegrasSalvas,
   preview = false,
 }: {
   clientId: string;
@@ -138,6 +140,8 @@ export default function AgentConfigForm({
   temInstancia?: boolean;
   /** /design: estado do WhatsApp sem consultar nada. */
   estadoWhatsAppForcado?: EstadoWhatsApp;
+  /** Regras salvas pelo time (clients.regras_salvas): revisar e apagar aqui. */
+  initialRegrasSalvas?: string[];
   /** /design: desativa o fetch de salvar. */
   preview?: boolean;
 }) {
@@ -148,6 +152,7 @@ export default function AgentConfigForm({
     initialPersona,
     prefillCompanyName,
     hasManualPersona,
+    initialRegrasSalvas,
     preview,
   });
 
@@ -431,6 +436,12 @@ export default function AgentConfigForm({
               preview={preview}
               onDraft={form.onDraft}
             />
+            <RegrasSalvas
+              clientId={clientId}
+              regras={form.regrasSalvas}
+              onRegras={form.setRegrasSalvas}
+              preview={preview}
+            />
           </TabsContent>
         </Tabs>
       ) : (
@@ -476,6 +487,15 @@ export default function AgentConfigForm({
               barato ao mesmo tempo.
             </AvisoCache>
           )}
+
+          {/* No avançado não existe outra lista de regras: as salvas pelo time
+              entram no fim do seu texto, antes da parte fixa. */}
+          <RegrasSalvas
+            clientId={clientId}
+            regras={form.regrasSalvas}
+            onRegras={form.setRegrasSalvas}
+            preview={preview}
+          />
 
           <div>
             <div className="mb-1.5 flex items-center gap-1.5 text-rotulo uppercase text-ink-3">

@@ -16,6 +16,10 @@ paths:
   - "app/api/conversations/**"
   - "app/api/send/**"
   - "app/api/clients/**/agent-config/**"
+  - "app/api/clients/**/agent-rules/**"
+  - "lib/publicacoes.ts"
+  - "components/SalvarComoRegra.tsx"
+  - "components/agente/RegrasSalvas.tsx"
   - "app/api/clients/**/notify-target/**"
   - "app/(app)/pedidos/**"
   - "components/Playground.tsx"
@@ -42,6 +46,7 @@ paths:
 - Periods follow each business's registered hours (`PERIODOS_DO_DIA`/`horariosDoPeriodo`, `lib/horarios.ts`: morning until 11h, afternoon 13h to 17h, evening from 18h, cut by the day's hours, today only what has not started; no registered hours means no list), stated in `### CALENDÁRIO`; a period alone is `none` and the agent offers those hours with the day. When a help trigger happens, `pausar` in that reply without collecting more data.  (why: docs/adr/2026-10-06-schedule-needs-time-and-summary-keeps-agreements.md)
 - A fix found in testing that is about HOW to attend (not one tenant's content) goes in the base (`buildBaseTail`), never only in one tenant's prompt: it must reach every tenant automatically. If a tenant text could contradict it, list it in `### PRECEDÊNCIA`. Examples: a meeting is `agendar` only with day AND time (period alone means ask the time); someone asking for a person NOW is `pausar`, never a confirmation nor a list of today's CALENDÁRIO hours; the summary keeps what was agreed and what did not happen.  (why: docs/adr/2026-10-06-schedule-needs-time-and-summary-keeps-agreements.md)
 - `LIMITS.persona` counts the WHOLE prompt (16,000, warn 13,600). When the base grows, check headroom: a tenant over the limit silently serves the saved text.  (why: docs/adr/2026-09-30-dates-and-times-in-base-prompt.md)
+- Saved rules (an orientation turned rule) live in `clients.regras_salvas` (jsonb array), normalized ONLY by `normalizarRegras` at the borders and rendered ONLY by `blocoRegrasSalvas` (`### REGRAS SALVAS PELO TIME`, end of tenant content, before the base tail). Compile a `clients` row ONLY through `compilarDoTenant` (`personaDoTenant`, `agent-rules`); config in edit (`PUT`, bench) passes the column's rules to `compilePersona`. Only `POST/DELETE /api/clients/[id]/agent-rules` (owner, `ativa`, `revalidar`) writes the list, by compare and swap (`trocar_regras_salvas`, retry once, then 409), never touching `agent_config`; over 200 chars is refused, never cut. `stripBaseTail` drops the generated section silently and reports an owner-written one in `removed`. Values count as guardrail source through the persona.  (why: docs/adr/2026-10-13-orientation-saved-as-agent-rule.md)
 - Save is publish: every `PUT /agent-config` writes an `agent_publications` row (append-only record, not source of truth). Restoring loads the version into the form; it does not write.  (why: docs/adr/2026-08-22-save-is-publish-agent-publications.md)
 - Prove AI safety against the real brain in `dryRun`; a guardrail rule counts as proven only once seen firing (use a sabotaged persona). Every manipulation attempt (prank, impersonating the owner, extracting data) must open a handoff (`pausar`).  (why: docs/adr/2026-08-28-ai-security-proven-with-real-brain.md, docs/adr/2026-09-11-ia-suite-paid-and-opt-in.md)
 - Never state a thing as certain while it is unproven (real audio transcription was never proven with a real voice).

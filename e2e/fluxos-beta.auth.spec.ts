@@ -104,6 +104,7 @@ test.describe("Handoff e orientação, com o cérebro real", () => {
         history: [],
         mode: "guiado",
         config: CONFIG,
+        regrasSalvas: [],
       },
     });
     expect(res.status(), await res.text()).toBe(200);
@@ -123,6 +124,7 @@ test.describe("Handoff e orientação, com o cérebro real", () => {
         history: [],
         mode: "guiado",
         config: CONFIG,
+        regrasSalvas: [],
         instruction: "Pode informar que a troca de óleo com filtro sai por R$ 180.",
       },
     });

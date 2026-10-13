@@ -240,6 +240,7 @@ export type Database = {
           onboarding_tested_at: string | null
           persona: string | null
           prompt_mode: string
+          regras_salvas: Json
           subscription_status: string
           trial_ends_at: string | null
         }
@@ -265,6 +266,7 @@ export type Database = {
           onboarding_tested_at?: string | null
           persona?: string | null
           prompt_mode?: string
+          regras_salvas?: Json
           subscription_status?: string
           trial_ends_at?: string | null
         }
@@ -290,6 +292,7 @@ export type Database = {
           onboarding_tested_at?: string | null
           persona?: string | null
           prompt_mode?: string
+          regras_salvas?: Json
           subscription_status?: string
           trial_ends_at?: string | null
         }
@@ -598,6 +601,7 @@ export type Database = {
           motivo: string | null
           opened_at: string
           phone: string
+          regra_salva_em: string | null
           solucao: string | null
           summary: string | null
         }
@@ -611,6 +615,7 @@ export type Database = {
           motivo?: string | null
           opened_at?: string
           phone: string
+          regra_salva_em?: string | null
           solucao?: string | null
           summary?: string | null
         }
@@ -624,6 +629,7 @@ export type Database = {
           motivo?: string | null
           opened_at?: string
           phone?: string
+          regra_salva_em?: string | null
           solucao?: string | null
           summary?: string | null
         }
@@ -1210,6 +1216,16 @@ export type Database = {
           role: string
           user_id: string
         }[]
+      }
+      trocar_regras_salvas: {
+        Args: {
+          p_antes: Json
+          p_client: string
+          p_depois: Json
+          p_persona: string
+          p_persona_antes: string
+        }
+        Returns: boolean
       }
     }
     Enums: {

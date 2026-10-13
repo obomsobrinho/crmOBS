@@ -38,7 +38,7 @@ sacadas, com o Deskcomm como catálogo).
 | | 2. ✅ **Página de pedidos abertos**, com orientar na própria linha (`docs/plano-pedidos.md`). **Feito em 29/09/2026** | O aviso leva direto para ela |
 | | 3. **Tela de Clientes**: lista com busca, ficha única (Clientes e painel da conversa), criar contato e iniciar conversa com alerta, contato frio (`docs/plano-clientes.md`). **Antes do beta**, decisão do dono em 30/09/2026 | Paridade básica de CRM: hoje quem falou há meses só aparece rolando o inbox, e quem nunca escreveu não existe |
 | **P1, durante o beta** | 4. ✅ **Motivo do pedido de ajuda** gravado + métricas de decisão da IA (`docs/plano-motivo-pedido.md`). **Feito em 06/10/2026**: motivo no pedido, em Pedidos (etiqueta e filtro), no aviso e no Painel do cliente | É o dado que diz o que ensinar à IA |
-| | 5. **Orientação vira regra permanente** do agente (sugestão "salvar como regra") | Hoje cada orientação vale uma vez |
+| | 5. **Orientação vira regra permanente** do agente (sugestão "salvar como regra"). Implementado em 13/10/2026, aguardando revisão do arquiteto (`docs/adr/2026-10-13-orientation-saved-as-agent-rule.md`) | Hoje cada orientação vale uma vez |
 | | 6. **Custo de IA por empresa em reais, com teto** | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |
 | | 7. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos | Mesma conta do item 6; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
 | **P2, antes de cobrar** | 8. **Admin v2**: pagamentos e assinatura | Cobrança está construída e desligada |

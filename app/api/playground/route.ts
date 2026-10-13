@@ -3,7 +3,7 @@ import { sessaoDaRota } from "@/lib/rota";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
-import { compilePersona, type BusinessHours } from "@/lib/agent-prompt";
+import { compilePersona, normalizarRegras, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
 
 // Bancada de teste (playground), dono-only. Fala direto com o cérebro REAL
@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
     persona?: string;
     /** Base do aviso de handoff em edição (só usada no modo avançado). */
     handoffNotice?: string;
+    /** Regras salvas pelo time (os dois modos). Ausente = as do tenant, do banco. */
+    regrasSalvas?: unknown;
     /** Hora fixa do turno (ISO), para a bateria de testes de data e horário. */
     agoraTeste?: string;
     /**
@@ -83,11 +85,28 @@ export async function POST(req: NextRequest) {
   // ⚠️ MESMO despacho do save e do turno (`compilePersona`). Se a bancada
   // compilasse por conta própria, ela testaria um texto que o agente nunca vai
   // receber, que é o oposto do que ela existe para provar.
+  // Regras salvas pelo time: as do corpo quando vierem (normalizadas aqui; as
+  // suítes `ia` e `bateria` mandam `[]` para a configuração fixa continuar fixa),
+  // senão as do tenant, lidas do banco (só quando há configuração em edição: sem
+  // `mode`, o turno já monta tudo do banco).
+  let regrasSalvas: string[] = [];
+  if (body.mode === "guiado" || body.mode === "avancado") {
+    if (body.regrasSalvas !== undefined) {
+      regrasSalvas = normalizarRegras(body.regrasSalvas);
+    } else {
+      const { data } = await createServiceClient()
+        .from("clients")
+        .select("regras_salvas")
+        .eq("id", client.id)
+        .maybeSingle();
+      regrasSalvas = normalizarRegras(data?.regras_salvas);
+    }
+  }
   if (body.mode === "guiado") {
     // Mesma validação do save. Config incompleta não é teste válido: uma persona
     // sem nome de empresa responde outra coisa, e o teste diria pouco. Devolve os
     // campos que faltam para a bancada apontar onde.
-    const r = compilePersona({ mode: "guiado", config: body.config });
+    const r = compilePersona({ mode: "guiado", config: body.config, regrasSalvas });
     if (!r.ok) {
       if (r.motivo === "campos") {
         return NextResponse.json(
@@ -109,6 +128,7 @@ export async function POST(req: NextRequest) {
       persona: body.persona,
       handoffNotice:
         typeof body.handoffNotice === "string" ? body.handoffNotice : undefined,
+      regrasSalvas,
     });
     if (!r.ok) {
       return NextResponse.json(

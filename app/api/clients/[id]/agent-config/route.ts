@@ -3,7 +3,9 @@ import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Json, TablesUpdate } from "@/lib/database.types";
 import { paraJson } from "@/lib/json";
-import { compilePersona, normalizeHours } from "@/lib/agent-prompt";
+import { compilePersona, LIMITS, normalizarRegras, normalizeHours } from "@/lib/agent-prompt";
+import { numeroBR } from "@/lib/format";
+import { registrarPublicacao } from "@/lib/publicacoes";
 
 // Salva a configuração do agente do tenant logado.
 // - modo "guiado": grava agent_config + a persona compilada.
@@ -52,7 +54,7 @@ export async function PUT(
   // Estado atual (para a guarda anti-destruição do prompt manual).
   const { data: current, error: readErr } = await svc
     .from("clients")
-    .select("persona, agent_config")
+    .select("persona, agent_config, regras_salvas")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -61,6 +63,10 @@ export async function PUT(
       { status: 500 }
     );
   }
+
+  // As regras salvas pelo time (`clients.regras_salvas`) entram no prompt e no
+  // teto de tamanho, mas esta rota não as escreve: só a rota `agent-rules` muda a lista.
+  const regrasSalvas = normalizarRegras(current?.regras_salvas);
 
   let update: TablesUpdate<"clients">;
   // Seções que a base tomou de volta no modo avançado. Vai na resposta para a
@@ -83,7 +89,7 @@ export async function PUT(
     // usam. Era código copiado nos três, e como a leitura passou a montar a
     // persona a cada turno (17/09/2026), duas cópias divergindo significaria o
     // agente atendendo com um texto que o Salvar nunca produziria.
-    const result = compilePersona({ mode: "guiado", config: body.config });
+    const result = compilePersona({ mode: "guiado", config: body.config, regrasSalvas });
     if (!result.ok) {
       if (result.motivo === "campos") {
         return NextResponse.json(
@@ -91,7 +97,7 @@ export async function PUT(
           { status: 400 }
         );
       }
-      return NextResponse.json({ error: "prompt muito longo" }, { status: 400 });
+      return NextResponse.json({ error: result.motivo === "longo" ? longoDemais(result.persona.length, regrasSalvas.length) : "prompt muito longo" }, { status: 400 });
     }
     const persona = result.persona;
 
@@ -125,14 +131,15 @@ export async function PUT(
       mode: "avancado",
       persona: body.persona,
       handoffNotice: cfgAtual?.handoffNotice,
+      regrasSalvas,
     });
     if (!result.ok) {
       return NextResponse.json(
         {
           error:
-            result.motivo === "vazio"
-              ? "o prompt não pode ficar vazio"
-              : "prompt muito longo",
+            result.motivo === "longo"
+              ? longoDemais(result.persona.length, regrasSalvas.length)
+              : "o prompt não pode ficar vazio",
         },
         { status: 400 }
       );
@@ -167,21 +174,15 @@ export async function PUT(
   // O mode "horario" NÃO gera versão: ele não toca a persona, só faz merge do
   // horário no agent_config.
   //
-  // Best-effort e nunca lança: perder o registro é ruim, derrubar o save do dono
-  // por causa do registro é pior. Mesmo princípio do logTurn.
+  // Best-effort e nunca lança (`registrarPublicacao`, a mesma da rota das regras).
   if (persona) {
-    try {
-      const { error: pubErr } = await svc.from("agent_publications").insert({
-        client_id: id,
-        config: update.agent_config ?? null,
-        persona,
-        prompt_mode: update.prompt_mode ?? "guiado",
-        published_by: mine.userId,
-      });
-      if (pubErr) console.error("falha ao registrar a versão:", pubErr.message);
-    } catch (e) {
-      console.error("falha ao registrar a versão:", e);
-    }
+    await registrarPublicacao(svc, {
+      client_id: id,
+      config: update.agent_config ?? null,
+      persona,
+      prompt_mode: update.prompt_mode ?? "guiado",
+      published_by: mine.userId,
+    });
   }
 
   return NextResponse.json({
@@ -190,4 +191,13 @@ export async function PUT(
     chars: persona ? persona.length : 0,
     removed: removidos,
   });
+}
+
+/**
+ * Mensagem de prompt acima do `LIMITS.persona`. Com regras salvas, diz que elas
+ * contam e que apagar alguma libera espaço (o dono não as vê neste formulário).
+ */
+function longoDemais(tamanho: number, regras: number): string {
+  if (regras === 0) return "prompt muito longo";
+  return `O prompt ficaria com ${numeroBR(tamanho)} caracteres, acima do limite de ${numeroBR(LIMITS.persona)}, contando ${regras === 1 ? "a regra salva" : `as ${regras} regras salvas`} pelo time. Apague alguma em "Regras salvas pelo time" para liberar espaço.`;
 }

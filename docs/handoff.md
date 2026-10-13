@@ -37,6 +37,7 @@ desligada de propósito**.
 
 Solução gravada, detalhe em seções com a fonte e pedido aberto atualizado pelo cliente estão em produção. `test:e2e:n8n` 11/11 na versão publicada, zero envio Evolution para 5500. O legado `closed_how` (coluna, check e gatilho de transição) foi apagado em `20261013151634_remove_closed_how_legado.sql`; o lint segue barrando o nome.
 PRÓXIMO: P1 item 5 (orientação vira regra permanente): botão no detalhe do pedido, regra no prompt junto das regras (no avançado, seção própria no fim), texto editável antes de salvar, conta no `LIMITS.persona`, valor da regra reconhecido pelo guardrail, registro em `agent_publications`.
+13/10/2026, tarde: P1 item 5 IMPLEMENTADO e revisado pelo arquiteto, NÃO COMMITADO (ADR `docs/adr/2026-10-13-orientation-saved-as-agent-rule.md`). Regras em `clients.regras_salvas`, escrita só por `agent-rules` com troca condicional. Migrações JÁ APLICADAS no banco: `20261013154539_handoff_regra_salva_em.sql`, `20261013211408_clients_regras_salvas.sql`, `20261013211807_trocar_regras_salvas_persona_nula.sql`. Dono aprovou: seção própria no guiado, 200 caracteres, 20 regras. Falta: suítes de login (`regras-salvas.serial`, `atendente.att`) e as pagas (`ia`/`bateria` agora mandam `regrasSalvas: []`), rodadas pelo arquiteto.
 
 ### 07/10/2026: PRÓXIMO PASSO (fazer primeiro)
 

@@ -298,10 +298,111 @@ export function renderHours(h: BusinessHours): string {
 }
 
 // ————————————————————————————————————————————————————————————————
+// Regras salvas pelo time (P1 item 5, 13/10/2026)
+// ————————————————————————————————————————————————————————————————
+
+/**
+ * Cabeçalho da seção das regras salvas. Ela é MONTADA a cada compilação a partir
+ * de `clients.regras_salvas`; no texto salvo do avançado, o `stripBaseTail` tira
+ * a cópia gerada em silêncio (`ehSecaoGerada`) e AVISA se a seção com este nome
+ * foi escrita pelo dono.
+ */
+export const REGRAS_SALVAS_HEADER = "REGRAS SALVAS PELO TIME";
+
+/** Primeira linha fixa da seção gerada: é o que a separa de um texto do dono com o mesmo título. */
+const REGRAS_SALVAS_ABERTURA =
+  "Regras que o time da empresa definiu a partir de atendimentos. Valem em toda conversa.";
+
+/**
+ * Quantas regras salvas cabem: o MESMO teto das outras listas do formulário
+ * (`asStringArray`, 20 itens). Na prática o `LIMITS.persona` costuma barrar antes.
+ */
+export const MAX_REGRAS_SALVAS = 20;
+
+/**
+ * Uma regra como ela entra no prompt e no banco: uma linha só, sem cabeçalho
+ * forjado. NÃO corta: passar de `LIMITS.bullet` é recusado (`tamanhoDaRegra`),
+ * nunca truncado em silêncio.
+ */
+function normalizarRegra(texto: unknown): string {
+  return sanitizeText(asString(texto).replace(/\s*\n+\s*/g, " "), Number.MAX_SAFE_INTEGER);
+}
+
+/**
+ * O tamanho da regra como ela será gravada. A tela (contador do editor) e a rota
+ * usam ESTA medida contra `LIMITS.bullet`, para os dois nunca discordarem.
+ */
+export function tamanhoDaRegra(texto: unknown): number {
+  return normalizarRegra(texto).length;
+}
+
+/**
+ * A ÚNICA normalização da lista, usada nas bordas (banco, corpo de requisição):
+ * só textos, uma linha, sanitizados, sem vazios nem repetidos. Daqui para dentro
+ * (`blocoRegrasSalvas`) a lista é confiável.
+ */
+export function normalizarRegras(lista: unknown): string[] {
+  if (!Array.isArray(lista)) return [];
+  const out: string[] = [];
+  for (const item of lista) {
+    if (typeof item !== "string") continue;
+    const r = normalizarRegra(item);
+    if (r && !out.includes(r)) out.push(r);
+  }
+  return out;
+}
+
+/**
+ * A lista nova depois de uma mudança pedida pelo dono (puro: a rota
+ * `agent-rules` decide com isto, e o teste prova sem banco). Recusa regra vazia,
+ * longa demais, lista cheia e remoção de regra que não está mais lá. Adicionar
+ * uma regra que JÁ existe não é erro: `mudou: false`.
+ */
+export function mudarRegras(
+  atuais: string[],
+  op: { tipo: "adicionar" | "remover"; texto: unknown }
+):
+  | { ok: true; regras: string[]; mudou: boolean }
+  | { ok: false; motivo: "vazia" | "longa" | "ausente" | "cheia" } {
+  const regra = normalizarRegra(op.texto);
+  if (!regra) return { ok: false, motivo: "vazia" };
+  if (op.tipo === "adicionar") {
+    if (atuais.includes(regra)) return { ok: true, regras: atuais, mudou: false };
+    if (regra.length > LIMITS.bullet) return { ok: false, motivo: "longa" };
+    if (atuais.length >= MAX_REGRAS_SALVAS) return { ok: false, motivo: "cheia" };
+    return { ok: true, regras: [...atuais, regra], mudou: true };
+  }
+  if (!atuais.includes(regra)) return { ok: false, motivo: "ausente" };
+  return { ok: true, regras: atuais.filter((r) => r !== regra), mudou: true };
+}
+
+/**
+ * A seção das regras salvas, igual nos dois modos e sempre no MESMO lugar: no
+ * fim do conteúdo do tenant, logo antes do rabo da base. É conteúdo do cliente
+ * (manda no jeito de atender), então a PRECEDÊNCIA da base continua valendo
+ * sobre ela. Sem regras, não existe seção. Confia na lista (`normalizarRegras`
+ * já passou na borda).
+ */
+export function blocoRegrasSalvas(regras: string[] | undefined): string {
+  if (!regras || regras.length === 0) return "";
+  return [`### ${REGRAS_SALVAS_HEADER}`, REGRAS_SALVAS_ABERTURA, ...regras.map((r) => `- ${r}`)].join("\n");
+}
+
+/**
+ * O corpo cortado de uma seção "REGRAS SALVAS PELO TIME" é a cópia GERADA? (a
+ * frase fixa de abertura e só itens "- "). Se não for, o texto é do dono e o
+ * corte precisa ir para `removed`.
+ */
+function ehSecaoGerada(corpo: string[]): boolean {
+  const linhas = corpo.map((l) => l.trim()).filter(Boolean);
+  return linhas[0] === REGRAS_SALVAS_ABERTURA && linhas.slice(1).every((l) => l.startsWith("- "));
+}
+
+// ————————————————————————————————————————————————————————————————
 // buildPersona — compila o AgentConfig no system prompt
 // ————————————————————————————————————————————————————————————————
 
-export function buildPersona(cfg: AgentConfig): string {
+export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = []): string {
   const name = cfg.agentName.trim() || "o atendente";
   const company = cfg.companyName.trim() || "a empresa";
   const role = cfg.agentRole.trim();
@@ -557,6 +658,9 @@ export function buildPersona(cfg: AgentConfig): string {
     restricoes,
     casosLimite,
     exemplos,
+    // Fim do conteúdo do tenant: as regras salvas pelo time (a mesma função do
+    // avançado, `buildAdvancedPersona`).
+    blocoRegrasSalvas(regrasSalvas),
     // O RABO DA BASE VEM POR ÚLTIMO, sempre. Ele é o mesmo nos dois modos, e é
     // por isso que virou função à parte: no avançado o cliente escreve tudo o
     // que está acima e este bloco continua sendo recolado, então o contrato de
@@ -739,15 +843,32 @@ export function stripBaseTail(text: string): { head: string; removed: string[] }
   const linhas = text.replace(/\r\n/g, "\n").split("\n");
   const fora: string[] = [];
   const removidos: string[] = [];
-  let cortando = false;
+  // "base": seção do rabo (sai e é avisada). "regras": a seção das regras
+  // salvas, que sai sempre; só é avisada quando NÃO é a cópia gerada
+  // (`ehSecaoGerada`), ou seja, quando o dono escreveu algo com esse título.
+  let modo: "manter" | "base" | "regras" = "manter";
+  let corpoRegras: string[] = [];
+  const fecharRegras = () => {
+    if (modo === "regras" && !ehSecaoGerada(corpoRegras)) removidos.push(REGRAS_SALVAS_HEADER);
+    corpoRegras = [];
+  };
   for (const l of linhas) {
     if (l.trimStart().startsWith("###")) {
+      fecharRegras();
       const h = l.replace(/^\s*#+\s*/, "").trim().toUpperCase();
-      cortando = TAIL_HEADERS.some((t) => h === t);
-      if (cortando) removidos.push(h);
+      if (TAIL_HEADERS.some((t) => h === t)) {
+        modo = "base";
+        removidos.push(h);
+      } else {
+        modo = h === REGRAS_SALVAS_HEADER ? "regras" : "manter";
+      }
+      if (modo === "manter") fora.push(l);
+      continue;
     }
-    if (!cortando) fora.push(l);
+    if (modo === "manter") fora.push(l);
+    else if (modo === "regras") corpoRegras.push(l);
   }
+  fecharRegras();
   return {
     head: fora.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd(),
     removed: removidos,
@@ -761,10 +882,15 @@ export function stripBaseTail(text: string): { head: string; removed: string[] }
  */
 export function buildAdvancedPersona(
   texto: string,
-  opts: BaseTailOpts = {}
+  opts: BaseTailOpts & { regrasSalvas?: string[] } = {}
 ): string {
   const { head } = stripBaseTail(texto);
-  return [head, buildBaseTail(opts)].filter(Boolean).join("\n\n");
+  const { regrasSalvas, ...tail } = opts;
+  // As regras salvas fecham o conteúdo do tenant, antes do rabo: o MESMO lugar
+  // e a MESMA função (`blocoRegrasSalvas`) do guiado.
+  return [head, blocoRegrasSalvas(regrasSalvas), buildBaseTail(tail)]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /**
@@ -789,13 +915,16 @@ export type CompiladoPersona =
 
 export function compilePersona(
   input:
-    | { mode: "guiado"; config: unknown }
-    | { mode: "avancado"; persona: unknown; handoffNotice?: string }
+    | { mode: "guiado"; config: unknown; regrasSalvas?: string[] }
+    | { mode: "avancado"; persona: unknown; handoffNotice?: string; regrasSalvas?: string[] }
 ): CompiladoPersona {
+  // As regras salvas pelo time (`clients.regras_salvas`, já normalizadas por
+  // `normalizarRegras`) entram nos dois modos pela MESMA seção. Para uma linha
+  // de `clients`, use `compilarDoTenant`.
   if (input.mode === "guiado") {
     const r = validateConfig(input.config);
     if (!r.ok) return { ok: false, motivo: "campos", fields: r.errors };
-    const persona = buildPersona(r.value);
+    const persona = buildPersona(r.value, input.regrasSalvas);
     if (persona.length > LIMITS.persona)
       return { ok: false, motivo: "longo", persona };
     return { ok: true, persona, config: r.value };
@@ -808,10 +937,39 @@ export function compilePersona(
   const { removed } = stripBaseTail(escrito);
   const persona = buildAdvancedPersona(escrito, {
     handoffNotice: input.handoffNotice,
+    regrasSalvas: input.regrasSalvas,
   });
   if (persona.length > LIMITS.persona)
     return { ok: false, motivo: "longo", persona };
   return { ok: true, persona, removed };
+}
+
+/** As colunas de `clients` que montam o prompt de um tenant. */
+export interface LinhaDoTenant {
+  persona: unknown;
+  agent_config: unknown;
+  prompt_mode: unknown;
+  regras_salvas: unknown;
+}
+
+/**
+ * Compila o prompt de UMA linha de `clients`: o despacho pelo `prompt_mode` mais
+ * as regras salvas, num lugar só. Usado pelo turno (`personaDoTenant`) e pela
+ * rota das regras (`agent-rules`, que passa a lista NOVA em `regrasOverride`).
+ * O `handoffNotice` vem do `agent_config` quando existe (no avançado ele pode faltar).
+ */
+export function compilarDoTenant(row: LinhaDoTenant, regrasOverride?: string[]): CompiladoPersona {
+  const regrasSalvas = regrasOverride ?? normalizarRegras(row.regras_salvas);
+  if (row.prompt_mode === "avancado") {
+    const cfg = row.agent_config && typeof row.agent_config === "object" ? (row.agent_config as Record<string, unknown>) : {};
+    return compilePersona({
+      mode: "avancado",
+      persona: row.persona,
+      handoffNotice: typeof cfg.handoffNotice === "string" ? cfg.handoffNotice : undefined,
+      regrasSalvas,
+    });
+  }
+  return compilePersona({ mode: "guiado", config: row.agent_config, regrasSalvas });
 }
 
 // Prompt mínimo para tenant que ainda não configurou nada (persona nula).
