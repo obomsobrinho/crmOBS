@@ -133,13 +133,13 @@ export default async function DesignPreview({
   const handoffsPreview =
     handoff === "aberto"
       ? [
-          { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: null, closedAt: null, closedHow: null },
-          { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: null, closedHow: null },
+          { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: null, closedAt: null, solucao: null },
+          { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: null, solucao: null },
         ]
       : handoff === "resolvido"
         ? [
-            { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: "O plano anual sai por R$ 1.800. Pode passar o valor.", closedAt: HOJE(12.05), closedHow: "ia" as const },
-            { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: HOJE(12.1), closedHow: "resolvido" as const },
+            { id: 1, openedAt: HOJE(11.95), summary: "Cliente quer falar com o dono sobre o valor do plano anual", instruction: "O plano anual sai por R$ 1.800. Pode passar o valor.", closedAt: HOJE(12.05), solucao: "orientou_ia" as const },
+            { id: 2, openedAt: HOJE(12.0), summary: "Quer saber se dá para parcelar no cartão", instruction: null, closedAt: HOJE(12.1), solucao: "time_resolveu" as const },
           ]
         : undefined;
   // `?lista=1` abre SEM conversa (a tela de /inbox), que no celular é outra

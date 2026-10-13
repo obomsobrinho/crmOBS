@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import type { Handoff } from "../HandoffCard";
+import { solucaoDoBanco } from "@/lib/solucoes";
 
 /**
  * Os pedidos de ajuda desta conversa: carga, tempo real (uma linha por evento),
@@ -28,7 +29,7 @@ export function useHandoffsDaConversa({
     if (handoffsPreview) return;
     const { data } = await supabase
       .from("handoffs")
-      .select("id, opened_at, summary, instruction, closed_at, closed_how, motivo")
+      .select("id, opened_at, summary, instruction, closed_at, solucao, motivo")
       .eq("client_id", clientId)
       .eq("phone", phone)
       .order("opened_at", { ascending: true });
@@ -39,7 +40,7 @@ export function useHandoffsDaConversa({
         summary: r.summary,
         instruction: r.instruction,
         closedAt: r.closed_at,
-        closedHow: r.closed_how as Handoff["closedHow"],
+        solucao: solucaoDoBanco(r.solucao),
         motivo: r.motivo,
       }))
     );
@@ -76,7 +77,7 @@ export function useHandoffsDaConversa({
         summary: (r.summary as string | null) ?? null,
         instruction: (r.instruction as string | null) ?? null,
         closedAt: (r.closed_at as string | null) ?? null,
-        closedHow: (r.closed_how as Handoff["closedHow"]) ?? null,
+        solucao: solucaoDoBanco(r.solucao),
         motivo: (r.motivo as string | null) ?? null,
       };
       setHandoffs((cur) =>
@@ -110,10 +111,12 @@ export function useHandoffsDaConversa({
       // Fecha na tela já; o evento do realtime traz a linha de verdade (sem
       // reler a lista, que era a segunda consulta por clique).
       if (res.ok) {
+        // A solução que a rota GRAVOU (`fecharPedido`), não um mapa repetido aqui.
+        const { solucao } = (await res.json()) as { solucao?: string | null };
         setHandoffs((cur) =>
           cur.map((h) =>
             h.id === pedidoId && !h.closedAt
-              ? { ...h, closedAt: new Date().toISOString(), closedHow: "resolvido" }
+              ? { ...h, closedAt: new Date().toISOString(), solucao: solucaoDoBanco(solucao) }
               : h
           )
         );

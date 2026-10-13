@@ -33,6 +33,17 @@ export interface AgentOutput {
    * guardrail barra) é o `processTurn`; o n8n ignora.
    */
   motivo: string;
+  /**
+   * PEDIDO EM ABERTO ATUALIZADO (08/10/2026, `lib/fila-de-pedidos.ts`): o número,
+   * na lista PEDIDOS DE AJUDA EM ABERTO (1, 2...), do pedido de que este turno
+   * trata; 0 = nenhum. Só o `processTurn` lê; o n8n ignora.
+   */
+  pedido_aberto: number;
+  /**
+   * O cliente trouxe informação NOVA para o pedido `pedido_aberto` (prazo,
+   * detalhe, preferência). Insistir, cobrar, agradecer ou repetir é false.
+   */
+  informacao_nova: boolean;
 }
 
 export interface ChatTurn {
@@ -148,8 +159,27 @@ const OUTPUT_SCHEMA = {
       enum: [...MOTIVOS_DO_MODELO.map((m) => m.chave), ""],
       description: `Por que você está chamando o time. Só quando action for pausar; vazio ("") no resto. ${motivosParaPrompt()}.`,
     },
+    pedido_aberto: {
+      type: "integer",
+      description:
+        "O número, na lista PEDIDOS DE AJUDA EM ABERTO, do pedido de que o cliente está tratando nesta mensagem (1, 2...). 0 quando a lista não existe ou a mensagem não é sobre nenhum deles.",
+    },
+    informacao_nova: {
+      type: "boolean",
+      description:
+        "true SOMENTE quando o cliente trouxe informação nova para o pedido de pedido_aberto (prazo, detalhe, preferência, dado que faltava). Insistir, cobrar, agradecer, confirmar ou repetir o que já está no pedido é false. Com pedido_aberto = 0, false.",
+    },
   },
-  required: ["messages", "action", "summary", "preferencia_horario", "pedido_novo", "motivo"],
+  required: [
+    "messages",
+    "action",
+    "summary",
+    "preferencia_horario",
+    "pedido_novo",
+    "motivo",
+    "pedido_aberto",
+    "informacao_nova",
+  ],
   additionalProperties: false,
 } as const;
 
@@ -319,6 +349,11 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
       typeof raw.preferencia_horario === "string" ? raw.preferencia_horario : "",
     pedido_novo: raw.pedido_novo === true,
     motivo: typeof raw.motivo === "string" ? raw.motivo : "",
+    pedido_aberto:
+      typeof raw.pedido_aberto === "number" && Number.isInteger(raw.pedido_aberto) && raw.pedido_aberto > 0
+        ? raw.pedido_aberto
+        : 0,
+    informacao_nova: raw.informacao_nova === true,
   };
 }
 
@@ -334,11 +369,14 @@ export function pedidosResolvidosBlock(linhas: string[]): string {
 
 // Pedidos de ajuda que o time ainda não respondeu nesta conversa. Sem isto, a IA
 // não tem como dizer se o cliente trouxe um assunto novo (vai para a fila) ou
-// só insistiu num que já está com o time (`pedido_novo`).
+// só insistiu num que já está com o time (`pedido_novo`). Desde 08/10/2026 também
+// diz o que fazer quando o cliente ACRESCENTA algo a um deles: `pausar`, não novo,
+// o número do pedido e `informacao_nova`, com o resumo completo, que o processTurn
+// grava no pedido (`atualizacaoDoPedido`). As regras dos campos moram no schema.
 export function pedidosAbertosBlock(resumos: string[]): string {
   return [
     "### PEDIDOS DE AJUDA EM ABERTO",
-    "Pedidos que você já passou ao time nesta conversa e que ainda não foram respondidos. Se o cliente insistir ou cobrar UM DESTES assuntos, diga que o time já está vendo e use pedido_novo = false. Assunto que não está nesta lista é pedido novo (pedido_novo = true).",
+    "Pedidos que você já passou ao time nesta conversa e que ainda não foram respondidos. Se o cliente insistir ou cobrar UM DESTES assuntos, diga que o time já está vendo e use pedido_novo = false. Se ele acrescentar algo a um destes pedidos, use action = pausar, pedido_novo = false, o número dele em pedido_aberto, informacao_nova = true e o pedido inteiro, já com a informação nova, no summary. Assunto que não está nesta lista é pedido novo (pedido_novo = true).",
     ...resumos.map((r, i) => `${i + 1}. ${r}`),
   ].join("\n");
 }

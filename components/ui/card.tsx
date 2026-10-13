@@ -29,6 +29,12 @@ const cardVariants = cva("border border-line shadow-[var(--panel-shadow)]", {
        */
       pagina:
         "rounded-xl bg-raised max-md:rounded-none max-md:border-0 max-md:shadow-none",
+      /**
+       * Seção DENTRO de um cartão de página (o detalhe do pedido, 08/10/2026): é
+       * um BLOCO encaixado, não outro cartão. Superfície `bloco`, raio interno,
+       * moldura `line-soft`, sem sombra e 16px de respiro (fundamentos-geometria).
+       */
+      secao: "rounded-lg border-line-soft bg-bloco p-4 shadow-none",
     },
   },
   defaultVariants: { variant: "conteudo" },

@@ -1,5 +1,6 @@
 import "server-only";
 import type { createServiceClient } from "@/lib/supabase/service";
+import type { Solucao } from "@/lib/solucoes";
 
 type Svc = ReturnType<typeof createServiceClient>;
 
@@ -10,13 +11,14 @@ type Svc = ReturnType<typeof createServiceClient>;
 // aberto mais antigo, que é o que mede a espera real.
 //
 // As três portas que fecham um pedido (orientar, "Eu respondo" e "Resolvido")
-// passam por aqui, para nenhuma esquecer de recalcular o `handoff_at`: fechar o
+// passam por aqui, e cada uma diz a SOLUÇÃO que grava (lib/solucoes.ts, 08/10/2026), para nenhuma esquecer de recalcular o `handoff_at`: fechar o
 // pedido e deixar a conversa em "Esperando" com o próximo já resolvido, ou
 // tirá-la de lá com outro ainda aberto, é o erro que isto existe para evitar.
 
 /**
  * Fecha UM pedido aberto: o `id` pedido (se ainda estiver aberto) ou, sem `id`,
- * o mais antigo. Devolve o id fechado, ou `null` se não havia o que fechar.
+ * o mais antigo. Devolve o id fechado e a solução GRAVADA (a tela usa esta, não
+ * repete o mapa da porta), ou `null` se não havia o que fechar.
  */
 export async function fecharPedido(
   svc: Svc,
@@ -24,11 +26,12 @@ export async function fecharPedido(
     clientId: string;
     phone: string;
     id?: number | null;
-    como: "ia" | "resolvido";
+    /** O que resolveu (lib/solucoes.ts), gravado em `handoffs.solucao`. */
+    solucao: Solucao;
     por: string | null;
     instrucao?: string | null;
   }
-): Promise<number | null> {
+): Promise<{ id: number; solucao: Solucao } | null> {
   let alvo = p.id ?? null;
   if (alvo == null) {
     const { data } = await svc
@@ -48,7 +51,7 @@ export async function fecharPedido(
     .from("handoffs")
     .update({
       closed_at: new Date().toISOString(),
-      closed_how: p.como,
+      solucao: p.solucao,
       closed_by: p.por,
       ...(p.instrucao ? { instruction: p.instrucao } : {}),
     })
@@ -60,7 +63,7 @@ export async function fecharPedido(
   if (error) throw new Error(error.message);
 
   await recalcularEspera(svc, p.clientId, p.phone);
-  return fechado && fechado.length > 0 ? alvo : null;
+  return fechado && fechado.length > 0 ? { id: alvo, solucao: p.solucao } : null;
 }
 
 /** `handoff_at` = abertura do pedido aberto mais antigo, ou nulo se não sobrou nenhum. */

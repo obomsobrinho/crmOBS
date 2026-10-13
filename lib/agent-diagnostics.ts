@@ -50,6 +50,10 @@ export interface TurnDiagnostics {
   // (`entraNaFila` em lib/agent-turn.ts, com a rede de segurança), calculada
   // também no dryRun para a bancada mostrar o pedido como ele apareceria.
   pedidoNaFila?: boolean;
+  // true = o turno reescreveu o resumo de um pedido EM ABERTO (08/10/2026,
+  // `atualizacaoDoPedido`, lib/fila-de-pedidos.ts; no dryRun, só diria).
+  // Ausente = nada a atualizar. Nunca gera aviso.
+  pedidoAtualizado?: boolean;
   // true = o agente não está publicado, então o turno foi silenciado sem chamar
   // o modelo (a mensagem do cliente continua sendo gravada pelo n8n).
   notPublished?: boolean;

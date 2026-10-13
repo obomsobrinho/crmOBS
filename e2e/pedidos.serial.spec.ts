@@ -53,10 +53,10 @@ async function abrirPedido(resumo: string): Promise<number> {
 async function desfecho(id: number) {
   const { data } = await servico()
     .from("handoffs")
-    .select("closed_how, instruction")
+    .select("solucao, instruction")
     .eq("id", id)
     .single();
-  return data as { closed_how: string | null; instruction: string | null };
+  return data;
 }
 
 async function linhaDoPedido(page: import("@playwright/test").Page, id: number) {
@@ -73,12 +73,16 @@ test("Resolvido pela página fecha o pedido no banco", async ({ page }) => {
   await expect(linha).toContainText("Quer saber se aceita cartão de débito");
 
   await linha.getByRole("button").first().click();
+  // As seções do pedido (08/10/2026) carregam das mensagens reais, ao abrir. A seção
+  // do cliente aparece sempre (com as mensagens, ou a linha de que não achou nenhuma).
+  await expect(page.locator('[data-slot="pedido-cliente"]')).toBeVisible();
+  await expect(page.locator('[data-slot="pedido-secoes-carregando"]')).toHaveCount(0, { timeout: 15_000 });
   await page.locator('[data-slot="pedido-detalhe"]').getByRole("button", { name: "Resolvido" }).click();
   await expect(page.locator('[data-slot="pedidos-resultado"]')).toHaveText("Marcado como resolvido.", {
     timeout: 20_000,
   });
 
-  await expect.poll(() => desfecho(id)).toMatchObject({ closed_how: "resolvido" });
+  await expect.poll(() => desfecho(id)).toMatchObject({ solucao: "time_resolveu" });
   await expect
     .poll(() => estadoDaConversa(servico(), clientId))
     .toMatchObject({ handoffAt: null });
@@ -101,7 +105,7 @@ test("Orientar pela página fecha como IA e guarda a orientação", async ({ pag
     timeout: 20_000,
   });
   await expect.poll(() => desfecho(id)).toMatchObject({
-    closed_how: "ia",
+    solucao: "orientou_ia",
     instruction: "Diga que a entrega leva 3 dias úteis.",
   });
   await expect

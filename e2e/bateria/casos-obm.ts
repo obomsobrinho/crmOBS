@@ -18,6 +18,13 @@ export interface Saida {
   summary: string;
   preferencia_horario: string;
   pedido_novo: boolean;
+  pedido_aberto?: number;
+  informacao_nova?: boolean;
+}
+/** O que a bancada diz da fila (lib/fila-de-pedidos.ts), calculado no servidor. */
+export interface Diag {
+  pedidoNaFila?: boolean;
+  pedidoAtualizado?: boolean;
 }
 export interface Caso {
   id: string;
@@ -32,6 +39,8 @@ export interface Caso {
   espera: string;
   /** Falhas checáveis por máquina. Vazio = passou. */
   check: (s: Saida, texto: string) => string[];
+  /** Falhas checáveis na decisão de fila do servidor (pedido novo ou atualizado). */
+  checkDiag?: (d: Diag) => string[];
   /**
    * Falha CONHECIDA cuja correção é decisão do dono: o caso fica registrado e
    * pulado (`test.fixme`), com o motivo, em vez de deixar a suíte vermelha.
@@ -467,6 +476,50 @@ export const CASOS: Caso[] = [
     check: (s, t) => [
       ...(s.action === "pausar" && s.pedido_novo ? ["abriu pedido NOVO na retomada"] : []),
       ...tem(t, /delivery|app/, "não deu o retorno"),
+    ],
+  },
+
+  {
+    id: "M9",
+    dim: "momento",
+    titulo: "Cliente acrescenta informação a um pedido em aberto (08/10)",
+    agora: QUA_10,
+    history: [
+      ...ATE_CONVITE.slice(0, 4),
+      { role: "user", content: "qual o prazo de entrega de um sistema desses?" },
+      { role: "assistant", content: "Vou confirmar o prazo com o time e já te retorno por aqui." },
+    ],
+    message: "preciso até sexta",
+    pedidosAbertos: ["Cliente quer saber o prazo de entrega do sistema."],
+    espera:
+      "Pausa sem pedido novo (pedido_novo=false, fora da fila) e o resumo, já com a sexta, atualiza o pedido aberto.",
+    check: (s) => [
+      ...action(s, ["pausar"]),
+      ...(s.pedido_novo ? ["pedido_novo=true para informação de um pedido aberto"] : []),
+      ...tem(s.summary.toLowerCase(), /sexta/, "o resumo não traz a sexta"),
+    ],
+    checkDiag: (d) => [
+      ...(d.pedidoNaFila ? ["entrou na fila como pedido novo"] : []),
+      ...(d.pedidoAtualizado ? [] : ["não atualizou o pedido aberto"]),
+    ],
+  },
+  {
+    id: "M10",
+    dim: "momento",
+    titulo: "Agradecimento com pedido em aberto não mexe no pedido (08/10)",
+    agora: QUA_10,
+    history: [
+      ...ATE_CONVITE.slice(0, 6),
+      { role: "user", content: "quero falar com alguem sobre valores" },
+      { role: "assistant", content: "Claro, vou verificar os valores com o time e já te retorno por aqui." },
+    ],
+    message: "valeu, obrigado",
+    pedidosAbertos: ["Cliente quer falar com alguém sobre valores."],
+    espera: "Segue a conversa: nenhum pedido novo e nenhuma atualização do pedido aberto.",
+    check: (s) => (s.action === "pausar" && s.pedido_novo ? ["abriu pedido NOVO num agradecimento"] : []),
+    checkDiag: (d) => [
+      ...(d.pedidoNaFila ? ["entrou na fila"] : []),
+      ...(d.pedidoAtualizado ? ["atualizou o pedido aberto num agradecimento"] : []),
     ],
   },
 

@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { AGENT_PRESETS } from "../lib/agent-presets";
-import { CASOS, type Caso, type Saida } from "./bateria/casos-obm";
+import { CASOS, type Caso, type Diag, type Saida } from "./bateria/casos-obm";
 import { SEGMENTOS } from "./bateria/casos-segmentos";
 
 // BATERIA DE DIAGNÓSTICO DO ATENDIMENTO (05/10/2026), cérebro real em dryRun.
 //
-// 76 casos: 34 da OBM (prompt avançado congelado de 05/10) e 42 de quatro
+// 80 casos: 38 da OBM (prompt avançado congelado de 05/10) e 42 de quatro
 // segmentos no guiado (odonto, advocacia, loja, pizzaria). Cobrem período e
 // horário, contexto, momento da conversa, interpretação do pedido e fidelidade
 // à base. Rodar ANTES de mudar a base do prompt, o modelo ou o calendário.
@@ -35,7 +35,7 @@ const HORARIO_OBM = {
 
 interface Resposta {
   output: Saida;
-  diagnostics: { guardrail: { blocked: boolean; reason: string | null }; motivo?: string | null };
+  diagnostics: { guardrail: { blocked: boolean; reason: string | null }; motivo?: string | null } & Diag;
 }
 
 async function rodar(request: APIRequestContext, c: Caso, corpo: Record<string, unknown>) {
@@ -57,6 +57,8 @@ async function rodar(request: APIRequestContext, c: Caso, corpo: Record<string, 
       : [`guardrail bloqueou: ${r.diagnostics.guardrail.reason}`]
     : [
         ...c.check(r.output, texto),
+        // A decisão de fila do servidor: pedido novo ou pedido aberto atualizado (08/10/2026).
+        ...(c.checkDiag ? c.checkDiag(r.diagnostics) : []),
         // O motivo gravado (lib/motivos.ts), só quando ela pediu ajuda.
         ...(c.motivos && r.output.action === "pausar" && !c.motivos.includes(r.diagnostics.motivo ?? "")
           ? [`motivo=${r.diagnostics.motivo ?? "nenhum"}, esperado ${c.motivos.join("|")}`]

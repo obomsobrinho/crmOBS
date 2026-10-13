@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { Handoff } from "../HandoffCard";
+import { SOLUCAO_DA_PORTA, type Solucao } from "@/lib/solucoes";
 import { esperar, historico, pausaDigitando } from "./apoio";
 import type { ApiResult, ConfiguracaoEmEdicao, PlaygroundTurn } from "./tipos";
 import { useColadoNoFim } from "./useColadoNoFim";
@@ -129,7 +130,7 @@ export function useConversaDeTeste({
           summary: output.summary || diagnostics.summary || null,
           instruction: null,
           closedAt: null,
-          closedHow: null,
+          solucao: null,
         },
       ]);
     }
@@ -216,12 +217,12 @@ export function useConversaDeTeste({
 
   // Fecha o pedido da vez: vira a linha de histórico na conversa, no ponto em
   // que fechou, como no atendimento.
-  function fecharPedido(p: Handoff, como: "ia" | "resolvido", instrucao: string | null) {
+  function fecharPedido(p: Handoff, solucao: Solucao, instrucao: string | null) {
     const fechado: Handoff = {
       ...p,
       instruction: instrucao,
       closedAt: new Date().toISOString(),
-      closedHow: como,
+      solucao,
     };
     setPedidos((prev) => prev.map((x) => (x.id === p.id ? fechado : x)));
     setTurns((prev) => [...prev, { role: "marco", content: "", pedido: fechado }]);
@@ -236,7 +237,7 @@ export function useConversaDeTeste({
     setSending(true);
     const history = historico(turns);
     const restantes = fila.slice(1);
-    fecharPedido(pedidoAtual, "ia", texto.trim());
+    fecharPedido(pedidoAtual, SOLUCAO_DA_PORTA.orientar, texto.trim());
     try {
       await responder("", history, { instruction: texto.trim() }, restantes);
     } catch (e) {
@@ -247,11 +248,11 @@ export function useConversaDeTeste({
   }
 
   // RESPONDER COMO TIME (o modo Responder da caixa): o pedido fecha como
-  // "resolvido pelo time", o time assume e a IA pausa, como no atendimento.
+  // "Time assumiu" (lib/solucoes.ts) e a IA pausa, como no atendimento (/api/send).
   function responderComoTime(texto: string) {
     const t = texto.trim();
     if (!t) return;
-    if (pedidoAtual) fecharPedido(pedidoAtual, "resolvido", null);
+    if (pedidoAtual) fecharPedido(pedidoAtual, SOLUCAO_DA_PORTA.responder, null);
     setTurns((prev) => [
       ...prev,
       ...(iaPausada ? [] : [{ role: "marco" as const, content: "", rotulo: "O time assumiu a conversa" }]),

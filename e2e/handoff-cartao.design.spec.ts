@@ -47,8 +47,8 @@ test("resolvido: vira linha de histórico, e a caixa volta ao normal", async ({ 
   await page.goto("/design?handoff=resolvido");
   const linhas = page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]');
   await expect(linhas).toHaveCount(2);
-  await expect(linhas.first()).toContainText("resolvido com a sua orientação");
+  await expect(linhas.first()).toContainText("Orientou IA");
   await expect(linhas.first()).toContainText("Orientação:");
-  await expect(linhas.last()).toContainText("resolvido pelo time");
+  await expect(linhas.last()).toContainText("Time resolveu");
   await expect(page.locator('[data-slot="pedido-caixa"]')).toHaveCount(0);
 });

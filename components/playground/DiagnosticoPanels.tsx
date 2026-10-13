@@ -137,6 +137,10 @@ export function SummaryPanel({ diag }: { diag: TurnDiagnostics | null }) {
         />
         {/* Motivo do pedido de ajuda (06/10/2026): só existe quando ela pede. */}
         {diag?.motivo && <Field label="Motivo do pedido" value={rotuloDoMotivo(diag.motivo)} />}
+        {/* Pedido em aberto atualizado (08/10/2026): na bancada só diz, nada é gravado. */}
+        {diag?.pedidoAtualizado && (
+          <Field label="Pedido em aberto" value="Seria atualizado com o resumo deste turno, sem aviso novo" />
+        )}
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <Field
             label="Preferência de horário"

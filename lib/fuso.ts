@@ -5,6 +5,10 @@
 // no fuso da máquina (o servidor roda em UTC: a mensagem das 17:47 aparecia como
 // 20:47, achado do dono em 27/09/2026). Quem precisa do fuso importa daqui; não
 // escreva a string "America/Sao_Paulo" em outro arquivo.
+// `formatTime` mora em lib/format.ts, que importa FUSO daqui: o ciclo é só de
+// funções chamadas depois do carregamento, nunca no topo do módulo.
+import { formatTime } from "./format";
+
 export const FUSO = "America/Sao_Paulo";
 
 // Um formatador só, reaproveitado: criar `Intl.DateTimeFormat` custa caro e a
@@ -63,4 +67,18 @@ export function diaMesCurtoHoraSP(iso: string): string {
     .replace(".", "");
   const hora = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO });
   return `${dia}, ${hora}`;
+}
+
+/** O mesmo dia civil de São Paulo? */
+export function mesmoDiaSP(a: string, b: string): boolean {
+  return diaIsoSP(Date.parse(a)) === diaIsoSP(Date.parse(b));
+}
+
+/**
+ * A hora de `iso` quando cai no mesmo dia civil de São Paulo que `refIso`
+ * ("16:03"); senão dia e hora ("8 out, 16:03"). É o que o detalhe do pedido usa
+ * para as mensagens e para o "atualizado às/em" (a referência é a abertura).
+ */
+export function horaNoDiaDe(iso: string, refIso: string): string {
+  return mesmoDiaSP(iso, refIso) ? formatTime(iso) : diaMesCurtoHoraSP(iso);
 }

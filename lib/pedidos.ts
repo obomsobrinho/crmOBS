@@ -8,6 +8,7 @@
 import { nomeDoContato } from "./inbox";
 import type { LinhaRpc } from "./supabase/schema";
 import { semNumeroDeAvisos } from "./avisos";
+import { solucaoDoBanco, type Solucao } from "./solucoes";
 
 export interface PedidoLinha {
   id: number;
@@ -16,6 +17,8 @@ export interface PedidoLinha {
   summary: string | null;
   /** Chave de lib/motivos.ts; null = pedido de antes do motivo existir. */
   motivo?: string | null;
+  /** Quando o cliente acrescentou algo e o resumo foi reescrito; null = nunca. */
+  atualizado_em?: string | null;
 }
 
 export interface ContatoLinha {
@@ -32,6 +35,8 @@ export interface PedidoAberto {
   summary: string | null;
   /** Por que a IA chamou o time (lib/motivos.ts); null = "Sem motivo". */
   motivo: string | null;
+  /** Quando o resumo foi reescrito pela informação nova do cliente; null = nunca. */
+  atualizadoEm: string | null;
   /** Nome do contato, ou null (a tela mostra o telefone). */
   nome: string | null;
   /** Foto guardada do contato (lib/fotos.ts), ou null (a tela mostra iniciais). */
@@ -74,6 +79,7 @@ export function montarFila(
       openedAt: p.opened_at,
       summary: p.summary,
       motivo: p.motivo ?? null,
+      atualizadoEm: p.atualizado_em ?? null,
       nome: nomes.get(p.phone) ?? null,
       fotoPath: fotos.get(p.phone) ?? null,
       posicao,
@@ -101,9 +107,11 @@ export interface PedidoResolvidoLinha {
   summary: string | null;
   instruction: string | null;
   closed_at: string;
-  closed_how: string | null;
+  /** Chave de lib/solucoes.ts, gravada no fechamento. */
+  solucao: string | null;
   closed_by: string | null;
   motivo?: string | null;
+  atualizado_em?: string | null;
 }
 
 export interface PedidoResolvido {
@@ -114,10 +122,11 @@ export interface PedidoResolvido {
   summary: string | null;
   /** Por que a IA chamou o time (lib/motivos.ts); null = "Sem motivo". */
   motivo: string | null;
+  atualizadoEm: string | null;
   nome: string | null;
   fotoPath: string | null;
-  /** `ia` = orientado e a IA respondeu; `resolvido` = alguém do time fechou. */
-  como: "ia" | "resolvido" | null;
+  /** O que resolveu, gravado no fechamento (lib/solucoes.ts); null = sem registro. */
+  solucao: Solucao | null;
   /** A orientação que o time deu, quando foi por ela. */
   orientacao: string | null;
   /** Quem fechou (user id), para a tela nomear pelo membro. */
@@ -149,9 +158,10 @@ export function montarResolvidos(
       closedAt: p.closed_at,
       summary: p.summary,
       motivo: p.motivo ?? null,
+      atualizadoEm: p.atualizado_em ?? null,
       nome: nomes.get(p.phone) ?? null,
       fotoPath: fotos.get(p.phone) ?? null,
-      como: p.closed_how === "ia" || p.closed_how === "resolvido" ? p.closed_how : null,
+      solucao: solucaoDoBanco(p.solucao),
       orientacao: p.instruction?.trim() || null,
       porQuem: p.closed_by,
     }));
@@ -200,7 +210,8 @@ export type LinhaPedidoBanco = LinhaRpc<
   | "summary"
   | "instruction"
   | "closed_at"
-  | "closed_how"
+  | "solucao"
+  | "atualizado_em"
   | "closed_by"
   | "nomewpp"
   | "display_name"
@@ -225,6 +236,7 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
       openedAt: l.opened_at,
       summary: l.summary,
       motivo: l.motivo ?? null,
+      atualizadoEm: l.atualizado_em ?? null,
       nome,
       fotoPath: l.foto_path ?? null,
       posicao: Number(l.posicao) || 1,
@@ -238,9 +250,10 @@ export function paraPedido(l: LinhaPedidoBanco): PedidoItem {
     closedAt: l.closed_at,
     summary: l.summary,
     motivo: l.motivo ?? null,
+    atualizadoEm: l.atualizado_em ?? null,
     nome,
     fotoPath: l.foto_path ?? null,
-    como: l.closed_how === "ia" || l.closed_how === "resolvido" ? l.closed_how : null,
+    solucao: solucaoDoBanco(l.solucao),
     orientacao: l.instruction?.trim() || null,
     porQuem: l.closed_by,
   };

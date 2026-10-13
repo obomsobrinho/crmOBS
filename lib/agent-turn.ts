@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { buildFallbackPersona, compilePersona, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
 import { motivoDoPedido, rotuloDoMotivo } from "@/lib/motivos";
+import { atualizacaoDoPedido, entraNaFila } from "@/lib/fila-de-pedidos";
 import {
   runAgent,
   type AgentOutput,
@@ -306,7 +307,7 @@ export async function processTurn(
   // ("esperando há 6h"); o último só troca o resumo.
   let handoffAt: string | null = null;
   // Pedidos de ajuda ainda abertos, do mais antigo para o mais novo (a fila).
-  let abertos: { id: number; summary: string | null }[] = [];
+  let abertos: { id: number; summary: string | null; motivo: string | null }[] = [];
   let resolvidos: string[] = [];
   if (dryRun) {
     history = sanitizeHistory(params.history);
@@ -318,9 +319,11 @@ export async function processTurn(
     abertos = (Array.isArray(params.pedidosAbertos) ? params.pedidosAbertos : [])
       .filter((t): t is string => typeof t === "string" && t.trim() !== "")
       .slice(0, 10)
-      .map((summary, i) => ({ id: -1 - i, summary: summary.slice(0, 500) }));
+      .map((summary, i) => ({ id: -1 - i, summary: summary.slice(0, 500), motivo: null }));
   } else {
-    const [{ data: rows, error: histErr }, { data: conv }] = await Promise.all([
+    // As quatro leituras do turno de uma vez: histórico, conversa, pedidos já
+    // fechados (`pedidosResolvidos`, best-effort) e a fila aberta.
+    const [{ data: rows, error: histErr }, { data: conv }, { data: pedidos }, { data: fila }] = await Promise.all([
       svc
         .from("chat_messages")
         .select("user_message, bot_message, created_at")
@@ -334,29 +337,27 @@ export async function processTurn(
         .eq("client_id", clientId)
         .eq("phone", phone)
         .maybeSingle(),
+      svc
+        .from("handoffs")
+        .select("summary, closed_at")
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .not("closed_at", "is", null)
+        .order("closed_at", { ascending: false })
+        .limit(HISTORY_ROWS),
+      svc
+        .from("handoffs")
+        .select("id, summary, motivo")
+        .eq("client_id", clientId)
+        .eq("phone", phone)
+        .is("closed_at", null)
+        .order("opened_at", { ascending: true }),
     ]);
     if (histErr) throw new TurnError(500, "falha ao carregar o histórico");
-    // Pedidos de ajuda JÁ FECHADOS (ver `pedidosResolvidos`). Best-effort: sem
-    // eles o turno segue como antes.
-    const { data: pedidos } = await svc
-      .from("handoffs")
-      .select("summary, closed_at, closed_how")
-      .eq("client_id", clientId)
-      .eq("phone", phone)
-      .not("closed_at", "is", null)
-      .order("closed_at", { ascending: false })
-      .limit(HISTORY_ROWS);
     // As mensagens do lote que está sendo respondido já estão gravadas e vêm no
     // `message`: sem o corte a IA leria cada uma duas vezes (`semLoteAtual`).
     history = buildHistory(retomada ? rows : semLoteAtual(rows ?? [], Date.now(), message));
     resolvidos = pedidosResolvidos(rows, pedidos);
-    const { data: fila } = await svc
-      .from("handoffs")
-      .select("id, summary")
-      .eq("client_id", clientId)
-      .eq("phone", phone)
-      .is("closed_at", null)
-      .order("opened_at", { ascending: true });
     abertos = fila ?? [];
     const pend = conv?.pending_instruction ?? null;
     instruction = retomada
@@ -400,6 +401,11 @@ export async function processTurn(
     console.error("falha no retrieval do RAG:", e);
   }
 
+  // A lista PEDIDOS DE AJUDA EM ABERTO como o modelo a vê (numerada a partir de
+  // 1, sem resumo vazio). `pedido_aberto` aponta para ESTA lista, então a
+  // decisão de atualizar usa a mesma (`atualizacaoDoPedido`).
+  const listaDoModelo = abertos.filter((p) => (p.summary ?? "").trim() !== "");
+
   // Modelo. Lança AgentError em falha (a rota mapeia para 502).
   const run = await runAgent({
     persona,
@@ -409,9 +415,7 @@ export async function processTurn(
     knowledge,
     operatorInstruction: instruction,
     pedidosResolvidos: resolvidos,
-    pedidosAbertos: abertos
-      .map((p) => (p.summary ?? "").trim())
-      .filter((t) => t !== ""),
+    pedidosAbertos: listaDoModelo.map((p) => (p.summary ?? "").trim()),
     now: dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
       ? new Date(params.agoraTeste)
       : undefined,
@@ -490,9 +494,6 @@ export async function processTurn(
   // time fecha em um clique, pedido engolido ninguém vê.
   // Calculado FORA do ramo de produção porque a bancada (dryRun) mostra o
   // pedido pela mesma regra; regra copiada nos dois lugares divergiria.
-  const novo =
-    output.pedido_novo ||
-    !abertos.some((p) => mesmoAssunto(output.summary, p.summary ?? ""));
   // "Sem pedido aberto": no dryRun só existe a lista que a bancada mandou
   // (`handoff_at` é da conversa de verdade e não vale para o teste).
   const semPedido = dryRun ? abertos.length === 0 : !handoffAt || abertos.length === 0;
@@ -504,10 +505,20 @@ export async function processTurn(
   // mas abriu um handoff"). Conversa marcada (`agendar`) não é a IA precisando
   // do time: quem avisa é o "Notifica grupo" do n8n, e se o horário não servir o
   // dono entra em contato. Antes, todo `agendar` virava pedido aberto também.
-  const entraNaFila =
-    !retomada &&
-    output.action === "pausar" &&
-    (semPedido || (novo && !guardrail.blocked));
+  // A regra (com a rede e a exceção do pedido apontado pelo modelo) é pura e
+  // testada: `entraNaFila`, lib/fila-de-pedidos.ts.
+  const naFila = entraNaFila({
+    retomada: !!retomada,
+    action: output.action,
+    guardrailBarrou: guardrail.blocked,
+    semPedido,
+    pedidoNovo: output.pedido_novo,
+    summary: output.summary,
+    abertos,
+    pedidoAberto: output.pedido_aberto,
+    informacaoNova: output.informacao_nova,
+    listaDoModelo,
+  });
 
   // Estágio que a IA moveria; em produção, também aplica (best-effort).
   let stageWouldMove: string | null = null;
@@ -516,6 +527,21 @@ export async function processTurn(
   // pausar; o guardrail que barrou ganha de tudo ("seguranca").
   const motivo =
     output.action === "pausar" ? motivoDoPedido(output.motivo, guardrail.blocked) : null;
+  // PEDIDO EM ABERTO ATUALIZADO (08/10/2026, pedido do dono): o cliente
+  // trouxe informação nova para um pedido que ainda espera. O MODELO diz qual
+  // (`pedido_aberto`) e se é informação nova (`informacao_nova`); a regra pura
+  // (lib/fila-de-pedidos.ts) só valida. NUNCA avisa no WhatsApp: só pedido novo.
+  const atualizacao = atualizacaoDoPedido({
+    retomada: !!retomada,
+    action: output.action,
+    guardrailBarrou: guardrail.blocked,
+    entraNaFila: naFila,
+    summary: output.summary,
+    motivo,
+    pedidoAberto: output.pedido_aberto,
+    informacaoNova: output.informacao_nova,
+    abertos: listaDoModelo,
+  });
   if (output.action !== "none") {
     if (dryRun) {
       const canonical = await loadCanonical(svc, clientId);
@@ -527,20 +553,39 @@ export async function processTurn(
       });
     } else {
       // Persiste a qualificação (alimenta a lista "Precisa de você" e o resumo
-      // da IA). Best-effort: um erro aqui não derruba a resposta ao cliente.
-      const { error: qErr } = await svc.from("conversation_qualifications").insert({
-        client_id: clientId,
-        phone,
-        action: output.action,
-        summary: output.summary,
-        preferencia_horario: output.preferencia_horario,
-      });
+      // da IA) e, em paralelo, atualiza o pedido aberto (`atualizacao`): só um
+      // aberto (`closed_at is null`), pedido fechado nunca muda, e sem aviso.
+      // Best-effort os dois: um erro aqui não derruba a resposta ao cliente.
+      const [{ error: qErr }, uErr] = await Promise.all([
+        svc.from("conversation_qualifications").insert({
+          client_id: clientId,
+          phone,
+          action: output.action,
+          summary: output.summary,
+          preferencia_horario: output.preferencia_horario,
+        }),
+        atualizacao.tipo === "atualizar"
+          ? svc
+              .from("handoffs")
+              .update({
+                summary: atualizacao.summary,
+                atualizado_em: new Date().toISOString(),
+                ...(atualizacao.motivo ? { motivo: atualizacao.motivo } : {}),
+              })
+              .eq("id", atualizacao.id)
+              .eq("client_id", clientId)
+              .eq("phone", phone)
+              .is("closed_at", null)
+              .then((r) => r.error)
+          : Promise.resolve(null),
+      ]);
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
+      if (uErr) console.error("falha ao atualizar o pedido aberto:", uErr.message);
       stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
 
       // A fila (`entraNaFila`, calculada acima). Best-effort: um erro aqui não
       // pode derrubar a resposta ao cliente.
-      if (entraNaFila) {
+      if (naFila) {
         const abertoEm = new Date().toISOString();
         // O id volta porque o link do aviso abre ESTE pedido na página.
         const { data: novoPedido, error: rErr } = await svc
@@ -588,7 +633,8 @@ export async function processTurn(
     stageWouldMove,
     guardrail,
     handoffOpened: output.action === "pausar" || guardrail.blocked,
-    pedidoNaFila: entraNaFila,
+    pedidoNaFila: naFila,
+    ...(atualizacao.tipo === "atualizar" ? { pedidoAtualizado: true } : {}),
     ...(avisoAgendado ? { avisoAgendado: true } : {}),
   };
 
@@ -751,6 +797,8 @@ function silentTurn(
       preferencia_horario: "",
       pedido_novo: false,
       motivo: "",
+      pedido_aberto: 0,
+      informacao_nova: false,
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
@@ -813,7 +861,7 @@ function buildHistory(
 // IA ignorou o desconto orientado 2 de 2 vezes; sem elas, usou 2 de 2).
 function pedidosResolvidos(
   rows: { created_at?: string | null }[] | null,
-  pedidos: { summary: string | null; closed_at: string | null; closed_how: string | null }[] | null
+  pedidos: { summary: string | null; closed_at: string | null }[] | null
 ): string[] {
   const tempos = (rows ?? [])
     .map((r) => Date.parse(r.created_at ?? ""))
@@ -834,34 +882,6 @@ function pedidosResolvidos(
       // OPERADOR do turno como já usada e a ignorava (medido, 0 de 3).
       return `${hora}: ${p.summary?.trim() || "pedido sem resumo"} (já respondido pelo time)`;
     });
-}
-
-// Palavras que aparecem em QUALQUER pedido de ajuda e por isso não dizem o
-// assunto ("cliente quer falar com uma pessoa do time sobre..."). Fora delas,
-// uma palavra em comum basta para dois resumos serem do mesmo assunto.
-const PALAVRAS_DE_PEDIDO = new Set([
-  "cliente", "quer", "queria", "pediu", "pedido", "pede", "falar", "fala", "pessoa", "alguem",
-  "time", "equipe", "humano", "atendente", "sobre", "contato", "retorno", "resposta", "responder",
-  "ajuda", "saber", "perguntou", "pergunta", "verificar", "confirmar", "dono", "voces", "para",
-  "com", "uma", "mais", "ainda", "agora", "direto", "depois", "entender", "conversar", "cobrou",
-  "cobra", "insistiu", "novamente", "tambem", "outra", "outro", "coisa", "assunto", "questao",
-]);
-function palavrasDeAssunto(texto: string): Set<string> {
-  return new Set(
-    texto
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "")
-      .split(/[^a-z0-9]+/)
-      .filter((p) => p.length >= 4 && !PALAVRAS_DE_PEDIDO.has(p))
-  );
-}
-/** Dois resumos de pedido falam do mesmo assunto? (uma palavra de assunto em comum) */
-export function mesmoAssunto(a: string, b: string): boolean {
-  const pa = palavrasDeAssunto(a);
-  if (pa.size === 0) return true; // resumo vazio de assunto: não dá para dizer que é novo
-  for (const p of palavrasDeAssunto(b)) if (pa.has(p)) return true;
-  return false;
 }
 
 // Canônicos ativos do tenant (para calcular o estágio que a IA moveria).

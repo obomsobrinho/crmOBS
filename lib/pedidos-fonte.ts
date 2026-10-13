@@ -18,6 +18,26 @@ import {
   type PedidoResolvido,
   type PedidoResolvidoLinha,
 } from "./pedidos";
+import {
+  COLUNAS_HISTORIA,
+  FILTRO_DE_RESPOSTA,
+  FILTRO_DO_CLIENTE,
+  LINHAS_ANTES,
+  LINHAS_DEPOIS,
+  MENSAGENS_DURANTE,
+  fimDepois,
+  inicioAntes,
+  inicioDepois,
+  janelaDoPedido,
+  mensagensDurante,
+  mensagensQueLevaram,
+  recorteAntes,
+  recorteDurante,
+  recorteDepois,
+  type HistoriaDoPedido,
+  type LinhaHistoria,
+} from "./historia-do-pedido";
+import { MANUAL } from "./mensagem";
 
 // DE ONDE A PÁGINA DE PEDIDOS TIRA OS DADOS (02/10/2026, auditoria F3, R-07).
 //
@@ -55,6 +75,11 @@ export interface FontePedidos {
   abertosDoFone(fora: string[], phone: string): Promise<PedidoAberto[]>;
   /** Os números das abas, seguindo o filtro de motivo (senão a aba mentiria). */
   contagens(fora: string[], motivo?: string | null): Promise<ContagensPedidos>;
+  /**
+   * A história de UM pedido (lib/historia-do-pedido.ts): só quando ele é aberto,
+   * nunca na lista. Três consultas pequenas por `client_id` + `phone` + janela.
+   */
+  historia(p: PedidoItem): Promise<HistoriaDoPedido>;
 }
 
 export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
@@ -97,6 +122,50 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
         ? { abertos: Number(c.abertos) || 0, resolvidos: Number(c.resolvidos) || 0 }
         : CONTAGENS_PEDIDOS_VAZIAS;
     },
+    async historia(p) {
+      const janela = janelaDoPedido(p);
+      // A base das três leituras: as linhas desta conversa, colunas explícitas.
+      const linhas = () =>
+        supabase.from("chat_messages").select(COLUNAS_HISTORIA).eq("client_id", clientId).eq("phone", p.phone);
+      const doCliente = "user_message.not.is.null,media_url.not.is.null";
+      // O limite do "durante" conta SÓ linhas do cliente (`FILTRO_DO_CLIENTE` = `linhaDoCliente`).
+      const durante = linhas().gte("created_at", janela.openedAt).or(FILTRO_DO_CLIENTE);
+      // "Depois" lê só RESPOSTAS: resolvido, da IA ou do time na janela; aberto, só do
+      // time (envio manual), da abertura em diante (ninguém respondeu o pedido ainda).
+      const respostas = janela.closedAt
+        ? linhas()
+            .gte("created_at", inicioDepois(janela))
+            .lte("created_at", fimDepois(janela))
+            .or(FILTRO_DE_RESPOSTA)
+        : linhas().gte("created_at", janela.openedAt).eq("message_type", MANUAL);
+      // O MESMO recorte de `recorteAntes`/`recorteDurante`/`recorteDepois` (a memória do /design).
+      const [antes, enquanto, depois] = await Promise.all([
+        linhas()
+          .gte("created_at", inicioAntes(janela))
+          .lt("created_at", janela.openedAt)
+          .or(doCliente)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(LINHAS_ANTES),
+        // As 10 mais NOVAS do período de espera, e uma a mais para saber se cortou.
+        (janela.closedAt ? durante.lte("created_at", janela.closedAt) : durante)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(MENSAGENS_DURANTE + 1),
+        respostas
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .limit(LINHAS_DEPOIS),
+      ]);
+      if (antes.error) throw antes.error;
+      if (enquanto.error) throw enquanto.error;
+      if (depois.error) throw depois.error;
+      return {
+        antes: mensagensQueLevaram(antes.data ?? []),
+        ...mensagensDurante(enquanto.data ?? []),
+        depois: depois.data ?? [],
+      };
+    },
   };
 }
 
@@ -108,7 +177,9 @@ export function fonteDaMemoria(
   abertosRaw: PedidoLinha[],
   resolvidosRaw: PedidoResolvidoLinha[],
   contatos: ContatoLinha[],
-  avisos: string | null
+  avisos: string | null,
+  /** As linhas falsas de `chat_messages`, por telefone (a história do pedido). */
+  mensagens: Record<string, LinhaHistoria[]> = {}
 ): FontePedidos {
   const abertos = montarFila(abertosRaw, contatos, avisos);
   const resolvidos = montarResolvidos(resolvidosRaw, contatos, avisos);
@@ -135,6 +206,15 @@ export function fonteDaMemoria(
       return {
         abertos: abertos.filter((x) => casaMotivo(x, motivo)).length,
         resolvidos: resolvidos.filter((x) => casaMotivo(x, motivo)).length,
+      };
+    },
+    async historia(p) {
+      const linhas = mensagens[p.phone] ?? [];
+      const janela = janelaDoPedido(p);
+      return {
+        antes: recorteAntes(linhas, janela),
+        ...recorteDurante(linhas, janela),
+        depois: recorteDepois(linhas, janela),
       };
     },
   };

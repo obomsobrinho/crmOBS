@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
+import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 
 // Resolve o handoff de uma conversa: fecha a pendência, LARGA O RESPONSÁVEL e
 // devolve o atendimento para a IA. Um gesto, três escritas, de propósito.
@@ -54,12 +55,13 @@ export async function POST(req: Request) {
   // FILA (27/09/2026): "Resolvido" fecha UM pedido, o que a caixa mostra (o
   // mais antigo, ou `pedidoId`). O `handoff_at` passa para o próximo da fila,
   // ou nulo se não sobrou nenhum (`fecharPedido`).
+  let fechado: Awaited<ReturnType<typeof fecharPedido>>;
   try {
-    await fecharPedido(svc, {
+    fechado = await fecharPedido(svc, {
       clientId: client.id,
       phone,
       id: typeof body.pedidoId === "number" ? body.pedidoId : null,
-      como: "resolvido",
+      solucao: SOLUCAO_DA_PORTA.resolver,
       por: client.userId,
     });
   } catch (e) {
@@ -98,5 +100,7 @@ export async function POST(req: Request) {
     ok: true,
     limpou: ["handoff_at", "assigned_user_id"],
     iaReativada: !iaErr,
+    // A solução GRAVADA (null = não havia pedido aberto para fechar).
+    solucao: fechado?.solucao ?? null,
   });
 }

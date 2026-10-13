@@ -5,6 +5,7 @@ import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { telefoneImpossivel } from "@/lib/avisos";
+import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 
 // ORIENTAR UM PEDIDO DE AJUDA É RESOLVÊ-LO, E A IA RESPONDE NA HORA
 // (27/09/2026, pedido do dono testando com o chip: "se eu já orientei, esse
@@ -12,7 +13,7 @@ import { telefoneImpossivel } from "@/lib/avisos";
 // `conversations.pending_instruction` esperando o cliente escrever de novo, e o
 // pedido só fechava depois disso. Agora, num gesto só:
 //
-// 1. FECHA o pedido (`handoffs` como `ia`, com a orientação guardada) e a
+// 1. FECHA o pedido (`handoffs` com a solução `orientou_ia`, com a orientação guardada) e a
 //    pendência (`handoff_at`), devolve a conversa à IA e larga o responsável,
 //    pela mesma regra do Resolvido (IA e pessoa não atendem juntas).
 // 2. Roda o cérebro num TURNO DE RETOMADA (`processTurn` com `retomada`), sem
@@ -53,13 +54,13 @@ export async function POST(req: Request) {
 
   // 1. Fecha O pedido que a caixa mostrava (o mais antigo da fila, ou o
   // `pedidoId` que veio da tela). O tenant vem da sessão, nunca do corpo.
-  let fechado: number | null;
+  let fechado: Awaited<ReturnType<typeof fecharPedido>>;
   try {
     fechado = await fecharPedido(svc, {
       clientId: client.id,
       phone,
       id: typeof body.pedidoId === "number" ? body.pedidoId : null,
-      como: "ia",
+      solucao: SOLUCAO_DA_PORTA.orientar,
       por: client.userId,
       instrucao: instruction,
     });
@@ -108,9 +109,9 @@ export async function POST(req: Request) {
       .eq("client_id", client.id)
       .eq("phone", phone);
     if (error) console.error("falha ao guardar a orientação pendente:", error.message);
-    return NextResponse.json({ ok: true, enviado: false, motivo: enviado.motivo });
+    return NextResponse.json({ ok: true, enviado: false, motivo: enviado.motivo, solucao: fechado.solucao });
   }
-  return NextResponse.json({ ok: true, enviado: true });
+  return NextResponse.json({ ok: true, enviado: true, solucao: fechado.solucao });
 }
 
 async function responderAgora(

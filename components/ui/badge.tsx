@@ -51,6 +51,14 @@ const badgeVariants = cva(
          */
         motivo:
           "inline-flex shrink-0 items-center rounded-full border border-line-soft bg-bloco px-2 py-0.5 text-legenda text-ink-2",
+        /**
+         * Solução do pedido de ajuda (08/10/2026, lib/solucoes.ts). Tom da MARCA
+         * de propósito: dizer o que resolveu não é bom nem ruim, então nada de
+         * verde, âmbar ou vermelho (que são estado). O que distingue as três é o
+         * ícone e o rótulo.
+         */
+        solucao:
+          "inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-line bg-brand-surface px-2 py-0.5 text-legenda font-semibold text-brand-ink",
         /** Tag do contato. */
         tag: "flex items-center gap-1.5 rounded-full border border-line py-0.5 text-legenda",
         /**

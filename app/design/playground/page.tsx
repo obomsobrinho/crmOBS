@@ -73,7 +73,7 @@ const PEDIDOS = [
     summary: "Cliente quer um atendimento de emergência em cerca de 30 minutos.",
     instruction: null,
     closedAt: null,
-    closedHow: null,
+    solucao: null,
   },
 ];
 

@@ -589,6 +589,7 @@ export type Database = {
       }
       handoffs: {
         Row: {
+          atualizado_em: string | null
           client_id: string
           closed_at: string | null
           closed_by: string | null
@@ -598,9 +599,11 @@ export type Database = {
           motivo: string | null
           opened_at: string
           phone: string
+          solucao: string | null
           summary: string | null
         }
         Insert: {
+          atualizado_em?: string | null
           client_id: string
           closed_at?: string | null
           closed_by?: string | null
@@ -610,9 +613,11 @@ export type Database = {
           motivo?: string | null
           opened_at?: string
           phone: string
+          solucao?: string | null
           summary?: string | null
         }
         Update: {
+          atualizado_em?: string | null
           client_id?: string
           closed_at?: string | null
           closed_by?: string | null
@@ -622,6 +627,7 @@ export type Database = {
           motivo?: string | null
           opened_at?: string
           phone?: string
+          solucao?: string | null
           summary?: string | null
         }
         Relationships: [
@@ -1116,9 +1122,9 @@ export type Database = {
           p_telefone?: string
         }
         Returns: {
+          atualizado_em: string
           closed_at: string
           closed_by: string
-          closed_how: string
           display_name: string
           foto_path: string
           id: number
@@ -1128,6 +1134,7 @@ export type Database = {
           opened_at: string
           phone: string
           posicao: number
+          solucao: string
           summary: string
           total: number
         }[]

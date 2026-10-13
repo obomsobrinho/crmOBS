@@ -3,6 +3,7 @@ import { sessaoDaRota } from "@/lib/rota";
 import { headersN8n } from "@/lib/n8n";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
+import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 import { telefoneImpossivel } from "@/lib/avisos";
 
 // Único bucket de que esta rota assina arquivo (o privado de mídia do WhatsApp).
@@ -211,24 +212,27 @@ export async function POST(req: Request) {
     // botão Resolvido, que também devolve o atendimento à IA.
     await assumirConversa(client.id, phone, client.userId);
     // "EU RESPONDO" (27/09/2026, decisão do dono): quem responde um pedido de
-    // ajuda com as próprias palavras o resolve, como "resolvido pelo time". Só
+    // ajuda com as próprias palavras o resolve, com a solução "Time assumiu"
+    // (`time_assumiu`, lib/solucoes.ts, 08/10/2026): respondeu e ficou com a conversa. Só
     // quando a tela diz QUAL pedido (`pedidoId`): uma resposta qualquer, sem
     // ter escolhido responder o pedido, continua não fechando nada. A IA segue
     // pausada, porque quem respondeu assumiu. Best-effort: a mensagem já saiu.
+    let solucao: string | null = null;
     if (typeof body.pedidoId === "number") {
       try {
-        await fecharPedido(createServiceClient(), {
+        solucao = (await fecharPedido(createServiceClient(), {
           clientId: client.id,
           phone,
           id: body.pedidoId,
-          como: "resolvido",
+          solucao: SOLUCAO_DA_PORTA.responder,
           por: client.userId,
-        });
+        }))?.solucao ?? null;
       } catch (e) {
         console.error("falha ao fechar o pedido respondido:", e);
       }
     }
-    return NextResponse.json({ ok: true });
+    // `solucao`: a gravada quando este envio fechou um pedido (senão null).
+    return NextResponse.json({ ok: true, solucao });
   } catch {
     return NextResponse.json(
       { error: "falha ao contatar o n8n" },

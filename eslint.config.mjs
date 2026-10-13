@@ -116,6 +116,11 @@ const regrasGerais = [
     message:
       "No text-white, bg-white or bg-black outside components/ui: use the tokens in app/globals.css (docs/design-system/fundamentos-cor.md).",
   },
+  {
+    selector: "Literal[value=/closed_how/], Property[key.name='closed_how'], MemberExpression[property.name='closed_how']",
+    message:
+      "handoffs.closed_how is legacy (dropped after the deploy): read and write handoffs.solucao through lib/solucoes.ts (docs/adr/2026-10-08-help-request-resolution-is-stored.md).",
+  },
 ];
 const conjunto = ({ fuso = true, mensagem = true, refresh = true } = {}) => [
   ...projectRules,
@@ -137,7 +142,8 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     files: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
-    ignores: ["components/ui/**", "app/design/**"],
+    // database.types.ts is generated (it still lists the legacy closed_how column).
+    ignores: ["components/ui/**", "app/design/**", "lib/database.types.ts"],
     rules: {
       "no-restricted-syntax": ["warn", ...conjunto()],
     },

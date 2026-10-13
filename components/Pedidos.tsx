@@ -4,10 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, HandHelping, MessagesSquare, Search } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
-import { Aviso } from "@/components/ui/aviso";
+import SecoesDoPedido from "@/components/SecoesDoPedido";
+import SolucaoBadge from "@/components/SolucaoBadge";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { StatRotulo } from "@/components/ui/stat";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +20,7 @@ import { CabecalhoBloco } from "./ContactFields";
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, prettyPhone } from "@/lib/format";
-import { diaMesCurtoHoraSP } from "@/lib/fuso";
+import { diaMesCurtoHoraSP, horaNoDiaDe, mesmoDiaSP } from "@/lib/fuso";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
@@ -48,6 +50,8 @@ import {
   type ParamsPedidos,
 } from "@/lib/pedidos-fonte";
 import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
+import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
+import type { LinhaHistoria } from "@/lib/historia-do-pedido";
 import { cn } from "@/lib/utils";
 
 // PEDIDOS DE AJUDA (refeita em 30/09/2026, docs/plano-fechar-p0.md, itens 1 e 2).
@@ -115,6 +119,8 @@ export default function Pedidos({
     abertos: PedidoLinha[];
     resolvidos: PedidoResolvidoLinha[];
     contatos: ContatoLinha[];
+    /** Linhas falsas de `chat_messages` por telefone (a história de cada pedido). */
+    mensagens?: Record<string, LinhaHistoria[]>;
   };
   /** /design: sem banco, e as ações só simulam. */
   preview?: boolean;
@@ -128,7 +134,8 @@ export default function Pedidos({
             dadosPreview?.abertos ?? [],
             dadosPreview?.resolvidos ?? [],
             dadosPreview?.contatos ?? [],
-            numeroAvisos
+            numeroAvisos,
+            dadosPreview?.mensagens ?? {}
           ),
     [clientId, preview, dadosPreview, numeroAvisos]
   );
@@ -273,8 +280,12 @@ export default function Pedidos({
     },
   });
 
-  /** O pedido saiu dos abertos: vira resolvido na tela, com o que aconteceu. */
-  function concluir(p: PedidoAberto, r: Resultado, como: "ia" | "resolvido", orientacao: string | null) {
+  /**
+   * O pedido saiu dos abertos: vira resolvido na tela, com a solução que a ROTA
+   * gravou (lib/solucoes.ts). `null` quando esta tela não sabe (outra aba já tinha
+   * fechado): o realtime e o `sincronizar` trazem a linha de verdade.
+   */
+  function concluir(p: PedidoAberto, r: Resultado, solucao: Solucao | null, orientacao: string | null) {
     setResultado(r);
     const fechado: PedidoResolvido = {
       id: p.id,
@@ -283,9 +294,10 @@ export default function Pedidos({
       closedAt: new Date().toISOString(),
       summary: p.summary,
       motivo: p.motivo,
+      atualizadoEm: p.atualizadoEm,
       nome: p.nome,
       fotoPath: p.fotoPath,
-      como,
+      solucao,
       orientacao,
       porQuem: null,
     };
@@ -309,7 +321,8 @@ export default function Pedidos({
               summary: p.summary,
               instruction: orientacao,
               closed_at: fechado.closedAt,
-              closed_how: como,
+              atualizado_em: p.atualizadoEm,
+              solucao,
               closed_by: null,
             },
             ...d.resolvidos,
@@ -324,7 +337,7 @@ export default function Pedidos({
 
   async function orientar(p: PedidoAberto, texto: string) {
     if (preview) {
-      concluir(p, { tom: "ok", texto: "Orientado. A IA respondeu ao cliente." }, "ia", texto);
+      concluir(p, { tom: "ok", texto: "Orientado. A IA respondeu ao cliente." }, SOLUCAO_DA_PORTA.orientar, texto);
       return;
     }
     const res = await postar("/api/conversations/orientar", {
@@ -334,14 +347,15 @@ export default function Pedidos({
     });
     if (!res) return setResultado(SEM_SERVIDOR);
     if (res.status === 409) {
-      concluir(p, { tom: "aviso", texto: "Esse pedido já tinha sido resolvido." }, "resolvido", null);
+      concluir(p, { tom: "aviso", texto: "Esse pedido já tinha sido resolvido." }, null, null);
       return;
     }
     if (!res.ok) {
       setResultado({ tom: "erro", texto: "Não foi possível orientar. Tente de novo." });
       return;
     }
-    const data = (await res.json()) as { enviado?: boolean };
+    // A solução que a rota GRAVOU (`fecharPedido`), não um mapa repetido aqui.
+    const data = (await res.json()) as { enviado?: boolean; solucao?: string | null };
     concluir(
       p,
       data.enviado
@@ -351,14 +365,14 @@ export default function Pedidos({
             texto:
               "Orientado. A IA não conseguiu responder agora e usa a orientação na próxima mensagem do cliente.",
           },
-      "ia",
+      solucaoDoBanco(data.solucao),
       texto
     );
   }
 
   async function marcarResolvido(p: PedidoAberto) {
     if (preview) {
-      concluir(p, { tom: "ok", texto: "Marcado como resolvido." }, "resolvido", null);
+      concluir(p, { tom: "ok", texto: "Marcado como resolvido." }, SOLUCAO_DA_PORTA.resolver, null);
       return;
     }
     const res = await postar("/api/conversations/resolve", { phone: p.phone, pedidoId: p.id });
@@ -367,20 +381,27 @@ export default function Pedidos({
       setResultado({ tom: "erro", texto: "Não foi possível resolver. Tente de novo." });
       return;
     }
-    concluir(p, { tom: "ok", texto: "Marcado como resolvido." }, "resolvido", null);
+    const data = (await res.json()) as { solucao?: string | null };
+    concluir(p, { tom: "ok", texto: "Marcado como resolvido." }, solucaoDoBanco(data.solucao), null);
   }
 
   const temDetalhe = aberto != null || resolvido != null;
 
+  // LAYOUT (08/10/2026, redesenho): a lista mostra nome, uma linha e os selos,
+  // então é uma coluna ESTREITA; o detalhe (a história do pedido) fica com o
+  // resto da largura. No celular continua uma tela por vez (lista, depois ficha).
   return (
     <div className="flex min-h-0 flex-1 md:gap-3">
       <Card
         asChild
         variant="pagina"
-        className={cn("flex min-w-0 flex-1 flex-col overflow-hidden", temDetalhe && "max-md:hidden")}
+        className={cn(
+          "flex min-w-0 flex-col overflow-hidden max-md:flex-1 md:w-[340px] md:shrink-0 xl:w-[380px]",
+          temDetalhe && "max-md:hidden"
+        )}
       >
-        <section aria-label="Pedidos de ajuda">
-          <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
+        <section aria-label="Pedidos de ajuda" data-slot="pedidos-coluna-lista">
+          <div className="border-b border-line px-4 pb-3 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <HandHelping size={20} className="text-brand-ink" />
@@ -404,35 +425,39 @@ export default function Pedidos({
                 </TabsList>
               </Tabs>
             </div>
-            <p className="mt-1 text-apoio text-ink-2">
+            <p className="mt-1 text-legenda text-ink-3">
               {aba === "abertos"
-                ? "O que a IA passou para o time e ainda espera resposta, de quem espera há mais tempo para o mais recente."
-                : `O que foi resolvido nos últimos ${DIAS_DE_RESOLVIDOS} dias, do mais recente para o mais antigo.`}
+                ? "Quem espera há mais tempo fica no topo."
+                : `Resolvidos nos últimos ${DIAS_DE_RESOLVIDOS} dias, do mais recente para o mais antigo.`}
             </p>
-            <div className="mt-3 flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line md:max-w-[420px]">
-              <Search size={15} className="shrink-0 text-ink-faint" />
-              <Input
-                variant="limpo"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar por cliente ou pelo que foi pedido"
-                aria-label="Buscar pedidos"
-                className="text-apoio"
-              />
+            {/* Busca e filtro por motivo lado a lado: os dois recortam a mesma lista no servidor. */}
+            <div data-slot="pedidos-filtros" className="mt-3 flex items-center gap-2">
+              <div className="flex h-[var(--h-control)] min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line">
+                <Search size={15} className="shrink-0 text-ink-faint" />
+                <Input
+                  variant="limpo"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Cliente ou pedido"
+                  aria-label="Buscar pedidos"
+                  className="text-apoio"
+                />
+              </div>
+              <Select value={motivo ?? "todos"} onValueChange={trocarMotivo}>
+                {/* Compacto: "Motivo" sem filtro, o rótulo escolhido (cortado com reticências) com filtro. */}
+                <SelectTrigger aria-label="Filtrar por motivo" data-filtro="motivo" className="max-w-[132px]">
+                  <SelectValue>{motivo ? rotuloDoMotivo(motivo) : "Motivo"}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos os motivos</SelectItem>
+                  {MOTIVOS.map((m) => (
+                    <SelectItem key={m.chave} value={m.chave}>
+                      {m.rotulo}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={motivo ?? "todos"} onValueChange={trocarMotivo}>
-              <SelectTrigger aria-label="Filtrar por motivo" data-filtro="motivo" className="mt-2 md:w-[260px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todos">Todos os motivos</SelectItem>
-                {MOTIVOS.map((m) => (
-                  <SelectItem key={m.chave} value={m.chave}>
-                    {m.rotulo}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {resultado && (
@@ -440,7 +465,7 @@ export default function Pedidos({
               role="status"
               data-slot="pedidos-resultado"
               className={cn(
-                "mx-4 mt-3 rounded-lg border px-3 py-2 text-apoio md:mx-5",
+                "mx-4 mt-3 rounded-lg border px-3 py-2 text-apoio",
                 resultado.tom === "ok" && "border-human-line bg-human-surface text-human-ink",
                 resultado.tom === "aviso" && "border-warn-line bg-warn-surface text-warn-ink",
                 resultado.tom === "erro" && "border-danger-line bg-danger-surface text-danger-ink"
@@ -515,18 +540,19 @@ export default function Pedidos({
       <Card
         asChild
         variant="pagina"
-        className={cn(
-          "flex w-[400px] shrink-0 flex-col overflow-hidden max-md:w-full max-md:flex-1",
-          !temDetalhe && "max-md:hidden"
-        )}
+        className={cn("flex min-w-0 flex-1 flex-col overflow-hidden", !temDetalhe && "max-md:hidden")}
       >
-        <aside aria-label="Pedido selecionado">
+        <aside aria-label="Pedido selecionado" data-slot="pedidos-coluna-detalhe">
           {aberto ? (
             <FichaPedido
               key={`a-${aberto.id}`}
               p={aberto}
               agora={agora}
               readOnly={readOnly}
+              fonte={fonte}
+              clientId={clientId}
+              preview={preview}
+              numeroAvisos={numeroAvisos}
               onVoltar={() => setSelecionado(null)}
               onOrientar={(t) => orientar(aberto, t)}
               onResolvido={() => marcarResolvido(aberto)}
@@ -537,6 +563,10 @@ export default function Pedidos({
               p={resolvido}
               agora={agora}
               readOnly
+              fonte={fonte}
+              clientId={clientId}
+              preview={preview}
+              numeroAvisos={numeroAvisos}
               quemResolveu={nomeDeQuem(resolvido.porQuem)}
               onVoltar={() => setSelecionado(null)}
             />
@@ -545,7 +575,7 @@ export default function Pedidos({
               data-slot="pedido-nenhum"
               tamanho="detalhe"
               icone={HandHelping}
-              texto="Escolha um pedido na lista para ver o que foi pedido e o que fazer."
+              texto="Escolha um pedido na lista para ver o que o cliente escreveu e o que fazer."
             />
           )}
         </aside>
@@ -584,7 +614,7 @@ function LinhaPedido({
         onClick={onSelecionar}
         aria-current={ativa ? "true" : undefined}
         className={cn(
-          "relative w-full items-start gap-3 border-b border-line-soft py-3 pl-4 pr-4 text-left md:pl-5",
+          "relative w-full flex-col items-stretch gap-1 border-b border-line-soft py-3 pl-4 pr-4 text-left",
           ativa && "bg-[var(--sel-bg)] hover:bg-[var(--sel-bg)]"
         )}
       >
@@ -595,46 +625,47 @@ function LinhaPedido({
             ativa ? "bg-[var(--sel-bar)]" : longa ? "bg-[var(--warn-fill)]" : "bg-transparent"
           )}
         />
-        <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-baseline gap-x-2">
-            <span className="truncate text-corpo font-semibold text-ink">{quem}</span>
-            {ehAberto && p.total > 1 && (
-              <span data-slot="pedido-posicao" className="text-legenda text-ink-3">
-                {p.posicao} de {p.total} nesta conversa
-              </span>
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-corpo font-semibold text-ink">{quem}</span>
+          <span
+            data-slot="pedido-espera"
+            data-longa={longa ? "sim" : undefined}
+            suppressHydrationWarning
+            className={cn(
+              "shrink-0 whitespace-nowrap text-legenda font-semibold tabular-nums",
+              longa ? "text-warn-ink" : "text-ink-3"
             )}
+          >
+            {ehAberto ? `há ${formatEspera(p.openedAt, agora)}` : quando(p.closedAt)}
           </span>
-          <span className="mt-0.5 line-clamp-2 text-apoio text-ink-2">
-            {p.summary?.trim() || "A IA não soube responder e passou para o time."}
-          </span>
+        </span>
+        <span className="line-clamp-2 text-apoio text-ink-2">
+          {p.summary?.trim() || "A IA não soube responder e passou para o time."}
+        </span>
+        <span className="flex flex-wrap items-center gap-1.5">
           {p.motivo && (
-            <Badge variant="motivo" data-motivo={p.motivo} className="mt-1.5">
+            <Badge variant="motivo" data-motivo={p.motivo}>
               {rotuloDoMotivo(p.motivo)}
             </Badge>
           )}
-        </span>
-        <span
-          data-slot="pedido-espera"
-          data-longa={longa ? "sim" : undefined}
-          suppressHydrationWarning
-          className={cn(
-            "mt-0.5 shrink-0 whitespace-nowrap text-legenda font-semibold tabular-nums",
-            longa ? "text-warn-ink" : "text-ink-3"
+          {!ehAberto && <SolucaoBadge solucao={p.solucao} />}
+          {ehAberto && p.total > 1 && (
+            <span data-slot="pedido-posicao" className="text-legenda text-ink-3">
+              {p.posicao} de {p.total} nesta conversa
+            </span>
           )}
-        >
-          {ehAberto ? `há ${formatEspera(p.openedAt, agora)}` : quando(p.closedAt)}
         </span>
       </Button>
     </li>
   );
 }
 
-/** Um par rótulo e valor da ficha, no desenho da tabela de Dados do contato. */
-function Par({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+/** Um fato do pedido (rótulo em cima, valor embaixo), na faixa do topo do detalhe. */
+function Fato({ rotulo, children, slot }: { rotulo: string; children: React.ReactNode; slot?: string }) {
   return (
-    <div className="flex items-baseline gap-2.5 border-b border-line-soft py-2">
-      <span className="w-[112px] shrink-0 text-legenda text-ink-3">{rotulo}</span>
-      <span className="min-w-0 flex-1 text-right text-apoio font-semibold text-ink" suppressHydrationWarning>
+    <div className="flex min-w-0 flex-col gap-1">
+      <StatRotulo>{rotulo}</StatRotulo>
+      <span data-slot={slot} className="min-w-0 text-apoio font-semibold text-ink" suppressHydrationWarning>
         {children}
       </span>
     </div>
@@ -645,6 +676,10 @@ function FichaPedido({
   p,
   agora,
   readOnly,
+  fonte,
+  clientId,
+  preview,
+  numeroAvisos,
   quemResolveu = null,
   onVoltar,
   onOrientar,
@@ -653,6 +688,10 @@ function FichaPedido({
   p: PedidoAberto | PedidoResolvido;
   agora: number;
   readOnly: boolean;
+  fonte: FontePedidos;
+  clientId?: string;
+  preview: boolean;
+  numeroAvisos: string | null;
   quemResolveu?: string | null;
   onVoltar: () => void;
   onOrientar?: (t: string) => Promise<void>;
@@ -664,6 +703,7 @@ function FichaPedido({
   const [orientando, setOrientando] = useState(false);
   const [resolvendo, setResolvendo] = useState(false);
   const longa = ehAberto && agora - Date.parse(p.openedAt) >= ESPERA_AVISO_MS;
+  const comAcoes = ehAberto && !readOnly;
 
   async function enviarOrientacao() {
     const t = texto.trim();
@@ -685,8 +725,8 @@ function FichaPedido({
         </Button>
       </div>
       <AreaRolavel className="min-h-0 flex-1">
-        <div className="flex flex-col gap-4 p-4">
-          <div className="flex items-center gap-2.5">
+        <div className="flex flex-col gap-5 p-4 md:p-6">
+          <div className="flex flex-wrap items-center gap-3">
             <AvatarContato size="lg" phone={p.phone} name={p.nome} fotoPath={p.fotoPath} />
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-corpo font-semibold text-ink">{quem}</span>
@@ -700,108 +740,117 @@ function FichaPedido({
             </Button>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <CabecalhoBloco rotulo="O que foi pedido" />
-            <p data-slot="pedido-resumo" className="text-corpo text-ink" style={{ textWrap: "pretty" }}>
+          {/* O resumo é a LEITURA da IA, rotulada como tal; o que o cliente escreveu de verdade está nas seções. */}
+          <div className="flex flex-col gap-1">
+            <StatRotulo>Resumo da IA</StatRotulo>
+            <h2 data-slot="pedido-resumo" className="text-cartao text-ink" style={{ textWrap: "pretty" }}>
               {p.summary?.trim() || "A IA não soube responder e passou para o time."}
-            </p>
+            </h2>
           </div>
 
-          <div className="flex flex-col">
-            <Par rotulo="Motivo">
+          <div
+            data-slot="pedido-fatos"
+            className="grid grid-cols-2 gap-x-6 gap-y-3 border-y border-line-soft py-3 lg:grid-cols-4"
+          >
+            <Fato rotulo="Motivo">
               <span data-slot="pedido-motivo">{rotuloDoMotivo(p.motivo)}</span>
-            </Par>
-            <Par rotulo="Aberto em">{quando(p.openedAt)}</Par>
+            </Fato>
+            <Fato rotulo="Aberto em">
+              {quando(p.openedAt)}
+              {/* O cliente acrescentou algo e o resumo foi reescrito (08/10/2026). */}
+              {p.atualizadoEm && (
+                <span data-slot="pedido-atualizado" className="block text-legenda font-normal text-ink-3">
+                  atualizado {mesmoDiaSP(p.atualizadoEm, p.openedAt) ? "às" : "em"} {horaNoDiaDe(p.atualizadoEm, p.openedAt)}
+                </span>
+              )}
+            </Fato>
             {ehAberto ? (
               <>
-                <Par rotulo="Esperando há">
+                <Fato rotulo="Esperando há">
                   <span className={longa ? "text-warn-ink" : undefined}>{formatEspera(p.openedAt, agora)}</span>
-                </Par>
-                {p.total > 1 && (
-                  <Par rotulo="Nesta conversa">
-                    {p.posicao} de {p.total} pedidos
-                  </Par>
-                )}
+                </Fato>
+                <Fato rotulo="Nesta conversa">
+                  {p.total > 1 ? `${p.posicao} de ${p.total} pedidos` : "Só este pedido"}
+                </Fato>
               </>
             ) : (
               <>
-                <Par rotulo="Resolvido em">{quando(p.closedAt)}</Par>
-                <Par rotulo="Esperou">{formatEspera(p.openedAt, Date.parse(p.closedAt))}</Par>
-                <Par rotulo="Como">
-                  <span data-slot="pedido-como">
-                    {p.como === "ia"
-                      ? "A IA respondeu com a orientação do time"
-                      : quemResolveu
-                        ? `Resolvido por ${quemResolveu}`
-                        : "Resolvido pelo time"}
+                <Fato rotulo="Resolvido em">
+                  {quando(p.closedAt)}
+                  <span className="block text-legenda font-normal text-ink-3">
+                    esperou {formatEspera(p.openedAt, Date.parse(p.closedAt))}
+                    {quemResolveu ? `, por ${quemResolveu}` : ""}
                   </span>
-                </Par>
+                </Fato>
+                <Fato rotulo="Solução" slot="pedido-solucao">
+                  {p.solucao ? <SolucaoBadge solucao={p.solucao} /> : <span className="text-ink-3">Sem registro</span>}
+                </Fato>
               </>
             )}
           </div>
 
-          {!ehAberto && p.orientacao && (
-            <div className="flex flex-col gap-2">
-              <CabecalhoBloco rotulo="Orientação dada" />
-              <Aviso
-                data-slot="pedido-orientacao"
-                className="text-ink"
-                style={{ textWrap: "pretty" }}
-              >
-                {p.orientacao}
-              </Aviso>
-            </div>
-          )}
+          {/* UMA coluna em leitura, em qualquer tela (dono, 08/10/2026): as seções e, no aberto, a caixa de
+              orientar EMBAIXO, na largura toda do detalhe (dono, 08/10/2026). */}
+          <div className="flex flex-col gap-6">
+            <SecoesDoPedido
+              p={p}
+              fonte={fonte}
+              clientId={clientId}
+              preview={preview}
+              numeroAvisos={numeroAvisos}
+              agora={agora}
+            />
 
-          {ehAberto && !readOnly && (
-            <div data-slot="pedido-acoes" className="flex flex-col gap-2">
-              <CabecalhoBloco rotulo="Orientar a IA" />
-              <Textarea
-                value={texto}
-                onChange={(e) => setTexto(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void enviarOrientacao();
-                  }
-                }}
-                placeholder="O que a IA deve dizer ao cliente"
-                aria-label="Orientação para a IA"
-                rows={3}
-              />
-              <p className="text-legenda text-ink-3">
-                A IA responde ao cliente na hora, seguindo a orientação, e o pedido fica resolvido.
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="warn"
-                  size="primary"
-                  onClick={() => void enviarOrientacao()}
-                  carregando={orientando}
-                  disabled={!texto.trim() || resolvendo}
-                >
-                  Orientar a IA
-                </Button>
-                <Button
-                  variant="outline"
-                  size="primary"
-                  onClick={async () => {
-                    if (!onResolvido) return;
-                    setResolvendo(true);
-                    try {
-                      await onResolvido();
-                    } finally {
-                      setResolvendo(false);
+            {comAcoes && (
+              <div data-slot="pedido-acoes" className="flex flex-col gap-2">
+                <CabecalhoBloco rotulo="Orientar a IA" />
+                <Textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      void enviarOrientacao();
                     }
                   }}
-                  carregando={resolvendo}
-                  disabled={orientando}
-                >
-                  Resolvido
-                </Button>
+                  placeholder="O que a IA deve dizer ao cliente"
+                  aria-label="Orientação para a IA"
+                  rows={4}
+                />
+                <p className="text-legenda text-ink-3">
+                  A IA responde ao cliente na hora, seguindo a orientação, e o pedido fica resolvido.
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="warn"
+                    size="primary"
+                    onClick={() => void enviarOrientacao()}
+                    carregando={orientando}
+                    disabled={!texto.trim() || resolvendo}
+                  >
+                    Orientar a IA
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="primary"
+                    onClick={async () => {
+                      if (!onResolvido) return;
+                      setResolvendo(true);
+                      try {
+                        await onResolvido();
+                      } finally {
+                        setResolvendo(false);
+                      }
+                    }}
+                    carregando={resolvendo}
+                    disabled={orientando}
+                  >
+                    Resolvido
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </AreaRolavel>
     </div>

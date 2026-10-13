@@ -124,7 +124,7 @@ export async function semearConversa(svc: SupabaseClient, clientId: string) {
   // E nenhum pedido de ajuda aberto (o registro do cartão, tabela `handoffs`).
   const { error: e4 } = await svc
     .from("handoffs")
-    .update({ closed_at: new Date().toISOString(), closed_how: "resolvido" })
+    .update({ closed_at: new Date().toISOString(), solucao: "time_resolveu" })
     .eq("client_id", clientId)
     .eq("phone", FONE_TESTE)
     .is("closed_at", null);
@@ -171,15 +171,15 @@ export async function estadoDaConversa(svc: SupabaseClient, clientId: string) {
   ]);
   const { data: ultimo } = await svc
     .from("handoffs")
-    .select("closed_how")
+    .select("solucao")
     .eq("client_id", clientId)
     .eq("phone", FONE_TESTE)
     .order("opened_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   return {
-    /** Desfecho do último pedido de ajuda: "ia", "resolvido", "aberto" ou null. */
-    registro: (ultimo?.closed_how as string | null) ?? (ultimo ? "aberto" : null),
+    /** Solução do último pedido de ajuda (lib/solucoes.ts), "aberto" ou null. */
+    registro: ultimo ? (ultimo.solucao ?? "aberto") : null,
     handoffAt: (conv?.handoff_at as string | null) ?? null,
     responsavel: (conv?.assigned_user_id as string | null) ?? null,
     orientacao: (conv?.pending_instruction as string | null) ?? null,

@@ -71,6 +71,9 @@ export function applyGuardrail(
     pedido_novo: output.pedido_novo,
     // `motivoDoPedido` (lib/motivos.ts) troca por "seguranca" ao gravar.
     motivo: "seguranca",
+    // Resposta barrada nunca atualiza pedido aberto (`atualizacaoDoPedido`).
+    pedido_aberto: 0,
+    informacao_nova: false,
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

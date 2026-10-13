@@ -644,7 +644,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // cliente escreveu "surgiu uma brecha, consigo conversar agora, pode ser?"
     // e a IA respondeu "Claro, pode ser sim", prometendo a hora de alguém do time
     // que ela não sabe se está livre. Vale para qualquer negócio.
-    "- A pessoa quiser falar com alguém do time AGORA ou daqui a pouco, sem horário combinado: você não sabe quem está livre, nunca confirme (nada de \"pode ser sim\"); diga que vai ver se alguém consegue. \"Hoje à tarde\" ou \"agora à tarde\" é período, não agora.",
+    "- A pessoa quiser falar com alguém do time AGORA ou daqui a pouco, sem horário combinado: você não sabe quem está livre, nunca confirme (nada de \"pode ser sim\") nem ofereça os horários do CALENDÁRIO no lugar; diga que vai ver se alguém consegue. \"Hoje à tarde\" ou \"agora à tarde\" é período, não agora.",
     // ⚠️ 06/10/2026: com o gatilho da empresa "quando a pessoa quiser fechar um
     // pedido", a IA de uma pizzaria pedia "entrega ou retirada?" antes de passar
     // (2 de 4 na bateria). Coletar dado depois do gatilho atrasa o time.

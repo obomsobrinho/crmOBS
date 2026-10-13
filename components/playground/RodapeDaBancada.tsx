@@ -4,6 +4,7 @@ import { ArrowUp, Mic, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Handoff } from "../HandoffCard";
+import { SOLUCAO_DA_PORTA, type Solucao } from "@/lib/solucoes";
 import MessageComposer from "../MessageComposer";
 import { mmss } from "./apoio";
 
@@ -36,7 +37,7 @@ export function RodapeDaBancada({
   setIaPausada: (v: boolean) => void;
   responderComoTime: (texto: string) => void;
   orientarPedido: (texto: string) => Promise<void>;
-  fecharPedido: (p: Handoff, como: "ia" | "resolvido", instrucao: string | null) => void;
+  fecharPedido: (p: Handoff, solucao: Solucao, instrucao: string | null) => void;
   gravando: boolean;
   segundos: number;
   pararGravacao: (enviar: boolean) => void;
@@ -67,7 +68,7 @@ export function RodapeDaBancada({
                   posicao: 1,
                   total: fila.length,
                   onOrientar: orientarPedido,
-                  onResolvido: () => fecharPedido(pedidoAtual, "resolvido", null),
+                  onResolvido: () => fecharPedido(pedidoAtual, SOLUCAO_DA_PORTA.resolver, null),
                 }}
               />
               {error && <p className="px-4 pb-2 text-legenda text-danger-ink">{error}</p>}

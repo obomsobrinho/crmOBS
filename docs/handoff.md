@@ -33,6 +33,14 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
+### 13/10/2026: PASSO PÓS-DEPLOY DO REDESENHO DE PEDIDOS (pendente)
+
+Depois que o código da solução gravada (`handoffs.solucao`, `lib/solucoes.ts`) estiver no ar:
+apagar o gatilho de transição `handoffs_solucao_do_legado` e a coluna `handoffs.closed_how`
+(aprovado pelo dono em 08/10), numa migração nova, e regerar `lib/database.types.ts`. Até lá o
+gatilho cobre o app antigo e o lint avisa qualquer uso novo de `closed_how` (`eslint.config.mjs`).
+ADR: `docs/adr/2026-10-08-help-request-resolution-is-stored.md`.
+
 ### 07/10/2026: PRÓXIMO PASSO (fazer primeiro)
 
 Tudo de 05 a 07/10 está commitado e no ar (calendário no código, motivo do pedido, tarde/manhã/noite

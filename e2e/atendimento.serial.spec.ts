@@ -96,7 +96,7 @@ test("handoff: entra em Esperando, a caixa vira a fila, e Resolvido fecha um de 
   // Vem o próximo da fila, e a espera passa a contar dele.
   await expect(caixa).toContainText("Quer saber se dá para parcelar", { timeout: 15_000 });
   await expect(page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()).toContainText(
-    "resolvido pelo time"
+    "Time resolveu"
   );
   const meio = await estadoDaConversa(svc, clientId);
   expect(meio.handoffAt).not.toBeNull();
@@ -113,18 +113,18 @@ test("handoff: entra em Esperando, a caixa vira a fila, e Resolvido fecha um de 
   await expect
     .poll(() => estadoDaConversa(svc, clientId))
     .toMatchObject({ handoffAt: null, responsavel: null, ia: "ativa" });
-  // E os DOIS pedidos deste teste fechados como "resolvido". ⚠️ Pelo id, e não
+  // E os DOIS pedidos deste teste fechados como "Time resolveu" (`time_resolveu`). ⚠️ Pelo id, e não
   // pelo "último pedido da conversa" (28/09/2026): a jornada 1 da rodada
   // anterior abre um pedido de verdade um minuto antes, e ele às vezes era o mais
   // novo, então o teste lia o pedido de outro teste e falhava sem defeito.
   const { data: meus } = await svc
     .from("handoffs")
-    .select("summary, closed_how")
+    .select("summary, solucao")
     .eq("client_id", clientId)
     .eq("phone", FONE_TESTE)
     .gt("id", idAntes)
     .order("id");
-  expect(meus?.map((p) => p.closed_how)).toEqual(["resolvido", "resolvido"]);
+  expect(meus?.map((p) => p.solucao)).toEqual(["time_resolveu", "time_resolveu"]);
 });
 
 test("orientar a IA: grava, religa a IA, larga o responsável e dá para cancelar", async ({
@@ -257,10 +257,10 @@ test.describe("jornadas com o cérebro real", () => {
     expect(await r.json()).toMatchObject({ ok: true, enviado: false, motivo: "envio_nao_configurado" });
     await expect
       .poll(() => estadoDaConversa(svc, clientId))
-      .toMatchObject({ handoffAt: null, registro: "ia" });
+      .toMatchObject({ handoffAt: null, registro: "orientou_ia" });
     await expect(
       page.locator('[data-slot="handoff-cartao"][data-estado="fechado"]').last()
-    ).toContainText("resolvido com a sua orientação", { timeout: 15_000 });
+    ).toContainText("Orientou IA", { timeout: 15_000 });
     await expect(caixa).toHaveCount(0);
 
     // 4. O cliente escreve de novo, e o agente responde COM a orientação pendente.
