@@ -33,6 +33,14 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
+### 14/10/2026 (madrugada): P1 ITENS 5 E 6 NO AR (641aab1, 68a5405). LER PRIMEIRO
+
+- Item 5 (orientacao vira regra) e item 6 (teto mensal de IA em tokens, avisos 80/100%, `/admin` Empresas, "Clientes" vira "Contatos" na tela) publicados.
+- Antes do push: sem-login 456, ia 12/12, bateria toda verde (O6 falhou na rodada cheia e deu 5/5 repetido), login completo verde (clientes.serial e realtime.serial cairam na rodada cheia e passaram sozinhos), build ok. Depois do deploy: `test:e2e:n8n` 11/11, zero envio Evolution para 5500. Contador `consumo_ia_mensal` gravando em producao.
+- Incidente do Supabase Realtime ("Realtime latency", 13/10) atrapalhou a suite logada naquela tarde; voltou de madrugada.
+- PENDENTE DO DONO: (1) cadastrar `ADMIN_USER_IDS=924dae85-57ff-4aed-820d-1e7c2d3377cf` na Vercel (ja esta no `.env.local`), senao `/admin` fica 404; (2) no `/admin`, subir o teto da OBM (as suites pagas rodam nela; outubro ja teve ~12 mi de tokens de teste antes do contador existir); (3) aprovar a tela do `/admin`; (4) decidir se troca os textos "Cliente desde", "Ver cliente" e "O que o cliente escreveu" (nao nomeiam a lista, ficaram); (5) testar com o chip o redesenho de Pedidos e o salvar como regra.
+- PROXIMO NO PLANO: P1 item 7, Admin v1 (prospeccao e o resto do admin; a pagina `/admin` ja existe com as Empresas).
+
 ### 13/10/2026: REDESENHO DE PEDIDOS NO AR (f250af2)
 
 Solução gravada, detalhe em seções com a fonte e pedido aberto atualizado pelo cliente estão em produção. `test:e2e:n8n` 11/11 na versão publicada, zero envio Evolution para 5500. O legado `closed_how` (coluna, check e gatilho de transição) foi apagado em `20261013151634_remove_closed_how_legado.sql`; o lint segue barrando o nome.
