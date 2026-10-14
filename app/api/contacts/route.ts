@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
   if (ehNumeroDeAvisos(jidDePessoa(tel.digitos), client.avisos)) {
     return NextResponse.json(
-      { error: "Esse é o número que recebe os avisos, não um cliente.", campo: "telefone" },
+      { error: "Esse é o número que recebe os avisos, não um contato.", campo: "telefone" },
       { status: 400 }
     );
   }

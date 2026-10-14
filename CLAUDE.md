@@ -49,6 +49,7 @@ Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack.
 ## Where things live
 Single sources of truth (pure `lib/` modules unless noted; never duplicate their rule):
 - Access and plans: `lib/billing.ts` (`accessState`, `PLANS`); beta switch `lib/beta.ts`; Asaas `lib/asaas.ts` (server-only).
+- AI usage and monthly cap: `lib/custo-ia.ts` (pure: prices, `estadoDoConsumo`, `mesSP`), `lib/consumo-ia.ts` (server: PK read, atomic sum, notices). Admin: `lib/admin-acesso.ts` (`ehAdmin`, pure), `lib/admin.ts` (server), `lib/admin-empresas.ts`.
 - Who replied (AI/human/imported): `lib/mensagem.ts`. Periods: `lib/periodo.ts`. Panel numbers: `lib/painel.ts`; perceived value: `lib/valor.ts`; metrics `lib/metrics.ts`.
 - Prompt: `lib/agent-prompt.ts` (`compilePersona`, `buildPersona`, `buildAdvancedPersona`, `buildBaseTail`, `LIMITS`), `lib/agent.ts` (model call and prompt prefix), `lib/agent-turn.ts` (`processTurn`, `personaDoTenant`, `logTurn`, server-only), `lib/guardrail.ts`, `lib/agent-diagnostics.ts`, `lib/agent-presets.ts`, `lib/rag.ts`.
 - Handoff and notices: `lib/handoffs.ts` (`fecharPedido`), `lib/pedidos.ts`, `lib/avisos.ts`, `lib/horarios.ts`, `lib/crm.ts` (`quemAtende`).
@@ -59,8 +60,8 @@ Single sources of truth (pure `lib/` modules unless noted; never duplicate their
 - UI: `components/ui/` base layer (shadcn/Radix), `components/` product, `components/agente/` agent form, `components/painel/` panel, tokens in `app/globals.css`, docs in `docs/design-system/`.
 - n8n workflows: `n8n/` (`obs-atendimento.json`, `crm-envio-manual.json`, `crm-envio-ia.json`).
 
-Routes. Public: `/login`, `/cadastro`, `/recuperar-senha`; auth: `/auth/confirm`, `/auth/concluir`, `/definir-senha`. Outside `app/(app)`: `/montagem` (owner-only wizard, once), `/assinatura`, `/connect`. In `app/(app)`: `/inbox`, `/inbox/[id]`, `/pedidos` (`?abrir={id}`), `/pipeline`, `/painel`, `/agente` (owner-only, 3 tabs + advanced, with the KB and the bench), `/clientes`, `/conhecimento` (out of the menu, route kept), `/equipe`, `/perfil`. Preview: `/design/*` (fake data). Landing (`app/page.tsx`): unpublished owner to `/montagem`, published owner to `/painel`, attendant to `/inbox`.
-API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground/transcrever` (owner-only, `dryRun`), `send`, `contacts`, `conversations/{orientar,resolve}`, `fotos/[...path]`, `inbound-media`, `team/{invite,remove}`, `signup` (public), `billing/{subscribe,webhook}`, `clients/[id]/{agent-config,connect-whatsapp,whatsapp-status,publish,notify-target,knowledge,whatsapp-media}`, `clients/by-instance`.
+Routes. Public: `/login`, `/cadastro`, `/recuperar-senha`; auth: `/auth/confirm`, `/auth/concluir`, `/definir-senha`. Outside `app/(app)`: `/montagem` (owner-only wizard, once), `/assinatura`, `/connect`, `/admin` (product owner only, `ADMIN_USER_IDS`, 404 for anyone else). In `app/(app)`: `/inbox`, `/inbox/[id]`, `/pedidos` (`?abrir={id}`), `/pipeline`, `/painel`, `/agente` (owner-only, 3 tabs + advanced, with the KB and the bench), `/clientes` (screen name "Contatos"), `/conhecimento` (out of the menu, route kept), `/equipe`, `/perfil`. Preview: `/design/*` (fake data). Landing (`app/page.tsx`): unpublished owner to `/montagem`, published owner to `/painel`, attendant to `/inbox`.
+API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground/transcrever` (owner-only, `dryRun`), `send`, `contacts`, `conversations/{orientar,resolve}`, `fotos/[...path]`, `inbound-media`, `team/{invite,remove}`, `signup` (public), `billing/{subscribe,webhook}`, `clients/[id]/{agent-config,connect-whatsapp,whatsapp-status,publish,notify-target,knowledge,whatsapp-media}`, `clients/by-instance`, `admin/empresas` + `admin/empresas/[id]/limite` (admin only).
 
 ## How to run
 - Dev: `npm run dev` (port 3001 via `.claude/launch.json`). Types/build: `npm run build`. Lint: `npm run lint`.
@@ -72,7 +73,7 @@ API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground
 - `docs/proximos-passos.md` = SOURCE OF TRUTH for product decisions and roadmap (read before prioritizing or scoping). `docs/estrategia-2026-07.md` = market research (its old prescriptions are superseded; `proximos-passos` wins).
 - `docs/instrumentacao-beta.md` = the five beta SQL queries (no UI, by decision; "AI reply" in SQL must equal `lib/mensagem.ts`).
 - `docs/design-system/` = tokens, base layer and the reasoning. `docs/adr/` = one decision per file (the "why" behind every rule line; index in `docs/adr/README.md`). `docs/plano-*.md` = feature plans. System maps (owner's, outside git): `Desktop/arquitetura-crm/`.
-- `.claude/rules/`: `engineering.md` (always) plus `data`, `realtime`, `ui`, `agent-ai`, `n8n`, `testing`, `billing`, `dashboard`, `onboarding` (loaded when matching files are read).
+- `.claude/rules/`: `engineering.md` (always) plus `data`, `realtime`, `ui`, `agent-ai`, `n8n`, `testing`, `billing`, `dashboard`, `onboarding`, `admin` (loaded when matching files are read).
 - Next 16 differs from your training data: read `node_modules/next/dist/docs/` first.
 
 ## How rules evolve

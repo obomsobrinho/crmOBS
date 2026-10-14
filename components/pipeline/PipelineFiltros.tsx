@@ -5,7 +5,7 @@ import { memberName, type Member } from "@/lib/team";
 import type { Stage } from "@/lib/pipeline";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { CampoBusca } from "@/components/ui/campo-busca";
 import {
   Select,
   SelectContent,
@@ -88,22 +88,17 @@ export function PipelineFiltros({
 
         {/* Mesmo campo com lupa da lista de conversas: moldura no degrau de
             controle, ícone em tinta fraca e o Input sem moldura própria. */}
-        <div
+        <CampoBusca
           className={cn(
-            "flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-line max-md:order-last max-md:h-11 max-md:w-full",
+            "px-3 max-md:order-last max-md:h-11 max-md:w-full",
             !buscaAberta && !search && "max-md:hidden"
           )}
-        >
-          <Search size={15} className="shrink-0 text-ink-faint" />
-          <Input
-            variant="limpo"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar nome ou telefone"
-            aria-label="Buscar cards"
-            className="w-44 text-apoio max-md:w-full"
-          />
-        </div>
+          classeDoCampo="w-44 max-md:w-full"
+          valor={search}
+          aoMudar={setSearch}
+          placeholder="Buscar nome ou telefone"
+          rotulo="Buscar cards"
+        />
 
         <Select value={attFilter} onValueChange={setAttFilter}>
           <SelectTrigger

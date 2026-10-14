@@ -8,7 +8,7 @@ export default function ClientesPage() {
       data-clientes-vazio
       tamanho="detalhe"
       icone={UsersRound}
-      texto="Escolha um cliente na lista para ver e completar o cadastro."
+      texto="Escolha um contato na lista para ver e completar o cadastro."
     />
   );
 }

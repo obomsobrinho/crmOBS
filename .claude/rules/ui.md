@@ -14,6 +14,7 @@ Base-layer reuse, `AreaRolavel`, `carregando`, tokens and no-dash are in `engine
 - Base-layer rules: geometry lives in the cva `size` (`size="none"` = no geometry); never `[&_svg]:size-4`; never a focus ring in a component (focus is global); `data-slot` AFTER the spread, and a `data-slot` passed from outside is ignored (mark states with another attribute, e.g. `data-em-breve`); never read an ancestor's `data-state` (pass state by prop); `tailwind-merge` knows the type scale via `extendTailwindMerge` in `lib/utils.ts`; a Radix root renders no element, so chained triggers attach to the SAME element.  (why: docs/design-system/camada-base.md)
 - `Button carregando`: with `asChild` the child goes ALONE (no `false` sibling, it breaks the Slot). `disabled` only for missing data.  (why: docs/adr/2026-09-26-button-carregando-prop.md)
 - Field inside a table of pairs: `Input` variant `sutil` (border `line`, not `line-soft`).  (why: docs/adr/2026-09-19-input-sutil-variant.md)
+- Search field with magnifier = `CampoBusca` (`components/ui/campo-busca.tsx`: frame classes in `className`, input classes in `classeDoCampo`, optional clear `x`); thin progress bar = `Medidor` (`components/ui/medidor.tsx`, `tom` marca/neutro/aviso/perigo, `rotulo` makes it an accessible meter). Never hand-write either again.  (why: docs/adr/2026-10-13-ai-usage-cap-in-tokens.md)
 - `Stat` period legend (`StatLegenda`) is mandatory. `sheet` width is a variant (`padrao` 520, `largo` 1040), never className on a screen.  (why: docs/design-system/camada-base.md)
 
 ## Scroll and surface
@@ -35,7 +36,8 @@ Base-layer reuse, `AreaRolavel`, `carregando`, tokens and no-dash are in `engine
 ## Copy and inbox behavior
 - Fixed screen text never assumes appointment, patient or scheduling (mixed audience); segment language comes from the preset.  (why: docs/adr/2026-08-26-beta-mvp-scope-and-menu.md)
 - Inbox list opens on `Hoje` (`Hoje`/`7 dias`/`Tudo`, `data-slot="inbox-periodo"`), rolling civil day in America/Sao_Paulo (`dentroDaJanela`/`diaSP`, `lib/inbox.ts`). A conversation with open `handoff_at` is NEVER hidden by the time filter (`needsYou(it) ||` in `components/ContactSidebar.tsx`). Chip counts follow the window; search ignores it.  (why: docs/adr/2026-09-19-inbox-opens-on-today.md)
-- Menu (`components/NavRail.tsx`): Painel first, Pedidos, Conversas, Pipeline, Agente (owner), Equipe. "Em breve" = Agenda and Follow-up; Campanhas does not come back.  (why: docs/adr/2026-08-26-beta-mvp-scope-and-menu.md)
+- Menu (`components/NavRail.tsx`): Painel first, Pedidos, Conversas, Contatos, Pipeline, Agente (owner), Equipe. "Em breve" = Agenda and Follow-up; Campanhas does not come back.  (why: docs/adr/2026-08-26-beta-mvp-scope-and-menu.md)
+- The tenant's contacts list is "Contatos" on every screen (menu, title, empty states, buttons); the `/clientes` route, the tables and the lib names stay. In `/admin` the tenants are "Empresas". "cliente" in conversation copy ("O que o cliente escreveu") and in AI prompts is a different meaning and stays.  (why: docs/adr/2026-10-13-ai-usage-cap-in-tokens.md)
 - Mobile: bottom bar has Pedidos where Pipeline was; Pipeline lives in "Mais".  (why: docs/adr/2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md)
 - `Stat` has an `elevado` variant because `--s-bloco` equals `--canvas` in the light theme: a `bloco` card on the canvas would be invisible. Use `elevado` there.
 

@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { caminhoDoAdmin, ehAdminPeloAmbiente } from "@/lib/admin-acesso";
 
 // Next 16: o antigo "middleware" agora se chama "proxy". Renova a sessão do
 // Supabase a cada request e protege as rotas do app (exige login).
@@ -37,6 +38,15 @@ export async function proxy(request: NextRequest) {
   const user = claimsData?.claims ?? null;
 
   const { pathname } = request.nextUrl;
+
+  // ADMIN (P1 item 6; decisão de 29/09/2026): `/admin` e `/api/admin` são 404
+  // para quem não está em `ADMIN_USER_IDS` (inclusive sem login), para nem
+  // revelar que existem. É a primeira trava; a página e cada rota conferem de
+  // novo no servidor (`adminDaSessao`, lib/admin.ts).
+  if (caminhoDoAdmin(pathname) && !ehAdminPeloAmbiente(user?.sub)) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   const isPublic =
     pathname.startsWith("/login") ||
     // Cadastro self-service e recuperação de senha: quem chega aqui não tem

@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plus, Search, UsersRound, X } from "lucide-react";
+import { Plus, UsersRound } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
-import { Input } from "@/components/ui/input";
+import { CampoBusca } from "@/components/ui/campo-busca";
 import {
   AreaRolavel,
   DISSOLVER_LISTA,
@@ -170,10 +170,10 @@ export default function ListaClientes({
         ativo != null && "max-md:hidden"
       )}
     >
-      <section aria-label="Clientes">
+      <section aria-label="Contatos">
         <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
           <div className="flex items-center gap-2">
-            <h1 className="text-titulo">Clientes</h1>
+            <h1 className="text-titulo">Contatos</h1>
             <span
               data-slot="clientes-total"
               className="text-apoio font-semibold tabular-nums text-ink-3"
@@ -189,33 +189,20 @@ export default function ListaClientes({
                 className="ml-auto"
               >
                 <Plus size={14} />
-                Novo cliente
+                Novo contato
               </Button>
             )}
           </div>
 
-          <div className="mt-3 flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line md:max-w-[420px]">
-            <Search size={15} className="shrink-0 text-ink-faint" />
-            <Input
-              variant="limpo"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar por nome, telefone ou dado"
-              aria-label="Buscar clientes"
-              className="text-apoio"
-            />
-            {temBusca && (
-              <Button
-                variant="ghost"
-                size="none"
-                onClick={() => setQ("")}
-                aria-label="Limpar busca"
-                className="rounded-sm text-ink-3"
-              >
-                <X size={14} />
-              </Button>
-            )}
-          </div>
+          <CampoBusca
+            className="mt-3 md:max-w-[420px]"
+            valor={q}
+            aoMudar={setQ}
+            placeholder="Buscar por nome, telefone ou dado"
+            rotulo="Buscar contatos"
+            aoLimpar={() => setQ("")}
+            mostrarLimpar={temBusca}
+          />
 
           {/* A MESMA regra da lista de conversas (D4, 30/09/2026): chip com zero
               some, menos "Todos" e o que estiver ligado; com um chip só, a faixa
@@ -249,7 +236,7 @@ export default function ListaClientes({
           aria-hidden
           className="grid grid-cols-[minmax(0,1fr)_150px_72px] gap-3 border-b border-line-soft px-5 py-2 text-rotulo uppercase text-ink-3 max-md:hidden xl:grid-cols-[minmax(0,1fr)_150px_minmax(0,180px)_72px]"
         >
-          <span>Cliente</span>
+          <span>Contato</span>
           <span>Último contato</span>
           <span className="max-xl:hidden">Tags</span>
           <span className="text-right">Cadastro</span>
@@ -258,13 +245,13 @@ export default function ListaClientes({
         <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
           {contagem.todos === 0 && !carregando ? (
             <Vazio
-              titulo="Ainda não há clientes"
+              titulo="Ainda não há contatos"
               texto="Quem escrever para o seu WhatsApp aparece aqui sozinho, com telefone e nome."
             />
           ) : linhas.length === 0 && !carregando ? (
             temBusca ? (
               <Vazio
-                titulo={`Nenhum cliente para “${busca}”`}
+                titulo={`Nenhum contato para “${busca}”`}
                 texto="A busca olha nome, telefone, e-mail, tags e os campos que você criou."
               >
                 {podeCadastrar && (
@@ -276,7 +263,7 @@ export default function ListaClientes({
                     onClick={() => abrirNovo(/\d{8,}/.test(q.replace(/\D/g, "")) ? q : "")}
                   >
                     <Plus size={14} />
-                    Cadastrar novo cliente
+                    Cadastrar novo contato
                   </Button>
                 )}
               </Vazio>
@@ -293,7 +280,7 @@ export default function ListaClientes({
             ) : filtro === "frio" ? (
               <Vazio
                 titulo="Ninguém esfriou"
-                texto={`Nenhum cliente passou ${LIMIAR_FRIO_DIAS} dias sem falar com você.`}
+                texto={`Nenhum contato passou ${LIMIAR_FRIO_DIAS} dias sem falar com você.`}
               />
             ) : (
               <Vazio

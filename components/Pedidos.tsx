@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, HandHelping, MessagesSquare, Search } from "lucide-react";
+import { ArrowLeft, HandHelping, MessagesSquare } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
 import SecoesDoPedido from "@/components/SecoesDoPedido";
 import SolucaoBadge from "@/components/SolucaoBadge";
@@ -11,7 +11,7 @@ import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatRotulo } from "@/components/ui/stat";
-import { Input } from "@/components/ui/input";
+import { CampoBusca } from "@/components/ui/campo-busca";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,6 +55,7 @@ import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
 import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
 import type { LinhaHistoria } from "@/lib/historia-do-pedido";
 import { cn } from "@/lib/utils";
+import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
 // PEDIDOS DE AJUDA (refeita em 30/09/2026, docs/plano-fechar-p0.md, itens 1 e 2).
 //
@@ -358,6 +359,13 @@ export default function Pedidos({
     });
     if (!res) return setResultado(SEM_SERVIDOR);
     if (res.status === 409) {
+      const corpo = (await res.json().catch(() => ({}))) as { motivo?: string; error?: string };
+      // A IA parada no limite de uso do mês (P1 item 6): o pedido CONTINUA
+      // aberto (a rota recusou antes de fechar) e a frase diz o que fazer.
+      if (corpo.motivo === "limite_ia") {
+        setResultado({ tom: "erro", texto: corpo.error ?? TEXTO_ORIENTAR_NO_LIMITE });
+        return;
+      }
       concluir(p, { tom: "aviso", texto: "Esse pedido já tinha sido resolvido." }, null, null);
       return;
     }
@@ -443,17 +451,13 @@ export default function Pedidos({
             </p>
             {/* Busca e filtro por motivo lado a lado: os dois recortam a mesma lista no servidor. */}
             <div data-slot="pedidos-filtros" className="mt-3 flex items-center gap-2">
-              <div className="flex h-[var(--h-control)] min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line">
-                <Search size={15} className="shrink-0 text-ink-faint" />
-                <Input
-                  variant="limpo"
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Cliente ou pedido"
-                  aria-label="Buscar pedidos"
-                  className="text-apoio"
-                />
-              </div>
+              <CampoBusca
+                className="min-w-0 flex-1"
+                valor={q}
+                aoMudar={setQ}
+                placeholder="Cliente ou pedido"
+                rotulo="Buscar pedidos"
+              />
               <Select value={motivo ?? "todos"} onValueChange={trocarMotivo}>
                 {/* Compacto: "Motivo" sem filtro, o rótulo escolhido (cortado com reticências) com filtro. */}
                 <SelectTrigger aria-label="Filtrar por motivo" data-filtro="motivo" className="max-w-[132px]">

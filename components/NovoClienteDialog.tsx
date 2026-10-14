@@ -108,7 +108,7 @@ export default function NovoClienteDialog({
   return (
     <Dialog open={aberto} onOpenChange={(v) => !v && fechar()}>
       <DialogContent className="max-w-md" data-slot="novo-cliente">
-        <DialogTitle>Novo cliente</DialogTitle>
+        <DialogTitle>Novo contato</DialogTitle>
         <DialogDescription className="mt-2 mb-4">
           Só o telefone é obrigatório. O resto dá para completar depois na ficha.
         </DialogDescription>
@@ -190,7 +190,7 @@ export default function NovoClienteDialog({
               carregando={salvando}
               disabled={!telefone.trim()}
             >
-              Salvar cliente
+              Salvar contato
             </Button>
           </div>
         </form>

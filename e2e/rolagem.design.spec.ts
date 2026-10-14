@@ -16,6 +16,7 @@ const TELAS = [
   { rota: "/design/equipe", nome: "equipe" },
   { rota: "/design/playground", nome: "bancada de teste" },
   { rota: "/design/clientes?sel=2", nome: "clientes" },
+  { rota: "/design/admin", nome: "admin" },
 ];
 
 // O CELULAR (plano do mobile, fase 6, 23/09/2026): a mesma regra em 375px, com a

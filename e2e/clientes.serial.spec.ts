@@ -27,7 +27,7 @@ test.afterAll(async () => {
 
 test("o contato aparece na lista, a busca acha, e a ficha é a mesma da conversa", async ({ page }) => {
   await page.goto("/clientes");
-  await page.getByLabel("Buscar clientes").fill("0000000001");
+  await page.getByLabel("Buscar contatos").fill("0000000001");
   const linha = page.locator('[data-slot="clientes-item"]', { hasText: NOME_TESTE });
   await expect(linha).toHaveCount(1);
   await linha.click();
@@ -54,11 +54,11 @@ test("o contato aparece na lista, a busca acha, e a ficha é a mesma da conversa
   await expect(page.getByLabel("E-mail").last()).toHaveValue(EMAIL);
 });
 
-test("o menu leva a Clientes", async ({ page }) => {
+test("o menu leva a Contatos", async ({ page }) => {
   await page.goto("/painel");
-  await page.getByRole("link", { name: "Clientes" }).first().click();
+  await page.getByRole("link", { name: "Contatos" }).first().click();
   await expect(page).toHaveURL(/\/clientes$/);
-  await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contatos" })).toBeVisible();
 });
 
 // FATIA B (01/10/2026): criar contato pela rota service_role, com outro número
@@ -187,7 +187,7 @@ test.describe("Clientes paginado", () => {
     expect(nomes).toEqual(Array.from({ length: 25 }, (_, i) => `Cliente paginado ${String(i + 1).padStart(2, "0")}`));
 
     chamadas.pagina = 0;
-    await page.getByLabel("Buscar clientes").pressSequentially("paginado 17", { delay: 40 });
+    await page.getByLabel("Buscar contatos").pressSequentially("paginado 17", { delay: 40 });
     await expect(itens).toHaveCount(1, { timeout: 15_000 });
     await expect(itens.first()).toContainText("Cliente paginado 17");
     expect(chamadas.pagina, "uma busca, não uma por letra").toBe(1);

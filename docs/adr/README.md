@@ -1,4 +1,4 @@
-# ADR index (docs/adr/, 96 files)
+# ADR index (docs/adr/, 97 files)
 
 | File | Area | Status | Title |
 |---|---|---|---|
@@ -95,6 +95,7 @@
 | 2026-10-08-pedido-detail-shows-source-messages.md | pedidos, data, realtime | Accepted | The Pedidos detail shows section cards in one column with the real client messages (before and while waiting), the orientation and the reply after, by who sent it (lib/historia-do-pedido.ts), loaded only on open; the AI summary is a labeled title, reason/times/resolution only in the facts strip |
 | 2026-10-08-open-request-updated-by-new-client-info.md | agent, data, pedidos | Accepted | Client info added to an open request rewrites its summary (atualizado_em) through the pure atualizacaoDoPedido (lib/fila-de-pedidos.ts); never a new notice, ties are skipped |
 | 2026-10-13-orientation-saved-as-agent-rule.md | agent-ai, pedidos, data | Accepted | An orientation can be saved as a rule in clients.regras_salvas, rendered by ONE section before the base tail in both modes; only POST/DELETE agent-rules writes it, by compare and swap (limit check, publication row); one compile helper (compilarDoTenant); the guardrail sees it through the persona |
+| 2026-10-13-ai-usage-cap-in-tokens.md | agent-ai, admin, data | Accepted | AI usage per company with a monthly cap in TOKENS (default 10M, SP month): one PK read before the model, atomic sum in logTurn, silent turn limite_ia, notices once per level, /admin guarded by ADMIN_USER_IDS with every action logged |
 | undated-agent-enabled-vs-published-at.md | onboarding | Accepted (see also 2026-08-28-agent-switch-two-columns.md) | agent_enabled is the switch; agent_published_at is the first activation and is never cleared |
 | undated-agent-turns-metering.md | agent-ai | Accepted | agent_turns: one measurement row per AI turn, best-effort, no message content |
 | undated-asaas-billing-and-webhook.md | billing | Accepted | Asaas billing: subscribe, idempotent public webhook, event map, cash-register screen |

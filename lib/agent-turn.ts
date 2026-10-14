@@ -24,6 +24,19 @@ import {
 } from "@/lib/avisos";
 import { nomeDoContato } from "@/lib/inbox";
 import { diaMesHoraSP } from "@/lib/fuso";
+import {
+  avisoPendente,
+  estadoDoConsumo,
+  limiteDaEmpresa,
+  mesSP,
+  tokensUsados,
+} from "@/lib/custo-ia";
+import {
+  agendarAvisoDeConsumo,
+  lerConsumoDoMes,
+  somarConsumoDoTurno,
+  type ConsumoDoMes,
+} from "@/lib/consumo-ia";
 import { semLoteAtual } from "@/lib/mensagem";
 import type {
   TurnDiagnostics,
@@ -189,13 +202,20 @@ export async function processTurn(
   // `personaDoTenant`), então o que importa aqui é `agent_config` +
   // `prompt_mode`; `persona` vem junto porque é a queda. As colunas de
   // assinatura vêm no mesmo select para o gate abaixo.
-  const { data: client, error: clientErr } = await svc
-    .from("clients")
-    .select(
-      "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance"
-    )
-    .eq("id", clientId)
-    .maybeSingle();
+  // O mês de uso de IA (P1 item 6) é lido JUNTO, no mesmo Promise.all: a
+  // checagem do teto não acrescenta ida e volta ao turno. O mês é o de São
+  // Paulo, pelo relógio de verdade (nunca `agoraTeste`).
+  const mes = mesSP(Date.now());
+  const [{ data: client, error: clientErr }, doMes] = await Promise.all([
+    svc
+      .from("clients")
+      .select(
+        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens"
+      )
+      .eq("id", clientId)
+      .maybeSingle(),
+    lerConsumoDoMes(svc, clientId, mes),
+  ]);
   if (clientErr) throw new TurnError(500, "falha ao carregar o tenant");
   if (!client) throw new TurnError(404, "tenant não encontrado");
   const avisos = (client.notify_group_jid as string | null) ?? null;
@@ -281,6 +301,47 @@ export async function processTurn(
       model: null,
       usage: null,
     });
+    return t;
+  }
+
+  // TETO DE IA DO MÊS (P1 item 6, docs/plano-custo-ia.md). Mesmo silêncio da
+  // chave do agente, ANTES do modelo e do RAG: nada de token gasto. Vale também
+  // na bancada (dryRun), porque o teste gasta o mesmo token (decisão do dono,
+  // 13/10/2026). Custo no caminho do turno: UMA leitura pela chave primária de
+  // `consumo_ia_mensal`, lida junto com o tenant lá em cima. Leitura que falha
+  // ATENDE (`null`): emudecer a empresa por um erro de leitura seria pior que
+  // passar do teto por um turno.
+  const limite = limiteDaEmpresa(client.ia_limite_tokens);
+  if (doMes && estadoDoConsumo(tokensUsados(doMes), limite) === "parado") {
+    const t = silentTurn(t0, { limiteIa: true });
+    await logTurn(svc, {
+      clientId,
+      phone,
+      dryRun,
+      diagnostics: t.diagnostics,
+      messagesSent: 0,
+      silenced: "limite_ia",
+      model: null,
+      usage: null,
+      mes,
+    });
+    // O aviso de 100% PENDENTE sai também daqui (cobre o teto que o admin
+    // BAIXOU abaixo do uso, e a bancada que cruzou a linha sem poder avisar).
+    // Já avisado, nada é escrito: a marca veio na leitura.
+    if (avisoPendente("parado", doMes)) {
+      agendarAvisoDeConsumo({
+        clientId,
+        empresa: texto(client.name) ?? "",
+        phone,
+        dryRun,
+        mes,
+        nivel: "parado",
+        usados: tokensUsados(doMes),
+        limite,
+        instancia: client.evolution_instance ?? null,
+        destino: avisos,
+      });
+    }
     return t;
   }
 
@@ -640,8 +701,9 @@ export async function processTurn(
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado
   // para o painel filtrar. Best-effort de propósito: medição nunca pode derrubar
-  // o atendimento de um cliente.
-  await logTurn(svc, {
+  // o atendimento de um cliente. Soma o turno ao mês (`consumo_ia_mensal`) e
+  // devolve o total, que decide o aviso de 80% ou 100% (uma vez no mês).
+  const total = await logTurn(svc, {
     clientId,
     phone,
     dryRun,
@@ -650,7 +712,24 @@ export async function processTurn(
     silenced: null,
     model: run.model,
     usage: run.usage,
+    mes,
   });
+  const usados = total ? tokensUsados(total) : 0;
+  const pendente = total ? avisoPendente(estadoDoConsumo(usados, limite), total) : null;
+  if (pendente) {
+    agendarAvisoDeConsumo({
+      clientId,
+      empresa: texto(client.name) ?? "",
+      phone,
+      dryRun,
+      mes,
+      nivel: pendente,
+      usados,
+      limite,
+      instancia: client.evolution_instance ?? null,
+      destino: avisos,
+    });
+  }
 
   return { output, diagnostics };
 }
@@ -740,7 +819,39 @@ async function logTurn(
     dryRun: boolean;
     diagnostics: TurnDiagnostics;
     messagesSent: number;
-    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | null;
+    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | null;
+    model: string | null;
+    usage: TurnUsage | null;
+    /** Mês de São Paulo do turno (`mesSP`): com `usage`, o turno soma no mês. */
+    mes?: string;
+  }
+): Promise<ConsumoDoMes | null> {
+  // A SOMA DO MÊS (P1 item 6): uma chamada atômica, em paralelo com o registro
+  // do turno. Conta a entrada inteira (com o cache) mais a saída; o cache vai à
+  // parte só para o custo estimado. Turno silencioso não chamou o modelo (sem
+  // `usage`) e não soma. O dryRun soma: o token da bancada é gasto de verdade.
+  const u = t.usage;
+  const soma =
+    t.mes && u && (u.inputTokens != null || u.outputTokens != null)
+      ? somarConsumoDoTurno(svc, t.clientId, t.mes, {
+          entrada: u.inputTokens ?? 0,
+          cache: u.cachedInputTokens ?? 0,
+          saida: u.outputTokens ?? 0,
+        })
+      : Promise.resolve(null);
+  await registrarTurno(svc, t);
+  return soma;
+}
+
+async function registrarTurno(
+  svc: ReturnType<typeof createServiceClient>,
+  t: {
+    clientId: string;
+    phone: string;
+    dryRun: boolean;
+    diagnostics: TurnDiagnostics;
+    messagesSent: number;
+    silenced: string | null;
     model: string | null;
     usage: TurnUsage | null;
   }
@@ -787,6 +898,7 @@ function silentTurn(
     subscriptionBlocked?: boolean;
     notPublished?: boolean;
     numeroDeAvisos?: boolean;
+    limiteIa?: boolean;
   }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {

@@ -63,6 +63,9 @@ export interface TurnDiagnostics {
   // true = a mensagem veio do NÚMERO DE AVISOS do time (clients.notify_group_jid):
   // silêncio, porque ali fala o time, não um cliente (lib/avisos.ts).
   numeroDeAvisos?: boolean;
+  // true = a empresa atingiu o teto de tokens de IA do mês (lib/custo-ia.ts):
+  // silêncio antes do modelo, como a chave desligada, também na bancada.
+  limiteIa?: boolean;
   // true = o turno abriu pedido de ajuda e o aviso ao time foi AGENDADO (sai
   // depois da resposta, por `after`). Se a mensagem saiu mesmo, só o log diz.
   avisoAgendado?: boolean;

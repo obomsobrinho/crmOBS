@@ -78,6 +78,18 @@ export function ehNumeroDeAvisos(
   return mesmoTelefone(phone, d);
 }
 
+/**
+ * Dois destinos de aviso são o mesmo? Número compara pela chave (nono dígito,
+ * `chaveTelefone`); grupo compara o JID inteiro.
+ */
+export function mesmoDestino(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (!a || !b) return false;
+  const da = digitosDoJid(a);
+  const db = digitosDoJid(b);
+  if (da && db) return mesmoTelefone(da, db);
+  return a === b;
+}
+
 /** Tira do conjunto as linhas do número de avisos. Sem destino, devolve igual. */
 export function semNumeroDeAvisos<T>(
   linhas: T[],
@@ -131,6 +143,38 @@ export function textoDoAviso(a: {
   ];
   if (a.abrir) blocos.push(`Abrir no CRM:\n${a.abrir}`);
   return blocos.join("\n\n");
+}
+
+/**
+ * O aviso de uso de IA do mês (P1 item 6, docs/plano-custo-ia.md). Dois níveis,
+ * cada um mandado UMA vez por empresa e mês (`consumo_ia_avisos`): `aviso` aos
+ * 80% do teto e `parado` no teto. Dois destinatários com o MESMO remetente do
+ * pedido de ajuda: a própria empresa (o destino de avisos dela) e o dono do
+ * produto (o destino de avisos do tenant dele), que leva o nome da empresa.
+ * Os números chegam já formatados (`tokensCurto`, lib/custo-ia.ts): este
+ * módulo não importa nada.
+ */
+export function textoDoAvisoDeConsumo(a: {
+  nivel: "aviso" | "parado";
+  /** Para o dono do produto: o nome da empresa entra no título. */
+  empresa?: string | null;
+  usados: string;
+  limite: string;
+}): string {
+  const deQuem = a.empresa?.trim() ? `*${a.empresa.trim()}:* ` : "";
+  const uso = `Uso do mês: ${a.usados} de ${a.limite} tokens.`;
+  if (a.nivel === "aviso") {
+    return [
+      `⚠️ ${deQuem}*IA em 80% do limite do mês*`,
+      uso,
+      "Ao chegar no limite, a IA para de responder até o mês virar ou o limite ser aumentado.",
+    ].join("\n\n");
+  }
+  return [
+    `⛔ ${deQuem}*Limite de IA do mês atingido*`,
+    uso,
+    "A IA parou de responder no WhatsApp até o mês virar ou o limite ser aumentado. As mensagens continuam chegando no CRM e o time pode responder por lá.",
+  ].join("\n\n");
 }
 
 export const TEXTO_TESTE_AVISO =

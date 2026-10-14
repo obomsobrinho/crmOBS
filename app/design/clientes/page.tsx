@@ -1,4 +1,5 @@
 import NavRail from "@/components/NavRail";
+import BannerLimiteIa from "@/components/BannerLimiteIa";
 import FichaContato from "@/components/FichaContato";
 import ListaClientes from "@/components/ListaClientes";
 import { Card } from "@/components/ui/card";
@@ -9,7 +10,8 @@ import { diasSemContato, montarClientes, type ContatoClienteRow, type ConversaCl
 
 // Preview da tela de CLIENTES (dev-only, liberado pelo proxy). Sem banco.
 // `?cenario=historico|nova|vazia` troca a conta; `?sel={id}` abre uma ficha
-// (sem `sel`, a coluna da ficha mostra o vazio "Escolha um cliente").
+// (sem `sel`, a coluna da ficha mostra o vazio "Escolha um contato").
+// `?ia=parada` mostra a faixa do teto de IA do mês (P1 item 6), como no app.
 export const dynamic = "force-dynamic";
 
 const D = 86_400_000;
@@ -17,9 +19,9 @@ const D = 86_400_000;
 export default async function DesignClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cenario?: string; sel?: string }>;
+  searchParams: Promise<{ cenario?: string; sel?: string; ia?: string }>;
 }) {
-  const { cenario = "historico", sel } = await searchParams;
+  const { cenario = "historico", sel, ia } = await searchParams;
   const agora = agoraMs();
   const iso = (ms: number) => new Date(agora - ms).toISOString();
 
@@ -93,6 +95,8 @@ export default async function DesignClientesPage({
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="O Bom Sobrinho" activeHref="/clientes" role="dono" />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
+      {ia === "parada" && <BannerLimiteIa />}
       <div className="flex min-h-0 min-w-0 flex-1 md:gap-3">
         <ListaClientes
           inicial={{
@@ -140,10 +144,11 @@ export default async function DesignClientesPage({
             </AreaRolavel>
           ) : (
             <div data-clientes-vazio className="flex flex-1 items-center justify-center p-6 text-center text-apoio text-ink-2">
-              Escolha um cliente na lista para ver e completar o cadastro.
+              Escolha um contato na lista para ver e completar o cadastro.
             </div>
           )}
         </Card>
+      </div>
       </div>
     </div>
   );

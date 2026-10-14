@@ -63,7 +63,7 @@ export default async function ClientePage({
           className="inline-flex items-center gap-1.5 text-apoio font-semibold text-ink-2"
         >
           <ArrowLeft size={16} />
-          Clientes
+          Contatos
         </Link>
       </div>
       <AreaRolavel className="min-h-0 flex-1">

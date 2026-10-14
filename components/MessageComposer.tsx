@@ -110,6 +110,9 @@ export default function MessageComposer({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);
+  // Recusa de uma nota ou orientação (ex.: a IA parada no limite de uso do
+  // mês, P1 item 6): o texto fica no campo e a frase diz o que fazer.
+  const [erroAcao, setErroAcao] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const canSend = !!text.trim() && !saving;
 
@@ -127,6 +130,7 @@ export default function MessageComposer({
     // Nota e orientação gravam no banco antes de limpar: se falhar, o que a
     // pessoa escreveu continua no campo em vez de sumir sem aviso.
     setSaving(true);
+    setErroAcao(null);
     void Promise.resolve(action(t))
       .then(() => {
         setText("");
@@ -135,6 +139,9 @@ export default function MessageComposer({
         // pílula, e a próxima coisa escrita quase sempre é para o cliente.
         setMode("responder");
       })
+      .catch((e: unknown) =>
+        setErroAcao(e instanceof Error && e.message ? e.message : "Não foi possível agora. Tente de novo.")
+      )
       .finally(() => setSaving(false));
   };
 
@@ -250,6 +257,11 @@ export default function MessageComposer({
       {attachError && (
         <Aviso tom="danger" className="mx-auto mb-2 w-full max-w-[960px]">
           {attachError}
+        </Aviso>
+      )}
+      {erroAcao && (
+        <Aviso tom="danger" data-erro-acao="" role="alert" className="mx-auto mb-2 w-full max-w-[960px]">
+          {erroAcao}
         </Aviso>
       )}
 

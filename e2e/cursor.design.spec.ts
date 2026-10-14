@@ -14,6 +14,7 @@ const ROTAS = [
   "/design",
   "/design?lista=1",
   "/design?handoff=aberto",
+  "/design/admin",
   "/design/agente",
   "/design/assinatura",
   "/design/bloqueio",

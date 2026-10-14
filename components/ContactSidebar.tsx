@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
-import { Input } from "@/components/ui/input";
+import { CampoBusca } from "@/components/ui/campo-busca";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -513,17 +513,13 @@ export default function ContactSidebar({
             chips não (são quatro, com contagem, e reenvolvem). Com os chips em
             cima, a busca mudava de altura conforme a fila enchia, e o cabeçalho
             inteiro pulava. Embaixo, quem reflui é a última coisa da faixa. */}
-        <div className="mt-[11px] flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line">
-          <Search size={15} className="shrink-0 text-ink-faint" />
-          <Input
-            variant="limpo"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar nome ou mensagem"
-            aria-label="Buscar conversas e mensagens"
-            className="text-apoio"
-          />
-        </div>
+        <CampoBusca
+          className="mt-[11px]"
+          valor={query}
+          aoMudar={setQuery}
+          placeholder="Buscar nome ou mensagem"
+          rotulo="Buscar conversas e mensagens"
+        />
 
         {/* CHIPS de filtro (desenho de 18/09/2026), no lugar do menu suspenso.
             O menu escondia o recorte atrás de um clique e, pior, escondia a

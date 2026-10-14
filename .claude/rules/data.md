@@ -34,6 +34,7 @@ Floor rules (pagination, tenant scope, service_role, SQL parity) are in `enginee
 - Invite/remove member goes through `app/api/team/*` (service_role, owner only). `pipeline_stages` management is a browser write, owner only (RLS `role='dono'`); moving a card is any member.  (why: docs/adr/undated-tenant-isolation-pool-rls.md)
 - Phase 2 tables (`conversation_qualifications`, `knowledge_documents`, `knowledge_chunks`, buckets `knowledge`, `whatsapp-media`) are read by `authenticated` through tenant RLS and written by `service_role` only.
 - `feedback` is write-only from the browser: no SELECT policy, no SELECT grant. Read by SQL only; no read screen.  (why: docs/adr/2026-08-28-feedback-table-write-only.md)
+- `consumo_ia_mensal` (tokens and notice marks) and `admin_acoes`: RLS on, no policy, nothing for `anon`/`authenticated`; service_role only (also the functions `somar_consumo_ia`, `reivindicar_aviso_consumo`, `liberar_aviso_consumo`, `admin_mudar_limite_ia`, `admin_empresas_pagina`). `clients.ia_limite_tokens` is readable by the tenant through the table SELECT grant and RLS (harmless: its own cap) and written only by `admin_mudar_limite_ia`.  (why: docs/adr/2026-10-13-ai-usage-cap-in-tokens.md)
 - `signup_attempts`: RLS on, no policy, revoked; service_role only.  (why: docs/adr/undated-signup-without-password-and-provision-tenant.md)
 
 ## Contacts, photos, pipeline
@@ -44,5 +45,5 @@ Floor rules (pagination, tenant scope, service_role, SQL parity) are in `enginee
 - Who replied (AI / human / imported) is decided ONLY in `lib/mensagem.ts`; `imported` is not an AI reply; SQL uses `is distinct from`, not `<>`.  (why: docs/adr/2026-08-27-dashboard-imported-is-not-ai-reply.md)
 
 ## Env (server-only, never `NEXT_PUBLIC`)
-`SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` (GLOBAL apikey), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`, `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` (sent as `x-webhook-secret` by `headersN8n`, `lib/n8n.ts`; every app call to an n8n webhook uses it), `OPENAI_API_KEY`, `OPENAI_AGENT_MODEL` (optional, default `gpt-5.4-mini`). Billing envs in `billing.md`.
+`SUPABASE_SERVICE_ROLE_KEY`, `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` (GLOBAL apikey), `N8N_BOT_WEBHOOK_URL`, `N8N_SEND_WEBHOOK_URL`, `N8N_LOOKUP_SECRET`, `N8N_IA_SEND_WEBHOOK_URL`, `N8N_WEBHOOK_SECRET` (sent as `x-webhook-secret` by `headersN8n`, `lib/n8n.ts`; every app call to an n8n webhook uses it), `OPENAI_API_KEY`, `OPENAI_AGENT_MODEL` (optional, default `gpt-5.4-mini`), `ADMIN_USER_IDS` (comma-separated `auth.users.id` of the product owner; without it `/admin` is 404 for everyone; see `admin.md`). Billing envs in `billing.md`.
 - Knowledge base upload goes straight to Storage by signed URL (`knowledge/upload-url`) and processing is a separate call (`knowledge/process`), to fit the Vercel request body limit. Never stream the file through a route handler.

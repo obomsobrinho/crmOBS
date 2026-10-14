@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { TurnDiagnostics } from "@/lib/agent-diagnostics";
 import type { Handoff } from "../HandoffCard";
 import { SOLUCAO_DA_PORTA, type Solucao } from "@/lib/solucoes";
+import { TEXTO_LIMITE_ATINGIDO, TEXTO_LIMITE_ATINGIDO_DETALHE } from "@/lib/custo-ia";
 import { esperar, historico, pausaDigitando } from "./apoio";
 import type { ApiResult, ConfiguracaoEmEdicao, PlaygroundTurn } from "./tipos";
 import { useColadoNoFim } from "./useColadoNoFim";
@@ -120,6 +121,12 @@ export function useConversaDeTeste({
       setPensando(false);
     }
     const { output, diagnostics } = res;
+    // TETO DE IA DO MÊS (P1 item 6): a empresa parada fica parada também na
+    // bancada, e aqui o motivo aparece no lugar do erro (a mensagem de teste
+    // volta para o campo, como em qualquer falha do agente).
+    if (diagnostics.limiteIa) {
+      throw new Error(`${TEXTO_LIMITE_ATINGIDO}. ${TEXTO_LIMITE_ATINGIDO_DETALHE}`);
+    }
     // O servidor decide pela MESMA regra do atendimento (`pedidoNaFila`).
     if (diagnostics.pedidoNaFila) {
       setPedidos((prev) => [

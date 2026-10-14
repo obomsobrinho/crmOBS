@@ -6,6 +6,8 @@ import { fecharPedido } from "@/lib/handoffs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { telefoneImpossivel } from "@/lib/avisos";
 import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
+import { estadoDaEmpresaNoMes } from "@/lib/consumo-ia";
+import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
 // ORIENTAR UM PEDIDO DE AJUDA É RESOLVÊ-LO, E A IA RESPONDE NA HORA
 // (27/09/2026, pedido do dono testando com o chip: "se eu já orientei, esse
@@ -51,6 +53,13 @@ export async function POST(req: Request) {
 
   const svc = createServiceClient();
   const agora = new Date().toISOString();
+
+  // TETO DE IA DO MÊS (P1 item 6): com a IA parada no limite, a retomada não
+  // aconteceria e o pedido fecharia sem resposta a ninguém. Recusa ANTES de
+  // fechar: o pedido continua aberto e a tela diz o que fazer.
+  if ((await estadoDaEmpresaNoMes(svc, client.id, Date.now())) === "parado") {
+    return NextResponse.json({ error: TEXTO_ORIENTAR_NO_LIMITE, motivo: "limite_ia" }, { status: 409 });
+  }
 
   // 1. Fecha O pedido que a caixa mostrava (o mais antigo da fila, ou o
   // `pedidoId` que veio da tela). O tenant vem da sessão, nunca do corpo.
@@ -129,8 +138,9 @@ async function responderAgora(
   if (telefoneImpossivel(phone)) return { ok: false, motivo: "telefone_de_teste" };
 
   let messages: string[];
+  let limiteIa = false;
   try {
-    const { output } = await processTurn({
+    const { output, diagnostics } = await processTurn({
       clientId,
       phone,
       message: "",
@@ -138,11 +148,13 @@ async function responderAgora(
       retomada: { instruction },
     });
     messages = output.messages;
+    limiteIa = diagnostics.limiteIa === true;
   } catch (e) {
     console.error("falha no turno de retomada:", e);
     return { ok: false, motivo: "modelo_falhou" };
   }
-  // Turno silencioso: agente desligado ou conta bloqueada.
+  // Turno silencioso: teto de IA do mês (P1 item 6), agente desligado ou conta bloqueada.
+  if (limiteIa) return { ok: false, motivo: "limite_ia" };
   if (messages.length === 0) return { ok: false, motivo: "agente_desligado" };
 
   try {

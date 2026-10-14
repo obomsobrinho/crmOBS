@@ -137,16 +137,16 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(page.locator('[data-slot="clientes-total"]')).toHaveText("17");
     await rolarAteOFim(page);
     await expect(itens).toHaveCount(17);
-    await expect(page.locator("[data-clientes-vazio]")).toContainText("Escolha um cliente");
+    await expect(page.locator("[data-clientes-vazio]")).toContainText("Escolha um contato");
 
-    const busca = page.getByLabel("Buscar clientes");
+    const busca = page.getByLabel("Buscar contatos");
     await busca.fill("souza");
     await expect(itens).toHaveCount(1);
     await expect(itens.first()).toContainText("Marina Souza");
     await busca.fill("98477");
     await expect(itens).toHaveCount(1);
     await busca.fill("ninguem com esse nome");
-    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Nenhum cliente para");
+    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Nenhum contato para");
     await page.getByLabel("Limpar busca").click();
 
     await page.locator('[data-slot="clientes-chip"]', { hasText: "Em conversa" }).click();
@@ -159,7 +159,7 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(itens).toHaveCount(14);
 
     await page.goto("/design/clientes?cenario=vazia");
-    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ainda não há clientes");
+    await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ainda não há contatos");
     await page.goto("/design/clientes?cenario=nova");
     await expect(itens).toHaveCount(3);
   });
@@ -300,7 +300,7 @@ test.describe("Novo cliente e primeira mensagem (/design/clientes)", () => {
 
   test("busca por número sem resultado oferece cadastrar com o número preenchido", async ({ page }) => {
     await page.goto("/design/clientes");
-    await page.getByLabel("Buscar clientes").fill("11 97777-0000");
+    await page.getByLabel("Buscar contatos").fill("11 97777-0000");
     await page.locator('[data-slot="clientes-vazio-novo"]').click();
     await expect(page.locator('[data-slot="novo-cliente"] [data-campo="telefone"]')).toHaveValue("(11) 97777-0000");
   });

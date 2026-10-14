@@ -55,6 +55,21 @@ test.describe("Atendente", () => {
     // e2e/regras-salvas.design.spec.ts).
   });
 
+  test("não enxerga o /admin: página e rotas respondem 404 (P1 item 6)", async ({ page }) => {
+    // Admin é só quem está em ADMIN_USER_IDS (lib/admin-acesso.ts); o atendente
+    // nunca está. 404 e não 403, para nem revelar que existe. Só leitura e uma
+    // escrita que tem de ser RECUSADA antes de tocar o banco.
+    const pagina = await page.goto("/admin");
+    expect(pagina?.status()).toBe(404);
+    const lista = await page.request.get("/api/admin/empresas");
+    expect(lista.status()).toBe(404);
+    const { clientId } = await tenantDeTeste(servico());
+    const editar = await page.request.put(`/api/admin/empresas/${clientId}/limite`, {
+      data: { limite: 1 },
+    });
+    expect(editar.status()).toBe(404);
+  });
+
   test("não gerencia o funil", async ({ page }) => {
     await page.goto("/pipeline");
     // A tela abre: mover card é liberado a qualquer membro do tenant.

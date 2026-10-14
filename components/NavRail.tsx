@@ -68,7 +68,7 @@ const NAV: {
   // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
-  { href: "/clientes", label: "Clientes", icon: BookUser },
+  { href: "/clientes", label: "Contatos", icon: BookUser },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:

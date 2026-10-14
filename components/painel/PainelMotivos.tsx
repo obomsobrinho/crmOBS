@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Medidor } from "@/components/ui/medidor";
 import { CheckCircle2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ORDEM_PERIODOS, PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
@@ -77,12 +78,7 @@ export default function PainelMotivos({
                   {it.n}
                 </span>
               </span>
-              <span aria-hidden className="h-1.5 w-full overflow-hidden rounded-full bg-bloco">
-                <span
-                  className={`block h-full rounded-full ${it.motivo ? "bg-brand" : "bg-line-strong"}`}
-                  style={{ width: `${(it.n / maior) * 100}%` }}
-                />
-              </span>
+              <Medidor valor={(it.n / maior) * 100} tom={it.motivo ? "marca" : "neutro"} />
             </li>
           ))}
         </ul>

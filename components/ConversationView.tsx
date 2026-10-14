@@ -15,6 +15,7 @@ import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
 import type { Json } from "@/lib/database.types";
 import type { ChatRow } from "@/lib/types";
+import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
 // Compõe a thread + o painel de contexto. Dono do estado da IA
 // (atendimento_ia) para que header e painel fiquem sempre sincronizados —
@@ -246,7 +247,13 @@ export default function ConversationView({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, instruction: text, pedidoId }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        // A IA parada no limite de uso do mês (P1 item 6): o pedido segue
+        // aberto e a caixa de escrita mostra a frase (o texto fica no campo).
+        const erro = (await res.json().catch(() => ({}))) as { motivo?: string; error?: string };
+        if (erro.motivo === "limite_ia") throw new Error(erro.error ?? TEXTO_ORIENTAR_NO_LIMITE);
+        return;
+      }
       const data = (await res.json()) as { enviado?: boolean };
       setIaState("ativa");
       setAssigned(null);

@@ -3,9 +3,20 @@ import NavRail from "@/components/NavRail";
 import AvisoMontagem from "@/components/AvisoMontagem";
 import BillingBanner from "@/components/BillingBanner";
 import WhatsAppBanner from "@/components/WhatsAppBanner";
+import BannerLimiteIa from "@/components/BannerLimiteIa";
+import { Suspense } from "react";
 import { getMyClient } from "@/lib/auth";
+import { estadoDoConsumoDoTenant } from "@/lib/consumo-ia";
+import { agoraMs } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
+
+// A faixa do teto de IA lê o mês no servidor (service_role, lib/consumo-ia.ts)
+// e só aparece com a IA parada (`estadoDoConsumo`, lib/custo-ia.ts).
+async function FaixaLimiteIa({ clientId }: { clientId: string }) {
+  const estado = await estadoDoConsumoDoTenant(clientId, agoraMs());
+  return estado === "parado" ? <BannerLimiteIa /> : null;
+}
 
 // Shell autenticado: nav rail + área de conteúdo. Compartilhado por
 // Conversas (/inbox), Agente (/agente) e Perfil (/perfil).
@@ -59,6 +70,12 @@ export default async function AppLayout({
             WhatsApp não caiu, ele ainda não existe, e quem diz isso é a linha
             da montagem logo abaixo (um sinal por fato). */}
         {client.evolution_instance && <WhatsAppBanner clientId={client.id} />}
+        {/* Teto de IA do mês (P1 item 6): a empresa parada no limite vê a
+            faixa em toda página. Em Suspense para nunca segurar a navegação:
+            são duas leituras pela chave primária, no servidor. */}
+        <Suspense fallback={null}>
+          <FaixaLimiteIa clientId={client.id} />
+        </Suspense>
         {/* Porta de volta para a montagem: uma linha, em toda página, até o
             agente ir ao ar. NÃO conta passos, porque o único contador da conta
             mora dentro do assistente.

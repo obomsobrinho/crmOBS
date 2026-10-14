@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_acoes: {
+        Row: {
+          acao: string
+          alvo: string | null
+          antes: Json | null
+          depois: Json | null
+          em: string
+          id: number
+          quem: string
+        }
+        Insert: {
+          acao: string
+          alvo?: string | null
+          antes?: Json | null
+          depois?: Json | null
+          em?: string
+          id?: never
+          quem: string
+        }
+        Update: {
+          acao?: string
+          alvo?: string | null
+          antes?: Json | null
+          depois?: Json | null
+          em?: string
+          id?: never
+          quem?: string
+        }
+        Relationships: []
+      }
       agent_publications: {
         Row: {
           client_id: string
@@ -233,6 +263,7 @@ export type Database = {
           created_at: string
           evolution_instance: string | null
           grace_until: string | null
+          ia_limite_tokens: number | null
           id: string
           imported_at: string | null
           name: string
@@ -259,6 +290,7 @@ export type Database = {
           created_at?: string
           evolution_instance?: string | null
           grace_until?: string | null
+          ia_limite_tokens?: number | null
           id?: string
           imported_at?: string | null
           name: string
@@ -285,6 +317,7 @@ export type Database = {
           created_at?: string
           evolution_instance?: string | null
           grace_until?: string | null
+          ia_limite_tokens?: number | null
           id?: string
           imported_at?: string | null
           name?: string
@@ -297,6 +330,47 @@ export type Database = {
           trial_ends_at?: string | null
         }
         Relationships: []
+      }
+      consumo_ia_mensal: {
+        Row: {
+          atualizado_em: string
+          aviso_100_em: string | null
+          aviso_80_em: string | null
+          client_id: string
+          mes: string
+          tokens_cache: number
+          tokens_entrada: number
+          tokens_saida: number
+        }
+        Insert: {
+          atualizado_em?: string
+          aviso_100_em?: string | null
+          aviso_80_em?: string | null
+          client_id: string
+          mes: string
+          tokens_cache?: number
+          tokens_entrada?: number
+          tokens_saida?: number
+        }
+        Update: {
+          atualizado_em?: string
+          aviso_100_em?: string | null
+          aviso_80_em?: string | null
+          client_id?: string
+          mes?: string
+          tokens_cache?: number
+          tokens_entrada?: number
+          tokens_saida?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumo_ia_mensal_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_notes: {
         Row: {
@@ -910,6 +984,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_empresas_pagina: {
+        Args: {
+          p_busca?: string
+          p_cursor_id?: string
+          p_cursor_nome?: string
+          p_limite?: number
+          p_mes: string
+        }
+        Returns: {
+          account_type: string
+          agent_enabled: boolean
+          agent_published_at: string
+          billing_plan: string
+          ia_limite_tokens: number
+          id: string
+          name: string
+          tokens_cache: number
+          tokens_entrada: number
+          tokens_saida: number
+          ultima_atividade: string
+        }[]
+      }
+      admin_mudar_limite_ia: {
+        Args: {
+          p_client: string
+          p_limiar_aviso: number
+          p_limiar_parado: number
+          p_limite: number
+          p_mes: string
+          p_quem: string
+        }
+        Returns: {
+          antes: number
+          depois: number
+        }[]
+      }
       chat_resumo_conversa: {
         Args: { p_phone: string }
         Returns: {
@@ -1011,6 +1121,10 @@ export type Database = {
           trecho: string
           unread_count: number
         }[]
+      }
+      liberar_aviso_consumo: {
+        Args: { p_client: string; p_mes: string; p_nivel: string }
+        Returns: undefined
       }
       match_knowledge_chunks: {
         Args: {
@@ -1200,7 +1314,27 @@ export type Database = {
         }
         Returns: string
       }
+      reivindicar_aviso_consumo: {
+        Args: { p_client: string; p_mes: string; p_nivel: string }
+        Returns: boolean
+      }
       sem_acento: { Args: { t: string }; Returns: string }
+      somar_consumo_ia: {
+        Args: {
+          p_cache: number
+          p_client: string
+          p_entrada: number
+          p_mes: string
+          p_saida: number
+        }
+        Returns: {
+          aviso_100_em: string
+          aviso_80_em: string
+          tokens_cache: number
+          tokens_entrada: number
+          tokens_saida: number
+        }[]
+      }
       tenant_members: {
         Args: never
         Returns: {
