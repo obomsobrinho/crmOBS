@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import { getMyClient } from "@/lib/auth";
+import { barrarContaDesativada, getMyClient } from "@/lib/auth";
 
 export default async function Home() {
   const client = await getMyClient();
   // O proxy já redireciona quem não está logado; aqui tratamos o caso raro de
   // usuário autenticado sem tenant vinculado.
   if (!client) redirect("/login");
+  barrarContaDesativada(client);
   // Dono que ainda não colocou o agente no ar cai no ASSISTENTE, mesmo já tendo
   // conectado: enquanto a montagem não termina, ela É o trabalho. O assistente
   // retoma no passo certo sozinho (`montagemState`).

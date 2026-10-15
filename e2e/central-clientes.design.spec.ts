@@ -27,14 +27,18 @@ test.describe("Central: lista de Clientes (/design/clientes)", () => {
     const itens = page.locator('[data-slot="central-cliente"]');
     await expect(itens).toHaveCount(10);
     await page.locator('[data-slot="central-mais"]').scrollIntoViewIfNeeded();
-    await expect(itens).toHaveCount(17);
+    await expect(itens).toHaveCount(20);
+    // 20 é múltiplo de 10: a segunda página veio cheia, então ainda se pede uma
+    // terceira, que volta vazia e encerra a lista.
+    await page.locator('[data-slot="central-mais"]').scrollIntoViewIfNeeded();
     await expect(page.locator('[data-slot="central-mais"]')).toHaveCount(0);
+    await expect(itens).toHaveCount(20);
   });
 
   test("situação, plano e alerta de cada cliente", async ({ page }) => {
     await page.goto("/design/clientes");
     await page.locator('[data-slot="central-mais"]').scrollIntoViewIfNeeded();
-    await expect(page.locator('[data-slot="central-cliente"]')).toHaveCount(17);
+    await expect(page.locator('[data-slot="central-cliente"]')).toHaveCount(20);
 
     const ze = cliente(page, "Barbearia do Zé");
     await expect(ze.locator('[data-slot="admin-situacao"]')).toHaveText("Ativo");
@@ -223,7 +227,7 @@ test.describe("Central: detalhe de um cliente", () => {
     const cab = page.locator('[data-slot="central-detalhe"]');
     await expect(cab.locator('[data-slot="admin-situacao"]').first()).toHaveText("Em teste");
     await expect(cab.locator('[data-slot="admin-alerta"]').first()).toHaveText("Perto do limite de IA");
-    await expect(page.getByRole("tab")).toHaveText(["Visão geral", "Uso de IA", "Atendimento"]);
+    await expect(page.getByRole("tab")).toHaveText(["Visão geral", "Uso de IA", "Atendimento", "Financeiro", "Ações"]);
     await expect(page.getByRole("tab", { name: "Visão geral" })).toHaveAttribute("aria-selected", "true");
   });
 

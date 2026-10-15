@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
@@ -15,9 +16,13 @@ import {
   fonteDoClienteDaMemoria,
   type FonteDoCliente,
   type PreviewDoCliente,
+  type RespostaDoApagar,
 } from "@/lib/admin-cliente-fonte";
+import type { PedidoDeAcao } from "@/lib/admin-conta";
 import { alertasDaEmpresa, comLimite } from "@/lib/admin-empresas";
 import AbaVisaoGeral from "@/components/admin/AbaVisaoGeral";
+import AbaFinanceiro from "@/components/admin/AbaFinanceiro";
+import AbaAcoes from "@/components/admin/AbaAcoes";
 import { AvatarCliente, ChipAlerta, SeloSituacao, linhaDoPlano } from "@/components/admin/pecas";
 
 // O diálogo do limite só pesa quando o dono clica em editar (chunk à parte). As abas de gráfico
@@ -50,6 +55,10 @@ export default function DetalheCliente({
   const [visitadas, setVisitadas] = useState<Set<AbaDoCliente>>(() => new Set([abaInicial]));
   const [editando, setEditando] = useState(false);
   const [whatsapp, setWhatsapp] = useState<EstadoDoWhatsApp | null>(null);
+  const [financeiro, setFinanceiro] = useState(detalhe.financeiro);
+  /** A última ação da conta: o texto que aparece no topo (feito, ou preview). */
+  const [recado, setRecado] = useState<string | null>(null);
+  const [apagado, setApagado] = useState<Extract<RespostaDoApagar, { ok: true }> | null>(null);
 
   const fonte = useMemo<FonteDoCliente>(
     () => (preview ? fonteDoClienteDaMemoria(preview) : fonteDoClienteDaApi(detalhe.empresa.id)),
@@ -79,10 +88,64 @@ export default function DetalheCliente({
   );
   const principal = alertas[0];
 
+  /**
+   * Uma ação do Financeiro ou das Ações: a rota grava (uma transação com
+   * `admin_acoes`) e devolve o cliente relido; a tela troca o que mostra. No
+   * preview nada é gravado e o recado diz isso.
+   */
+  const executar = useCallback(
+    async (pedido: PedidoDeAcao): Promise<string | null> => {
+      const r = await fonte.mudarConta(pedido);
+      if (!r.ok) return r.erro;
+      if ("simulado" in r) {
+        setRecado("Preview: nada foi gravado.");
+        return null;
+      }
+      if ("recarregue" in r) {
+        setRecado("Feito e registrado. Recarregue a página para ver o estado novo.");
+        return null;
+      }
+      setEmpresa(r.empresa);
+      setFinanceiro(r.financeiro);
+      setRecado("Feito. A ação ficou registrada.");
+      return null;
+    },
+    [fonte],
+  );
+
   function mudarAba(v: string) {
     if (!ehAbaDoCliente(v)) return;
     setAba(v);
     setVisitadas((cur) => (cur.has(v) ? cur : new Set(cur).add(v)));
+  }
+
+  if (apagado) {
+    return (
+      <Card asChild variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <section aria-label={`Cliente ${empresa.nome} apagado`} data-slot="central-apagado" className="p-5">
+          <h1 className="text-titulo">{apagado.simulado ? "Preview: nada foi apagado" : `${empresa.nome} foi apagado`}</h1>
+          <p className="mt-2 text-apoio text-ink-2">
+            O registro do apagamento (quem, quando, nome e id do cliente) ficou guardado.
+          </p>
+          {apagado.pendencias.length > 0 && (
+            <Aviso tom="warn" className="mt-3" data-slot="central-apagado-pendencias">
+              <p className="font-semibold">Falta resolver à mão:</p>
+              <ul className="mt-1 list-disc pl-5">
+                {apagado.pendencias.map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
+            </Aviso>
+          )}
+          <Button asChild variant="outline" size="control" className="mt-4">
+            <Link href={hrefLista}>
+              <ArrowLeft size={14} />
+              Voltar para Clientes
+            </Link>
+          </Button>
+        </section>
+      </Card>
+    );
   }
 
   return (
@@ -119,7 +182,18 @@ export default function DetalheCliente({
               <TabsTrigger value="atendimento" data-slot="central-aba-atendimento-gatilho">
                 Atendimento
               </TabsTrigger>
+              <TabsTrigger value="financeiro" data-slot="central-aba-financeiro-gatilho">
+                Financeiro
+              </TabsTrigger>
+              <TabsTrigger value="acoes" data-slot="central-aba-acoes-gatilho">
+                Ações
+              </TabsTrigger>
             </TabsList>
+            {recado && (
+              <p data-slot="central-recado" role="status" className="mt-2 text-legenda text-ink-3">
+                {recado}
+              </p>
+            )}
           </div>
 
           <AreaRolavel className="min-h-0 flex-1">
@@ -144,6 +218,22 @@ export default function DetalheCliente({
               </TabsContent>
               <TabsContent value="atendimento" forceMount>
                 {visitadas.has("atendimento") && <AbaAtendimento fonte={fonte} />}
+              </TabsContent>
+              <TabsContent value="financeiro" forceMount>
+                {visitadas.has("financeiro") && (
+                  <AbaFinanceiro
+                    empresa={empresa}
+                    financeiro={financeiro}
+                    membros={detalhe.membros}
+                    fonte={fonte}
+                    executar={executar}
+                  />
+                )}
+              </TabsContent>
+              <TabsContent value="acoes" forceMount>
+                {visitadas.has("acoes") && (
+                  <AbaAcoes empresa={empresa} fonte={fonte} executar={executar} onApagado={setApagado} />
+                )}
               </TabsContent>
             </div>
           </AreaRolavel>

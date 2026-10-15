@@ -57,6 +57,9 @@ const conta = (status: string, extra: { trial?: number | null; grace?: number | 
   subscription_status: status,
   trial_ends_at: extra.trial == null ? null : iso(AGORA + extra.trial),
   grace_until: extra.grace == null ? null : iso(AGORA + extra.grace),
+  vitalicio_desde: null as string | null,
+  bloqueado_em: null as string | null,
+  desativada_em: null as string | null,
 });
 
 /** O estado da IA que a lista e o detalhe calculam e entregam prontos aos alertas. */
@@ -114,8 +117,16 @@ test.describe("Situação (lib/admin-alertas.ts, sobre accessState)", () => {
     expect(situacaoDaConta(vencido, AGORA).chave).toBe("teste_encerrado");
   });
 
-  test("os filtros são o status gravado; plano sem nome conhecido é nulo", () => {
-    expect(FILTROS_DE_SITUACAO.map((f) => f.chave)).toEqual(["trialing", "active", "past_due", "canceled"]);
+  test("os filtros mapeiam das situações (que saem do tipo de acesso); plano sem nome conhecido é nulo", () => {
+    expect(FILTROS_DE_SITUACAO.map((f) => f.chave)).toEqual([
+      "vitalicio",
+      "trialing",
+      "active",
+      "past_due",
+      "canceled",
+      "bloqueado",
+      "desativado",
+    ]);
     expect(ehFiltroDeSituacao("active")).toBe(true);
     expect(ehFiltroDeSituacao("lifetime")).toBe(false);
     expect(ehFiltroDeSituacao(null)).toBe(false);
@@ -542,7 +553,9 @@ test.describe("Atendimento (lib/admin-cliente.ts, sobre as contas do painel)", (
     expect(ehPeriodo("ano")).toBe(false);
     expect(ehPeriodo(null)).toBe(false);
     expect(ehAbaDoCliente("uso")).toBe(true);
-    expect(ehAbaDoCliente("financeiro")).toBe(false);
+    expect(ehAbaDoCliente("financeiro")).toBe(true);
+    expect(ehAbaDoCliente("acoes")).toBe(true);
+    expect(ehAbaDoCliente("apagar")).toBe(false);
   });
 });
 
@@ -668,7 +681,11 @@ test.describe("Trava por rota da central", () => {
   const PAGINAS_DA_CENTRAL = ["app/(app)/clientes/[id]/page.tsx", "app/(app)/clientes/page.tsx"];
   const PAGINA_ADMIN = "app/admin/page.tsx";
   const ROTAS = [
+    "app/api/admin/empresas/[id]/apagar/route.ts",
     "app/api/admin/empresas/[id]/atendimento/route.ts",
+    "app/api/admin/empresas/[id]/cobrancas/route.ts",
+    "app/api/admin/empresas/[id]/conta/route.ts",
+    "app/api/admin/empresas/[id]/exportar/route.ts",
     "app/api/admin/empresas/[id]/limite/route.ts",
     "app/api/admin/empresas/[id]/uso/route.ts",
     "app/api/admin/empresas/[id]/whatsapp/route.ts",

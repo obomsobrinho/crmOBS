@@ -10,6 +10,8 @@ import {
   type UsoBruto,
 } from "@/lib/admin-cliente";
 import type { PreviewDoCliente } from "@/lib/admin-cliente-fonte";
+import { financeiroDe, type Cobranca } from "@/lib/admin-conta";
+import { PLAN_ORDER, PLANS } from "@/lib/billing";
 import type { EstadoDoWhatsApp } from "@/lib/admin-alertas";
 import { SERIES_VAZIAS, type JanelaAgregada, type SeriesAgregadas } from "@/lib/painel-agregado";
 import { ORDEM_PERIODOS, type PeriodoKey } from "@/lib/periodo";
@@ -53,6 +55,9 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
     grace_until: null,
     created_at: iso(60 * D),
     tem_instancia: true,
+    vitalicio_desde: null,
+    bloqueado_em: null,
+    desativada_em: null,
     ...extra,
   });
 
@@ -110,6 +115,24 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
       subscription_status: "trialing",
       trial_ends_at: iso(2 * D),
       ultima_atividade: iso(9 * D),
+    }),
+    // 18. Vitalício (teste vencido por baixo: a marca vence o estado gravado).
+    linha(18, "Ateliê Lumière", [700_000, 200_000, 12_000], {
+      subscription_status: "trialing",
+      trial_ends_at: iso(20 * D),
+      vitalicio_desde: iso(10 * D),
+    }),
+    // 19. Bloqueio manual do dono do produto (assinatura ativa por baixo).
+    linha(19, "Padaria Pão Quente", [200_000, 50_000, 4_000], {
+      billing_plan: "essencial",
+      bloqueado_em: iso(2 * D),
+    }),
+    // 20. Desativada: nada entra; pronta para "Apagar de vez".
+    linha(20, "Academia Força", [0, 0, 0], {
+      subscription_status: "trialing",
+      trial_ends_at: iso(30 * D),
+      ultima_atividade: iso(40 * D),
+      desativada_em: iso(5 * D),
     }),
     ...Array.from({ length: 8 }, (_, i) =>
       linha(10 + i, `Cliente de exemplo ${String(i + 1).padStart(2, "0")}`, [300_000 * (i + 1), 100_000, 5_000 * (i + 1)], {
@@ -245,15 +268,35 @@ function atendimentoFalso(agora: number, vazio: boolean): AtendimentoPorPeriodo 
   });
 }
 
-export function previewDoCliente(agora: number, whatsapp: EstadoDoWhatsApp, vazio: boolean): PreviewDoCliente {
+/** O único cliente falso com assinatura no Asaas (para a aba Financeiro). */
+const COM_ASSINATURA = "Estúdio Aurora";
+
+function cobrancasFalsas(e: EmpresaItem, agora: number): Cobranca[] | null {
+  if (e.nome !== COM_ASSINATURA) return null;
+  const dia = (d: number) => diaIsoSP(agora - d * D);
+  return [
+    { vencimento: dia(2), valor: 347, status: "OVERDUE" },
+    { vencimento: dia(32), valor: 347, status: "RECEIVED" },
+    { vencimento: dia(62), valor: 347, status: "RECEIVED" },
+  ];
+}
+
+export function previewDoCliente(
+  e: EmpresaItem,
+  agora: number,
+  whatsapp: EstadoDoWhatsApp,
+  vazio: boolean
+): PreviewDoCliente {
   return {
     uso: usoParaTela(usoFalso(agora, vazio), agora, MODELO),
     atendimento: atendimentoFalso(agora, vazio),
     whatsapp,
+    cobrancas: cobrancasFalsas(e, agora),
   };
 }
 
 export function detalheFalso(e: EmpresaItem, agora: number): DetalheDoCliente {
+  const asaas = e.nome === COM_ASSINATURA;
   return {
     empresa: e,
     agora,
@@ -261,5 +304,14 @@ export function detalheFalso(e: EmpresaItem, agora: number): DetalheDoCliente {
     avisosConfigurados: e.publicada,
     donoEmail: `dono@${e.nome.toLowerCase().replace(/[^a-z0-9]+/g, "")}.exemplo`,
     membros: e.nome === "Barbearia do Zé" ? 3 : 1,
+    // Pela MESMA função do servidor (`financeiroDe`): os ids saem mascarados.
+    financeiro: financeiroDe({
+      billing_plan: PLAN_ORDER.find((k) => PLANS[k].name === e.plano) ?? null,
+      billing_provider: asaas ? "asaas" : null,
+      billing_customer_id: asaas ? "cus_000000aurora" : null,
+      billing_subscription_id: asaas ? "sub_00000000aur1" : null,
+      billing_seats: asaas ? 2 : null,
+      billing_updated_at: asaas ? new Date(agora - 3 * D).toISOString() : null,
+    }),
   };
 }

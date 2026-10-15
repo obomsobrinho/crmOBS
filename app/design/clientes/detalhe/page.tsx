@@ -8,9 +8,9 @@ import { agoraMs } from "@/lib/periodo";
 
 // Preview do detalhe de um cliente da central do dono (dev-only). Sem banco e sem
 // sessão. Parâmetros: `cliente` (id falso; padrão o primeiro), `aba`
-// (`visao`, `uso`, `atendimento`), `whatsapp` (`conectado`, `reconectando`, `desconectado`,
-// `desconhecido`) e `vazio=1` (sem uso e sem atendimento). Editar o limite
-// valida e não grava.
+// (`visao`, `uso`, `atendimento`, `financeiro`, `acoes`), `whatsapp` (`conectado`, `reconectando`, `desconectado`,
+// `desconhecido`) e `vazio=1` (sem uso e sem atendimento). Editar o limite e as
+// ações do Financeiro e das Ações validam e não gravam.
 export const dynamic = "force-dynamic";
 
 export default async function DesignDetalheClientePage({
@@ -34,7 +34,7 @@ export default async function DesignDetalheClientePage({
           key={`${e.id}-${aba ?? ""}`}
           detalhe={detalheFalso(e, agora)}
           abaInicial={ehAbaDoCliente(aba) ? aba : "visao"}
-          preview={previewDoCliente(agora, estado, vazio === "1")}
+          preview={previewDoCliente(e, agora, estado, vazio === "1")}
           hrefLista="/design/clientes"
         />
       </div>

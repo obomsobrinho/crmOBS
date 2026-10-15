@@ -17,6 +17,9 @@ const BLOQUEADA = accessState({
   subscription_status: "past_due",
   trial_ends_at: null,
   grace_until: "2026-08-05T12:00:00.000Z",
+  vitalicio_desde: null,
+  bloqueado_em: null,
+  desativada_em: null,
 });
 
 export default function DesignBloqueioPage() {

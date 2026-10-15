@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMyClient } from "@/lib/auth";
+import { barrarContaDesativada, getMyClient } from "@/lib/auth";
 import { fetchMembers } from "@/lib/team";
 import { createServiceClient } from "@/lib/supabase/service";
 import SubscriptionPanel from "@/components/SubscriptionPanel";
@@ -33,6 +33,7 @@ export default async function AssinaturaPage({
 }) {
   const client = await getMyClient();
   if (!client) redirect("/login");
+  barrarContaDesativada(client);
 
   const supabase = await createClient();
   const {

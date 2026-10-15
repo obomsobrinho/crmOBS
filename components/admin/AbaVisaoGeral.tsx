@@ -9,23 +9,12 @@ import { usdCurto } from "@/lib/custo-ia";
 import { montagemTerminada } from "@/lib/onboarding";
 import type { Alerta, EstadoDoWhatsApp } from "@/lib/admin-alertas";
 import type { DetalheDoCliente } from "@/lib/admin-cliente";
-import { ChipAlerta, EstadoIa, MedidorDoLimite, textoDoAgente } from "@/components/admin/pecas";
+import { ChipAlerta, Dado, EstadoIa, MedidorDoLimite, textoDoAgente } from "@/components/admin/pecas";
 
 // ABA "VISÃO GERAL" do detalhe de um cliente (central do dono, entrega 1): quem é
 // o cliente, em que ponto da montagem está, como está o agente e o WhatsApp e o
 // que pede atenção. Tudo vem pronto: o texto e o tom dos alertas são de
 // `lib/admin-alertas.ts`, o estado da IA de `lib/custo-ia.ts`.
-
-function Dado({ rotulo, children, slot }: { rotulo: string; children: React.ReactNode; slot?: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-2 last:border-b-0">
-      <dt className="text-apoio text-ink-3">{rotulo}</dt>
-      <dd data-slot={slot} className="min-w-0 text-right text-apoio text-ink">
-        {children}
-      </dd>
-    </div>
-  );
-}
 
 const ROTULO_DO_WHATSAPP: Record<EstadoDoWhatsApp, string> = {
   conectado: "Conectado",

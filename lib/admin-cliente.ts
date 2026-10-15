@@ -14,6 +14,7 @@ import { contagemPorMotivo, type ContagemDeMotivo } from "./motivos";
 import { contagemPorSolucao, type ContagemDeSolucao } from "./solucoes";
 import { ORDEM_PERIODOS, PERIODOS, limites, unidadeDoPeriodo, type PeriodoKey } from "./periodo";
 import type { EmpresaItem } from "./admin-empresas";
+import type { FinanceiroDoCliente } from "./admin-conta";
 
 // O DETALHE DE UM CLIENTE NA CENTRAL DO DONO (docs/plano-central-clientes.md,
 // entrega 1): as contas das abas "Uso de IA" e "Atendimento" e o formato dos
@@ -510,10 +511,12 @@ export function atendimentoDe(a: {
 // ---------------------------------------------------------------------------
 
 /** As abas do detalhe (o `aba` da URL e do preview). */
-export type AbaDoCliente = "visao" | "uso" | "atendimento";
+export const ABAS_DO_CLIENTE = ["visao", "uso", "atendimento", "financeiro", "acoes"] as const;
+
+export type AbaDoCliente = (typeof ABAS_DO_CLIENTE)[number];
 
 export function ehAbaDoCliente(v: unknown): v is AbaDoCliente {
-  return v === "visao" || v === "uso" || v === "atendimento";
+  return (ABAS_DO_CLIENTE as readonly unknown[]).includes(v);
 }
 
 /** O que a página do detalhe leva ao navegador (um cliente, sem prompt nem config). */
@@ -529,4 +532,6 @@ export interface DetalheDoCliente {
   donoEmail: string | null;
   /** Pessoas com acesso (o dono e os atendentes). */
   membros: number;
+  /** A aba Financeiro (ids do gateway já mascarados no servidor). */
+  financeiro: FinanceiroDoCliente;
 }

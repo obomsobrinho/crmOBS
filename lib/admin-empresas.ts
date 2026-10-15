@@ -1,9 +1,11 @@
 import type { LinhaRpc } from "@/lib/supabase/schema";
+import type { BillingRow } from "./billing";
 import { normalizar } from "./clientes";
 import {
   alertasDaConta,
   nomeDoPlano,
   situacaoDaConta,
+  situacaoNoFiltro,
   type Alerta,
   type EstadoDoWhatsApp,
   type FiltroDeSituacao,
@@ -54,8 +56,8 @@ export interface EmpresaItem {
   /** Estimativa pela tabela oficial; nulo quando o modelo não está nela. */
   custoUsd: number | null;
   ultimaAtividade: string | null;
-  /** As colunas de assinatura que `accessState` lê (a situação sai delas). */
-  conta: { subscription_status: string; trial_ends_at: string | null; grace_until: string | null };
+  /** As colunas que `accessState` lê e a desativação (a situação sai delas). */
+  conta: BillingRow;
   situacao: Situacao;
   /** Do mais urgente ao menos; o primeiro é o principal. */
   alertas: Alerta[];
@@ -76,6 +78,9 @@ export type LinhaEmpresa = LinhaRpc<
   | "ultima_atividade"
   | "trial_ends_at"
   | "grace_until"
+  | "vitalicio_desde"
+  | "bloqueado_em"
+  | "desativada_em"
 >;
 
 /**
@@ -95,10 +100,13 @@ export function paraEmpresa(l: LinhaEmpresa, modelo: string | null, agora: numbe
   const consumo = estadoDoConsumo(usados, limite);
   const publicada = !!l.agent_published_at;
   const ligada = l.agent_enabled !== false;
-  const conta = {
+  const conta: BillingRow = {
     subscription_status: l.subscription_status,
     trial_ends_at: l.trial_ends_at,
     grace_until: l.grace_until,
+    vitalicio_desde: l.vitalicio_desde,
+    bloqueado_em: l.bloqueado_em,
+    desativada_em: l.desativada_em,
   };
   const temInstancia = !!l.tem_instancia;
   const base: EmpresaBase = {
@@ -207,7 +215,7 @@ export function fonteEmpresasDaMemoria(todas: EmpresaItem[]): FonteEmpresas {
   return {
     async pagina(p, depois, n = PAGINA_EMPRESAS) {
       const lista = ordenadas.filter(
-        (e) => casaNome(e.nome, p.busca) && (!p.situacao || e.conta.subscription_status === p.situacao)
+        (e) => casaNome(e.nome, p.busca) && (!p.situacao || situacaoNoFiltro(e.situacao.chave, p.situacao))
       );
       const ini = depois ? lista.findIndex((e) => antes(e, depois) > 0) : 0;
       return ini < 0 ? [] : lista.slice(ini, ini + n);

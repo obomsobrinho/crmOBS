@@ -54,6 +54,12 @@ export async function sessaoDaRota(
   if (!mine) {
     return { erro: NextResponse.json({ error: "não autenticado" }, { status: 401 }) };
   }
+  // Conta DESATIVADA pelo dono do produto (central "Clientes"): nenhuma rota de
+  // sessão trabalha, leitura inclusive (o login inteiro está barrado; a tela é
+  // `/conta-desativada`). Vem antes de tudo o mais, como a sessão.
+  if (mine.contaDesativada) {
+    return { erro: NextResponse.json({ error: "conta desativada" }, { status: 403 }) };
+  }
   if (exige.id !== undefined && mine.id !== exige.id) {
     return { erro: NextResponse.json({ error: "acesso negado" }, { status: 403 }) };
   }

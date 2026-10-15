@@ -1,4 +1,4 @@
-import { getMyClient } from "@/lib/auth";
+import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // A FOTO DE PERFIL GUARDADA (`lib/fotos.ts`), servida pelo app.
@@ -8,13 +8,16 @@ import { createServiceClient } from "@/lib/supabase/service";
 // um endereço FIXO: o nome leva o hash da imagem, então foto nova é endereço
 // novo, e cada endereço pode ficar no cache do navegador para sempre.
 //
-// Só quem é do tenant: o primeiro pedaço do caminho é o id dele.
+// Só quem é do tenant: o primeiro pedaço do caminho é o id dele. A sessão passa
+// por `sessaoDaRota` como toda rota de sessão (conta desativada: 403); o corpo é
+// vazio porque quem pede é uma tag <img>.
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ path: string[] }> }
 ) {
-  const client = await getMyClient();
-  if (!client) return new Response(null, { status: 401 });
+  const r = await sessaoDaRota();
+  if ("erro" in r) return new Response(null, { status: r.erro.status });
+  const client = r.mine;
   const partes = (await ctx.params).path ?? [];
   if (partes.length !== 3 || partes[0] !== client.id || partes[1] !== "fotos") {
     return new Response(null, { status: 404 });

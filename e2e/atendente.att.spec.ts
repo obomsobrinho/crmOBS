@@ -69,10 +69,18 @@ test.describe("Atendente", () => {
     });
     expect(editar.status()).toBe(404);
     // As rotas das abas da central (docs/plano-central-clientes.md) também.
-    for (const rota of ["uso", "atendimento", "whatsapp"]) {
+    for (const rota of ["uso", "atendimento", "whatsapp", "cobrancas", "exportar"]) {
       const res = await page.request.get(`/api/admin/empresas/${clientId}/${rota}`);
       expect(res.status(), rota).toBe(404);
     }
+    // As escritas da entrega 2 (Financeiro e Ações) também: 404 ANTES de tocar o
+    // banco, com corpos que seriam válidos para o admin. Nada é gravado.
+    const conta = await page.request.put(`/api/admin/empresas/${clientId}/conta`, { data: { acao: "vitalicio" } });
+    expect(conta.status(), "conta").toBe(404);
+    const desativar = await page.request.put(`/api/admin/empresas/${clientId}/conta`, { data: { acao: "desativar" } });
+    expect(desativar.status(), "desativar").toBe(404);
+    const apagar = await page.request.post(`/api/admin/empresas/${clientId}/apagar`, { data: { nome: "OBM" } });
+    expect(apagar.status(), "apagar").toBe(404);
   });
 
   test("a central Clientes não existe para ele: sem item no menu, e os endereços levam a Contatos", async ({ page }) => {

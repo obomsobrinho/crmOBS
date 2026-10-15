@@ -210,7 +210,7 @@ export async function processTurn(
     svc
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens"
+        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, vitalicio_desde, bloqueado_em, desativada_em"
       )
       .eq("id", clientId)
       .maybeSingle(),
@@ -219,6 +219,44 @@ export async function processTurn(
   if (clientErr) throw new TurnError(500, "falha ao carregar o tenant");
   if (!client) throw new TurnError(404, "tenant não encontrado");
   const avisos = (client.notify_group_jid as string | null) ?? null;
+
+  // Gate de assinatura no servidor. Vem ANTES do modelo e do retrieval de
+  // propósito: conta bloqueada não gasta token nosso e o agente fica em silêncio
+  // (o nó do n8n recebe 402 e nada é enviado nem gravado). O layout do app cobre
+  // as telas; este é o caminho que o n8n usa sem passar por layout nenhum.
+  const access = accessState(
+    {
+      subscription_status: (client.subscription_status as string) ?? "",
+      trial_ends_at: (client.trial_ends_at as string | null) ?? null,
+      grace_until: (client.grace_until as string | null) ?? null,
+      vitalicio_desde: client.vitalicio_desde,
+      bloqueado_em: client.bloqueado_em,
+      desativada_em: client.desativada_em,
+    },
+    undefined,
+    // A MESMA chave do beta que as telas usam: se só a tela liberasse, o
+    // testador veria o app aberto e o agente mudo no WhatsApp.
+    { betaAberto: betaAberto() }
+  );
+  // CONTA DESATIVADA pelo dono do produto (central "Clientes", aba Ações): o tipo
+  // `desativado` de `accessState` vem antes de tudo, e a IA para ANTES de
+  // qualquer outro gate, também na bancada, sem gastar nada. Mesmo silêncio dos
+  // outros gates (200, mensagens vazias): o n8n segue gravando o que chega, e
+  // nada se apaga até o "Apagar de vez".
+  if (access.kind === "desativado") {
+    const t = silentTurn(t0, { contaDesativada: true });
+    await logTurn(svc, {
+      clientId,
+      phone,
+      dryRun,
+      diagnostics: t.diagnostics,
+      messagesSent: 0,
+      silenced: "desativada",
+      model: null,
+      usage: null,
+    });
+    return t;
+  }
 
   // O NÚMERO DE AVISOS NUNCA É ATENDIDO (29/09/2026, docs/plano-avisos.md). O
   // aviso de pedido de ajuda sai do número do agente para o número do time; se
@@ -241,21 +279,6 @@ export async function processTurn(
     return t;
   }
 
-  // Gate de assinatura no servidor. Vem ANTES do modelo e do retrieval de
-  // propósito: conta bloqueada não gasta token nosso e o agente fica em silêncio
-  // (o nó do n8n recebe 402 e nada é enviado nem gravado). O layout do app cobre
-  // as telas; este é o caminho que o n8n usa sem passar por layout nenhum.
-  const access = accessState(
-    {
-      subscription_status: (client.subscription_status as string) ?? "",
-      trial_ends_at: (client.trial_ends_at as string | null) ?? null,
-      grace_until: (client.grace_until as string | null) ?? null,
-    },
-    undefined,
-    // A MESMA chave do beta que as telas usam: se só a tela liberasse, o
-    // testador veria o app aberto e o agente mudo no WhatsApp.
-    { betaAberto: betaAberto() }
-  );
   // DOIS gates, mesma resposta: turno silencioso, 200 e NÃO erro. O n8n segue o
   // fluxo e GRAVA a mensagem que o cliente mandou, então a conversa continua
   // aparecendo no inbox (como um WhatsApp Web aberto) e nada se perde. O que
@@ -819,7 +842,7 @@ async function logTurn(
     dryRun: boolean;
     diagnostics: TurnDiagnostics;
     messagesSent: number;
-    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | null;
+    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | "desativada" | null;
     model: string | null;
     usage: TurnUsage | null;
     /** Mês de São Paulo do turno (`mesSP`): com `usage`, o turno soma no mês. */
@@ -899,6 +922,7 @@ function silentTurn(
     notPublished?: boolean;
     numeroDeAvisos?: boolean;
     limiteIa?: boolean;
+    contaDesativada?: boolean;
   }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {

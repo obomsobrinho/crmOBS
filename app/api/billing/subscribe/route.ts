@@ -45,11 +45,15 @@ export async function POST(req: NextRequest) {
   const svc = createServiceClient();
   const { data: atual, error: readErr } = await svc
     .from("clients")
-    .select("billing_customer_id, billing_subscription_id, billing_plan")
+    .select("billing_customer_id, billing_subscription_id, billing_plan, vitalicio_desde")
     .eq("id", mine.id)
     .maybeSingle();
   if (readErr) {
     return NextResponse.json({ error: "falha ao ler a conta" }, { status: 500 });
+  }
+  // Conta vitalícia nunca é cobrada (central do dono): não há o que assinar.
+  if (atual?.vitalicio_desde) {
+    return NextResponse.json({ error: "esta conta é vitalícia: não há plano a contratar" }, { status: 409 });
   }
 
   const customerId = (atual?.billing_customer_id as string | null) ?? null;

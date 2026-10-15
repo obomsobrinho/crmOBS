@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, RefreshCw } from "lucide-react";
+import { Building2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
@@ -13,6 +14,7 @@ import { diaMesHoraSP } from "@/lib/fuso";
 import { useDebounce } from "@/lib/use-debounce";
 import { usePaginada } from "@/lib/use-paginada";
 import { usdCurto } from "@/lib/custo-ia";
+import { plural } from "@/lib/format";
 import { FILTROS_DE_SITUACAO, type FiltroDeSituacao } from "@/lib/admin-alertas";
 import {
   PAGINA_EMPRESAS,
@@ -41,6 +43,7 @@ export default function ListaCentral({
   inicial,
   previewTodas,
   hrefModelo = "/clientes/{id}",
+  bloqueariamSemBeta = null,
 }: {
   /** A primeira página, que o servidor já buscou. */
   inicial: { itens: EmpresaItem[]; temMais: boolean };
@@ -48,6 +51,12 @@ export default function ListaCentral({
   previewTodas?: EmpresaItem[];
   /** Para onde a linha leva; o preview aponta para o detalhe de mentira. */
   hrefModelo?: string;
+  /**
+   * Com `BETA_ABERTO` ligado: quantos clientes ficariam bloqueados se a chave
+   * fosse desligada hoje (`admin_bloqueados_sem_beta`). Nulo = chave desligada
+   * (ou a contagem falhou): sem aviso.
+   */
+  bloqueariamSemBeta?: number | null;
 }) {
   const simular = !!previewTodas;
   const [q, setQ] = useState("");
@@ -94,6 +103,7 @@ export default function ListaCentral({
             As empresas que usam o CRM. Uso de IA do mês (fuso de São Paulo), custo estimado pela tabela oficial de
             preços.
           </p>
+          {bloqueariamSemBeta !== null && <AvisoDoBeta bloqueariam={bloqueariamSemBeta} />}
           <CampoBusca
             className="mt-3 md:max-w-[420px]"
             valor={q}
@@ -246,5 +256,27 @@ function Linha({ e, href }: { e: EmpresaItem; href: string }) {
         </span>
       </Link>
     </li>
+  );
+}
+
+/**
+ * O aviso do `BETA_ABERTO` (entrega 2): enquanto a chave está ligada ninguém é
+ * bloqueado, e o dono vê quantos clientes cairiam se ela fosse desligada hoje,
+ * para marcar como vitalício quem deve continuar sem pagar antes de desligar.
+ */
+function AvisoDoBeta({ bloqueariam }: { bloqueariam: number }) {
+  return (
+    <Aviso
+      tom={bloqueariam > 0 ? "warn" : "neutro"}
+      icone={AlertTriangle}
+      className="mt-3"
+      data-slot="central-aviso-beta"
+      data-bloqueariam={bloqueariam}
+    >
+      Beta aberto: hoje ninguém é bloqueado.{" "}
+      {bloqueariam > 0
+        ? `Se a chave fosse desligada hoje, ${bloqueariam} ${plural(bloqueariam, "cliente ficaria bloqueado", "clientes ficariam bloqueados")} (teste encerrado, pagamento atrasado fora da carência ou cancelado). Marque como vitalício quem deve continuar sem pagar.`
+        : "Se a chave fosse desligada hoje, nenhum cliente ficaria bloqueado."}
+    </Aviso>
   );
 }

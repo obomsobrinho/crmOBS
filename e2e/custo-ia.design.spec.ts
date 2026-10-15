@@ -220,6 +220,9 @@ test.describe("Admin (lib/admin-acesso.ts)", () => {
         grace_until: null,
         created_at: "2026-08-01T00:00:00Z",
         tem_instancia: true,
+        vitalicio_desde: null,
+        bloqueado_em: null,
+        desativada_em: null,
       },
       "gpt-9-turbo",
       Date.parse("2026-10-14T12:00:00Z")

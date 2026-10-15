@@ -208,3 +208,15 @@ export function Indicador({
     </Stat>
   );
 }
+
+/** Uma linha rótulo e valor de um cartão do detalhe (Visão geral, Financeiro). */
+export function Dado({ rotulo, children, slot }: { rotulo: string; children: React.ReactNode; slot?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-line-soft py-2 last:border-b-0">
+      <dt className="text-apoio text-ink-3">{rotulo}</dt>
+      <dd data-slot={slot} className="min-w-0 text-right text-apoio text-ink">
+        {children}
+      </dd>
+    </div>
+  );
+}

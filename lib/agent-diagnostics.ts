@@ -66,6 +66,9 @@ export interface TurnDiagnostics {
   // true = a empresa atingiu o teto de tokens de IA do mês (lib/custo-ia.ts):
   // silêncio antes do modelo, como a chave desligada, também na bancada.
   limiteIa?: boolean;
+  // true = a conta foi DESATIVADA pelo dono do produto (central "Clientes"):
+  // silêncio antes de tudo, também na bancada.
+  contaDesativada?: boolean;
   // true = o turno abriu pedido de ajuda e o aviso ao time foi AGENDADO (sai
   // depois da resposta, por `after`). Se a mensagem saiu mesmo, só o log diz.
   avisoAgendado?: boolean;

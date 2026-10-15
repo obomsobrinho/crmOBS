@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { graceUntilFrom } from "@/lib/billing";
+import { atualizacaoDoEvento } from "@/lib/billing";
 import { segredoConfere } from "@/lib/segredo";
 import type { Json } from "@/lib/database.types";
 
@@ -64,31 +64,33 @@ export async function POST(req: NextRequest) {
   // Acha o tenant: pela assinatura, pelo cliente do gateway, ou pelo
   // externalReference (que guarda o clients.id na criação). Três caminhos
   // porque perder um pagamento por causa de um id é pior que uma query a mais.
-  let clientId: string | null = null;
+  // Cada busca já traz `vitalicio_desde`: a conta vitalícia nunca é reescrita.
+  let tenant: { id: string; vitalicio_desde: string | null } | null = null;
   if (pagamento.subscription) {
     const { data } = await svc
       .from("clients")
-      .select("id")
+      .select("id, vitalicio_desde")
       .eq("billing_subscription_id", pagamento.subscription)
       .maybeSingle();
-    clientId = (data?.id as string | undefined) ?? null;
+    tenant = data;
   }
-  if (!clientId && pagamento.customer) {
+  if (!tenant && pagamento.customer) {
     const { data } = await svc
       .from("clients")
-      .select("id")
+      .select("id, vitalicio_desde")
       .eq("billing_customer_id", pagamento.customer)
       .maybeSingle();
-    clientId = (data?.id as string | undefined) ?? null;
+    tenant = data;
   }
-  if (!clientId && pagamento.externalReference) {
+  if (!tenant && pagamento.externalReference) {
     const { data } = await svc
       .from("clients")
-      .select("id")
+      .select("id, vitalicio_desde")
       .eq("id", pagamento.externalReference)
       .maybeSingle();
-    clientId = (data?.id as string | undefined) ?? null;
+    tenant = data;
   }
+  const clientId = tenant?.id ?? null;
 
   // Grava o evento ANTES de aplicar a regra (recomendação do Asaas). O UNIQUE
   // é o que garante que reenvio não reprocessa.
@@ -119,49 +121,15 @@ export async function POST(req: NextRequest) {
   }
 
   const agora = new Date();
-  let update: Record<string, unknown> | null = null;
 
-  switch (evento) {
-    case "PAYMENT_CONFIRMED":
-    case "PAYMENT_RECEIVED":
-      // Dinheiro entrou: conta em dia, sem carência pendente, e o teste some
-      // (quem paga não volta a ser trial).
-      update = {
-        subscription_status: "active",
-        grace_until: null,
-        trial_ends_at: null,
-      };
-      break;
-
-    case "PAYMENT_OVERDUE":
-      // Atrasou: entra em carência em vez de bloquear na hora, porque Pix e
-      // boleto atrasam por motivo bobo e derrubar o atendimento de quem paga é
-      // pior que esperar alguns dias.
-      update = {
-        subscription_status: "past_due",
-        grace_until: graceUntilFrom(agora),
-      };
-      break;
-
-    case "PAYMENT_REFUNDED":
-      // Dinheiro devolvido: o período deixou de estar pago. Sem carência, mas
-      // também sem cancelar, porque estorno não é sempre desistência.
-      update = { subscription_status: "past_due", grace_until: null };
-      break;
-
-    case "PAYMENT_DELETED":
-      // Cobrança apagada NÃO muda estado de propósito: isso acontece em limpeza
-      // administrativa e ao cancelar assinatura, e bloquear alguém por causa de
-      // uma faxina nossa seria um tiro no pé. Fica só o registro.
-      update = null;
-      break;
-
-    default:
-      update = null;
-  }
-
+  // CONTA VITALÍCIA NUNCA É REESCRITA PELO GATEWAY (central do dono, entrega 2):
+  // o evento fica registrado e nada muda. O gatilho `clients_guarda_da_conta`
+  // recusa a escrita no banco também, se algum outro caminho tentar.
   let erro: string | null = null;
-  if (update) {
+  const update = atualizacaoDoEvento(evento, agora);
+  if (tenant?.vitalicio_desde) {
+    erro = "ignorado: cliente vitalicio";
+  } else if (update) {
     const { error: upErr, data: linhas } = await svc
       .from("clients")
       .update({ ...update, billing_updated_at: agora.toISOString() })

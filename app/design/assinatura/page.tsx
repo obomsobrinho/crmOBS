@@ -10,6 +10,9 @@ const TRIAL_VENCIDO = accessState({
   subscription_status: "trialing",
   trial_ends_at: "2026-08-01T12:00:00.000Z",
   grace_until: null,
+  vitalicio_desde: null,
+  bloqueado_em: null,
+  desativada_em: null,
 });
 
 export default function DesignAssinaturaPage() {

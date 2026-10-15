@@ -6,7 +6,7 @@ import WhatsAppBanner from "@/components/WhatsAppBanner";
 import BannerLimiteIa from "@/components/BannerLimiteIa";
 import { Suspense } from "react";
 import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
-import { getMyClient } from "@/lib/auth";
+import { barrarContaDesativada, getMyClient } from "@/lib/auth";
 import { estadoDoConsumoDoTenant } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
 
@@ -35,6 +35,10 @@ export default async function AppLayout({
 }) {
   const client = await getMyClient();
   if (!client) redirect("/login");
+  // Conta DESATIVADA pelo dono do produto: a tela clara, nunca um erro. Cada
+  // página paga confere de novo (`requireActiveTenant`) e cada rota também
+  // (`sessaoDaRota`): o layout roda em paralelo com a página.
+  barrarContaDesativada(client);
   // ⚠️ O DONO ENTRA MESMO SEM WHATSAPP CONECTADO (30/09/2026, achado do dono no
   // celular). Esta guarda mandava o dono sem instância para `/montagem`, de quando
   // conectar era o PRIMEIRO passo. Desde que virou o último (24/09), o "Terminar

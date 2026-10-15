@@ -260,7 +260,9 @@ export type Database = {
           billing_seats: number | null
           billing_subscription_id: string | null
           billing_updated_at: string | null
+          bloqueado_em: string | null
           created_at: string
+          desativada_em: string | null
           evolution_instance: string | null
           grace_until: string | null
           ia_limite_tokens: number | null
@@ -274,6 +276,7 @@ export type Database = {
           regras_salvas: Json
           subscription_status: string
           trial_ends_at: string | null
+          vitalicio_desde: string | null
         }
         Insert: {
           account_type?: string | null
@@ -287,7 +290,9 @@ export type Database = {
           billing_seats?: number | null
           billing_subscription_id?: string | null
           billing_updated_at?: string | null
+          bloqueado_em?: string | null
           created_at?: string
+          desativada_em?: string | null
           evolution_instance?: string | null
           grace_until?: string | null
           ia_limite_tokens?: number | null
@@ -301,6 +306,7 @@ export type Database = {
           regras_salvas?: Json
           subscription_status?: string
           trial_ends_at?: string | null
+          vitalicio_desde?: string | null
         }
         Update: {
           account_type?: string | null
@@ -314,7 +320,9 @@ export type Database = {
           billing_seats?: number | null
           billing_subscription_id?: string | null
           billing_updated_at?: string | null
+          bloqueado_em?: string | null
           created_at?: string
+          desativada_em?: string | null
           evolution_instance?: string | null
           grace_until?: string | null
           ia_limite_tokens?: number | null
@@ -328,6 +336,7 @@ export type Database = {
           regras_salvas?: Json
           subscription_status?: string
           trial_ends_at?: string | null
+          vitalicio_desde?: string | null
         }
         Relationships: []
       }
@@ -984,6 +993,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_apagar_cliente: {
+        Args: {
+          p_client: string
+          p_nome: string
+          p_quem: string
+          p_tabelas: string[]
+          p_usuarios?: number
+        }
+        Returns: string
+      }
+      admin_arquivos_do_cliente: {
+        Args: { p_client: string; p_limite?: number }
+        Returns: {
+          bucket: string
+          nome: string
+        }[]
+      }
+      admin_bloqueados_sem_beta: { Args: { p_agora?: string }; Returns: number }
       admin_cliente_solucoes: {
         Args: {
           p_ate?: string[]
@@ -1026,7 +1053,9 @@ export type Database = {
           agent_enabled: boolean
           agent_published_at: string
           billing_plan: string
+          bloqueado_em: string
           created_at: string
+          desativada_em: string
           grace_until: string
           ia_limite_tokens: number
           id: string
@@ -1038,7 +1067,32 @@ export type Database = {
           tokens_saida: number
           trial_ends_at: string
           ultima_atividade: string
+          vitalicio_desde: string
         }[]
+      }
+      admin_exportar_lote: {
+        Args: {
+          p_client: string
+          p_depois?: Json
+          p_limite?: number
+          p_nulos?: boolean
+          p_ordem?: string[]
+          p_tabela: string
+        }
+        Returns: {
+          chave: Json
+          linha: Json
+        }[]
+      }
+      admin_mudar_conta: {
+        Args: {
+          p_acao: string
+          p_client: string
+          p_dias?: number
+          p_plano?: string
+          p_quem: string
+        }
+        Returns: string
       }
       admin_mudar_limite_ia: {
         Args: {
@@ -1052,6 +1106,17 @@ export type Database = {
         Returns: {
           antes: number
           depois: number
+        }[]
+      }
+      admin_registrar_exportacao: {
+        Args: { p_client: string; p_quem: string }
+        Returns: boolean
+      }
+      admin_tabelas_fora_da_purga: { Args: { p_tabelas: string[] }; Returns: string[] }
+      admin_usuarios_so_do_cliente: {
+        Args: { p_client: string }
+        Returns: {
+          user_id: string
         }[]
       }
       chat_resumo_conversa: {

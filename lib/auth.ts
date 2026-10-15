@@ -5,6 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
 import { betaAberto } from "@/lib/beta";
 import { montagemState, type MontagemState } from "@/lib/onboarding";
+import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
+
+/** A tela clara de quem tem a conta DESATIVADA pelo dono do produto. */
+const ROTA_CONTA_DESATIVADA = "/conta-desativada";
 
 export interface MyClient {
   id: string;
@@ -47,6 +51,14 @@ export interface MyClient {
    * (`ehNumeroDeAvisos`, lib/avisos.ts), e as telas delas já chamam isto.
    */
   avisos: string | null;
+  /**
+   * A conta foi DESATIVADA pelo dono do produto (central "Clientes", aba Ações) e
+   * este login NÃO é do dono do produto: nada entra (páginas vão a
+   * `ROTA_CONTA_DESATIVADA`, rotas respondem 403 em `sessaoDaRota`). O dono do
+   * produto passa, para nunca se trancar fora da própria central. A IA para em
+   * `processTurn` para todo mundo.
+   */
+  contaDesativada: boolean;
 }
 
 // Cliente (tenant) do usuário logado. A RLS já restringe `clients` ao(s)
@@ -87,7 +99,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     supabase
       .from("clients")
       .select(
-        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at, notify_group_jid"
+        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at, notify_group_jid, vitalicio_desde, bloqueado_em, desativada_em"
       )
       // ⚠️ `order` ANTES do `limit(1)`, e não é detalhe (achado A2): sem ordenação
       // o banco devolve qualquer uma das linhas que a RLS liberou, então um
@@ -111,6 +123,20 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       (m) => m.client_id === client.id
     ) ?? null;
 
+  const access = accessState(
+    {
+      subscription_status: client.subscription_status,
+      trial_ends_at: client.trial_ends_at,
+      grace_until: client.grace_until,
+      vitalicio_desde: client.vitalicio_desde,
+      bloqueado_em: client.bloqueado_em,
+      desativada_em: client.desativada_em,
+    },
+    undefined,
+    // Chave geral do beta: ligada, ninguém é bloqueado por assinatura (lib/beta.ts).
+    { betaAberto: betaAberto() }
+  );
+
   return {
     id: client.id,
     name: client.name,
@@ -122,16 +148,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     trialEndsAt: client.trial_ends_at,
     graceUntil: client.grace_until,
     billingPlan: client.billing_plan,
-    access: accessState(
-      {
-        subscription_status: client.subscription_status,
-        trial_ends_at: client.trial_ends_at,
-        grace_until: client.grace_until,
-      },
-      undefined,
-      // Chave geral do beta: ligada, ninguém é bloqueado (lib/beta.ts).
-      { betaAberto: betaAberto() }
-    ),
+    access,
     agentPublishedAt: client.agent_published_at,
     // `!== false` e não `?? true`: a coluna é NOT NULL com default true, mas um
     // tenant lido antes da migration chegaria com undefined, e nesse caso ligado
@@ -145,6 +162,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       hasNotify: !!client.notify_group_jid,
     }),
     avisos: client.notify_group_jid ?? null,
+    contaDesativada: access.kind === "desativado" && !ehAdminPeloAmbiente(userId),
   };
 });
 
@@ -161,6 +179,16 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
 export async function requireActiveTenant(): Promise<MyClient> {
   const client = await getMyClient();
   if (!client) redirect("/login");
+  barrarContaDesativada(client);
   if (client.access.blocked) redirect("/assinatura");
   return client;
+}
+
+/**
+ * Porta das PÁGINAS para a conta desativada (o layout do app, `/montagem`,
+ * `/assinatura`, `/connect`, a entrada e `requireActiveTenant`): manda para a
+ * tela clara, nunca um erro. As rotas fecham em `sessaoDaRota` (403).
+ */
+export function barrarContaDesativada(client: MyClient | null): void {
+  if (client?.contaDesativada) redirect(ROTA_CONTA_DESATIVADA);
 }

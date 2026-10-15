@@ -30,6 +30,20 @@ export interface BillingRow {
   subscription_status: string;
   trial_ends_at: string | null;
   grace_until: string | null;
+  /**
+   * Vitalício (`clients.vitalicio_desde`, só a central do dono escreve): acesso
+   * pleno, nunca cobrado. Obrigatório de propósito: um gate que esquecesse de ler
+   * a coluna bloquearia um vitalício sem ninguém perceber.
+   */
+  vitalicio_desde: string | null;
+  /** Bloqueio manual do dono do produto (`clients.bloqueado_em`). */
+  bloqueado_em: string | null;
+  /**
+   * Conta DESATIVADA pelo dono do produto (`clients.desativada_em`, aba Ações da
+   * central): nada entra (lib/auth.ts manda as páginas à tela clara e as rotas
+   * respondem 403) e a IA para. Vem antes de tudo.
+   */
+  desativada_em: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,9 +260,39 @@ export function seatState(plan: Plan | null, used: number): SeatState {
   };
 }
 
-export type BlockReason = "trial_expired" | "past_due" | "canceled";
+export type BlockReason = "trial_expired" | "past_due" | "canceled" | "bloqueio_manual" | "desativada";
+
+/**
+ * O TIPO de acesso, discriminado (central do dono, entrega 2). Cada tipo sai de
+ * UMA regra (`accessState`); quem precisa de um rótulo ou de um filtro mapeia
+ * daqui (`situacaoDaConta`, os alertas e os filtros de `lib/admin-alertas.ts`),
+ * nunca relendo `subscription_status` por conta própria.
+ *
+ * Precedência: desativada > bloqueio manual > vitalício > chave do beta > estado gravado.
+ */
+export type AccessKind =
+  /** Desativada pelo dono do produto (`clients.desativada_em`): nada entra, a IA para. */
+  | "desativado"
+  /** Bloqueio manual do dono do produto (`clients.bloqueado_em`): vale até com o beta aberto. */
+  | "bloqueado"
+  /** Vitalício (`clients.vitalicio_desde`): acesso pleno, nunca cobrado, nunca bloqueado por teste ou pagamento. */
+  | "vitalicio"
+  /** `BETA_ABERTO` ligado: todo mundo entra (a central nunca passa a chave). */
+  | "beta_aberto"
+  | "ativo"
+  /** Em teste, com prazo correndo ou sem prazo. */
+  | "em_teste"
+  | "teste_encerrado"
+  /** Pagamento atrasado dentro da carência: entra, com aviso. */
+  | "carencia"
+  | "atrasado_bloqueado"
+  | "cancelado"
+  /** Estado que o código não conhece: NÃO bloqueia. */
+  | "desconhecido";
 
 export interface AccessState {
+  /** O tipo de acesso; rótulos e filtros mapeiam daqui. */
+  kind: AccessKind;
   /** true = o app é bloqueado no servidor e a pessoa vai para /assinatura. */
   blocked: boolean;
   reason: BlockReason | null;
@@ -293,9 +337,19 @@ function parse(iso: string | null | undefined): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+/** Um acesso liberado, sem aviso. */
+function livre(kind: AccessKind, message: string): AccessState {
+  return { kind, blocked: false, reason: null, trialDaysLeft: null, warn: null, message };
+}
+
 /**
  * Decide se o tenant tem acesso ao app. Chamada no gate do servidor (layout
  * autenticado, /api/agent, /api/send) e também na UI para o aviso.
+ *
+ * ⚠️ Esta regra tem DOIS gêmeos em SQL, que a repetem sem ler linhas para a
+ * central do dono: o filtro de situação de `admin_empresas_pagina` (a mesma
+ * precedência) e `admin_bloqueados_sem_beta` (quem bloquearia sem a chave do
+ * beta). Quem muda um tipo ou um bloqueio aqui muda lá também.
  */
 export function accessState(
   row: BillingRow,
@@ -308,19 +362,42 @@ export function accessState(
      * quando o beta acabar e a chave desligar. Uma chave e não conta por conta,
      * porque liberar e depois travar dez tenants à mão é trabalho e esquecimento.
      * Quem lê a variável de ambiente é o servidor (`lib/beta.ts`); este módulo
-     * continua puro e só recebe o valor.
+     * continua puro e só recebe o valor. O BLOQUEIO MANUAL do dono do produto
+     * vale mesmo com a chave ligada (é uma decisão dele sobre UMA conta).
      */
     betaAberto?: boolean;
   } = {}
 ): AccessState {
-  if (opcoes.betaAberto) {
+  // Desativada (central do dono, aba Ações): mais que modo leitura, o login
+  // inteiro fecha (`contaDesativada` em lib/auth.ts); vale com qualquer estado.
+  if (parse(row?.desativada_em) !== null) {
     return {
-      blocked: false,
-      reason: null,
+      kind: "desativado",
+      blocked: true,
+      reason: "desativada",
       trialDaysLeft: null,
       warn: null,
-      message: "Beta aberto: acesso liberado.",
+      message: "Esta conta está desativada.",
     };
+  }
+  // Bloqueio manual (central do dono): modo leitura, como a assinatura bloqueada.
+  if (parse(row?.bloqueado_em) !== null) {
+    return {
+      kind: "bloqueado",
+      blocked: true,
+      reason: "bloqueio_manual",
+      trialDaysLeft: null,
+      warn: null,
+      message: "O acesso desta conta está suspenso. Fale com a gente para liberar.",
+    };
+  }
+  // Vitalício: nunca cobrado, nunca bloqueado por teste, pagamento ou carência.
+  // Vem antes do estado gravado: o que o gateway escrever não rebaixa a conta.
+  if (parse(row?.vitalicio_desde) !== null) {
+    return livre("vitalicio", "Acesso vitalício.");
+  }
+  if (opcoes.betaAberto) {
+    return livre("beta_aberto", "Beta aberto: acesso liberado.");
   }
   const t = now.getTime();
   const status = typeof row?.subscription_status === "string" ? row.subscription_status : "";
@@ -328,29 +405,18 @@ export function accessState(
   const grace = parse(row?.grace_until);
 
   if (status === "active") {
-    return {
-      blocked: false,
-      reason: null,
-      trialDaysLeft: null,
-      warn: null,
-      message: "Assinatura ativa.",
-    };
+    return livre("ativo", "Assinatura ativa.");
   }
 
   if (status === "trialing") {
     // Sem data de fim = teste sem prazo (contas internas). Não bloqueia: dado
     // faltando nunca pode derrubar quem está atendendo.
     if (trialEnd === null) {
-      return {
-        blocked: false,
-        reason: null,
-        trialDaysLeft: null,
-        warn: null,
-        message: "Teste gratuito em andamento.",
-      };
+      return livre("em_teste", "Teste gratuito em andamento.");
     }
     if (trialEnd <= t) {
       return {
+        kind: "teste_encerrado",
         blocked: true,
         reason: "trial_expired",
         trialDaysLeft: 0,
@@ -360,6 +426,7 @@ export function accessState(
     }
     const left = Math.ceil((trialEnd - t) / DAY_MS);
     return {
+      kind: "em_teste",
       blocked: false,
       reason: null,
       trialDaysLeft: left,
@@ -375,6 +442,7 @@ export function accessState(
     if (grace !== null && t < grace) {
       const left = Math.ceil((grace - t) / DAY_MS);
       return {
+        kind: "carencia",
         blocked: false,
         reason: null,
         trialDaysLeft: null,
@@ -387,6 +455,7 @@ export function accessState(
       };
     }
     return {
+      kind: "atrasado_bloqueado",
       blocked: true,
       reason: "past_due",
       trialDaysLeft: null,
@@ -398,6 +467,7 @@ export function accessState(
 
   if (status === "canceled") {
     return {
+      kind: "cancelado",
       blocked: true,
       reason: "canceled",
       trialDaysLeft: null,
@@ -411,10 +481,52 @@ export function accessState(
   // defasado, e derrubar o atendimento de quem paga é pior que liberar um dia
   // a mais. Fica o aviso para aparecer na tela de assinatura.
   return {
+    kind: "desconhecido",
     blocked: false,
     reason: null,
     trialDaysLeft: null,
     warn: "Não conseguimos confirmar o estado da sua assinatura.",
     message: "Estado da assinatura desconhecido.",
   };
+}
+
+// ---------------------------------------------------------------------------
+// Webhook do gateway: o efeito de cada evento
+// ---------------------------------------------------------------------------
+
+/** O que o webhook grava em `clients` para um evento (sem `billing_updated_at`). */
+export interface AtualizacaoDoEvento {
+  subscription_status: "active" | "past_due";
+  grace_until: string | null;
+  trial_ends_at?: null;
+}
+
+/**
+ * O efeito de um evento do Asaas no estado da assinatura (o mapa da regra de
+ * cobrança, `.claude/rules/billing.md`). `null` = nada muda. Conta VITALÍCIA
+ * nunca é reescrita pelo gateway: quem chama (o webhook) confere antes e só
+ * registra o evento (o gatilho `clients_guarda_da_conta` recusa a escrita também).
+ */
+export function atualizacaoDoEvento(evento: string, agora: Date): AtualizacaoDoEvento | null {
+  switch (evento) {
+    case "PAYMENT_CONFIRMED":
+    case "PAYMENT_RECEIVED":
+      // Dinheiro entrou: conta em dia, sem carência pendente, e o teste some
+      // (quem paga não volta a ser trial).
+      return { subscription_status: "active", grace_until: null, trial_ends_at: null };
+    case "PAYMENT_OVERDUE":
+      // Atrasou: entra em carência em vez de bloquear na hora, porque Pix e
+      // boleto atrasam por motivo bobo e derrubar o atendimento de quem paga é
+      // pior que esperar alguns dias.
+      return { subscription_status: "past_due", grace_until: graceUntilFrom(agora) };
+    case "PAYMENT_REFUNDED":
+      // Dinheiro devolvido: o período deixou de estar pago. Sem carência, mas
+      // também sem cancelar, porque estorno não é sempre desistência.
+      return { subscription_status: "past_due", grace_until: null };
+    default:
+      // PAYMENT_DELETED NÃO muda estado de propósito: isso acontece em limpeza
+      // administrativa e ao cancelar assinatura, e bloquear alguém por causa de
+      // uma faxina nossa seria um tiro no pé. Fica só o registro.
+      return null;
+  }
 }
