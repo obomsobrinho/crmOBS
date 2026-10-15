@@ -174,6 +174,9 @@ test.describe("Admin (lib/admin-acesso.ts)", () => {
     expect(caminhoDoAdmin("/api/admin/empresas")).toBe(true);
     expect(caminhoDoAdmin("/administrar")).toBe(false);
     expect(caminhoDoAdmin("/design/admin")).toBe(false);
+    // A central mora em /clientes: não é caminho 404 (a página redireciona quem não é admin).
+    expect(caminhoDoAdmin("/clientes")).toBe(false);
+    expect(caminhoDoAdmin("/contatos")).toBe(false);
   });
 
   test("o limite digitado em milhões vira tokens; vazio é o padrão; lixo é recusado", () => {
@@ -212,16 +215,26 @@ test.describe("Admin (lib/admin-acesso.ts)", () => {
         tokens_cache: 100_000,
         tokens_saida: 150_000,
         ultima_atividade: null,
+        subscription_status: "active",
+        trial_ends_at: null,
+        grace_until: null,
+        created_at: "2026-08-01T00:00:00Z",
+        tem_instancia: true,
       },
-      "gpt-9-turbo"
+      "gpt-9-turbo",
+      Date.parse("2026-10-14T12:00:00Z")
     );
     expect(e.usados).toBe(1_050_000);
     expect(e.estado).toBe("parada");
     expect(e.custoUsd).toBeNull();
-    const subiu = comLimite(e, 2_000_000);
+    const agora = Date.parse("2026-10-14T12:00:00Z");
+    const subiu = comLimite(e, 2_000_000, agora);
     expect(subiu.estado).toBe("ativa");
     expect(subiu.percentual).toBeCloseTo(52.5, 5);
-    expect(comLimite(e, null).limite).toBe(LIMITE_PADRAO_TOKENS);
+    expect(comLimite(e, null, agora).limite).toBe(LIMITE_PADRAO_TOKENS);
+    // Os alertas acompanham o teto: parada no limite antes, sem esse alerta depois.
+    expect(e.alertas[0].chave).toBe("limite_parado");
+    expect(subiu.alertas.some((a) => a.chave === "limite_parado")).toBe(false);
   });
 });
 

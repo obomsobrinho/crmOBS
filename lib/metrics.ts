@@ -12,7 +12,8 @@
 // agente, contavam como trabalho da IA. Ver lib/mensagem.ts para o tamanho
 // medido do estrago.
 
-import { FUSO, diaIsoSP } from "@/lib/fuso";
+import { FUSO, diaIsoSP, diaMes } from "@/lib/fuso";
+import { unidadeDoPeriodo } from "@/lib/periodo";
 import { ehImportada, respostaDaIa, respostaHumana } from "@/lib/mensagem";
 
 /** Uma mensagem da janela (derivada de chat_messages). */
@@ -211,7 +212,7 @@ function balde(inst: Date, porHora: boolean): string {
  * de fuso. É a mesma regra escrita em lib/valor.ts.
  */
 export function barras(msgs: JanelaMsg[], dias: number, agora: number): Barra[] {
-  const porHora = dias <= 1;
+  const porHora = unidadeDoPeriodo(dias) === "hora";
   const baldes: BaldesDeBarras = new Map();
   for (const m of msgs) {
     if (!m.bot_message || ehImportada(m.message_type)) continue;
@@ -225,6 +226,28 @@ export function barras(msgs: JanelaMsg[], dias: number, agora: number): Barra[] 
     else if (respostaHumana(m)) e.time++;
   }
   return barrasDeBaldes(baldes, dias, agora);
+}
+
+/**
+ * O ESQUELETO de um gráfico por período, da coluna mais antiga à atual: 24 horas
+ * para a janela de 1 dia, `dias` dias para as outras, em São Paulo. Existe para
+ * balde vazio aparecer como buraco em vez de sumir e encurtar o eixo, porque o
+ * buraco É a informação (um dia sem movimento). É a MESMA lista do painel e da
+ * central do dono (`lib/admin-cliente.ts`).
+ */
+export function chavesDoEsqueleto(
+  dias: number,
+  agora: number
+): { chave: string; inst: Date }[] {
+  const porHora = unidadeDoPeriodo(dias) === "hora";
+  const passos = porHora ? 24 : dias;
+  const passoMs = porHora ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const lista: { chave: string; inst: Date }[] = [];
+  for (let i = passos - 1; i >= 0; i--) {
+    const inst = new Date(agora - i * passoMs);
+    lista.push({ chave: balde(inst, porHora), inst });
+  }
+  return lista;
 }
 
 /** Contagem por balde: chave `AAAA-MM-DD` (dia) ou `AAAA-MM-DDTHH` (hora), em São Paulo. */
@@ -242,17 +265,11 @@ export function barrasDeBaldes(
   dias: number,
   agora: number
 ): Barra[] {
-  const porHora = dias <= 1;
-  const passos = porHora ? 24 : dias;
-  const passoMs = porHora ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const porHora = unidadeDoPeriodo(dias) === "hora";
 
-  // Esqueleto: existe para balde vazio aparecer como buraco em vez de sumir e
-  // encurtar o eixo, porque o buraco É a informação (um dia sem movimento).
   const ordem: string[] = [];
   const mapa = new Map<string, Barra>();
-  for (let i = passos - 1; i >= 0; i--) {
-    const inst = new Date(agora - i * passoMs);
-    const chave = balde(inst, porHora);
+  for (const { chave, inst } of chavesDoEsqueleto(dias, agora)) {
     const eixo = porHora
       ? `${FMT_HORA.format(inst)}h`
       : DIA_CURTO[new Date(`${diaIsoSP(inst)}T12:00:00Z`).getUTCDay()];
@@ -269,15 +286,9 @@ export function barrasDeBaldes(
 
   return ordem.map((c) => {
     const b = mapa.get(c)!;
-    const quando = porHora ? b.eixo : legivel(c);
+    const quando = porHora ? b.eixo : diaMes(c);
     return { ...b, titulo: `${quando}: ${b.ia} da IA, ${b.time} do time` };
   });
-}
-
-/** "2026-08-20" vira "20/08". Sem `Date` no meio: a string já está no fuso certo. */
-function legivel(dia: string): string {
-  const [, mes, d] = dia.split("-");
-  return `${d}/${mes}`;
 }
 
 // Duração legível (linguagem de dono): 12s, 3min, 1h 5min.

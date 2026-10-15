@@ -68,6 +68,36 @@ test.describe("Atendente", () => {
       data: { limite: 1 },
     });
     expect(editar.status()).toBe(404);
+    // As rotas das abas da central (docs/plano-central-clientes.md) também.
+    for (const rota of ["uso", "atendimento", "whatsapp"]) {
+      const res = await page.request.get(`/api/admin/empresas/${clientId}/${rota}`);
+      expect(res.status(), rota).toBe(404);
+    }
+  });
+
+  test("a central Clientes não existe para ele: sem item no menu, e os endereços levam a Contatos", async ({ page }) => {
+    // O item "Clientes" é do dono do produto (ADMIN_USER_IDS); o atendente nunca
+    // está na lista. A trava de verdade é a página: redireciona (nunca 404, que
+    // revelaria o caminho) para `/contatos`, ou para `/contatos/{id}` quando o id
+    // é um contato do próprio tenant. Só leitura.
+    await page.goto("/inbox");
+    await expect(page.getByRole("link", { name: "Clientes", exact: true })).toHaveCount(0);
+
+    await page.goto("/clientes");
+    await expect(page).toHaveURL(/\/contatos$/, { timeout: 30_000 });
+    await expect(page.getByRole("heading", { name: "Contatos" })).toBeVisible({ timeout: 20_000 });
+
+    const { clientId } = await tenantDeTeste(servico());
+    await page.goto(`/clientes/${clientId}`);
+    await expect(page).toHaveURL(/\/contatos$/, { timeout: 30_000 });
+    await page.goto("/clientes/999999999");
+    await expect(page).toHaveURL(/\/contatos$/, { timeout: 30_000 });
+
+    const { data: contato } = await servico().from("dados_cliente").select("id").eq("client_id", clientId).limit(1).maybeSingle();
+    if (contato) {
+      await page.goto(`/clientes/${contato.id}`);
+      await expect(page).toHaveURL(new RegExp(`/contatos/${contato.id}$`), { timeout: 30_000 });
+    }
   });
 
   test("não gerencia o funil", async ({ page }) => {

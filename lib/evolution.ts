@@ -141,6 +141,19 @@ export async function connectionState(instanceName: string) {
   );
 }
 
+/**
+ * O estado CRU da instância (`open`, `close`, `connecting`) já lido do corpo da
+ * resposta, ou `null` quando a Evolution não respondeu com sucesso. Quem
+ * normaliza é `normalizarEstado` (lib/whatsapp-estado.ts). Lança em falha de
+ * rede, como `connectionState`.
+ */
+export async function estadoDaInstancia(instanceName: string): Promise<string | null> {
+  const res = await connectionState(instanceName);
+  if (!res.ok) return null;
+  const corpo = (await res.json()) as { instance?: { state?: string }; state?: string };
+  return corpo.instance?.state ?? corpo.state ?? null;
+}
+
 // AVISOS NO WHATSAPP (29/09/2026, docs/plano-avisos.md).
 // Os três formatos abaixo foram conferidos na doc (context7) E numa leitura real
 // da instância da OBM em 29/09/2026 (Evolution 2.3.x). ⚠️ A doc publicada da v2

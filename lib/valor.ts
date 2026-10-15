@@ -25,6 +25,7 @@
 import type { BusinessHours, DayKey } from "@/lib/agent-prompt";
 import { DAY_ORDER } from "@/lib/agent-prompt";
 import { FUSO } from "@/lib/fuso";
+import { plural } from "@/lib/format";
 import { ehImportada, respostaDaIa, respostaHumana } from "@/lib/mensagem";
 
 // ---------------------------------------------------------------------------
@@ -424,10 +425,6 @@ export interface FraseValor {
   numero: string;
   /** A frase, em linguagem de dono. */
   texto: string;
-}
-
-function plural(n: number, um: string, muitos: string): string {
-  return n === 1 ? um : muitos;
 }
 
 /**

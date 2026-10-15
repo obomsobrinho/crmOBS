@@ -15,7 +15,7 @@ paths:
 
 Billing is built and PARKED on purpose during the free beta.
 
-- Access rule lives ONLY in `lib/billing.ts` (`accessState`, pure, zero imports); server and browser use the same function. Never reimplement it.  (why: docs/adr/undated-subscription-access-gate-read-only-mode.md)
+- Access rule lives ONLY in `lib/billing.ts` (`accessState`, pure; its only import is `plural` from the pure `lib/format.ts`); server and browser use the same function. Never reimplement it.  (why: docs/adr/undated-subscription-access-gate-read-only-mode.md)
 - Blocked account = READ-ONLY mode, never expelled. `/inbox`, `/perfil`, `/assinatura` stay open. Never block on unknown status, nor on `trialing` without `trial_ends_at`.  (why: docs/adr/undated-subscription-access-gate-read-only-mode.md)
 - Enforce on the server at four points: `requireActiveTenant()` (`lib/auth.ts`) in EACH paid page (`/pipeline`, `/painel`, `/agente`, `/conhecimento`, `/equipe`), not in the layout; `processTurn` silent turn before model/RAG; `POST /api/send` returns 402; UI `readOnly` prop on `MessageComposer` plus the guard in `toggleIa`. Hiding a button is not the gate.  (why: docs/adr/undated-subscription-access-gate-read-only-mode.md)
 - Subscription columns are written only by service_role (gateway webhook).

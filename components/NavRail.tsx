@@ -26,6 +26,7 @@ import {
   HandHelping,
   MessagesSquare,
   BookUser,
+  Building2,
   KanbanSquare,
   LayoutDashboard,
   Bot,
@@ -49,12 +50,16 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 // O diálogo de feedback está em toda página mas só pesa quando alguém o abre (R-30).
 const FeedbackDialog = dynamic(() => import("./FeedbackDialog"));
 
-const NAV: {
+interface ItemDoMenu {
   href: string;
   label: string;
   icon: LucideIcon;
   donoOnly?: boolean;
-}[] = [
+  /** Só o dono do PRODUTO (`ADMIN_USER_IDS`): a central "Clientes". */
+  adminOnly?: boolean;
+}
+
+const NAV: ItemDoMenu[] = [
   // Painel PRIMEIRO (26/08/2026): é a tela que prova valor, é o que o dono
   // mostra ao cliente dele, e é onde o empresário julga o produto depois que a
   // novidade passa. A tela INICIAL, porém, depende do papel (ver app/page.tsx):
@@ -68,7 +73,7 @@ const NAV: {
   // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
-  { href: "/clientes", label: "Contatos", icon: BookUser },
+  { href: "/contatos", label: "Contatos", icon: BookUser },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
@@ -82,6 +87,11 @@ const NAV: {
   // /agente, porque configurar e testar são a mesma atividade e ter duas telas
   // obrigava a SALVAR (ou seja, publicar) só para testar.
   { href: "/equipe", label: "Equipe", icon: Users },
+  // CLIENTES (14/10/2026, docs/plano-central-clientes.md): a central do dono do
+  // PRODUTO, com as empresas que usam o CRM. O item só existe para quem está em
+  // `ADMIN_USER_IDS` (decidido no servidor, `app/(app)/layout.tsx`); esconder o
+  // item não é a trava, a trava é a página e as rotas (`adminDaSessao`).
+  { href: "/clientes", label: "Clientes", icon: Building2, adminOnly: true },
 ];
 
 // "Em breve" (26/08/2026). Agenda porque ela saiu do "não construir" e agora vai
@@ -105,6 +115,7 @@ export default function NavRail({
   clientId,
   activeHref,
   role,
+  ehAdmin = false,
   whatsappConnected = true,
   numeroAvisos = null,
 }: {
@@ -117,8 +128,10 @@ export default function NavRail({
   clientId?: string;
   /** Só para o preview de design (/design): força o item ativo. */
   activeHref?: string;
-  /** Papel do usuário: 'dono' | 'atendente'. Esconde itens só-do-dono. */
+  /** Papel do usuário: 'dono' | 'atendente'. Itens só-do-dono pedem 'dono'. */
   role?: string;
+  /** Dono do produto (`ADMIN_USER_IDS`, decidido no servidor): mostra "Clientes". */
+  ehAdmin?: boolean;
   /** Estado do canal. Hoje chega sempre `true`: consultar a Evolution a cada
       navegação ficou para uma rodada própria, então a faixa existe e está no
       lugar certo, mas ainda não mede nada. */
@@ -128,6 +141,13 @@ export default function NavRail({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  // O menu que ESTA pessoa vê, filtrado UMA vez e dado aos dois (trilho e barra do
+  // celular): item só-do-dono EXIGE `role === "dono"` (sem papel, some: toda
+  // renderização, real ou de /design, passa o papel), e "Clientes" só existe para
+  // o dono do produto.
+  const visiveis = NAV.filter(
+    (n) => !(n.donoOnly && role !== "dono") && !(n.adminOnly && !ehAdmin),
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackAberto, setFeedbackAberto] = useState(false);
@@ -265,9 +285,7 @@ export default function NavRail({
           </TooltipContent>
         </Tooltip>
 
-      {NAV.map(({ href, label, icon: Icon, donoOnly }) => {
-        // Item só-do-dono some para atendente (role definido e diferente de dono).
-        if (donoOnly && role && role !== "dono") return null;
+      {visiveis.map(({ href, label, icon: Icon }) => {
         const atual = activeHref ?? pathname;
         const active = atual === href || atual.startsWith(href + "/");
         const unread = href === "/inbox" && unreadConvos > 0;
@@ -482,6 +500,7 @@ export default function NavRail({
     <BarraAbas
       pathname={activeHref ?? pathname}
       role={role}
+      itens={visiveis}
       clientName={clientName}
       unread={unreadConvos}
       pedidos={pedidosAbertos}
@@ -533,6 +552,7 @@ function MarkOnly() {
 function BarraAbas({
   pathname,
   role,
+  itens,
   clientName,
   unread,
   pedidos,
@@ -543,6 +563,8 @@ function BarraAbas({
 }: {
   pathname: string;
   role?: string;
+  /** O menu já filtrado para esta pessoa (`visiveis`). */
+  itens: ItemDoMenu[];
   clientName: string;
   unread: number;
   pedidos: number;
@@ -558,9 +580,8 @@ function BarraAbas({
 
   // Pedidos entrou na barra no lugar do Pipeline (29/09/2026, decisão do
   // dono), e o Pipeline foi para "Mais".
-  const emMais = ["/pipeline", "/agente", "/equipe", "/perfil"].some((p) =>
-    pathname.startsWith(p),
-  );
+  const itensMais = itens.filter((n) => !["/painel", "/pedidos", "/inbox"].includes(n.href));
+  const emMais = pathname.startsWith("/perfil") || itensMais.some((n) => pathname.startsWith(n.href));
   const abas: {
     href?: string;
     label: string;
@@ -574,11 +595,6 @@ function BarraAbas({
     { href: "/inbox", label: "Conversas", icon: MessagesSquare, ativa: pathname.startsWith("/inbox"), badge: unread },
     { label: "Mais", icon: Ellipsis, ativa: emMais || maisAberto },
   ];
-  const itensMais = NAV.filter(
-    (n) =>
-      !["/painel", "/pedidos", "/inbox"].includes(n.href) &&
-      (!n.donoOnly || role === "dono"),
-  );
 
   return (
     <nav

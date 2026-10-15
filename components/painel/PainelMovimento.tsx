@@ -4,7 +4,7 @@ import * as React from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Selo, NumeroAnimado } from "@/components/painel/pecas";
 import { calcularDelta } from "@/lib/delta";
-import { diaIsoSP } from "@/lib/fuso";
+import { diaIsoSP, diaMes } from "@/lib/fuso";
 import { numeroBR } from "@/lib/format";
 import type { Barra } from "@/lib/metrics";
 
@@ -53,12 +53,6 @@ const DIA_LONGO = [
 /** "2026-08-20" vira o instante do meio-dia daquele dia, para comparar datas. */
 function instanteDoDia(chave: string): number {
   return Date.parse(`${chave}T12:00:00Z`);
-}
-
-/** "2026-08-20" vira "20/08". A string já está no fuso certo. */
-function legivel(chave: string): string {
-  const [, m, d] = chave.split("-");
-  return `${d}/${m}`;
 }
 
 function nomeDoDia(chave: string): string {
@@ -295,12 +289,12 @@ export default function PainelMovimento({
                   className="painel-balao absolute bottom-full z-10 mb-1 whitespace-nowrap rounded-lg border border-line-strong bg-raised px-2.5 py-1.5 text-legenda text-ink shadow-[var(--panel-shadow)]">
                   {inexistente ? (
                     <span className="text-ink-3">
-                      {legivel(p.barra.chave)} · antes desta conta
+                      {diaMes(p.barra.chave)} · antes desta conta
                     </span>
                   ) : (
                     <>
                       <span className="font-semibold">
-                        {nomeDoDia(p.barra.chave)}, {legivel(p.barra.chave)}
+                        {nomeDoDia(p.barra.chave)}, {diaMes(p.barra.chave)}
                       </span>
                       <span className="text-ink-3">
                         {" "}
@@ -325,7 +319,7 @@ export default function PainelMovimento({
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-line-soft px-6 py-3">
         <p className="text-legenda text-ink-2">
           {pico && total(pico) > 0
-            ? `pico de ${total(pico)} na ${nomeDoDia(pico.chave)}, ${legivel(pico.chave)}`
+            ? `pico de ${total(pico)} na ${nomeDoDia(pico.chave)}, ${diaMes(pico.chave)}`
             : "sem pico no período"}
           {" · "}
           média de {numeroBR(media)} por dia

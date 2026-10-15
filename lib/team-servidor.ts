@@ -7,7 +7,7 @@ import { fetchMembers, type Member } from "@/lib/team";
 // Membros do time lidos NO SERVIDOR, com cache por tenant (R-52, 01/10/2026).
 //
 // Quem lê isto: as páginas que só PRECISAM do nome do atendente
-// (`/inbox/[id]`, `/clientes/[id]`, `/pedidos`). A abertura de uma conversa
+// (`/inbox/[id]`, `/contatos/[id]`, `/pedidos`). A abertura de uma conversa
 // relia a RPC (join com auth.users) toda vez, e o time muda quase nunca.
 // Fora daqui, de propósito: `/equipe` e `/assinatura` (a conta de assentos
 // cobra dinheiro, então leem do banco na hora) e os componentes de browser

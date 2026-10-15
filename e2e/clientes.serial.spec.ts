@@ -26,13 +26,13 @@ test.afterAll(async () => {
 });
 
 test("o contato aparece na lista, a busca acha, e a ficha é a mesma da conversa", async ({ page }) => {
-  await page.goto("/clientes");
+  await page.goto("/contatos");
   await page.getByLabel("Buscar contatos").fill("0000000001");
   const linha = page.locator('[data-slot="clientes-item"]', { hasText: NOME_TESTE });
   await expect(linha).toHaveCount(1);
   await linha.click();
   // A primeira navegação compila a rota no dev server.
-  await expect(page).toHaveURL(/\/clientes\/\d+$/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/contatos\/\d+$/, { timeout: 30_000 });
   await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toBeVisible();
 
   const email = page.getByLabel("E-mail");
@@ -57,7 +57,7 @@ test("o contato aparece na lista, a busca acha, e a ficha é a mesma da conversa
 test("o menu leva a Contatos", async ({ page }) => {
   await page.goto("/painel");
   await page.getByRole("link", { name: "Contatos" }).first().click();
-  await expect(page).toHaveURL(/\/clientes$/);
+  await expect(page).toHaveURL(/\/contatos$/);
   await expect(page.getByRole("heading", { name: "Contatos" })).toBeVisible();
 });
 
@@ -77,13 +77,13 @@ async function apagarNovo() {
 test("Novo cliente cadastra, não duplica, nasce com conversa vazia e não entra em Conversas", async ({ page }) => {
   await apagarNovo();
   try {
-    await page.goto("/clientes");
+    await page.goto("/contatos");
     await page.locator('[data-slot="clientes-novo"]').click();
     const dialogo = page.locator('[data-slot="novo-cliente"]');
     await dialogo.locator('[data-campo="telefone"]').fill("00000000002");
     await dialogo.locator('[data-campo="nome"]').fill("Novo cliente (e2e)");
     await dialogo.locator('[data-slot="novo-cliente-salvar"]').click();
-    await expect(page).toHaveURL(/\/clientes\/\d+$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/contatos\/\d+$/, { timeout: 30_000 });
     await expect(page.locator('[data-slot="ficha-nunca"]')).toBeVisible();
     await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toHaveCount(0);
 
@@ -172,7 +172,7 @@ test.describe("Clientes paginado", () => {
       if (r.method() === "POST" && r.url().includes("/rest/v1/rpc/clientes_pagina")) chamadas.pagina++;
     });
     await page.setViewportSize({ width: 1440, height: 700 });
-    await page.goto("/clientes");
+    await page.goto("/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
     await expect(itens).toHaveCount(10, { timeout: 30_000 });
     expect(chamadas.pagina, "a primeira página veio do servidor").toBe(0);

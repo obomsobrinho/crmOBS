@@ -52,3 +52,43 @@ export function solucaoDoBanco(v: unknown): Solucao | null {
 export function rotuloDaSolucao(s: string | null | undefined): string | null {
   return (s && ROTULO.get(s)) || null;
 }
+
+export interface ContagemDeSolucao {
+  solucao: Solucao;
+  rotulo: string;
+  n: number;
+}
+
+/**
+ * Os pedidos de ajuda que ABRIRAM numa janela, vistos pela solução gravada (a
+ * central do dono, aba Atendimento). As linhas vêm de `admin_cliente_solucoes`:
+ * por solução e por estar aberto ou fechado. Aberto não tem solução ainda, então
+ * entra em `abertos`; fechado sem solução (de antes de ela existir) entra em
+ * `semSolucao`, nunca reclassificado. Do mais frequente ao menos; empate segue a
+ * ordem da lista. Zero não entra.
+ */
+export function contagemPorSolucao(
+  linhas: { solucao: string | null; aberto: boolean; n: number }[]
+): { total: number; abertos: number; semSolucao: number; itens: ContagemDeSolucao[] } {
+  const soma = new Map<Solucao, number>();
+  let abertos = 0;
+  let semSolucao = 0;
+  let total = 0;
+  for (const l of linhas) {
+    const n = Number(l.n) || 0;
+    if (n <= 0) continue;
+    total += n;
+    if (l.aberto) {
+      abertos += n;
+      continue;
+    }
+    const s = solucaoDoBanco(l.solucao);
+    if (s) soma.set(s, (soma.get(s) ?? 0) + n);
+    else semSolucao += n;
+  }
+  const ordem = (s: Solucao) => SOLUCOES.findIndex((x) => x.chave === s);
+  const itens = [...soma.entries()]
+    .map(([solucao, n]) => ({ solucao, rotulo: ROTULO.get(solucao) ?? solucao, n }))
+    .sort((a, b) => b.n - a.n || ordem(a.solucao) - ordem(b.solucao));
+  return { total, abertos, semSolucao, itens };
+}

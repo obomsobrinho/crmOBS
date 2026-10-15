@@ -81,6 +81,21 @@ const badgeVariants = cva(
           "inline-flex shrink-0 items-center gap-1 rounded-full border border-danger-line bg-danger-surface px-2 py-0.5 text-legenda font-semibold tabular-nums text-danger-ink",
         "delta-neutro":
           "inline-flex shrink-0 items-center gap-1 rounded-full border border-line-soft bg-bloco px-2 py-0.5 text-legenda font-semibold tabular-nums text-ink-2",
+        /**
+         * Situação e alerta de um cliente na central do dono (14/10/2026,
+         * docs/plano-central-clientes.md). Os quatro tons são ESTADO: `bom` (verde),
+         * `aviso` (âmbar), `perigo` (vermelho) e `neutro` (sem cor). O tom vem de
+         * `lib/admin-alertas.ts`, que sabe qual situação é qual; o chip não decide.
+         * `-ink` sobre `-surface`, nunca `-fill` como tinta.
+         */
+        "estado-bom":
+          "inline-flex min-w-0 shrink-0 items-center gap-1 rounded-full border border-human-line bg-human-surface px-2 py-0.5 text-legenda font-semibold text-human-ink",
+        "estado-aviso":
+          "inline-flex min-w-0 shrink-0 items-center gap-1 rounded-full border border-warn-line bg-warn-surface px-2 py-0.5 text-legenda font-semibold text-warn-ink",
+        "estado-perigo":
+          "inline-flex min-w-0 shrink-0 items-center gap-1 rounded-full border border-danger-line bg-danger-surface px-2 py-0.5 text-legenda font-semibold text-danger-ink",
+        "estado-neutro":
+          "inline-flex min-w-0 shrink-0 items-center gap-1 rounded-full border border-line-soft bg-bloco px-2 py-0.5 text-legenda font-semibold text-ink-2",
       },
     },
     defaultVariants: { variant: "contorno" },

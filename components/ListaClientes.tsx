@@ -63,7 +63,7 @@ export default function ListaClientes({
   previewTodos,
   numeroAvisos = null,
   selecionadoId = null,
-  hrefModelo = "/clientes/{id}",
+  hrefModelo = "/contatos/{id}",
   podeCadastrar = true,
   simular = false,
 }: {
@@ -76,9 +76,9 @@ export default function ListaClientes({
   numeroAvisos?: string | null;
   /** Conta bloqueada (modo leitura) não cadastra. */
   podeCadastrar?: boolean;
-  /** Preview `/design/clientes`: o "Novo cliente" valida e não grava. */
+  /** Preview `/design/contatos`: o "Novo cliente" valida e não grava. */
   simular?: boolean;
-  /** Para o preview `/design/clientes`, que não tem rota por contato. */
+  /** Para o preview `/design/contatos`, que não tem rota por contato. */
   selecionadoId?: number | null;
   /** Endereço de cada linha, com `{id}` no lugar do id. O preview troca. */
   hrefModelo?: string;
@@ -152,7 +152,7 @@ export default function ListaClientes({
 
   // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
   // some (por CSS, como a lista de conversas), e quem volta é o "voltar".
-  const abertoPelaRota = pathname.match(/^\/clientes\/(\d+)/)?.[1];
+  const abertoPelaRota = pathname.match(/^\/contatos\/(\d+)/)?.[1];
   const ativo = selecionadoId ?? (abertoPelaRota ? Number(abertoPelaRota) : null);
 
   const linhas = itens;

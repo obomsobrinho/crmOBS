@@ -112,6 +112,15 @@ export interface MontagemState {
   feito: Record<StepKey, boolean>;
 }
 
+/**
+ * A montagem está terminada quando o agente já foi ao ar alguma vez
+ * (`agent_published_at` preenchido, que nunca é limpo). A regra mora aqui e
+ * `montagemState` e a central do dono a usam; ninguém recalcula.
+ */
+export function montagemTerminada(publicada: boolean): boolean {
+  return !!publicada;
+}
+
 export function montagemState(input: OnboardingInput): MontagemState {
   const feito: Record<StepKey, boolean> = {
     conectar: !!input.hasInstance,
@@ -133,7 +142,7 @@ export function montagemState(input: OnboardingInput): MontagemState {
     passo,
     indice: PASSOS_MONTAGEM.findIndex((p) => p.key === passo),
     total: PASSOS_MONTAGEM.length,
-    completo: feito.publicar,
+    completo: montagemTerminada(feito.publicar),
     feito,
   };
 }

@@ -20,7 +20,7 @@ import AgentPromptDrawer from "./AgentPromptDrawer";
 import AgentPowerToggle from "./AgentPowerToggle";
 import AgentTestDrawer from "./AgentTestDrawer";
 import ConexaoCampo from "./agente/ConexaoCampo";
-import type { EstadoWhatsApp } from "./WhatsAppBanner";
+import type { EstadoWhatsApp } from "@/lib/whatsapp-estado";
 import { numeroBR } from "@/lib/format";
 import {
   CamposOQuePodeFazer,

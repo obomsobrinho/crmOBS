@@ -31,7 +31,7 @@ export default function NovoClienteDialog({
   onFechar: () => void;
   /** A busca que não achou ninguém, quando ela era um número. */
   telefoneInicial?: string;
-  /** Preview `/design/clientes`: valida tudo e não grava. */
+  /** Preview `/design/contatos`: valida tudo e não grava. */
   simular?: boolean;
 }) {
   const router = useRouter();
@@ -94,7 +94,7 @@ export default function NovoClienteDialog({
         return;
       }
       fechar();
-      router.push(`/clientes/${data.id}`);
+      router.push(`/contatos/${data.id}`);
       // A lista de clientes (sem realtime) busca de novo as linhas que tem, em vez
       // de refazer a página inteira (R-15, lib/contato-bus.ts).
       anunciarContato({ phone: null });

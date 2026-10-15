@@ -33,7 +33,7 @@ export default function PrimeiraMensagemDialog({
   onFechar: () => void;
   nome: string;
   phone: string;
-  /** Preview `/design/clientes`: não envia nada. */
+  /** Preview `/design/contatos`: não envia nada. */
   simular?: boolean;
 }) {
   const router = useRouter();

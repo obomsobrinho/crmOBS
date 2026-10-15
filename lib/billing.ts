@@ -1,12 +1,14 @@
 // Estado de assinatura do tenant: uma regra só, em módulo PURO.
 //
-// Sem imports, sem process.env, sem "server-only" (mesmo padrão de
+// Só importa o `plural` de lib/format.ts (puro), sem process.env, sem "server-only" (mesmo padrão de
 // lib/agent-prompt.ts). É isso que permite o servidor usar no gate e o browser
 // usar no aviso sem duas implementações que divergem com o tempo.
 //
 // Quem ESCREVE estas colunas é sempre service_role (webhook do gateway e rotas
 // de cobrança): `clients` não tem grant de UPDATE para `authenticated`, então o
 // browser não consegue se auto-liberar mesmo se alguém tentar pelo devtools.
+
+import { plural } from "./format";
 
 export type SubscriptionStatus = "trialing" | "active" | "past_due" | "canceled";
 
@@ -289,10 +291,6 @@ function parse(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
   return Number.isFinite(t) ? t : null;
-}
-
-function plural(n: number, um: string, muitos: string): string {
-  return n === 1 ? um : muitos;
 }
 
 /**

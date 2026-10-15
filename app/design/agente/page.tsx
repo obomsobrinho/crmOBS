@@ -103,7 +103,7 @@ export default async function DesignAgentePage({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
-      <NavRail clientName="Ótica Vision" activeHref="/agente" />
+      <NavRail clientName="Ótica Vision" activeHref="/agente" role="dono" />
       {/* overflow-y-auto como na tela real: a rolagem é do cartão, uma só. E
           `px-6 pt-6` como lá, pelo mesmo motivo: o rodapé é sticky e `bottom: 0`
           cola no fim da content box, então padding embaixo deixa conteúdo

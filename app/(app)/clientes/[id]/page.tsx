@@ -1,98 +1,34 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import FichaContato from "@/components/FichaContato";
-import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
-import { getMyClient } from "@/lib/auth";
-import { cleanName, nomeDoContato } from "@/lib/inbox";
-import { diasSemContato } from "@/lib/clientes";
+import DetalheCliente from "@/components/admin/DetalheCliente";
+import { adminDaPagina, detalheDoCliente } from "@/lib/admin";
+import { ehAbaDoCliente } from "@/lib/admin-cliente";
+import { AGENT_MODEL } from "@/lib/agent";
 import { agoraMs } from "@/lib/periodo";
-import { createClient } from "@/lib/supabase/server";
-import { membrosDoTenant } from "@/lib/team-servidor";
-import { resumoDaConversa } from "@/lib/conversa-resumo";
+import { createServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Cliente", robots: { index: false } };
 
-// A ficha na tela de Clientes. É a MESMA do painel da conversa
-// (`FichaContato`), com `superficie="clientes"`.
-export default async function ClientePage({
+// DETALHE DE UM CLIENTE da central do dono (docs/plano-central-clientes.md). Só o
+// dono do produto (`ADMIN_USER_IDS`). Quem não é admin NÃO recebe 404:
+// `adminDaPagina` o leva a `/contatos/{id}` quando o id é um contato do tenant da
+// própria pessoa (link antigo de Contatos) e a `/contatos` em qualquer outro
+// caso, sem revelar que a central existe. Um id que não é de cliente (os
+// contatos têm id numérico) segue esse caminho também para o admin, para o link
+// antigo dele continuar valendo.
+export default async function ClienteDetalhePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ aba?: string }>;
 }) {
-  const id = Number((await params).id);
-  if (!Number.isInteger(id) || id <= 0) notFound();
-  const supabase = await createClient();
+  const { id } = await params;
+  await adminDaPagina(id);
 
-  const { data } = await supabase
-    .from("dados_cliente")
-    .select("id, telefone, nomewpp, atendimento_ia, created_at, display_name, custom_fields, email, birth_date, foto_path")
-    .eq("id", id)
-    .maybeSingle();
-  const contato = data;
-  if (!contato) notFound();
-  const phone = contato.telefone;
+  const { aba } = await searchParams;
+  const detalhe = await detalheDoCliente(createServiceClient(), id, agoraMs(), AGENT_MODEL);
+  if (!detalhe) notFound();
 
-  const clientPromise = getMyClient();
-  const [{ data: conv }, resumo, { data: qual }, members, client] =
-    await Promise.all([
-      supabase
-        .from("conversations")
-        .select("id, last_message_at")
-        .eq("phone", phone)
-        .maybeSingle(),
-      resumoDaConversa(supabase, phone),
-      supabase
-        .from("conversation_qualifications")
-        .select("summary")
-        .eq("phone", phone)
-        .not("summary", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      clientPromise.then((c) => (c ? membrosDoTenant(supabase, c.id) : [])),
-      clientPromise,
-    ]);
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* No celular a ficha é a tela inteira, e este é o caminho de volta. */}
-      <div className="border-b border-line px-4 py-2 md:hidden">
-        <Link
-          href="/clientes"
-          className="inline-flex items-center gap-1.5 text-apoio font-semibold text-ink-2"
-        >
-          <ArrowLeft size={16} />
-          Contatos
-        </Link>
-      </div>
-      <AreaRolavel className="min-h-0 flex-1">
-        <FichaContato
-          key={contato.id}
-          superficie="clientes"
-          name={nomeDoContato(contato)}
-          nomeBase={cleanName(contato.nomewpp)}
-          phone={phone}
-          firstMessageAt={resumo.primeira}
-          messageCount={resumo.total}
-          members={members}
-          myUserId={client?.userId ?? ""}
-          conversationId={conv?.id ?? null}
-          diasSemContato={diasSemContato(
-            conv?.last_message_at ?? null,
-            agoraMs()
-          )}
-          clientId={client?.id ?? ""}
-          editableName={contato.display_name ?? null}
-          customFields={contato.custom_fields ?? null}
-          email={contato.email ?? null}
-          birthDate={contato.birth_date ?? null}
-          entendimento={qual?.summary ?? null}
-          podeEnviar={!client?.access.blocked}
-          fotoPath={contato.foto_path ?? null}
-          contactExists
-        />
-      </AreaRolavel>
-    </div>
-  );
+  return <DetalheCliente detalhe={detalhe} abaInicial={ehAbaDoCliente(aba) ? aba : "visao"} />;
 }

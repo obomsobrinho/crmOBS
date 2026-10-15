@@ -1,7 +1,7 @@
 import type { Supa } from "@/lib/supabase/tipos";
 
 // Total de mensagens e data da primeira de UMA conversa, para a ficha do
-// contato (`/inbox/[id]` e `/clientes/[id]`). Uma ida ao banco (R-14,
+// contato (`/inbox/[id]` e `/contatos/[id]`). Uma ida ao banco (R-14,
 // 01/10/2026): antes eram um count exato e uma leitura da primeira linha.
 export interface ResumoConversa {
   total: number;

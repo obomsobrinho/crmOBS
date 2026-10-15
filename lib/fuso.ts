@@ -25,6 +25,18 @@ export function diaIsoSP(instante: number | Date): string {
   return FMT_DIA_ISO.format(instante);
 }
 
+/** Soma `n` dias a uma data AAAA-MM-DD (aritmética de calendário, sem fuso no meio). */
+export function somarDias(dia: string, n: number): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
+/** "2026-08-20" vira "20/08". Sem `Date` no meio: a string já está no fuso certo. */
+export function diaMes(dia: string): string {
+  const [, m, d] = dia.split("-");
+  return `${d}/${m}`;
+}
+
 /** "20 de julho de 2026" (dia com 2 dígitos, mês por extenso, ano). */
 export function dataLongaSP(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", {

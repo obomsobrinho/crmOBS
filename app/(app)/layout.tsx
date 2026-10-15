@@ -5,6 +5,7 @@ import BillingBanner from "@/components/BillingBanner";
 import WhatsAppBanner from "@/components/WhatsAppBanner";
 import BannerLimiteIa from "@/components/BannerLimiteIa";
 import { Suspense } from "react";
+import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
 import { getMyClient } from "@/lib/auth";
 import { estadoDoConsumoDoTenant } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
@@ -55,6 +56,9 @@ export default async function AppLayout({
         clientName={client.name}
         clientId={client.id}
         role={client.role ?? undefined}
+        // Só mostra o item "Clientes" (a central do dono do produto). Decidido
+        // aqui, no servidor; a trava de verdade é a página e as rotas.
+        ehAdmin={ehAdminPeloAmbiente(client.userId)}
         numeroAvisos={client.avisos}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">

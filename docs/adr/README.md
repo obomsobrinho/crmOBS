@@ -1,4 +1,4 @@
-# ADR index (docs/adr/, 97 files)
+# ADR index (docs/adr/, 98 files)
 
 | File | Area | Status | Title |
 |---|---|---|---|
@@ -96,6 +96,8 @@
 | 2026-10-08-open-request-updated-by-new-client-info.md | agent, data, pedidos | Accepted | Client info added to an open request rewrites its summary (atualizado_em) through the pure atualizacaoDoPedido (lib/fila-de-pedidos.ts); never a new notice, ties are skipped |
 | 2026-10-13-orientation-saved-as-agent-rule.md | agent-ai, pedidos, data | Accepted | An orientation can be saved as a rule in clients.regras_salvas, rendered by ONE section before the base tail in both modes; only POST/DELETE agent-rules writes it, by compare and swap (limit check, publication row); one compile helper (compilarDoTenant); the guardrail sees it through the persona |
 | 2026-10-13-ai-usage-cap-in-tokens.md | agent-ai, admin, data | Accepted | AI usage per company with a monthly cap in TOKENS (default 10M, SP month): one PK read before the model, atomic sum in logTurn, silent turn limite_ia, notices once per level, /admin guarded by ADMIN_USER_IDS with every action logged |
+| 2026-10-14-clientes-central-with-tabs.md | admin, ui, data | Accepted | The owner's central "Clientes" at /clientes (contacts moved to /contatos): guard per route (page and API, listed and tested), non-admins redirected and never told it exists, menu item only for the owner, ONE keyset list query with alert chips from lib/admin-alertas.ts, detail with Visao geral, Uso de IA (cap edit moved here) and Atendimento reusing the panel's numbers |
+| 2026-10-15-charts-recharts-in-base-layer.md | ui, admin, dashboard | Accepted | shadcn chart (Recharts 3.8.0 + react-is 19) in components/ui/chart.tsx and mapa-de-calor.tsx, ONLY door to charts, themed with --chart-* tokens (brand + neutral, ramp for slices, green/amber/red stay state); tooltip and table view on every chart; central Uso de IA = columns + monthly-limit pace line + period chips, heatmap with tooltip, Atendimento = stacked columns, donut, horizontal bars; admin_cliente_uso_horas for the Dia period |
 | undated-agent-enabled-vs-published-at.md | onboarding | Accepted (see also 2026-08-28-agent-switch-two-columns.md) | agent_enabled is the switch; agent_published_at is the first activation and is never cleared |
 | undated-agent-turns-metering.md | agent-ai | Accepted | agent_turns: one measurement row per AI turn, best-effort, no message content |
 | undated-asaas-billing-and-webhook.md | billing | Accepted | Asaas billing: subscribe, idempotent public webhook, event map, cash-register screen |

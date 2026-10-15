@@ -984,25 +984,59 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_cliente_solucoes: {
+        Args: {
+          p_ate?: string[]
+          p_client: string
+          p_de?: string[]
+          p_fora?: string[]
+        }
+        Returns: {
+          aberto: boolean
+          janela: number
+          n: number
+          solucao: string
+        }[]
+      }
+      admin_cliente_uso: {
+        Args: {
+          p_ate: string
+          p_client: string
+          p_cubo_de: string
+          p_de: string
+        }
+        Returns: Json
+      }
+      admin_cliente_uso_horas: {
+        Args: { p_ate: string; p_client: string; p_de: string }
+        Returns: Json
+      }
       admin_empresas_pagina: {
         Args: {
           p_busca?: string
           p_cursor_id?: string
           p_cursor_nome?: string
+          p_id?: string
           p_limite?: number
           p_mes: string
+          p_situacao?: string
         }
         Returns: {
           account_type: string
           agent_enabled: boolean
           agent_published_at: string
           billing_plan: string
+          created_at: string
+          grace_until: string
           ia_limite_tokens: number
           id: string
           name: string
+          subscription_status: string
+          tem_instancia: boolean
           tokens_cache: number
           tokens_entrada: number
           tokens_saida: number
+          trial_ends_at: string
           ultima_atividade: string
         }[]
       }

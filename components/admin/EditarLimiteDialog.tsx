@@ -14,14 +14,14 @@ import { numeroBR } from "@/lib/format";
 import { LIMITE_PADRAO_TOKENS, tokensCurto } from "@/lib/custo-ia";
 import { limiteDigitado, type EmpresaItem } from "@/lib/admin-empresas";
 
-// EDITAR O LIMITE DE IA DE UMA EMPRESA (/admin, P1 item 6). O campo é SEMPRE em
+// EDITAR O LIMITE DE IA DE UM CLIENTE (aba "Uso de IA" da central, P1 item 6). O campo é SEMPRE em
 // milhões de tokens ("10", "2,5" ou "2.5"); embaixo dele, os tokens que vão ser
 // gravados, para não haver dúvida. Vazio ou "Usar o padrão" volta ao padrão do
 // código. Grava por `PUT /api/admin/empresas/[id]/limite` (uma transação, com o
 // registro em `admin_acoes`). Subir acima do uso reativa a IA na próxima
 // mensagem. No preview (`simular`) valida e não grava.
 //
-// A lista monta este diálogo com `key` = id da empresa: abrir outra empresa é
+// O detalhe monta este diálogo com `key` = id do cliente: abrir outro cliente é
 // outro diálogo, com o campo já começando no teto dela.
 export default function EditarLimiteDialog({
   empresa,

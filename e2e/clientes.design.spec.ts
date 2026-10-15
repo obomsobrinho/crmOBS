@@ -128,9 +128,9 @@ async function rolarAteOFim(page: import("@playwright/test").Page) {
   }
 }
 
-test.describe("Tela de Clientes (/design/clientes)", () => {
+test.describe("Tela de Clientes (/design/contatos)", () => {
   test("lista, busca, filtros e estados vazios", async ({ page }) => {
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
     // PAGINADA (01/10/2026): abre com 10, e rolar traz o resto.
     await expect(itens).toHaveCount(10);
@@ -158,14 +158,14 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await rolarAteOFim(page);
     await expect(itens).toHaveCount(14);
 
-    await page.goto("/design/clientes?cenario=vazia");
+    await page.goto("/design/contatos?cenario=vazia");
     await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Ainda não há contatos");
-    await page.goto("/design/clientes?cenario=nova");
+    await page.goto("/design/contatos?cenario=nova");
     await expect(itens).toHaveCount(3);
   });
 
   test("filtro de contato frio: 60+ dias, e quem nunca escreveu fica de fora", async ({ page }) => {
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
     const chip = page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato há 60+ dias" });
     await expect(chip).toContainText("6");
@@ -184,25 +184,25 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
 
     // Chip com zero some (D4, a mesma regra das Conversas): na conta nova
     // ninguém esfriou, e o chip nem aparece.
-    await page.goto("/design/clientes?cenario=nova");
+    await page.goto("/design/contatos?cenario=nova");
     await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" })).toHaveCount(0);
     await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Em conversa" })).toHaveCount(1);
 
     // Com um chip só, a faixa inteira some.
-    await page.goto("/design/clientes?cenario=vazia");
+    await page.goto("/design/contatos?cenario=vazia");
     await expect(page.locator('[data-slot="clientes-chip"]')).toHaveCount(0);
   });
 
   test("a ficha do contato frio diz há quanto tempo, e a de quem está em dia não diz", async ({ page }) => {
-    await page.goto("/design/clientes?sel=11");
+    await page.goto("/design/contatos?sel=11");
     await expect(page.locator('[data-slot="ficha-frio"]')).toHaveText("Última mensagem há 70 dias");
-    await page.goto("/design/clientes?sel=2");
+    await page.goto("/design/contatos?sel=2");
     await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toBeVisible();
     await expect(page.locator('[data-slot="ficha-frio"]')).toHaveCount(0);
   });
 
   test("a ficha é a do painel da conversa, com o atalho e o Entendimento", async ({ page }) => {
-    await page.goto("/design/clientes?sel=1");
+    await page.goto("/design/contatos?sel=1");
     await expect(page.locator('[data-slot="clientes-item"][aria-current="page"]')).toContainText("Franck");
     await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toHaveAttribute("href", "/inbox/5535984774753");
     await expect(page.locator('[data-slot="ficha-entendimento"]')).toContainText("plano anual");
@@ -216,12 +216,12 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await page.getByLabel("Nascimento").blur();
     await expect(page.locator('[data-slot="painel-dados-status"]')).toHaveText("data inválida");
 
-    await page.goto("/design/clientes?sel=2");
+    await page.goto("/design/contatos?sel=2");
     await expect(page.locator('[data-slot="painel-completude"]')).toHaveText("Completo");
   });
 
   test("texto de tela sem travessão e sem vocabulário de segmento", async ({ page }) => {
-    for (const rota of ["/design/clientes?sel=1", "/design/clientes?cenario=vazia"]) {
+    for (const rota of ["/design/contatos?sel=1", "/design/contatos?cenario=vazia"]) {
       await page.goto(rota);
       const texto = await page.locator("body").innerText();
       expect(texto).not.toMatch(/[—–]/);
@@ -231,7 +231,7 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
 
   test("no celular é uma tela por vez, sem rolagem lateral", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     await expect(page.locator('[data-slot="clientes-lista"]')).toBeVisible();
     await expect(page.locator("[data-clientes-vazio]")).toBeHidden();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
@@ -242,7 +242,7 @@ test.describe("Tela de Clientes (/design/clientes)", () => {
     await expect(linha).toHaveText("Sem contato há 150 dias");
     expect(await linha.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
 
-    await page.goto("/design/clientes?sel=1");
+    await page.goto("/design/contatos?sel=1");
     await expect(page.locator('[data-slot="painel-completude"]')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
@@ -270,9 +270,9 @@ test.describe("Novo cliente (lib/clientes.ts, fatia B)", () => {
   });
 });
 
-test.describe("Novo cliente e primeira mensagem (/design/clientes)", () => {
+test.describe("Novo cliente e primeira mensagem (/design/contatos)", () => {
   test("Novo cliente: máscara, telefone obrigatório e motivo na tela", async ({ page }) => {
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     await page.locator('[data-slot="clientes-novo"]').click();
     const dialogo = page.locator('[data-slot="novo-cliente"]');
     await expect(dialogo).toContainText("Cadastrar não envia nada");
@@ -299,20 +299,20 @@ test.describe("Novo cliente e primeira mensagem (/design/clientes)", () => {
   });
 
   test("busca por número sem resultado oferece cadastrar com o número preenchido", async ({ page }) => {
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     await page.getByLabel("Buscar contatos").fill("11 97777-0000");
     await page.locator('[data-slot="clientes-vazio-novo"]').click();
     await expect(page.locator('[data-slot="novo-cliente"] [data-campo="telefone"]')).toHaveValue("(11) 97777-0000");
   });
 
   test("filtro 'Nunca escreveram' e o peso de cada ação na ficha", async ({ page }) => {
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     await page.locator('[data-slot="clientes-chip"]', { hasText: "Nunca escreveram" }).click();
     await expect(page.locator('[data-slot="clientes-item"]')).toHaveCount(1);
     await expect(page.locator('[data-slot="clientes-item"]')).toContainText("Ana Clara");
 
     // Quem nunca escreveu: aviso, sem "Abrir conversa".
-    await page.goto("/design/clientes?sel=17");
+    await page.goto("/design/contatos?sel=17");
     await expect(page.locator('[data-slot="ficha-nunca"]')).toHaveText("Este número nunca escreveu para você");
     await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toHaveCount(0);
     await page.locator('[data-slot="ficha-primeira-mensagem"]').click();
@@ -329,20 +329,20 @@ test.describe("Novo cliente e primeira mensagem (/design/clientes)", () => {
     await expect(dialogo).toBeHidden();
 
     // Quem já conversou: sem fricção, sem o aviso.
-    await page.goto("/design/clientes?sel=2");
+    await page.goto("/design/contatos?sel=2");
     await expect(page.locator('[data-slot="ficha-abrir-conversa"]')).toBeVisible();
     await expect(page.locator('[data-slot="ficha-primeira-mensagem"]')).toHaveCount(0);
   });
 
   test("diálogos sem travessão e cabendo no celular", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/design/clientes?sel=17");
+    await page.goto("/design/contatos?sel=17");
     await page.locator('[data-slot="ficha-primeira-mensagem"]').click();
     const primeira = page.locator('[data-slot="primeira-mensagem"]');
     expect(await primeira.innerText()).not.toMatch(/[—–]/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
     await page.keyboard.press("Escape");
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     await page.locator('[data-slot="clientes-novo"]').click();
     const novo = page.locator('[data-slot="novo-cliente"]');
     expect(await novo.innerText()).not.toMatch(/[—–]/);

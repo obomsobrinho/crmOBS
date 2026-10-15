@@ -1,4 +1,5 @@
-import WhatsAppBanner, { type EstadoWhatsApp } from "@/components/WhatsAppBanner";
+import WhatsAppBanner from "@/components/WhatsAppBanner";
+import type { EstadoWhatsApp } from "@/lib/whatsapp-estado";
 import ConexaoCampo from "@/components/agente/ConexaoCampo";
 
 // Preview do aviso de WhatsApp caído (dev-only, liberado pelo proxy). Os quatro

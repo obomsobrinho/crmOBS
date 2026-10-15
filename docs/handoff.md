@@ -33,6 +33,14 @@ desligada de propósito**.
 
 ## 3. Estado em 27/09/2026
 
+### 15/10/2026 (madrugada): CENTRAL "CLIENTES", ENTREGA 1 PUBLICADA SEM APROVACAO DE TELA. LER PRIMEIRO
+
+- Plano: `docs/plano-central-clientes.md` (secao Execution). Sessao arquiteto + subagente executor; o dono autorizou commit e push das duas entregas sem ver a tela, para revisar de manha.
+- Entrega 1: `/clientes` e `/clientes/[id]` viraram a central do dono (so `ADMIN_USER_IDS`; quem nao e admin vai para `/contatos`); a lista de contatos mudou para `/contatos`. Abas Visao geral, Uso de IA (grafico unico com filtro de periodo e mapa de calor) e Atendimento (graficos). Recharts entrou na camada base (`components/ui/chart.tsx`, ADR 2026-10-15). Migrations JA APLICADAS: `20261014215549`, `20261014223146`, `20261015032015` (todas aditivas).
+- Fechamento: /simplify e /code-review high com achados aplicados; sem-login 536, login 88 (pipeline.serial caiu na rodada cheia e passou sozinho), ia 28/28, bateria 80 + C3/M8/O7 instaveis conhecidos (passaram repetidos), build ok.
+- Achados registrados SEM correcao: a aba Atendimento le o historico inteiro (janela 0 de `painel_janelas` e `painel_series` sem limite inferior); limitar exigiria uma copia da regra "quem respondeu" em SQL.
+- PENDENTE DO DONO: aprovar as telas; decidir (1) WhatsApp na lista mostra so "Instancia criada" (banco nao guarda o estado); (2) ordem do alerta principal; (3) "sem atividade" conta turno da bancada; (4) linha de ritmo do teto no grafico de uso; (5) os cards Hoje/7 dias/Mes viraram o filtro de periodo.
+
 ### 14/10/2026 (madrugada): P1 ITENS 5 E 6 NO AR (641aab1, 68a5405). LER PRIMEIRO
 
 - Item 5 (orientacao vira regra) e item 6 (teto mensal de IA em tokens, avisos 80/100%, `/admin` Empresas, "Clientes" vira "Contatos" na tela) publicados.

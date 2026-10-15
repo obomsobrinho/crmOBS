@@ -3,6 +3,7 @@ import { foraDaLista } from "@/lib/inbox-lista";
 import {
   agregadoDe,
   type AgregadoDoPainel,
+  type JanelaAgregada,
   type LimitesDeJanela,
   type SeriesAgregadas,
 } from "@/lib/painel-agregado";
@@ -11,6 +12,63 @@ import { UM_MINUTO } from "@/lib/valor";
 const DIA_MS = 24 * 60 * 60 * 1000;
 
 const iso = (ms: number) => new Date(ms).toISOString();
+
+/**
+ * A metade `painel_janelas` da leitura do painel: UMA chamada de escalares para
+ * todas as janelas (a janela 0 é o acumulado, as outras seguem a ordem de
+ * `janelas`). A central do dono (`atendimentoDoCliente`) usa esta mesma função
+ * com o service_role. Erro do banco LEVANTA, nunca vira zero.
+ */
+export async function carregarJanelasDoPainel(
+  supabase: Supa,
+  o: {
+    clientId: string;
+    /** `client.avisos`: o número de avisos do time fica fora de toda conta. */
+    avisos: string | null | undefined;
+    agora: number;
+    janelas: LimitesDeJanela[];
+  }
+): Promise<JanelaAgregada[]> {
+  const { data, error } = await supabase.rpc("painel_janelas", {
+    p_client: o.clientId,
+    p_fora: foraDaLista(o.avisos),
+    p_agora: iso(o.agora),
+    p_de: o.janelas.map((j) => iso(j.de)),
+    p_ate: o.janelas.map((j) => iso(j.ate)),
+    p_rapida_ms: UM_MINUTO,
+  });
+  if (error) throw new Error(`painel_janelas: ${error.message}`);
+  return data ?? [];
+}
+
+/**
+ * A metade `painel_series` da leitura do painel: o jsonb pequeno por data, por
+ * hora e por dia da semana x minuto (sem baixar linha de mensagem). A central do
+ * dono (`atendimentoDoCliente`) usa esta mesma função com o service_role, para
+ * o gráfico de respostas por dia. Erro do banco LEVANTA, nunca vira zero.
+ */
+export async function carregarSeriesDoPainel(
+  supabase: Supa,
+  o: {
+    clientId: string;
+    avisos: string | null | undefined;
+    agora: number;
+    mes: { inicioMs: number; fimMs: number } | null;
+  }
+): Promise<SeriesAgregadas | null> {
+  const { data, error } = await supabase.rpc("painel_series", {
+    p_client: o.clientId,
+    p_fora: foraDaLista(o.avisos),
+    p_ate: iso(o.agora),
+    // As colunas por hora só existem para a janela de 24 horas; dois dias
+    // sobram para o esqueleto inteiro.
+    p_horas_de: iso(o.agora - 2 * DIA_MS),
+    p_mes_de: o.mes ? iso(o.mes.inicioMs) : null,
+    p_mes_ate: o.mes ? iso(o.mes.fimMs) : null,
+  });
+  if (error) throw new Error(`painel_series: ${error.message}`);
+  return data as SeriesAgregadas | null;
+}
 
 /**
  * Lê do banco o que o painel e a assinatura contam (R-04, R-06): UMA chamada de
@@ -33,33 +91,11 @@ export async function carregarAgregadoDoPainel(
     mes: { inicioMs: number; fimMs: number } | null;
   }
 ): Promise<AgregadoDoPainel> {
-  const fora = foraDaLista(o.avisos);
   const [janelas, series] = await Promise.all([
-    supabase.rpc("painel_janelas", {
-      p_client: o.clientId,
-      p_fora: fora,
-      p_agora: iso(o.agora),
-      p_de: o.janelas.map((j) => iso(j.de)),
-      p_ate: o.janelas.map((j) => iso(j.ate)),
-      p_rapida_ms: UM_MINUTO,
-    }),
-    supabase.rpc("painel_series", {
-      p_client: o.clientId,
-      p_fora: fora,
-      p_ate: iso(o.agora),
-      // As colunas por hora só existem para a janela de 24 horas; dois dias
-      // sobram para o esqueleto inteiro.
-      p_horas_de: iso(o.agora - 2 * DIA_MS),
-      p_mes_de: o.mes ? iso(o.mes.inicioMs) : null,
-      p_mes_ate: o.mes ? iso(o.mes.fimMs) : null,
-    }),
+    carregarJanelasDoPainel(supabase, o),
+    carregarSeriesDoPainel(supabase, o),
   ]);
-  if (janelas.error) throw new Error(`painel_janelas: ${janelas.error.message}`);
-  if (series.error) throw new Error(`painel_series: ${series.error.message}`);
-  return agregadoDe(
-    janelas.data ?? [],
-    series.data as SeriesAgregadas | null
-  );
+  return agregadoDe(janelas, series);
 }
 
 /**

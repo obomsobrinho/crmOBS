@@ -74,6 +74,18 @@ export const PERIODOS: Record<PeriodoKey, Periodo> = {
 /** Ordem de exibição do seletor, do mais curto ao mais longo. */
 export const ORDEM_PERIODOS: PeriodoKey[] = ["dia", "semana", "quinzena", "mes"];
 
+export function ehPeriodo(v: unknown): v is PeriodoKey {
+  return typeof v === "string" && (ORDEM_PERIODOS as string[]).includes(v);
+}
+
+/**
+ * A coluna de um gráfico por período: a janela de 1 dia sai por HORA (24 colunas),
+ * qualquer outra por dia. Uma regra só para o painel (`lib/metrics.ts`) e a central.
+ */
+export function unidadeDoPeriodo(dias: number): "hora" | "dia" {
+  return dias <= 1 ? "hora" : "dia";
+}
+
 /** Janela padrão ao abrir a tela. */
 export const PERIODO_PADRAO: PeriodoKey = "semana";
 

@@ -29,7 +29,7 @@ import {
   type BaldesDeBarras,
   type DashboardMetrics,
 } from "@/lib/metrics";
-import { ORDEM_PERIODOS, PERIODOS, limites, type PeriodoKey } from "@/lib/periodo";
+import { ORDEM_PERIODOS, PERIODOS, limites, unidadeDoPeriodo, type PeriodoKey } from "@/lib/periodo";
 import {
   dentroDoHorario,
   ehFeriado,
@@ -292,7 +292,7 @@ export function barrasDasSeries(
   agora: number
 ): Barra[] {
   const baldes: BaldesDeBarras = new Map();
-  if (dias <= 1) {
+  if (unidadeDoPeriodo(dias) === "hora") {
     for (const [data, hora, ia, time] of series.horas) {
       baldes.set(`${data}T${String(hora).padStart(2, "0")}`, { ia, time });
     }

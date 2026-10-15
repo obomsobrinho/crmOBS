@@ -476,6 +476,27 @@
   --chip-fg: #4b4468;
   --chip-line: rgba(58, 31, 122, 0.16);
 
+  /* ── Gráficos (`components/ui/chart.tsx`, 15/10/2026) ──
+     Só aliases dos tokens da casa, declarados UMA vez: `:root` e o bloco escuro
+     casam com o mesmo elemento (o <html>), então `var(--brand-fill)` já resolve
+     para o valor do tema e não precisa de uma cópia escura. A paleta é a da
+     casa: UMA cor categórica (a marca) mais o neutro, e verde, âmbar e vermelho
+     são ESTADO, nunca série. `--chart-1` é a série principal (IA, uso);
+     `--chart-2` é a segunda, neutra (o time); `--chart-guia` é a linha de
+     referência (um limite, uma média). */
+  --chart-1: var(--brand-fill);
+  --chart-2: var(--ink-3);
+  --chart-guia: var(--ink-2);
+  --chart-grade: var(--line);
+  --chart-eixo: var(--ink-3);
+  --chart-cursor: var(--line-strong);
+  /* A rampa de UM matiz (a marca), do vazio ao cheio: a escala do mapa de calor e as fatias de uma rosca. */
+  --chart-rampa-0: var(--line-soft);
+  --chart-rampa-1: color-mix(in srgb, var(--brand-fill) 22%, transparent);
+  --chart-rampa-2: color-mix(in srgb, var(--brand-fill) 44%, transparent);
+  --chart-rampa-3: color-mix(in srgb, var(--brand-fill) 70%, transparent);
+  --chart-rampa-4: var(--brand-fill);
+
   /* ── Chip de filtro ATIVO (lista de conversas) ──
      O desenho de 18/09/2026 marca o recorte ativo por INVERSÃO de tinta, e não
      por peso da fonte: fundo na tinta principal, rótulo na superfície do

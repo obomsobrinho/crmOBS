@@ -1,10 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Medidor } from "@/components/ui/medidor";
+import ListaDeContagens from "@/components/painel/ListaDeContagens";
 import { CheckCircle2 } from "lucide-react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ORDEM_PERIODOS, PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
+import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
+import { PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
 import type { ContagemDeMotivo } from "@/lib/motivos";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +35,6 @@ export default function PainelMotivos({
   const [periodo, setPeriodo] = React.useState<PeriodoKey>(PERIODO_PADRAO);
   const p = PERIODOS[periodo];
   const { total, itens } = porPeriodo[periodo];
-  const maior = Math.max(1, ...itens.map((i) => i.n));
 
   return (
     <section
@@ -49,15 +48,7 @@ export default function PainelMotivos({
             {total === 1 ? "1 pedido de ajuda" : `${total} pedidos de ajuda`}, {p.legenda}
           </p>
         </div>
-        <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoKey)}>
-          <TabsList variant="painel" aria-label="Período">
-            {ORDEM_PERIODOS.map((k) => (
-              <TabsTrigger key={k} value={k} variant="painel">
-                {PERIODOS[k].aba}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <SeletorDePeriodo valor={periodo} aoMudar={setPeriodo} />
       </div>
 
       {total === 0 ? (
@@ -67,21 +58,17 @@ export default function PainelMotivos({
           Ela não precisou te chamar {p.legenda}.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3 px-6 py-5" data-slot="painel-motivos-lista">
-          {itens.map((it) => (
-            <li key={it.motivo ?? "sem"} data-motivo={it.motivo ?? "sem"} className="flex flex-col gap-1.5">
-              <span className="flex items-baseline justify-between gap-2.5">
-                <span className={`min-w-0 truncate text-corpo ${it.motivo ? "text-ink" : "text-ink-3"}`}>
-                  {it.rotulo}
-                </span>
-                <span className="shrink-0 font-display text-corpo font-semibold tabular-nums text-ink">
-                  {it.n}
-                </span>
-              </span>
-              <Medidor valor={(it.n / maior) * 100} tom={it.motivo ? "marca" : "neutro"} />
-            </li>
-          ))}
-        </ul>
+        <ListaDeContagens
+          className="px-6 py-5"
+          data-slot="painel-motivos-lista"
+          atributoDoItem="data-motivo"
+          itens={itens.map((it) => ({
+            chave: it.motivo ?? "sem",
+            rotulo: it.rotulo,
+            n: it.n,
+            neutro: it.motivo === null,
+          }))}
+        />
       )}
     </section>
   );

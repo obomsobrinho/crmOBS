@@ -38,10 +38,10 @@ test.describe("Regra da foto (lib/fotos.ts)", () => {
   });
 });
 
-test.describe("Avatar com foto (/design/clientes)", () => {
+test.describe("Avatar com foto (/design/contatos)", () => {
   test("com foto mostra a imagem na lista e na ficha; sem foto, as iniciais", async ({ page }) => {
     await page.route("**/api/fotos/**", (r) => r.fulfill({ status: 200, contentType: "image/png", body: PNG }));
-    await page.goto("/design/clientes?sel=2");
+    await page.goto("/design/contatos?sel=2");
     const linha = page.locator('[data-slot="clientes-item"]', { hasText: "Marina Souza" });
     await expect(linha.locator('[data-slot="avatar-image"]')).toBeVisible();
     await expect(page.locator('main [data-slot="avatar-image"], [data-slot="avatar"][data-foto] img').last()).toBeVisible();
@@ -51,7 +51,7 @@ test.describe("Avatar com foto (/design/clientes)", () => {
 
   test("foto que não carrega cai nas iniciais", async ({ page }) => {
     await page.route("**/api/fotos/**", (r) => r.fulfill({ status: 404, body: "" }));
-    await page.goto("/design/clientes");
+    await page.goto("/design/contatos");
     const linha = page.locator('[data-slot="clientes-item"]', { hasText: "Marina Souza" });
     await expect(linha.locator('[data-slot="avatar"]')).toHaveText("MS");
     await expect(linha.locator('[data-slot="avatar-image"]')).toHaveCount(0);

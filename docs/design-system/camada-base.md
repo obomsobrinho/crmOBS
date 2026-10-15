@@ -45,7 +45,9 @@ Tem `asChild`, então um `<Link>` com aparência de botão não precisa ser escr
 
 ### `badge`
 `contorno` (padrão), `tracejado`, `contagem`, `nao-lidas`, `dia`, `tag`, `delta-bom`,
-`delta-ruim`, `delta-neutro`.
+`delta-ruim`, `delta-neutro`, `estado-bom`, `estado-aviso`, `estado-perigo`, `estado-neutro`.
+Os quatro `estado-*` são o selo de SITUAÇÃO e de ALERTA de um cliente na central do dono
+(`/clientes`); o tom vem de `lib/admin-alertas.ts` e o chip não decide nada.
 ⚠️ Os três `delta-*` são o selo de variação e **têm consumidor único**, o `Selo` do painel. O
 padrão é `delta-neutro` e o selo é OPCIONAL no cartão: a referência que inspirou isto tem selo
 colorido em 100% dos cartões, e é assim que verde deixa de ser estado e vira enfeite.
@@ -116,6 +118,23 @@ Tamanhos `field` e `control`.
 ### `avatar`
 Tamanhos `xl` (44), `lg` (40), `md` (36), `sm` (32), `xs` (28). A cor sai de `avatarPair()`
 (`lib/inbox.ts`), nunca branco sobre cor cheia.
+
+### `chart` e `mapa-de-calor`
+`components/ui/chart.tsx` é a ÚNICA porta para gráfico novo: o `chart` do shadcn (Recharts 3.8.0,
+`react-is` 19 junto) ligado aos tokens da casa, sem o tema por `<style>` do shadcn. Peças:
+`ChartContainer` (`config` aponta para tokens, nunca hexadecimal solto), `ChartTooltip` e
+`ChartTooltipContent` (valor em destaque, nome em segundo plano, chave de linha curta; `titulo` e
+`rodape` a tela preenche), `ChartLegenda` (lista HTML ao lado, obrigatória com duas séries ou mais,
+com a cor explícita porque mora fora do container) e `useAnimacaoDoGrafico` (movimento reduzido).
+Cores: `--chart-1` (a marca), `--chart-2` (neutro), `--chart-guia`, `--chart-grade`,
+`--chart-eixo`, `--chart-cursor` e a rampa `--chart-rampa-0..4` (um matiz) em `globals.css`;
+verde, âmbar e vermelho continuam ESTADO. Toda série além das duas primeiras sai da rampa da marca e
+de neutros, e a identidade vai na legenda (nome, número, fração), nunca só na cor. Todo gráfico tem
+balão ao passar o mouse e ao focar, e uma tabela `sr-only` (dentro de uma `div`, porque tabela
+ignora `overflow`) com os mesmos números. Marca: coluna de até 24px com ponta de 4px, linha de 2px,
+grade de 1px. `mapa-de-calor.tsx` é o que o Recharts não desenha: grade de células em cinco degraus,
+pico com contorno e explicado na legenda, um balão só, setas do teclado. Razão e escolhas:
+[../adr/2026-10-15-charts-recharts-in-base-layer.md](../adr/2026-10-15-charts-recharts-in-base-layer.md).
 
 ### `dropdown-menu`, `tooltip`, `scroll-area`, `separator`, `checkbox`
 Sem variantes. `dropdown-menu` e `tooltip` usam `.anim-flutuante`. A `scroll-area` imita a barra

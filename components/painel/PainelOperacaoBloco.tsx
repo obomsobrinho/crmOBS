@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Stat,
   StatTopo,
@@ -11,18 +10,15 @@ import {
   StatLegenda,
 } from "@/components/ui/stat";
 import { Selo, NumeroAnimado, CartaoEmBreve } from "@/components/painel/pecas";
+import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
+import { pct } from "@/lib/format";
 import { calcularDelta, deltaDuracao } from "@/lib/delta";
 import {
   formatDuration,
   type Barra,
   type DashboardMetrics,
 } from "@/lib/metrics";
-import {
-  ORDEM_PERIODOS,
-  PERIODOS,
-  PERIODO_PADRAO,
-  type PeriodoKey,
-} from "@/lib/periodo";
+import { PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
 
 // "A operação": quatro cartões numa linha, com o seletor de período DENTRO do
 // bloco.
@@ -56,8 +52,7 @@ export default function PainelOperacaoBloco({
   const j = janelas[periodo];
   const m = j.metrics;
 
-  const pct =
-    m.conversas > 0 ? Math.round((m.semIntervencao / m.conversas) * 100) : 0;
+  const autonomia = pct(m.semIntervencao, m.conversas);
 
   const deltaAutonomia = calcularDelta({
     atual: m.semIntervencao,
@@ -97,15 +92,7 @@ export default function PainelOperacaoBloco({
             período anterior
           </p>
         </div>
-        <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoKey)}>
-          <TabsList variant="painel" aria-label="Período">
-            {ORDEM_PERIODOS.map((k) => (
-              <TabsTrigger key={k} value={k} variant="painel">
-                {PERIODOS[k].aba}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <SeletorDePeriodo valor={periodo} aoMudar={setPeriodo} />
       </div>
 
       {/* Quatro numa linha a partir de 1280. Abaixo disso vira duas, e nunca
@@ -125,7 +112,7 @@ export default function PainelOperacaoBloco({
           </StatFrase>
           <StatLegenda>
             {m.conversas > 0
-              ? `${m.semIntervencao} de ${m.conversas} conversas (${pct}%), ${p.legenda}`
+              ? `${m.semIntervencao} de ${m.conversas} conversas (${autonomia}%), ${p.legenda}`
               : p.legenda}
           </StatLegenda>
         </Stat>

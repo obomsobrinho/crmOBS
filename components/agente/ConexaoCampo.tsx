@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AcoesConexao, { type AcaoConexao } from "@/components/AcoesConexao";
-import { normalizarEstado, type EstadoWhatsApp } from "@/components/WhatsAppBanner";
+import { normalizarEstado, type EstadoWhatsApp } from "@/lib/whatsapp-estado";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 

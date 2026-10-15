@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CircleHelp, RefreshCw, WifiOff } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
+import { normalizarEstado, type EstadoWhatsApp } from "@/lib/whatsapp-estado";
 
 // O app diz quando o WhatsApp caiu.
 //
@@ -26,17 +27,8 @@ import { Aviso } from "@/components/ui/aviso";
 // `estadoForcado` existe para o preview de design e para o teste: com ele o
 // componente NÃO consulta nada. O layout nunca passa essa prop.
 
-export type EstadoWhatsApp = "open" | "close" | "connecting" | "unknown";
-
 /** Um minuto: queda de WhatsApp é medida em minutos, não em segundos. */
 export const INTERVALO_MS = 60_000;
-
-/** A Evolution devolve `open`, `close` e `connecting`; qualquer outra coisa é `unknown`. */
-export function normalizarEstado(valor: unknown): EstadoWhatsApp {
-  return valor === "open" || valor === "close" || valor === "connecting"
-    ? valor
-    : "unknown";
-}
 
 export default function WhatsAppBanner({
   clientId,

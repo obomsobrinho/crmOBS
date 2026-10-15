@@ -95,7 +95,7 @@ export default function FichaContato({
   fotoPath?: string | null;
   /** Conta bloqueada (modo leitura) não escreve. Só em `clientes`. */
   podeEnviar?: boolean;
-  /** Preview `/design/clientes`: o diálogo da primeira mensagem não envia. */
+  /** Preview `/design/contatos`: o diálogo da primeira mensagem não envia. */
   simular?: boolean;
   /** Onde a ficha está. `clientes` acrescenta o atalho da conversa e o Entendimento. */
   superficie?: "conversa" | "clientes";

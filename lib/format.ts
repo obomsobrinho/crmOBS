@@ -14,6 +14,16 @@ export function numeroBR(n: number): string {
   return NUMERO_BR.format(n);
 }
 
+/** Porcentagem inteira de `parte` em `todo` (0 quando não há todo). Uma conta só para o painel e a central. */
+export function pct(parte: number, todo: number): number {
+  return todo > 0 ? Math.round((parte / todo) * 100) : 0;
+}
+
+/** `1 dia`, `2 dias`: o singular só para exatamente 1. Uma função só para toda a casa. */
+export function plural(n: number, um: string, muitos: string): string {
+  return n === 1 ? um : muitos;
+}
+
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", {
     hour: "2-digit",
