@@ -158,6 +158,8 @@ export type Database = {
           asaas_event_id: string
           client_id: string | null
           created_at: string
+          deleted_client_id: string | null
+          deleted_client_name: string | null
           error: string | null
           event: string
           id: number
@@ -168,6 +170,8 @@ export type Database = {
           asaas_event_id: string
           client_id?: string | null
           created_at?: string
+          deleted_client_id?: string | null
+          deleted_client_name?: string | null
           error?: string | null
           event: string
           id?: never
@@ -178,6 +182,8 @@ export type Database = {
           asaas_event_id?: string
           client_id?: string | null
           created_at?: string
+          deleted_client_id?: string | null
+          deleted_client_name?: string | null
           error?: string | null
           event?: string
           id?: never
@@ -249,7 +255,6 @@ export type Database = {
       }
       clients: {
         Row: {
-          account_type: string | null
           agent_config: Json | null
           agent_config_updated_at: string | null
           agent_enabled: boolean
@@ -279,7 +284,6 @@ export type Database = {
           vitalicio_desde: string | null
         }
         Insert: {
-          account_type?: string | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
           agent_enabled?: boolean
@@ -309,7 +313,6 @@ export type Database = {
           vitalicio_desde?: string | null
         }
         Update: {
-          account_type?: string | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
           agent_enabled?: boolean
@@ -996,6 +999,7 @@ export type Database = {
       admin_apagar_cliente: {
         Args: {
           p_client: string
+          p_mantidas?: string[]
           p_nome: string
           p_quem: string
           p_tabelas: string[]
@@ -1010,7 +1014,6 @@ export type Database = {
           nome: string
         }[]
       }
-      admin_bloqueados_sem_beta: { Args: { p_agora?: string }; Returns: number }
       admin_cliente_solucoes: {
         Args: {
           p_ate?: string[]
@@ -1025,6 +1028,10 @@ export type Database = {
           solucao: string
         }[]
       }
+      admin_cliente_picos: {
+        Args: { p_ate: string[]; p_client: string; p_de: string[] }
+        Returns: Json
+      }
       admin_cliente_uso: {
         Args: {
           p_ate: string
@@ -1035,6 +1042,10 @@ export type Database = {
         Returns: Json
       }
       admin_cliente_uso_horas: {
+        Args: { p_ate: string; p_client: string; p_de: string }
+        Returns: Json
+      }
+      admin_cliente_uso_meses: {
         Args: { p_ate: string; p_client: string; p_de: string }
         Returns: Json
       }
@@ -1049,7 +1060,6 @@ export type Database = {
           p_situacao?: string
         }
         Returns: {
-          account_type: string
           agent_enabled: boolean
           agent_published_at: string
           billing_plan: string
@@ -1224,6 +1234,15 @@ export type Database = {
       liberar_aviso_consumo: {
         Args: { p_client: string; p_mes: string; p_nivel: string }
         Returns: undefined
+      }
+      limpar_marcas_consumo_ia: {
+        Args: {
+          p_client: string
+          p_limiar_aviso: number
+          p_limiar_parado: number
+          p_mes: string
+        }
+        Returns: number
       }
       match_knowledge_chunks: {
         Args: {

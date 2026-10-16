@@ -4,21 +4,33 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Supa } from "@/lib/supabase/tipos";
 import { ehAdminPeloAmbiente, ehUuid, idsDeAdmin, listaDeAdmins } from "@/lib/admin-acesso";
-import { mesSP } from "@/lib/custo-ia";
+import { custoEstimadoUsd, mesSP } from "@/lib/custo-ia";
+import { diaIsoSP } from "@/lib/fuso";
 import { mesmoDestino } from "@/lib/avisos";
 import { PAGINA_EMPRESAS, paraEmpresa, type EmpresaItem } from "@/lib/admin-empresas";
 import { estadoDoWhatsApp, type EstadoDoWhatsApp, type FiltroDeSituacao } from "@/lib/admin-alertas";
 import {
   atendimentoPorPeriodo,
+  atuaisEAnteriores,
+  diasDoJson,
   janelaDeUso,
   janelasDoAtendimento,
+  leituraDoHistorico,
+  mesesDoJson,
+  planoDoAtendimento,
   usoBruto,
+  usoDoHistorico,
   type AtendimentoPorPeriodo,
   type DetalheDoCliente,
+  type ModeloDoCliente,
+  type SelecaoHistorica,
   type UsoBruto,
+  type UsoHistorico,
 } from "@/lib/admin-cliente";
+import { instantesDaJanela, janelaDoChip, picosDoJson, type DadosDePicos, type JanelaDePicos } from "@/lib/picos";
+import { ORDEM_PERIODOS, type PeriodoKey } from "@/lib/periodo";
 import { normalizarRegras } from "@/lib/agent-prompt";
-import { estadoDaInstancia, logoutInstance } from "@/lib/evolution";
+import { deleteInstance, estadoDaInstancia, logoutInstance } from "@/lib/evolution";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { carregarJanelasDoPainel, carregarMotivosDoPainel, carregarSeriesDoPainel } from "@/lib/painel-dados";
 import {
@@ -36,8 +48,11 @@ import {
   COLUNAS_DO_CLIENTE,
   LEITURA_DA_EXPORTACAO,
   LOTE_DA_EXPORTACAO,
+  TABELAS_DA_EXPORTACAO,
   TABELAS_DO_CLIENTE,
+  TABELAS_MANTIDAS,
   ehObjeto,
+  type TabelaDaExportacao,
   linhaCsv,
 } from "@/lib/admin-purga";
 import type { ArquivoDoZip } from "@/lib/zip";
@@ -209,19 +224,22 @@ export async function destinosDoDono(
 /**
  * O cliente do detalhe: a MESMA linha da lista (`admin_empresas_pagina` com
  * `p_id`, que traz o contador do mês e a última atividade), mais o que só a
- * "Visão geral" usa (modo do prompt e destino de avisos, uma leitura por chave) e
- * os membros. `null` = não existe.
+ * "Visão geral" usa (modo do prompt e destino de avisos, uma leitura por chave), os
+ * membros e o modelo de IA do cliente (o do último turno, ou o do sistema). A cotação do dólar
+ * NÃO entra aqui: a página a entrega ao navegador como promessa (`lib/use-cambio.ts`). O custo
+ * estimado da linha é refeito com o preço do modelo DO CLIENTE. `null` = não existe.
  */
 export async function detalheDoCliente(
   svc: Supa,
   id: string,
   agora: number,
-  modelo: string | null
+  modeloDoSistema: string
 ): Promise<DetalheDoCliente | null> {
-  const [base, extra, membros] = await Promise.all([
-    empresaEFinanceiro(svc, id, agora, modelo),
+  const [base, extra, membros, modelo] = await Promise.all([
+    empresaEFinanceiro(svc, id, agora, modeloDoSistema),
     svc.from("clients").select("prompt_mode, notify_group_jid").eq("id", id).maybeSingle(),
     svc.rpc("tenant_members_do_cliente", { p_client: id }),
+    modeloDoCliente(svc, id, modeloDoSistema, agora),
   ]);
   if (extra.error) throw extra.error;
   if (membros.error) throw membros.error;
@@ -230,6 +248,8 @@ export async function detalheDoCliente(
   const pessoas = membros.data ?? [];
   return {
     ...base,
+    empresa: { ...base.empresa, custoUsd: custoEstimadoUsd(base.empresa.tokens, modelo.nome) },
+    modelo,
     agora,
     modoDoPrompt: extra.data.prompt_mode,
     avisosConfigurados: !!extra.data.notify_group_jid,
@@ -264,19 +284,146 @@ export async function empresaEFinanceiro(
 }
 
 /**
- * O uso de IA de um cliente por dia e por dia da semana x hora
- * (`admin_cliente_uso`, 31 e 30 dias) e por hora nas últimas 25 horas
- * (`admin_cliente_uso_horas`), as duas em paralelo.
+ * O modelo de IA do cliente: o `model` do turno mais recente dele (o que ele realmente usa, bancada
+ * excluída), ou o modelo atual do sistema quando ainda não teve turno com modelo. Uma leitura de uma
+ * linha pelo índice `(client_id, created_at)`. O custo estimado de todo o período usa o preço dele.
+ */
+export async function modeloDoCliente(
+  svc: Supa,
+  id: string,
+  doSistema: string,
+  agora: number
+): Promise<ModeloDoCliente> {
+  // Primeiro só os turnos RECENTES (a faixa do índice `(client_id, created_at)` é curta mesmo para quem tem
+  // muita bancada); só quando não há nenhum dentro dela é que a leitura volta ao histórico inteiro, que é o
+  // caso raro (cliente parado há meses, ou que nunca teve turno).
+  const ultimoTurno = async (desde: string | null) => {
+    let consulta = svc
+      .from("agent_turns")
+      .select("model")
+      .eq("client_id", id)
+      .eq("dry_run", false)
+      .not("model", "is", null);
+    if (desde) consulta = consulta.gte("created_at", desde);
+    const { data, error } = await consulta.order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) throw error;
+    return data?.model ?? null;
+  };
+  const nome =
+    (await ultimoTurno(new Date(agora - JANELA_DO_MODELO_DIAS * 86_400_000).toISOString())) ??
+    (await ultimoTurno(null));
+  return nome ? { nome, origem: "ultimo_turno" } : { nome: doSistema, origem: "sistema" };
+}
+
+/** Quantos dias para trás a primeira leitura do modelo do cliente olha (o resto cai na leitura do histórico inteiro). */
+const JANELA_DO_MODELO_DIAS = 61;
+
+/** Os turnos por dia e por dia da semana x hora de cada janela (`admin_cliente_picos`, UMA chamada, até 8 janelas). */
+async function picosDasJanelas(svc: Supa, id: string, janelas: JanelaDePicos[]): Promise<DadosDePicos[]> {
+  const instantes = janelas.map(instantesDaJanela);
+  const { data, error } = await svc.rpc("admin_cliente_picos", {
+    p_client: id,
+    p_de: instantes.map((i) => i.de),
+    p_ate: instantes.map((i) => i.ate),
+  });
+  if (error) throw error;
+  const lista = Array.isArray(data) ? data : [];
+  return janelas.map((_, i) => picosDoJson(lista[i]));
+}
+
+/** Os dias de uso de uma janela de dias civis (`admin_cliente_uso` com os instantes dela; sem grade). */
+async function diasDeUsoDaJanela(svc: Supa, id: string, janela: JanelaDePicos) {
+  const j = instantesDaJanela(janela);
+  const { data, error } = await svc.rpc("admin_cliente_uso", {
+    p_client: id,
+    p_de: j.de,
+    p_ate: j.ate,
+    p_cubo_de: j.ate,
+  });
+  if (error) throw error;
+  return diasDoJson(data);
+}
+
+/**
+ * O uso de IA de um cliente: por dia nos últimos 61 dias (`admin_cliente_uso`: os 30 dias do período
+ * mais os 30 anteriores, base da variação), por hora nas últimas 48 horas (`admin_cliente_uso_horas`: hoje e
+ * ontem), o primeiro turno do cliente e os picos de cada chip (`admin_cliente_picos`), tudo em paralelo.
  */
 export async function usoDoCliente(svc: Supa, id: string, agora: number): Promise<UsoBruto> {
   const j = janelaDeUso(agora);
-  const [porDia, porHora] = await Promise.all([
-    svc.rpc("admin_cliente_uso", { p_client: id, p_de: j.de, p_ate: j.ate, p_cubo_de: j.cuboDe }),
+  const hoje = diaIsoSP(agora);
+  const [porDia, porHora, primeira, picos] = await Promise.all([
+    // `p_cubo_de` é obrigatório na função implantada; igual a `p_ate`, a grade (que ninguém mais lê) vem vazia.
+    svc.rpc("admin_cliente_uso", { p_client: id, p_de: j.de, p_ate: j.ate, p_cubo_de: j.ate }),
     svc.rpc("admin_cliente_uso_horas", { p_client: id, p_de: j.horasDe, p_ate: j.ate }),
+    primeiraAtividadeDoCliente(svc, id),
+    picosDasJanelas(svc, id, ORDEM_PERIODOS.map((k) => janelaDoChip(k, hoje))),
   ]);
   if (porDia.error) throw porDia.error;
   if (porHora.error) throw porHora.error;
-  return usoBruto(porDia.data, porHora.data);
+  const bruto = usoBruto(porDia.data, porHora.data, primeira);
+  return {
+    ...bruto,
+    picos: Object.fromEntries(ORDEM_PERIODOS.map((k, i) => [k, picos[i]])) as Record<PeriodoKey, DadosDePicos>,
+  };
+}
+
+/**
+ * O dia civil (AAAA-MM-DD, São Paulo) do PRIMEIRO turno do cliente, ou `null`: limita os meses
+ * do seletor de período. Uma leitura de uma linha pelo índice `(client_id, created_at)`.
+ */
+async function primeiraAtividadeDoCliente(svc: Supa, id: string): Promise<string | null> {
+  const { data, error } = await svc
+    .from("agent_turns")
+    .select("created_at")
+    .eq("client_id", id)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? diaIsoSP(new Date(data.created_at)) : null;
+}
+
+/** Os meses (`admin_cliente_uso_meses`) de uma janela de dias civis, só os turnos que caem dentro dela. */
+async function mesesDeUsoDaJanela(svc: Supa, id: string, janela: JanelaDePicos) {
+  const j = instantesDaJanela(janela);
+  const { data, error } = await svc.rpc("admin_cliente_uso_meses", { p_client: id, p_de: j.de, p_ate: j.ate });
+  if (error) throw error;
+  return mesesDoJson(data);
+}
+
+/**
+ * O uso de um mês civil (o atual ou um passado, por dia), de TODO o período (por mês) ou de um
+ * INTERVALO escolhido (por dia até 62 dias, por mês acima), com os picos da mesma janela e a base da
+ * variação (o mês anterior, ou o intervalo anterior de mesmo tamanho). Os picos e o uso saem juntos, em
+ * paralelo, e a janela volta junto para a tela desenhar as colunas por data e a média.
+ */
+export async function usoHistoricoDoCliente(
+  svc: Supa,
+  id: string,
+  agora: number,
+  modeloDoSistema: string,
+  selecao: SelecaoHistorica
+): Promise<UsoHistorico> {
+  const hoje = diaIsoSP(agora);
+  // "Todo o período" precisa do primeiro dia de uso ANTES de saber que janelas ler; as outras não.
+  const primeira = selecao.tipo === "tudo" ? await primeiraAtividadeDoCliente(svc, id) : null;
+  // O QUE ler é a regra pura de `leituraDoHistorico` (a mesma do preview); aqui só se lê, tudo em paralelo,
+  // inclusive o modelo do cliente (o custo estimado usa o preço dele).
+  const l = leituraDoHistorico(selecao, hoje, primeira);
+  const [dias, anteriores, meses, [picos], modelo] = await Promise.all([
+    l.dias ? diasDeUsoDaJanela(svc, id, l.dias) : Promise.resolve([]),
+    l.anteriores ? diasDeUsoDaJanela(svc, id, l.anteriores) : Promise.resolve(null),
+    l.meses ? mesesDeUsoDaJanela(svc, id, l.meses) : Promise.resolve([]),
+    picosDasJanelas(svc, id, [l.janela]),
+    modeloDoCliente(svc, id, modeloDoSistema, agora),
+  ]);
+  const uso = usoDoHistorico(
+    selecao,
+    { dias, anteriores, meses },
+    { janela: l.janela, agora, modelo: modelo.nome, primeira }
+  );
+  return { uso, picos, janela: l.janela };
 }
 
 /**
@@ -305,8 +452,11 @@ export async function atendimentoDoCliente(
   const janelas = janelasDoAtendimento(agora);
   const iso = (ms: number) => new Date(ms).toISOString();
 
-  const [linhas, series, motivos, solucoes] = await Promise.all([
-    carregarJanelasDoPainel(svc, { clientId: id, avisos: c.notify_group_jid, agora, janelas }),
+  // As janelas atuais e as anteriores (a base dos selos de variação) vão numa chamada SÓ de `painel_janelas`, como
+  // o painel faz: uma chamada por lista refazia a janela do acumulado (todo o histórico) duas vezes.
+  const plano = planoDoAtendimento(agora);
+  const [todas, series, motivos, solucoes] = await Promise.all([
+    carregarJanelasDoPainel(svc, { clientId: id, avisos: c.notify_group_jid, agora, janelas: plano.lista }),
     carregarSeriesDoPainel(svc, { clientId: id, avisos: c.notify_group_jid, agora, mes: null }),
     carregarMotivosDoPainel(svc, { clientId: id, avisos: c.notify_group_jid, janelas }),
     svc.rpc("admin_cliente_solucoes", {
@@ -318,8 +468,10 @@ export async function atendimentoDoCliente(
   ]);
   if (solucoes.error) throw solucoes.error;
 
+  const { atuais, anteriores } = atuaisEAnteriores(todas, plano);
   return atendimentoPorPeriodo({
-    janelas: linhas,
+    janelas: atuais,
+    anteriores,
     motivos,
     solucoes: (solucoes.data ?? []).map((l) => ({
       janela: l.janela,
@@ -351,7 +503,7 @@ export async function whatsappDoCliente(svc: Supa, id: string): Promise<EstadoDo
 }
 
 // ---------------------------------------------------------------------------
-// ENTREGA 2: Financeiro, Ações, Apagar de vez e o aviso do BETA_ABERTO. Cada
+// ENTREGA 2: Financeiro, Ações e Apagar de vez. Cada
 // escrita é UMA função SQL com a linha em `admin_acoes` na mesma transação; as
 // regras de validação e as respostas moram em `lib/admin-conta.ts` (puro).
 // ---------------------------------------------------------------------------
@@ -374,16 +526,6 @@ export async function mudarConta(svc: Supa, admin: string, id: string, pedido: P
     throw error;
   }
   return data;
-}
-
-/**
- * Quantos clientes ficariam BLOQUEADOS se `BETA_ABERTO` fosse desligado hoje
- * (`admin_bloqueados_sem_beta`, que espelha `accessState` em SQL). Uma contagem.
- */
-export async function bloqueadosSemBeta(svc: Supa): Promise<number> {
-  const { data, error } = await svc.rpc("admin_bloqueados_sem_beta", {});
-  if (error) throw error;
-  return Number(data) || 0;
 }
 
 /**
@@ -422,7 +564,7 @@ function* csvDoLote(linhas: Record<string, unknown>[], colunas: string[], comCab
  * ordem, uma segunda passada pega as linhas de primeira coluna nula, que a
  * comparação de linha pula.
  */
-async function* csvDaTabela(svc: Supa, tabela: (typeof TABELAS_DO_CLIENTE)[number], id: string): AsyncGenerator<string> {
+async function* csvDaTabela(svc: Supa, tabela: TabelaDaExportacao, id: string): AsyncGenerator<string> {
   const leitura = LEITURA_DA_EXPORTACAO[tabela];
   const lote = leitura?.lote ?? LOTE_DA_EXPORTACAO;
   const ordem = leitura?.ordem ? [...leitura.ordem] : undefined;
@@ -458,7 +600,7 @@ async function* csvDaTabela(svc: Supa, tabela: (typeof TABELAS_DO_CLIENTE)[numbe
 /**
  * A EXPORTAÇÃO LGPD de um cliente (decisão do dono: um ZIP com UM CSV POR
  * TABELA): `cliente.csv` (a linha de `clients`), `membros.csv` (logins e papéis) e
- * um arquivo por tabela de `TABELAS_DO_CLIENTE`. Lida em lotes (memória limitada);
+ * um arquivo por tabela de `TABELAS_DA_EXPORTACAO` (as apagadas e as mantidas). Lida em lotes (memória limitada);
  * os arquivos do Storage não entram (só os caminhos, nas linhas). A exportação
  * deixa rastro em `admin_acoes` antes de começar. `null` = o cliente não existe.
  */
@@ -483,7 +625,7 @@ export async function exportacaoDoCliente(
     const { data: membros, error: mErr } = await svc.rpc("tenant_members_do_cliente", { p_client: id });
     if (mErr) throw mErr;
     yield { nome: "membros.csv", partes: csvDoLote(membros ?? [], ["user_id", "email", "role"], true) };
-    for (const t of TABELAS_DO_CLIENTE) yield { nome: `${t}.csv`, partes: csvDaTabela(svc, t, id) };
+    for (const t of TABELAS_DA_EXPORTACAO) yield { nome: `${t}.csv`, partes: csvDaTabela(svc, t, id) };
   }
   return { nome: c.name, arquivos: arquivos() };
 }
@@ -498,17 +640,21 @@ export interface ResultadoDoApagar {
  * APAGAR DE VEZ (docs/adr/2026-10-15-two-step-company-deletion.md): UMA rotina, na
  * ordem que permite tentar de novo sem perder nada.
  * 1. Confere (cliente existe, está DESATIVADO, nome digitado igual) e se toda tabela
- *    com `client_id` está em `TABELAS_DO_CLIENTE` (`admin_tabelas_fora_da_purga`):
+ *    com `client_id` está em `TABELAS_DO_CLIENTE` ou em `TABELAS_MANTIDAS`
+ *    (`admin_tabelas_fora_da_purga`):
  *    com uma tabela nova esquecida, NADA acontece.
  * 2. Lê os logins que só pertencem a ele (antes: `user_clients` some com o banco).
  * 3. Cancela a assinatura no Asaas (`deleteSubscription`, o helper que existe).
  *    Falhou: para aqui, nada foi apagado. Outro provedor: não há integração, fica
  *    como pendência.
  * 4. Remove os arquivos do Storage (`{client_id}/...`, em lotes). Falhou: para aqui.
- * 5. Desconecta o WhatsApp (`logoutInstance`). NÃO existe helper para apagar a
- *    instância da Evolution: ela fica, e a pendência diz.
+ * 5. Desconecta o WhatsApp (`logoutInstance`) e apaga a instância na Evolution
+ *    (`deleteInstance`; 404 = já não existia). Uma falha aqui não para a rotina:
+ *    vira pendência.
  * 6. O banco, numa transação, com o registro em `admin_acoes` que sobrevive
- *    (`admin_apagar_cliente`, que confere tudo de novo com a linha travada).
+ *    (`admin_apagar_cliente`, que confere tudo de novo com a linha travada). As
+ *    `TABELAS_MANTIDAS` (o histórico de cobrança) ficam, marcadas com o id e o nome
+ *    do cliente apagado.
  * 7. Apaga os logins do passo 2 (nunca um id de `ADMIN_USER_IDS`).
  * Depois do primeiro efeito de fora (passo 3), toda parada ou erro passa por
  * `parar`: as pendências dizem o que JÁ foi feito (`pendenciasDosEfeitos`) e o log
@@ -530,7 +676,10 @@ export async function apagarCliente(
   if (!nomeConfere(a.nome, c.name)) return { resultado: "nome_diferente", pendencias };
 
   const tabelas = [...TABELAS_DO_CLIENTE];
-  const { data: fora, error: foraErr } = await svc.rpc("admin_tabelas_fora_da_purga", { p_tabelas: tabelas });
+  const mantidas = [...TABELAS_MANTIDAS];
+  const { data: fora, error: foraErr } = await svc.rpc("admin_tabelas_fora_da_purga", {
+    p_tabelas: [...tabelas, ...mantidas],
+  });
   if (foraErr) throw foraErr;
   if (fora && fora.length > 0) {
     console.error("apagar cliente: tabelas com client_id fora da rotina:", fora.join(", "));
@@ -606,16 +755,29 @@ export async function apagarCliente(
     }
 
     if (c.evolution_instance) {
+      // Desconecta e depois APAGA a instância. Não para a rotina: o que falhar
+      // vira pendência para o dono resolver no painel da Evolution. 404 = a
+      // instância já não existe (uma nova tentativa depois de uma parada).
+      let desconectou = false;
       try {
         const res = await logoutInstance(c.evolution_instance);
-        if (res.ok || res.status === 404) efeitos.whatsappDesconectado = true;
-        else pendencias.push("Não deu para desconectar o WhatsApp na Evolution.");
+        if (res.ok || res.status === 404) {
+          desconectou = true;
+          efeitos.whatsappDesconectado = true;
+        }
       } catch {
-        pendencias.push("Não deu para desconectar o WhatsApp na Evolution.");
+        // A exclusão abaixo também derruba a sessão; só vira pendência se ela falhar.
       }
-      pendencias.push(
-        "A instância do WhatsApp continua criada na Evolution (o sistema não tem como apagá-la): apague no painel da Evolution."
-      );
+      try {
+        const res = await deleteInstance(c.evolution_instance);
+        if (res.ok || res.status === 404) efeitos.instanciaApagada = true;
+      } catch {
+        // Fica como pendência abaixo.
+      }
+      if (!efeitos.instanciaApagada) {
+        if (!desconectou) pendencias.push("Não deu para desconectar o WhatsApp na Evolution.");
+        pendencias.push("Não deu para apagar a instância do WhatsApp na Evolution: apague no painel da Evolution.");
+      }
     }
 
     const { data: resultado, error: pErr } = await svc.rpc("admin_apagar_cliente", {
@@ -623,6 +785,7 @@ export async function apagarCliente(
       p_client: a.id,
       p_nome: a.nome,
       p_tabelas: tabelas,
+      p_mantidas: mantidas,
       p_usuarios: usuarios.length,
     });
     if (pErr) return parar("falha_banco", pErr);

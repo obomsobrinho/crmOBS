@@ -250,6 +250,19 @@ export function chavesDoEsqueleto(
   return lista;
 }
 
+/**
+ * As colunas por HORA do DIA CIVIL de São Paulo: da 00h de hoje até a hora atual
+ * (hoje, às 14h, são 15 colunas: 00h ... 14h). É a variante da central do dono
+ * (15/10/2026): `chavesDoEsqueleto` é uma janela ROLANTE de 24 horas (que começa na
+ * hora seguinte à de ontem), e o dono quer "hoje desde a meia-noite". O painel
+ * continua com a rolante; esta lista não é usada por ele.
+ */
+export function chavesDoDiaCivil(agora: number): { chave: string }[] {
+  const dia = diaIsoSP(agora);
+  const horaAtual = Number(FMT_HORA.format(new Date(agora))) % 24;
+  return Array.from({ length: horaAtual + 1 }, (_, h) => ({ chave: `${dia}T${String(h).padStart(2, "0")}` }));
+}
+
 /** Contagem por balde: chave `AAAA-MM-DD` (dia) ou `AAAA-MM-DDTHH` (hora), em São Paulo. */
 export type BaldesDeBarras = Map<string, { ia: number; time: number }>;
 

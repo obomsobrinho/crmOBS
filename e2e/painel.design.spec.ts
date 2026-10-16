@@ -580,7 +580,7 @@ test.describe("Painel: escrita", () => {
 
   test("nenhum texto fixo assume um único segmento", async ({ page }) => {
     await page.goto("/design/painel");
-    // O beta tem advogado, pediatra, barbeiro, engenheiro, clínica e comércio.
+    // Os clientes têm advogado, pediatra, barbeiro, engenheiro, clínica e comércio.
     // Quem carrega a linguagem do segmento é o preset, nunca a tela.
     const texto = await page.locator("body").innerText();
     expect(texto).not.toMatch(/\bconsulta\b/i);

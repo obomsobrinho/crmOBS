@@ -42,8 +42,9 @@ test.describe("Guardas do assistente de montagem", () => {
 //
 // 1. CONTA BLOQUEADA vai para `/assinatura` (`requireActiveTenant`).
 //    Falta: sessão de uma conta com assinatura vencida. O tenant de teste nunca
-//    fica bloqueado, de propósito, porque é onde todo o resto da suíte roda (e
-//    no beta a chave `BETA_ABERTO` libera todo tenant de qualquer forma). Criar uma conta vencida só para isto significa mais um tenant
+//    fica bloqueado, de propósito, porque é onde todo o resto da suíte roda
+//    (a chave `BETA_ABERTO` saiu em 15/10/2026; quem deve ficar livre é marcado
+//    Vitalício na central). Criar uma conta vencida só para isto significa mais um tenant
 //    de mentira no banco de produção; a alternativa honesta é testar
 //    `accessState` como função pura, que é onde a decisão mora de verdade
 //    (`lib/billing.ts`), e deixar o redirecionamento para verificação manual.

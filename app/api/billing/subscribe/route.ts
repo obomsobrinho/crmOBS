@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { PLANS, planFor, type PlanKey } from "@/lib/billing";
+import { alinharMarcasDoMes } from "@/lib/consumo-ia";
+import { agoraMs } from "@/lib/periodo";
 import {
   AsaasError,
   createCustomer,
@@ -81,6 +83,7 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
+      await alinharMarcasDoMes(svc, mine.id, agoraMs());
       const pagamento = await openPayment(subscriptionId);
       return NextResponse.json({
         ok: true,
@@ -156,6 +159,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await alinharMarcasDoMes(svc, mine.id, agoraMs());
     const pagamento = await openPayment(assinatura.id);
     return NextResponse.json({
       ok: true,

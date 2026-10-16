@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { servico, tenantDeTeste } from "./semente";
+import { FUSO } from "../lib/fuso";
 
 // A CENTRAL "CLIENTES" com a sessão REAL do dono do produto (docs/plano-central-clientes.md,
 // entrega 1). O dono de teste (`E2E_EMAIL`) está em `ADMIN_USER_IDS` (conferido em
@@ -64,7 +65,7 @@ test.describe("Central Clientes: o dono do produto", () => {
     await expect(page.locator('[data-bloco="central-uso"]')).toBeVisible();
     await expect(page.locator('[data-bloco="uso-tokens"]')).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('[data-bloco="uso-turnos"]')).toBeVisible();
-    await expect(page.locator('[data-bloco="central-grade"]')).toBeVisible();
+    await expect(page.locator('[data-bloco="central-picos"]')).toBeVisible();
     await expect(page.getByText(FALHA)).toHaveCount(0);
 
     // Atendimento: os quatro períodos chegam numa leitura, e trocar não busca de novo.
@@ -108,7 +109,7 @@ test.describe("Central Clientes: rotas da API do admin", () => {
     expect((await page.request.get("/api/admin/empresas?depoisId=nao-e-uuid")).status()).toBe(400);
   });
 
-  test("GET /uso: os quatro períodos do painel (Dia por hora, os outros por dia) e a grade 7 x 24", async ({ page }) => {
+  test("GET /uso: os quatro períodos (Dia = hoje por hora desde as 00h, os outros por dia) e os picos de cada chip", async ({ page }) => {
     const res = await page.request.get(`/api/admin/empresas/${clientId}/uso`);
     expect(res.status()).toBe(200);
     const u = (await res.json()) as {
@@ -121,11 +122,15 @@ test.describe("Central Clientes: rotas da API do admin", () => {
           barras: { chave: string; usados: number; turnos: number }[];
         }
       >;
-      grade: { celulas: number[][]; total: number; maximo: number };
+      picos: Record<string, { dias: [string, number][]; cubo: [number, number, number][] }>;
+      primeiraAtividade: string | null;
     };
+    expect(u.primeiraAtividade === null || /^\d{4}-\d{2}-\d{2}$/.test(u.primeiraAtividade)).toBe(true);
+    // O Dia é o dia civil de São Paulo: da 00h até a hora atual, as duas inclusive.
+    const horaAgora = Number(new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", hour12: false }).format(new Date())) % 24;
     expect(Object.keys(u.periodos).sort()).toEqual(["dia", "mes", "quinzena", "semana"]);
     const colunas: Record<string, [string, number]> = {
-      dia: ["hora", 24],
+      dia: ["hora", horaAgora + 1],
       semana: ["dia", 7],
       quinzena: ["dia", 15],
       mes: ["dia", 30],
@@ -142,8 +147,58 @@ test.describe("Central Clientes: rotas da API do admin", () => {
     // Janelas aninhadas: o mês contém a quinzena, que contém a semana.
     expect(u.periodos.mes.total.usados).toBeGreaterThanOrEqual(u.periodos.quinzena.total.usados);
     expect(u.periodos.quinzena.total.usados).toBeGreaterThanOrEqual(u.periodos.semana.total.usados);
-    expect(u.grade.celulas).toHaveLength(7);
-    for (const linha of u.grade.celulas) expect(linha).toHaveLength(24);
+    // Os picos de cada chip: os turnos por dia somam os turnos do período (a mesma janela, o mesmo banco).
+    expect(Object.keys(u.picos).sort()).toEqual(["dia", "mes", "quinzena", "semana"]);
+    for (const k of ["semana", "quinzena", "mes"]) {
+      const dosPicos = u.picos[k].dias.reduce((s, [, n]) => s + n, 0);
+      expect(dosPicos, k).toBe(u.periodos[k].total.turnos);
+      expect(u.picos[k].cubo.reduce((s, [, , n]) => s + n, 0), k).toBe(dosPicos);
+    }
+  });
+
+  test("GET /uso?mes e ?tudo: um mês por dia, todo o período por mês, e parâmetro torto é 400", async ({ page }) => {
+    const base = `/api/admin/empresas/${clientId}/uso`;
+    const mes = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit" }).format(new Date()).slice(0, 7);
+    const atual = await page.request.get(`${base}?mes=${mes}`);
+    expect(atual.status()).toBe(200);
+    type Historico = {
+      uso: { periodo: string | null; unidade: string; total: { usados: number; turnos: number }; barras: { chave: string; usados: number }[] };
+      picos: { dias: [string, number][]; cubo: [number, number, number][] };
+      janela: { de: string; ate: string };
+    };
+    const m = (await atual.json()) as Historico;
+    expect(m.uso.periodo).toBeNull();
+    expect(m.uso.unidade).toBe("dia");
+    expect(m.uso.barras.reduce((s, b) => s + b.usados, 0)).toBe(m.uso.total.usados);
+    // Os picos são da MESMA janela do uso: a soma dos turnos por dia é a dos turnos do mês.
+    expect(m.picos.dias.reduce((s, [, n]) => s + n, 0)).toBe(m.uso.total.turnos);
+    expect(m.janela.de).toBe(`${mes}-01`);
+
+    const tudo = await page.request.get(`${base}?tudo=1`);
+    expect(tudo.status()).toBe(200);
+    const t = (await tudo.json()) as Historico;
+    expect(t.uso.unidade).toBe("mes");
+    expect(t.uso.barras.length).toBeGreaterThanOrEqual(1);
+    expect(t.uso.barras.at(-1)!.chave).toBe(mes);
+    expect(t.uso.barras.reduce((s, b) => s + b.usados, 0)).toBe(t.uso.total.usados);
+    expect(t.picos.dias.reduce((s, [, n]) => s + n, 0)).toBe(t.uso.total.turnos);
+
+    // Um intervalo de datas: as duas pontas contam, e o uso e os picos são do mesmo intervalo.
+    const hoje = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(new Date());
+    const iv = await page.request.get(`${base}?de=${t.janela.de}&ate=${hoje}`);
+    expect(iv.status()).toBe(200);
+    const ivj = (await iv.json()) as Historico;
+    expect(ivj.janela).toEqual({ de: t.janela.de, ate: hoje });
+    expect(ivj.picos.dias.reduce((s, [, n]) => s + n, 0)).toBe(ivj.uso.total.turnos);
+    expect((await page.request.get(`${base}?de=${hoje}&ate=2000-01-01`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?de=${hoje}`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?de=lixo&ate=${hoje}`)).status()).toBe(400);
+
+    expect((await page.request.get(`${base}?mes=2026-13`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?mes=lixo`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?mes=2999-01`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?tudo=2`)).status()).toBe(400);
+    expect((await page.request.get(`${base}?tudo=1&mes=${mes}`)).status()).toBe(400);
   });
 
   test("GET /atendimento: os quatro períodos do painel numa resposta", async ({ page }) => {

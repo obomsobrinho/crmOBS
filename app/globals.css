@@ -490,12 +490,18 @@
   --chart-grade: var(--line);
   --chart-eixo: var(--ink-3);
   --chart-cursor: var(--line-strong);
-  /* A rampa de UM matiz (a marca), do vazio ao cheio: a escala do mapa de calor e as fatias de uma rosca. */
+  /* A rampa de UM matiz (a marca), do vazio ao cheio: as fatias de uma rosca. */
   --chart-rampa-0: var(--line-soft);
   --chart-rampa-1: color-mix(in srgb, var(--brand-fill) 22%, transparent);
   --chart-rampa-2: color-mix(in srgb, var(--brand-fill) 44%, transparent);
-  --chart-rampa-3: color-mix(in srgb, var(--brand-fill) 70%, transparent);
+  --chart-rampa-3: color-mix(in srgb, var(--brand-fill) 62%, transparent);
   --chart-rampa-4: var(--brand-fill);
+  /* A barra que NÃO é o destaque (os picos): cinza claro, para a barra de marca ler como a escolhida. */
+  --chart-barra-neutra: color-mix(in srgb, var(--ink-3) 55%, var(--s-bloco));
+  /* O preenchimento de um mini gráfico de tendência (sparkline): a marca bem diluída. */
+  --chart-area: color-mix(in srgb, var(--brand-fill) 16%, transparent);
+  /* Coluna ACIMA de uma referência (o ritmo do limite): é ESTADO (âmbar), nunca uma segunda série. */
+  --chart-acima: var(--warn-fill);
 
   /* ── Chip de filtro ATIVO (lista de conversas) ──
      O desenho de 18/09/2026 marca o recorte ativo por INVERSÃO de tinta, e não

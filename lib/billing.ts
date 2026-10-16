@@ -268,17 +268,17 @@ export type BlockReason = "trial_expired" | "past_due" | "canceled" | "bloqueio_
  * daqui (`situacaoDaConta`, os alertas e os filtros de `lib/admin-alertas.ts`),
  * nunca relendo `subscription_status` por conta própria.
  *
- * Precedência: desativada > bloqueio manual > vitalício > chave do beta > estado gravado.
+ * Precedência: desativada > bloqueio manual > vitalício > estado gravado. A chave
+ * geral de acesso livre (`BETA_ABERTO`) saiu em 15/10/2026: quem deve ficar livre é
+ * marcado Vitalício (docs/adr/2026-10-15-vitalicio-replaces-the-beta-switch.md).
  */
 export type AccessKind =
   /** Desativada pelo dono do produto (`clients.desativada_em`): nada entra, a IA para. */
   | "desativado"
-  /** Bloqueio manual do dono do produto (`clients.bloqueado_em`): vale até com o beta aberto. */
+  /** Bloqueio manual do dono do produto (`clients.bloqueado_em`): vale até sobre o vitalício. */
   | "bloqueado"
   /** Vitalício (`clients.vitalicio_desde`): acesso pleno, nunca cobrado, nunca bloqueado por teste ou pagamento. */
   | "vitalicio"
-  /** `BETA_ABERTO` ligado: todo mundo entra (a central nunca passa a chave). */
-  | "beta_aberto"
   | "ativo"
   /** Em teste, com prazo correndo ou sem prazo. */
   | "em_teste"
@@ -346,28 +346,11 @@ function livre(kind: AccessKind, message: string): AccessState {
  * Decide se o tenant tem acesso ao app. Chamada no gate do servidor (layout
  * autenticado, /api/agent, /api/send) e também na UI para o aviso.
  *
- * ⚠️ Esta regra tem DOIS gêmeos em SQL, que a repetem sem ler linhas para a
- * central do dono: o filtro de situação de `admin_empresas_pagina` (a mesma
- * precedência) e `admin_bloqueados_sem_beta` (quem bloquearia sem a chave do
- * beta). Quem muda um tipo ou um bloqueio aqui muda lá também.
+ * ⚠️ Esta regra tem um gêmeo em SQL, que a repete sem ler linhas para a central
+ * do dono: o filtro de situação de `admin_empresas_pagina` (a mesma
+ * precedência). Quem muda um tipo ou um bloqueio aqui muda lá também.
  */
-export function accessState(
-  row: BillingRow,
-  now: Date = new Date(),
-  opcoes: {
-    /**
-     * CHAVE GERAL DO BETA (23/09/2026, decisão do dono). Ligada, ninguém é
-     * bloqueado nem avisado por assinatura: o beta existe para as pessoas
-     * usarem e gerarem dado, e o teste de 7 dias do cadastro só passa a valer
-     * quando o beta acabar e a chave desligar. Uma chave e não conta por conta,
-     * porque liberar e depois travar dez tenants à mão é trabalho e esquecimento.
-     * Quem lê a variável de ambiente é o servidor (`lib/beta.ts`); este módulo
-     * continua puro e só recebe o valor. O BLOQUEIO MANUAL do dono do produto
-     * vale mesmo com a chave ligada (é uma decisão dele sobre UMA conta).
-     */
-    betaAberto?: boolean;
-  } = {}
-): AccessState {
+export function accessState(row: BillingRow, now: Date = new Date()): AccessState {
   // Desativada (central do dono, aba Ações): mais que modo leitura, o login
   // inteiro fecha (`contaDesativada` em lib/auth.ts); vale com qualquer estado.
   if (parse(row?.desativada_em) !== null) {
@@ -395,9 +378,6 @@ export function accessState(
   // Vem antes do estado gravado: o que o gateway escrever não rebaixa a conta.
   if (parse(row?.vitalicio_desde) !== null) {
     return livre("vitalicio", "Acesso vitalício.");
-  }
-  if (opcoes.betaAberto) {
-    return livre("beta_aberto", "Beta aberto: acesso liberado.");
   }
   const t = now.getTime();
   const status = typeof row?.subscription_status === "string" ? row.subscription_status : "";

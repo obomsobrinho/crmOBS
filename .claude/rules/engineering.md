@@ -3,7 +3,7 @@
 These caused real owner complaints. Check each one BEFORE writing a list, query, subscription or screen.
 Scoped rules (`data`, `realtime`, `ui`, ...) add detail; this file is the floor.
 
-## Never size for the beta
+## Never size for a small audience
 - Production scale from day one. Every list paginates 10 at a time with infinite scroll; search goes to the server with debounce (`lib/use-debounce.ts`, `lib/use-paginada.ts`). Never fetch hundreds of rows to filter in memory.  (why: docs/adr/2026-10-01-production-loading-and-realtime-rules.md)
 - Always list explicit columns in `select(...)`; no `select("*")` on lists, and never pull `persona`/`agent_config` into a list or a layout.
 - Counters are HEAD/aggregate queries or SQL functions (`inbox_pagina`, `inbox_contagens`), never "fetch rows then `.length`".  (why: docs/adr/2026-10-01-production-loading-and-realtime-rules.md)
@@ -37,7 +37,7 @@ Scoped rules (`data`, `realtime`, `ui`, ...) add detail; this file is the floor.
 - Visible vocabulary: "Agente ativo" / "Desativado" for the agent switch, never "pausado" (pausada = the AI of ONE conversation when a human took over).  (why: docs/adr/undated-agent-enabled-vs-published-at.md)
 
 ## Never invent
-- Never invent a value (enum, ID, port, schema, credential, number shown to a customer). If unknown, leave it out or NULL and ask. `null`/unclassified is a valid state (`account_type`, plan).  (why: docs/adr/2026-08-28-account-type-identifies-not-authorizes.md)
+- Never invent a value (enum, ID, port, schema, credential, number shown to a customer). If unknown, leave it out or NULL and ask. `null`/unclassified is a valid state (plan).  (why: docs/adr/2026-10-16-account-type-removed.md)
 - Business-behavior divergence is the owner's call, case by case. Do not create an automatic criterion to decide alone.
 
 ## Machine checks

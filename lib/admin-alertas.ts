@@ -16,11 +16,6 @@ import { normalizarEstado } from "./whatsapp-estado";
 // (lib/onboarding.ts); "dias sem atividade" conta dias civis de Sao Paulo por
 // `diasDesde` (lib/clientes.ts). O que este modulo acrescenta e so a ORDEM dos
 // alertas e o prazo de "sem atividade" (7 dias, decisao do dono no plano).
-//
-// ATENCAO: a situacao NAO passa `betaAberto` ao `accessState`: com a chave geral do beta
-// ligada todo cliente leria "Beta aberto" e a central nao distinguiria ninguem. A
-// central mostra o que a assinatura de cada um diz hoje; quantos cairiam se a
-// chave fosse desligada e o aviso da lista (`admin_bloqueados_sem_beta`).
 
 /** Dias sem atividade para o alerta (plano da central, 14/10/2026). */
 export const DIAS_SEM_ATIVIDADE = 7;
@@ -33,7 +28,6 @@ export type SituacaoChave =
   | "desativado"
   | "bloqueado"
   | "vitalicio"
-  | "beta_aberto"
   | "em_teste"
   | "teste_encerrado"
   | "ativo"
@@ -59,7 +53,6 @@ const SITUACAO_DO_TIPO: Record<AccessKind, Omit<Situacao, "kind">> = {
   desativado: { chave: "desativado", rotulo: "Desativado", detalhe: "sem acesso", tom: "neutro" },
   bloqueado: { chave: "bloqueado", rotulo: "Bloqueado", detalhe: "bloqueio manual", tom: "perigo" },
   vitalicio: { chave: "vitalicio", rotulo: "Vitalício", detalhe: "nunca cobrado", tom: "bom" },
-  beta_aberto: { chave: "beta_aberto", rotulo: "Beta aberto", detalhe: null, tom: "neutro" },
   ativo: { chave: "ativo", rotulo: "Ativo", detalhe: null, tom: "bom" },
   em_teste: { chave: "em_teste", rotulo: "Em teste", detalhe: null, tom: "neutro" },
   teste_encerrado: { chave: "teste_encerrado", rotulo: "Teste encerrado", detalhe: "acesso bloqueado", tom: "perigo" },
@@ -70,8 +63,8 @@ const SITUACAO_DO_TIPO: Record<AccessKind, Omit<Situacao, "kind">> = {
 };
 
 /**
- * A situacao do cliente: o tipo de acesso de `accessState` (sem a chave geral do
- * beta), que ja poe a desativada primeiro. A precedencia e a mesma do filtro em
+ * A situacao do cliente: o tipo de acesso de `accessState`, que ja poe a
+ * desativada primeiro. A precedencia e a mesma do filtro em
  * SQL (`admin_empresas_pagina`, gemeo de `accessState`).
  */
 export function situacaoDaConta(row: BillingRow, agora: number): Situacao {
@@ -94,8 +87,8 @@ export function situacaoDaConta(row: BillingRow, agora: number): Situacao {
  * acesso). A `chave` e o valor que o SQL entende (`p_situacao` de
  * `admin_empresas_pagina`, que repete a mesma precedencia): "Em teste" inclui os
  * testes que ja terminaram, que o selo da linha distingue como "Teste encerrado".
- * "Beta aberto" e "Estado desconhecido" nao aparecem na central (ela nao passa a
- * chave do beta, e o CHECK do banco nao deixa outro status).
+ * "Estado desconhecido" nao aparece na central (o CHECK do banco nao deixa outro
+ * status).
  */
 export const FILTROS_DE_SITUACAO = [
   { chave: "vitalicio", rotulo: "Vitalícios", situacoes: ["vitalicio"] },
@@ -117,18 +110,6 @@ export function ehFiltroDeSituacao(v: unknown): v is FiltroDeSituacao {
 export function situacaoNoFiltro(chave: SituacaoChave, filtro: FiltroDeSituacao): boolean {
   const f = FILTROS_DE_SITUACAO.find((x) => x.chave === filtro);
   return !!f && (f.situacoes as readonly SituacaoChave[]).includes(chave);
-}
-
-/**
- * Este cliente ficaria BLOQUEADO se `BETA_ABERTO` fosse desligado hoje? E o que o
- * aviso da lista conta: `accessState` sem a chave diz bloqueado, e ele ainda nao
- * esta fora por outro motivo (desativado ou bloqueio manual, que ja valem hoje).
- * `admin_bloqueados_sem_beta` (SQL) conta exatamente isto sem ler as linhas; o
- * preview e os testes usam esta funcao.
- */
-export function cairiaSemBeta(conta: BillingRow, agora: number): boolean {
-  const acesso = accessState(conta, new Date(agora));
-  return acesso.blocked && acesso.kind !== "bloqueado" && acesso.kind !== "desativado";
 }
 
 /** Nome do plano para a tela; sem plano gravado, nulo (nunca um plano chutado). */

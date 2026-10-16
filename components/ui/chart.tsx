@@ -99,6 +99,9 @@ function ChartContainer({
           "flex h-60 w-full justify-center text-legenda",
           "[&_.recharts-cartesian-axis-tick-value]:fill-[var(--chart-eixo)]",
           "[&_.recharts-sector]:outline-hidden",
+          // O balão fica ACIMA de qualquer peça irmã posicionada (o número no meio da rosca):
+          // sem isto um irmão absoluto declarado depois pintava por cima dele.
+          "[&_.recharts-tooltip-wrapper]:z-50!",
           "[&_.recharts-surface]:outline-hidden [&_.recharts-wrapper]:outline-hidden",
           className,
         )}
@@ -211,29 +214,94 @@ function ChartTabela({
   colunas?: string[];
   linhas: { chave: string; atributos?: Record<`data-${string}`, string | number>; celulas: React.ReactNode[] }[];
 }) {
+  // O `relative` de fora é a CAUSA RAIZ da barra de rolagem de página que sobrava abaixo do
+  // cartão da central (15/10/2026): `sr-only` é `position: absolute`, e sem um ancestral
+  // posicionado o bloco de contenção dele é a página, não a área que rola. A tabela ficava na
+  // altura que ela teria DENTRO do conteúdo rolado (mais de 1000px de página) e o documento
+  // inteiro ganhava rolagem, com uma faixa vazia embaixo do cartão. Com o pai posicionado a tabela
+  // fica presa à área rolável, e some junto com ela.
   return (
-    <div className="sr-only">
-      <table data-slot="chart-tabela" data-tabela={nome}>
-        <caption>{legenda}</caption>
-        {colunas && (
-          <thead>
-            <tr>
-              {colunas.map((c) => (
-                <th key={c}>{c}</th>
-              ))}
-            </tr>
-          </thead>
-        )}
-        <tbody>
-          {linhas.map((l) => (
-            <tr key={l.chave} {...l.atributos}>
-              {l.celulas.map((c, i) => (
-                <td key={i}>{c}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="relative">
+      <div className="sr-only">
+        <table data-slot="chart-tabela" data-tabela={nome}>
+          <caption>{legenda}</caption>
+          {colunas && (
+            <thead>
+              <tr>
+                {colunas.map((c) => (
+                  <th key={c}>{c}</th>
+                ))}
+              </tr>
+            </thead>
+          )}
+          <tbody>
+            {linhas.map((l) => (
+              <tr key={l.chave} {...l.atributos}>
+                {l.celulas.map((c, i) => (
+                  <td key={i}>{c}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/** Um ponto de um mini gráfico de tendência. */
+export type PontoDeTendencia = { chave: string; rotulo: string; valor: number };
+
+/**
+ * O mini gráfico de tendência de um cartão de indicador (sparkline): uma área fina na cor da marca, sem
+ * eixos nem grade, com o balão ao passar o mouse (o rótulo do ponto e o valor). Não é uma segunda
+ * fonte de números: ele repete as MESMAS colunas do gráfico grande da aba (que tem a tabela de texto) e o
+ * valor do cartão já está escrito em texto, por isso o desenho fica fora da leitura de tela
+ * (`aria-hidden`) e sem a camada de foco do Recharts (nada focável dentro de `aria-hidden`).
+ */
+function ChartSparkline({
+  dados,
+  nome,
+  formatar,
+  className,
+}: {
+  dados: PontoDeTendencia[];
+  /** O que a linha mede ("Tokens"), no balão. */
+  nome: string;
+  formatar: (valor: number) => React.ReactNode;
+  className?: string;
+}) {
+  const animar = useAnimacaoDoGrafico();
+  return (
+    <div data-slot="sparkline" aria-hidden className={cn("w-full", className)}>
+      <ChartContainer config={{ valor: { label: nome, color: "var(--chart-1)" } }} className="h-12">
+        <RechartsPrimitive.AreaChart
+          data={dados}
+          margin={{ top: 4, right: 2, left: 2, bottom: 2 }}
+          accessibilityLayer={false}
+        >
+          <ChartTooltip
+            cursor={{ stroke: "var(--chart-cursor)" }}
+            content={
+              <ChartTooltipContent<PontoDeTendencia>
+                semSeries
+                titulo={(p) => p.rotulo}
+                rodape={(p) => <ChartTooltipLinha rotulo={nome}>{formatar(p.valor)}</ChartTooltipLinha>}
+              />
+            }
+          />
+          <RechartsPrimitive.Area
+            dataKey="valor"
+            type="monotone"
+            stroke="var(--color-valor)"
+            strokeWidth={2}
+            fill="var(--chart-area)"
+            dot={false}
+            activeDot={{ r: 3, strokeWidth: 0, fill: "var(--color-valor)" }}
+            isAnimationActive={animar}
+          />
+        </RechartsPrimitive.AreaChart>
+      </ChartContainer>
     </div>
   );
 }
@@ -297,5 +365,6 @@ export {
   ChartTooltipLinha,
   ChartLegenda,
   ChartTabela,
+  ChartSparkline,
   useAnimacaoDoGrafico,
 };

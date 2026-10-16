@@ -1,8 +1,8 @@
 import ListaCentral from "@/components/admin/ListaCentral";
-import { adminDaPagina, bloqueadosSemBeta, paginaDeClientes } from "@/lib/admin";
-import { betaAberto } from "@/lib/beta";
+import { adminDaPagina, paginaDeClientes } from "@/lib/admin";
 import { PAGINA_EMPRESAS, type EmpresaItem } from "@/lib/admin-empresas";
 import { AGENT_MODEL } from "@/lib/agent";
+import { cotacaoPtax } from "@/lib/cambio-servidor";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -17,19 +17,15 @@ export default async function ClientesPage() {
   await adminDaPagina();
 
   const svc = createServiceClient();
-  // As duas leituras em paralelo; uma falha não derruba a outra. Com a chave do
-  // beta ligada, o aviso diz quantos cairiam se ela fosse desligada hoje (uma
-  // contagem em SQL que espelha `accessState`); desligada, nada a avisar.
-  const [pagina, contagem] = await Promise.allSettled([
-    paginaDeClientes(svc, { agora: agoraMs(), busca: "", depois: null, modelo: AGENT_MODEL }),
-    betaAberto() ? bloqueadosSemBeta(svc) : Promise.resolve(null),
-  ]);
-  if (pagina.status === "rejected") console.error("clientes, primeira página:", pagina.reason);
-  if (contagem.status === "rejected") console.error("clientes, aviso do beta:", contagem.reason);
-  const itens: EmpresaItem[] = pagina.status === "fulfilled" ? pagina.value : [];
-  const bloqueariam = contagem.status === "fulfilled" ? contagem.value : null;
-
-  return (
-    <ListaCentral inicial={{ itens, temMais: itens.length === PAGINA_EMPRESAS }} bloqueariamSemBeta={bloqueariam} />
+  const agora = agoraMs();
+  // A cotação do dólar segue como promessa (a lista não espera por ela): ver `useCambio`.
+  const cambio = cotacaoPtax(agora);
+  const itens = await paginaDeClientes(svc, { agora, busca: "", depois: null, modelo: AGENT_MODEL }).catch(
+    (e): EmpresaItem[] => {
+      console.error("clientes, primeira página:", e);
+      return [];
+    }
   );
+
+  return <ListaCentral inicial={{ itens, temMais: itens.length === PAGINA_EMPRESAS }} cambio={cambio} />;
 }

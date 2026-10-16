@@ -16,7 +16,7 @@ diz onde está cada coisa e o que estava acontecendo no dia em que foi escrito.
 | Antes de decidir **o que construir** | `docs/proximos-passos.md`. **Fonte de verdade de roadmap.** |
 | Perguntas de **mercado, concorrente, preço, risco de banimento** | `docs/estrategia-2026-07.md`. É base de pesquisa; as conclusões prescritivas antigas estão superadas, e o banner no topo diz o que vale. |
 | Antes de mexer em **cor, tipografia, espaçamento, componente base** | `docs/design-system/` (8 arquivos). O código tem os valores; esses arquivos têm o porquê. |
-| Para **ler o que os testadores fizeram** | `docs/instrumentacao-beta.md`. Cinco consultas SQL. Não existe tela, e isso é decisão. |
+| Para **ler o uso de cada empresa e o que os usuários escreveram** | `docs/instrumentacao-uso.md`. Cinco consultas SQL. Não existe tela, e isso é decisão. |
 | Para **escrever no Next 16** | `node_modules/next/dist/docs/`. Esta versão tem mudanças que quebram o que você aprendeu; `AGENTS.md` avisa. |
 
 A antiga `Desktop/DesingSystem/` (obsoleta) foi para a Lixeira em 26/09/2026. O design system vale pelo `docs/design-system/`.
@@ -28,12 +28,46 @@ para pequenos negócios locais. **Horizontal de propósito**: advogado, pediatra
 engenheiro, clínica, comércio. Multi-tenant sobre Supabase com RLS. A Evolution API conecta o
 WhatsApp por QR, o n8n é só o cano, e o cérebro é `POST /api/agent` neste repositório.
 
-O lançamento é um **beta gratuito** com 5 a 10 conhecidos do dono. A cobrança está **construída e
-desligada de propósito**.
+É um produto **pago**: toda empresa nova tem **teste de 7 dias** e depois escolhe um plano
+(Essencial, Profissional ou Avançado; preços e limites em `PLANS`, `lib/billing.ts`). **Vitalício**
+(acesso total, nunca cobrado) vale para as contas internas do dono e casos especiais. A cobrança passa
+pelo **Asaas** (`lib/asaas.ts`; qualquer `ASAAS_ENV` diferente de `producao` é sandbox), e teste
+vencido bloqueia a conta (modo somente leitura), salvo Vitalício. Desde 15/10/2026 não existe chave
+global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
-### 15/10/2026 (madrugada): CENTRAL "CLIENTES", ENTREGA 1 PUBLICADA SEM APROVACAO DE TELA. LER PRIMEIRO
+### 16/10/2026 (rodada 3): MEDIDOR DE META, CABECALHO LIMPO, SEM account_type (NAO COMMITADA). LER PRIMEIRO
+
+Detalhe em `docs/adr/2026-10-16-goal-progress-meter-and-no-account-type.md` e `docs/adr/2026-10-16-account-type-removed.md`. Resumo: o medidor do limite virou barra de meta com bolinha do ritmo ideal, trecho listrado, verde/vermelho pelo ritmo e a frase da projecao (`ritmoDoMes`, `textoDoRitmo`); rotulo "X de Y tokens (Plano ...), R$ ... estimado" no canto de cima do cartao; cabecalho sem a linha Conta/Plano e sem "nunca cobrado" no Vitalicio; donut com o numero do centro que cabe (`tamanhoDoCentroDoDonut`, bilhao em `tokensCurto`).
+- FIM DO BETA: nenhum codigo le ou escreve `clients.account_type`. A migration que derruba a coluna esta escrita e NAO aplicada: `supabase/migrations/20261017000000_drop_clients_account_type.sql` (aplicar DEPOIS do deploy; recria `admin_empresas_pagina` sem a coluna). Junto, `20261017000100_drop_admin_bloqueados_sem_beta.sql` (sem chamador). Depois de aplicar, regenerar `lib/database.types.ts` (hoje editado a mao para ja nao ter as duas coisas).
+- As consultas de `docs/instrumentacao-uso.md` e a skill `consultas-uso` pararam de filtrar por tipo (listam todas as empresas).
+
+### 16/10/2026: SEGUNDA RODADA DA CENTRAL (NAO COMMITADA). LER PRIMEIRO
+
+Detalhe em `docs/adr/2026-10-16-central-picos-plan-caps-ptax-and-cards.md`. Resumo: horarios de pico na variacao A (tres numeros e dois graficos) seguindo o filtro da aba, com intervalo de datas (`lib/picos.ts`, pura, para portar ao /painel; migration JA APLICADA `20261015220551_admin_cliente_picos.sql`); LIMITE POR PLANO NO ENFORCEMENT REAL (Essencial 13 mi, Profissional 33 mi, Avancado 100 mi, sem plano 10 mi; ninguem passa a ter limite menor que antes); medidor com a barra do gasto ideal; modelo do cliente e custos em reais pela PTAX do Banco Central; cartoes com variacao, sparkline, meta e rosca.
+- Falta: login (`central-clientes.auth.spec.ts` foi atualizado e nao rodou; as relacoes picos x uso foram conferidas contra o banco real por script) e o deploy.
+- A metrica de conversas ficou fora das variacoes (definicao pendente com o dono).
+- `mapa-de-calor.tsx` foi APAGADO na revisao de 16/10 (o dono escolheu a variacao A); tokens `--chart-rampa-tinta*` tambem.
+- Revisao da rodada (16/10, apos o /code-review): o teto por plano agora limpa as marcas dos avisos na troca de plano (`alinharMarcasDoMes`, migration `20261016170702_limpar_marcas_consumo_ia.sql` JA APLICADA); "Padrao do plano" limpa o limite personalizado e o valor de outro plano abre o valor personalizado preenchido; o ritmo do limite e do mes de CADA coluna (periodo que atravessa dois meses tem um trecho por mes); selos pelo `Selo` do painel sobre `lib/delta.ts` (`IndicadorComparado`); a PTAX nao segura mais a pagina (`useCambio`, falha lembrada por 10 min); `atendimentoDoCliente` faz UMA chamada de `painel_janelas`; os dados das abas Uso/Atendimento so saem quando o dono mostra que vai abrir a aba; `MedidorDeMeta` e `DropdownMenuItemMarcado` na camada base; PTAX e donut fora de `lib/custo-ia.ts`.
+- As duas migrations de drop (`account_type`, `admin_bloqueados_sem_beta`) foram RENOMEADAS para `20261017000000` e `20261017000100` (continuam NAO aplicadas e continuam as ultimas).
+
+### 15/10/2026 (noite): 15 AJUSTES DE LAYOUT DA CENTRAL, NAO COMMITADOS. LER PRIMEIRO
+
+Detalhe e motivos em `docs/adr/2026-10-15-central-layout-adjustments.md`. Resumo: o trilho do menu rola os itens por dentro (a pagina inteira rolava abaixo do cartao em janela baixa); "Dia" do Uso de IA e hoje desde as 00h; coluna acima do ritmo em ambar; mapa de pico em faixas de 3 horas com numero; Financeiro mostra so o que vale para a situacao; "Feito" some; filtro da lista virou um botao de icone; medidor com trilha; balao da rosca por cima; botao Clientes ajustado; cabecalho com Conta e Plano; Visao geral em seis cartoes; seletor de meses passados e Todo o periodo no Uso de IA (migration JA APLICADA e aditiva: `20261015201151_admin_cliente_uso_meses.sql`); "Editar limite" na aba Acoes (valores por plano A, B, C ainda NAO existem: o dono esta definindo, o cartao ja tem o lugar); detalhe com esqueleto proprio e abas aquecidas.
+- Falta: rodar login (`central-clientes.auth.spec.ts` le a Visao geral nova; ainda nao foi rodado) e conferir em producao o clique da lista (o esqueleto so e pre-buscado em producao).
+- O Atendimento NAO ganhou o seletor de meses (as quatro janelas vem das funcoes do painel; um mes pediria janelas novas em quatro funcoes SQL).
+
+### 15/10/2026 (tarde): AJUSTES DO DONO NA ENTREGA 2 (NAO COMMITADOS AINDA). LER PRIMEIRO
+
+- Chave do beta REMOVIDA: `lib/beta.ts`, o tipo `beta_aberto` de `accessState`, `cairiaSemBeta` e o aviso da lista sairam. A variavel `BETA_ABERTO` nao faz mais nada: o dono pode apagar na Vercel. Consequencia aceita pelo dono: teste vencido vai para a tela de assinatura e o agente silencia. Em 15/10 eram 4 empresas com teste vencido (Dra Maria Jullia, MajuTeste, Novasenhateste, testesworkfranck); a OBM esta `active`. Marcar Vitalicio quem deve ficar livre ANTES do deploy.
+- A funcao SQL `admin_bloqueados_sem_beta` FICOU no banco (o codigo implantado ainda chama em `/clientes`); apagar numa migration depois do deploy.
+- "Estender teste" virou um controle so: 7 dias, 15 dias, Personalizado e Vitalicio (a mesma acao `vitalicio`). "Remover vitalicio" so aparece para um vitalicio.
+- "Apagar de vez" MANTEM `billing_events` (registro fiscal): `TABELAS_MANTIDAS`, colunas `deleted_client_id`/`deleted_client_name`, `admin_apagar_cliente` com `p_mantidas`. Migration JA APLICADA (aditiva, compativel com o codigo implantado): `20261015191433_apagar_de_vez_mantem_billing_events.sql`.
+- "Apagar de vez" APAGA a instancia da Evolution (`deleteInstance`, `DELETE /instance/delete/{instance}`, conferido na doc v2 pelo context7), depois do logout.
+- Falta rodar: login (inclui `central-clientes-conta.serial`, que agora confere o `billing_events` mantido) e o `test:e2e:n8n` depois do deploy (o gate de acesso do `processTurn` mudou).
+
+### 15/10/2026 (madrugada): CENTRAL "CLIENTES", ENTREGA 1 PUBLICADA SEM APROVACAO DE TELA
 
 - Plano: `docs/plano-central-clientes.md` (secao Execution). Sessao arquiteto + subagente executor; o dono autorizou commit e push das duas entregas sem ver a tela, para revisar de manha.
 - Entrega 1: `/clientes` e `/clientes/[id]` viraram a central do dono (so `ADMIN_USER_IDS`; quem nao e admin vai para `/contatos`); a lista de contatos mudou para `/contatos`. Abas Visao geral, Uso de IA (grafico unico com filtro de periodo e mapa de calor) e Atendimento (graficos). Recharts entrou na camada base (`components/ui/chart.tsx`, ADR 2026-10-15). Migrations JA APLICADAS: `20261014215549`, `20261014223146`, `20261015032015` (todas aditivas).
@@ -175,8 +209,8 @@ obrigatório para o beta).
 - `account_type`: **não marcar testador um a um.** Decisão do dono: o projeto inteiro está em beta,
   e quando mudar, muda para todos. Não propor de novo a marcação manual.
 - Trocar o token do Supabase exposto no chat: o dono recusou. Não levantar de novo.
-- Ao desligar o `BETA_ABERTO`, quem se cadastrou no beta cai no bloqueio (teste vencido): decidir
-  antes de desligar.
+- A chave `BETA_ABERTO` saiu do codigo em 15/10/2026 (decisao do dono): teste vencido bloqueia; quem deve
+  ficar livre e marcado Vitalicio na central.
 
 ### A sessão de 24 a 27/09/2026
 

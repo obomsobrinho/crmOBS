@@ -1,4 +1,4 @@
-import { PLANS, type BillingRow, type PlanKey } from "./billing";
+import { PLANS, type AccessKind, type BillingRow, type PlanKey } from "./billing";
 
 // AS ACOES DA CENTRAL SOBRE A CONTA DE UM CLIENTE (docs/plano-central-clientes.md,
 // entrega 2): aba "Financeiro" (vitalicio, estender teste, plano, bloqueio) e aba
@@ -141,6 +141,57 @@ export interface FinanceiroDoCliente {
   atualizadoEm: string | null;
 }
 
+/** Uma linha de data do cartão "Assinatura" (só as que servem à situação da conta). */
+export interface LinhaDaAssinatura {
+  chave: "teste" | "carencia" | "vitalicio" | "bloqueado";
+  rotulo: string;
+  /** O instante gravado; nulo quando a coluna está vazia. */
+  quando: string | null;
+  /** O que a tela escreve quando `quando` é nulo. */
+  vazio: string;
+}
+
+/**
+ * As datas que a aba Financeiro mostra, escolhidas pelo TIPO de acesso (`accessState().kind`) e não
+ * por quais colunas existem: o fim do teste só enquanto está em teste (ou depois que acabou), a
+ * carência só quando o pagamento atrasou, o vitalício e o bloqueio só quando a marca existe. Antes
+ * eram seis linhas sempre, e "Fim do teste" e "Carência até" pareciam a mesma coisa. Nada é inventado:
+ * cada linha lê a coluna que já está gravada.
+ */
+export function linhasDaAssinatura(
+  conta: Pick<BillingRow, "trial_ends_at" | "grace_until" | "vitalicio_desde" | "bloqueado_em">,
+  kind: AccessKind
+): LinhaDaAssinatura[] {
+  const linhas: LinhaDaAssinatura[] = [];
+  if (kind === "em_teste") {
+    linhas.push({ chave: "teste", rotulo: "O teste termina em", quando: conta.trial_ends_at, vazio: "Sem prazo" });
+  } else if (kind === "teste_encerrado") {
+    linhas.push({ chave: "teste", rotulo: "O teste terminou em", quando: conta.trial_ends_at, vazio: "Sem prazo" });
+  } else if (kind === "carencia") {
+    linhas.push({ chave: "carencia", rotulo: "Carência do pagamento até", quando: conta.grace_until, vazio: "Sem data" });
+  } else if (kind === "atrasado_bloqueado") {
+    linhas.push({ chave: "carencia", rotulo: "A carência terminou em", quando: conta.grace_until, vazio: "Sem data" });
+  }
+  if (conta.vitalicio_desde) {
+    linhas.push({ chave: "vitalicio", rotulo: "Vitalício desde", quando: conta.vitalicio_desde, vazio: "" });
+  }
+  if (conta.bloqueado_em) {
+    linhas.push({ chave: "bloqueado", rotulo: "Bloqueado desde", quando: conta.bloqueado_em, vazio: "" });
+  }
+  return linhas;
+}
+
+/** A única linha que substitui o bloco do provedor quando NÃO há provedor: sem cobrança ou sem assinatura. */
+export function textoSemAssinatura(conta: Pick<BillingRow, "vitalicio_desde">): string {
+  return conta.vitalicio_desde ? "Sem cobrança: conta vitalícia." : "Sem assinatura no Asaas.";
+}
+
+/** O nome do provedor de cobrança como a tela escreve ("asaas" vira "Asaas"); uma chave nova vira o mesmo com a inicial maiúscula, nunca a chave crua. */
+export function nomeDoProvedor(chave: string): string {
+  const NOMES: Record<string, string> = { asaas: "Asaas", stripe: "Stripe" };
+  return NOMES[chave.toLowerCase()] ?? `${chave.charAt(0).toUpperCase()}${chave.slice(1)}`;
+}
+
 /** "sub_12345abcd" vira "•••• abcd": so os 4 ultimos, o bastante para conferir no Asaas. */
 export function mascararId(id: string | null | undefined): string | null {
   if (!id) return null;
@@ -212,6 +263,26 @@ export interface AcaoDoFinanceiro<A extends AcaoDaConta> {
 }
 
 /**
+ * Os prazos prontos do controle "Estender teste" (decisão do dono, 15/10/2026).
+ * "Personalizado" aceita qualquer prazo de `diasValidos`, sem teto de negócio.
+ */
+export const PRAZOS_DO_TESTE = [7, 15] as const;
+
+/**
+ * O controle "Estender teste" (15/10/2026): UM controle com as opções 7 dias,
+ * 15 dias, Personalizado (o dono digita os dias) e Vitalício. Os dias vão como
+ * `estender_teste`; Vitalício é a MESMA ação `vitalicio` de sempre, oferecida aqui.
+ * `recusa` é a do controle inteiro: nula quando ao menos uma opção passa; senão a
+ * recusa dos dias.
+ */
+export interface ControleDoTeste {
+  dias: AcaoDoFinanceiro<"estender_teste">;
+  /** `null` = já é vitalício (tirar é outra ação, `remover_vitalicio`). */
+  vitalicio: AcaoDoFinanceiro<"vitalicio"> | null;
+  recusa: string | null;
+}
+
+/**
  * As ações da aba Financeiro com a mesma ordem de recusas de `admin_mudar_conta`
  * (o SQL confere de novo; isto só evita mostrar um botão que vai ser recusado e
  * diz por quê, com o texto de `RESPOSTA_DO_SQL`). A tela nunca relê as colunas.
@@ -221,25 +292,28 @@ export function acoesDoFinanceiro(
   financeiro: Pick<FinanceiroDoCliente, "temAssinatura">
 ): {
   vitalicio: AcaoDoFinanceiro<"vitalicio" | "remover_vitalicio">;
-  estenderTeste: AcaoDoFinanceiro<"estender_teste">;
+  estenderTeste: ControleDoTeste;
   mudarPlano: AcaoDoFinanceiro<"mudar_plano">;
   bloqueio: AcaoDoFinanceiro<"bloquear" | "liberar">;
 } {
-  const vitalicio = !!conta.vitalicio_desde;
+  const ehVitalicio = !!conta.vitalicio_desde;
+  const marcar: AcaoDoFinanceiro<"vitalicio"> | null = ehVitalicio
+    ? null
+    : { acao: "vitalicio", recusa: financeiro.temAssinatura ? "tem_assinatura" : null };
+  const dias: AcaoDoFinanceiro<"estender_teste"> = {
+    acao: "estender_teste",
+    recusa: ehVitalicio
+      ? "vitalicio"
+      : conta.subscription_status !== "trialing"
+        ? "nao_em_teste"
+        : conta.trial_ends_at === null
+          ? "sem_prazo"
+          : null,
+  };
+  const algumaPassa = dias.recusa === null || (marcar !== null && marcar.recusa === null);
   return {
-    vitalicio: vitalicio
-      ? { acao: "remover_vitalicio", recusa: null }
-      : { acao: "vitalicio", recusa: financeiro.temAssinatura ? "tem_assinatura" : null },
-    estenderTeste: {
-      acao: "estender_teste",
-      recusa: vitalicio
-        ? "vitalicio"
-        : conta.subscription_status !== "trialing"
-          ? "nao_em_teste"
-          : conta.trial_ends_at === null
-            ? "sem_prazo"
-            : null,
-    },
+    vitalicio: marcar ?? { acao: "remover_vitalicio", recusa: null },
+    estenderTeste: { dias, vitalicio: marcar, recusa: algumaPassa ? null : dias.recusa },
     mudarPlano: { acao: "mudar_plano", recusa: financeiro.temAssinatura ? "tem_assinatura" : null },
     bloqueio: { acao: conta.bloqueado_em ? "liberar" : "bloquear", recusa: null },
   };
@@ -250,9 +324,15 @@ export interface EfeitosDoApagar {
   assinaturaCancelada: boolean;
   arquivosRemovidos: number;
   whatsappDesconectado: boolean;
+  instanciaApagada: boolean;
 }
 
-export const SEM_EFEITOS: EfeitosDoApagar = { assinaturaCancelada: false, arquivosRemovidos: 0, whatsappDesconectado: false };
+export const SEM_EFEITOS: EfeitosDoApagar = {
+  assinaturaCancelada: false,
+  arquivosRemovidos: 0,
+  whatsappDesconectado: false,
+  instanciaApagada: false,
+};
 
 /**
  * Uma parada DEPOIS de efeitos externos (o banco não foi apagado, mas a assinatura,
@@ -269,6 +349,48 @@ export function pendenciasDosEfeitos(e: EfeitosDoApagar): string[] {
         : `${e.arquivosRemovidos} arquivos já foram removidos do Storage.`
     );
   }
-  if (e.whatsappDesconectado) saida.push("O WhatsApp já foi desconectado na Evolution.");
+  if (e.instanciaApagada) saida.push("A instância do WhatsApp já foi apagada na Evolution.");
+  else if (e.whatsappDesconectado) saida.push("O WhatsApp já foi desconectado na Evolution.");
   return saida;
+}
+
+/** Uma recusa e as ações que ela trava: o mesmo motivo escrito UMA vez ("Marcar como vitalício e mudar plano: ..."). */
+export interface RecusaAgrupada {
+  /** A chave da recusa em `RESPOSTA_DO_SQL`. */
+  recusa: string;
+  /** As ações travadas por ela, na ordem da tela. */
+  acoes: string[];
+  /** A frase da tela: as ações juntas e o motivo. */
+  frase: string;
+}
+
+/**
+ * O que a aba Financeiro NÃO deixa fazer agora, sem botão morto e sem repetir motivo: cada ação travada
+ * vira uma linha curta com a razão, e as que travam pelo MESMO motivo se juntam numa linha só. O controle
+ * "Estender teste" só entra aqui quando NENHUMA das suas opções passa (se ao menos uma passa, o botão
+ * existe e a razão das outras fica dentro da caixa). O texto é o da rota (`RESPOSTA_DO_SQL`).
+ */
+export function recusasAgrupadas(a: ReturnType<typeof acoesDoFinanceiro>): RecusaAgrupada[] {
+  const travadas: { acao: string; recusa: string }[] = [];
+  if (a.estenderTeste.recusa !== null) {
+    if (a.estenderTeste.dias.recusa) travadas.push({ acao: "Estender o teste", recusa: a.estenderTeste.dias.recusa });
+    if (a.estenderTeste.vitalicio?.recusa) {
+      travadas.push({ acao: "Marcar como vitalício", recusa: a.estenderTeste.vitalicio.recusa });
+    }
+  }
+  if (a.mudarPlano.recusa !== null) travadas.push({ acao: "Mudar plano", recusa: a.mudarPlano.recusa });
+  const grupos: RecusaAgrupada[] = [];
+  for (const t of travadas) {
+    let g = grupos.find((x) => x.recusa === t.recusa);
+    if (!g) {
+      g = { recusa: t.recusa, acoes: [], frase: "" };
+      grupos.push(g);
+    }
+    g.acoes.push(t.acao);
+  }
+  for (const g of grupos) {
+    const nomes = g.acoes.map((n, i) => (i === 0 ? n : `${n.charAt(0).toLowerCase()}${n.slice(1)}`)).join(" e ");
+    g.frase = `${nomes}: ${RESPOSTA_DO_SQL[g.recusa]?.texto ?? g.recusa}`;
+  }
+  return grupos;
 }

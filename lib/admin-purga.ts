@@ -1,16 +1,19 @@
 // A LISTA DE TABELAS DE UM CLIENTE (docs/plano-central-clientes.md, entrega 2,
 // "Apagar de vez"; docs/adr/2026-10-15-two-step-company-deletion.md). Modulo PURO.
 //
-// TODA tabela de `public` com a coluna `client_id`, na ORDEM de apagar (filhas
-// antes das maes: as chaves sem cascata, como `conversations.stage` para
-// `pipeline_stages` e `knowledge_chunks` para `knowledge_documents`, mandam na
-// ordem). A mesma lista serve a exportacao LGPD (um CSV por tabela).
+// TODA tabela de `public` com a coluna `client_id` esta em UMA de duas listas:
+// `TABELAS_DO_CLIENTE` (apagadas, na ORDEM de apagar: filhas antes das maes; as
+// chaves sem cascata, como `conversations.stage` para `pipeline_stages` e
+// `knowledge_chunks` para `knowledge_documents`, mandam na ordem) ou
+// `TABELAS_MANTIDAS` (ficam de proposito). As duas juntas servem a exportacao
+// LGPD (um CSV por tabela, `TABELAS_DA_EXPORTACAO`).
 //
 // Tres travas para uma tabela nova nunca ser esquecida em silencio:
 // 1. `admin_apagar_cliente` (SQL) confere no catalogo, na hora, se toda tabela com
-//    `client_id` esta na lista recebida; se nao, ABORTA sem apagar nada.
-// 2. `e2e/central-clientes-lib.design.spec.ts` compara esta lista com as tabelas
-//    que tem `client_id` em `lib/database.types.ts` (gerado do banco a cada migration).
+//    `client_id` esta numa das duas listas recebidas; se nao, ABORTA sem apagar nada.
+// 2. `e2e/central-clientes-conta.design.spec.ts` compara as duas listas com as
+//    tabelas que tem `client_id` em `lib/database.types.ts` (gerado do banco a cada
+//    migration).
 // 3. O spec serial do cliente descartavel apaga de verdade e confere cada tabela.
 //
 // `admin_acoes` nao tem `client_id` (o alvo e texto): o registro do apagamento
@@ -33,9 +36,22 @@ export const TABELAS_DO_CLIENTE = [
   "consumo_ia_mensal",
   "quick_replies",
   "feedback",
-  "billing_events",
   "user_clients",
 ] as const;
+
+/**
+ * As tabelas com `client_id` que o "Apagar de vez" MANTEM (decisao do dono,
+ * 15/10/2026): `billing_events` e registro fiscal da cobranca. Cada uma precisa de
+ * uma chave para `clients` com `on delete set null` (ou nenhuma) e das colunas
+ * `deleted_client_id` e `deleted_client_name`, que `admin_apagar_cliente` preenche
+ * antes de apagar o cliente (migration 20261015191433). Entra na exportacao.
+ */
+export const TABELAS_MANTIDAS = ["billing_events"] as const;
+
+/** Um CSV por tabela na exportacao LGPD: as apagadas e as mantidas. */
+export const TABELAS_DA_EXPORTACAO = [...TABELAS_DO_CLIENTE, ...TABELAS_MANTIDAS] as const;
+
+export type TabelaDaExportacao = (typeof TABELAS_DA_EXPORTACAO)[number];
 
 /**
  * Como cada tabela e lida na exportacao (`admin_exportar_lote`): `ordem` = colunas
@@ -46,7 +62,7 @@ export const TABELAS_DO_CLIENTE = [
  * (cada linha leva o vetor de 1536 numeros), 2000 nas outras.
  */
 export const LEITURA_DA_EXPORTACAO: Partial<
-  Record<(typeof TABELAS_DO_CLIENTE)[number], { ordem?: readonly string[]; lote?: number }>
+  Record<TabelaDaExportacao, { ordem?: readonly string[]; lote?: number }>
 > = {
   chat_messages: { ordem: ["created_at", "id"] },
   agent_turns: { ordem: ["created_at", "id"] },
@@ -102,5 +118,5 @@ export function nomeDoArquivo(nome: string): string {
  * uma coluna nova não some da exportação LGPD em silêncio).
  */
 export const COLUNAS_DO_CLIENTE =
-  "id, name, created_at, account_type, prompt_mode, persona, agent_config, agent_config_updated_at, agent_enabled, agent_published_at, onboarding_tested_at, regras_salvas, evolution_instance, notify_group_jid, imported_at, ia_limite_tokens, subscription_status, trial_ends_at, grace_until, billing_plan, billing_provider, billing_customer_id, billing_subscription_id, billing_seats, billing_updated_at, vitalicio_desde, bloqueado_em, desativada_em";
+  "id, name, created_at, prompt_mode, persona, agent_config, agent_config_updated_at, agent_enabled, agent_published_at, onboarding_tested_at, regras_salvas, evolution_instance, notify_group_jid, imported_at, ia_limite_tokens, subscription_status, trial_ends_at, grace_until, billing_plan, billing_provider, billing_customer_id, billing_subscription_id, billing_seats, billing_updated_at, vitalicio_desde, bloqueado_em, desativada_em";
 

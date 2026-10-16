@@ -44,8 +44,15 @@ export function calcularDelta(input: {
   direcao: Direcao;
   /** Texto do "sem base". Ex.: "primeira semana medida". */
   semBase?: string;
+  /**
+   * Base mínima para sair em porcentagem (padrão `PISO_PERCENTUAL`). `0` = SEMPRE em porcentagem, para o que
+   * não tem um absoluto legível (custo em dólar, milhões de tokens): uma diferença que arredonda para 0%
+   * sai "igual", nunca um absoluto torto.
+   */
+  piso?: number;
 }): Delta {
   const { atual, anterior, direcao } = input;
+  const piso = input.piso ?? PISO_PERCENTUAL;
   const semBase = input.semBase ?? "sem período anterior para comparar";
 
   // Sem período anterior, ou período anterior vazio: não há de onde tirar
@@ -63,7 +70,7 @@ export function calcularDelta(input: {
   const tom: Tom = melhorou == null ? "neutro" : melhorou ? "bom" : "ruim";
 
   // Base pequena: valor absoluto em vez de porcentagem.
-  if (anterior < PISO_PERCENTUAL) {
+  if (anterior < piso) {
     return { tipo: "selo", texto: `${subiu ? "+" : ""}${diff}`, tom, subiu };
   }
 
@@ -71,6 +78,7 @@ export function calcularDelta(input: {
   // Arredondamento pode zerar uma diferença real (de 201 para 202 dá 0%), e
   // "0%" com seta seria pior que o absoluto.
   if (pct === 0) {
+    if (piso === 0) return { tipo: "selo", texto: "igual", tom: "neutro", subiu: false };
     return { tipo: "selo", texto: `${subiu ? "+" : ""}${diff}`, tom, subiu };
   }
 

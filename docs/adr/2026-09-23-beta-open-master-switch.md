@@ -1,6 +1,6 @@
 # BETA_ABERTO: master switch that frees every tenant during the beta
 - Date: 2026-09-23
-- Status: Accepted
+- Status: Superseded by `docs/adr/2026-10-15-vitalicio-replaces-the-beta-switch.md` (15/10/2026: the switch and `lib/beta.ts` were removed; a company that must stay free is marked Vitalício)
 - Area: billing
 
 ## Context

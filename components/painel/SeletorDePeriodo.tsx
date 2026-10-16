@@ -14,12 +14,13 @@ export default function SeletorDePeriodo({
   aoMudar,
   className,
 }: {
-  valor: PeriodoKey;
+  /** `null` = nenhum chip aceso (a central escolheu um mês passado ou "Todo o período" por outro controle). */
+  valor: PeriodoKey | null;
   aoMudar: (p: PeriodoKey) => void;
   className?: string;
 }) {
   return (
-    <Tabs value={valor} onValueChange={(v) => ehPeriodo(v) && aoMudar(v)} className={className}>
+    <Tabs value={valor ?? ""} onValueChange={(v) => ehPeriodo(v) && aoMudar(v)} className={className}>
       <TabsList variant="painel" aria-label="Período">
         {ORDEM_PERIODOS.map((k) => (
           <TabsTrigger key={k} value={k} variant="painel">

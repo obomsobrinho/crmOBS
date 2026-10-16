@@ -2,10 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, RefreshCw, AlertTriangle } from "lucide-react";
-import { Aviso } from "@/components/ui/aviso";
+import { Building2, ListFilter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItemMarcado,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
@@ -13,8 +20,8 @@ import { cn } from "@/lib/utils";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { useDebounce } from "@/lib/use-debounce";
 import { usePaginada } from "@/lib/use-paginada";
-import { usdCurto } from "@/lib/custo-ia";
-import { plural } from "@/lib/format";
+import { custoCurto, type Cambio } from "@/lib/cambio";
+import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
 import { FILTROS_DE_SITUACAO, type FiltroDeSituacao } from "@/lib/admin-alertas";
 import {
   PAGINA_EMPRESAS,
@@ -38,12 +45,18 @@ import {
 // 10 por vez, mais ao rolar (`usePaginada`), busca por nome e filtro de situação
 // no SERVIDOR (busca com debounce). Sem realtime (decisão do plano): o botão
 // "Atualizar" revalida o que está na tela. A linha inteira abre o detalhe. O
-// limite de IA se edita no detalhe, na aba "Uso de IA".
+// limite de IA se edita no detalhe, na aba "Ações".
+//
+// A situação se filtra por UM botão de ícone ao lado da busca, que abre a lista de
+// situações e mostra um "1" quando há filtro (eram sete chips ocupando uma linha
+// inteira). A linha é um `Link`: no navegador de produção o Next já busca o esqueleto
+// do detalhe (`clientes/[id]/loading.tsx`) quando a linha aparece, e o clique mostra
+// a tela na hora.
 export default function ListaCentral({
   inicial,
   previewTodas,
   hrefModelo = "/clientes/{id}",
-  bloqueariamSemBeta = null,
+  cambio: cambioDaTela = null,
 }: {
   /** A primeira página, que o servidor já buscou. */
   inicial: { itens: EmpresaItem[]; temMais: boolean };
@@ -52,13 +65,13 @@ export default function ListaCentral({
   /** Para onde a linha leva; o preview aponta para o detalhe de mentira. */
   hrefModelo?: string;
   /**
-   * Com `BETA_ABERTO` ligado: quantos clientes ficariam bloqueados se a chave
-   * fosse desligada hoje (`admin_bloqueados_sem_beta`). Nulo = chave desligada
-   * (ou a contagem falhou): sem aviso.
+   * A cotação PTAX do dólar (o custo sai em reais): pronta, `null` (indisponível, os custos ficam em US$) ou a
+   * promessa de uma que ainda está sendo buscada (a página não espera por ela, `useCambio`).
    */
-  bloqueariamSemBeta?: number | null;
+  cambio?: CambioDaTela;
 }) {
   const simular = !!previewTodas;
+  const { cambio, buscando: cambioBuscando } = useCambio(cambioDaTela);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<FiltroDeSituacao | null>(null);
@@ -101,41 +114,25 @@ export default function ListaCentral({
           </div>
           <p className="mt-1 text-legenda text-ink-3">
             As empresas que usam o CRM. Uso de IA do mês (fuso de São Paulo), custo estimado pela tabela oficial de
-            preços.
+            preços
+            {cambio
+              ? ", em reais pela PTAX do Banco Central"
+              : cambioBuscando
+                ? ", em US$ por enquanto (buscando a cotação do dólar)"
+                : ", em US$ (a cotação do dólar está indisponível agora)"}
+            .
           </p>
-          {bloqueariamSemBeta !== null && <AvisoDoBeta bloqueariam={bloqueariamSemBeta} />}
-          <CampoBusca
-            className="mt-3 md:max-w-[420px]"
-            valor={q}
-            aoMudar={setQ}
-            placeholder="Buscar cliente pelo nome"
-            rotulo="Buscar clientes"
-            aoLimpar={() => setQ("")}
-            mostrarLimpar={q !== ""}
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Situação">
-            <Button
-              variant="chip"
-              size="chip"
-              data-slot="central-chip"
-              aria-pressed={situacao === null}
-              onClick={() => setSituacao(null)}
-            >
-              Todos
-            </Button>
-            {FILTROS_DE_SITUACAO.map((f) => (
-              <Button
-                key={f.chave}
-                variant="chip"
-                size="chip"
-                data-slot="central-chip"
-                data-filtro={f.chave}
-                aria-pressed={situacao === f.chave}
-                onClick={() => setSituacao(f.chave)}
-              >
-                {f.rotulo}
-              </Button>
-            ))}
+          <div className="mt-3 flex items-center gap-2">
+            <CampoBusca
+              className="min-w-0 flex-1 md:max-w-[420px]"
+              valor={q}
+              aoMudar={setQ}
+              placeholder="Buscar cliente pelo nome"
+              rotulo="Buscar clientes"
+              aoLimpar={() => setQ("")}
+              mostrarLimpar={q !== ""}
+            />
+            <BotaoDeFiltro valor={situacao} aoEscolher={setSituacao} />
           </div>
         </div>
 
@@ -174,7 +171,7 @@ export default function ListaCentral({
           ) : (
             <ul data-slot="central-lista">
               {itens.map((e) => (
-                <Linha key={e.id} e={e} href={hrefModelo.replace("{id}", e.id)} />
+                <Linha key={e.id} e={e} href={hrefModelo.replace("{id}", e.id)} cambio={cambio} />
               ))}
               {temMais && (
                 <li
@@ -199,11 +196,59 @@ export default function ListaCentral({
   );
 }
 
+/** O botão de ícone que filtra por situação: abre a lista, marca a escolhida e mostra "1" quando há filtro. */
+function BotaoDeFiltro({
+  valor,
+  aoEscolher,
+}: {
+  valor: FiltroDeSituacao | null;
+  aoEscolher: (f: FiltroDeSituacao | null) => void;
+}) {
+  const atual = FILTROS_DE_SITUACAO.find((f) => f.chave === valor);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon-control"
+          className="relative shrink-0"
+          data-slot="central-filtro"
+          data-ativo={valor ?? undefined}
+          aria-label={atual ? `Filtrar por situação: ${atual.rotulo}` : "Filtrar por situação"}
+        >
+          <ListFilter size={15} />
+          {valor && (
+            <Badge variant="nao-lidas" data-slot="central-filtro-contagem" className="absolute -right-1.5 -top-1.5">
+              1
+            </Badge>
+          )}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52" data-menu="central-filtro">
+        <DropdownMenuLabel>Situação</DropdownMenuLabel>
+        <DropdownMenuItemMarcado data-filtro="todos" marcado={valor === null} onSelect={() => aoEscolher(null)}>
+          Todos
+        </DropdownMenuItemMarcado>
+        {FILTROS_DE_SITUACAO.map((f) => (
+          <DropdownMenuItemMarcado
+            key={f.chave}
+            data-filtro={f.chave}
+            marcado={valor === f.chave}
+            onSelect={() => aoEscolher(f.chave)}
+          >
+            {f.rotulo}
+          </DropdownMenuItemMarcado>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 const COLUNAS =
   "grid xl:grid-cols-[minmax(200px,1.3fr)_130px_120px_120px_minmax(140px,190px)_130px] xl:gap-3";
 
-function Linha({ e, href }: { e: EmpresaItem; href: string }) {
-  const custo = usdCurto(e.custoUsd);
+function Linha({ e, href, cambio }: { e: EmpresaItem; href: string; cambio: Cambio | null }) {
+  const custo = custoCurto(e.custoUsd, cambio);
   const principal = e.alertas[0];
   return (
     <li>
@@ -256,27 +301,5 @@ function Linha({ e, href }: { e: EmpresaItem; href: string }) {
         </span>
       </Link>
     </li>
-  );
-}
-
-/**
- * O aviso do `BETA_ABERTO` (entrega 2): enquanto a chave está ligada ninguém é
- * bloqueado, e o dono vê quantos clientes cairiam se ela fosse desligada hoje,
- * para marcar como vitalício quem deve continuar sem pagar antes de desligar.
- */
-function AvisoDoBeta({ bloqueariam }: { bloqueariam: number }) {
-  return (
-    <Aviso
-      tom={bloqueariam > 0 ? "warn" : "neutro"}
-      icone={AlertTriangle}
-      className="mt-3"
-      data-slot="central-aviso-beta"
-      data-bloqueariam={bloqueariam}
-    >
-      Beta aberto: hoje ninguém é bloqueado.{" "}
-      {bloqueariam > 0
-        ? `Se a chave fosse desligada hoje, ${bloqueariam} ${plural(bloqueariam, "cliente ficaria bloqueado", "clientes ficariam bloqueados")} (teste encerrado, pagamento atrasado fora da carência ou cancelado). Marque como vitalício quem deve continuar sem pagar.`
-        : "Se a chave fosse desligada hoje, nenhum cliente ficaria bloqueado."}
-    </Aviso>
   );
 }

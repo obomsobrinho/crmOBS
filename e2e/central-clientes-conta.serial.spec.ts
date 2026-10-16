@@ -1,7 +1,7 @@
 import { inflateRawSync } from "node:zlib";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { segredoDoAgente, servico, tenantDeTeste } from "./semente";
-import { TABELAS_DO_CLIENTE } from "../lib/admin-purga";
+import { TABELAS_DA_EXPORTACAO, TABELAS_DO_CLIENTE, TABELAS_MANTIDAS } from "../lib/admin-purga";
 
 // A CENTRAL "CLIENTES", ENTREGA 2, CONTRA O BANCO DE VERDADE (docs/plano-central-clientes.md).
 // Roda com a sessão do DONO de teste, que está em ADMIN_USER_IDS (projeto
@@ -177,6 +177,8 @@ let nomeDescartavel = "";
 let usuarioDescartavel = "";
 const ARQUIVO = (id: string) => `${id}/e2e/descartavel.txt`;
 
+let eventoDeTeste = "";
+
 async function limparDescartavel() {
   if (!descartavel) return;
   const svc = servico();
@@ -190,8 +192,11 @@ async function limparDescartavel() {
       p_nome: nomeDescartavel,
       p_tabelas: [...TABELAS_DO_CLIENTE],
       p_usuarios: 1,
+      p_mantidas: [...TABELAS_MANTIDAS],
     });
   }
+  // O evento de cobrança de teste fica depois do apagar (é a regra); some aqui.
+  if (eventoDeTeste) await svc.from("billing_events").delete().eq("asaas_event_id", eventoDeTeste);
   if (usuarioDescartavel) await svc.auth.admin.deleteUser(usuarioDescartavel);
 }
 
@@ -253,6 +258,12 @@ test("descartável: estender teste, vitalício que o gateway não rebaixa, expor
   expect(
     (await svc.from("feedback").insert({ client_id: descartavel, user_id: usuarioDescartavel, message: "e2e" })).error
   ).toBeNull();
+  // Um evento de cobrança: o "Apagar de vez" o MANTÉM (registro fiscal).
+  eventoDeTeste = `e2e-descartavel-${marca}`;
+  expect(
+    (await svc.from("billing_events").insert({ asaas_event_id: eventoDeTeste, event: "E2E", client_id: descartavel, payload: {} }))
+      .error
+  ).toBeNull();
   expect(
     (
       await svc.storage
@@ -295,7 +306,7 @@ test("descartável: estender teste, vitalício que o gateway não rebaixa, expor
   expect(exp.headers()["content-type"]).toContain("application/zip");
   const arquivos = lerZip(Buffer.from(await exp.body()));
   expect(Object.keys(arquivos).sort()).toEqual(
-    ["cliente.csv", "membros.csv", ...TABELAS_DO_CLIENTE.map((t) => `${t}.csv`)].sort()
+    ["cliente.csv", "membros.csv", ...TABELAS_DA_EXPORTACAO.map((t) => `${t}.csv`)].sort()
   );
   expect(arquivos["cliente.csv"]).toContain(nomeDescartavel);
   expect(arquivos["chat_messages.csv"]).toContain("Oi, mensagem descartável");
@@ -317,6 +328,15 @@ test("descartável: estender teste, vitalício que o gateway não rebaixa, expor
     expect(count, t).toBe(0);
   }
   expect((await svc.from("clients").select("id").eq("id", descartavel).maybeSingle()).data).toBeNull();
+  // O histórico de cobrança ficou, sem a chave para o cliente e com o id e o nome dele.
+  const { data: evento } = await svc
+    .from("billing_events")
+    .select("client_id, deleted_client_id, deleted_client_name")
+    .eq("asaas_event_id", eventoDeTeste)
+    .single();
+  expect(evento).toEqual({ client_id: null, deleted_client_id: descartavel, deleted_client_name: nomeDescartavel });
+  await svc.from("billing_events").delete().eq("asaas_event_id", eventoDeTeste);
+  eventoDeTeste = "";
   const { data: sobrou } = await svc.storage.from("whatsapp-media").list(`${descartavel}/e2e`);
   expect(sobrou ?? []).toEqual([]);
   const { data: login } = await svc.auth.admin.getUserById(usuarioDescartavel);

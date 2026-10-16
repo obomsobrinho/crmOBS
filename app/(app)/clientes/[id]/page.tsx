@@ -3,6 +3,7 @@ import DetalheCliente from "@/components/admin/DetalheCliente";
 import { adminDaPagina, detalheDoCliente } from "@/lib/admin";
 import { ehAbaDoCliente } from "@/lib/admin-cliente";
 import { AGENT_MODEL } from "@/lib/agent";
+import { cotacaoPtax } from "@/lib/cambio-servidor";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -27,8 +28,12 @@ export default async function ClienteDetalhePage({
   await adminDaPagina(id);
 
   const { aba } = await searchParams;
-  const detalhe = await detalheDoCliente(createServiceClient(), id, agoraMs(), AGENT_MODEL);
+  // A cotação do dólar (PTAX do Banco Central) NÃO segura a página: segue como promessa, a tela abre em US$
+  // e troca para reais quando ela chega (`useCambio`). Sem cotação fica em US$ e a nota diz que está indisponível.
+  const agora = agoraMs();
+  const cambio = cotacaoPtax(agora);
+  const detalhe = await detalheDoCliente(createServiceClient(), id, agora, AGENT_MODEL);
   if (!detalhe) notFound();
 
-  return <DetalheCliente detalhe={detalhe} abaInicial={ehAbaDoCliente(aba) ? aba : "visao"} />;
+  return <DetalheCliente detalhe={detalhe} cambio={cambio} abaInicial={ehAbaDoCliente(aba) ? aba : "visao"} />;
 }

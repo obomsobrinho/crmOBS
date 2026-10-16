@@ -40,7 +40,7 @@ sacadas, com o Deskcomm como catálogo).
 | **P1, durante o beta** | 4. ✅ **Motivo do pedido de ajuda** gravado + métricas de decisão da IA (`docs/plano-motivo-pedido.md`). **Feito em 06/10/2026**: motivo no pedido, em Pedidos (etiqueta e filtro), no aviso e no Painel do cliente | É o dado que diz o que ensinar à IA |
 | | 5. ✅ **Orientação vira regra permanente** do agente. **Feito em 13/10/2026**: "Salvar como regra" no pedido orientado, regras em `clients.regras_salvas`, lista em `/agente` (`docs/adr/2026-10-13-orientation-saved-as-agent-rule.md`) | Hoje cada orientação vale uma vez |
 | | 6. ✅ **Custo de IA por empresa, com teto**. **Feito em 14/10/2026**, em tokens (decisão do dono): teto mensal de 10 mi por empresa, avisos a 80% e 100%, IA para no teto, página `/admin` com as Empresas (`docs/plano-custo-ia.md`, `docs/adr/2026-10-13-ai-usage-cap-in-tokens.md`) | Tokens já estão em `agent_turns`; beta custeado pelo dono precisa de freio |
-| | 7. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos. **Em andamento (15/10/2026)**: virou a central "Clientes" do dono (`docs/plano-central-clientes.md`); entrega 1 (rotas `/clientes` e `/contatos`, lista, detalhe com Visão geral, Uso de IA e Atendimento, gráficos) publicada SEM a aprovação de tela do dono, por decisão dele, para ele revisar em 15/10; entrega 2 (Financeiro, Vitalício no lugar da chave do beta, aviso de quantos cairiam sem o beta, Ações com desativar, exportar e apagar de vez) publicada em 15/10 também sem aprovação de tela. Falta: o dono aprovar as telas e decidir os pontos listados em `docs/handoff.md`; desligar o `BETA_ABERTO` é um passo à parte. Prospecção virou o item "Campanha", a discutir | Mesma conta do item 6; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
+| | 7. **Admin v1** (ver abaixo), com a **prospecção** como um dos primeiros tópicos. **Em andamento (15/10/2026)**: virou a central "Clientes" do dono (`docs/plano-central-clientes.md`); entrega 1 (rotas `/clientes` e `/contatos`, lista, detalhe com Visão geral, Uso de IA e Atendimento, gráficos) publicada SEM a aprovação de tela do dono, por decisão dele, para ele revisar em 15/10; entrega 2 (Financeiro, Vitalício no lugar da chave do beta, aviso de quantos cairiam sem o beta, Ações com desativar, exportar e apagar de vez) publicada em 15/10 também sem aprovação de tela. Falta: o dono aprovar as telas e decidir os pontos listados em `docs/handoff.md`; o beta acabou (15/10/2026, decisão do dono): a chave `BETA_ABERTO` saiu do código e o Vitalício a substitui. Prospecção virou o item "Campanha", a discutir | Mesma conta do item 6; o teto se configura aqui. A prospecção é como o dono vai trazer clientes |
 | **P2, antes de cobrar** | 8. **Admin v2**: pagamentos e assinatura | Cobrança está construída e desligada |
 | | 9. **LGPD**: exportar e apagar os dados de um contato | Cliente sério pede |
 | | 10. **Agenda** com Google Calendar | Já decidido como primeiro depois do beta (26/08) |
@@ -60,9 +60,9 @@ sacadas, com o Deskcomm como catálogo).
   no `proxy.ts` para qualquer outro login e leitura sempre no servidor (service_role). Domínio próprio,
   se um dia quiser, aponta para o mesmo deploy.
 - **Toda ação do admin fica registrada** (quem, o quê, quando), porque ele enxerga todas as empresas.
-- **v1 (P1):** lista de clientes com montagem, conexão, agente ativo, última atividade, tipo
-  (`account_type`), pedidos abertos; gasto de IA por cliente em reais e o teto; leitura do `feedback`
-  (substitui a consulta por SQL de `docs/instrumentacao-beta.md`).
+- **v1 (P1):** lista de clientes com montagem, conexão, agente ativo, última atividade,
+  pedidos abertos; gasto de IA por cliente em reais e o teto; leitura do `feedback`
+  (substitui a consulta por SQL de `docs/instrumentacao-uso.md`).
 - **Prospecção, um dos primeiros tópicos do admin (decisão do dono, 29/09/2026).** É a ferramenta
   para o DONO DO PRODUTO buscar clientes para o CRM. **Só o usuário dele, dentro do `/admin`; nunca
   vira funcionalidade dos tenants.** Ele sabe que abordar contato frio pelo QR é o cenário de bloqueio
@@ -357,7 +357,7 @@ O trabalho de verdade tem três partes, em ordem de risco:
 2. **Steps do agente.** Mesmo tratamento: pesquisa e desenho antes de implementar.
 3. ✅ **Os 4 furos** (FEITO em 28/08/2026): marcar tenant de beta (`account_type`, abaixo), canal de
    feedback, instrumentação do beta, testes mínimos de segurança da IA. As consultas ficaram em
-   `docs/instrumentacao-beta.md` e os resultados da bateria na seção própria mais abaixo.
+   `docs/instrumentacao-uso.md` e os resultados da bateria na seção própria mais abaixo.
 4. **Design e mobile no Claude Design** (redesenho geral, tema claro, celular).
 5. **Aplicar o design escolhido.**
 6. **Testes** (incluindo a bateria completa de segurança da IA).

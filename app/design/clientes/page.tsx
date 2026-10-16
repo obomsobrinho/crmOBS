@@ -2,26 +2,22 @@ import NavRail from "@/components/NavRail";
 import ListaCentral from "@/components/admin/ListaCentral";
 import { PAGINA_EMPRESAS, fonteEmpresasDaMemoria } from "@/lib/admin-empresas";
 import { agoraMs } from "@/lib/periodo";
-import { cairiaSemBeta } from "@/lib/admin-alertas";
-import { clientesFalsos } from "./dados";
+import { cambioDoPreview, clientesFalsos } from "./dados";
 
 // Preview da central "Clientes" do dono do produto (dev-only, liberado pelo
 // proxy). Sem banco e sem sessão: as linhas falsas passam pela MESMA conta da tela
 // de verdade (`paraEmpresa`). `?cenario=vazia` mostra a lista sem clientes. A
-// linha leva ao detalhe de mentira (`/design/clientes/detalhe`). O aviso do
-// BETA_ABERTO aparece ligado (`?beta=0` o esconde), contado pela mesma regra
-// pura que a contagem em SQL espelha (`cairiaSemBeta`).
+// linha leva ao detalhe de mentira (`/design/clientes/detalhe`). `?cambio=atraso|falha`: a cotação chega depois.
 export const dynamic = "force-dynamic";
 
 export default async function DesignClientesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cenario?: string; beta?: string }>;
+  searchParams: Promise<{ cenario?: string; cambio?: string }>;
 }) {
-  const { cenario, beta } = await searchParams;
+  const { cenario, cambio } = await searchParams;
   const agora = agoraMs();
   const todos = cenario === "vazia" ? [] : clientesFalsos(agora);
-  const bloqueariam = beta === "0" ? null : todos.filter((e) => cairiaSemBeta(e.conta, agora)).length;
   const primeira = await fonteEmpresasDaMemoria(todos).pagina({ busca: "", situacao: null }, null);
 
   return (
@@ -32,7 +28,7 @@ export default async function DesignClientesPage({
           inicial={{ itens: primeira, temMais: primeira.length === PAGINA_EMPRESAS }}
           previewTodas={todos}
           hrefModelo="/design/clientes/detalhe?cliente={id}"
-          bloqueariamSemBeta={bloqueariam}
+          cambio={cambioDoPreview(agora, cambio)}
         />
       </div>
     </div>

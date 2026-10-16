@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Canal de feedback do beta.
+ * Canal de feedback dos usuários.
  *
  * Escreve DIRETO do browser na tabela `feedback`, sob RLS, que é o padrão das
  * tabelas próprias do CRM (tags, notas, respostas rápidas). Não existe route
@@ -25,7 +25,7 @@ import { createClient } from "@/lib/supabase/client";
  * cumprir, e promessa quebrada custa mais do que o relato vale.
  *
  * ⚠️ NINGUÉM É AVISADO quando um relato chega. O dono só vê rodando a consulta
- * de `docs/instrumentacao-beta.md`. É limitação conhecida e assumida: notificar
+ * de `docs/instrumentacao-uso.md`. É limitação conhecida e assumida: notificar
  * exigiria mexer no n8n, que é produção.
  */
 export default function FeedbackDialog({

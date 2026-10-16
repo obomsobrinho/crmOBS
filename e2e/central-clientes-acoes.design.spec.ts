@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 
 // A CENTRAL "CLIENTES", ENTREGA 2, NA TELA (previews com dados falsos; as ações
-// validam e não gravam): o aviso do BETA_ABERTO na lista, os filtros novos, a aba
+// validam e não gravam): os filtros novos da lista (e nenhum aviso do beta), a aba
 // Financeiro (ids mascarados, cobranças, ações com as razões de estarem
 // desabilitadas), a aba Ações (zona de perigo, desativar, exportar, apagar com o
 // nome digitado) e a tela da conta desativada. O comportamento com o banco de
@@ -20,29 +20,25 @@ async function semRolagemLateral(page: Page) {
   expect(sobra).toBeLessThanOrEqual(0);
 }
 
-test.describe("Central: aviso do BETA_ABERTO e filtros novos (/design/clientes)", () => {
-  test("o aviso diz quantos cairiam se a chave fosse desligada hoje", async ({ page }) => {
+test.describe("Central: filtros novos e nenhum aviso do beta (/design/clientes)", () => {
+  test("a chave do beta saiu (15/10/2026): a lista não fala mais dela", async ({ page }) => {
     await page.goto("/design/clientes");
-    const aviso = page.locator('[data-slot="central-aviso-beta"]');
-    await expect(aviso).toBeVisible();
-    // Teste encerrado (Ótica Vision) e cancelado (Mercearia Central). Atrasado na
-    // carência, vitalício, bloqueado e desativado não entram na conta.
-    await expect(aviso).toHaveAttribute("data-bloqueariam", "2");
-    await expect(aviso).toContainText("2 clientes ficariam bloqueados");
-    await expect(aviso).toContainText("Marque como vitalício");
-    await semTraco(page);
-  });
-
-  test("com a chave desligada, não há aviso", async ({ page }) => {
-    await page.goto("/design/clientes?beta=0");
     await expect(page.getByRole("heading", { name: "Clientes" })).toBeVisible();
     await expect(page.locator('[data-slot="central-aviso-beta"]')).toHaveCount(0);
+    expect(await page.locator("body").innerText()).not.toMatch(/beta aberto/i);
+    await semTraco(page);
   });
 
   test("vitalício, bloqueado e desativado têm selo e filtro próprios", async ({ page }) => {
     await page.goto("/design/clientes");
     const itens = page.locator('[data-slot="central-cliente"]');
-    const chip = (nome: string) => page.locator('[data-slot="central-chip"]', { hasText: nome });
+    // O filtro é UM botão de ícone ao lado da busca, que abre a lista de situações.
+    const escolher = async (nome: string) => {
+      await page.locator('[data-slot="central-filtro"]').click();
+      await page.getByRole("menuitem", { name: nome, exact: true }).click();
+      await expect(page.getByRole("menu")).toHaveCount(0);
+    };
+    const chip = (nome: string) => ({ click: () => escolher(nome) });
 
     await chip("Vitalícios").click();
     await expect(itens).toHaveCount(1);
@@ -75,7 +71,7 @@ test.describe("Central: aba Financeiro (/design/clientes/detalhe?aba=financeiro)
     await expect(aba).toBeVisible();
     await expect(aba.locator('[data-slot="financeiro-situacao"]')).toContainText("Atrasado");
     await expect(aba.locator('[data-slot="financeiro-plano"]')).toHaveText("Profissional");
-    await expect(aba.locator('[data-slot="financeiro-provedor"]')).toHaveText("asaas");
+    await expect(aba.locator('[data-slot="financeiro-provedor"]')).toHaveText("Asaas");
     await expect(aba.locator('[data-slot="financeiro-assinatura-gateway"]')).toHaveText("•••• aur1");
     await expect(aba.locator('[data-slot="financeiro-cliente-gateway"]')).toHaveText("•••• rora");
     expect(await page.content()).not.toContain("sub_00000000aur1");
@@ -88,18 +84,29 @@ test.describe("Central: aba Financeiro (/design/clientes/detalhe?aba=financeiro)
     await expect(cobrancas.first()).toContainText("R$ 347");
 
     // Com assinatura no Asaas: nem vitalício nem troca de plano por aqui; não está em teste.
-    await expect(aba.locator('[data-slot="financeiro-vitalicio-botao"]')).toBeDisabled();
-    await expect(aba.locator('[data-slot="financeiro-vitalicio-motivo"]')).toContainText("assinatura no Asaas");
-    await expect(aba.locator('[data-slot="financeiro-plano-botao"]')).toBeDisabled();
-    await expect(aba.locator('[data-slot="financeiro-teste-botao"]')).toBeDisabled();
-    // A razão escrita é a MESMA resposta da rota (acoesDoFinanceiro + RESPOSTA_DO_SQL).
-    await expect(aba.locator('[data-slot="financeiro-teste-motivo"]')).toHaveAttribute("data-recusa", "nao_em_teste");
-    await expect(aba.locator('[data-slot="financeiro-plano-motivo"]')).toHaveAttribute("data-recusa", "tem_assinatura");
+    // O vitalício mora no controle "Estender teste", e o botão de remover só aparece num vitalício.
+    await expect(aba.locator('[data-slot="financeiro-vitalicio-botao"]')).toHaveCount(0);
+    // Ação travada NÃO vira botão apagado: o botão nem existe, e a razão aparece numa linha curta.
+    await expect(aba.locator('[data-slot="financeiro-plano-botao"]')).toHaveCount(0);
+    await expect(aba.locator('[data-slot="financeiro-teste-botao"]')).toHaveCount(0);
+    // A razão escrita é a MESMA resposta da rota (acoesDoFinanceiro + RESPOSTA_DO_SQL), e cada motivo UMA vez:
+    // "Estender o teste" tem o seu, e "Marcar como vitalício" e "Mudar plano" dividem o da assinatura.
+    const recusas = aba.locator('[data-slot="financeiro-recusa"]');
+    await expect(recusas).toHaveCount(2);
+    await expect(recusas.nth(0)).toHaveAttribute("data-recusa", "nao_em_teste");
+    await expect(recusas.nth(0)).toHaveText("Estender o teste: Só dá para estender o teste de quem está em teste.");
+    await expect(recusas.nth(1)).toHaveAttribute("data-recusa", "tem_assinatura");
+    await expect(recusas.nth(1)).toHaveAttribute("data-acoes", "Marcar como vitalício|Mudar plano");
+    await expect(recusas.nth(1)).toContainText("Marcar como vitalício e mudar plano: Este cliente tem assinatura no Asaas.");
+    expect((await aba.locator('[data-bloco="financeiro-acoes"]').innerText()).split("tem assinatura no Asaas").length - 1).toBe(1);
+    // Provedor com nome de verdade, nunca a chave crua.
+    await expect(aba.locator('[data-slot="financeiro-tile-cobranca-valor"]')).toHaveText("Asaas");
+    await expect(aba.locator('[data-slot="financeiro-provedor"]')).toHaveText("Asaas");
     await expect(aba.locator('[data-slot="financeiro-bloqueio-botao"]')).toHaveText("Bloquear acesso");
     await semTraco(page);
   });
 
-  test("estender o teste: só com dias inteiros, e o preview não grava", async ({ page }) => {
+  test("estender o teste: 7 dias, 15 dias, Personalizado e Vitalício num controle só", async ({ page }) => {
     // Clínica Sorriso: em teste com prazo.
     await page.goto(detalhe(2, "financeiro"));
     const botao = page.locator('[data-slot="financeiro-teste-botao"]');
@@ -107,7 +114,22 @@ test.describe("Central: aba Financeiro (/design/clientes/detalhe?aba=financeiro)
     await botao.click();
     const dialogo = page.locator('[data-slot="dialogo-teste"]');
     await expect(dialogo).toBeVisible();
+    const opcoes = dialogo.locator("[data-opcao]");
+    await expect(opcoes).toHaveText(["7 dias", "15 dias", "Personalizado", "Vitalício"]);
     const confirmar = dialogo.locator('[data-slot="central-acao-confirmar"]');
+    await expect(confirmar).toBeDisabled();
+    // Um prazo pronto confirma direto.
+    await dialogo.locator('[data-opcao="15"]').click();
+    await expect(dialogo.locator('[data-opcao="15"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(confirmar).toBeEnabled();
+    await expect(confirmar).toHaveText("Estender");
+    // Vitalício: a mesma ação de sempre, com o texto dela.
+    await dialogo.locator('[data-opcao="vitalicio"]').click();
+    await expect(dialogo).toContainText("nunca cobrado");
+    await expect(confirmar).toHaveText("Marcar vitalício");
+    // Personalizado: só com dias inteiros.
+    await expect(dialogo.locator('[data-campo="dias"]')).toHaveCount(0);
+    await dialogo.locator('[data-opcao="personalizado"]').click();
     await expect(confirmar).toBeDisabled();
     await dialogo.locator('[data-campo="dias"]').fill("0");
     await expect(confirmar).toBeDisabled();
@@ -134,17 +156,26 @@ test.describe("Central: aba Financeiro (/design/clientes/detalhe?aba=financeiro)
     await expect(confirmar).toBeEnabled();
   });
 
-  test("vitalício: marcar e remover pedem confirmação", async ({ page }) => {
+  test("vitalício: marcar pelo Estender teste e remover pedem confirmação", async ({ page }) => {
     await page.goto(detalhe(18, "financeiro"));
     const aba = page.locator('[data-slot="central-aba-financeiro"]');
     await expect(aba.locator('[data-slot="financeiro-situacao"]')).toContainText("Vitalício");
     await expect(aba.locator('[data-slot="financeiro-vitalicio-botao"]')).toHaveText("Remover vitalício");
-    // Vitalício não tem teste a estender.
-    await expect(aba.locator('[data-slot="financeiro-teste-botao"]')).toBeDisabled();
+    // Vitalício não tem teste a estender (nem o que marcar de novo).
+    await expect(aba.locator('[data-slot="financeiro-teste-botao"]')).toHaveCount(0);
+    await expect(aba.locator('[data-slot="financeiro-recusa"]')).toHaveAttribute("data-recusa", "vitalicio");
+    await aba.locator('[data-slot="financeiro-vitalicio-botao"]').click();
+    const remover = page.locator('[data-slot="dialogo-vitalicio"]');
+    await expect(remover).toContainText("volta a seguir a assinatura gravada");
+    await remover.locator('[data-slot="central-acao-confirmar"]').click();
+    await expect(page.locator('[data-slot="central-recado"]')).toHaveText("Preview: nada foi gravado.");
 
+    // Barbearia do Zé (sem assinatura): o Vitalício está no controle do teste.
     await page.goto(detalhe(1, "financeiro"));
-    await page.locator('[data-slot="financeiro-vitalicio-botao"]').click();
-    const dialogo = page.locator('[data-slot="dialogo-vitalicio"]');
+    await expect(page.locator('[data-slot="financeiro-vitalicio-botao"]')).toHaveCount(0);
+    await page.locator('[data-slot="financeiro-teste-botao"]').click();
+    const dialogo = page.locator('[data-slot="dialogo-teste"]');
+    await dialogo.locator('[data-opcao="vitalicio"]').click();
     await expect(dialogo).toContainText("nunca cobrado");
     await dialogo.locator('[data-slot="central-acao-confirmar"]').click();
     await expect(page.locator('[data-slot="central-recado"]')).toHaveText("Preview: nada foi gravado.");

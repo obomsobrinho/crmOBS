@@ -15,26 +15,26 @@ import {
 import {
   atendimentoDe,
   atendimentoPorPeriodo,
-  diasDoMesSP,
+  atuaisEAnteriores,
+  diasDoJson,
   ehAbaDoCliente,
   fatiasDasSolucoes,
   marcasDoEixo,
   quebrarRotulo,
-  gradeDeHoras,
   horasDoJson,
   janelasDoAtendimento,
   movimentoDoPeriodo,
-  ritmoDoLimite,
+  planoDoAtendimento,
+  ritmoDaBarra,
   usoBruto,
-  usoDoJson,
   usoDoPeriodo,
   usoParaTela,
 } from "../lib/admin-cliente";
 import { barrasDasSeries, SERIES_VAZIAS } from "../lib/painel-agregado";
 import { ehPeriodo, ORDEM_PERIODOS, unidadeDoPeriodo } from "../lib/periodo";
-import { chavesDoEsqueleto } from "../lib/metrics";
+import { chavesDoDiaCivil, chavesDoEsqueleto } from "../lib/metrics";
 import { pct } from "../lib/format";
-import { somarDias } from "../lib/fuso";
+import { diasDoMes, somarDias } from "../lib/fuso";
 import { montagemState, montagemTerminada } from "../lib/onboarding";
 import { normalizarEstado } from "../lib/whatsapp-estado";
 import { janelaFalsa } from "../app/design/clientes/dados";
@@ -111,9 +111,9 @@ test.describe("Situação (lib/admin-alertas.ts, sobre accessState)", () => {
     expect(situacaoDaConta(conta("outra-coisa"), AGORA)).toMatchObject({ chave: "desconhecido", tom: "neutro" });
   });
 
-  test("a situação NÃO passa a chave geral do beta: ela vê a assinatura de cada um", () => {
+  test("a situação é o tipo de acesso: um teste vencido bloqueia e a central mostra isso", () => {
     const vencido = conta("trialing", { trial: -2 * D });
-    expect(accessState(vencido, new Date(AGORA), { betaAberto: true }).blocked).toBe(false);
+    expect(accessState(vencido, new Date(AGORA)).blocked).toBe(true);
     expect(situacaoDaConta(vencido, AGORA).chave).toBe("teste_encerrado");
   });
 
@@ -231,24 +231,19 @@ test.describe("Alertas (lib/admin-alertas.ts)", () => {
 });
 
 test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
-  test("o jsonb do banco vira dias, horas e grade; formato torto vira vazio", () => {
-    const uso = usoDoJson({
+  test("o jsonb do banco vira dias e horas; formato torto vira vazio (a grade saiu: os picos têm a função própria)", () => {
+    const dias = diasDoJson({
       dias: [
         ["2026-10-13", 10, 50_000, 20_000, 900],
         ["2026-10-14", 4, 20_000, 8_000, 300],
         ["x", "y"],
       ],
-      cubo: [
-        [1, 16, 9],
-        [9, 3, 1],
-        [2, 25, 1],
-      ],
+      cubo: [[1, 16, 9]],
     });
-    expect(uso.dias).toHaveLength(2);
-    expect(uso.dias[0]).toEqual({ dia: "2026-10-13", turnos: 10, tokens: { entrada: 50_000, cache: 20_000, saida: 900 } });
-    expect(uso.cubo).toEqual([[1, 16, 9]]);
-    expect(usoDoJson(null)).toEqual({ dias: [], cubo: [] });
-    expect(usoDoJson("lixo")).toEqual({ dias: [], cubo: [] });
+    expect(dias).toHaveLength(2);
+    expect(dias[0]).toEqual({ dia: "2026-10-13", turnos: 10, tokens: { entrada: 50_000, cache: 20_000, saida: 900 } });
+    expect(diasDoJson(null)).toEqual([]);
+    expect(diasDoJson("lixo")).toEqual([]);
 
     // As horas: [data, hora, turnos, entrada, cache, saida]; hora fora de 0 a 23 e data torta caem.
     const horas = horasDoJson([
@@ -258,10 +253,13 @@ test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
     ]);
     expect(horas).toEqual([{ chave: "2026-10-14T09", turnos: 3, tokens: { entrada: 1_000, cache: 400, saida: 30 } }]);
     expect(horasDoJson(null)).toEqual([]);
-    expect(usoBruto(null, "lixo")).toEqual({ dias: [], horas: [], cubo: [] });
+    expect(usoBruto(null, "lixo")).toEqual({ dias: [], horas: [], primeira: null });
+    // O primeiro turno do cliente (limita os meses do seletor): só uma data AAAA-MM-DD vale.
+    expect(usoBruto(null, null, "2026-03-09").primeira).toBe("2026-03-09");
+    expect(usoBruto(null, null, "ontem").primeira).toBeNull();
   });
 
-  test("os quatro períodos do painel: Dia sai por hora (24 colunas), os outros por dia (1, 7, 15, 30 dias com hoje)", () => {
+  test("os quatro períodos: Dia sai por hora e é HOJE desde as 00h, os outros por dia (7, 15, 30 dias com hoje)", () => {
     const bruto = usoBruto(
       {
         dias: [
@@ -276,7 +274,7 @@ test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
         ["2026-10-13", 16, 2, 400, 0, 4],
         ["2026-10-14", 14, 4, 1_000, 500, 10],
         ["2026-10-14", 15, 1, 50, 0, 1],
-        // Fora das 24 horas (a coluna mais antiga é 13/10 às 16h): ignorada.
+        // Antes das 00h de hoje (o Dia é o dia civil, não uma janela rolante): ignorada.
         ["2026-10-13", 14, 9, 9_999, 0, 9],
       ]
     );
@@ -284,13 +282,14 @@ test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
 
     const dia = tela.periodos.dia;
     expect(dia.unidade).toBe("hora");
-    expect(dia.barras).toHaveLength(24);
-    expect(dia.barras[0].chave).toBe("2026-10-13T16");
-    expect(dia.barras[23].chave).toBe("2026-10-14T15");
-    expect(dia.barras[23]).toMatchObject({ eixo: "15h", rotulo: "14/10, 15h", turnos: 1, usados: 51 });
-    expect(dia.total.turnos).toBe(2 + 4 + 1);
+    // AGORA são 15h em São Paulo: as colunas vão de 00h a 15h de hoje (16), não de ontem às 16h.
+    expect(dia.barras).toHaveLength(16);
+    expect(dia.barras[0].chave).toBe("2026-10-14T00");
+    expect(dia.barras[15].chave).toBe("2026-10-14T15");
+    expect(dia.barras[15]).toMatchObject({ eixo: "15h", rotulo: "14/10, 15h", turnos: 1, usados: 51 });
+    expect(dia.total.turnos).toBe(4 + 1);
     expect(dia.maior?.chave).toBe("2026-10-14T14");
-    expect(dia.legenda).toBe("últimas 24 horas");
+    expect(dia.legenda).toBe("hoje, desde as 00h");
 
     const semana = tela.periodos.semana;
     expect(semana.unidade).toBe("dia");
@@ -326,7 +325,7 @@ test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
   test("o dia de São Paulo manda: 31/10 de noite ainda é outubro, e o último dia da semana é 31/10", () => {
     const meiaNoite = Date.parse("2026-11-01T02:30:00Z"); // 31/10 23:30 em SP
     expect(mesSP(meiaNoite)).toBe("2026-10-01");
-    expect(diasDoMesSP(meiaNoite)).toBe(31);
+    expect(diasDoMes(mesSP(meiaNoite).slice(0, 7))).toBe(31);
     const semana = usoDoPeriodo(
       usoBruto({ dias: [["2026-10-31", 5, 1_000, 0, 10]] }, []),
       "semana",
@@ -335,57 +334,39 @@ test.describe("Uso de IA (lib/admin-cliente.ts)", () => {
     );
     expect(semana.barras).toHaveLength(7);
     expect(semana.barras[6]).toMatchObject({ chave: "2026-10-31", turnos: 5, usados: 1_010, eixo: "31/10" });
-    // As horas seguem o relógio de SP: 23h de 31/10 é a última coluna do Dia.
+    // As horas seguem o relógio de SP: 23h de 31/10 é a última coluna do Dia (e o dia tem as 24).
     const dia = usoDoPeriodo(usoBruto(null, [["2026-10-31", 23, 2, 10, 0, 1]]), "dia", meiaNoite, null);
     expect(dia.barras[23]).toMatchObject({ chave: "2026-10-31T23", turnos: 2 });
     expect(dia.barras[0].chave).toBe("2026-10-31T00");
   });
 
   test("o ritmo do limite é limite ÷ dias do mês (÷ 24 por hora): só aritmética sobre o limite", () => {
-    expect(diasDoMesSP(AGORA)).toBe(31); // outubro
-    expect(diasDoMesSP(Date.parse("2026-02-10T12:00:00Z"))).toBe(28);
-    expect(diasDoMesSP(Date.parse("2028-02-10T12:00:00Z"))).toBe(29);
-    expect(diasDoMesSP(Date.parse("2026-09-10T12:00:00Z"))).toBe(30);
-    expect(ritmoDoLimite(10_000_000, AGORA, "dia")).toBeCloseTo(10_000_000 / 31, 6);
-    expect(ritmoDoLimite(10_000_000, AGORA, "hora")).toBeCloseTo(10_000_000 / 31 / 24, 6);
+    expect(diasDoMes("2026-10")).toBe(31);
+    expect(diasDoMes("2026-02")).toBe(28);
+    expect(diasDoMes("2028-02")).toBe(29);
+    expect(diasDoMes("2026-09")).toBe(30);
+    expect(ritmoDaBarra(10_000_000, "2026-10-14", "dia")).toBeCloseTo(10_000_000 / 31, 6);
+    expect(ritmoDaBarra(10_000_000, "2026-10-14T09", "hora")).toBeCloseTo(10_000_000 / 31 / 24, 6);
   });
 
-  test("a soma das colunas é o total do período, e a grade acha o pico", () => {
+  test("a soma das colunas é o total do período", () => {
     const bruto = usoBruto(
       {
         dias: [
           ["2026-10-12", 2, 1_000, 400, 20],
           ["2026-10-10", 3, 2_000, 800, 40],
         ],
-        cubo: [
-          [1, 16, 5],
-          [1, 17, 5],
-          [3, 9, 2],
-        ],
       },
       []
     );
     const tela = usoParaTela(bruto, AGORA, "gpt-5.4-mini");
-    for (const k of ORDEM_PERIODOS) {
-      const p = tela.periodos[k];
-      expect(
-        p.barras.reduce((s, b) => s + b.usados, 0),
-        k
-      ).toBe(p.total.usados);
-      expect(
-        p.barras.reduce((s, b) => s + b.turnos, 0),
-        k
-      ).toBe(p.total.turnos);
-    }
-    // O maior dia da semana é 10/10 (tokens 2.040 contra 1.020); sem uso, não há maior.
-    expect(tela.periodos.semana.maior?.chave).toBe("2026-10-10");
-    expect(tela.periodos.dia.maior).toBeNull();
-    expect(tela.grade.total).toBe(12);
-    // Empate: fica o primeiro da semana e da hora.
-    expect(tela.grade.pico).toEqual({ dia: 1, hora: 16, n: 5 });
-    expect(tela.grade.celulas).toHaveLength(7);
-    expect(tela.grade.celulas[0]).toHaveLength(24);
-    expect(gradeDeHoras([]).pico).toBeNull();
+    const semana = tela.periodos.semana;
+    expect(semana.barras.reduce((s, b) => s + b.turnos, 0)).toBe(semana.total.turnos);
+    expect(semana.barras.reduce((s, b) => s + b.usados, 0)).toBe(semana.total.usados);
+    expect(semana.total.turnos).toBe(5);
+    expect(semana.maior?.chave).toBe("2026-10-10");
+    // Sem leitura de picos, os quatro chips têm janela vazia (nunca um erro).
+    expect(tela.picos.semana).toEqual({ dias: [], cubo: [] });
   });
 });
 
@@ -510,6 +491,26 @@ test.describe("Atendimento (lib/admin-cliente.ts, sobre as contas do painel)", (
     expect(por.mes.regrasSalvas).toBe(2);
   });
 
+  test("as janelas atuais e as anteriores vão numa chamada só (a lista do painel) e voltam separadas, renumeradas de 1 a 4", () => {
+    const plano = planoDoAtendimento(AGORA);
+    // Oito janelas: a atual e a anterior de cada período, na ordem de ORDEM_PERIODOS (a regra de lib/periodo.ts).
+    expect(plano.lista).toHaveLength(8);
+    expect(janelasDoAtendimento(AGORA)).toEqual(ORDEM_PERIODOS.map((k) => plano.lista[plano.operacao[k].atual - 1]));
+    // A resposta do banco traz a janela 0 (o acumulado) e as oito, em qualquer ordem: cada uma vai para o seu lugar.
+    const linhas = [0, ...plano.lista.map((_, i) => i + 1)].map((n) => ({ ...janelaFalsa(1), janela: n, conversas: 100 + n }));
+    const { atuais, anteriores } = atuaisEAnteriores([...linhas].reverse(), plano);
+    expect(atuais.map((j) => j.janela)).toEqual([1, 2, 3, 4]);
+    expect(anteriores.map((j) => j.janela)).toEqual([1, 2, 3, 4]);
+    ORDEM_PERIODOS.forEach((k, i) => {
+      expect(atuais[i].conversas).toBe(100 + plano.operacao[k].atual);
+      expect(anteriores[i].conversas).toBe(100 + plano.operacao[k].anterior);
+    });
+    // Cada janela anterior é a atual do mesmo período deslocada (a regra do painel): as bordas não se cruzam.
+    ORDEM_PERIODOS.forEach((k) => {
+      expect(plano.lista[plano.operacao[k].anterior - 1].ate).toBeLessThanOrEqual(plano.lista[plano.operacao[k].atual - 1].de);
+    });
+  });
+
   test("o movimento: as colunas do painel (barrasDasSeries), Dia por hora e os outros por dia, com o dia da semana", () => {
     const series = {
       ...SERIES_VAZIAS,
@@ -593,16 +594,21 @@ test.describe("Lógica dos gráficos da central (lib, fora dos componentes)", ()
     expect(unidadeDoPeriodo(30)).toBe("dia");
   });
 
-  test("o esqueleto de colunas é UM só: 24 horas ou N dias, da mais antiga à atual, em São Paulo", () => {
+  test("o esqueleto do painel é 24 horas ou N dias, da mais antiga à atual; o Dia da central é hoje desde as 00h", () => {
     const horas = chavesDoEsqueleto(1, AGORA);
     expect(horas).toHaveLength(24);
     expect(horas[0].chave).toBe("2026-10-13T16");
     expect(horas[23].chave).toBe("2026-10-14T15");
     const dias = chavesDoEsqueleto(7, AGORA).map((d) => d.chave);
     expect(dias).toEqual(["2026-10-08", "2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14"]);
-    // O uso da central e o movimento do painel desenham as MESMAS colunas.
+    // O Dia da central é o dia civil (00h até a hora atual), e a janela rolante do painel não muda.
     const uso = usoDoPeriodo(usoBruto(null, null), "dia", AGORA, null).barras.map((b) => b.chave);
-    expect(uso).toEqual(horas.map((h) => h.chave));
+    expect(uso).toEqual(chavesDoDiaCivil(AGORA).map((h) => h.chave));
+    expect(uso).toHaveLength(16);
+    expect(uso[0]).toBe("2026-10-14T00");
+    // Os outros períodos da central seguem desenhando as MESMAS colunas do painel.
+    const semanaUso = usoDoPeriodo(usoBruto(null, null), "semana", AGORA, null).barras.map((b) => b.chave);
+    expect(semanaUso).toEqual(dias);
     const mov = movimentoDoPeriodo(barrasDasSeries(SERIES_VAZIAS, 7, AGORA), "semana").barras.map((b) => b.chave);
     expect(mov).toEqual(dias);
   });

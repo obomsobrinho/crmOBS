@@ -21,7 +21,7 @@
 //   - public.painel_janelas e public.painel_series
 //     (supabase/migrations/20261001225553_painel_agregados_janelas_series.sql)
 //   - public.painel_verbatim (mesma migration)
-//   - as cinco consultas de docs/instrumentacao-beta.md
+//   - as cinco consultas de docs/instrumentacao-uso.md
 // A tradução, que as três funções repetem igual:
 //   ehImportada(t)     <=>  message_type = 'imported'
 //   respostaDaIa(m)    <=>  coalesce(bot_message, '') <> ''

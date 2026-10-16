@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { AgentConfig } from "../lib/agent-prompt";
 
-// Os quatro fluxos que o dono pediu provados antes do beta (23/09/2026):
+// Os quatro fluxos que o dono pediu provados antes do lançamento (23/09/2026):
 // login, esqueci a senha, handoff e orientação para a IA.
 //
 // Login e esqueci a senha rodam contra o Supabase Auth de verdade. Handoff e

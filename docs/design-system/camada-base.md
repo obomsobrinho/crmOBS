@@ -119,7 +119,7 @@ Tamanhos `field` e `control`.
 Tamanhos `xl` (44), `lg` (40), `md` (36), `sm` (32), `xs` (28). A cor sai de `avatarPair()`
 (`lib/inbox.ts`), nunca branco sobre cor cheia.
 
-### `chart` e `mapa-de-calor`
+### `chart`, `medidor` e `medidor-de-meta`
 `components/ui/chart.tsx` é a ÚNICA porta para gráfico novo: o `chart` do shadcn (Recharts 3.8.0,
 `react-is` 19 junto) ligado aos tokens da casa, sem o tema por `<style>` do shadcn. Peças:
 `ChartContainer` (`config` aponta para tokens, nunca hexadecimal solto), `ChartTooltip` e
@@ -132,8 +132,10 @@ verde, âmbar e vermelho continuam ESTADO. Toda série além das duas primeiras 
 de neutros, e a identidade vai na legenda (nome, número, fração), nunca só na cor. Todo gráfico tem
 balão ao passar o mouse e ao focar, e uma tabela `sr-only` (dentro de uma `div`, porque tabela
 ignora `overflow`) com os mesmos números. Marca: coluna de até 24px com ponta de 4px, linha de 2px,
-grade de 1px. `mapa-de-calor.tsx` é o que o Recharts não desenha: grade de células em cinco degraus,
-pico com contorno e explicado na legenda, um balão só, setas do teclado. Razão e escolhas:
+grade de 1px. O mapa de calor (grade de células em cinco degraus) foi apagado em 16/10/2026: o dono escolheu
+as colunas de pico. O `medidor` é a barra fina; a barra de META COM RITMO (trilha clara do estado, preenchimento
+sólido, bolinha no ideal e trecho listrado) é a peça própria `medidor-de-meta.tsx`, cujo estado vem de
+`posicaoNoRitmo` (`lib/custo-ia.ts`). Razão e escolhas:
 [../adr/2026-10-15-charts-recharts-in-base-layer.md](../adr/2026-10-15-charts-recharts-in-base-layer.md).
 
 ### `dropdown-menu`, `tooltip`, `scroll-area`, `separator`, `checkbox`

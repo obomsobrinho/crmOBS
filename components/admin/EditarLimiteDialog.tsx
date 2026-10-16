@@ -11,57 +11,56 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { numeroBR } from "@/lib/format";
-import { LIMITE_PADRAO_TOKENS, tokensCurto } from "@/lib/custo-ia";
+import { limiteDaEmpresa, tokensCurto } from "@/lib/custo-ia";
 import { limiteDigitado, type EmpresaItem } from "@/lib/admin-empresas";
+import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
 
-// EDITAR O LIMITE DE IA DE UM CLIENTE (aba "Uso de IA" da central, P1 item 6). O campo é SEMPRE em
+// EDITAR O LIMITE DE IA DE UM CLIENTE (aba "Ações" da central, "Valor personalizado"). O campo é SEMPRE em
 // milhões de tokens ("10", "2,5" ou "2.5"); embaixo dele, os tokens que vão ser
-// gravados, para não haver dúvida. Vazio ou "Usar o padrão" volta ao padrão do
-// código. Grava por `PUT /api/admin/empresas/[id]/limite` (uma transação, com o
-// registro em `admin_acoes`). Subir acima do uso reativa a IA na próxima
-// mensagem. No preview (`simular`) valida e não grava.
+// gravados, para não haver dúvida. Vazio ou "Usar o limite do plano" volta ao limite do plano (ou ao padrão de quem não tem plano).
+// Grava por `fonte.mudarLimite` (`PUT /api/admin/empresas/[id]/limite`: uma transação, com o
+// registro em `admin_acoes`; o preview valida e não grava). Subir acima do uso reativa a IA na próxima
+// mensagem.
 //
 // O detalhe monta este diálogo com `key` = id do cliente: abrir outro cliente é
 // outro diálogo, com o campo já começando no teto dela.
 export default function EditarLimiteDialog({
   empresa,
-  simular,
+  sugestao,
+  fonte,
   onFechar,
   onSalvo,
 }: {
   empresa: EmpresaItem | null;
-  simular: boolean;
+  /** O valor (em tokens) com que a caixa abre preenchida, quando o dono parte do valor de um plano; senão, o limite gravado. */
+  sugestao?: number | null;
+  fonte: FonteDoCliente;
   onFechar: () => void;
   onSalvo: (id: string, limite: number | null) => void;
 }) {
-  const [texto, setTexto] = useState(() =>
-    empresa?.limiteGravado == null ? "" : numeroBR(empresa.limiteGravado / 1_000_000).replace(/\./g, "")
-  );
+  const [texto, setTexto] = useState(() => {
+    const inicial = sugestao ?? empresa?.limiteGravado ?? null;
+    return inicial == null ? "" : numeroBR(inicial / 1_000_000).replace(/\./g, "");
+  });
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
   const valor = limiteDigitado(texto);
+  // O "vazio" é o limite do PLANO da empresa (ou o padrão de quem não tem plano).
+  const padrao = limiteDaEmpresa(null, empresa?.planoChave);
+  const quemDefine = empresa?.planoChave ? "do plano" : "sem plano";
 
   async function gravar(limite: number | null) {
     if (!empresa) return;
     setErro(null);
     setSalvando(true);
     try {
-      if (!simular) {
-        const res = await fetch(`/api/admin/empresas/${empresa.id}/limite`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ limite }),
-        });
-        if (!res.ok) {
-          const corpo = (await res.json().catch(() => ({}))) as { error?: string };
-          setErro(corpo.error ?? "Não deu para salvar agora. Tente de novo.");
-          return;
-        }
+      const r = await fonte.mudarLimite(limite);
+      if (!r.ok) {
+        setErro(r.erro);
+        return;
       }
       onSalvo(empresa.id, limite);
       onFechar();
-    } catch {
-      setErro("Não deu para salvar agora. Tente de novo.");
     } finally {
       setSalvando(false);
     }
@@ -102,11 +101,11 @@ export default function EditarLimiteDialog({
                 setTexto(e.target.value);
                 setErro(null);
               }}
-              placeholder={`Vazio = padrão (${tokensCurto(LIMITE_PADRAO_TOKENS)})`}
+              placeholder={`Vazio = ${quemDefine} (${tokensCurto(padrao)})`}
             />
             <span data-slot="admin-limite-tokens" className="text-legenda text-ink-3">
               {valor === null
-                ? `Padrão: ${numeroBR(LIMITE_PADRAO_TOKENS)} tokens`
+                ? `Limite ${quemDefine}: ${numeroBR(padrao)} tokens`
                 : valor === undefined
                   ? "Ex.: 10 (10 milhões) ou 2,5 (2,5 milhões)"
                   : `${numeroBR(valor)} tokens`}
@@ -126,7 +125,7 @@ export default function EditarLimiteDialog({
               data-slot="admin-limite-padrao"
               onClick={() => void gravar(null)}
             >
-              Usar o padrão
+              {empresa?.planoChave ? "Usar o limite do plano" : "Usar o padrão"}
             </Button>
             <DialogClose asChild>
               <Button type="button" variant="outline" size="field" className="px-4">

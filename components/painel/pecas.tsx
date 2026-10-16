@@ -11,6 +11,7 @@ import {
   StatLegenda,
 } from "@/components/ui/stat";
 import type { Delta } from "@/lib/delta";
+import { numeroBR } from "@/lib/format";
 import { useContagem } from "@/components/painel/useContagem";
 
 // Peças pequenas que os dois blocos com estado do painel (operação e movimento)
@@ -28,8 +29,14 @@ import { useContagem } from "@/components/painel/useContagem";
 export function Selo({
   delta,
   sufixo,
+  contra,
 }: {
   delta: Delta;
+  /**
+   * Contra o que se compara ("os 7 dias anteriores"): vai para o título e para o leitor de tela, sem mudar a pílula.
+   * A central do dono o usa (não há subtítulo que diga a base).
+   */
+  contra?: string;
   /**
    * A BASE da comparação, DENTRO da pílula. Ex.: "vs. 36".
    *
@@ -41,7 +48,11 @@ export function Selo({
   sufixo?: string;
 }) {
   if (delta.tipo === "sem-base") {
-    return <span className="text-legenda text-ink-3">{delta.texto}</span>;
+    return (
+      <span data-variacao="sem-base" className="text-legenda text-ink-3">
+        {delta.texto}
+      </span>
+    );
   }
   const variant =
     delta.tom === "bom"
@@ -50,11 +61,18 @@ export function Selo({
         ? "delta-ruim"
         : "delta-neutro";
   const Seta = delta.subiu ? TrendingUp : TrendingDown;
+  const igual = delta.texto === "igual";
   return (
-    <Badge variant={variant}>
-      {delta.texto !== "igual" && <Seta size={12} aria-hidden />}
+    <Badge
+      variant={variant}
+      data-variacao={delta.tom}
+      data-sentido={igual ? "igual" : delta.subiu ? "subiu" : "desceu"}
+      title={contra ? `Contra ${contra}` : undefined}
+    >
+      {!igual && <Seta size={12} aria-hidden />}
       {delta.texto}
       {sufixo && <span className="font-medium opacity-80">{sufixo}</span>}
+      {contra && <span className="sr-only"> contra {contra}</span>}
     </Badge>
   );
 }
@@ -72,7 +90,7 @@ export function NumeroAnimado({
   formatar?: (n: number) => string;
 }) {
   const n = useContagem(valor);
-  return <>{formatar ? formatar(n) : n.toLocaleString("pt-BR")}</>;
+  return <>{formatar ? formatar(n) : numeroBR(n)}</>;
 }
 
 /**

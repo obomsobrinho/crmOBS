@@ -283,7 +283,7 @@ const HORAS = horasSintetico();
  * decrescente, variação sempre neutra e um deles aberto.
  *
  * ⚠️ O CONTEÚDO é neutro de segmento de propósito. A prancha foi desenhada para
- * uma ótica e fala em consulta e lente; aqui os testadores do beta são advogado,
+ * uma ótica e fala em consulta e lente; aqui os clientes são advogado,
  * pediatra, barbeiro, engenheiro, clínica e comércio, e existe e2e que reprova
  * a tela se um texto assumir um único ramo. O que o preview precisa provar é o
  * ARRANJO, não o vocabulário de uma empresa fictícia.

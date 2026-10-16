@@ -124,7 +124,7 @@ export function CamposQuemAtende({
               onChange={(e) => patch({ companyWhat: e.target.value })}
               rows={2}
               // ⚠️ O placeholder NÃO nomeia um segmento. A versão anterior dizia
-              // "Ex.: é uma clínica odontológica no centro de...", e o beta é misto
+              // "Ex.: é uma clínica odontológica no centro de...", e o público é misto
               // (advogado, pediatra, barbeiro, engenheiro, clínica, loja): texto
               // fixo de tela que assume uma vertical faz o resto parecer não ser
               // para você. Quem dá exemplo de segmento é o modelo escolhido, que

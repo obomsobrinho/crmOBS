@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Download } from "lucide-react";
+import { memo, useState } from "react";
+import { Download, Pencil } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { diaMesHoraSP } from "@/lib/fuso";
+import { numeroBR } from "@/lib/format";
+import { limiteDaEmpresa, tokensCurto } from "@/lib/custo-ia";
+import { PLAN_ORDER, PLANS } from "@/lib/billing";
 import { nomeConfere, type PedidoDeAcao } from "@/lib/admin-conta";
 import type { EmpresaItem } from "@/lib/admin-empresas";
 import type { FonteDoCliente, RespostaDoApagar } from "@/lib/admin-cliente-fonte";
@@ -19,18 +22,52 @@ import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
 // 2. APAGAR DE VEZ: só para cliente desativado. Antes, a exportação LGPD (ZIP, um
 //    CSV por tabela); depois, a confirmação digitando o nome do cliente.
 // Quem faz cada coisa é o servidor (rotas do admin); esconder um botão nunca é a trava.
+//
+// O LIMITE DE IA do mês mora aqui também (15/10/2026, antes estava na aba Uso de IA): é uma
+// decisão do dono sobre a conta, no mesmo lugar das outras. O teto SEGUE o plano da empresa
+// (`limiteDaEmpresa`, `lib/custo-ia.ts`), então "Padrão do plano" limpa o limite personalizado (`null`) e
+// a empresa continua seguindo o plano se ele mudar. O valor de OUTRO plano só entra como valor
+// personalizado, de propósito e com o número já preenchido na caixa de edição (`EditarLimiteDialog`,
+// uma transação com a linha em `admin_acoes`): gravá-lo direto faria a empresa parar de seguir o plano
+// sem o dono perceber.
 
-export default function AbaAcoes({
+function AbaAcoes({
   empresa,
   fonte,
   executar,
   onApagado,
+  onEditarLimite,
+  aoMudarLimite,
 }: {
   empresa: EmpresaItem;
   fonte: FonteDoCliente;
   executar: (pedido: PedidoDeAcao) => Promise<string | null>;
   onApagado: (r: Extract<RespostaDoApagar, { ok: true }>) => void;
+  /** Abre a caixa de edição do limite de IA (o diálogo mora no detalhe), com um valor já preenchido quando há. */
+  onEditarLimite: (sugestao?: number) => void;
+  /** O limite foi limpo (volta a seguir o plano): o detalhe refaz o item (`comLimite`), sem ir ao banco. */
+  aoMudarLimite: (limite: number | null) => void;
 }) {
+  const [aplicando, setAplicando] = useState(false);
+  const [erroDoLimite, setErroDoLimite] = useState<string | null>(null);
+
+  /** "Padrão do plano": limpa o limite personalizado, e o teto volta a seguir o plano da empresa. */
+  async function seguirOPlano() {
+    setAplicando(true);
+    setErroDoLimite(null);
+    const r = await fonte.mudarLimite(null);
+    setAplicando(false);
+    if (!r.ok) {
+      setErroDoLimite(r.erro);
+      return;
+    }
+    aoMudarLimite(null);
+  }
+
+  // O que o teto vale para cada plano vem de `limiteDaEmpresa` (a única regra), nunca de uma tabela lida aqui.
+  const padrao = limiteDaEmpresa(null, empresa.planoChave);
+  const outrosPlanos = PLAN_ORDER.filter((k) => k !== empresa.planoChave);
+
   const [dialogo, setDialogo] = useState<"desativar" | "apagar" | null>(null);
   const [nome, setNome] = useState("");
   const desativada = !!empresa.conta.desativada_em;
@@ -50,6 +87,57 @@ export default function AbaAcoes({
 
   return (
     <div data-slot="central-aba-acoes" className="flex flex-col gap-3">
+      <Card variant="secao" data-bloco="acoes-limite">
+        <h2 className="text-rotulo uppercase text-ink-3">Limite de IA do mês</h2>
+        <p className="mt-2 text-apoio text-ink-2" data-slot="acoes-limite-atual">
+          Limite atual: {numeroBR(empresa.limite)} tokens ({empresa.origemDoLimite}). Ao chegar nele, a IA para até o
+          mês virar ou o limite subir.
+        </p>
+        <div
+          role="group"
+          aria-label="Limite de IA do mês"
+          data-slot="acoes-limite-opcoes"
+          className="mt-3 flex flex-wrap items-center gap-2"
+        >
+          <Button
+            type="button"
+            variant="alternavel"
+            size="control"
+            data-limite-plano="padrao"
+            aria-pressed={empresa.limiteGravado == null}
+            carregando={aplicando}
+            onClick={() => void seguirOPlano()}
+          >
+            {empresa.planoChave ? `Padrão do plano, ${tokensCurto(padrao)}` : `Sem plano, ${tokensCurto(padrao)}`}
+          </Button>
+          {outrosPlanos.map((k) => (
+            <Button
+              key={k}
+              type="button"
+              variant="outline"
+              size="control"
+              data-limite-valor={k}
+              onClick={() => onEditarLimite(limiteDaEmpresa(null, k))}
+            >
+              {PLANS[k].name}, {tokensCurto(limiteDaEmpresa(null, k))}
+            </Button>
+          ))}
+          <Button variant="outline" size="control" data-slot="central-editar-limite" onClick={() => onEditarLimite()}>
+            <Pencil size={14} />
+            Valor personalizado
+          </Button>
+        </div>
+        <p className="mt-2 text-legenda text-ink-3" data-slot="acoes-limite-nota">
+          Os valores dos outros planos abrem o valor personalizado já preenchido: um limite personalizado deixa de
+          seguir o plano da empresa.
+        </p>
+        {erroDoLimite && (
+          <p data-slot="acoes-limite-erro" className="mt-2 text-apoio text-danger-ink" role="alert">
+            {erroDoLimite}
+          </p>
+        )}
+      </Card>
+
       <Aviso tom="danger" forma="caixa" data-slot="acoes-zona-de-perigo">
         Zona de perigo. Cada ação aqui fica registrada com o seu login e a hora.
       </Aviso>
@@ -171,3 +259,5 @@ export default function AbaAcoes({
     </div>
   );
 }
+
+export default memo(AbaAcoes);

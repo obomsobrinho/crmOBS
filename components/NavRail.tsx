@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,7 +100,7 @@ const NAV: ItemDoMenu[] = [
 //
 // **Campanhas SAIU.** Manter prometia disparo em massa sobre conexão QR, que é o
 // cenário de banimento que o projeto decidiu não correr, e atrai o cliente
-// errado logo no beta. Se um dia vier por API Oficial, volta.
+// errado logo de início. Se um dia vier por API Oficial, volta.
 //
 // **Follow-up e não "Fluxos"**: o cliente final não pensa em fluxo, pensa em
 // "falar de novo com quem sumiu". ⚠️ O nome está amarrado a uma regra: o produto
@@ -285,87 +286,95 @@ export default function NavRail({
           </TooltipContent>
         </Tooltip>
 
-      {visiveis.map(({ href, label, icon: Icon }) => {
-        const atual = activeHref ?? pathname;
-        const active = atual === href || atual.startsWith(href + "/");
-        const unread = href === "/inbox" && unreadConvos > 0;
-        const esperando = href === "/pedidos" && pedidosAbertos > 0;
-        const item = (
-          <Button
-            asChild
-            variant="rail"
-            size="none"
-            className={cn(
-              "relative h-10 gap-3 rounded-lg text-corpo font-normal",
-              collapsed ? "w-10 justify-center" : "px-3",
-              active &&
-                "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
-            )}
-          >
-            <Link href={href} aria-current={active ? "page" : undefined}>
-              <Icon size={18} strokeWidth={1.8} className="shrink-0" />
-              {!collapsed && (
-                <span className="min-w-0 flex-1 truncate">{label}</span>
-              )}
-              {/* Expandido, pílula com o número; recolhido, só o ponto. A
-                  pílula encolhida virava um círculo escuro sem nada legível
-                  dentro. */}
-              {unread && !collapsed && (
-                <Badge variant="nao-lidas" className="ml-auto">
-                  {unreadConvos > 99 ? "99+" : unreadConvos}
-                </Badge>
-              )}
-              {unread && collapsed && (
-                <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
-              )}
-              {/* Âmbar, e não a cor da marca: aqui o número é ESTADO (tem gente
-                  esperando), e âmbar é a cor de estado de espera do sistema. */}
-              {esperando && !collapsed && (
-                <Badge variant="pedidos" data-slot="rail-pedidos" className="ml-auto">
-                  {pedidosAbertos > 99 ? "99+" : pedidosAbertos}
-                </Badge>
-              )}
-              {esperando && collapsed && (
-                <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
-              )}
-            </Link>
-          </Button>
-        );
-        // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
-        // ícone. Expandido, o rótulo está escrito ao lado e a dica seria eco.
-        return collapsed ? (
-          <Tooltip key={href}>
-            <TooltipTrigger asChild>{item}</TooltipTrigger>
-            <TooltipContent side="right">
-              {unread
-                ? `${label} (${unreadConvos} não lidas)`
-                : esperando
-                  ? `${label} (${pedidosAbertos} esperando)`
-                  : label}
-            </TooltipContent>
-          </Tooltip>
-        ) : (
-          <React.Fragment key={href}>{item}</React.Fragment>
-        );
-      })}
+      {/* Os itens rolam sozinhos quando a janela é baixa (menos de uns 660px): sem
+          isto o trilho passava da altura da casca e a PÁGINA inteira ganhava uma
+          barra de rolagem embaixo do cartão. A marca e o rodapé (conta, tema,
+          canal) ficam fixos. */}
+      <AreaRolavel tamanho={16} data-slot="rail-itens" className="min-h-0 w-full flex-1">
+        <div className={cn("flex flex-col gap-1", collapsed && "items-center")}>
+          {visiveis.map(({ href, label, icon: Icon }) => {
+            const atual = activeHref ?? pathname;
+            const active = atual === href || atual.startsWith(href + "/");
+            const unread = href === "/inbox" && unreadConvos > 0;
+            const esperando = href === "/pedidos" && pedidosAbertos > 0;
+            const item = (
+              <Button
+                asChild
+                variant="rail"
+                size="none"
+                className={cn(
+                  "relative h-10 gap-3 rounded-lg text-corpo font-normal",
+                  collapsed ? "w-10 justify-center" : "px-3",
+                  active &&
+                    "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
+                )}
+              >
+                <Link href={href} aria-current={active ? "page" : undefined}>
+                  <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+                  {!collapsed && (
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
+                  )}
+                  {/* Expandido, pílula com o número; recolhido, só o ponto. A
+                      pílula encolhida virava um círculo escuro sem nada legível
+                      dentro. */}
+                  {unread && !collapsed && (
+                    <Badge variant="nao-lidas" className="ml-auto">
+                      {unreadConvos > 99 ? "99+" : unreadConvos}
+                    </Badge>
+                  )}
+                  {unread && collapsed && (
+                    <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
+                  )}
+                  {/* Âmbar, e não a cor da marca: aqui o número é ESTADO (tem gente
+                      esperando), e âmbar é a cor de estado de espera do sistema. */}
+                  {esperando && !collapsed && (
+                    <Badge variant="pedidos" data-slot="rail-pedidos" className="ml-auto">
+                      {pedidosAbertos > 99 ? "99+" : pedidosAbertos}
+                    </Badge>
+                  )}
+                  {esperando && collapsed && (
+                    <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
+                  )}
+                </Link>
+              </Button>
+            );
+            // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
+            // ícone. Expandido, o rótulo está escrito ao lado e a dica seria eco.
+            return collapsed ? (
+              <Tooltip key={href}>
+                <TooltipTrigger asChild>{item}</TooltipTrigger>
+                <TooltipContent side="right">
+                  {unread
+                    ? `${label} (${unreadConvos} não lidas)`
+                    : esperando
+                      ? `${label} (${pedidosAbertos} esperando)`
+                      : label}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <React.Fragment key={href}>{item}</React.Fragment>
+            );
+          })}
 
-      {SOON.map(({ label, icon: Icon }) => (
-        <Tooltip key={label}>
-          <TooltipTrigger asChild>
-            <div
-              tabIndex={0}
-              className={cn(
-                "flex h-10 shrink-0 cursor-not-allowed items-center gap-3 rounded-lg text-corpo text-ink-3 opacity-60",
-                collapsed ? "w-10 justify-center" : "px-3",
-              )}
-            >
-              <Icon size={18} strokeWidth={1.8} className="shrink-0" />
-              {!collapsed && <span className="truncate">{label}</span>}
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="right">{label} (em breve)</TooltipContent>
-        </Tooltip>
-      ))}
+          {SOON.map(({ label, icon: Icon }) => (
+            <Tooltip key={label}>
+              <TooltipTrigger asChild>
+                <div
+                  tabIndex={0}
+                  className={cn(
+                    "flex h-10 shrink-0 cursor-not-allowed items-center gap-3 rounded-lg text-corpo text-ink-3 opacity-60",
+                    collapsed ? "w-10 justify-center" : "px-3",
+                  )}
+                >
+                  <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">{label} (em breve)</TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+      </AreaRolavel>
 
       <div className="relative mt-auto flex w-full flex-col gap-2 pt-2">
         {/* Estado do canal e tema. É o que decide se vale a pena escrever

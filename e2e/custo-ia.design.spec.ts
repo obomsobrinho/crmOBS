@@ -9,6 +9,7 @@ import {
   limiteDaEmpresa,
   mesSP,
   avisoPendente,
+  limiaresDaEmpresa,
   limiaresDoLimite,
   percentualDoLimite,
   podeAvisarConsumo,
@@ -131,6 +132,24 @@ test.describe("Aviso pendente e limiares", () => {
     expect(estadoDoConsumo(l.parado, 7)).toBe("parado");
   });
 
+  test("trocar o plano muda os limiares das marcas dos avisos: a MESMA regra de editar o limite (limiaresDaEmpresa)", () => {
+    // O teto segue o plano, então a limpeza das marcas depois de uma troca de plano usa o teto que VALE.
+    expect(limiaresDaEmpresa(null, "essencial")).toEqual({ aviso: 10_400_000, parado: 13_000_000 });
+    expect(limiaresDaEmpresa(null, "profissional")).toEqual({ aviso: 26_400_000, parado: 33_000_000 });
+    expect(limiaresDaEmpresa(null, "avancado")).toEqual({ aviso: 80_000_000, parado: 100_000_000 });
+    // Sem plano vale o padrão; um limite personalizado vence o plano.
+    expect(limiaresDaEmpresa(null, null)).toEqual(limiaresDoLimite(LIMITE_PADRAO_TOKENS));
+    expect(limiaresDaEmpresa(5_000_000, "avancado")).toEqual(limiaresDoLimite(5_000_000));
+    // Sempre igual a "o limiar do teto que a empresa tem": nenhuma segunda fórmula.
+    for (const plano of ["essencial", "profissional", "avancado", null]) {
+      expect(limiaresDaEmpresa(null, plano)).toEqual(limiaresDoLimite(limiteDaEmpresa(null, plano)));
+    }
+    // De um plano menor para um maior o uso do mês fica ABAIXO dos limiares novos (as marcas saem); ao contrário, não.
+    const uso = 12_000_000;
+    expect(uso >= limiaresDaEmpresa(null, "essencial").aviso).toBe(true);
+    expect(uso < limiaresDaEmpresa(null, "profissional").aviso).toBe(true);
+  });
+
   test("destinos iguais pela chave do telefone; grupo pelo JID", () => {
     expect(mesmoDestino("5535984774753@s.whatsapp.net", "553584774753@s.whatsapp.net")).toBe(true);
     expect(mesmoDestino("123@g.us", "123@g.us")).toBe(true);
@@ -206,7 +225,6 @@ test.describe("Admin (lib/admin-acesso.ts)", () => {
       {
         id: "x",
         name: "Empresa",
-        account_type: null,
         billing_plan: null,
         agent_enabled: true,
         agent_published_at: "2026-08-01T00:00:00Z",

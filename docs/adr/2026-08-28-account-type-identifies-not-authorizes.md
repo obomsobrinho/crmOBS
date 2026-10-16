@@ -1,6 +1,6 @@
 # clients.account_type identifies the tester, it never authorizes access
 - Date: 2026-08-28
-- Status: Accepted
+- Status: Superseded by 2026-10-16-account-type-removed.md (the column was removed with the end of the beta)
 - Area: billing
 
 ## Context
@@ -11,7 +11,7 @@ Add `clients.account_type` (`interno` / `beta` / `pago`, CHECK in the database, 
 - It IDENTIFIES, it does NOT AUTHORIZE. `accessState` keeps deciding access only from `subscription_status` and `trial_ends_at`.
 - `null` = not classified, on purpose. Guessing a default for whoever came through `/cadastro` would invent a fact.
 - Marking is manual (`update clients set account_type = 'beta'`). With 5 to 10 testers an admin screen costs more than it solves.
-- It is the column the queries in `docs/instrumentacao-beta.md` filter on.
+- It is the column the queries in `docs/instrumentacao-uso.md` filter on.
 
 ## Consequences
 - Mixing the two concerns (identity and access) is how a paying customer ends up locked out. Never read `account_type` inside `accessState`.

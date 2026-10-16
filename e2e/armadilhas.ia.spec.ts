@@ -5,7 +5,7 @@ import { buildPersona, type AgentConfig } from "../lib/agent-prompt";
 // "Bateria de testes de segurança da IA"), agora por comando.
 //
 // "IA que não inventa" é o posicionamento do produto, e até aqui era prova de
-// uma vez só: qualquer ajuste no prompt durante o beta regrediria sem ninguém
+// uma vez só: qualquer ajuste no prompt regrediria sem ninguém
 // ver. Cada caso chama o MODELO DE VERDADE via /api/playground (sessão do dono
 // do tenant de teste, dryRun travado pela rota: nada em chat_messages, nenhum card
 // movido, sobram só linhas de medição em agent_turns com dry_run = true).

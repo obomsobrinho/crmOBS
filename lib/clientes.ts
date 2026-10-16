@@ -160,7 +160,7 @@ function variantesSemNove(d: string): string[] {
 
 /**
  * Quantos dias civis sem mensagem fazem um contato FRIO. Decisão do dono (D3,
- * 30/09/2026): 60 fixo no beta, configurável quando um testador pedir. 60 cobre
+ * 30/09/2026): 60 fixo, configurável quando um cliente pedir. 60 cobre
  * com folga quem volta todo mês (barbeiro, ótica) sem chamar de frio.
  */
 export const LIMIAR_FRIO_DIAS = 60;

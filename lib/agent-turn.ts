@@ -14,7 +14,6 @@ import { applyGuardrail } from "@/lib/guardrail";
 import { embedTexts, toVector } from "@/lib/rag";
 import { nextIaStage } from "@/lib/pipeline";
 import { accessState } from "@/lib/billing";
-import { betaAberto } from "@/lib/beta";
 import { after } from "next/server";
 import { sendText } from "@/lib/evolution";
 import {
@@ -210,7 +209,7 @@ export async function processTurn(
     svc
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, vitalicio_desde, bloqueado_em, desativada_em"
+        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, billing_plan, vitalicio_desde, bloqueado_em, desativada_em"
       )
       .eq("id", clientId)
       .maybeSingle(),
@@ -232,11 +231,7 @@ export async function processTurn(
       vitalicio_desde: client.vitalicio_desde,
       bloqueado_em: client.bloqueado_em,
       desativada_em: client.desativada_em,
-    },
-    undefined,
-    // A MESMA chave do beta que as telas usam: se só a tela liberasse, o
-    // testador veria o app aberto e o agente mudo no WhatsApp.
-    { betaAberto: betaAberto() }
+    }
   );
   // CONTA DESATIVADA pelo dono do produto (central "Clientes", aba Ações): o tipo
   // `desativado` de `accessState` vem antes de tudo, e a IA para ANTES de
@@ -334,7 +329,7 @@ export async function processTurn(
   // `consumo_ia_mensal`, lida junto com o tenant lá em cima. Leitura que falha
   // ATENDE (`null`): emudecer a empresa por um erro de leitura seria pior que
   // passar do teto por um turno.
-  const limite = limiteDaEmpresa(client.ia_limite_tokens);
+  const limite = limiteDaEmpresa(client.ia_limite_tokens, client.billing_plan);
   if (doMes && estadoDoConsumo(tokensUsados(doMes), limite) === "parado") {
     const t = silentTurn(t0, { limiteIa: true });
     await logTurn(svc, {

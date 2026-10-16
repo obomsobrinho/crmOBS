@@ -97,6 +97,23 @@ export async function logoutInstance(instanceName: string) {
 }
 
 /**
+ * APAGA a instância na Evolution (`DELETE /instance/delete/{instance}`, Evolution
+ * v2: conferido na referência da API v2 e no código do projeto pelo context7 em
+ * 15/10/2026; a Evolution implantada é a 2.3.x, ver o comentário dos avisos
+ * abaixo). Responde 200 `{ status: "SUCCESS" }`; 404 = a instância não existe.
+ * Pela doc, a própria Evolution derruba a sessão antes de apagar quando ela está
+ * aberta ou conectando. Irreversível: só o "Apagar de vez" da central
+ * (`apagarCliente`, lib/admin.ts) chama, depois do `logoutInstance`.
+ */
+export async function deleteInstance(instanceName: string) {
+  ensureEnv();
+  return fetch(`${BASE}/instance/delete/${encodeURIComponent(instanceName)}`, {
+    method: "DELETE",
+    headers: headers(),
+  });
+}
+
+/**
  * Reaponta o webhook da instância para o n8n (`POST /webhook/set/{instance}`,
  * Evolution v2, corpo `{ webhook: {...} }`). Usado ao RECONECTAR uma instância
  * que já existia (troca de número): o `createInstance` só grava o webhook na

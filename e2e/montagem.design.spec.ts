@@ -242,7 +242,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
   });
 
   test("nenhum texto fixo assume um único segmento", async ({ page }) => {
-    // ⚠️ Os testadores do beta são advogado, pediatra, barbeiro, engenheiro,
+    // ⚠️ Os clientes são advogado, pediatra, barbeiro, engenheiro,
     // clínica e loja. Quem carrega a linguagem do segmento é o MODELO, nunca o
     // texto fixo da tela: um placeholder que diz "clínica" faz o barbeiro achar
     // que o produto não é para ele.

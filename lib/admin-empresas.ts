@@ -1,5 +1,5 @@
 import type { LinhaRpc } from "@/lib/supabase/schema";
-import type { BillingRow } from "./billing";
+import type { BillingRow, PlanKey } from "./billing";
 import { normalizar } from "./clientes";
 import {
   alertasDaConta,
@@ -12,7 +12,9 @@ import {
   type Situacao,
 } from "./admin-alertas";
 import {
+  chaveDoPlano,
   custoEstimadoUsd,
+  rotuloDaOrigemDoLimite,
   estadoDaIa,
   estadoDoConsumo,
   limiteDaEmpresa,
@@ -38,10 +40,12 @@ export const PAGINA_EMPRESAS = 10;
 export interface EmpresaItem {
   id: string;
   nome: string;
-  /** `clients.account_type` (identifica, nunca autoriza; nulo = sem tipo). */
-  tipo: string | null;
   /** Nome do plano em `clients.billing_plan` (`PLANS`); nulo = sem plano. */
   plano: string | null;
+  /** A chave do plano (a que `limiteDaEmpresa` usa); nula = sem plano. */
+  planoChave: PlanKey | null;
+  /** De onde vem o teto: "Plano Avançado", "Limite personalizado" ou "Sem plano". */
+  origemDoLimite: string;
   publicada: boolean;
   ligada: boolean;
   /** O teto gravado (nulo = o padrão). */
@@ -71,7 +75,6 @@ export type EmpresaBase = Omit<EmpresaItem, "alertas">;
 
 export type LinhaEmpresa = LinhaRpc<
   "admin_empresas_pagina",
-  | "account_type"
   | "billing_plan"
   | "agent_published_at"
   | "ia_limite_tokens"
@@ -95,7 +98,7 @@ export function paraEmpresa(l: LinhaEmpresa, modelo: string | null, agora: numbe
     saida: Number(l.tokens_saida) || 0,
   };
   const limiteGravado = l.ia_limite_tokens == null ? null : Number(l.ia_limite_tokens);
-  const limite = limiteDaEmpresa(limiteGravado);
+  const limite = limiteDaEmpresa(limiteGravado, l.billing_plan);
   const usados = tokensUsados(tokens);
   const consumo = estadoDoConsumo(usados, limite);
   const publicada = !!l.agent_published_at;
@@ -112,8 +115,9 @@ export function paraEmpresa(l: LinhaEmpresa, modelo: string | null, agora: numbe
   const base: EmpresaBase = {
     id: l.id,
     nome: l.name,
-    tipo: l.account_type,
     plano: nomeDoPlano(l.billing_plan),
+    planoChave: chaveDoPlano(l.billing_plan),
+    origemDoLimite: rotuloDaOrigemDoLimite(limiteGravado, l.billing_plan),
     publicada,
     ligada,
     limiteGravado,
@@ -154,10 +158,11 @@ export function alertasDaEmpresa(e: EmpresaBase, agora: number, whatsapp?: Estad
 
 /** Recalcula o item com um teto novo (depois de editar), sem ir ao banco. */
 export function comLimite(e: EmpresaItem, limiteGravado: number | null, agora: number): EmpresaItem {
-  const limite = limiteDaEmpresa(limiteGravado);
+  const limite = limiteDaEmpresa(limiteGravado, e.planoChave);
   const consumo = estadoDoConsumo(e.usados, limite);
   const novo: EmpresaBase = {
     ...e,
+    origemDoLimite: rotuloDaOrigemDoLimite(limiteGravado, e.planoChave),
     limiteGravado,
     limite,
     consumo,

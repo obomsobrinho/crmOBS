@@ -1,7 +1,8 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { idFalso } from "../app/design/clientes/dados";
-import { ritmoDoLimite } from "../lib/admin-cliente";
+import { ritmoDaBarra, type UnidadeDeUso } from "../lib/admin-cliente";
 import { tokensCurto } from "../lib/custo-ia";
+import { FUSO, diaIsoSP } from "../lib/fuso";
 
 // A central "Clientes" do dono do produto e a faixa do teto de IA, no preview com
 // dados FALSOS (P1 item 6; docs/plano-central-clientes.md, entrega 1). Prova
@@ -16,7 +17,12 @@ function cliente(page: Page, nome: string) {
 }
 
 /** O ritmo do limite como a tela o escreve ("322,6 mil"), pela mesma conta pura, no mês do relógio de hoje. */
-const ritmo = (limite: number, unidade: "hora" | "dia") => tokensCurto(ritmoDoLimite(limite, Date.now(), unidade));
+const ritmo = (limite: number, unidade: UnidadeDeUso) =>
+  tokensCurto(ritmoDaBarra(limite, diaIsoSP(Date.now()), unidade));
+
+/** Quantas colunas o "Dia" tem agora: de 00h de hoje (São Paulo) até a hora atual, as duas inclusive. */
+const colunasDoDia = () =>
+  (Number(new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", hour12: false }).format(new Date())) % 24) + 1;
 
 const detalhe = (n: number, extra = "") => `/design/clientes/detalhe?cliente=${ID(n)}${extra}`;
 
@@ -42,7 +48,7 @@ test.describe("Central: lista de Clientes (/design/clientes)", () => {
 
     const ze = cliente(page, "Barbearia do Zé");
     await expect(ze.locator('[data-slot="admin-situacao"]')).toHaveText("Ativo");
-    await expect(ze).toContainText("plano Essencial");
+    await expect(ze).toContainText("Plano Essencial");
     await expect(ze.locator('[data-slot="admin-alerta"]')).toHaveCount(0);
     await expect(ze.locator('[data-slot="central-agente"]')).toContainText("Agente ativo");
     await expect(ze.locator('[data-slot="central-whatsapp"]')).toContainText("Instância criada");
@@ -80,11 +86,12 @@ test.describe("Central: lista de Clientes (/design/clientes)", () => {
     await expect(cliente(page, "Loja Teste").locator('[data-slot="admin-alerta"]')).toHaveCount(0);
   });
 
-  test("custo estimado em dólar pela tabela", async ({ page }) => {
+  test("custo estimado pela tabela, em reais pela cotação PTAX (a do preview é fixa)", async ({ page }) => {
     await page.goto("/design/clientes");
-    // (1.200.000 * 0,75 + 1.200.000 * 0,075 + 42.000 * 4,5) / 1e6 = 1,179
+    // (1.200.000 * 0,75 + 1.200.000 * 0,075 + 42.000 * 4,5) / 1e6 = 1,179 dólar; x 5,0521 = 5,956 reais
     const custo = await cliente(page, "Barbearia do Zé").locator('[data-slot="central-custo"]').innerText();
-    expect(custo.replace(/\s/g, " ")).toContain("US$ 1,18");
+    expect(custo.replace(/\s/g, " ")).toContain("R$ 5,96");
+    await expect(page.getByRole("heading", { name: "Clientes" }).locator("xpath=..").locator("xpath=..")).toContainText("em reais pela PTAX");
   });
 
   test("busca por nome, sem acento e sem caixa", async ({ page }) => {
@@ -99,13 +106,29 @@ test.describe("Central: lista de Clientes (/design/clientes)", () => {
   test("filtro por situação, no servidor da lista", async ({ page }) => {
     await page.goto("/design/clientes");
     const itens = page.locator('[data-slot="central-cliente"]');
-    const chip = (nome: string) => page.locator('[data-slot="central-chip"]', { hasText: nome });
-    await expect(chip("Todos")).toHaveAttribute("aria-pressed", "true");
+    // O filtro é UM botão de ícone ao lado da busca (os chips de situação saíram): abre a lista de
+    // situações, marca a escolhida e mostra um "1" no botão enquanto há filtro.
+    const botao = page.locator('[data-slot="central-filtro"]');
+    const contagem = page.locator('[data-slot="central-filtro-contagem"]');
+    const escolher = async (nome: string) => {
+      await botao.click();
+      await page.getByRole("menuitem", { name: nome, exact: true }).click();
+      await expect(page.getByRole("menu")).toHaveCount(0);
+    };
+    const chip = (nome: string) => ({ click: () => escolher(nome) });
+    await expect(page.locator('[data-slot="central-chip"]')).toHaveCount(0);
+    await expect(botao).toHaveAccessibleName("Filtrar por situação");
+    await expect(contagem).toHaveCount(0);
 
     await chip("Atrasados").click();
     await expect(itens).toHaveCount(1);
     await expect(itens).toContainText("Estúdio Aurora");
-    await expect(chip("Atrasados")).toHaveAttribute("aria-pressed", "true");
+    await expect(contagem).toHaveText("1");
+    await expect(botao).toHaveAccessibleName("Filtrar por situação: Atrasados");
+    await botao.click();
+    await expect(page.getByRole("menuitem", { name: "Atrasados", exact: true })).toHaveAttribute("aria-current", "true");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
 
     await chip("Cancelados").click();
     await expect(itens).toHaveCount(1);
@@ -125,7 +148,12 @@ test.describe("Central: lista de Clientes (/design/clientes)", () => {
     await expect(itens).toContainText("Barbearia do Zé");
     await chip("Cancelados").click();
     await expect(page.locator('[data-slot="central-vazio"]')).toBeVisible();
-    await expect(chip("Todos")).toHaveAttribute("aria-pressed", "false");
+    await expect(contagem).toHaveText("1");
+
+    // "Todos" tira o filtro e o "1" some.
+    await chip("Todos").click();
+    await expect(contagem).toHaveCount(0);
+    await expect(botao).toHaveAccessibleName("Filtrar por situação");
   });
 
   test("a linha inteira abre o detalhe do cliente", async ({ page }) => {
@@ -310,7 +338,7 @@ test.describe("Central: detalhe de um cliente", () => {
     await expect(aba.getByRole("tab", { name: "Semana", exact: true })).toHaveAttribute("aria-selected", "true");
 
     for (const [nome, colunas, unidade, legenda] of [
-      ["Dia", 24, "hora", "últimas 24 horas"],
+      ["Dia", colunasDoDia(), "hora", "hoje, desde as 00h"],
       ["Semana", 7, "dia", "últimos 7 dias"],
       ["Quinzena", 15, "dia", "últimos 15 dias"],
       ["Mês", 30, "dia", "últimos 30 dias"],
@@ -325,7 +353,7 @@ test.describe("Central: detalhe de um cliente", () => {
       expect(usados.reduce((s, n) => s + n, 0), nome).toBe(Number(await tokens.getAttribute("data-usados")));
       expect(turnos.reduce((s, n) => s + n, 0), nome).toBe(Number(await aba.locator('[data-bloco="uso-turnos"]').getAttribute("data-turnos")));
       await expect(tokens).toContainText(legenda);
-      await expect(aba.locator('[data-bloco="uso-custo"]')).toContainText("US$");
+      await expect(aba.locator('[data-bloco="uso-custo"]')).toContainText("R$");
     }
     // O mês é rolante (30 dias) e soma pelo menos o que a semana soma.
     const mes = Number(await aba.locator('[data-bloco="uso-tokens"]').getAttribute("data-usados"));
@@ -350,8 +378,8 @@ test.describe("Central: detalhe de um cliente", () => {
       Number(await ultima.getAttribute("data-usados")).toLocaleString("pt-BR")
     );
     await expect(balao.locator('[data-linha="turnos"]')).toContainText(String(await ultima.getAttribute("data-turnos")));
-    await expect(balao.locator('[data-linha="custo"]')).toContainText("US$");
-    await expect(balao.locator('[data-linha="ritmo"]')).toContainText(ritmo(10_000_000, "dia"));
+    await expect(balao.locator('[data-linha="custo"]')).toContainText("R$");
+    await expect(balao.locator('[data-linha="ritmo"]')).toContainText(ritmo(13_000_000, "dia"));
     // Hoje em semana: "quarta, 14/10" (dia da semana e dia/mês).
     expect(rotulo).toMatch(/^(domingo|segunda|terça|quarta|quinta|sexta|sábado), \d{2}\/\d{2}$/);
 
@@ -364,7 +392,7 @@ test.describe("Central: detalhe de um cliente", () => {
     await passarNaUltimaColuna(page, grafico);
     await expect(balao).toBeVisible();
     await expect(balao).toContainText(/\d{2}\/\d{2}, \d{2}h/);
-    await expect(balao.locator('[data-linha="ritmo"]')).toContainText(ritmo(10_000_000, "hora"));
+    await expect(balao.locator('[data-linha="ritmo"]')).toContainText(ritmo(13_000_000, "hora"));
   });
 
   test("Uso de IA: o limite aparece no gráfico como a linha do ritmo, e seguir o limite muda a linha", async ({ page }) => {
@@ -379,11 +407,15 @@ test.describe("Central: detalhe de um cliente", () => {
     await expect(legendaDoRitmo).toContainText(`${ritmo(5_000_000, "hora")} por hora`);
     await periodo(page, aba, "Semana");
 
+    // O botão não está mais na aba Uso de IA: o limite se edita na aba Ações.
+    await expect(aba.locator('[data-slot="central-editar-limite"]')).toHaveCount(0);
+    await page.getByRole("tab", { name: "Ações" }).click();
     await page.locator('[data-slot="central-editar-limite"]').click();
     const dialogo = page.locator('[data-slot="admin-limite-dialogo"]');
     await dialogo.locator('[data-campo="limite"]').fill("20");
     await dialogo.locator('[data-slot="admin-limite-salvar"]').click();
     await expect(dialogo).toHaveCount(0);
+    await page.getByRole("tab", { name: "Uso de IA" }).click();
     await expect(legendaDoRitmo).toContainText(`Ritmo do limite: ${ritmo(20_000_000, "dia")} por dia`);
     // A nota da diferença entre o contador do mês e as colunas continua na tela.
     await expect(grafico).toContainText("O limite conta pelo contador do mês");
@@ -398,6 +430,9 @@ test.describe("Central: detalhe de um cliente", () => {
     await expect(page.locator('[data-slot="central-limite-estado"]')).toHaveText("Parada no limite");
     await expect(page.locator('[data-bloco="central-uso"] [data-slot="central-percentual"]')).toContainText("102%");
 
+    // O limite se edita na aba Ações (o cartão mostra o valor de agora).
+    await page.getByRole("tab", { name: "Ações" }).click();
+    await expect(page.locator('[data-slot="acoes-limite-atual"]')).toContainText("5.000.000 tokens");
     await page.locator('[data-slot="central-editar-limite"]').click();
     const dialogo = page.locator('[data-slot="admin-limite-dialogo"]');
     await expect(dialogo).toBeVisible();
@@ -412,68 +447,19 @@ test.describe("Central: detalhe de um cliente", () => {
     await campo.fill("20");
     await dialogo.locator('[data-slot="admin-limite-salvar"]').click();
     await expect(dialogo).toHaveCount(0);
+    await expect(page.locator('[data-slot="acoes-limite-atual"]')).toContainText("20.000.000 tokens");
 
+    await page.getByRole("tab", { name: "Uso de IA" }).click();
     await expect(page.locator('[data-slot="central-limite-estado"]')).toHaveText("Ativa");
     await expect(page.locator('[data-bloco="central-uso"] [data-slot="central-tokens"]')).toContainText("de 20 mi tokens");
     await expect(cab.locator('[data-slot="admin-alerta"]')).toHaveCount(0);
-  });
-
-  test("Uso de IA: horários de pico, com balão por célula, legenda da escala e o pico em destaque", async ({ page }) => {
-    await page.goto(detalhe(1, "&aba=uso"));
-    const mapa = uso(page).locator('[data-slot="mapa-de-calor"]');
-    await expect(mapa.locator('[data-slot="mapa-celula"]')).toHaveCount(7 * 24);
-    await expect(page.locator('[data-slot="central-grade-pico"]')).toContainText("Pico: segunda, 16h (46 turnos)");
-
-    // O pico é UMA célula, a de maior número, com contorno próprio.
-    const pico = mapa.locator('[data-slot="mapa-celula"][data-pico]');
-    await expect(pico).toHaveCount(1);
-    await expect(pico).toHaveAttribute("data-linha", "1");
-    await expect(pico).toHaveAttribute("data-coluna", "16");
-    await expect(pico).toHaveAttribute("data-n", "46");
-    await expect(pico).toHaveAttribute("data-nivel", "4");
-    expect(await pico.evaluate((e) => getComputedStyle(e).outlineStyle)).toBe("solid");
-
-    // Madrugada sem uso: célula vazia, no degrau 0 da escala.
-    const madrugada = mapa.locator('[data-slot="mapa-celula"][data-linha="2"][data-coluna="3"]');
-    await expect(madrugada).toHaveAttribute("data-n", "0");
-    await expect(madrugada).toHaveAttribute("data-nivel", "0");
-
-    // O balão de cada célula: "quarta, 14h: 23 turnos".
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveCount(0);
-    await mapa.locator('[data-slot="mapa-celula"][data-linha="3"][data-coluna="14"]').hover();
-    const n = await mapa
-      .locator('[data-slot="mapa-celula"][data-linha="3"][data-coluna="14"]')
-      .getAttribute("data-n");
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveText(`quarta, 14h: ${n} turnos`);
-    await pico.hover();
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveText("segunda, 16h: 46 turnos");
-    await madrugada.hover();
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveText("terça, 03h: 0 turnos");
-
-    // A legenda: a escala (menos a mais) e o que o contorno significa.
-    const legenda = mapa.locator('[data-slot="mapa-legenda"]');
-    await expect(legenda).toContainText("Menos turnos");
-    await expect(legenda).toContainText("Mais turnos");
-    await expect(legenda).toContainText("Pico");
-
-    // Pelo teclado: a grade é um ponto de tabulação, entra no pico, as setas andam.
-    await page.mouse.move(5, 5);
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveCount(0);
-    await mapa.locator('[role="grid"]').focus();
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveText("segunda, 16h: 46 turnos");
-    await page.keyboard.press("ArrowRight");
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toContainText("segunda, 17h");
-    await page.keyboard.press("ArrowDown");
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toContainText("terça, 17h");
-    await page.keyboard.press("Escape");
-    await expect(mapa.locator('[data-slot="mapa-balao"]')).toHaveCount(0);
   });
 
   test("Uso de IA sem nenhum uso: o vazio diz isso", async ({ page }) => {
     await page.goto(detalhe(6, "&aba=uso&vazio=1"));
     const aba = uso(page);
     await expect(aba.locator('[data-slot="central-grafico-vazio"]')).toContainText("Nenhum uso de IA neste período");
-    await expect(page.locator('[data-slot="central-grade-vazio"]')).toContainText("Nenhum uso de IA nos últimos 30 dias");
+    await expect(page.locator('[data-slot="central-picos-vazio"]')).toContainText("Nenhum uso de IA neste período");
     await expect(aba.locator('[data-bloco="uso-tokens"]')).toHaveAttribute("data-usados", "0");
     await expect(aba.locator('[data-bloco="uso-maior"]')).toContainText("Sem uso");
     // O vazio vale para todos os períodos; nenhum gráfico vazio é desenhado.
@@ -625,20 +611,20 @@ test.describe("Central: detalhe de um cliente", () => {
       const cores = await page.evaluate(() => {
         const barra = document.querySelector('[data-slot="central-grafico"] .recharts-rectangle');
         const eixo = document.querySelector('[data-slot="central-grafico"] .recharts-cartesian-axis-tick-value');
-        const celula = document.querySelector('[data-slot="mapa-celula"][data-nivel="4"]');
+        const pico = document.querySelector('[data-bloco="picos-dia"] path.recharts-rectangle[fill="var(--color-destaque)"]');
         const rect = barra!.getBoundingClientRect();
         return {
           barra: getComputedStyle(barra!).fill,
           alturaDaBarra: rect.height,
           eixo: getComputedStyle(eixo!).fill,
-          celula: getComputedStyle(celula!).backgroundColor,
+          pico: getComputedStyle(pico!).fill,
         };
       });
       expect(cores.barra).toBe(marca);
       expect(cores.alturaDaBarra).toBeGreaterThan(4);
-      // O eixo usa a tinta terciária do tema (nunca a cor da série); o pico da grade é a marca cheia.
+      // O eixo usa a tinta terciária do tema (nunca a cor da série); a coluna do pico é a marca cheia.
       expect(cores.eixo).toBe(tinta);
-      expect(cores.celula).toBe(marca);
+      expect(cores.pico).toBe(marca);
 
       await page.goto(detalhe(1, "&aba=atendimento"));
       const atendimento = atend(page);
@@ -679,7 +665,8 @@ test.describe("Central: detalhe de um cliente", () => {
           for (const sobra of medidas.graficos) expect(sobra, `${aba} ${nome}`).toBeLessThanOrEqual(1);
         }
         // O gráfico tem largura de verdade (não ficou em zero dentro da aba).
-        const caixa = (await raiz.locator('[data-slot="chart"]').first().boundingBox())!;
+        const principal = aba === "uso" ? '[data-slot="central-grafico"] [data-slot="chart"]' : '[data-bloco="atendimento-movimento"] [data-slot="chart"]';
+        const caixa = (await raiz.locator(principal).first().boundingBox())!;
         expect(caixa.width, aba).toBeGreaterThan(largura === 375 ? 200 : 400);
       }
     });

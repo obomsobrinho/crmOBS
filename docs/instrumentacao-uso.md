@@ -1,27 +1,19 @@
-# Instrumentação do beta
+# Instrumentação de uso por empresa
 
-Consultas para acompanhar os testadores do beta gratuito. **Não existe tela para
-isso, e é decisão:** são cinco a dez contas e um leitor só (o dono). Uma página
-interna para dez linhas seria mais uma tela para o passo de redesenho repintar,
+Consultas para acompanhar o uso de cada empresa: quem publicou o agente, quantos dias usou, quanto
+da resposta é da IA, quem sumiu e o que escreveu no canal de feedback. **Não existe tela para
+isso, e é decisão:** o leitor é um só (o dono) e a central de Clientes cobre o resto. Uma página
+interna para estas linhas seria mais uma tela para o passo de redesenho repintar,
 e mais uma superfície para manter.
 
 **Como rodar:** no SQL Editor do Supabase, ou pelo MCP do Supabase. Todas as
 consultas rodam como `postgres`/`service_role`; nenhuma delas passa pela RLS.
 
-**Quem entra:** só quem tem `clients.account_type = 'beta'`. Marcar é manual, e
-também é decisão (com cinco a dez contas, uma tela de administração custaria mais
-do que resolve):
-
-```sql
-update public.clients set account_type = 'beta' where name = 'Nome da Empresa';
-```
-
-Os valores possíveis são `interno`, `beta` e `pago`, com CHECK no banco.
-**`null` quer dizer "não classificado"**, e a coluna nasceu sem default de
-propósito: uma conta que entrou sozinha pelo `/cadastro` não é beta nem interna
-até alguém dizer que é. ⚠️ **`account_type` IDENTIFICA, NÃO AUTORIZA.** Quem
-decide acesso é `accessState` (`lib/billing.ts`), por `subscription_status` e
-`trial_ends_at`, e continua assim.
+**Quem entra:** todas as empresas (`clients`). A coluna `clients.account_type` (interno, beta,
+pago) saiu em 16/10/2026 (`docs/adr/2026-10-16-account-type-removed.md`):
+as consultas deixaram de filtrar por tipo e viram métricas de uso de cada empresa. A OBM e as contas
+de teste aparecem na lista como qualquer outra; quem quiser ignorá-las filtra por `c.name` na hora.
+Quem decide acesso é `accessState` (`lib/billing.ts`), nunca estas consultas.
 
 ---
 
@@ -50,7 +42,7 @@ Duas traduções para SQL que não são opcionais:
   em nenhum tenant (verificado em 28/08/2026), mas a consulta não pode depender
   disso.
 - **Dia é em `America/Sao_Paulo`**, nunca em UTC. Em UTC a mensagem da noite cai
-  no dia seguinte e o testador ganha um dia de uso que não teve.
+  no dia seguinte e a empresa ganha um dia de uso que não teve.
 
 ---
 
@@ -77,7 +69,6 @@ select
   end as onde_parou,
   c.agent_published_at
 from public.clients c
-where c.account_type = 'beta'
 order by c.agent_published_at nulls first, c.name;
 ```
 
@@ -113,7 +104,6 @@ left join public.chat_messages m
       -- tenant que importou conversa recente apareceria com dias de uso que
       -- nunca teve. Importado é o passado dele, não o uso do produto.
       and m.message_type is distinct from 'imported'
-where c.account_type = 'beta'
 group by c.id, c.name
 order by dias_ativos_14 desc, c.name;
 ```
@@ -154,12 +144,11 @@ from public.clients c
 left join public.chat_messages m
        on m.client_id = c.id
       and m.created_at >= now() - interval '30 days'
-where c.account_type = 'beta'
 group by c.id, c.name
 order by pct_ia nulls last;
 ```
 
-**Como ler.** `pct_ia` baixo é o testador que está usando o produto como um
+**Como ler.** `pct_ia` baixo é a empresa que está usando o produto como um
 WhatsApp Web caro: a IA está no ar, mas quem responde é ele. Ou o agente está
 mal configurado, ou não confiam nele. `pct_ia` nulo quer dizer que não houve
 resposta nenhuma no período, o que é a consulta 2 falando de novo.
@@ -177,7 +166,6 @@ from public.clients c
 left join public.chat_messages m
        on m.client_id = c.id
       and m.message_type is distinct from 'imported'
-where c.account_type = 'beta'
 group by c.id, c.name
 order by dias_em_silencio desc nulls first;
 ```
@@ -190,7 +178,7 @@ férias.
 recebendo mensagem no WhatsApp e nós não vemos nada: os dois casos produzem o
 mesmo número. Hoje não há como distinguir sem consultar a Evolution.
 
-## 5. O que os testadores escreveram
+## 5. O que os usuários escreveram
 
 Único jeito de ler a tabela `feedback`: ela não tem policy de SELECT e
 `authenticated` não tem grant de leitura, então nem o próprio autor relê o que
@@ -200,7 +188,6 @@ mandou pelo browser.
 select
   f.created_at,
   c.name as conta,
-  c.account_type,
   u.email as quem,
   f.path,
   f.message

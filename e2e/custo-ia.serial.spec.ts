@@ -145,6 +145,62 @@ test("cada aviso é reivindicado uma vez; liberar devolve; o admin troca o teto 
   }
 });
 
+test("trocar o plano limpa as marcas que o teto novo deixou para trás (limpar_marcas_consumo_ia), e só elas", async () => {
+  const svc = servico();
+  const mes = "2000-02-01";
+  const marcar = async () => {
+    await svc.rpc("somar_consumo_ia", { p_client: clientId, p_mes: mes, p_entrada: 900, p_cache: 0, p_saida: 0 });
+    await svc.rpc("reivindicar_aviso_consumo", { p_client: clientId, p_mes: mes, p_nivel: "aviso" });
+    await svc.rpc("reivindicar_aviso_consumo", { p_client: clientId, p_mes: mes, p_nivel: "parado" });
+  };
+  const ler = async () =>
+    (
+      await svc
+        .from("consumo_ia_mensal")
+        .select("aviso_80_em, aviso_100_em")
+        .eq("client_id", clientId)
+        .eq("mes", mes)
+        .single()
+    ).data;
+  try {
+    await marcar();
+    // Teto que DESCEU (limiares 500/600): o uso (900) segue acima dos dois, nada é limpo.
+    const desceu = await svc.rpc("limpar_marcas_consumo_ia", {
+      p_client: clientId,
+      p_mes: mes,
+      p_limiar_aviso: 500,
+      p_limiar_parado: 600,
+    });
+    expect(desceu.error).toBeNull();
+    expect(desceu.data).toBe(0);
+    expect((await ler())?.aviso_80_em).not.toBeNull();
+    // Teto que subiu o bastante para o aviso (800/1000): fica a marca do 80%, sai a do 100%.
+    const meio = await svc.rpc("limpar_marcas_consumo_ia", {
+      p_client: clientId,
+      p_mes: mes,
+      p_limiar_aviso: 800,
+      p_limiar_parado: 1000,
+    });
+    expect(meio.data).toBe(1);
+    const depoisDoMeio = await ler();
+    expect(depoisDoMeio?.aviso_80_em).not.toBeNull();
+    expect(depoisDoMeio?.aviso_100_em).toBeNull();
+    // Teto muito maior (1000/1250): limpa o que sobrou. A linha de outro mês nunca é tocada.
+    const tudo = await svc.rpc("limpar_marcas_consumo_ia", {
+      p_client: clientId,
+      p_mes: mes,
+      p_limiar_aviso: 1000,
+      p_limiar_parado: 1250,
+    });
+    expect(tudo.data).toBe(1);
+    const limpo = await ler();
+    expect(limpo?.aviso_80_em).toBeNull();
+    expect(limpo?.aviso_100_em).toBeNull();
+  } finally {
+    await svc.from("consumo_ia_mensal").delete().eq("client_id", clientId).eq("mes", mes);
+  }
+});
+
 test("turno de bancada no teto nunca marca nem manda aviso de uso (só turno real do WhatsApp avisa)", async ({
   request,
   page,

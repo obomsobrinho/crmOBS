@@ -1,11 +1,11 @@
 ---
-name: consultas-beta
-description: Rodar as consultas de instrumentação do beta (quem publicou o agente, dias de uso, IA contra time, quem sumiu, feedback dos testadores). Use quando o usuário perguntar como o beta está indo ou o que os testadores escreveram.
+name: consultas-uso
+description: Rodar as consultas de métricas de uso por empresa (quem publicou o agente, dias de uso, IA contra time, quem sumiu, feedback dos usuários). Use quando o usuário perguntar como está o uso de cada empresa ou o que os usuários escreveram no canal de feedback.
 ---
 
-# Consultas do beta
+# Consultas de uso por empresa
 
-**Não existe tela, e é decisão.** As cinco consultas estão em `docs/instrumentacao-beta.md`;
+**Não existe tela, e é decisão.** As cinco consultas estão em `docs/instrumentacao-uso.md`;
 leia o arquivo e use o SQL de lá, não escreva SQL novo de cabeça.
 
 Rodar pelo MCP do Supabase (`execute_sql`) ou pelo SQL Editor.
@@ -20,9 +20,8 @@ Duas definições do mesmo número é como o produto começa a mentir.
 
 ## O que filtrar
 
-`clients.account_type` marca o testador (`interno` / `beta` / `pago`). `null` é "não classificado"
-de propósito, não chute um valor. Marcar é manual:
-`update clients set account_type = 'beta' where id = ...`.
+Nada por tipo de conta: `clients.account_type` saiu em 16/10/2026 (`docs/adr/2026-10-16-account-type-removed.md`). As consultas listam todas as empresas; filtre por
+`c.name` ou `c.id` só quando o dono pedir uma empresa.
 
 ## `feedback`
 

@@ -6,7 +6,6 @@ import { accessState, atualizacaoDoEvento, type AccessKind, type BillingRow } fr
 import {
   FILTROS_DE_SITUACAO,
   alertasDaConta,
-  cairiaSemBeta,
   situacaoDaConta,
   situacaoNoFiltro,
   type SituacaoChave,
@@ -15,6 +14,7 @@ import { estadoDaIa } from "../lib/custo-ia";
 import {
   ACOES_DA_CONTA,
   PARADAS_DO_APAGAR,
+  PRAZOS_DO_TESTE,
   RESPOSTA_DO_SQL,
   SEM_EFEITOS,
   acoesDoFinanceiro,
@@ -31,7 +31,9 @@ import {
 import {
   COLUNAS_DO_CLIENTE,
   LEITURA_DA_EXPORTACAO,
+  TABELAS_DA_EXPORTACAO,
   TABELAS_DO_CLIENTE,
+  TABELAS_MANTIDAS,
   celulaCsv,
   linhaCsv,
   nomeDoArquivo,
@@ -40,8 +42,7 @@ import { crc32, zipEmPartes } from "../lib/zip";
 
 // A CENTRAL "CLIENTES", ENTREGA 2 (docs/plano-central-clientes.md): o tipo de
 // acesso com vitalício e bloqueio manual, o webhook que não rebaixa um vitalício,
-// a situação e os filtros que MAPEIAM do tipo, o aviso do BETA_ABERTO, as ações
-// da conta, a lista de tabelas do "Apagar de vez" contra o schema e o ZIP da
+// a situação e os filtros que MAPEIAM do tipo, as ações da conta, a lista de tabelas do "Apagar de vez" contra o schema e o ZIP da
 // exportação. Sem banco e sem tela.
 
 const H = 3_600_000;
@@ -69,7 +70,7 @@ function conta(
   };
 }
 
-const acesso = (row: BillingRow, betaAberto = false) => accessState(row, new Date(AGORA), { betaAberto });
+const acesso = (row: BillingRow) => accessState(row, new Date(AGORA));
 
 /** Todos os estados gravados que o banco permite, mais um que o código não conhece. */
 const TODAS_AS_CONTAS: BillingRow[] = [
@@ -124,27 +125,29 @@ test.describe("Tipo de acesso (accessState, lib/billing.ts)", () => {
     }
   });
 
-  test("a chave do beta libera todo mundo, menos o bloqueio manual do dono do produto", () => {
+  test("sem chave do beta (removida em 15/10/2026): teste vencido bloqueia e o bloqueio manual vale para todos", () => {
+    expect(acesso(conta("trialing", { trial: -D }))).toMatchObject({ kind: "teste_encerrado", blocked: true });
     for (const row of TODAS_AS_CONTAS) {
-      expect(acesso(row, true)).toMatchObject({ kind: "beta_aberto", blocked: false });
-      expect(acesso({ ...row, bloqueado_em: iso(AGORA) }, true)).toMatchObject({
+      expect(acesso({ ...row, bloqueado_em: iso(AGORA) })).toMatchObject({
         kind: "bloqueado",
         blocked: true,
         reason: "bloqueio_manual",
       });
     }
+    const billing = fs.readFileSync(path.join(process.cwd(), "lib/billing.ts"), "utf8");
+    expect(billing).not.toContain("beta_aberto");
+    expect(billing).not.toContain("betaAberto");
+    expect(fs.existsSync(path.join(process.cwd(), "lib/beta.ts"))).toBe(false);
   });
 
-  test("desativada vem antes de tudo: bloqueia mesmo vitalícia, bloqueada ou com o beta aberto", () => {
+  test("desativada vem antes de tudo: bloqueia mesmo vitalícia ou bloqueada", () => {
     for (const row of TODAS_AS_CONTAS) {
       for (const extra of [{}, { vitalicio_desde: iso(AGORA) }, { bloqueado_em: iso(AGORA) }]) {
-        for (const beta of [false, true]) {
-          expect(acesso({ ...row, ...extra, desativada_em: iso(AGORA - D) }, beta)).toMatchObject({
-            kind: "desativado",
-            blocked: true,
-            reason: "desativada",
-          });
-        }
+        expect(acesso({ ...row, ...extra, desativada_em: iso(AGORA - D) })).toMatchObject({
+          kind: "desativado",
+          blocked: true,
+          reason: "desativada",
+        });
       }
     }
   });
@@ -270,38 +273,6 @@ test.describe("Situação, alertas e filtros mapeiam do tipo de acesso (lib/admi
   });
 });
 
-test.describe("Aviso do BETA_ABERTO: quantos cairiam (cairiaSemBeta e o espelho em SQL)", () => {
-  test("cai quem accessState bloquearia sem a chave; vitalício, bloqueado e desativado não entram na conta", () => {
-    const cai = (c: BillingRow) => cairiaSemBeta(c, AGORA);
-    expect(cai(conta("trialing", { trial: -D }))).toBe(true);
-    expect(cai(conta("past_due"))).toBe(true);
-    expect(cai(conta("past_due", { grace: -H }))).toBe(true);
-    expect(cai(conta("canceled"))).toBe(true);
-    expect(cai(conta("trialing"))).toBe(false);
-    expect(cai(conta("trialing", { trial: D }))).toBe(false);
-    expect(cai(conta("past_due", { grace: D }))).toBe(false);
-    expect(cai(conta("active"))).toBe(false);
-    expect(cai(conta("trialing", { trial: -D, vitalicio: true }))).toBe(false);
-    expect(cai(conta("canceled", { bloqueado: true }))).toBe(false);
-    expect(cai(conta("canceled", { desativada: true }))).toBe(false);
-  });
-
-  test("a contagem em SQL tem as mesmas condições (o comentário diz que espelha accessState)", () => {
-    const sql = fs.readFileSync(
-      path.join(process.cwd(), "supabase/migrations/20261015043128_central_clientes_financeiro_e_acoes.sql"),
-      "utf8"
-    );
-    const corpo = sql.slice(sql.indexOf("function public.admin_bloqueados_sem_beta"));
-    expect(corpo).toContain("c.desativada_em is null");
-    expect(corpo).toContain("c.bloqueado_em is null");
-    expect(corpo).toContain("c.vitalicio_desde is null");
-    expect(corpo).toContain("c.subscription_status = 'trialing' and c.trial_ends_at is not null and c.trial_ends_at <= p_agora");
-    expect(corpo).toContain("c.subscription_status = 'past_due' and (c.grace_until is null or c.grace_until <= p_agora)");
-    expect(corpo).toContain("c.subscription_status = 'canceled'");
-    expect(fs.readFileSync(path.join(process.cwd(), "lib/billing.ts"), "utf8")).toContain("admin_bloqueados_sem_beta");
-  });
-});
-
 test.describe("Ações da conta (lib/admin-conta.ts)", () => {
   test("o pedido da rota é validado: ação da lista, dias inteiros positivos, plano de PLANS", () => {
     expect(ACOES_DA_CONTA).toContain("vitalicio");
@@ -392,11 +363,31 @@ test.describe("Apagar de vez: a lista de tabelas contra o schema (lib/admin-purg
     return saida.sort();
   }
 
-  test("TODA tabela com client_id está na rotina, e só elas", () => {
+  test("TODA tabela com client_id está na rotina (apagada ou mantida), e só elas", () => {
     const doSchema = tabelasComClientId();
     expect(doSchema.length).toBeGreaterThan(10);
-    expect([...TABELAS_DO_CLIENTE].sort()).toEqual(doSchema);
-    expect(new Set(TABELAS_DO_CLIENTE).size).toBe(TABELAS_DO_CLIENTE.length);
+    expect([...TABELAS_DO_CLIENTE, ...TABELAS_MANTIDAS].sort()).toEqual(doSchema);
+    expect(new Set(TABELAS_DA_EXPORTACAO).size).toBe(TABELAS_DA_EXPORTACAO.length);
+    expect([...TABELAS_DA_EXPORTACAO].sort()).toEqual(doSchema);
+  });
+
+  test("o histórico de cobrança fica (registro fiscal): mantido, com as colunas que guardam de quem era", () => {
+    expect(TABELAS_MANTIDAS).toEqual(["billing_events"]);
+    expect(TABELAS_DO_CLIENTE as readonly string[]).not.toContain("billing_events");
+    const tipos = fs.readFileSync(path.join(process.cwd(), "lib/database.types.ts"), "utf8").replace(/\r\n/g, "\n");
+    const linha = tipos.slice(tipos.indexOf("      billing_events: {"), tipos.indexOf("      chat_messages: {"));
+    expect(linha).toContain("deleted_client_id: string | null");
+    expect(linha).toContain("deleted_client_name: string | null");
+    const sql = fs.readFileSync(
+      path.join(process.cwd(), "supabase/migrations/20261015191433_apagar_de_vez_mantem_billing_events.sql"),
+      "utf8"
+    );
+    expect(sql).toContain("tabela ao mesmo tempo apagada e mantida");
+    expect(sql).toContain("k.confdeltype <> 'n'");
+    expect(sql).toContain("p_mantidas text[] default '{}'::text[]");
+    const rotina = fs.readFileSync(path.join(process.cwd(), "lib/admin.ts"), "utf8");
+    expect(rotina).toContain("p_mantidas: mantidas");
+    expect(rotina).toContain("p_tabelas: [...tabelas, ...mantidas]");
   });
 
   test("o registro do apagamento não tem client_id (sobrevive à purga)", () => {
@@ -414,7 +405,7 @@ test.describe("Apagar de vez: a lista de tabelas contra o schema (lib/admin-purg
 
   test("o SQL confere o catálogo antes de apagar, e a rotina confere antes de tocar no Asaas e no Storage", () => {
     const sql = fs.readFileSync(
-      path.join(process.cwd(), "supabase/migrations/20261015043128_central_clientes_financeiro_e_acoes.sql"),
+      path.join(process.cwd(), "supabase/migrations/20261015191433_apagar_de_vez_mantem_billing_events.sql"),
       "utf8"
     );
     expect(sql).toContain("tabelas com client_id fora da rotina de apagar");
@@ -426,7 +417,9 @@ test.describe("Apagar de vez: a lista de tabelas contra o schema (lib/admin-purg
     expect(pos("admin_tabelas_fora_da_purga")).toBeGreaterThan(0);
     expect(pos("admin_tabelas_fora_da_purga")).toBeLessThan(pos("deleteSubscription("));
     expect(pos("deleteSubscription(")).toBeLessThan(pos("admin_arquivos_do_cliente"));
-    expect(pos("admin_arquivos_do_cliente")).toBeLessThan(pos('"admin_apagar_cliente"'));
+    expect(pos("admin_arquivos_do_cliente")).toBeLessThan(pos("logoutInstance("));
+    expect(pos("logoutInstance(")).toBeLessThan(pos("deleteInstance("));
+    expect(pos("deleteInstance(")).toBeLessThan(pos('"admin_apagar_cliente"'));
     expect(pos('"admin_apagar_cliente"')).toBeLessThan(pos("deleteUser("));
     // Nunca apaga o login de um admin.
     expect(corpo).toContain("filter((u) => !ehAdminPeloAmbiente(u))");
@@ -550,7 +543,8 @@ test.describe("Aba Financeiro: o que pode e por que não (acoesDoFinanceiro)", (
     }
     for (const [row, assinatura] of casos) {
       const a = acoesDoFinanceiro(row, fin(assinatura));
-      for (const acao of [a.vitalicio, a.estenderTeste, a.mudarPlano, a.bloqueio]) {
+      const t = a.estenderTeste;
+      for (const acao of [a.vitalicio, t.dias, ...(t.vitalicio ? [t.vitalicio] : []), a.mudarPlano, a.bloqueio]) {
         expect(ACOES_DA_CONTA).toContain(acao.acao);
         if (acao.recusa) expect(RESPOSTA_DO_SQL[acao.recusa]?.status, acao.recusa).toBe(409);
       }
@@ -561,12 +555,33 @@ test.describe("Aba Financeiro: o que pode e por que não (acoesDoFinanceiro)", (
     const vit = acoesDoFinanceiro(conta("trialing", { trial: D, vitalicio: true }), fin(false));
     expect(vit.vitalicio).toEqual({ acao: "remover_vitalicio", recusa: null });
     expect(vit.estenderTeste.recusa).toBe("vitalicio");
+    expect(vit.estenderTeste.vitalicio).toBeNull();
     expect(acoesDoFinanceiro(conta("active"), fin(true)).vitalicio).toEqual({ acao: "vitalicio", recusa: "tem_assinatura" });
     expect(acoesDoFinanceiro(conta("active"), fin(true)).mudarPlano.recusa).toBe("tem_assinatura");
     expect(acoesDoFinanceiro(conta("active"), fin(false)).mudarPlano.recusa).toBeNull();
-    expect(acoesDoFinanceiro(conta("active"), fin(false)).estenderTeste.recusa).toBe("nao_em_teste");
-    expect(acoesDoFinanceiro(conta("trialing"), fin(false)).estenderTeste.recusa).toBe("sem_prazo");
+    expect(acoesDoFinanceiro(conta("active"), fin(false)).estenderTeste.dias.recusa).toBe("nao_em_teste");
+    expect(acoesDoFinanceiro(conta("trialing"), fin(false)).estenderTeste.dias.recusa).toBe("sem_prazo");
+    expect(acoesDoFinanceiro(conta("trialing", { trial: -D }), fin(false)).estenderTeste.dias.recusa).toBeNull();
     expect(acoesDoFinanceiro(conta("trialing", { trial: -D }), fin(false)).estenderTeste.recusa).toBeNull();
+  });
+
+  test("Estender teste é UM controle: 7 dias, 15 dias, Personalizado e Vitalício", () => {
+    expect(PRAZOS_DO_TESTE).toEqual([7, 15]);
+    for (const n of PRAZOS_DO_TESTE) expect(diasDigitados(String(n))).toBe(n);
+    // Sem teste a estender, o controle segue aberto pelo Vitalício.
+    const ativo = acoesDoFinanceiro(conta("active"), fin(false)).estenderTeste;
+    expect(ativo.dias.recusa).toBe("nao_em_teste");
+    expect(ativo.vitalicio).toEqual({ acao: "vitalicio", recusa: null });
+    expect(ativo.recusa).toBeNull();
+    // Com assinatura no Asaas, o Vitalício é recusado como antes; sem teste, o controle trava pelos dias.
+    const comAssinatura = acoesDoFinanceiro(conta("past_due", { grace: D }), fin(true)).estenderTeste;
+    expect(comAssinatura.vitalicio).toEqual({ acao: "vitalicio", recusa: "tem_assinatura" });
+    expect(comAssinatura.recusa).toBe("nao_em_teste");
+    // Em teste e com assinatura: os dias passam, o Vitalício não.
+    const emTeste = acoesDoFinanceiro(conta("trialing", { trial: D }), fin(true)).estenderTeste;
+    expect(emTeste.dias.recusa).toBeNull();
+    expect(emTeste.vitalicio?.recusa).toBe("tem_assinatura");
+    expect(emTeste.recusa).toBeNull();
     expect(acoesDoFinanceiro(conta("active", { bloqueado: true }), fin(false)).bloqueio.acao).toBe("liberar");
     expect(acoesDoFinanceiro(conta("active"), fin(false)).bloqueio.acao).toBe("bloquear");
   });
@@ -631,10 +646,16 @@ test.describe("Toda rota com a sessão do usuário passa por sessaoDaRota (conta
 test.describe("Apagar de vez: uma parada depois de efeitos externos diz o que já foi feito", () => {
   test("pendenciasDosEfeitos: cada efeito vira uma linha; sem efeito, nenhuma", () => {
     expect(pendenciasDosEfeitos(SEM_EFEITOS)).toEqual([]);
-    expect(pendenciasDosEfeitos({ assinaturaCancelada: true, arquivosRemovidos: 3, whatsappDesconectado: true })).toEqual([
+    expect(
+      pendenciasDosEfeitos({ assinaturaCancelada: true, arquivosRemovidos: 3, whatsappDesconectado: true, instanciaApagada: false })
+    ).toEqual([
       "A assinatura já foi cancelada no Asaas.",
       "3 arquivos já foram removidos do Storage.",
       "O WhatsApp já foi desconectado na Evolution.",
+    ]);
+    // A instância apagada já inclui a sessão derrubada: uma linha só.
+    expect(pendenciasDosEfeitos({ ...SEM_EFEITOS, whatsappDesconectado: true, instanciaApagada: true })).toEqual([
+      "A instância do WhatsApp já foi apagada na Evolution.",
     ]);
     expect(pendenciasDosEfeitos({ ...SEM_EFEITOS, arquivosRemovidos: 1 })).toEqual(["1 arquivo já foi removido do Storage."]);
     expect(respostaDoApagar("falha_banco").status).toBe(500);

@@ -9,6 +9,9 @@ import {
   type HoraDeUso,
   type UsoBruto,
 } from "@/lib/admin-cliente";
+import type { Cambio } from "@/lib/cambio";
+import type { CambioDaTela } from "@/lib/use-cambio";
+import { janelaDoChip, picosDeHistorico, type DadosDePicos } from "@/lib/picos";
 import type { PreviewDoCliente } from "@/lib/admin-cliente-fonte";
 import { financeiroDe, type Cobranca } from "@/lib/admin-conta";
 import { PLAN_ORDER, PLANS } from "@/lib/billing";
@@ -41,7 +44,6 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
   ): LinhaEmpresa => ({
     id: idFalso(n),
     name: nome,
-    account_type: "beta",
     billing_plan: null,
     agent_enabled: true,
     agent_published_at: iso(40 * D),
@@ -75,16 +77,14 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
       subscription_status: "trialing",
       trial_ends_at: futuro(2.5 * D),
     }),
-    // 4. Agente desativado, teste sem prazo, sem tipo.
+    // 4. Agente desativado, teste sem prazo.
     linha(4, "Loja Teste", [120_000, 40_000, 3_000], {
       agent_enabled: false,
-      account_type: null,
       subscription_status: "trialing",
       ultima_atividade: iso(12 * D),
     }),
-    // 5. Interno, limite maior, nunca teve turno, no ar há 60 dias: "Sem atividade".
+    // 5. Limite maior, nunca teve turno, no ar há 60 dias: "Sem atividade".
     linha(5, "OBM", [0, 0, 0], {
-      account_type: "interno",
       ia_limite_tokens: 50_000_000,
       ultima_atividade: null,
       billing_plan: "avancado",
@@ -158,39 +158,61 @@ function horasRecentes(agora: number, quantas: number): { dia: string; hora: num
   });
 }
 
-function usoFalso(agora: number, vazio: boolean): UsoBruto {
-  if (vazio) return { dias: [], horas: [], cubo: [] };
+/** Quantos dias para trás o uso falso vai: mais de três meses, para o seletor ter meses passados. */
+const DIAS_DE_HISTORICO = 100;
+
+/** O peso de cada hora num dia (8h às 21h, pico às 14h; segunda tem um pico extra às 16h), para repartir os turnos do dia. */
+function pesoDaHora(dow: number, h: number): number {
+  if (h < 8 || h > 21) return 0;
+  const peso = dow === 0 || dow === 6 ? 1 : 3;
+  return peso * (1 + ((h * 5 + dow * 3) % 7)) + (dow === 1 && h === 16 ? 25 : 0);
+}
+
+/**
+ * O histórico falso: para cada dia, os turnos de cada hora (24 números). O total do dia é o de sempre
+ * (`6 + ((dia * 7) % 13) * 4`), repartido pelas horas com `pesoDaHora`; hoje só tem as horas que já passaram.
+ */
+function historicoFalso(agora: number): { dia: string; horas: number[] }[] {
   const hoje = diaIsoSP(agora);
-  const dias: DiaDeUso[] = [];
-  for (let dia = somarDias(hoje, -30); dia <= hoje; dia = somarDias(dia, 1)) {
-    const n = Number(dia.slice(8));
-    const turnos = 6 + ((n * 7) % 13) * 4;
-    dias.push({
-      dia,
-      turnos,
-      tokens: { entrada: turnos * 4700, cache: turnos * 2300, saida: turnos * 85 },
-    });
+  const horaAtual = Number(FMT_HORA.format(new Date(agora)));
+  const saida: { dia: string; horas: number[] }[] = [];
+  for (let dia = somarDias(hoje, -DIAS_DE_HISTORICO); dia <= hoje; dia = somarDias(dia, 1)) {
+    const dow = new Date(`${dia}T12:00:00Z`).getUTCDay();
+    const total = 6 + ((Number(dia.slice(8)) * 7) % 13) * 4;
+    const pesos = Array.from({ length: 24 }, (_, h) => (dia === hoje && h > horaAtual ? 0 : pesoDaHora(dow, h)));
+    const soma = pesos.reduce((s, p) => s + p, 0);
+    const horas = pesos.map((p) => Math.floor((total * p) / soma));
+    // O resto da divisão vai para a hora de maior peso, para o total do dia fechar.
+    horas[pesos.indexOf(Math.max(...pesos))] += total - horas.reduce((s, n) => s + n, 0);
+    saida.push({ dia, horas });
   }
-  // Por hora: movimento só entre 8h e 21h, com um pico às 14h.
+  return saida;
+}
+
+function usoFalso(agora: number, vazio: boolean, escala = 1): { bruto: UsoBruto; hist: { dia: string; horas: number[] }[] } {
+  if (vazio) return { bruto: { dias: [], horas: [], primeira: null }, hist: [] };
+  const hoje = diaIsoSP(agora);
+  const hist = historicoFalso(agora);
+  const dias: DiaDeUso[] = hist.map(({ dia, horas }) => {
+    const turnos = horas.reduce((s, n) => s + n, 0);
+    return { dia, turnos, tokens: { entrada: turnos * 4700 * escala, cache: turnos * 2300 * escala, saida: turnos * 85 * escala } };
+  });
+  // Por hora (as últimas 48): ontem tem movimento entre 8h e 21h; HOJE tem em toda hora, para o "Dia" (00h
+  // até agora) nunca ficar vazio conforme o relógio de quem abre o preview.
   const horas: HoraDeUso[] = [];
-  for (const { dia, hora } of horasRecentes(agora, 25)) {
-    if (hora < 8 || hora > 21) continue;
+  for (const { dia, hora } of horasRecentes(agora, 48)) {
+    if ((hora < 8 || hora > 21) && dia !== hoje) continue;
     const turnos = 2 + ((hora * 5) % 9) + (hora === 14 ? 14 : 0);
     horas.push({
       chave: `${dia}T${String(hora).padStart(2, "0")}`,
       turnos,
-      tokens: { entrada: turnos * 4700, cache: turnos * 2300, saida: turnos * 85 },
+      tokens: { entrada: turnos * 4700 * escala, cache: turnos * 2300 * escala, saida: turnos * 85 * escala },
     });
   }
-  const cubo: [number, number, number][] = [];
-  for (let dw = 0; dw < 7; dw++) {
-    for (let h = 8; h <= 21; h++) {
-      const peso = dw === 0 || dw === 6 ? 1 : 3;
-      const n = peso * (1 + ((h * 5 + dw * 3) % 7)) + (dw === 1 && h === 16 ? 25 : 0);
-      cubo.push([dw, h, n]);
-    }
-  }
-  return { dias, horas, cubo };
+  const picos = Object.fromEntries(
+    ORDEM_PERIODOS.map((k) => [k, picosDeHistorico(hist, janelaDoChip(k, hoje))])
+  ) as Record<PeriodoKey, DadosDePicos>;
+  return { bruto: { dias, horas, primeira: dias[0].dia, picos }, hist };
 }
 
 /** As respostas por dia e por hora que `painel_series` devolveria: a IA responde mais que o time. */
@@ -248,6 +270,14 @@ function atendimentoFalso(agora: number, vazio: boolean): AtendimentoPorPeriodo 
   if (vazio) return atendimentoPorPeriodo({ janelas, motivos: [], solucoes: [], regrasSalvas: 0, agora });
   return atendimentoPorPeriodo({
     janelas,
+    // O período anterior do preview: um pouco menos movimento e um primeiro atendimento mais lento.
+    anteriores: ORDEM_PERIODOS.map((k, i) => ({
+      ...janelaFalsa(FATOR[k] * 0.8),
+      janela: i + 1,
+      dif_lo: 52_000,
+      dif_hi: 58_000,
+      dif_soma: 2_200_000,
+    })),
     series: seriesFalsas(agora, false),
     agora,
     // A soma dos motivos é a das soluções (os dois contam os mesmos pedidos): 9f + 2.
@@ -285,21 +315,47 @@ export function previewDoCliente(
   e: EmpresaItem,
   agora: number,
   whatsapp: EstadoDoWhatsApp,
-  vazio: boolean
+  vazio: boolean,
+  /** Multiplica os tokens do uso falso (prova um número grande no centro do donut). */
+  escala = 1
 ): PreviewDoCliente {
+  const { bruto, hist } = usoFalso(agora, vazio, escala);
   return {
-    uso: usoParaTela(usoFalso(agora, vazio), agora, MODELO),
+    uso: usoParaTela(bruto, agora, MODELO),
+    memoria: { dias: bruto.dias, hist, primeira: bruto.primeira ?? null, agora, modelo: MODELO },
     atendimento: atendimentoFalso(agora, vazio),
     whatsapp,
     cobrancas: cobrancasFalsas(e, agora),
   };
 }
 
-export function detalheFalso(e: EmpresaItem, agora: number): DetalheDoCliente {
+/** A cotação FALSA do preview (só desenho: na tela de verdade ela vem da PTAX do Banco Central). */
+export function cambioFalso(agora: number, indisponivel = false): Cambio | null {
+  return indisponivel ? null : { taxa: 5.0521, data: diaIsoSP(agora) };
+}
+
+/**
+ * A cotação do preview como a página de verdade a entrega: pronta, ou como PROMESSA (`?cambio=atraso`: chega depois
+ * de 3 s; `?cambio=falha`: chega vazia depois de 0,6 s), para provar que a tela abre em US$ e troca para
+ * reais sem a página esperar (`useCambio`).
+ */
+export function cambioDoPreview(agora: number, modo?: string, indisponivel = false): CambioDaTela {
+  if (modo === "atraso") return new Promise((resolve) => setTimeout(() => resolve(cambioFalso(agora)), 3000));
+  if (modo === "falha") return new Promise((resolve) => setTimeout(() => resolve(null), 600));
+  return cambioFalso(agora, indisponivel);
+}
+
+export function detalheFalso(
+  e: EmpresaItem,
+  agora: number,
+  opcoes: { vazio?: boolean } = {}
+): DetalheDoCliente {
   const asaas = e.nome === COM_ASSINATURA;
   return {
     empresa: e,
     agora,
+    // O cliente do preview sem uso ainda não teve turno: vale o modelo do sistema.
+    modelo: { nome: MODELO, origem: opcoes.vazio ? "sistema" : "ultimo_turno" },
     modoDoPrompt: e.nome === "OBM" ? "avancado" : "guiado",
     avisosConfigurados: e.publicada,
     donoEmail: `dono@${e.nome.toLowerCase().replace(/[^a-z0-9]+/g, "")}.exemplo`,

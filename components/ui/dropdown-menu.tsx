@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Check } from "lucide-react";
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 
 import { cn } from "@/lib/utils";
@@ -104,6 +105,23 @@ function DropdownMenuItem({
   );
 }
 
+/**
+ * Item de uma lista de ESCOLHA (filtro, período, mês): o texto numa linha que trunca e o "check" quando é o
+ * escolhido, com `aria-current` para o leitor de tela. Era escrito à mão cinco vezes na central.
+ */
+function DropdownMenuItemMarcado({
+  marcado,
+  children,
+  ...props
+}: React.ComponentProps<typeof DropdownMenuItem> & { marcado: boolean }) {
+  return (
+    <DropdownMenuItem aria-current={marcado || undefined} {...props}>
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {marcado && <Check size={14} />}
+    </DropdownMenuItem>
+  );
+}
+
 function DropdownMenuLabel({
   className,
   ...props
@@ -136,6 +154,7 @@ export {
   DropdownMenuGroup,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuItemMarcado,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 };

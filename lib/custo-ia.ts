@@ -9,8 +9,9 @@
 // O teto é em TOKENS (entrada + saída dos turnos do agente), não em dinheiro. O
 // custo em US$ é só ESTIMATIVA, pela tabela oficial abaixo, e modelo fora da
 // tabela é `null` (nunca um chute).
-import { diaIsoSP } from "./fuso";
+import { diaIsoSP, diasDoMes, inicioDoDiaSP, somarMes } from "./fuso";
 import { telefoneImpossivel } from "./avisos";
+import { PLANS, PLAN_ORDER, type PlanKey } from "./billing";
 
 /**
  * QUEM PODE DISPARAR O AVISO DE USO DE IA (revisão do arquiteto, 13/10/2026).
@@ -47,11 +48,60 @@ export const PRECOS_POR_MODELO: Readonly<Record<string, PrecoPorMilhao>> = {
 };
 
 /**
- * Teto padrão por empresa e mês: 10 milhões de tokens (~2.100 respostas, ~US$ 5
- * no `gpt-5.4-mini`, medido na OBM em 13/10/2026). `clients.ia_limite_tokens`
- * nulo significa este valor.
+ * Teto de quem NÃO tem plano (teste, conta interna, vitalício sem plano): 10 milhões de
+ * tokens (~2.100 respostas, ~US$ 5 no `gpt-5.4-mini`, medido na OBM em 13/10/2026).
  */
 export const LIMITE_PADRAO_TOKENS = 10_000_000;
+
+/**
+ * Teto por PLANO (decisão do dono, 15/10/2026): Essencial 13 mi, Profissional 33 mi,
+ * Avançado 100 mi. Derivação em `DERIVACAO_DO_LIMITE` (conversas do plano em
+ * `lib/billing.ts` x turnos por conversa x tokens por turno x margem), arredondada para o
+ * número redondo que o dono aprovou. `clients.ia_limite_tokens` (limite personalizado)
+ * sempre vence; sem plano vale `LIMITE_PADRAO_TOKENS`.
+ */
+export const LIMITE_POR_PLANO: Readonly<Record<PlanKey, number>> = {
+  essencial: 13_000_000,
+  profissional: 33_000_000,
+  avancado: 100_000_000,
+};
+
+/**
+ * De onde saem os números de `LIMITE_POR_PLANO`: 6 turnos do agente por conversa e cerca de
+ * 4.400 tokens por turno (medido nos últimos 30 dias, 15/10/2026), com 25% de margem.
+ */
+export const DERIVACAO_DO_LIMITE = { turnosPorConversa: 6, tokensPorTurno: 4_400, margem: 1.25 } as const;
+
+/** Tokens por mês que um plano de `conversas` por mês precisa, pela derivação (sem arredondar). */
+export function limiteDerivadoDoPlano(conversas: number): number {
+  const d = DERIVACAO_DO_LIMITE;
+  return conversas * d.turnosPorConversa * d.tokensPorTurno * d.margem;
+}
+
+/** A chave do plano, ou `null` (nunca um plano chutado). */
+export function chaveDoPlano(v: string | null | undefined): PlanKey | null {
+  return (PLAN_ORDER as readonly string[]).includes(v ?? "") ? (v as PlanKey) : null;
+}
+
+/** De onde vem o teto de uma empresa. */
+export type OrigemDoLimite = "personalizado" | "plano" | "padrao";
+
+function limiteGravadoValido(gravado: number | null | undefined): gravado is number {
+  return typeof gravado === "number" && Number.isFinite(gravado) && gravado > 0;
+}
+
+export function origemDoLimite(gravado: number | null | undefined, plano?: string | null): OrigemDoLimite {
+  if (limiteGravadoValido(gravado)) return "personalizado";
+  return chaveDoPlano(plano) ? "plano" : "padrao";
+}
+
+/** O texto que acompanha o teto: "Plano Avançado", "Limite personalizado" ou "Sem plano". */
+export function rotuloDaOrigemDoLimite(gravado: number | null | undefined, plano?: string | null): string {
+  const origem = origemDoLimite(gravado, plano);
+  if (origem === "personalizado") return "Limite personalizado";
+  const chave = chaveDoPlano(plano);
+  return origem === "plano" && chave ? `Plano ${PLANS[chave].name}` : "Sem plano";
+}
 
 /** A partir de quanto do teto a empresa e o dono são avisados (80%). */
 export const FRACAO_DO_AVISO = 0.8;
@@ -65,11 +115,15 @@ export interface TokensDoMes {
 
 export type EstadoDoConsumo = "normal" | "aviso" | "parado";
 
-/** O teto da empresa: o gravado, ou o padrão quando é nulo (ou inválido). */
-export function limiteDaEmpresa(gravado: number | null | undefined): number {
-  return typeof gravado === "number" && Number.isFinite(gravado) && gravado > 0
-    ? gravado
-    : LIMITE_PADRAO_TOKENS;
+/**
+ * O teto da empresa: o personalizado gravado (`ia_limite_tokens`), senão o do PLANO
+ * (`LIMITE_POR_PLANO`), senão o padrão de quem não tem plano. É a ÚNICA regra: o
+ * `processTurn`, a faixa do app, os avisos e a central usam esta função.
+ */
+export function limiteDaEmpresa(gravado: number | null | undefined, plano?: string | null): number {
+  if (limiteGravadoValido(gravado)) return gravado;
+  const chave = chaveDoPlano(plano);
+  return chave ? LIMITE_POR_PLANO[chave] : LIMITE_PADRAO_TOKENS;
 }
 
 /** O que conta para o teto: entrada (com o cache) mais saída. */
@@ -91,6 +145,19 @@ export function estadoDoConsumo(usados: number, limite: number): EstadoDoConsumo
  */
 export function limiaresDoLimite(limite: number): { aviso: number; parado: number } {
   return { aviso: Math.ceil(limite * FRACAO_DO_AVISO), parado: limite };
+}
+
+/**
+ * Os limiares do teto que VALE para a empresa (o personalizado, senão o do plano, senão o padrão). É o que
+ * qualquer escrita que muda o teto passa ao banco para limpar as marcas dos avisos do mês: a edição do
+ * limite (`admin_mudar_limite_ia`) e a troca de plano (`limpar_marcas_consumo_ia`, via
+ * `alinharMarcasDoMes`, lib/consumo-ia.ts). Uma regra só, a de `limiaresDoLimite`.
+ */
+export function limiaresDaEmpresa(
+  gravado: number | null | undefined,
+  plano?: string | null
+): { aviso: number; parado: number } {
+  return limiaresDoLimite(limiteDaEmpresa(gravado, plano));
 }
 
 /** Marcas dos avisos do mês (`consumo_ia_mensal.aviso_80_em`/`aviso_100_em`). */
@@ -192,9 +259,10 @@ const FMT_USD = new Intl.NumberFormat("pt-BR", {
   maximumFractionDigits: 2,
 });
 
-/** "1,2 mi", "850 mil", "320". */
+/** "1,2 bi", "1,2 mi", "850 mil", "320". */
 export function tokensCurto(n: number): string {
   const v = Math.max(0, Math.round(n));
+  if (v >= 1_000_000_000) return `${FMT_UMA_CASA.format(v / 1_000_000_000)} bi`;
   if (v >= 1_000_000) return `${FMT_UMA_CASA.format(v / 1_000_000)} mi`;
   if (v >= 1_000) return `${FMT_UMA_CASA.format(v / 1_000)} mil`;
   return String(v);
@@ -205,4 +273,77 @@ export function usdCurto(v: number | null): string | null {
   if (v == null) return null;
   if (v > 0 && v < 0.01) return `menos de ${FMT_USD.format(0.01)}`;
   return FMT_USD.format(v);
+}
+
+/** O mês civil de São Paulo de um instante: a chave `AAAA-MM`, e os instantes (ms) em que ele começa e acaba. */
+function mesCivilSP(agora: number): { mes: string; inicio: number; fim: number } {
+  const mes = mesSP(agora).slice(0, 7);
+  return { mes, inicio: inicioDoDiaSP(`${mes}-01`), fim: inicioDoDiaSP(`${somarMes(mes, 1)}-01`) };
+}
+
+/**
+ * Quanto do mês civil de São Paulo já passou, de 0 a 1 (o instante dentro do mês, pelo relógio de lá). É a
+ * base do "gasto ideal até hoje" (limite x esta fração).
+ */
+export function fracaoDoMesSP(agora: number): number {
+  const { inicio, fim } = mesCivilSP(agora);
+  return Math.min(1, Math.max(0, (agora - inicio) / (fim - inicio)));
+}
+
+/**
+ * ONDE o uso do mês está contra o ritmo ideal de hoje: a posição do marcador (`idealPct`, a fração do mês em
+ * %) e se o gasto está no ou abaixo do ritmo (`abaixo`, bom: gasto, menos é melhor) ou acima (`acima`, ruim).
+ * É a ÚNICA regra de "no ritmo": a barra de meta, a frase e a projeção saem dela, nunca de uma segunda conta.
+ */
+export function posicaoNoRitmo(
+  usados: number,
+  limite: number,
+  agora: number
+): { idealPct: number; estado: "abaixo" | "acima" } {
+  const f = fracaoDoMesSP(agora);
+  return { idealPct: f * 100, estado: usados <= limite * f ? "abaixo" : "acima" };
+}
+
+/**
+ * O ritmo do gasto do mês: o uso contra o ideal de hoje (limite x fração do mês já passada) e para onde o
+ * ritmo atual leva. `abaixo` é bom (gasta menos que o ritmo do limite), `acima` é ruim. A projeção usa o
+ * MESMO contador do mês (`usados`) e a fração do mês, nada de curva inventada: no ritmo atual o mês termina
+ * em `usados / fração` tokens, e o limite se esgota na fração `fração x limite / usados` do mês. Sem
+ * dados de verdade (nenhum token, ou menos de um dia inteiro do mês passado) devolve `null`: a tela não diz nada.
+ */
+export interface RitmoDoMes {
+  estado: "abaixo" | "acima";
+  /** O gasto ideal até hoje, em % do limite (a posição do marcador). */
+  idealPct: number;
+  /** Onde o mês termina no ritmo atual, em % do limite. */
+  projetadoPct: number;
+  /** O limite já foi atingido. */
+  esgotado: boolean;
+  /** O dia (AAAA-MM-DD, São Paulo) em que o ritmo atual esgota o limite; nulo quando está abaixo do ritmo ou já esgotou. */
+  esgotaEm: string | null;
+}
+
+export function ritmoDoMes(usados: number, limite: number, agora: number): RitmoDoMes | null {
+  if (!(limite > 0) || !(usados > 0)) return null;
+  const { mes, inicio, fim } = mesCivilSP(agora);
+  const f = fracaoDoMesSP(agora);
+  if (f * diasDoMes(mes) < 1) return null; // menos de um dia inteiro: o número ainda é ruído
+  const { idealPct, estado } = posicaoNoRitmo(usados, limite, agora);
+  const projetadoPct = (usados / f / limite) * 100;
+  const esgotado = usados >= limite;
+  let esgotaEm: string | null = null;
+  if (estado === "acima" && !esgotado) {
+    esgotaEm = diaIsoSP(inicio + ((f * limite) / usados) * (fim - inicio));
+  }
+  return { estado, idealPct, projetadoPct, esgotado, esgotaEm };
+}
+
+/** A frase sob a barra: "Abaixo do ritmo: ... termina o mês em 38% do limite" ou "Acima do ritmo: ... passa do limite por volta de 24/10". */
+export function textoDoRitmo(r: RitmoDoMes): string {
+  if (r.estado === "abaixo") {
+    return `Abaixo do ritmo: no ritmo atual termina o mês em ${Math.round(r.projetadoPct)}% do limite`;
+  }
+  if (r.esgotado || !r.esgotaEm) return "Acima do ritmo: o limite do mês já foi atingido";
+  const [, mes, dia] = r.esgotaEm.split("-");
+  return `Acima do ritmo: no ritmo atual passa do limite por volta de ${dia}/${mes}`;
 }

@@ -25,6 +25,34 @@ export function diaIsoSP(instante: number | Date): string {
   return FMT_DIA_ISO.format(instante);
 }
 
+/**
+ * O instante (ms) da meia-noite de São Paulo que abre o dia civil `AAAA-MM-DD`. SP é UTC-3 o ano todo
+ * (sem horário de verão desde 2019): é a ÚNICA conta de "início do dia" com o deslocamento do fuso, para
+ * quem manda janelas ao banco (picos, uso, mês do limite) não repetir a constante.
+ */
+export function inicioDoDiaSP(dia: string): number {
+  const [a, m, d] = dia.split("-").map(Number);
+  return Date.UTC(a, m - 1, d, 3);
+}
+
+/** O mesmo instante, como o ISO que o servidor manda ao banco. */
+export function inicioDoDiaSPIso(dia: string): string {
+  return new Date(inicioDoDiaSP(dia)).toISOString();
+}
+
+/** `AAAA-MM` mais `n` meses (aritmética de calendário, sem fuso no meio). */
+export function somarMes(mes: string, n: number): string {
+  const [a, m] = mes.split("-").map(Number);
+  const d = new Date(Date.UTC(a, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Quantos dias tem o mês civil `AAAA-MM`. */
+export function diasDoMes(mes: string): number {
+  const [a, m] = mes.split("-").map(Number);
+  return new Date(Date.UTC(a, m, 0)).getUTCDate();
+}
+
 /** Soma `n` dias a uma data AAAA-MM-DD (aritmética de calendário, sem fuso no meio). */
 export function somarDias(dia: string, n: number): string {
   const [a, m, d] = dia.split("-").map(Number);

@@ -3,7 +3,6 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
-import { betaAberto } from "@/lib/beta";
 import { montagemState, type MontagemState } from "@/lib/onboarding";
 import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
 
@@ -131,10 +130,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
       vitalicio_desde: client.vitalicio_desde,
       bloqueado_em: client.bloqueado_em,
       desativada_em: client.desativada_em,
-    },
-    undefined,
-    // Chave geral do beta: ligada, ninguém é bloqueado por assinatura (lib/beta.ts).
-    { betaAberto: betaAberto() }
+    }
   );
 
   return {

@@ -19,7 +19,7 @@ npm run build
 
 ## As suítes e2e
 
-⚠️ **Rodar as DUAS**, sempre. No passo 1 do MVP do beta só a sem-login foi rodada e três testes
+⚠️ **Rodar as DUAS**, sempre. Num passo anterior só a sem-login foi rodada e três testes
 com login ficaram quebrados por seis dias, porque o painel novo tinha renomeado dois cabeçalhos.
 
 ```bash
@@ -41,7 +41,7 @@ Rode em TRÊS casos, e avise o custo antes:
 2. A **regra do guardrail** mudou (`lib/guardrail.ts`).
 3. O **modelo** mudou (`OPENAI_AGENT_MODEL`) ou a montagem do prompt em `lib/agent.ts`.
 
-Mais uma vez, fora de mudança de código: **antes de abrir o beta**, como linha de base.
+Mais uma vez, fora de mudança de código: **antes de um release e a cada troca de modelo**, como linha de base.
 
 ⚠️ **Mexer em `lib/agent-turn.ts` NÃO é motivo por si só**, e a versão anterior desta skill dizia
 que era. A bateria manda a configuração FIXA no corpo da requisição, então ela nunca passa pelo

@@ -9,7 +9,7 @@ paths:
   - "components/painel/**"
   - "components/PainelBlocos.tsx"
   - "components/ValorResumo.tsx"
-  - "docs/instrumentacao-beta.md"
+  - "docs/instrumentacao-uso.md"
 ---
 # Dashboard (`/painel`) and perceived value
 
@@ -19,7 +19,7 @@ paths:
 - NEVER count the panel (or the `/assinatura` "desde o início") over fetched rows: PostgREST "Max rows" is 1000 and silently cuts any `.limit(20000)` or row-returning `rpc`. The database aggregates (`painel_janelas`: scalars per window, windows passed as parameters; `painel_series`: small jsonb per date / hour / weekday x minute) and `lib/painel-agregado.ts` + `lib/painel-dados.ts` turn that into the numbers; both screens use the same loader. Business hours, weekend, holiday, median and thresholds stay in TS; holidays are never in SQL. A database error throws, never renders zero.  (why: docs/adr/2026-10-02-painel-agrega-no-banco.md)
 - The month window is a parameter in instants (`mesFechado`), never an ISO string comparison (`+00:00` vs `Z`); weekend/holiday for the month use the São Paulo calendar dates of that month. An empty closed month falls back to the accumulated and the label becomes "desde o início". Business hours are saved alone by `PUT` agent-config `mode: "horario"` (merge, never touches `persona`/`prompt_mode`); read only `agent_config->hours`, never the whole jsonb.  (why: docs/adr/undated-perceived-value-lib-valor.md, docs/adr/2026-10-02-painel-agrega-no-banco.md)
 - "Who replied" exists in SQL too (`painel_janelas`, `painel_series`, `painel_verbatim`), declared in the header of `lib/mensagem.ts` and proven by `e2e/painel-agregado.serial.spec.ts`. Use `is distinct from` / `is not distinct from` so a NULL `message_type` is an AI reply and never drops a conversation. Any new `message_type` changes `lib/mensagem.ts` and these functions together. Any new aggregate over `chat_messages` filtered by tenant and date needs the `(client_id, created_at desc)` index.  (why: docs/adr/2026-10-02-painel-agrega-no-banco.md)
-- The same "AI reply" rule must hold in the beta queries of `docs/instrumentacao-beta.md`.
+- The same "AI reply" rule must hold in the usage queries of `docs/instrumentacao-uso.md`.
 
 ## Periods and layout
 - Periods live in `lib/periodo.ts` (pure): rolling windows dia/semana/quinzena/mes; the previous period is the equal previous window, except "dia" compares with the same weekday of the previous week. Compute the 4 periods on the server in one pass. Never `Date.now()` in a Server Component (`agoraMs()`).  (why: docs/adr/2026-08-27-dashboard-periods-and-headline.md)

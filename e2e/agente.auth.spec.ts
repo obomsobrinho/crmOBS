@@ -227,7 +227,7 @@ test.describe("Painel com dados reais", () => {
     // agendamento) fica em `/design/painel` e NÃO é conferida aqui. Ela foi trazida
     // para cá em 18/09/2026 e revertida no mesmo dia, por um motivo que não tem
     // conserto: o texto desta tela inclui o que o TENANT escreveu, porque a frase
-    // do agente aparece na íntegra no painel. O primeiro testador que for clínica
+    // do agente aparece na íntegra no painel. O primeiro cliente que for clínica
     // deixaria a suíte vermelha acusando vazamento NOSSO num texto que é do
     // cliente. A regra fala das nossas strings fixas, então o lugar dela é a tela
     // de design, onde todo o texto é nosso e controlado pelo teste.

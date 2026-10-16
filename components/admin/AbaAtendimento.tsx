@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/chart";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { numeroBR, pct, plural } from "@/lib/format";
+import { calcularDelta, deltaDuracao } from "@/lib/delta";
 import { formatDuration } from "@/lib/metrics";
 import { PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
 import {
@@ -40,6 +41,7 @@ import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
 import { useCarga } from "@/lib/use-carga";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
 import { FalhaAoLer, Indicador } from "@/components/admin/pecas";
+import IndicadorComparado from "@/components/admin/IndicadorComparado";
 
 // ABA "ATENDIMENTO" do detalhe de um cliente (central do dono): o que melhorar ou
 // oferecer. Quatro números (conversas, quanto a IA atendeu sozinha, respostas da
@@ -52,7 +54,7 @@ import { FalhaAoLer, Indicador } from "@/components/admin/pecas";
 // `lib/solucoes.ts`), montadas em `lib/admin-cliente.ts`. Os QUATRO períodos do
 // painel (`lib/periodo.ts`) chegam numa leitura só; trocar de período não busca
 // nada.
-export default function AbaAtendimento({ fonte }: { fonte: FonteDoCliente }) {
+function AbaAtendimento({ fonte }: { fonte: FonteDoCliente }) {
   const [periodo, setPeriodo] = useState<PeriodoKey>(PERIODO_PADRAO);
   const { dados, erro, tentarDeNovo } = useCarga<AtendimentoPorPeriodo>(fonte.atendimento);
 
@@ -98,15 +100,31 @@ function Conteudo({ a }: { a: AtendimentoDoCliente }) {
           frase={`${numeroBR(a.semIntervencao)} de ${numeroBR(a.conversas)} sem resposta humana, ${numeroBR(a.comTime)} com o time`}
           legenda={a.legenda}
         />
-        <Indicador
+        <IndicadorComparado
           data-bloco="atendimento-respostas"
           marcaDoValor="atendimento-numero"
           rotulo="Respostas da IA"
           valor={numeroBR(a.respostasIa)}
           frase={`${numeroBR(a.passouParaOTime)} ${plural(a.passouParaOTime, "vez", "vezes")} passou o caso para o time`}
           legenda={a.legenda}
+          comparacao={
+            a.anterior && {
+              contra: a.rotuloAnterior,
+              delta: calcularDelta({
+                atual: a.respostasIa,
+                anterior: a.anterior.respostasIa,
+                direcao: "neutra",
+                semBase: "sem respostas antes",
+              }),
+            }
+          }
+          serie={{
+            pontos: a.movimento.barras.map((b) => ({ chave: b.chave, rotulo: b.rotulo, valor: b.ia })),
+            nome: "Respostas da IA",
+            formatar: numeroBR,
+          }}
         />
-        <Indicador
+        <IndicadorComparado
           data-bloco="atendimento-tempo"
           marcaDoValor="atendimento-numero"
           rotulo="Primeiro atendimento"
@@ -117,6 +135,20 @@ function Conteudo({ a }: { a: AtendimentoDoCliente }) {
               : `mediana de ${numeroBR(a.amostraMediana)} ${plural(a.amostraMediana, "atendimento", "atendimentos")}`
           }
           legenda={a.legenda}
+          // Um tempo sai em segundos ou minutos, nunca em porcentagem (`deltaDuracao`, a conta do painel).
+          comparacao={
+            a.anterior && {
+              contra: a.rotuloAnterior,
+              delta:
+                a.primeiraRespostaMs !== null && a.anterior.primeiraRespostaMs !== null
+                  ? deltaDuracao({
+                      atualMs: a.primeiraRespostaMs,
+                      anteriorMs: a.anterior.primeiraRespostaMs,
+                      semBase: "sem medição antes",
+                    })
+                  : null,
+            }
+          }
         />
       </div>
 
@@ -458,3 +490,5 @@ function GraficoDeMotivos({ a }: { a: AtendimentoDoCliente }) {
     </>
   );
 }
+
+export default memo(AbaAtendimento);

@@ -7,6 +7,7 @@ import { mesmoDestino, textoDoAvisoDeConsumo } from "@/lib/avisos";
 import { destinosDoDono } from "@/lib/admin";
 import {
   estadoDoConsumo,
+  limiaresDaEmpresa,
   limiteDaEmpresa,
   mesSP,
   podeAvisarConsumo,
@@ -103,6 +104,40 @@ export async function somarConsumoDoTurno(
 }
 
 /**
+ * Limpa as marcas dos avisos do mês que o teto QUE VALE AGORA para a empresa deixou para trás. O teto segue o
+ * PLANO (`limiteDaEmpresa`), então uma troca de plano muda o teto sem passar por `admin_mudar_limite_ia`
+ * (que limpa as marcas na edição do limite): quem troca o plano chama isto DEPOIS de gravar (`admin_mudar_conta`
+ * com `mudar_plano`, `/api/billing/subscribe`). Lê o limite personalizado e o plano da empresa, calcula os
+ * limiares pela MESMA regra da edição (`limiaresDaEmpresa`, `lib/custo-ia.ts`) e chama
+ * `limpar_marcas_consumo_ia`: a marca de um nível cujo limiar ficou acima do uso do mês é limpa, e o aviso volta a
+ * sair se o uso cruzar de novo. Teto que DESCEU não limpa nada (o próximo turno real manda o aviso pendente).
+ * Chamada depois da escrita que já valeu: NUNCA lança (uma falha fica no log, e o aviso pendente só atrasa).
+ */
+export async function alinharMarcasDoMes(svc: Supa, clientId: string, agora: number): Promise<void> {
+  try {
+    const { data: c, error } = await svc
+      .from("clients")
+      .select("ia_limite_tokens, billing_plan")
+      .eq("id", clientId)
+      .maybeSingle();
+    if (error || !c) {
+      console.error("falha ao ler o teto para alinhar as marcas dos avisos:", error?.message ?? "empresa não encontrada");
+      return;
+    }
+    const limiares = limiaresDaEmpresa(c.ia_limite_tokens, c.billing_plan);
+    const { error: erroDaLimpeza } = await svc.rpc("limpar_marcas_consumo_ia", {
+      p_client: clientId,
+      p_mes: mesSP(agora),
+      p_limiar_aviso: limiares.aviso,
+      p_limiar_parado: limiares.parado,
+    });
+    if (erroDaLimpeza) console.error("falha ao limpar as marcas dos avisos de IA:", erroDaLimpeza.message);
+  } catch (e) {
+    console.error("falha ao alinhar as marcas dos avisos de IA:", e);
+  }
+}
+
+/**
  * Estado da IA da empresa no mês, com UMA leitura (o mês com o teto da empresa
  * embutido pela chave estrangeira). Sem linha do mês, nenhum token foi gasto:
  * `normal`, sem ler mais nada. Erro = `normal` (quem chama decide se isso
@@ -116,7 +151,7 @@ export async function estadoDaEmpresaNoMes(
   try {
     const { data, error } = await svc
       .from("consumo_ia_mensal")
-      .select("tokens_entrada, tokens_saida, clients(ia_limite_tokens)")
+      .select("tokens_entrada, tokens_saida, clients(ia_limite_tokens, billing_plan)")
       .eq("client_id", clientId)
       .eq("mes", mesSP(agora))
       .maybeSingle();
@@ -127,7 +162,7 @@ export async function estadoDaEmpresaNoMes(
     if (!data) return "normal";
     return estadoDoConsumo(
       tokensUsados({ entrada: data.tokens_entrada, saida: data.tokens_saida }),
-      limiteDaEmpresa(data.clients?.ia_limite_tokens)
+      limiteDaEmpresa(data.clients?.ia_limite_tokens, data.clients?.billing_plan)
     );
   } catch (e) {
     console.error("falha ao ler o estado da IA do mês:", e);

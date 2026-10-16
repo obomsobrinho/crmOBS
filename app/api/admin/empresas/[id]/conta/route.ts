@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { empresaEFinanceiro, mudarConta, rotaDoAdmin } from "@/lib/admin";
 import { pedidoDeAcao, respostaDoSql } from "@/lib/admin-conta";
 import { AGENT_MODEL } from "@/lib/agent";
+import { alinharMarcasDoMes } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -38,6 +39,9 @@ export const PUT = rotaDoAdmin(
     }
     const r = respostaDoSql(resultado);
     if (r.status !== 200) return NextResponse.json({ error: r.texto, resultado }, { status: r.status });
+    // O teto segue o plano: trocar o plano muda o teto, e as marcas dos avisos do mês que o teto novo deixou
+    // para trás saem aqui (a mesma regra da edição do limite).
+    if (pedido.acao === "mudar_plano" && resultado === "ok") await alinharMarcasDoMes(svc, id, agoraMs());
     try {
       const relido = await empresaEFinanceiro(svc, id, agoraMs(), AGENT_MODEL);
       if (relido) return NextResponse.json({ ok: true, resultado, ...relido });

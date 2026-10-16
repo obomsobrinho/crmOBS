@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-// O canal de feedback do beta.
+// O canal de feedback dos usuários.
 //
 // A tela `/design` monta o NavRail SEM sessão, então o envio aqui é simulado
 // (o componente só grava quando recebe `clientId`). O que estes testes prendem
@@ -17,12 +17,12 @@ async function abrirFeedback(page: import("@playwright/test").Page) {
   return dialogo;
 }
 
-test.describe("Canal de feedback do beta", () => {
+test.describe("Canal de feedback dos usuários", () => {
   test("mora no menu do avatar, e não num botão flutuante", async ({ page }) => {
     await page.goto("/design");
 
     // ⚠️ Nada de botão flutuante. Ele cobriria conteúdo em TODA tela do produto
-    // para servir a uma ação que a pessoa usa poucas vezes no beta inteiro.
+    // para servir a uma ação que a pessoa usa poucas vezes no uso inteiro.
     const flutuantes = await page.evaluate(
       () =>
         [...document.querySelectorAll("button, a")].filter((el) => {

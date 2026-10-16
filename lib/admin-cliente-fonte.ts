@@ -1,5 +1,17 @@
 import type { EstadoDoWhatsApp } from "./admin-alertas";
-import type { AtendimentoPorPeriodo, UsoDoCliente } from "./admin-cliente";
+import {
+  descricaoDaSelecao,
+  leituraDoHistorico,
+  usoDoHistorico,
+  type AtendimentoPorPeriodo,
+  type DiaDeUso,
+  type MesDeUso,
+  type SelecaoHistorica,
+  type UsoDoCliente,
+  type UsoHistorico,
+} from "./admin-cliente";
+import { diaIsoSP } from "./fuso";
+import { picosDeHistorico } from "./picos";
 import type { Cobranca, FinanceiroDoCliente, PedidoDeAcao } from "./admin-conta";
 import type { EmpresaItem } from "./admin-empresas";
 
@@ -25,6 +37,11 @@ export type RespostaDoApagar =
 
 export interface FonteDoCliente {
   uso(): Promise<UsoDoCliente>;
+  /**
+   * Um mês civil (por dia), todo o período (por mês) ou um intervalo de datas: o seletor ao lado dos chips
+   * da aba Uso de IA. Traz o uso, os picos e a janela dos picos.
+   */
+  usoHistorico(selecao: SelecaoHistorica): Promise<UsoHistorico>;
   /** Os quatro períodos do painel, numa leitura só. */
   atendimento(): Promise<AtendimentoPorPeriodo>;
   /** Ao vivo na Evolution; falha vira `desconhecido`. */
@@ -33,6 +50,8 @@ export interface FonteDoCliente {
   cobrancas(): Promise<Cobranca[] | null>;
   /** Uma ação do Financeiro ou das Ações (`PUT .../conta`). */
   mudarConta(pedido: PedidoDeAcao): Promise<RespostaDaAcao>;
+  /** Grava o limite de IA do mês (`PUT .../limite`; `null` = o do plano). No preview valida e não grava. */
+  mudarLimite(limite: number | null): Promise<{ ok: true } | { ok: false; erro: string }>;
   /** Apagar de vez (`POST .../apagar`), com o nome digitado. */
   apagar(nome: string): Promise<RespostaDoApagar>;
   /** O endereço do ZIP da exportação LGPD; `null` no preview (não há o que baixar). */
@@ -61,12 +80,40 @@ async function enviar(url: string, metodo: "PUT" | "POST", corpo: unknown): Prom
 
 const FALHA = "Não deu para concluir agora. Tente de novo.";
 
+/**
+ * Lembra a leitura que deu certo (uma falha NÃO fica lembrada, para o "tentar de novo" ler de
+ * verdade). É o que deixa o detalhe adiantar a leitura de uma aba em segundo plano
+ * (`aquecer`): quando a aba abre, a resposta já está aqui e a troca não espera a rede.
+ */
+function lembrar<T>(ler: () => Promise<T>): () => Promise<T> {
+  let p: Promise<T> | null = null;
+  return () => {
+    if (!p) {
+      p = ler().catch((e) => {
+        p = null;
+        throw e;
+      });
+    }
+    return p;
+  };
+}
+
 /** Navegador: as rotas do admin. */
 export function fonteDoClienteDaApi(id: string): FonteDoCliente {
   const base = `/api/admin/empresas/${id}`;
+  const historico = new Map<string, () => Promise<UsoHistorico>>();
   return {
-    uso: () => lerJson<UsoDoCliente>(`${base}/uso`, "uso"),
-    atendimento: () => lerJson<AtendimentoPorPeriodo>(`${base}/atendimento`, "atendimento"),
+    uso: lembrar(() => lerJson<UsoDoCliente>(`${base}/uso`, "uso")),
+    usoHistorico(selecao) {
+      const { consulta } = descricaoDaSelecao(selecao);
+      let ler = historico.get(consulta);
+      if (!ler) {
+        ler = lembrar(() => lerJson<UsoHistorico>(`${base}/uso?${consulta}`, "uso"));
+        historico.set(consulta, ler);
+      }
+      return ler();
+    },
+    atendimento: lembrar(() => lerJson<AtendimentoPorPeriodo>(`${base}/atendimento`, "atendimento")),
     async whatsapp() {
       try {
         const corpo = await lerJson<{ estado?: EstadoDoWhatsApp }>(`${base}/whatsapp`, "whatsapp");
@@ -86,6 +133,11 @@ export function fonteDoClienteDaApi(id: string): FonteDoCliente {
       if (r.ok) return { ok: true, recarregue: true };
       return { ok: false, erro: c.error ?? FALHA };
     },
+    async mudarLimite(limite) {
+      const r = await enviar(`${base}/limite`, "PUT", { limite });
+      if (r.ok) return { ok: true };
+      return { ok: false, erro: (r.corpo as { error?: string }).error ?? FALHA };
+    },
     async apagar(nome) {
       const r = await enviar(`${base}/apagar`, "POST", { nome });
       const c = r.corpo as { error?: string; pendencias?: string[] };
@@ -99,6 +151,12 @@ export function fonteDoClienteDaApi(id: string): FonteDoCliente {
 /** Os dados falsos do preview. */
 export interface PreviewDoCliente {
   uso: UsoDoCliente;
+  /**
+   * O histórico falso de cada dia (turnos por hora), do qual o preview tira um mês, todo o período ou um
+   * intervalo pelas MESMAS contas do servidor (`usoDoMes`, `usoDeTodoOPeriodo`, `usoDoIntervalo`,
+   * `resumoDePicos`). Dados, e não função: o preview nasce num Server Component e atravessa para o navegador.
+   */
+  memoria: MemoriaDoPreview;
   atendimento: AtendimentoPorPeriodo;
   whatsapp: EstadoDoWhatsApp;
   cobrancas: Cobranca[] | null;
@@ -108,11 +166,54 @@ export interface PreviewDoCliente {
 export function fonteDoClienteDaMemoria(p: PreviewDoCliente): FonteDoCliente {
   return {
     uso: async () => p.uso,
+    usoHistorico: async (selecao) => usoHistoricoDeMemoria(p.memoria, selecao),
     atendimento: async () => p.atendimento,
     whatsapp: async () => p.whatsapp,
     cobrancas: async () => p.cobrancas,
     mudarConta: async () => ({ ok: true, simulado: true }),
+    mudarLimite: async () => ({ ok: true }),
     apagar: async () => ({ ok: true, pendencias: [], simulado: true }),
     urlDaExportacao: null,
   };
+}
+
+/** O histórico falso do preview: dias com tokens, turnos por hora de cada dia e o primeiro dia. */
+export interface MemoriaDoPreview {
+  dias: DiaDeUso[];
+  hist: { dia: string; horas: number[] }[];
+  primeira: string | null;
+  agora: number;
+  modelo: string | null;
+}
+
+/** O mesmo que `usoHistoricoDoCliente` (servidor) faz no banco, feito sobre o histórico falso. */
+export function usoHistoricoDeMemoria(m: MemoriaDoPreview, selecao: SelecaoHistorica): UsoHistorico {
+  const hoje = diaIsoSP(m.agora);
+  const entre = (de: string, ate: string) => m.dias.filter((d) => d.dia >= de && d.dia <= ate);
+  const mesesDe = (dias: DiaDeUso[]): MesDeUso[] => {
+    const porMes = new Map<string, MesDeUso>();
+    for (const d of dias) {
+      const mes = d.dia.slice(0, 7);
+      const x = porMes.get(mes) ?? { mes, turnos: 0, tokens: { entrada: 0, cache: 0, saida: 0 } };
+      x.turnos += d.turnos;
+      x.tokens.entrada += d.tokens.entrada;
+      x.tokens.cache += d.tokens.cache;
+      x.tokens.saida += d.tokens.saida;
+      porMes.set(mes, x);
+    }
+    return [...porMes.values()];
+  };
+  // O QUE ler é a regra pura do servidor (`leituraDoHistorico`); aqui as janelas filtram o histórico falso.
+  const primeira = selecao.tipo === "tudo" ? m.primeira : null;
+  const l = leituraDoHistorico(selecao, hoje, primeira);
+  const uso = usoDoHistorico(
+    selecao,
+    {
+      dias: l.dias ? entre(l.dias.de, l.dias.ate) : [],
+      anteriores: l.anteriores ? entre(l.anteriores.de, l.anteriores.ate) : null,
+      meses: l.meses ? mesesDe(entre(l.meses.de, l.meses.ate)) : [],
+    },
+    { janela: l.janela, agora: m.agora, modelo: m.modelo, primeira }
+  );
+  return { uso, picos: picosDeHistorico(m.hist, l.janela), janela: l.janela };
 }
