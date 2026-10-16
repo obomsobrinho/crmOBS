@@ -1,6 +1,21 @@
 import fs from "node:fs";
 import { test, expect, type Page } from "@playwright/test";
 import { FONE_TESTE, NOME_TESTE, servico, tenantDeTeste } from "./semente";
+import { FUSO } from "../lib/fuso";
+
+// Esta suíte roda no relógio REAL (o n8n não aceita `agoraTeste`). "Amanhã às 15h"
+// falhou numa sexta (16/10/2026): amanhã era sábado, a OBM não abre, e a IA acertou
+// ao recusar. O dia pedido é sempre um dia útil de 2 a 6 dias à frente, pelo nome.
+function diaUtilAFrente(): string {
+  const nomes = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+  const curto = new Intl.DateTimeFormat("en-US", { timeZone: FUSO, weekday: "short" });
+  const idx = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  for (let d = 2; d <= 6; d++) {
+    const dia = idx.indexOf(curto.format(new Date(Date.now() + d * 86_400_000)));
+    if (dia >= 1 && dia <= 5) return nomes[dia];
+  }
+  return "terça";
+}
 
 // ATENDIMENTO DE PONTA A PONTA (01/10/2026, pedido do dono: "só me mande testar
 // depois de estar 100%").
@@ -229,7 +244,7 @@ test("conversa marcada é agendar e NÃO abre pedido de ajuda", async () => {
       { client_id: clientId, phone: JID, nomewpp: NOME_TESTE, user_message: "Quero sim", created_at: new Date(base + 60_000).toISOString() },
       { client_id: clientId, phone: JID, bot_message: "Ótimo. Me diz um dia e um período que fiquem melhores pra você.", message_type: "text", created_at: new Date(base + 90_000).toISOString() },
     ]);
-    await texto("Pode ser amanhã às 15h");
+    await texto(`Pode ser ${diaUtilAFrente()} às 15h`);
     await respostaUnica(8000);
     const { data: q } = await svc
       .from("conversation_qualifications")
