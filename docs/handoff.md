@@ -37,6 +37,16 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
+### 16/10/2026 (tarde): DECISAO DO DONO: COLOCAR O SISTEMA A PROVA AGORA. LER PRIMEIRO
+
+- Decisao: liberar o teste para 3 a 5 pessoas reais JA, sem esperar a cobranca estar provada. Motivo: o teste de 7 dias e gratis, a cobranca so pesa no dia 8; o teto de IA protege o custo; Vitalicio e a valvula se a cobranca nao estiver redonda no dia 7. O dono reconhece que tende a adiar ("nunca acho que esta bom o bastante"): ajuste de detalhe espera o retorno dos testadores; bug de atendimento continua passando na frente.
+- Antes do convite (1 a 2 dias): (1) o dono faz o cadastro como DESCONHECIDO, e-mail e numero novos, ate a IA responder a primeira mensagem (caminho nunca percorrido por um estranho); (2) escolher 3 a 5 pessoas com VOLUME REAL de WhatsApp; (3) criterio de sucesso definido antes: publicou o agente em ate 2 dias, a IA respondeu conversas reais na semana, no dia 7 quer continuar (acompanhar na central /clientes).
+- Em paralelo, dentro dos 7 dias do teste deles: provar a cobranca de ponta a ponta no sandbox do Asaas (teste, plano, pagamento, ativo, atraso, bloqueio, pagamento, liberacao), depois virar ASAAS_ENV=producao com o dono acompanhando a primeira cobranca real. Revisar as 4 empresas com teste vencido de 15/10 (Dra Maria Jullia, MajuTeste, Novasenhateste, testesworkfranck): Vitalicio ou bloqueadas.
+- Estado conferido em 16/10: login suite verde (realtime.serial e atendente caem na rodada cheia por instabilidade do Supabase Realtime e passam sozinhos), test:e2e:n8n 11/11 apos corrigir o caso que dependia do dia da semana (ea6714b), zero envio Evolution para 5500.
+- Pendentes do dono ainda abertos: testar com o chip o detalhe de Pedidos, a atualizacao do pedido aberto e o Salvar como regra.
+- Depois: LGPD por contato (item 9) e Agenda com Google Calendar (item 10, precisa de plano proprio). Campanha (prospeccao do dono) a discutir.
+- Proxima sessao (16/10): o dono vai usar o Claude como CONSELHEIRO de marketing, estrategia e lancamento (prompt montado nesta sessao).
+
 ### 16/10/2026 (rodada 3): MEDIDOR DE META, CABECALHO LIMPO, SEM account_type (no ar: 5072414, 01118f4)
 
 Detalhe em `docs/adr/2026-10-16-goal-progress-meter-and-no-account-type.md` e `docs/adr/2026-10-16-account-type-removed.md`. Resumo: o medidor do limite virou barra de meta com bolinha do ritmo ideal, trecho listrado, verde/vermelho pelo ritmo e a frase da projecao (`ritmoDoMes`, `textoDoRitmo`); rotulo "X de Y tokens (Plano ...), R$ ... estimado" no canto de cima do cartao; cabecalho sem a linha Conta/Plano e sem "nunca cobrado" no Vitalicio; donut com o numero do centro que cabe (`tamanhoDoCentroDoDonut`, bilhao em `tokensCurto`).
