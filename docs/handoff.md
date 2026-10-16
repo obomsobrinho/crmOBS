@@ -40,7 +40,7 @@ global de acesso livre.
 ### 16/10/2026 (rodada 3): MEDIDOR DE META, CABECALHO LIMPO, SEM account_type (NAO COMMITADA). LER PRIMEIRO
 
 Detalhe em `docs/adr/2026-10-16-goal-progress-meter-and-no-account-type.md` e `docs/adr/2026-10-16-account-type-removed.md`. Resumo: o medidor do limite virou barra de meta com bolinha do ritmo ideal, trecho listrado, verde/vermelho pelo ritmo e a frase da projecao (`ritmoDoMes`, `textoDoRitmo`); rotulo "X de Y tokens (Plano ...), R$ ... estimado" no canto de cima do cartao; cabecalho sem a linha Conta/Plano e sem "nunca cobrado" no Vitalicio; donut com o numero do centro que cabe (`tamanhoDoCentroDoDonut`, bilhao em `tokensCurto`).
-- FIM DO BETA: nenhum codigo le ou escreve `clients.account_type`. A migration que derruba a coluna esta escrita e NAO aplicada: `supabase/migrations/20261017000000_drop_clients_account_type.sql` (aplicar DEPOIS do deploy; recria `admin_empresas_pagina` sem a coluna). Junto, `20261017000100_drop_admin_bloqueados_sem_beta.sql` (sem chamador). Depois de aplicar, regenerar `lib/database.types.ts` (hoje editado a mao para ja nao ter as duas coisas).
+- FIM DO BETA: nenhum codigo le ou escreve `clients.account_type`. A migration que derruba a coluna foi APLICADA em 16/10 depois do deploy de 5072414: `supabase/migrations/20261016182108_drop_clients_account_type.sql` (recria `admin_empresas_pagina` sem a coluna). Junto, `20261016182110_drop_admin_bloqueados_sem_beta.sql` (sem chamador). `lib/database.types.ts` ja reflete o banco (editado a mao).
 - As consultas de `docs/instrumentacao-uso.md` e a skill `consultas-uso` pararam de filtrar por tipo (listam todas as empresas).
 
 ### 16/10/2026: SEGUNDA RODADA DA CENTRAL (NAO COMMITADA). LER PRIMEIRO
@@ -50,7 +50,7 @@ Detalhe em `docs/adr/2026-10-16-central-picos-plan-caps-ptax-and-cards.md`. Resu
 - A metrica de conversas ficou fora das variacoes (definicao pendente com o dono).
 - `mapa-de-calor.tsx` foi APAGADO na revisao de 16/10 (o dono escolheu a variacao A); tokens `--chart-rampa-tinta*` tambem.
 - Revisao da rodada (16/10, apos o /code-review): o teto por plano agora limpa as marcas dos avisos na troca de plano (`alinharMarcasDoMes`, migration `20261016170702_limpar_marcas_consumo_ia.sql` JA APLICADA); "Padrao do plano" limpa o limite personalizado e o valor de outro plano abre o valor personalizado preenchido; o ritmo do limite e do mes de CADA coluna (periodo que atravessa dois meses tem um trecho por mes); selos pelo `Selo` do painel sobre `lib/delta.ts` (`IndicadorComparado`); a PTAX nao segura mais a pagina (`useCambio`, falha lembrada por 10 min); `atendimentoDoCliente` faz UMA chamada de `painel_janelas`; os dados das abas Uso/Atendimento so saem quando o dono mostra que vai abrir a aba; `MedidorDeMeta` e `DropdownMenuItemMarcado` na camada base; PTAX e donut fora de `lib/custo-ia.ts`.
-- As duas migrations de drop (`account_type`, `admin_bloqueados_sem_beta`) foram RENOMEADAS para `20261017000000` e `20261017000100` (continuam NAO aplicadas e continuam as ultimas).
+- As duas migrations de drop (`account_type`, `admin_bloqueados_sem_beta`) foram RENOMEADAS para `20261016182108` e `20261016182110` (APLICADAS em 16/10 depois do deploy de 5072414).
 
 ### 15/10/2026 (noite): 15 AJUSTES DE LAYOUT DA CENTRAL, NAO COMMITADOS. LER PRIMEIRO
 

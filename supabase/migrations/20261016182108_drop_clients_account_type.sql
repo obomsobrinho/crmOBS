@@ -1,4 +1,4 @@
--- APPLY AFTER THE DEPLOY of the code that no longer reads clients.account_type (16/10/2026).
+-- APPLIED on 16/10/2026 after the deploy of 5072414. Was: APPLY AFTER THE DEPLOY of the code that no longer reads clients.account_type (16/10/2026).
 -- Do NOT apply before: the code that is live today still selects the column (the list of the
 -- central, the LGPD export) and would fail with "column does not exist".
 --

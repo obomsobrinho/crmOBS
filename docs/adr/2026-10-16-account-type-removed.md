@@ -8,9 +8,9 @@
 
 ## Decision
 - Two steps, because the deployed code still selects the column. Step 1 (this delivery): no code reads or writes it (`lib/admin-empresas.ts`, the LGPD export list `COLUNAS_DO_CLIENTE`, the preview data, the generated types, every screen of the central). `admin_empresas_pagina` keeps returning it until step 2, and the code ignores the extra field.
-- Step 2: `supabase/migrations/20261017000000_drop_clients_account_type.sql`, written but NOT applied. The architect applies it AFTER the deploy of step 1. It recreates `admin_empresas_pagina` without the column (same body, grants and precedence), drops the check and drops the column. The generated types are regenerated in the same step.
+- Step 2: `supabase/migrations/20261016182108_drop_clients_account_type.sql`, written but NOT applied. The architect applies it AFTER the deploy of step 1. It recreates `admin_empresas_pagina` without the column (same body, grants and precedence), drops the check and drops the column. The generated types are regenerated in the same step.
 - The beta queries of `docs/instrumentacao-uso.md` stop filtering by type and list every company; a name filter is applied by hand when needed.
-- `admin_bloqueados_sem_beta` (no caller since 15/10/2026) goes in its own migration, `20261017000100_drop_admin_bloqueados_sem_beta.sql`, also applied after the deploy.
+- `admin_bloqueados_sem_beta` (no caller since 15/10/2026) goes in its own migration, `20261016182110_drop_admin_bloqueados_sem_beta.sql`, also applied after the deploy.
 
 ## Consequences
 - No "type of account" appears anywhere in the central (header, Visão geral, Plano card, list subtitle: the list says only "Plano X" or "Sem plano").
