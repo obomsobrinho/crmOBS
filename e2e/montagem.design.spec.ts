@@ -356,12 +356,10 @@ test("conectar no molde do WhatsApp Web: três passos, o código ao lado", async
   await expect(page.getByText(/escaneie o QR code abaixo/)).toHaveCount(0);
   await expect(page.getByText(/Clique em Conectar/)).toHaveCount(0);
 
-  // Troca de modo: pelo número, com os mesmos três passos.
-  await page.locator('[data-slot="trocar-modo-conexao"]').click();
-  await expect(passos).toHaveCount(3);
-  await expect(page.getByRole("textbox", { name: "Número do WhatsApp" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gerar código" })).toBeDisabled();
-  await expect(page.locator('[data-slot="trocar-modo-conexao"]')).toHaveText(
-    "Conectar com QR code"
-  );
+  // Sem troca de modo (17/10/2026): o código de pareamento está desligado
+  // (docs/adr/2026-10-17-pairing-code-off-qr-only.md). No computador também não
+  // aparece o aviso de abrir no computador.
+  await expect(page.locator('[data-slot="trocar-modo-conexao"]')).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Número do WhatsApp" })).toHaveCount(0);
+  await expect(page.locator('[data-slot="conectar-pelo-computador"]')).toHaveCount(0);
 });

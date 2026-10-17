@@ -19,17 +19,18 @@ test("login sem moldura de cartão e com campos de 44px", async ({ page }) => {
   );
 });
 
-test("no celular a conexão abre pelo número, com o QR como alternativa", async ({ page }) => {
-  // ⚠️ REESCRITO EM 24/09/2026. Era o cartão "Está neste celular?", que só
-  // dizia que o QR precisava de outro aparelho. Agora o celular conecta pelo
-  // número (código de pareamento da Evolution), e o QR vira o link de troca.
+test("no celular a conexão é pelo QR, com o caminho do computador escrito", async ({ page }) => {
+  // ⚠️ REESCRITO EM 17/10/2026. O código de pareamento (padrão no celular desde
+  // 24/09) foi desligado: o WhatsApp recusa o código da Evolution 2.3.7
+  // (docs/adr/2026-10-17-pairing-code-off-qr-only.md). O celular mostra o QR (um
+  // chip em outro aparelho lê daqui) e diz para abrir no computador.
   await page.goto("/design/montagem?passo=conectar");
   await page.waitForLoadState("networkidle");
-  const campo = page.getByRole("textbox", { name: "Número do WhatsApp" });
-  await expect(campo).toBeVisible();
-  await expect(campo).toHaveAttribute("inputmode", "tel");
-  await expect(page.getByRole("button", { name: "Gerar código" })).toBeDisabled();
-  await page.locator('[data-slot="trocar-modo-conexao"]').click();
+  await expect(page.getByRole("textbox", { name: "Número do WhatsApp" })).toHaveCount(0);
+  await expect(page.locator('[data-slot="trocar-modo-conexao"]')).toHaveCount(0);
+  await expect(page.locator('[data-slot="conectar-pelo-computador"]')).toContainText(
+    "abra esta página no computador"
+  );
   // O botão diz o que faz (26/09/2026, dono): era "Conectar WhatsApp" e só
   // gerava o QR.
   await expect(page.getByRole("button", { name: "Gerar QR code" })).toBeVisible();

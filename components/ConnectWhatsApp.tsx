@@ -21,6 +21,13 @@ import { ChevronRight, CircleCheck } from "lucide-react";
 type Phase = "idle" | "loading" | "waiting" | "connected" | "conectado" | "error";
 
 /**
+ * Conectar pelo código de pareamento. Desligado em 17/10/2026: o WhatsApp recusa
+ * o código gerado pela Evolution 2.3.7 (docs/adr/2026-10-17-pairing-code-off-qr-only.md).
+ * Tipado `boolean` de propósito, para o caminho do código continuar compilando.
+ */
+const PAREAMENTO_LIGADO: boolean = false;
+
+/**
  * Máscara de celular brasileiro, "(31) 99999-8888", aplicada enquanto digita.
  * Corta em 11 dígitos (DDD + 9 dígitos): sem isso dava para digitar um número
  * gigante (achado do dono, 24/09/2026). O DDI 55 quem põe é o servidor.
@@ -67,11 +74,14 @@ export default function ConnectWhatsApp({
   const [error, setError] = useState<string | null>(null);
   // CONECTAR PELO NÚMERO (24/09/2026, pedido do dono): quem está no próprio
   // celular não consegue ler um QR na mesma tela, e a Evolution gera um código
-  // de 8 caracteres para digitar no WhatsApp. No celular esse é o padrão; no
-  // computador o QR continua sendo, e os dois trocam por um link.
+  // de 8 caracteres para digitar no WhatsApp.
+  // ⚠️ DESLIGADO EM 17/10/2026: o código é gerado mas o WhatsApp recusa o
+  // pareamento ("Não foi possível conectar") em toda Evolution 2.3.7, desde uma
+  // mudança do WhatsApp no fim de julho (docs/adr/2026-10-17-pairing-code-off-qr-only.md).
+  // O QR conecta. Religar só depois de um número real conectar pelo código.
   const celular = useCelular();
   const [modoEscolhido, setModo] = useState<"qr" | "numero" | null>(null);
-  const modo = modoEscolhido ?? (celular ? "numero" : "qr");
+  const modo: "qr" | "numero" = PAREAMENTO_LIGADO ? (modoEscolhido ?? (celular ? "numero" : "qr")) : "qr";
   const [numero, setNumero] = useState("");
   const [codigo, setCodigo] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -309,6 +319,15 @@ export default function ConnectWhatsApp({
                   : "WhatsApp desconectado. O agente está Desativado até você conectar um número."}
               </Aviso>
             )}
+            {/* Sem o código de pareamento, quem abriu no celular do próprio
+                número não tem como ler o QR desta tela: diz o caminho ANTES dos
+                passos. Um chip em OUTRO aparelho lê daqui mesmo. */}
+            {!PAREAMENTO_LIGADO && celular && (
+              <Aviso data-slot="conectar-pelo-computador">
+                Se o WhatsApp que vai atender está neste celular, abra esta
+                página no computador e leia o QR code com o celular.
+              </Aviso>
+            )}
             <div
               className={cn(
                 "flex flex-col gap-6 text-left",
@@ -377,6 +396,7 @@ export default function ConnectWhatsApp({
                 <div className={cn("space-y-3", passo ? "max-sm:order-last" : "order-last")}>
                   {/* A troca de modo muda só o jeito de ligar: a conexão, o
                       polling e o que vem depois são os mesmos. */}
+                  {PAREAMENTO_LIGADO && (
                   <Button
                     variant="link"
                     size="link"
@@ -391,6 +411,7 @@ export default function ConnectWhatsApp({
                       : "Conectar com número de telefone"}
                     <ChevronRight size={15} aria-hidden />
                   </Button>
+                  )}
                   {/* Transparência sobre a conexão, dentro do cartão: é a nota
                       de rodapé dos passos, não um bloco à parte. */}
                   <div className="[&>div]:max-w-none [&>div]:px-0">

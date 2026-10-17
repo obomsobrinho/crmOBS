@@ -37,6 +37,11 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
+### 17/10/2026: BASE ZERADA E CODIGO DE PAREAMENTO DESLIGADO
+
+- Base de producao zerada a pedido do dono em 16/10: as 4 empresas de teste pelo "Apagar de vez" da central e a OBM por script (mesma rotina: arquivos, instancia da Evolution, banco, logins). O prompt avancado da OBM foi salvo fora do repo em `Desktop/Desk/projetos/backup-obm-2026-10-16/`. O dono recriou a empresa (OBS) em 17/10; `ADMIN_USER_IDS` (Vercel e `.env.local`) e as credenciais de `.env.e2e.local` precisam apontar para os logins novos, senao a central some e `test:e2e:login`/`test:e2e:n8n` quebram.
+- No teste do dono como desconhecido, o codigo de pareamento falhou 5 vezes (o WhatsApp recusa o codigo da Evolution 2.3.7, upstream #2696) e o QR conectou de primeira. Codigo desligado, so QR, aviso no celular para abrir no computador: `docs/adr/2026-10-17-pairing-code-off-qr-only.md`.
+
 ### 16/10/2026 (tarde): DECISAO DO DONO: COLOCAR O SISTEMA A PROVA AGORA. LER PRIMEIRO
 
 - Decisao: liberar o teste para 3 a 5 pessoas reais JA, sem esperar a cobranca estar provada. Motivo: o teste de 7 dias e gratis, a cobranca so pesa no dia 8; o teto de IA protege o custo; Vitalicio e a valvula se a cobranca nao estiver redonda no dia 7. O dono reconhece que tende a adiar ("nunca acho que esta bom o bastante"): ajuste de detalhe espera o retorno dos testadores; bug de atendimento continua passando na frente.
