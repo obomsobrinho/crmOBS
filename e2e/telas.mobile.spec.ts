@@ -20,9 +20,10 @@ const TELAS = [
   "/design/agente",
   "/design/equipe",
   "/design/assinatura",
-  // Ordem do assistente desde 24/09/2026: quem, sabe, testar, conectar. O
-  // passo "ativar" deixou de existir (virou "testar", e a ativação foi para o
-  // fim do passo de conectar, que ganhou a variante já conectada).
+  // Ordem do assistente desde 23/10/2026: quem, sabe, testar, conectar e
+  // avisos (o passo 5, com a revisão e o Ativar). Mais a abertura.
+  "/design/montagem",
+  "/design/montagem?passo=avisos&avisos=1",
   "/design/montagem?passo=quem",
   "/design/montagem?passo=sabe",
   "/design/montagem?passo=testar",

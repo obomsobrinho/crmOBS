@@ -550,18 +550,21 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     // eram a mesma página com voz diferente. O padrão de setup do WooCommerce
     // ganhou a discussão: um assistente que roda uma vez em rota própria, e uma
     // tela permanente de abas. Um não cancela o outro.
-    await page.goto("/design/montagem");
+    // Num passo, e não na abertura (23/10/2026), que vem antes do contador.
+    await page.goto("/design/montagem?passo=quem");
     const montagem = await page.evaluate(() => ({
-      contador: /Passo \d de 4/.test(document.body.innerText),
+      contador: /Passo \d de \d/.test(document.body.innerText),
       salvar: [...document.querySelectorAll("button")].some(
         (b) => b.textContent?.trim() === "Salvar"
       ),
-      abas: document.querySelectorAll('[role="tab"]').length,
+      // Sem o "Um número / Um grupo" dos avisos, que mora no passo 1 desde
+      // 23/10/2026 (mesma exclusão da edição, abaixo).
+      abas: document.querySelectorAll('[role="tab"]:not([data-slot="avisos-tipo"])').length,
     }));
 
     await page.goto("/design/agente");
     const edicao = await page.evaluate(() => ({
-      contador: /Passo \d de 4/.test(document.body.innerText),
+      contador: /Passo \d de \d/.test(document.body.innerText),
       salvar: [...document.querySelectorAll("button")].some(
         (b) => b.textContent?.trim() === "Salvar"
       ),
@@ -604,7 +607,8 @@ test.describe("Item 4: guiado em três grupos, colunas no nível do campo", () =
     const contadores = (texto: string) =>
       (texto.match(/\d+\s+de\s+\d+/g) ?? []).length;
 
-    await page.goto("/design/montagem");
+    // Num passo: a abertura (23/10/2026) não conta passos.
+    await page.goto("/design/montagem?passo=quem");
     expect(contadores(await page.locator("body").innerText())).toBe(1);
 
     // A linha que sobrou da barra NÃO conta passos.

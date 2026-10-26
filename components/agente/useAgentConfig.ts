@@ -191,6 +191,7 @@ export function useAgentConfig({
       companySite: c.companySite,
       hours: c.hours,
       hoursNote: c.hoursNote,
+      hoursConfirmed: c.hoursConfirmed,
       handoffNotice: c.handoffNotice,
       neverAdmitAi: c.neverAdmitAi,
     }));

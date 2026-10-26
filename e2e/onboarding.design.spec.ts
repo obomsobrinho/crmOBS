@@ -24,7 +24,7 @@ test.describe("Aviso de montagem (/design/onboarding)", () => {
     // O CONTADOR SUMIU DAQUI. Existe um só na conta, e ele mora dentro do
     // assistente: dois contadores davam "passo 2 de 3" dentro de "passo 2 de 4".
     await expect(page.getByText("Configurar sua conta")).toHaveCount(0);
-    await expect(page.getByText(/\d de 4/)).toHaveCount(0);
+    await expect(page.getByText(/\d de \d/)).toHaveCount(0);
     await expect(page.getByRole("progressbar")).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "Ver todos os passos" })

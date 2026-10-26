@@ -60,6 +60,7 @@ const CONFIG: AgentConfig = {
     dom: { open: false, from: "09:00", to: "13:00" },
   },
   hoursNote: "",
+  hoursConfirmed: true,
   agentName: "Maju",
   agentRole: "atender os pacientes tirando duvidas e marcando o agendamento",
   tone: "profissional",

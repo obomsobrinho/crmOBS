@@ -5,6 +5,7 @@ import {
   Bot,
   Building2,
   CalendarClock,
+  Check,
   LayoutTemplate,
   ShieldCheck,
   Store,
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Aviso } from "@/components/ui/aviso";
 import {
   estimarTokens,
   foraDoCache,
@@ -44,7 +46,7 @@ export const GRUPOS_PREVIEW = [
   { jid: "120363000000000001@g.us", nome: "Time de atendimento" },
   { jid: "120363000000000002@g.us", nome: "Sócios" },
 ];
-import { AvisoCache, Field, Hint, Par, SubBloco, Trio } from "./ui";
+import { AvisoCache, Destaque, Field, Hint, Par, SubBloco, Trio } from "./ui";
 
 // Os campos do agente, em três grupos, na ordem em que se pensa sobre um
 // funcionário novo: quem é você, o que você sabe, o que você pode fazer.
@@ -296,29 +298,31 @@ export function SeletorDePreset({
     );
   }
 
+  // ⚠️ VIROU DESTAQUE em 23/10/2026 (dono): era uma linha de texto acima das
+  // pílulas, e era fácil passar sem ver. O convite só existe na montagem.
   return (
-    <div data-slot="preset-convite" className="space-y-2">
-      <p className="flex items-center gap-2 text-apoio font-medium">
-        <LayoutTemplate size={15} className="shrink-0 text-brand-ink" />
-        Comece de um modelo do seu segmento
-      </p>
-      <Hint>
-        Ele preenche tom, objetivos e limites. Você ajusta tudo depois.
-      </Hint>
-      <div className="flex flex-wrap gap-2">
-        {AGENT_PRESETS.map((p) => (
-          <Button
-            key={p.id}
-            variant="alternavel"
-            title={p.description}
-            aria-pressed={escolhido === p.id}
-            onClick={() => onEscolher(p)}
-            className="rounded-full"
-          >
-            {p.label}
-          </Button>
-        ))}
-      </div>
+    <div data-slot="preset-convite">
+      <Destaque
+        chave="modelo"
+        icone={LayoutTemplate}
+        titulo="Comece de um modelo do seu segmento"
+        porque="Ele preenche de uma vez o tom, os objetivos e os limites do agente. Você ajusta tudo depois."
+      >
+        <div className="flex flex-wrap gap-2">
+          {AGENT_PRESETS.map((p) => (
+            <Button
+              key={p.id}
+              variant="alternavel"
+              title={p.description}
+              aria-pressed={escolhido === p.id}
+              onClick={() => onEscolher(p)}
+              className="rounded-full"
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+      </Destaque>
     </div>
   );
 }
@@ -347,25 +351,7 @@ export function CamposOQueSabe({
   // cada turno paga o preço cheio de entrada. Só aparece quando o risco existe.
   const semCache = foraDoCache(personaPreview);
 
-  // ⚠️ A OBSERVAÇÃO DE HORÁRIO SAIU DA TELA em 22/09/2026 (pedido do dono), mas
-  // `hoursNote` segue no `agent_config` e no prompt: tirar o campo do tipo
-  // mexeria na base do prompt. Conferido no banco no mesmo dia: nenhum tenant
-  // tinha valor nela, então nada ficou invisível continuando a valer.
-  const horario = (
-    <SubBloco
-      titulo="Horário de atendimento"
-      icone={CalendarClock}
-      descricao="Quando sua empresa atende. O agente informa esses horários aos clientes."
-      primeiro
-      className="flex h-full flex-col"
-    >
-      <AgentHoursEditor
-        value={cfg.hours}
-        onChange={(v) => patch({ hours: v })}
-        className="flex-1"
-      />
-    </SubBloco>
-  );
+  const horario = <CampoHorario cfg={cfg} patch={patch} />;
 
   // A base de conhecimento mora nesta aba desde 26/08/2026, e o argumento é o
   // código, não navegação: a seção FONTES E HONESTIDADE do prompt lista
@@ -445,6 +431,62 @@ export function CamposOQueSabe({
       </div>
       {detalhes(false)}
     </>
+  );
+}
+
+/**
+ * O horário de atendimento. Exportado à parte porque a revisão antes de ativar
+ * da montagem o abre num painel (23/10/2026): o passo "o que ele sabe" do
+ * assistente não mostra o horário, e a conta ia ao ar com o padrão sem ver.
+ */
+export function CampoHorario({
+  cfg,
+  patch,
+  semCabecalho = false,
+}: Pick<CamposComuns, "cfg" | "patch"> & {
+  /** Dentro de um `Destaque` (passo 1 da montagem), que já traz título e ícone. */
+  semCabecalho?: boolean;
+}) {
+  // ⚠️ A OBSERVAÇÃO DE HORÁRIO SAIU DA TELA em 22/09/2026 (pedido do dono), mas
+  // `hoursNote` segue no `agent_config` e no prompt: tirar o campo do tipo
+  // mexeria na base do prompt. Conferido no banco no mesmo dia: nenhum tenant
+  // tinha valor nela, então nada ficou invisível continuando a valer.
+  return (
+    <SubBloco
+      titulo={semCabecalho ? undefined : "Horário de atendimento"}
+      icone={CalendarClock}
+      descricao="Quando sua empresa atende. O agente informa esses horários aos clientes."
+      primeiro
+      className="flex h-full flex-col"
+    >
+      {/* CONFERIR (23/10/2026, dono): o horário pronto é sugestão, e nada de
+          salvá-lo como se a empresa o tivesse escolhido. Mexer em qualquer dia
+          também confere. Sem conferir, ele não vale (`horarioDaConfig`). */}
+      {!cfg.hoursConfirmed && (
+        <Aviso
+          data-slot="horario-nao-conferido"
+          className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2"
+        >
+          <p className="min-w-0 flex-1 basis-60">
+            Este horário é só uma sugestão: até você conferir, a IA não usa.
+          </p>
+          <Button
+            variant="outline"
+            size="control"
+            data-slot="horario-confirmar"
+            onClick={() => patch({ hoursConfirmed: true })}
+          >
+            <Check size={14} />
+            Este é o nosso horário
+          </Button>
+        </Aviso>
+      )}
+      <AgentHoursEditor
+        value={cfg.hours}
+        onChange={(v) => patch({ hours: v, hoursConfirmed: true })}
+        className="flex-1"
+      />
+    </SubBloco>
   );
 }
 
@@ -544,55 +586,78 @@ export function CamposOQuePodeFazer({
           salvo. Sem recolher, não há o que desmontar, e a armadilha deixa de
           existir para este bloco. Ela volta no minuto em que alguém puser
           `AgentBulletList` dentro de algo que desmonte. */}
-      <SubBloco
-        titulo="Limites e quando chamar o time"
-        icone={ShieldCheck}
-        descricao="O que o agente nunca faz e quando ele passa a conversa para você."
-      >
-        <div className="space-y-4">
-          <Field label="O que o agente NÃO deve fazer">
-            <AgentBulletList
-              value={cfg.dontDo}
-              onChange={(v) => patch({ dontDo: v })}
-              onDraftChange={(v) => onDraft("dontDo", v)}
-              placeholder="Ex.: nunca dar desconto por conta própria"
-              maxLen={LIMITS.bullet}
-            />
-          </Field>
-          <Field label="Quando chamar um humano">
-            <AgentBulletList
-              value={cfg.escalateWhen}
-              onChange={(v) => patch({ escalateWhen: v })}
-              onDraftChange={(v) => onDraft("escalateWhen", v)}
-              placeholder="Ex.: quando pedirem orçamento fechado"
-              maxLen={LIMITS.bullet}
-            />
-          </Field>
-          <Field label="O que avisar ao passar para o time">
-            <Input
-              value={cfg.handoffNotice}
-              onChange={(e) =>
-                patch({
-                  handoffNotice: e.target.value.slice(0, LIMITS.handoffNotice),
-                })
-              }
-              placeholder={DEFAULT_HANDOFF_NOTICE}
-            />
-            <Hint>
-              É a base da frase, não a frase pronta: o agente adapta ao que a
-              pessoa acabou de pedir (por exemplo &quot;vou verificar se tem
-              horário pra hoje&quot;). Em branco, ele usa a frase acima.
-            </Hint>
-          </Field>
-          <label className="flex cursor-pointer items-center gap-2 text-apoio">
-            <Checkbox
-              checked={cfg.neverAdmitAi}
-              onCheckedChange={(v) => patch({ neverAdmitAi: v === true })}
-            />
-            Nunca admitir que é uma IA
-          </label>
-        </div>
-      </SubBloco>
+      <BlocoLimites cfg={cfg} patch={patch} onDraft={onDraft} />
     </>
+  );
+}
+
+/**
+ * Limites e quando chamar o time: as regras e a mensagem de quando chama alguém.
+ * Exportado à parte pelo mesmo motivo de `CampoHorario`: a revisão antes de
+ * ativar da montagem o abre num painel (23/10/2026).
+ *
+ * ⚠️ No painel da montagem o bloco DESMONTA ao fechar, que é a armadilha do
+ * comentário acima. Lá o painel salva ao fechar, e o save incorpora o rascunho.
+ */
+export function BlocoLimites({
+  cfg,
+  patch,
+  onDraft,
+  primeiro = false,
+}: Pick<CamposComuns, "cfg" | "patch"> & {
+  onDraft: (campo: "dontDo" | "escalateWhen", v: string) => void;
+  primeiro?: boolean;
+}) {
+  return (
+    <SubBloco
+      titulo="Limites e quando chamar o time"
+      icone={ShieldCheck}
+      descricao="O que o agente nunca faz e quando ele passa a conversa para você."
+      primeiro={primeiro}
+    >
+      <div className="space-y-4">
+        <Field label="O que o agente NÃO deve fazer">
+          <AgentBulletList
+            value={cfg.dontDo}
+            onChange={(v) => patch({ dontDo: v })}
+            onDraftChange={(v) => onDraft("dontDo", v)}
+            placeholder="Ex.: nunca dar desconto por conta própria"
+            maxLen={LIMITS.bullet}
+          />
+        </Field>
+        <Field label="Quando chamar um humano">
+          <AgentBulletList
+            value={cfg.escalateWhen}
+            onChange={(v) => patch({ escalateWhen: v })}
+            onDraftChange={(v) => onDraft("escalateWhen", v)}
+            placeholder="Ex.: quando pedirem orçamento fechado"
+            maxLen={LIMITS.bullet}
+          />
+        </Field>
+        <Field label="O que avisar ao passar para o time">
+          <Input
+            value={cfg.handoffNotice}
+            onChange={(e) =>
+              patch({
+                handoffNotice: e.target.value.slice(0, LIMITS.handoffNotice),
+              })
+            }
+            placeholder={DEFAULT_HANDOFF_NOTICE}
+          />
+          <Hint>
+            É a base da frase, não a frase pronta: o agente adapta ao que a
+            pessoa acabou de pedir (por exemplo &quot;vou verificar se tem
+            horário pra hoje&quot;). Em branco, ele usa a frase acima.
+          </Hint>
+        </Field>
+        <label className="flex cursor-pointer items-center gap-2 text-apoio">
+          <Checkbox
+            checked={cfg.neverAdmitAi}
+            onCheckedChange={(v) => patch({ neverAdmitAi: v === true })}
+          />
+          Nunca admitir que é uma IA
+        </label>
+      </div>
+    </SubBloco>
   );
 }

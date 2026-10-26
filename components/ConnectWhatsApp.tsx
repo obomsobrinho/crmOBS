@@ -321,8 +321,12 @@ export default function ConnectWhatsApp({
             )}
             {/* Sem o código de pareamento, quem abriu no celular do próprio
                 número não tem como ler o QR desta tela: diz o caminho ANTES dos
-                passos. Um chip em OUTRO aparelho lê daqui mesmo. */}
-            {!PAREAMENTO_LIGADO && celular && (
+                passos. Um chip em OUTRO aparelho lê daqui mesmo.
+                ⚠️ Só na tela própria (`/connect`) desde 23/10/2026: na montagem
+                o celular para antes, em "Continue no computador"
+                (`MontagemParada`), e só chega aqui quem disse que o WhatsApp
+                está em outro aparelho. */}
+            {!PAREAMENTO_LIGADO && celular && !passo && (
               <Aviso data-slot="conectar-pelo-computador">
                 Se o WhatsApp que vai atender está neste celular, abra esta
                 página no computador e leia o QR code com o celular.

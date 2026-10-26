@@ -33,6 +33,8 @@ const ROTAS = [
   "/design/equipe",
   "/design/montagem",
   "/design/montagem?passo=conectar",
+  "/design/montagem?passo=conectar&conectado=1",
+  "/design/montagem?passo=avisos",
   "/design/montagem?passo=testar",
   "/design/onboarding",
   "/design/painel",

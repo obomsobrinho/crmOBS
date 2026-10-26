@@ -37,16 +37,17 @@ export default async function DesignMontagemPage({
   // O padrão é o PRIMEIRO passo, que desde 24/09/2026 é "quem" (a ordem foi
   // invertida: conectar virou o último).
   const inicial: PassoMontagem = ehPasso(passo) ? passo : "quem";
-  // `?conectado=1` abre o último passo já conectado, que é onde a ativação
-  // aparece. Sem banco não existe polling que diga isso.
-  const jaConectado = conectado === "1";
+  // `?conectado=1` abre o passo 4 já conectado (o Continuar liberado). O passo
+  // 5 só existe conectado, então `?passo=avisos` também abre assim. Sem banco
+  // não existe polling que diga isso.
+  const jaConectado = conectado === "1" || passo === "avisos";
 
   return (
     <div className="bg-canvas">
       <MontagemWizard
         // A chave remonta o assistente ao trocar de passo pelos links abaixo:
         // o passo inicial é lido uma vez só, no primeiro render.
-        key={`${inicial}-${jaConectado}-${destinoAvisos}`}
+        key={`${passo ?? "abertura"}-${jaConectado}-${destinoAvisos}`}
         clientId="preview"
         clientName="Ótica Vision"
         // Sem instância: o passo de conectar mostra o convite a gerar o código
@@ -62,6 +63,8 @@ export default async function DesignMontagemPage({
         stageNames={{ aguardando_humano: "Aguardando atendimento" }}
         passoDoServidor="quem"
         passoInicial={inicial}
+        // Sem `?passo=` o preview abre como uma conta nova: na abertura.
+        aberturaInicial={!ehPasso(passo)}
         preview
       />
 
@@ -69,22 +72,27 @@ export default async function DesignMontagemPage({
           tela real. */}
       <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-6 sm:px-6">
         <span className="text-rotulo uppercase text-ink-3">Abrir o passo</span>
+        <Link
+          href="/design/montagem"
+          className={`text-legenda ${!ehPasso(passo) ? "font-semibold text-brand-ink" : "text-ink-2"
+            }`}
+        >
+          0. Abertura
+        </Link>
         {PASSOS_MONTAGEM.map((p, i) => (
           <Link
             key={p.key}
             href={`/design/montagem?passo=${p.key}`}
-            className={`text-legenda ${
-              p.key === inicial ? "font-semibold text-brand-ink" : "text-ink-2"
-            }`}
+            className={`text-legenda ${p.key === inicial ? "font-semibold text-brand-ink" : "text-ink-2"
+              }`}
           >
             {i + 1}. {p.titulo}
           </Link>
         ))}
         <Link
           href="/design/montagem?passo=conectar&conectado=1"
-          className={`text-legenda ${
-            jaConectado ? "font-semibold text-brand-ink" : "text-ink-2"
-          }`}
+          className={`text-legenda ${jaConectado && passo === "conectar" ? "font-semibold text-brand-ink" : "text-ink-2"
+            }`}
         >
           4b. Já conectado
         </Link>

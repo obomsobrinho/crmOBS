@@ -81,7 +81,8 @@ export async function PUT(
     const hours = normalizeHours(body.hours);
     const anterior = (current?.agent_config as Record<string, Json | undefined> | null) ?? {};
     update = {
-      agent_config: { ...anterior, hours: paraJson(hours) },
+      // Salvar o horário à mão é conferir (`hoursConfirmed`, 23/10/2026).
+      agent_config: { ...anterior, hours: paraJson(hours), hoursConfirmed: true },
       agent_config_updated_at: new Date().toISOString(),
     };
   } else if (body.mode === "guiado") {

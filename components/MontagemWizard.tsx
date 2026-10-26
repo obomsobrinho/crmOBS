@@ -1,33 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   Bell,
+  CalendarClock,
   Check,
-  FileUp,
+  FileText,
   Power,
   RotateCcw,
+  X,
 } from "lucide-react";
 import BrandMark from "./BrandMark";
 import ConnectWhatsApp from "./ConnectWhatsApp";
 import Playground from "./Playground";
+import MontagemAbertura from "./MontagemAbertura";
+import { coresDoPasso, VISUAL_DO_PASSO } from "./montagem-visual";
+import MontagemParada from "./MontagemParada";
+import MontagemRevisao, { type PainelDaRevisao } from "./MontagemRevisao";
 import {
+  BlocoLimites,
+  CampoHorario,
   CamposOQueSabe,
   CamposQuemAtende,
   SeletorDePreset,
   GRUPOS_PREVIEW,
 } from "./agente/campos";
-import { Banner, CabecalhoBloco, ConfirmModal } from "./agente/ui";
+import { Banner, ConfirmModal, Destaque } from "./agente/ui";
 import AvisosCampo from "./agente/AvisosCampo";
 import { useAgentConfig } from "./agente/useAgentConfig";
 import { gravarRascunho, lerRascunho, limparRascunho } from "./agente/rascunho";
 import { Aviso } from "@/components/ui/aviso";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { PASSOS_MONTAGEM, type PassoMontagem } from "@/lib/onboarding";
+import { useCelular } from "@/lib/useCelular";
+import {
+  EXEMPLO_DO_PEDIDO_DE_AJUDA,
+  ITENS_DA_REVISAO,
+  PASSOS_MONTAGEM,
+  type PassoMontagem,
+} from "@/lib/onboarding";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import type { KnowledgeDoc } from "@/lib/crm";
 
@@ -63,6 +84,7 @@ export default function MontagemWizard({
   stageNames,
   passoDoServidor,
   passoInicial,
+  aberturaInicial,
   conectadoInicial,
   preview = false,
 }: {
@@ -85,6 +107,11 @@ export default function MontagemWizard({
    * ninguém passa isto, porque escolher o passo à mão pularia a gravação.
    */
   passoInicial?: PassoMontagem;
+  /**
+   * Só `/design` e e2e: força (ou tira) a abertura. Em produção ela aparece
+   * sozinha para quem ainda não começou.
+   */
+  aberturaInicial?: boolean;
   /**
    * Só `/design` e e2e: abre o último passo já no estado conectado. Em produção
    * quem diz que conectou é o polling do `ConnectWhatsApp`, nunca uma prop.
@@ -117,9 +144,27 @@ export default function MontagemWizard({
   // ⚠️ Até 24/09/2026 conectar era piso duro (sem instância, o assistente
   // forçava o passo 1). A ordem foi invertida e conectar virou o ÚLTIMO passo,
   // então a instância não decide mais onde a montagem abre.
-  const [passo, setPasso] = useState<PassoMontagem>(
-    () => passoInicial ?? rascunho?.passo ?? passoDoServidor
+  // ⚠️ O passo 5 (avisos) só serve conectado: o grupo e o teste saem do
+  // WhatsApp, e ativar exige a conexão vista nesta tela. Quem volta direto nele
+  // (rascunho) recomeça no 4, que vê a conexão sozinho e libera o Continuar.
+  const [passo, setPasso] = useState<PassoMontagem>(() => {
+    const p = passoInicial ?? rascunho?.passo ?? passoDoServidor;
+    return p === "avisos" && !conectadoInicial ? "conectar" : p;
+  });
+
+  // A ABERTURA (23/10/2026, dono): o mapa dos cinco passos e a frase do
+  // computador, antes do passo 1. Só para quem ainda não começou: sem rascunho
+  // no navegador e sem agente configurado no servidor (que é o que manda
+  // `passoDoServidor` para "quem").
+  const [abertura, setAbertura] = useState(
+    () => aberturaInicial ?? (!passoInicial && !rascunho && passoDoServidor === "quem")
   );
+  const celular = useCelular();
+  // Passo 4 no celular: a parada "Continue no computador" vem no lugar do QR,
+  // que continua a um toque para quem tem o WhatsApp em outro aparelho.
+  const [qrNoCelular, setQrNoCelular] = useState(false);
+  // Painel da revisão antes de ativar: regras e mensagem, ou horário.
+  const [painel, setPainel] = useState<PainelDaRevisao | null>(null);
 
   const [ativando, setAtivando] = useState(false);
   // Gravando o passo ou ativando: o botão principal gira e "Terminar depois"
@@ -153,18 +198,25 @@ export default function MontagemWizard({
   // ela perde nada: antes de "o que ele sabe" o rascunho fica no navegador, e
   // dali em diante a configuração já está salva no servidor.
   const rotuloSaida =
-    passo === "conectar"
-      ? conectado
-        ? "Ativar depois"
-        : "Conectar depois"
-      : passo === "testar"
-        ? "Testar depois"
-        : "Terminar depois";
+    passo === "avisos"
+      ? "Ativar depois"
+      : passo === "conectar"
+        ? conectado
+          ? "Terminar depois"
+          : "Conectar depois"
+        : passo === "testar"
+          ? "Testar depois"
+          : "Terminar depois";
   const sair = () => router.push("/inbox");
 
   const indice = PASSOS_MONTAGEM.findIndex((p) => p.key === passo);
   const atual = PASSOS_MONTAGEM[indice];
-  const ultimo = passo === "conectar";
+  // A cor e o ícone do passo, os mesmos do mapa da abertura (26/10/2026, dono).
+  const corDoPasso = coresDoPasso(passo);
+  const IconeDoPasso = VISUAL_DO_PASSO[passo].icone;
+  const ultimo = passo === "avisos";
+  // O passo 4 só avança conectado: o 5 precisa do WhatsApp ligado.
+  const esperandoConexao = passo === "conectar" && !conectado;
 
   function irPara(p: PassoMontagem) {
     setPasso(p);
@@ -198,6 +250,7 @@ export default function MontagemWizard({
     // Testar é OFERECIDO, nunca exigido (decisão do dono, 28/08/2026): o
     // Continuar funciona sem ninguém ter aberto a bancada.
     if (passo === "testar") return irPara("conectar");
+    if (passo === "conectar") return conectado ? irPara("avisos") : undefined;
     if (passo === "sabe") {
       const { ok, campos } = await form.save();
       if (!ok) {
@@ -236,12 +289,31 @@ export default function MontagemWizard({
       // a redirecionar para `/agente`. Mandar para o painel é mandar para a tela
       // que responde "e agora, o que ele está fazendo?".
       router.replace("/painel");
+      // eslint-disable-next-line no-restricted-syntax -- ativar muda o estado do tenant (agent_published_at) lido nos Server Components do app
       router.refresh();
     } catch {
       setErroAtivar("Não foi possível contatar o servidor.");
       setAtivando(false);
     }
   }
+
+  /**
+   * Fechar o painel da revisão SALVA (pelo botão, pelo X ou pelo fundo): o que
+   * se muda ali precisa estar no servidor antes de ativar, e ativar não salva o
+   * formulário. O save incorpora também o rascunho de regra ainda não
+   * adicionada, que sumiria quando o painel desmonta. Se o servidor recusar, o
+   * painel fica aberto com o erro.
+   */
+  async function fecharPainel() {
+    const { ok } = await form.save();
+    if (!ok) return;
+    if (!preview) limparRascunho(clientId);
+    setPainel(null);
+  }
+
+  const marcarConectado = useCallback(() => setConectado(true), []);
+  const docRevisao = ITENS_DA_REVISAO.find((i) => i.key === "documentos")!;
+  const horarioRevisao = ITENS_DA_REVISAO.find((i) => i.key === "horario")!;
 
   return (
     <div
@@ -272,7 +344,10 @@ export default function MontagemWizard({
 
       <main
         className={cn(
-          "mx-auto w-full max-w-2xl flex-1 px-4 sm:px-6",
+          // O passo 4 fica mais largo (dono, 26/10/2026): as instruções do
+          // WhatsApp Web e o QR moram lado a lado e espremiam na coluna estreita.
+          "mx-auto w-full flex-1 px-4 sm:px-6",
+          passo === "conectar" && !abertura ? "max-w-2xl" : "max-w-lg",
           telaCheia ? "flex min-h-0 flex-col py-4 sm:py-6" : "py-6 sm:py-8"
         )}
       >
@@ -283,247 +358,298 @@ export default function MontagemWizard({
             pessoas (Yan, Conrad, Tourangeau e Couper, 2010), o indicador que
             parecia lento no início dobrou o abandono, de 11,3% para 21,8%, e
             ficou abaixo até do grupo sem indicador nenhum (12,7%). */}
-        <div className={telaCheia ? "mb-4" : "mb-6"}>
-          <div className="mb-2 flex items-center gap-1.5">
-            {PASSOS_MONTAGEM.map((p, i) => (
-              <span
-                key={p.key}
-                data-slot="montagem-trilho"
-                data-estado={
-                  i < indice ? "feito" : i === indice ? "atual" : "futuro"
-                }
-                className={`h-1.5 flex-1 rounded-full ${
-                  i <= indice ? "bg-primary" : "bg-[var(--chip-bg)]"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="text-legenda tabular-nums text-ink-3">
-            Passo {indice + 1} de {PASSOS_MONTAGEM.length}
-          </p>
-        </div>
+        {abertura ? (
+          <MontagemAbertura celular={celular} />
+        ) : (
+          <>
+            <div className={telaCheia ? "mb-4" : "mb-6"}>
+              <div className="mb-2 flex items-center gap-1.5">
+                {PASSOS_MONTAGEM.map((p, i) => (
+                  <span
+                    key={p.key}
+                    data-slot="montagem-trilho"
+                    data-estado={
+                      i < indice ? "feito" : i === indice ? "atual" : "futuro"
+                    }
+                    className={cn(
+                      "h-1.5 flex-1 rounded-full",
+                      i <= indice ? "bg-primary" : "bg-[var(--chip-bg)]"
+                    )}
+                  />
+                ))}
+              </div>
+              <p
+                className="text-legenda font-semibold tabular-nums"
+                style={{ color: corDoPasso.ink }}
+              >
+                Passo {indice + 1} de {PASSOS_MONTAGEM.length}
+              </p>
+            </div>
 
-        {/* ⚠️ NÃO EXISTE MAIS o "Retomamos de onde você parou. Nada foi ao ar
+            {/* ⚠️ NÃO EXISTE MAIS o "Retomamos de onde você parou. Nada foi ao ar
             ainda." (26/09/2026, dono): voltar com o que já tinha escrito é o
             esperado e dispensa aviso, e a frase aparecia longe do que dizia, a
             ponto de o próprio dono não entender. O rascunho continua sendo lido
             do mesmo jeito; só o anúncio saiu. */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-titulo">{atual.titulo}</h1>
-            {/* No passo de conectar o subtítulo É a razão do Ativar desabilitado
-                (`aria-describedby` do botão aponta para cá). */}
-            <p
-              id={passo === "conectar" ? "razao-ativar" : undefined}
-              data-slot="montagem-porque"
-              className="mt-1.5 text-apoio text-ink-2"
-            >
-              {atual.porque}
-            </p>
-          </div>
-          {/* Sempre à vista, e não só depois da primeira mensagem (dono): é a
-              saída para testar de novo do zero depois de voltar e ajustar. */}
-          {passo === "testar" && (
-            <Button
-              variant="outline"
-              size="field"
-              onClick={() => setConversaTeste((n) => n + 1)}
-              aria-label="Recomeçar conversa"
-              // No celular só o ícone: com o rótulo o título quebrava em duas
-              // linhas e empurrava a conversa para baixo.
-              className="shrink-0 max-sm:w-10 max-sm:justify-center max-sm:px-0"
-            >
-              <RotateCcw size={14} />
-              <span className="max-sm:hidden">Recomeçar conversa</span>
-            </Button>
-          )}
-        </div>
-
-        {form.error && (
-          <Aviso tom="danger" data-slot="erro-agente" role="alert" className="mt-4">
-            {form.error}
-          </Aviso>
-        )}
-
-        <div
-          className={
-            telaCheia ? "mt-4 flex min-h-0 flex-1 flex-col" : "mt-6 space-y-5"
-          }
-        >
-          {passo === "quem" && (
-            <>
-              <SeletorDePreset
-                apresentacao="convite"
-                escolhido={form.presetAplicado}
-                onEscolher={form.choosePreset}
-              />
-              <CamposQuemAtende
-                cfg={form.cfg}
-                patch={patch}
-                fields={form.fields}
-                mostrarOpcionais={false}
-              />
-            </>
-          )}
-
-          {passo === "sabe" && (
-            <>
-              <CamposOQueSabe
-                cfg={form.cfg}
-                patch={patch}
-                mostrarOpcionais={false}
-                personaPreview={form.previewPersona}
-                clientId={clientId}
-                knowledgeDocs={knowledgeDocs}
-                knowledgeKeyConfigured={knowledgeKeyConfigured}
-                preview={preview}
-              />
-              <div className="flex items-start gap-3 rounded-xl border border-line bg-bloco p-4">
-                <FileUp
-                  size={18}
-                  className="mt-0.5 shrink-0 text-brand-ink"
-                  aria-hidden
-                />
-                <p className="text-legenda text-ink-3">
-                  Nada aqui é obrigatório. Você pode escrever agora o que mais
-                  repete no WhatsApp e completar o resto depois, a qualquer
-                  momento, na tela do agente.
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                {/* O ícone e a cor do passo, os mesmos do mapa da abertura. */}
+                <h1 className="flex items-center gap-3 text-titulo">
+                  <span
+                    data-slot="montagem-passo-icone"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-xl"
+                    style={{ background: corDoPasso.fill, color: corDoPasso.on }}
+                  >
+                    <IconeDoPasso size={18} aria-hidden />
+                  </span>
+                  {atual.titulo}
+                </h1>
+                {/* ⚠️ EM DESTAQUE no passo 4 (23/10/2026, dono): "conectar não liga
+                o agente" é a frase que tira o medo de ler o QR. Continua UMA
+                frase só, no lugar do subtítulo (a caixa repetida saiu em
+                26/09/2026). Ativar mora no passo 5 desde o mesmo dia. */}
+                <p
+                  data-slot="montagem-porque"
+                  data-destaque={passo === "conectar" ? "" : undefined}
+                  className={
+                    passo === "conectar"
+                      ? "mt-3 flex items-start gap-2 rounded-lg border border-brand-line bg-brand-surface px-3 py-2 text-apoio font-medium text-brand-ink"
+                      : "mt-1.5 text-apoio text-ink-2"
+                  }
+                >
+                  {passo === "conectar" && (
+                    <Power size={15} className="mt-0.5 shrink-0" aria-hidden />
+                  )}
+                  {atual.porque}
                 </p>
               </div>
-            </>
-          )}
+              {/* Sempre à vista, e não só depois da primeira mensagem (dono): é a
+              saída para testar de novo do zero depois de voltar e ajustar. */}
+              {passo === "testar" && (
+                <Button
+                  variant="outline"
+                  size="field"
+                  onClick={() => setConversaTeste((n) => n + 1)}
+                  aria-label="Recomeçar conversa"
+                  // No celular só o ícone: com o rótulo o título quebrava em duas
+                  // linhas e empurrava a conversa para baixo.
+                  className="shrink-0 max-sm:w-10 max-sm:justify-center max-sm:px-0"
+                >
+                  <RotateCcw size={14} />
+                  <span className="max-sm:hidden">Recomeçar conversa</span>
+                </Button>
+              )}
+            </div>
 
-          {/* A CONVERSA MORA NO PASSO (26/09/2026, pedido do dono). Era um cartão
+            {form.error && (
+              <Aviso tom="danger" data-slot="erro-agente" role="alert" className="mt-4">
+                {form.error}
+              </Aviso>
+            )}
+
+            <div
+              className={
+                telaCheia ? "mt-4 flex min-h-0 flex-1 flex-col" : "mt-6 space-y-5"
+              }
+            >
+              {passo === "quem" && (
+                <>
+                  <SeletorDePreset
+                    apresentacao="convite"
+                    escolhido={form.presetAplicado}
+                    onEscolher={form.choosePreset}
+                  />
+                  <CamposQuemAtende
+                    cfg={form.cfg}
+                    patch={patch}
+                    fields={form.fields}
+                    mostrarOpcionais={false}
+                  />
+                  {/* HORÁRIO NO PASSO 1 (23/10/2026, dono): era só da tela do
+                  agente, e a conta ia ao ar com segunda a sexta, das 8h às 18h,
+                  sem ninguém ver. O pronto é sugestão até alguém conferir
+                  (`hoursConfirmed`). Os mesmos campos do /agente. */}
+                  <Destaque
+                    chave="horario"
+                    icone={CalendarClock}
+                    titulo={horarioRevisao.titulo}
+                    porque={horarioRevisao.porque}
+                  >
+                    <CampoHorario cfg={form.cfg} patch={patch} semCabecalho />
+                  </Destaque>
+                </>
+              )}
+
+              {passo === "sabe" && (
+                <>
+                  <CamposOQueSabe
+                    cfg={form.cfg}
+                    patch={patch}
+                    mostrarOpcionais={false}
+                    personaPreview={form.previewPersona}
+                    clientId={clientId}
+                    knowledgeDocs={knowledgeDocs}
+                    knowledgeKeyConfigured={knowledgeKeyConfigured}
+                    preview={preview}
+                  />
+                  {/* Logo depois do bloco de documentos, que é onde eles se mandam
+                  (23/10/2026, dono: documento é dos que passam batido). */}
+                  <Destaque
+                    chave="documentos"
+                    icone={FileText}
+                    titulo="Mande o que você já tem pronto"
+                    porque={docRevisao.porque}
+                  />
+                  <p className="text-legenda text-ink-3">
+                    Nada aqui é obrigatório: dá para completar depois, na tela do
+                    agente.
+                  </p>
+                </>
+              )}
+
+              {/* A CONVERSA MORA NO PASSO (26/09/2026, pedido do dono). Era um cartão
               repetindo o subtítulo com um botão que abria a bancada num painel
               lateral: um clique a mais num passo cuja razão de existir é testar.
               Sem o diagnóstico (`diagnostico={false}`), porque aqui quem testa
               quer ver o agente responder, não RAG e estágio.
               Testar continua OFERECIDO, nunca exigido (decisão de 28/08/2026):
               o Continuar deste passo funciona sem mensagem nenhuma. */}
-          {passo === "testar" && (
-            <div
-              data-slot="montagem-bancada"
-              className="flex min-h-0 flex-1 flex-col"
-            >
-              <Playground
-                key={conversaTeste}
-                stageNames={stageNames}
-                configuracao={form.configuracao}
-                diagnostico={false}
-              />
-            </div>
-          )}
+              {passo === "testar" && (
+                <div
+                  data-slot="montagem-bancada"
+                  className="flex min-h-0 flex-1 flex-col"
+                >
+                  <Playground
+                    key={conversaTeste}
+                    stageNames={stageNames}
+                    configuracao={form.configuracao}
+                    diagnostico={false}
+                  />
+                </div>
+              )}
 
-          {passo === "conectar" && (
-            <>
-              {/* ⚠️ A CAIXA "Conectar não liga o agente" SAIU (26/09/2026, dono):
+              {passo === "conectar" && (
+                <>
+                  {/* ⚠️ A CAIXA "Conectar não liga o agente" SAIU (26/09/2026, dono):
                   ela repetia o subtítulo quase palavra por palavra. A frase que
                   a ordem nova existe para dizer mora agora no próprio subtítulo
                   do passo (`PASSOS_MONTAGEM`), uma vez só. */}
-              {conectado ? (
-                <div
-                  data-slot="whatsapp-conectado"
-                  className="flex items-center gap-3 rounded-xl border border-human-line bg-human-surface px-4 py-3"
-                >
-                  <Check
-                    size={17}
-                    className="shrink-0 text-human-ink"
-                    aria-hidden
-                  />
-                  <p className="text-apoio font-medium text-human-ink">
-                    WhatsApp conectado. Falta só ativar.
-                  </p>
-                </div>
-              ) : (
-                // O `onConectado` NÃO avança de passo: ele revela a ativação logo
-                // abaixo, no mesmo passo. Conectar e ativar são dois gestos, e o
-                // segundo é da pessoa.
-                <ConnectWhatsApp
-                  clientId={clientId}
-                  clientName={clientName}
-                  hasInstance={hasInstance}
-                  enquadramento="passo"
-                  onConectado={() => setConectado(true)}
-                />
+                  {conectado ? (
+                    <div
+                      data-slot="whatsapp-conectado"
+                      className="flex items-center gap-3 rounded-xl border border-human-line bg-human-surface px-4 py-3"
+                    >
+                      <Check
+                        size={17}
+                        className="shrink-0 text-human-ink"
+                        aria-hidden
+                      />
+                      <p className="text-apoio font-medium text-human-ink">
+                        WhatsApp conectado. Continue para escolher quem a IA chama.
+                      </p>
+                    </div>
+                  ) : celular && !qrNoCelular ? (
+                    <MontagemParada
+                      clientId={clientId}
+                      hasInstance={hasInstance}
+                      onMostrarQr={() => setQrNoCelular(true)}
+                      onConectado={marcarConectado}
+                    />
+                  ) : (
+                    // O `onConectado` NÃO avança de passo: ele libera o Continuar.
+                    // Conectar e seguir são dois gestos, e o segundo é da pessoa.
+                    <ConnectWhatsApp
+                      clientId={clientId}
+                      clientName={clientName}
+                      hasInstance={hasInstance}
+                      enquadramento="passo"
+                      onConectado={marcarConectado}
+                    />
+                  )}
+                  {!conectado && (
+                    <p
+                      id="razao-continuar"
+                      data-slot="montagem-razao-continuar"
+                      className="text-legenda text-ink-3"
+                    >
+                      O Continuar libera quando o WhatsApp conectar.
+                    </p>
+                  )}
+                </>
               )}
-            </>
-          )}
 
-          {passo === "conectar" && conectado && (
-            <>
-              {/* AVISOS vêm DEPOIS de conectar (plano de 29/09/2026): a lista
-                  de grupos e o "Mandar teste" saem do próprio WhatsApp. */}
-              <div
-                data-slot="montagem-avisos"
-                className="rounded-xl border border-line bg-bloco p-5"
-              >
-                <CabecalhoBloco
-                  icone={Bell}
-                  titulo="Para onde vão os avisos"
-                  descricao="Quando a IA pedir sua ajuda, ela avisa neste WhatsApp. Sem isso, ninguém fica sabendo."
-                  className="mb-4"
-                />
-                <AvisosCampo
-                  clientId={clientId}
-                  initialJid={initialNotifyJid}
-                  onSalvo={setDestinoAvisos}
-                  preview={preview}
-                  gruposPreview={preview ? GRUPOS_PREVIEW : undefined}
-                />
-                {!destinoAvisos && (
-                  <p
-                    id="razao-avisos"
-                    data-slot="montagem-razao-avisos"
-                    className="mt-3 text-legenda text-warn-ink"
-                  >
-                    Salve um número ou um grupo para poder ativar o agente.
-                  </p>
-                )}
-              </div>
+              {passo === "avisos" && (
+                <>
+                  {/* PASSO 5 (23/10/2026, dono): o passo inteiro é do pedido de
+                  ajuda, o diferencial. Vem depois de conectar porque a lista de
+                  grupos e o "Mandar teste" saem do próprio WhatsApp. */}
+                  <div data-slot="montagem-avisos" className="scroll-mt-4">
+                    <Destaque
+                      chave="avisos"
+                      icone={Bell}
+                      titulo="Para onde vão os avisos"
+                      exemplo={EXEMPLO_DO_PEDIDO_DE_AJUDA}
+                    >
+                      <AvisosCampo
+                        clientId={clientId}
+                        initialJid={destinoAvisos}
+                        onSalvo={setDestinoAvisos}
+                        preview={preview}
+                        gruposPreview={preview ? GRUPOS_PREVIEW : undefined}
+                      />
+                      {!destinoAvisos && (
+                        <p
+                          id="razao-avisos"
+                          data-slot="montagem-razao-avisos"
+                          className="mt-3 text-legenda text-warn-ink"
+                        >
+                          Salve um número ou um grupo para poder ativar o agente.
+                        </p>
+                      )}
+                    </Destaque>
+                  </div>
 
-              <div className="rounded-xl border border-line bg-bloco p-5">
-                <p className="text-corpo font-semibold">
-                  Ao ativar, o que acontece
-                </p>
-                <ul className="mt-2 space-y-1.5 text-apoio text-ink-2">
-                  <li className="flex items-start gap-2">
-                    <Check
-                      size={15}
-                      className="mt-0.5 shrink-0 text-human-ink"
-                      aria-hidden
-                    />
-                    Quem mandar mensagem no seu número recebe resposta do agente.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check
-                      size={15}
-                      className="mt-0.5 shrink-0 text-human-ink"
-                      aria-hidden
-                    />
-                    Quando ele não tiver certeza, ele avisa que vai verificar e
-                    passa para você.
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check
-                      size={15}
-                      className="mt-0.5 shrink-0 text-human-ink"
-                      aria-hidden
-                    />
-                    Você desliga a qualquer momento, e assume qualquer conversa
-                    na mão.
-                  </li>
-                </ul>
-              </div>
+                  {/* A revisão mora ANTES do que acontece ao ativar e do botão: é
+                  a última parada antes de ir ao ar. */}
+                  <MontagemRevisao
+                    clientId={clientId}
+                    cfg={form.cfg}
+                    documentosDoPreview={knowledgeDocs.length}
+                    preview={preview}
+                    onAbrirPainel={setPainel}
+                    onIrParaDocumentos={() => irPara("sabe")}
+                  />
 
-              {erroAtivar && <Banner>{erroAtivar}</Banner>}
+                  <div className="rounded-xl border border-line bg-bloco p-5">
+                    <p className="text-corpo font-semibold">
+                      Ao ativar, o que acontece
+                    </p>
+                    <ul className="mt-2 space-y-1.5 text-apoio text-ink-2">
+                      <li className="flex items-start gap-2">
+                        <Check
+                          size={15}
+                          className="mt-0.5 shrink-0 text-human-ink"
+                          aria-hidden
+                        />
+                        Quem mandar mensagem no seu número recebe resposta do agente.
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check
+                          size={15}
+                          className="mt-0.5 shrink-0 text-human-ink"
+                          aria-hidden
+                        />
+                        Você desliga quando quiser e assume qualquer conversa.
+                      </li>
+                    </ul>
+                  </div>
 
-              <p className="text-legenda text-ink-3">
-                Depois de ativar, esta montagem sai do caminho e os ajustes
-                passam a morar na tela do agente.
-              </p>
-            </>
-          )}
-        </div>
+                  {erroAtivar && <Banner>{erroAtivar}</Banner>}
+                </>
+              )}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Rodapé grudado: no celular o conteúdo rola e o par voltar/continuar
@@ -532,7 +658,7 @@ export default function MontagemWizard({
         <Button
           variant="outline"
           size="field"
-          disabled={indice === 0}
+          disabled={abertura || indice === 0}
           onClick={() => irPara(PASSOS_MONTAGEM[Math.max(0, indice - 1)].key)}
         >
           <ArrowLeft size={15} />
@@ -556,38 +682,102 @@ export default function MontagemWizard({
             {rotuloSaida}
           </Button>
 
-          {/* No último passo o botão é "Ativar o agente", e ele fica DESABILITADO
-              até a conexão ser vista nesta tela: ativar sem número ligado seria
-              um agente sem de onde responder. A razão está escrita no passo
-              (`razao-ativar`, o subtítulo do passo), porque botão desabilitado
-              não mostra dica. */}
-          <Button
-            size="field"
-            carregando={ocupado}
-            disabled={ultimo && !podeAtivar}
-            aria-describedby={
-              ultimo && !conectado
-                ? "razao-ativar"
-                : ultimo && !destinoAvisos
-                  ? "razao-avisos"
-                  : undefined
-            }
-            onClick={() => (ultimo ? ativar() : avancar())}
-          >
-            {ultimo ? (
-              <>
-                {ativando ? "Ativando…" : "Ativar o agente"}
-                <Power size={15} />
-              </>
-            ) : (
-              <>
-                {form.saving ? "Salvando…" : "Continuar"}
-                <ArrowRight size={15} />
-              </>
-            )}
-          </Button>
+          {/* No passo 4 o Continuar fica DESABILITADO até a conexão ser vista
+              nesta tela (o 5 precisa do WhatsApp ligado). No 5 o botão é
+              "Ativar o agente", desabilitado sem destino salvo. As razões estão
+              escritas na tela (`razao-continuar`, `razao-avisos`), porque botão
+              desabilitado não mostra dica. */}
+          {abertura ? (
+            <Button
+              size="field"
+              onClick={() => {
+                setAbertura(false);
+                window.scrollTo({ top: 0 });
+              }}
+            >
+              Começar
+              <ArrowRight size={15} />
+            </Button>
+          ) : (
+            <Button
+              size="field"
+              carregando={ocupado}
+              disabled={esperandoConexao || (ultimo && !podeAtivar)}
+              aria-describedby={
+                esperandoConexao
+                  ? "razao-continuar"
+                  : ultimo && !destinoAvisos
+                    ? "razao-avisos"
+                    : undefined
+              }
+              onClick={() => (ultimo ? ativar() : avancar())}
+            >
+              {ultimo ? (
+                <>
+                  {ativando ? "Ativando…" : "Ativar o agente"}
+                  <Power size={15} />
+                </>
+              ) : (
+                <>
+                  {form.saving ? "Salvando…" : "Continuar"}
+                  <ArrowRight size={15} />
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </footer>
+
+      {/* O PAINEL DA REVISÃO (23/10/2026, dono): regras, mensagem e horário
+          abrem aqui, com os MESMOS campos do /agente, sem sair da montagem.
+          Fechar por qualquer caminho salva (`fecharPainel`). */}
+      <Sheet
+        open={painel !== null}
+        onOpenChange={(aberto) => {
+          if (!aberto) void fecharPainel();
+        }}
+      >
+        <SheetContent
+          lado={celular ? "baixo" : "direita"}
+          aria-describedby={undefined}
+          data-painel={painel ?? undefined}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-line p-5">
+            <SheetTitle>Ajustar o agente</SheetTitle>
+            <SheetClose asChild>
+              <Button variant="ghost" size="icon-control" aria-label="Fechar">
+                <X size={16} />
+              </Button>
+            </SheetClose>
+          </div>
+          <AreaRolavel className="min-h-0 flex-1 p-5">
+            {painel === "horario" ? (
+              <CampoHorario cfg={form.cfg} patch={patch} />
+            ) : (
+              <BlocoLimites
+                cfg={form.cfg}
+                patch={patch}
+                onDraft={form.onDraft}
+                primeiro
+              />
+            )}
+            {form.error && (
+              <Aviso tom="danger" role="alert" className="mt-4">
+                {form.error}
+              </Aviso>
+            )}
+          </AreaRolavel>
+          <div className="flex justify-end border-t border-line p-4">
+            <Button
+              size="field"
+              carregando={form.saving}
+              onClick={() => void fecharPainel()}
+            >
+              {form.saving ? "Salvando…" : "Salvar"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* ⚠️ BUG DE 26/09/2026: trocar de modelo com o formulário preenchido
           não fazia nada. `choosePreset` guarda o modelo em `pendingPreset` e

@@ -92,6 +92,12 @@ export default function CadastroPage() {
           <p className="text-apoio text-ink-2">
             {TRIAL_DAYS} dias para testar, sem cartão.
           </p>
+          {/* Discreta, e aqui no começo (23/10/2026, dono): a montagem termina
+              lendo um QR, e quem descobre isso só no fim, no celular, para. */}
+          <p data-slot="cadastro-dica-computador" className="mt-2 text-legenda text-ink-3">
+            Dica: faça pelo computador. No final você conecta o WhatsApp lendo
+            um QR code.
+          </p>
         </div>
 
         <div className="space-y-1.5">

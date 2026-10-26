@@ -75,6 +75,7 @@ const CONFIG: AgentConfig = {
     dom: { open: false, from: "09:00", to: "13:00" },
   },
   hoursNote: "",
+  hoursConfirmed: true,
   agentName: "Léo",
   agentRole: "atender os clientes da oficina",
   tone: "profissional",

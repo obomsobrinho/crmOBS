@@ -90,7 +90,7 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
     await page.goto("/design/montagem?passo=conectar");
     await expect(page.locator('[data-slot="montagem-avisos"]')).toHaveCount(0);
 
-    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.goto("/design/montagem?passo=avisos");
     const bloco = page.locator('[data-slot="montagem-avisos"]');
     await expect(bloco).toBeVisible();
     const ativar = page.getByRole("button", { name: "Ativar o agente" });
@@ -112,7 +112,7 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
   });
 
   test("grupo é escolhido numa lista, nunca digitado", async ({ page }) => {
-    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.goto("/design/montagem?passo=avisos");
     const bloco = page.locator('[data-slot="montagem-avisos"]');
     await bloco.getByRole("tab", { name: "Um grupo" }).click();
     await expect(bloco.locator('[data-slot="avisos-numero"]')).toHaveCount(0);
@@ -126,7 +126,7 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
   });
 
   test("número com máscara, e o seletor é o mesmo componente das abas do Painel", async ({ page }) => {
-    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.goto("/design/montagem?passo=avisos");
     const bloco = page.locator('[data-slot="montagem-avisos"]');
     const campo = bloco.locator('[data-slot="avisos-numero"]');
     await campo.fill("");
@@ -140,7 +140,7 @@ test.describe("Bloco de avisos na montagem (/design/montagem)", () => {
   });
 
   test("o texto do bloco não tem travessão nem assume segmento", async ({ page }) => {
-    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.goto("/design/montagem?passo=avisos");
     const texto = await page.locator('[data-slot="montagem-avisos"]').innerText();
     expect(texto).not.toMatch(/[—–]/);
     expect(texto).not.toMatch(/consulta|paciente|agendamento/i);

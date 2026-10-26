@@ -37,6 +37,14 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
+### 23/10/2026: MONTAGEM MAIS CLARA, SEM COMMIT, ESPERANDO O DONO REVISAR
+
+- Brief do dono (vault, `projetos/atenda.md`, secao "Montagem mais clara"). A tela "Guia" (`/guia`) construida antes no mesmo dia foi desfeita a pedido dele, sem commit. Detalhe em `docs/adr/2026-10-23-montagem-clear-from-start-to-end.md`: abertura com o mapa dos passos e o computador, destaques (modelo, horario, documentos, avisos), revisao antes de ativar com painel dos campos do `/agente`, parada "Continue no computador" no celular, dica no cadastro.
+- Achado: a montagem salva `hours = DEFAULT_HOURS` sem mostrar o horario, e `horarioCadastrado` trata isso como cadastrado; a revisao agora mostra "Padrao, confira". Funil em 23/10: 8 contas de testadores, 1 ativou, 5 salvaram o agente e pararam antes de ativar.
+- Nada commitado nem publicado ate o dono revisar no navegador.
+- Rodadas seguintes (dono, mesma entrega): montagem em 5 passos (4 so conecta, 5 "Quem a IA chama" com avisos, revisao e Ativar); horario no passo 1, sugestao ate conferir (`hoursConfirmed`, lido so por `horarioDaConfig`); a primeira ativacao recusa destino igual ao numero do agente; abertura com um icone colorido por passo. Contas salvas antes disso nao tem a marca e contam como horario conferido (as 6 contas de testadores estao com seg a sex 8h as 18h que ninguem escolheu).
+- `.env.e2e.local`: o e-mail de atendente de teste virou dono da conta "testes franck novo" (criada em 23/10); o projeto `atendente` falha ate trocar.
+
 ### 17/10/2026: BASE ZERADA E CODIGO DE PAREAMENTO DESLIGADO
 
 - Base de producao zerada a pedido do dono em 16/10: as 4 empresas de teste pelo "Apagar de vez" da central e a OBM por script (mesma rotina: arquivos, instancia da Evolution, banco, logins). O prompt avancado da OBM foi salvo fora do repo em `Desktop/Desk/projetos/backup-obm-2026-10-16/`. O dono recriou a empresa (OBS) em 17/10; `ADMIN_USER_IDS` (Vercel e `.env.local`) e as credenciais de `.env.e2e.local` precisam apontar para os logins novos, senao a central some e `test:e2e:login`/`test:e2e:n8n` quebram.

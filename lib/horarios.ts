@@ -119,10 +119,25 @@ function minutos(hhmm: string): number {
  * só com as datas.
  */
 export function horarioCadastrado(agentConfig: unknown): BusinessHours | null {
-  const bruto = (agentConfig as { hours?: unknown } | null)?.hours;
-  if (!bruto || typeof bruto !== "object") return null;
-  const h = normalizeHours(bruto);
+  const h = horarioDaConfig(agentConfig);
+  if (!h) return null;
   return DAY_ORDER.some((d) => h[d].open) ? h : null;
+}
+
+/**
+ * O horário do `agent_config` que VALE para alguma coisa (prompt, calendário do
+ * turno, gráficos do Painel), ou `null`. É a ÚNICA leitura do horário guardado.
+ *
+ * ⚠️ `hoursConfirmed === false` (23/10/2026, dono) é a sugestão que a montagem
+ * traz pronta e ninguém conferiu: vale como sem horário. Ausente é conferido
+ * (configurações de antes dessa data). Diferente de `horarioCadastrado`, não
+ * exige dia aberto: o Painel trata "todos fechados" do jeito dele.
+ */
+export function horarioDaConfig(agentConfig: unknown): BusinessHours | null {
+  const c = agentConfig as { hours?: unknown; hoursConfirmed?: unknown } | null;
+  if (!c || c.hoursConfirmed === false) return null;
+  if (!c.hours || typeof c.hours !== "object") return null;
+  return normalizeHours(c.hours);
 }
 
 /**

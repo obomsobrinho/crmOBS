@@ -3,7 +3,8 @@ import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { TablesUpdate } from "@/lib/database.types";
 import { publishBlockers } from "@/lib/onboarding";
-import { connectionState } from "@/lib/evolution";
+import { connectionState, ownerNumber } from "@/lib/evolution";
+import { digitosDoJid, ehGrupo, mesmoTelefone } from "@/lib/avisos";
 
 /**
  * Estado da instância na Evolution (`open`, `close`, `connecting`), ou `null`
@@ -98,6 +99,27 @@ export async function PUT(
         },
         { status: 409 }
       );
+    }
+
+    // DESTINO NO PRÓPRIO NÚMERO DO AGENTE (23/10/2026). Desde que o número dos
+    // avisos se escolhe no passo 1, ANTES de conectar, a rota do destino ainda
+    // não sabe qual é o número do agente e não consegue recusar. Aqui, já
+    // conectado, sabe: o aviso sairia dele para ele mesmo e o celular não toca.
+    // Mesma regra de só bloquear com resposta clara da Evolution.
+    const destino = mine.avisos;
+    if (destino && !ehGrupo(destino)) {
+      const dono = await ownerNumber(mine.evolution_instance!);
+      const digitos = digitosDoJid(destino);
+      if (dono && digitos && mesmoTelefone(dono, digitos)) {
+        return NextResponse.json(
+          {
+            error:
+              "antes de ativar, troque o destino dos avisos: ele é o número do próprio agente. Os avisos precisam ir para outro número, o de quem vai responder.",
+            faltas: ["definir para onde vão os avisos"],
+          },
+          { status: 409 }
+        );
+      }
     }
   }
 

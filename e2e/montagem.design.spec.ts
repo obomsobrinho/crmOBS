@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { ITENS_DA_REVISAO, PASSOS_MONTAGEM as PASSOS_DA_LIB, revisaoAntesDeAtivar } from "../lib/onboarding";
+import { EMPTY_CONFIG, validateConfig } from "../lib/agent-prompt";
+import { horarioCadastrado, horarioDaConfig } from "../lib/horarios";
 
 // O assistente de montagem (`/montagem`), previsto em `/design/montagem`.
 //
@@ -15,13 +18,17 @@ import { test, expect } from "@playwright/test";
 const PASSOS = [
   { key: "quem", titulo: "Quem atende" },
   { key: "sabe", titulo: "O que ele sabe" },
-  // "Testar" virou "Converse com o seu agente" em 26/09/2026 (dono: pobre).
-  { key: "testar", titulo: "Converse com o seu agente" },
-  { key: "conectar", titulo: "Conectar e ativar" },
+  // "Testar" virou "Converse com o seu agente" em 26/09/2026 (dono: pobre), e
+  // "Teste o seu agente" em 23/10/2026 (dono).
+  { key: "testar", titulo: "Teste o seu agente" },
+  // "Conectar e ativar" virou dois passos em 23/10/2026 (dono): conectar, e
+  // "Quem a IA chama" (o destino dos avisos) com o Ativar no fim.
+  { key: "conectar", titulo: "Conectar o WhatsApp" },
+  { key: "avisos", titulo: "Quem a IA chama" },
 ];
 
 test.describe("Assistente de montagem (/design/montagem)", () => {
-  test("são quatro passos, cada um com o seu numeral", async ({ page }) => {
+  test("são cinco passos, cada um com o seu numeral", async ({ page }) => {
     for (const [i, p] of PASSOS.entries()) {
       await page.goto(`/design/montagem?passo=${p.key}`);
       await expect(page.getByRole("heading", { name: p.titulo })).toBeVisible();
@@ -29,26 +36,39 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       // diferentes (escanear um código contra digitar um nome), e barra de
       // porcentagem que parece travada logo no começo é medidamente pior do que
       // não ter indicador nenhum.
-      await expect(page.getByText(`Passo ${i + 1} de 4`)).toBeVisible();
-      await expect(page.locator('[data-slot="montagem-trilho"]')).toHaveCount(4);
+      await expect(page.getByText(`Passo ${i + 1} de 5`)).toBeVisible();
+      await expect(page.locator('[data-slot="montagem-trilho"]')).toHaveCount(5);
     }
   });
 
-  test("a ordem é quem, sabe, testar e conectar, e abre em quem", async ({
+  test("a ordem é quem, sabe, testar, conectar e avisos, e abre na abertura", async ({
     page,
   }) => {
-    // Sem `?passo=` o preview abre onde uma conta nova abre: no primeiro passo.
+    // Sem `?passo=` o preview abre onde uma conta nova abre. Desde 23/10/2026
+    // é a ABERTURA (o mapa dos passos e o computador), e "Começar" leva ao 1.
     await page.goto("/design/montagem");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-slot="montagem-abertura"]')).toBeVisible();
+    await page.getByRole("button", { name: "Começar" }).click();
     await expect(page.getByRole("heading", { name: "Quem atende" })).toBeVisible();
 
     // Andando pelo Continuar, e não por URL: é o caminho que a pessoa faz. O
     // preview não grava, então sair de "sabe" não depende de banco.
     const continuar = page.getByRole("button", { name: "Continuar", exact: true });
-    await page.waitForLoadState("networkidle");
-    for (const p of PASSOS.slice(1)) {
+    for (const p of PASSOS.slice(1, 4)) {
       await continuar.click();
       await expect(page.getByRole("heading", { name: p.titulo })).toBeVisible();
     }
+    // Do 4 para o 5 só conectado: sem conexão (o preview não tem), o Continuar
+    // espera, com a razão escrita.
+    await expect(continuar).toBeDisabled();
+    await expect(continuar).toHaveAttribute("aria-describedby", "razao-continuar");
+
+    // Conectado, segue para o 5.
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await page.waitForLoadState("networkidle");
+    await continuar.click();
+    await expect(page.getByRole("heading", { name: "Quem a IA chama" })).toBeVisible();
   });
 
   test("testar vem antes de conectar e não é obrigatório", async ({ page }) => {
@@ -69,34 +89,41 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     ).toBeEnabled();
   });
 
-  test("conectar não liga o agente: ativar fica travado até conectar", async ({
+  test("conectar não liga o agente: o 4 só conecta, e ativar mora no 5", async ({
     page,
   }) => {
     await page.goto("/design/montagem?passo=conectar");
     // ⚠️ Desde 26/09/2026 a frase mora UMA vez, no subtítulo do passo: a caixa
     // "Conectar não liga o agente" e a linha "Conecte o WhatsApp para ativar"
-    // saíram por repetir o subtítulo (dono). O subtítulo virou a razão do
-    // botão desabilitado.
+    // saíram por repetir o subtítulo (dono).
     const porque = page.locator('[data-slot="montagem-porque"]');
     await expect(porque).toHaveText(
       "Conectar não liga o agente: ele só começa a responder quando você ativar."
     );
     await expect(page.getByText(/Conectar não liga o agente/)).toHaveCount(1);
+    // Desde 23/10/2026 o 4 não tem Ativar nem avisos: só a conexão.
+    await expect(page.getByRole("button", { name: "Ativar o agente" })).toHaveCount(0);
+    await expect(page.locator('[data-slot="montagem-avisos"]')).toHaveCount(0);
+    await expect(page.getByText("Ao ativar, o que acontece")).toHaveCount(0);
+    await expect(page.locator("#razao-continuar")).toHaveText(
+      "O Continuar libera quando o WhatsApp conectar."
+    );
+
+    // Conectado, o QR sai da frente e o Continuar libera.
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    await expect(page.locator('[data-slot="whatsapp-conectado"]')).toBeVisible();
+    await expect(page.locator('[data-slot="passos-conexao"]')).toHaveCount(0);
+    await expect(page.locator("#razao-continuar")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continuar", exact: true })).toBeEnabled();
+
+    // No 5, o Ativar só libera com destino salvo.
+    await page.goto("/design/montagem?passo=avisos");
     const ativar = page.getByRole("button", { name: "Ativar o agente" });
     await expect(ativar).toBeDisabled();
-    await expect(ativar).toHaveAttribute("aria-describedby", "razao-ativar");
-    await expect(porque).toHaveAttribute("id", "razao-ativar");
-    // O que acontece ao ativar só aparece depois de conectar.
-    await expect(page.getByText("Ao ativar, o que acontece")).toHaveCount(0);
-
-    await page.goto("/design/montagem?passo=conectar&conectado=1&avisos=1");
-    await expect(page.locator('[data-slot="whatsapp-conectado"]')).toBeVisible();
+    await expect(ativar).toHaveAttribute("aria-describedby", "razao-avisos");
+    await page.goto("/design/montagem?passo=avisos&avisos=1");
     await expect(page.getByText("Ao ativar, o que acontece")).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "Ativar o agente" })
-    ).toBeEnabled();
-    // Conectado, o QR sai da frente: a tela passa a ser sobre ativar.
-    await expect(page.locator('[data-slot="passos-conexao"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Ativar o agente" })).toBeEnabled();
   });
 
   test("um contador só, e ele é este", async ({ page }) => {
@@ -112,7 +139,9 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     // obrigatório traz um `*` colado, então comparação exata por texto nunca
     // bateria.
     const rotulos = await page.evaluate(() =>
-      [...document.querySelectorAll("main label")].map((l) =>
+      // Fora dos destaques: horário e avisos são opcionais e têm o próprio
+      // teste ("Montagem mais clara"); aqui contam os campos que se DIGITAM.
+      [...document.querySelectorAll("main label")].filter((l) => !l.closest('[data-slot="montagem-destaque"]')).map((l) =>
         (l as HTMLElement).innerText.replace(/\*/g, "").trim()
       )
     );
@@ -166,7 +195,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     // mesmo que o Continuar (os dois gravam e avançam; nada ali é obrigatório,
     // e o passo diz isso). Com a saída do assistente indo para o rodapé, seriam
     // três botões com "depois" em dois. O Continuar livre é o pular.
-    for (const key of ["quem", "sabe", "testar", "conectar"]) {
+    for (const key of ["quem", "sabe", "testar", "conectar", "avisos"]) {
       await page.goto(`/design/montagem?passo=${key}`);
       await expect(
         page.getByRole("button", { name: "Deixar para depois" })
@@ -174,20 +203,20 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     }
   });
 
-  test("no passo de conectar não existe Continuar, e o aviso de risco fica", async ({
+  test("no passo de conectar o Continuar espera a conexão, e o aviso de risco fica", async ({
     page,
   }) => {
     await page.goto("/design/montagem?passo=conectar");
-    // ⚠️ O MOTIVO MUDOU EM 24/09/2026. Antes: quem avançava era a conexão,
-    // sozinha, para o passo seguinte. Agora conectar é o ÚLTIMO passo, e o botão
-    // da direita é "Ativar o agente" (desabilitado até conectar, provado no
-    // teste acima). Continuar aqui não teria para onde ir.
+    // ⚠️ MUDOU DE NOVO EM 23/10/2026. De 24/09 até ali conectar era o último
+    // passo e não tinha Continuar. Agora o 5 (avisos e ativar) vem depois, e o
+    // Continuar do 4 existe mas espera a conexão: quem avança é a pessoa,
+    // depois de conectar, nunca a conexão sozinha.
     //
     // `exact` é obrigatório: sem ele o Playwright casa por SUBSTRING no nome
     // acessível, e "Continuar" poderia casar com outro botão.
     await expect(
       page.getByRole("button", { name: "Continuar", exact: true })
-    ).toHaveCount(0);
+    ).toBeDisabled();
 
     // O aviso de risco do QR vem junto, com as mesmas regras de conteúdo da tela
     // `/connect`: nada de prometer proteção contra bloqueio.
@@ -216,6 +245,7 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       sabe: "Terminar depois",
       testar: "Testar depois",
       conectar: "Conectar depois",
+      avisos: "Ativar depois",
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     for (const p of PASSOS) {
@@ -226,9 +256,9 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
       await expect(page.locator("footer").getByRole("button", { name: ROTULO[p.key] })).toBeVisible();
       await expect(page.getByText("Sair e continuar depois")).toHaveCount(0);
     }
-    // Conectado, o que fica para depois é ativar.
+    // Conectado, o passo 4 já não deixa "conectar" para depois.
     await page.goto("/design/montagem?passo=conectar&conectado=1");
-    await expect(page.getByRole("button", { name: "Ativar depois" })).toBeVisible();
+    await expect(page.locator("footer").getByRole("button", { name: "Terminar depois" })).toBeVisible();
 
     // No celular a saída sobe para o cabeçalho.
     await page.setViewportSize({ width: 375, height: 812 });
@@ -293,12 +323,15 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     await page.goto("/design/montagem?passo=quem");
 
     const m = await page.evaluate(() => {
-      const inputs = [...document.querySelectorAll("main input")].filter(
+      const inputs = [...document.querySelectorAll("main input")].filter((i) => !i.closest('[data-slot="montagem-destaque"]')).filter(
         (i) => (i as HTMLElement).offsetParent !== null
       );
       const rodape = document.querySelector("footer")!;
+      // A linha "Segunda a sexta / Editar" do editor de horário (no passo 1
+      // desde 23/10/2026) recua o botão fantasma 8px de propósito (`-mr-2`,
+      // alinha o texto à borda): sobra visível, nada cortado.
       const cortados = [...document.querySelectorAll("main *")].filter(
-        (e) => e.scrollWidth - e.clientWidth > 1
+        (e) => e.scrollWidth - e.clientWidth > 1 && !e.closest('[data-slot="horario-semana"]')
       ).length;
       return {
         // Uma coluna: todo campo começa no mesmo x.
@@ -315,6 +348,245 @@ test.describe("Assistente de montagem (/design/montagem)", () => {
     expect(m.rodapeGrudado).toBe(true);
     expect(m.rodapeVisivel).toBe(true);
     expect(m.cortados).toBe(0);
+  });
+});
+
+// ⚠️ MONTAGEM MAIS CLARA (23/10/2026, dono). Dos oito cadastros de testadores,
+// cinco configuraram e pararam antes de ativar: ninguém sabia antes que o QR
+// pede um computador, e o destino dos avisos (o diferencial) só aparecia no fim.
+// Os testes abaixo prendem a abertura, os destaques, o horário conferido, o
+// passo 5 dos avisos, a revisão antes de ativar e a dica do cadastro. A parada
+// do passo 4 no celular está em `entrada.mobile.spec.ts`.
+test.describe("Montagem mais clara", () => {
+  const COMPUTADOR =
+    "Precisa de um computador: você lê o QR com o celular da empresa.";
+
+  test("a abertura mostra os cinco passos e o computador antes de começar", async ({ page }) => {
+    await page.goto("/design/montagem");
+    const abertura = page.locator('[data-slot="montagem-abertura"]');
+    await expect(abertura.getByRole("heading", { name: "Vamos montar o seu agente" })).toBeVisible();
+    const passos = abertura.locator('[data-slot="abertura-passo"]');
+    await expect(passos).toHaveCount(5);
+    for (const [i, p] of PASSOS.entries()) await expect(passos.nth(i)).toContainText(p.titulo);
+    await expect(passos.nth(3)).toContainText("celular da empresa");
+    // O pedido de ajuda é o passo 5, com a etiqueta dos destaques.
+    await expect(passos.nth(4)).toContainText("O número ou o grupo que a IA avisa quando precisa de alguém");
+    await expect(passos.nth(4).locator('[data-slot="abertura-faz-diferenca"]')).toHaveText("Faz diferença");
+    // O alerta do computador mora no passo 4 do mapa, e só nele (dono).
+    await expect(abertura.locator('[data-slot="abertura-computador"]')).toHaveCount(1);
+    await expect(passos.nth(3).locator('[data-slot="abertura-computador"]')).toHaveText(COMPUTADOR);
+    // Não é um passo a mais: sem contador, sem trilho e sem "Continuar".
+    await expect(page.getByText(/Passo \d de 5/)).toHaveCount(0);
+    await expect(page.locator('[data-slot="montagem-trilho"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Continuar", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Voltar" })).toBeDisabled();
+    // Sem tempo estimado (decisão do dono: pouco dado para prometer).
+    await expect(abertura).not.toContainText(/minuto/);
+    // Quem abre um passo direto não vê a abertura.
+    await page.goto("/design/montagem?passo=quem");
+    await expect(page.locator('[data-slot="montagem-abertura"]')).toHaveCount(0);
+  });
+
+  test("a abertura tem um ícone colorido por passo", async ({ page }) => {
+    await page.goto("/design/montagem");
+    const icones = page.locator('[data-slot="abertura-icone"]');
+    await expect(icones).toHaveCount(5);
+    // Cores da paleta de rótulos, uma por passo, nenhuma repetida.
+    const fundos = await icones.evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundColor));
+    expect(new Set(fundos).size).toBe(5);
+    for (const f of fundos) expect(f).not.toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("o modelo do segmento, o horário, os documentos e os avisos estão em destaque", async ({ page }) => {
+    const destaque = (chave: string) => page.locator(`[data-slot="montagem-destaque"][data-destaque="${chave}"]`);
+    await page.goto("/design/montagem?passo=quem");
+    // As pílulas do modelo moram DENTRO do destaque.
+    await expect(destaque("modelo").getByRole("button", { name: "Advocacia" })).toBeVisible();
+    await expect(destaque("horario")).toContainText("é por este horário que ela diz quando a empresa atende e se está aberta agora");
+    // Os avisos não estão no passo 1: dependem da conexão (passo 5).
+    await expect(page.locator('[data-slot="montagem-avisos"]')).toHaveCount(0);
+
+    await page.goto("/design/montagem?passo=sabe");
+    await expect(destaque("documentos")).toContainText("Quanto mais ela sabe, menos ela precisa te chamar.");
+
+    await page.goto("/design/montagem?passo=avisos");
+    await expect(page.locator('[data-slot="montagem-porque"]')).toHaveText(
+      "Quando a IA precisa de alguém, ela chama o time e avisa num número ou grupo do WhatsApp, e segue atendendo."
+    );
+    const avisos = page.locator('[data-slot="montagem-avisos"]');
+    await expect(avisos.locator('[data-destaque="avisos"]')).toBeVisible();
+    await expect(avisos.locator('[data-slot="destaque-exemplo"]')).toBeVisible();
+  });
+
+  test("conectar não liga o agente fica em destaque no passo 4, uma vez só", async ({ page }) => {
+    await page.goto("/design/montagem?passo=conectar");
+    const porque = page.locator('[data-slot="montagem-porque"]');
+    await expect(porque).toHaveAttribute("data-destaque", "");
+    await expect(porque).toHaveClass(/bg-brand-surface/);
+    await expect(page.getByText(/Conectar não liga o agente/)).toHaveCount(1);
+    // Nos outros passos o subtítulo continua discreto.
+    await page.goto("/design/montagem?passo=quem");
+    await expect(page.locator('[data-slot="montagem-porque"]')).not.toHaveAttribute("data-destaque", "");
+  });
+
+  test("o passo 5 tem o número E o grupo, e o teste, porque já está conectado", async ({ page }) => {
+    await page.goto("/design/montagem?passo=avisos");
+    await page.waitForLoadState("networkidle");
+    const bloco = page.locator('[data-slot="montagem-avisos"]');
+    await bloco.getByRole("tab", { name: "Um grupo" }).click();
+    await expect(bloco.getByRole("combobox", { name: "Grupo que recebe os avisos" })).toBeVisible();
+    await bloco.getByRole("tab", { name: "Um número" }).click();
+    await bloco.locator('[data-slot="avisos-numero"]').fill("11 91234-5678");
+    await bloco.locator('[data-slot="avisos-salvar"]').click();
+    await expect(bloco.locator('[data-slot="avisos-destino"]')).toContainText("91234-5678");
+    await expect(bloco.locator('[data-slot="avisos-teste"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Ativar o agente" })).toBeEnabled();
+  });
+
+  test("a revisão antes de ativar diz o que está valendo e não bloqueia", async ({ page }) => {
+    await page.goto("/design/montagem?passo=conectar&conectado=1");
+    // Só no passo 5, onde a ativação mora.
+    await expect(page.locator('[data-slot="montagem-revisao"]')).toHaveCount(0);
+
+    await page.goto("/design/montagem?passo=avisos&avisos=1");
+    const revisao = page.locator('[data-slot="montagem-revisao"]');
+    const item = (k: string) => revisao.locator(`[data-slot="revisao-item"][data-item="${k}"]`);
+    // Os avisos são o próprio passo, logo acima: não repetem na revisão.
+    await expect(revisao.locator('[data-slot="revisao-item"]')).toHaveCount(4);
+    await expect(item("avisos")).toHaveCount(0);
+    await expect(item("regras")).toHaveAttribute("data-estado", "vazio");
+    await expect(item("documentos")).toHaveAttribute("data-estado", "vazio");
+    // O horário pronto é sugestão: não conferido, ele não vale (hoursConfirmed).
+    await expect(item("horario")).toHaveAttribute("data-estado", "nao_conferido");
+    await expect(item("horario")).toContainText("Não conferido");
+    await expect(item("horario").getByRole("button", { name: "Conferir" })).toBeVisible();
+    await expect(item("mensagem")).toHaveAttribute("data-estado", "padrao");
+    await expect(item("mensagem")).toContainText("Padrão");
+    // Uma linha por item, sem porquê nem exemplo (dono, 26/10/2026).
+    await expect(item("regras")).toContainText("Recomendado");
+    await expect(item("regras")).not.toContainText("Exemplo");
+    // Não bloqueia: com os avisos salvos o Ativar libera, com tudo o resto vazio.
+    await expect(page.getByRole("button", { name: "Ativar o agente" })).toBeEnabled();
+    // Ordem: avisos, revisão, o que acontece ao ativar.
+    const ordem = await page.evaluate(() => {
+      const a = document.querySelector('[data-slot="montagem-avisos"]')!;
+      const r = document.querySelector('[data-slot="montagem-revisao"]')!;
+      const d = [...document.querySelectorAll("p")].find((p) => p.textContent === "Ao ativar, o que acontece")!;
+      const segue = (x: Element, y: Element) => (x.compareDocumentPosition(y) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      return segue(a, r) && segue(r, d);
+    });
+    expect(ordem).toBe(true);
+  });
+
+  test("Adicionar regras abre os campos ali mesmo, e fechar salva", async ({ page }) => {
+    await page.goto("/design/montagem?passo=avisos&avisos=1");
+    await page.waitForLoadState("networkidle");
+    const regras = page.locator('[data-slot="revisao-item"][data-item="regras"]');
+    await regras.getByRole("button", { name: "Adicionar" }).click();
+    const painel = page.locator('[data-slot="sheet-content"]');
+    await expect(painel).toHaveAttribute("data-painel", "limites");
+    // Os MESMOS campos do /agente.
+    const campo = painel.getByPlaceholder("Ex.: nunca dar desconto por conta própria");
+    await campo.fill("nunca prometer prazo sem confirmar");
+    await campo.press("Enter");
+    await painel.getByRole("button", { name: "Salvar" }).click();
+    await expect(painel).toHaveCount(0);
+    await expect(regras).toHaveAttribute("data-estado", "preenchido");
+    await expect(regras).toContainText("1 regra");
+    // Ainda na montagem, no mesmo passo.
+    await expect(page.getByRole("heading", { name: "Quem a IA chama" })).toBeVisible();
+
+    // O horário abre o editor de horário; documentos voltam ao passo 2.
+    await page.locator('[data-item="horario"]').getByRole("button", { name: "Conferir" }).click();
+    await expect(page.locator('[data-slot="sheet-content"]')).toHaveAttribute("data-painel", "horario");
+    await expect(page.locator('[data-slot="sheet-content"]').getByText("Segunda a sexta")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator('[data-slot="sheet-content"]')).toHaveCount(0);
+    await page.locator('[data-item="documentos"]').getByRole("button", { name: "Adicionar" }).click();
+    await expect(page.getByRole("heading", { name: "O que ele sabe" })).toBeVisible();
+  });
+
+  test("o texto novo não tem travessão nem assume segmento", async ({ page }) => {
+    for (const url of [
+      "/design/montagem",
+      "/design/montagem?passo=quem",
+      "/design/montagem?passo=sabe",
+      "/design/montagem?passo=conectar&conectado=1",
+      "/design/montagem?passo=avisos",
+    ]) {
+      await page.goto(url);
+      const texto = (await page.locator("main").innerText())
+        .toLowerCase()
+        .replace(/advocacia|clínica odontológica|pediatria|engenharia e projetos|clínica de estética|restaurante ou pizzaria|loja ou varejo|imobiliária|salão de beleza ou barbearia/g, "");
+      expect(texto, url).not.toMatch(/[—–]/);
+      expect(texto, url).not.toMatch(/\bconsultas\b|\b(a|sua|da|na|uma) consulta\b|\bpacientes?\b|\bagendamentos?\b|\bprocedimentos?\b|\bprocessos?\b|\bestoques?\b|\bobras?\b/);
+    }
+  });
+
+  test("a regra da revisão: vazio, preenchido, padrão, não conferido e conferindo", async () => {
+    const base = { nuncaFaz: 0, chamaQuando: 0, documentos: 0, horarioConferido: false, mensagem: false };
+    expect(revisaoAntesDeAtivar(base)).toEqual({
+      regras: "vazio",
+      documentos: "vazio",
+      horario: "nao_conferido",
+      mensagem: "padrao",
+    });
+    expect(
+      revisaoAntesDeAtivar({ nuncaFaz: 0, chamaQuando: 2, documentos: 3, horarioConferido: true, mensagem: true })
+    ).toEqual({ regras: "preenchido", documentos: "preenchido", horario: "preenchido", mensagem: "preenchido" });
+    expect(revisaoAntesDeAtivar({ ...base, documentos: null }).documentos).toBe("conferindo");
+    // Cada item com título; cada passo com o seu resumo para a abertura.
+    for (const i of ITENS_DA_REVISAO) expect(i.titulo, i.key).toBeTruthy();
+    for (const p of PASSOS_DA_LIB) expect(p.resumo, p.key).toBeTruthy();
+    expect(PASSOS_DA_LIB.map((p) => p.key)).toEqual(["quem", "sabe", "testar", "conectar", "avisos"]);
+  });
+
+  test("horário não conferido não vale: nem no prompt, nem no calendário, nem no Painel", async () => {
+    // Configuração nova nasce com a sugestão de segunda a sexta NÃO conferida.
+    expect(EMPTY_CONFIG.hoursConfirmed).toBe(false);
+    const nova = { ...EMPTY_CONFIG, companyName: "Ótica Vision", companyWhat: "vende óculos", agentName: "Alê" };
+    const r = validateConfig(nova);
+    expect(r.ok && r.value.hoursConfirmed).toBe(false);
+    expect(horarioDaConfig(nova)).toBeNull();
+    expect(horarioCadastrado(nova)).toBeNull();
+    // Conferida, vale.
+    expect(horarioCadastrado({ ...nova, hoursConfirmed: true })).not.toBeNull();
+    // Configuração de antes de 23/10/2026, sem a marca: conta como conferida.
+    const { hoursConfirmed: _semMarca, ...antiga } = { ...nova, hoursConfirmed: true };
+    void _semMarca;
+    const ra = validateConfig(antiga);
+    expect(ra.ok && ra.value.hoursConfirmed).toBe(true);
+    expect(horarioDaConfig(antiga)).not.toBeNull();
+  });
+
+  test("no passo 1, o horário pede conferência", async ({ page }) => {
+    await page.goto("/design/montagem?passo=quem");
+    await page.waitForLoadState("networkidle");
+    const horario = page.locator('[data-slot="montagem-destaque"][data-destaque="horario"]');
+    await expect(horario.locator('[data-slot="horario-nao-conferido"]')).toBeVisible();
+    await horario.locator('[data-slot="horario-confirmar"]').click();
+    await expect(horario.locator('[data-slot="horario-nao-conferido"]')).toHaveCount(0);
+  });
+
+  test("conferido no passo 1, o horário chega conferido à revisão", async ({ page }) => {
+    // `conectado=1` deixa o passo 4 já conectado; o caminho é pelo Continuar.
+    await page.goto("/design/montagem?passo=quem&conectado=1&avisos=1");
+    await page.waitForLoadState("networkidle");
+    await page.locator('[data-slot="horario-confirmar"]').click();
+    const continuar = page.getByRole("button", { name: "Continuar", exact: true });
+    for (const titulo of ["O que ele sabe", "Teste o seu agente", "Conectar o WhatsApp", "Quem a IA chama"]) {
+      await continuar.click();
+      await expect(page.getByRole("heading", { name: titulo })).toBeVisible();
+    }
+    await expect(page.locator('[data-slot="revisao-item"][data-item="horario"]')).toHaveAttribute("data-estado", "preenchido");
+    await expect(page.getByRole("button", { name: "Ativar o agente" })).toBeEnabled();
+  });
+
+  test("o cadastro dá a dica do computador", async ({ page }) => {
+    await page.goto("/cadastro");
+    await expect(page.locator('[data-slot="cadastro-dica-computador"]')).toHaveText(
+      "Dica: faça pelo computador. No final você conecta o WhatsApp lendo um QR code."
+    );
   });
 });
 

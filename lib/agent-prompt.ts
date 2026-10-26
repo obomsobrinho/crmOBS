@@ -31,6 +31,15 @@ export interface AgentConfig {
   companySite: string; // "" = omite
   hours: BusinessHours; // todos fechados = omite a seção
   hoursNote: string; // "" = omite (ex.: "fechado em feriados")
+  /**
+   * O horário foi CONFERIDO por alguém (23/10/2026, dono). A montagem nasce com
+   * `DEFAULT_HOURS` preenchido para servir de sugestão, e até ali ele ia ao
+   * prompt e ao calendário do turno como se a empresa o tivesse escolhido.
+   * `false` = sugestão não conferida: a seção de horário sai do prompt e o
+   * horário não vale para nada (`horarioDaConfig`, lib/horarios.ts). Ausente no
+   * jsonb (configurações de antes desta data) conta como conferido.
+   */
+  hoursConfirmed: boolean;
   // Agente
   agentName: string; // obrigatório
   agentRole: string; // "" = omite (ex.: "atendente", "consultora")
@@ -190,6 +199,8 @@ export const EMPTY_CONFIG: AgentConfig = {
   companySite: "",
   hours: DEFAULT_HOURS,
   hoursNote: "",
+  // Configuração nova: o horário pronto é só sugestão até alguém conferir.
+  hoursConfirmed: false,
   agentName: "",
   agentRole: "",
   tone: "profissional",
@@ -471,7 +482,9 @@ export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = []): str
     line("Site", cfg.companySite),
   ]);
 
-  const hoursProse = renderHours(cfg.hours);
+  // Horário não conferido não vai ao prompt: seria afirmar um expediente que
+  // ninguém escolheu.
+  const hoursProse = cfg.hoursConfirmed ? renderHours(cfg.hours) : "";
   const horario = hoursProse
     ? [
         "### HORÁRIO DE ATENDIMENTO",
@@ -1091,6 +1104,7 @@ export function validateConfig(
     companySite: asString(src.companySite).trim().slice(0, 200),
     hours: normalizeHours(src.hours),
     hoursNote: asString(src.hoursNote).trim().slice(0, LIMITS.bullet),
+    hoursConfirmed: src.hoursConfirmed !== false, // ausente = conferido
     agentName: agentName.slice(0, 60),
     agentRole: asString(src.agentRole).trim().slice(0, 60),
     tone,

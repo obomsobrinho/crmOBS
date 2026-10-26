@@ -46,7 +46,7 @@ import {
 import { carregarAgregadoDoPainel, carregarMotivosDoPainel } from "@/lib/painel-dados";
 import { dentroDoHorario, parteLocal } from "@/lib/valor";
 import { frasesDeValor, mesFechado, rotuloDoMes } from "@/lib/valor";
-import type { BusinessHours } from "@/lib/agent-prompt";
+import { horarioDaConfig } from "@/lib/horarios";
 import { semNumeroDeAvisos } from "@/lib/avisos";
 
 export const dynamic = "force-dynamic";
@@ -114,7 +114,7 @@ export default async function PainelPage() {
       // têm o que fazer aqui.
       supabase
         .from("clients")
-        .select("hours:agent_config->hours, prompt_mode")
+        .select("hours:agent_config->hours, hoursConfirmed:agent_config->hoursConfirmed, prompt_mode")
         .eq("id", client.id)
         .maybeSingle(),
       // Conversas com handoff em aberto AGORA, e a mais antiga delas. É o único
@@ -146,7 +146,8 @@ export default async function PainelPage() {
     ORDEM_PERIODOS.map((k, i) => [k, contagemPorMotivo(motivosLinhas.filter((l) => l.janela === i + 1))])
   ) as Record<PeriodoKey, MotivosDoPeriodo>;
 
-  const hours = (cfg?.hours as BusinessHours | null | undefined) ?? null;
+  // Horário não conferido (sugestão da montagem) não vale: `horarioDaConfig`.
+  const hours = horarioDaConfig(cfg);
 
   // O número que RECEBE os avisos do time não é cliente: fora de toda conta
   // (lib/avisos.ts). O banco já o deixa fora das agregações (`p_fora`); aqui só

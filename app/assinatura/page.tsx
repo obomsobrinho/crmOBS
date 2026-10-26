@@ -10,7 +10,7 @@ import { frasesDeValor, type FraseValor } from "@/lib/valor";
 import { agoraMs } from "@/lib/periodo";
 import { resumoDeValorAgregado } from "@/lib/painel-agregado";
 import { carregarAgregadoDoPainel } from "@/lib/painel-dados";
-import type { BusinessHours } from "@/lib/agent-prompt";
+import { horarioDaConfig } from "@/lib/horarios";
 
 export const dynamic = "force-dynamic";
 
@@ -81,14 +81,14 @@ export default async function AssinaturaPage({
         // Só `hours` sai do jsonb (R-51).
         supabase
           .from("clients")
-          .select("hours:agent_config->hours")
+          .select("hours:agent_config->hours, hoursConfirmed:agent_config->hoursConfirmed")
           .eq("id", client.id)
           .maybeSingle(),
       ]);
       const acumulado = resumoDeValorAgregado({
         janela: agregado.janela(0),
         series: agregado.series,
-        hours: (cfg?.hours as BusinessHours | null | undefined) ?? null,
+        hours: horarioDaConfig(cfg),
         mes: null,
       });
       frasesAcumuladas = frasesDeValor(acumulado, "desde o início");

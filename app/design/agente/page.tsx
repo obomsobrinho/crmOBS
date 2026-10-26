@@ -16,6 +16,8 @@ const MOCK: AgentConfig = {
   companyAddress: "Rua das Flores, 120 - Centro",
   companySite: "https://oticavision.com.br",
   hoursNote: "fechado em feriados",
+  // Conta já configurada: o horário foi conferido (`hoursConfirmed`, 23/10/2026).
+  hoursConfirmed: true,
   agentName: "Alê",
   agentRole: "atendente",
   tone: "amigavel",

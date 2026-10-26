@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CACHE_SAFE_TOKENS } from "@/lib/agent-prompt";
+import { numeroBR } from "@/lib/format";
 
 // Helpers de layout do formulário do agente. Moravam no rodapé do
 // `AgentConfigForm.tsx`; saíram de lá quando o formulário passou a ter DUAS
@@ -184,6 +185,49 @@ export function CabecalhoBloco({
 }
 
 /**
+ * O que FAZ DIFERENÇA e costuma passar batido (montagem, 23/10/2026, dono): o
+ * cabeçalho de sempre, a moldura da marca, o porquê em uma frase e um exemplo.
+ * Não é aviso (não falta nada) e não é estado: por isso a cor é a da marca, e
+ * só na moldura e na etiqueta.
+ */
+export function Destaque({
+  chave,
+  icone,
+  titulo,
+  porque,
+  exemplo,
+  className,
+  children,
+}: {
+  /** Vai em `data-destaque`, que é como o e2e acha cada um. */
+  chave: string;
+  icone: LucideIcon;
+  titulo: string;
+  /** Opcional: no passo 5 o subtítulo do passo já diz o porquê. */
+  porque?: string;
+  exemplo?: string;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div
+      data-slot="montagem-destaque"
+      data-destaque={chave}
+      className={cn("rounded-xl border border-brand-line bg-bloco p-5 max-sm:p-4", className)}
+    >
+      <p className="mb-2 text-rotulo uppercase text-brand-ink">Faz diferença</p>
+      <CabecalhoBloco icone={icone} titulo={titulo} descricao={porque} />
+      {exemplo && (
+        <p data-slot="destaque-exemplo" className="mt-2 pl-12 text-legenda text-ink-3">
+          <span className="font-medium text-ink-2">Exemplo:</span> {exemplo}
+        </p>
+      )}
+      {children && <div className="mt-4">{children}</div>}
+    </div>
+  );
+}
+
+/**
  * Sub-bloco que recolhe, mostrando o VALOR na linha do cabeçalho quando fechado.
  * É a regra que torna o recolhimento um ganho e não uma escondida: quem volta
  * para conferir o horário lê "Segunda a sexta: 08:00 às 18:00" sem abrir nada.
@@ -318,8 +362,8 @@ export function AvisoCache({
     <p className="flex items-start gap-1.5 text-legenda text-warn-ink">
       <AlertTriangle size={14} className="mt-px shrink-0" />
       <span>
-        O prompt tem cerca de {tokens.toLocaleString("pt-BR")} tokens, abaixo dos{" "}
-        {CACHE_SAFE_TOKENS.toLocaleString("pt-BR")} que a OpenAI pede para
+        O prompt tem cerca de {numeroBR(tokens)} tokens, abaixo dos{" "}
+        {numeroBR(CACHE_SAFE_TOKENS)} que a OpenAI pede para
         reaproveitar o prompt entre mensagens, então cada resposta paga o preço
         cheio de entrada. {children}
       </span>
