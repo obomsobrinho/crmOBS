@@ -15,6 +15,7 @@ import type { Member } from "@/lib/team";
 import type { Qualification } from "@/lib/crm";
 import type { Json } from "@/lib/database.types";
 import type { ChatRow } from "@/lib/types";
+import type { ArquivoDoContato } from "@/lib/arquivos";
 import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
 // Compõe a thread + o painel de contexto. Dono do estado da IA
@@ -45,6 +46,7 @@ export default function ConversationView({
   qualificacaoPreview,
   handoffAtInicial,
   handoffsPreview,
+  arquivosPreview,
 }: {
   phone: string;
   name: string | null;
@@ -77,6 +79,8 @@ export default function ConversationView({
   handoffAtInicial?: string | null;
   /** Só o preview /design: os pedidos de ajuda da IA. */
   handoffsPreview?: Handoff[];
+  /** Só o preview /design: as imagens e documentos do contato. */
+  arquivosPreview?: ArquivoDoContato[];
 }) {
   const supabase = createClient();
   // Renomear o contato (aba "Dados") corrige o cabeçalho na hora, sem refresh (R-15).
@@ -366,6 +370,7 @@ export default function ConversationView({
       email={contactEmail}
       birthDate={contactBirthDate}
       contactExists={contactExists}
+      arquivosPreview={arquivosPreview}
     />
   );
 

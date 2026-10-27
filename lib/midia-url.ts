@@ -66,6 +66,23 @@ export function urlAssinadaDaMidia(caminho: string): Promise<string | null> {
   });
 }
 
+/**
+ * URL assinada que BAIXA o arquivo com o nome dado (`Content-Disposition:
+ * attachment`). Não entra no lote nem no cache: é um clique, e o `download` do
+ * `<a>` é ignorado numa URL de outra origem, então o nome tem de vir do Storage.
+ */
+export async function urlParaBaixar(caminho: string, nome: string): Promise<string | null> {
+  try {
+    const { data } = await createClient()
+      .storage.from("whatsapp-media")
+      .createSignedUrl(caminho, VALIDADE_S, { download: nome });
+    return data?.signedUrl ?? null;
+  } catch (e) {
+    console.error("url de download da mídia:", e);
+    return null;
+  }
+}
+
 /** A URL já guardada, para o balão que remonta nascer pronto (sem piscar). */
 export function urlGuardadaDaMidia(caminho: string): string | null {
   const g = guardadas.get(caminho);

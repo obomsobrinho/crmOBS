@@ -64,6 +64,13 @@ const conteudoVariants = cva(
          */
         gestao:
           "flex max-h-[85vh] max-w-lg flex-col overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-none max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]",
+        /**
+         * Prévia de um arquivo (imagem ou PDF do contato, 27/10/2026): largo
+         * para a imagem respirar, cabeçalho e rodapé fixos, a mídia no meio.
+         * No celular é tela cheia, pelo mesmo motivo da `gestao`.
+         */
+        midia:
+          "flex h-[85vh] max-w-3xl flex-col overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]",
       },
     },
     defaultVariants: { tamanho: "confirmacao" },

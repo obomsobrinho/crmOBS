@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import ConversationView from "@/components/ConversationView";
 import type { Member } from "@/lib/team";
 import type { ChatRow, InboxItem } from "@/lib/types";
+import type { ArquivoDoContato } from "@/lib/arquivos";
 import { JANELA_PADRAO } from "@/lib/inbox";
 import { PAGINA_INBOX, inicioDaJanela, type ItemLista } from "@/lib/inbox-lista";
 import { fonteDaMemoria } from "@/lib/inbox-fonte";
@@ -106,17 +107,36 @@ const LIST: InboxItem[] = [
   { phone: "553399412233@s.whatsapp.net", name: null, lastPreview: "Obrigado, era só isso mesmo", lastFrom: "in", lastMessageAt: DIAS_ATRAS(20), unread: 0, assignedUserId: null, stage: null, handoffAt: null },
 ];
 
+// Imagens do preview do bloco Arquivos: quadros lisos em SVG, sem foto de ninguém.
+const quadro = (cor: string, rotulo: string) =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="${cor}"/><text x="240" y="190" font-family="sans-serif" font-size="28" fill="#ffffff" text-anchor="middle">${rotulo}</text></svg>`
+  )}`;
+
+// Três imagens, um vídeo (sem arquivo de verdade: a miniatura fica lisa com o
+// botão de tocar), um PDF (com prévia) e um .docx (sem prévia: só abrir e baixar).
+const ARQUIVOS_PREVIEW: ArquivoDoContato[] = [
+  { id: 906, caminho: "/design/video-exemplo.mp4", tipo: "video", nome: null, criadoEm: HOJE(11.7) },
+  { id: 905, caminho: "/design/documento-exemplo.pdf", tipo: "document", nome: "comprovante-pix.pdf", criadoEm: HOJE(11.6) },
+  { id: 904, caminho: quadro("#5b7bd5", "Foto 3"), tipo: "image", nome: null, criadoEm: HOJE(11.5) },
+  { id: 903, caminho: quadro("#3d9a7a", "Foto 2"), tipo: "image", nome: null, criadoEm: HOJE(11.4) },
+  { id: 902, caminho: "/design/proposta-exemplo.txt", tipo: "document", nome: "proposta-assinada.docx", criadoEm: DIAS_ATRAS(1) },
+  { id: 901, caminho: quadro("#b36b3c", "Foto 1"), tipo: "image", nome: null, criadoEm: DIAS_ATRAS(1) },
+];
+
 export default async function DesignPreview({
   searchParams,
 }: {
-  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string; mensagens?: string; paginada?: string }>;
+  searchParams: Promise<{ entendimento?: string; lista?: string; handoff?: string; mensagens?: string; paginada?: string; arquivos?: string }>;
 }) {
   // ⚠️ DOIS ESTADOS DA FAIXA "O cliente quer", e o preview mostra os dois
   // (21/09/2026). Desde que ela some quando a IA ainda não entendeu nada, o
   // estado ausente é tão parte do desenho quanto o presente, e sem uma porta
   // para ele não há como conferir nenhum dos dois: o preview não tem banco.
   // `?entendimento=nao` abre a conversa sem qualificação nenhuma.
-  const { entendimento, lista, handoff, mensagens, paginada } = await searchParams;
+  const { entendimento, lista, handoff, mensagens, paginada, arquivos } = await searchParams;
+  // `?arquivos=nenhum` (27/10/2026): a ficha sem imagem nem documento.
+  const arquivosPreview = arquivos === "nenhum" ? [] : ARQUIVOS_PREVIEW;
   // `?mensagens=N` (05/10/2026): conversa longa, para medir a rolagem (a barra
   // da conversa saltava com a roda do mouse). Mensagens de tamanhos variados,
   // minuto a minuto, antes das fixas.
@@ -248,6 +268,7 @@ export default async function DesignPreview({
                 // só o estado vazio, que é justamente o menos interessante de
                 // conferir. O texto imita o que a IA grava de verdade em
                 // `conversation_qualifications.summary`.
+                arquivosPreview={arquivosPreview}
                 qualificacaoPreview={
                   semEntendimento
                     ? undefined

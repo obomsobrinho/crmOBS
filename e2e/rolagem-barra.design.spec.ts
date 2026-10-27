@@ -78,7 +78,10 @@ test.describe("Barra de rolagem da conversa", () => {
     });
     await page.waitForTimeout(500);
 
-    const thumb = page.locator('main [data-slot="scroll-area-thumb"]');
+    // `.first()`: a barra da CONVERSA, a primeira do `main`, a mesma que
+    // `medida` lê. A ficha do contato também rola desde o bloco Arquivos
+    // (27/10/2026) e tem a barra dela.
+    const thumb = page.locator('main [data-slot="scroll-area-thumb"]').first();
     const b = (await thumb.boundingBox())!;
     const x = b.x + b.width / 2;
     const y0 = b.y + b.height / 2;

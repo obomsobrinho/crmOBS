@@ -15,6 +15,8 @@ import type { Member } from "@/lib/team";
 import ContactNotes from "./ContactNotes";
 import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
+import ContactArquivos from "./ContactArquivos";
+import type { ArquivoDoContato } from "@/lib/arquivos";
 import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
 import AvatarContato from "./AvatarContato";
 import type { Json } from "@/lib/database.types";
@@ -90,7 +92,10 @@ export default function FichaContato({
   simular = false,
   fotoPath = null,
   contactExists,
+  arquivosPreview,
 }: {
+  /** Só o preview `/design`: as imagens e documentos, que sem banco não existem. */
+  arquivosPreview?: ArquivoDoContato[];
   /** Foto de perfil guardada (lib/fotos.ts). */
   fotoPath?: string | null;
   /** Conta bloqueada (modo leitura) não escreve. Só em `clientes`. */
@@ -304,6 +309,10 @@ export default function FichaContato({
         initialBirthDate={birthDate}
         editable={contactExists}
       />
+
+      {/* Depois dos Dados e antes das Notas (27/10/2026): o papel que a pessoa
+          mandou é cadastro, e é o que se procura depois de "quem é". */}
+      <ContactArquivos clientId={clientId} phone={phone} preview={arquivosPreview} />
 
       <ContactNotes
         clientId={clientId}
