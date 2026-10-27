@@ -638,10 +638,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -662,10 +662,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -686,10 +686,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -710,10 +710,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -734,10 +734,10 @@
             {
               "conditions": {
                 "options": {
-                  "caseSensitive": true,
+                  "version": 2,
                   "leftValue": "",
-                  "typeValidation": "strict",
-                  "version": 2
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
                 },
                 "conditions": [
                   {
@@ -1486,11 +1486,11 @@
             },
             {
               "fieldId": "media_url",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.path || null }}"
+              "fieldValue": "={{ $('Envia arquivo').first().json.Key ? $('Sobe mídia recebida').first().json.path : null }}"
             },
             {
               "fieldId": "media_type",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.type || null }}"
+              "fieldValue": "={{ $('Envia arquivo').first().json.Key ? $('Sobe mídia recebida').first().json.type : null }}"
             }
           ]
         }
@@ -1586,7 +1586,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ client_id: $('Resolve tenant').first().json.id, base64: $('Dados').item.json.base64, mime: $('Dados').item.json.mime, filename: $('Dados').item.json.filename, type: $('Dados').item.json.tipo }) }}",
+        "jsonBody": "={{ JSON.stringify({ client_id: $('Resolve tenant').first().json.id, assinar: !!$('Dados').item.json.base64, mime: $('Dados').item.json.mime, filename: $('Dados').item.json.filename, type: $('Dados').item.json.tipo }) }}",
         "options": {}
       },
       "id": "667caa8d-26db-49ac-8339-9bd544c9a9a9",
@@ -1824,7 +1824,7 @@
             {
               "id": "is1",
               "name": "content",
-              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\n\n' : '') }}[Imagem enviada. Não foi possível ver a imagem.]",
+              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\\n\\n' : '') }}[Imagem enviada. Não foi possível ver a imagem.]",
               "type": "string"
             }
           ]
@@ -1847,7 +1847,7 @@
             {
               "id": "vd1",
               "name": "content",
-              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\n\n' : '') }}[{{ $('Dados').item.json.tipo === 'video' ? 'Vídeo enviado' : 'Documento enviado' + ($('Dados').item.json.filename ? ': ' + $('Dados').item.json.filename : '') }}. O conteúdo não pôde ser lido.]",
+              "value": "={{ ($('Dados').item.json.texto || '').trim() }}{{ ($('Dados').item.json.texto ? '\\n\\n' : '') }}[{{ $('Dados').item.json.tipo === 'video' ? 'Vídeo enviado' : 'Documento enviado' + ($('Dados').item.json.filename ? ': ' + $('Dados').item.json.filename : '') + '. O conteúdo não pôde ser lido.' }}]",
               "type": "string"
             }
           ]
@@ -1894,11 +1894,11 @@
             },
             {
               "fieldId": "media_url",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.path || null }}"
+              "fieldValue": "={{ $('Envia arquivo').first().json.Key ? $('Sobe mídia recebida').first().json.path : null }}"
             },
             {
               "fieldId": "media_type",
-              "fieldValue": "={{ $('Sobe mídia recebida').first().json.type || null }}"
+              "fieldValue": "={{ $('Envia arquivo').first().json.Key ? $('Sobe mídia recebida').first().json.type : null }}"
             }
           ]
         }
@@ -2226,6 +2226,77 @@
         },
         "options": {}
       }
+    },
+    {
+      "id": "b64midia-0001-4c1e-9d3a-midia0000001",
+      "name": "Base64 da mídia",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3808,
+        -200
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bm1",
+              "name": "base64",
+              "value": "={{ $('Dados').item.json.base64 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b64midia-0002-4c1e-9d3a-midia0000002",
+      "name": "Mídia → Binary",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        3808,
+        -360
+      ],
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "base64",
+        "options": {
+          "mimeType": "={{ $('Dados').item.json.mime || 'application/octet-stream' }}"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b64midia-0003-4c1e-9d3a-midia0000003",
+      "name": "Envia arquivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3808,
+        -520
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Sobe mídia recebida').item.json.signedUploadUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "={{ $('Dados').item.json.mime || 'application/octet-stream' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "onError": "continueRegularOutput"
     }
   ],
   "connections": {
@@ -2518,17 +2589,6 @@
         ]
       ]
     },
-    "Push msg (Redis)": {
-      "main": [
-        [
-          {
-            "node": "Salva recebida",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Lock counter": {
       "main": [
         [
@@ -2545,17 +2605,6 @@
         [
           {
             "node": "Espera 15s",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Espera 15s": {
-      "main": [
-        [
-          {
-            "node": "Lê chegou",
             "type": "main",
             "index": 0
           }
@@ -2759,17 +2808,6 @@
         ]
       ]
     },
-    "Sobe mídia recebida": {
-      "main": [
-        [
-          {
-            "node": "IA pausada?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Rotas": {
       "main": [
         [
@@ -2797,17 +2835,6 @@
         [
           {
             "node": "Get Lead",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Salva user (IA falhou)": {
-      "main": [
-        [
-          {
-            "node": "Telefone real? (falha)",
             "type": "main",
             "index": 0
           }
@@ -2869,11 +2896,11 @@
         ]
       ]
     },
-    "Salva recebida": {
+    "Push msg (Redis)": {
       "main": [
         [
           {
-            "node": "Marca pronto",
+            "node": "Salva recebida",
             "type": "main",
             "index": 0
           }
@@ -2885,6 +2912,17 @@
         [
           {
             "node": "Sobe mídia recebida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva recebida": {
+      "main": [
+        [
+          {
+            "node": "Marca pronto",
             "type": "main",
             "index": 0
           }
@@ -2907,6 +2945,17 @@
         [
           {
             "node": "Lock counter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Espera 15s": {
+      "main": [
+        [
+          {
+            "node": "Lê chegou",
             "type": "main",
             "index": 0
           }
@@ -3015,11 +3064,66 @@
         ]
       ]
     },
+    "Salva user (IA falhou)": {
+      "main": [
+        [
+          {
+            "node": "Telefone real? (falha)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Telefone real? (falha)": {
       "main": [
         [
           {
             "node": "Fallback ao cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sobe mídia recebida": {
+      "main": [
+        [
+          {
+            "node": "Base64 da mídia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base64 da mídia": {
+      "main": [
+        [
+          {
+            "node": "Mídia → Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mídia → Binary": {
+      "main": [
+        [
+          {
+            "node": "Envia arquivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia arquivo": {
+      "main": [
+        [
+          {
+            "node": "IA pausada?",
             "type": "main",
             "index": 0
           }
