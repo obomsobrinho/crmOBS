@@ -19,6 +19,16 @@ function headers() {
 
 const EVENTS = ["MESSAGES_UPSERT", "CONNECTION_UPDATE", "QRCODE_UPDATED"];
 
+// O webhook de TODA instância, na criação e ao reapontar (uma fonte só).
+// ⚠️ `base64: true` (27/10/2026): o n8n lê a mídia de `data.message.base64`
+// (nó `Dados`). Com `false`, desde 04/08, nenhum áudio, imagem ou documento de
+// instância criada pelo CRM chegou à IA nem ao bucket: 19 de 19 áudios da
+// primeira cliente viraram "não foi possível transcrever". `npm run checar`
+// falha se `base64: false` voltar a este arquivo.
+function webhookDaInstancia(webhookUrl: string) {
+  return { url: webhookUrl, byEvents: false, base64: true, events: EVENTS };
+}
+
 // Extrai o base64 do QR de formatos diferentes de resposta da Evolution.
 export function extractQrBase64(payload: unknown): string | null {
   const p = payload as
@@ -62,7 +72,7 @@ export async function createInstance(
       // o passado de forma nenhuma). Vale para instância criada daqui em
       // diante; as que já existem foram criadas com `true`.
       syncFullHistory: false,
-      webhook: { url: webhookUrl, byEvents: false, base64: false, events: EVENTS },
+      webhook: webhookDaInstancia(webhookUrl),
     }),
   });
 }
@@ -133,13 +143,7 @@ export async function setWebhook(
         method: "POST",
         headers: headers(),
         body: JSON.stringify({
-          webhook: {
-            enabled: true,
-            url: webhookUrl,
-            byEvents: false,
-            base64: false,
-            events: EVENTS,
-          },
+          webhook: { enabled: true, ...webhookDaInstancia(webhookUrl) },
         }),
         signal: AbortSignal.timeout(10_000),
       }

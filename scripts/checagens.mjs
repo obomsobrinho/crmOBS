@@ -14,6 +14,9 @@
 //  4. n8n Evolution sends (03/10/2026): every `n8n-nodes-evolution-api.evolutionApi`
 //     node is reached ONLY through the TRUE output of an IF named `Telefone real?...`
 //     whose condition drops phones starting with 5500 (DDD 00, the test phone).
+//  5. Evolution webhook (27/10/2026): lib/evolution.ts asks for `base64: true` and
+//     never `base64: false` (n8n reads media from `data.message.base64`; with false,
+//     no audio, image or document of a CRM-created instance ever reached the AI).
 import fs from "node:fs";
 import path from "node:path";
 
@@ -119,6 +122,13 @@ for (const f of lista("n8n", ".json")) {
     if (n.type !== EVOLUTION || n.disabled) continue;
     if (!seguro(n.name)) erros.push(`n8n/${f}: Evolution node "${n.name}" must be reached only through the TRUE output of a "Telefone real?" IF (test phone never reaches Evolution)`);
   }
+}
+
+// 5. Evolution webhook with base64 (comments stripped: they may quote the old value)
+{
+  const codigo = ler("lib/evolution.ts").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  if (/base64\s*:\s*false/.test(codigo)) erros.push("lib/evolution.ts: webhook must use base64: true (n8n reads media from data.message.base64)");
+  if (!/base64\s*:\s*true/.test(codigo)) erros.push("lib/evolution.ts: webhook config must set base64: true");
 }
 
 // CARACTERE DE CONTROLE EM TEXTO (07/10/2026): um `\b` de regex escrito por
