@@ -15,7 +15,7 @@ import { janelaDoChip, picosDeHistorico, type DadosDePicos } from "@/lib/picos";
 import type { PreviewDoCliente } from "@/lib/admin-cliente-fonte";
 import { financeiroDe, type Cobranca } from "@/lib/admin-conta";
 import { PLAN_ORDER, PLANS } from "@/lib/billing";
-import type { EstadoDoWhatsApp } from "@/lib/admin-alertas";
+import type { EstadoDoWhatsApp, PedidosEmAberto } from "@/lib/admin-alertas";
 import { SERIES_VAZIAS, type JanelaAgregada, type SeriesAgregadas } from "@/lib/painel-agregado";
 import { ORDEM_PERIODOS, type PeriodoKey } from "@/lib/periodo";
 
@@ -142,8 +142,16 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
   ];
 }
 
+// Pedidos de ajuda abertos (ícone da lista, 27/10/2026): um cliente com vários e
+// antigos, um com um só e recente; o resto sem nenhum (sem ícone).
+// Pelo NOME, e os dois na primeira página da lista (que é em ordem de nome).
+const PEDIDOS_FALSOS: Record<string, (agora: number) => PedidosEmAberto> = {
+  "Barbearia do Zé": (agora) => ({ abertos: 7, maisAntigo: new Date(agora - 5 * D - 3 * H).toISOString() }),
+  "Ateliê Lumière": (agora) => ({ abertos: 1, maisAntigo: new Date(agora - 3 * H).toISOString() }),
+};
+
 export function clientesFalsos(agora: number): EmpresaItem[] {
-  return linhasFalsas(agora).map((l) => paraEmpresa(l, MODELO, agora));
+  return linhasFalsas(agora).map((l) => paraEmpresa(l, MODELO, agora, PEDIDOS_FALSOS[l.name]?.(agora)));
 }
 
 // --- Uso de IA falso: o mês até hoje e a grade de 30 dias -------------------

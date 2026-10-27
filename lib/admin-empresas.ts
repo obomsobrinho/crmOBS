@@ -6,7 +6,9 @@ import {
   nomeDoPlano,
   situacaoDaConta,
   situacaoNoFiltro,
+  SEM_PEDIDOS,
   type Alerta,
+  type PedidosEmAberto,
   type EstadoDoWhatsApp,
   type FiltroDeSituacao,
   type Situacao,
@@ -68,6 +70,8 @@ export interface EmpresaItem {
   /** `clients.evolution_instance` preenchida (o banco não guarda se a conexão está de pé). */
   temInstancia: boolean;
   criadaEm: string;
+  /** Pedidos de ajuda ainda abertos (`admin_pedidos_abertos`); o ícone da lista sai daqui. */
+  pedidos: PedidosEmAberto;
 }
 
 /** O item sem os alertas (os alertas dependem do resto dele). */
@@ -91,7 +95,12 @@ export type LinhaEmpresa = LinhaRpc<
  * depende dele); `agora` é o relógio de quem monta (situação e alertas dependem
  * de datas).
  */
-export function paraEmpresa(l: LinhaEmpresa, modelo: string | null, agora: number): EmpresaItem {
+export function paraEmpresa(
+  l: LinhaEmpresa,
+  modelo: string | null,
+  agora: number,
+  pedidos: PedidosEmAberto = SEM_PEDIDOS
+): EmpresaItem {
   const tokens: TokensDoMes = {
     entrada: Number(l.tokens_entrada) || 0,
     cache: Number(l.tokens_cache) || 0,
@@ -133,6 +142,7 @@ export function paraEmpresa(l: LinhaEmpresa, modelo: string | null, agora: numbe
     situacao: situacaoDaConta(conta, agora),
     temInstancia,
     criadaEm: l.created_at,
+    pedidos,
   };
   return { ...base, alertas: alertasDaEmpresa(base, agora) };
 }

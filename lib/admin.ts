@@ -8,7 +8,12 @@ import { custoEstimadoUsd, mesSP } from "@/lib/custo-ia";
 import { diaIsoSP } from "@/lib/fuso";
 import { mesmoDestino } from "@/lib/avisos";
 import { PAGINA_EMPRESAS, paraEmpresa, type EmpresaItem } from "@/lib/admin-empresas";
-import { estadoDoWhatsApp, type EstadoDoWhatsApp, type FiltroDeSituacao } from "@/lib/admin-alertas";
+import {
+  estadoDoWhatsApp,
+  type EstadoDoWhatsApp,
+  type FiltroDeSituacao,
+  type PedidosEmAberto,
+} from "@/lib/admin-alertas";
 import {
   atendimentoPorPeriodo,
   atuaisEAnteriores,
@@ -170,7 +175,31 @@ export async function paginaDeClientes(
     p_id: a.id ?? null,
   });
   if (error) throw error;
-  return (data ?? []).map((l) => paraEmpresa(l, a.modelo, a.agora));
+  const linhas = data ?? [];
+  const pedidos = await pedidosAbertosDaPagina(svc, linhas.map((l) => l.id));
+  return linhas.map((l) => paraEmpresa(l, a.modelo, a.agora, pedidos.get(l.id)));
+}
+
+/**
+ * Os pedidos de ajuda abertos dos clientes de UMA página (`admin_pedidos_abertos`,
+ * uma chamada por página, nunca uma por cliente). Falha não derruba a lista: o
+ * ícone some e o log diz (o que mais importa na central é a lista abrir).
+ */
+async function pedidosAbertosDaPagina(
+  svc: Supa,
+  ids: string[]
+): Promise<Map<string, PedidosEmAberto>> {
+  const mapa = new Map<string, PedidosEmAberto>();
+  if (ids.length === 0) return mapa;
+  const { data, error } = await svc.rpc("admin_pedidos_abertos", { p_clients: ids });
+  if (error) {
+    console.error("central: falha ao contar os pedidos de ajuda abertos:", error.message);
+    return mapa;
+  }
+  for (const l of data ?? []) {
+    mapa.set(l.client_id, { abertos: Number(l.abertos) || 0, maisAntigo: l.mais_antigo ?? null });
+  }
+  return mapa;
 }
 
 /**

@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, ListFilter, RefreshCw } from "lucide-react";
+import { Building2, ListFilter, MessageCircleWarning, RefreshCw } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { agoraMs } from "@/lib/periodo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -22,7 +24,11 @@ import { useDebounce } from "@/lib/use-debounce";
 import { usePaginada } from "@/lib/use-paginada";
 import { custoCurto, type Cambio } from "@/lib/cambio";
 import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
-import { FILTROS_DE_SITUACAO, type FiltroDeSituacao } from "@/lib/admin-alertas";
+import {
+  FILTROS_DE_SITUACAO,
+  textoDosPedidosAbertos,
+  type FiltroDeSituacao,
+} from "@/lib/admin-alertas";
 import {
   PAGINA_EMPRESAS,
   fonteEmpresasDaApi,
@@ -244,6 +250,35 @@ function BotaoDeFiltro({
   );
 }
 
+/**
+ * O ícone dos pedidos de ajuda abertos (27/10/2026, dono): aparece com UM pedido
+ * aberto, e o texto do balão é o da regra (`textoDosPedidosAbertos`). Âmbar porque
+ * é "alguém espera por você", o mesmo sentido do âmbar em Pedidos. O texto vai
+ * também em `aria-label`: no celular não há ponteiro para abrir o balão.
+ */
+function IconeDePedidos({ e }: { e: EmpresaItem }) {
+  const texto = textoDosPedidosAbertos(e.pedidos, agoraMs());
+  if (!texto) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={texto}
+          data-slot="central-pedidos"
+          data-abertos={e.pedidos.abertos}
+          className="flex shrink-0 items-center text-warn-ink"
+        >
+          <MessageCircleWarning size={15} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="whitespace-nowrap" suppressHydrationWarning>
+        {texto}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 const COLUNAS =
   "grid xl:grid-cols-[minmax(200px,1.3fr)_130px_120px_120px_minmax(140px,190px)_130px] xl:gap-3";
 
@@ -265,8 +300,11 @@ function Linha({ e, href, cambio }: { e: EmpresaItem; href: string; cambio: Camb
         <span className="flex min-w-0 items-center gap-2.5">
           <AvatarCliente e={e} size="md" className="max-md:hidden" />
           <span className="flex min-w-0 flex-col gap-1">
-            <span data-slot="central-nome" className="truncate text-corpo font-semibold text-ink">
-              {e.nome}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span data-slot="central-nome" className="truncate text-corpo font-semibold text-ink">
+                {e.nome}
+              </span>
+              <IconeDePedidos e={e} />
             </span>
             <span className="truncate text-legenda text-ink-3">{linhaDoPlano(e)}</span>
             {principal && <ChipAlerta alerta={principal} className="self-start" />}

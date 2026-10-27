@@ -1104,6 +1104,14 @@ export type Database = {
         }
         Returns: string
       }
+      admin_pedidos_abertos: {
+        Args: { p_clients: string[] }
+        Returns: {
+          abertos: number
+          client_id: string
+          mais_antigo: string
+        }[]
+      }
       admin_mudar_limite_ia: {
         Args: {
           p_client: string

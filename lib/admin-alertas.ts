@@ -230,3 +230,47 @@ export function alertasDaConta(e: EntradaDeAlertas): Alerta[] {
   }
   return alertas;
 }
+
+// ---------------------------------------------------------------------------
+// Pedidos de ajuda em aberto (27/10/2026, dono)
+// ---------------------------------------------------------------------------
+
+/**
+ * Os pedidos de ajuda (`handoffs`) que a empresa ainda não fechou, contados no
+ * banco (`admin_pedidos_abertos`). Fica FORA da lista de `alertasDaConta` de
+ * propósito: é um ícone próprio ao lado do nome, não disputa o lugar do alerta
+ * principal (a ordem daquela lista é decisão registrada em `admin.md`).
+ */
+export interface PedidosEmAberto {
+  abertos: number;
+  /** `opened_at` do mais antigo ainda aberto; nulo quando não há nenhum. */
+  maisAntigo: string | null;
+}
+
+export const SEM_PEDIDOS: PedidosEmAberto = { abertos: 0, maisAntigo: null };
+
+const HORA_MS = 3_600_000;
+
+/** "há 5 dias", "há 3 horas", "há menos de 1 hora". */
+function haQuanto(iso: string, agora: number): string {
+  const horas = Math.floor((agora - Date.parse(iso)) / HORA_MS);
+  if (!Number.isFinite(horas) || horas < 1) return "há menos de 1 hora";
+  if (horas < 24) return `há ${horas} ${plural(horas, "hora", "horas")}`;
+  const dias = Math.floor(horas / 24);
+  return `há ${dias} ${plural(dias, "dia", "dias")}`;
+}
+
+/**
+ * O texto do ícone, ou `null` quando ele não aparece. Regra do dono: UM pedido
+ * aberto já mostra; nenhum outro limite.
+ * Ex.: "7 pedidos de ajuda abertos · o mais antigo há 5 dias".
+ */
+export function textoDosPedidosAbertos(p: PedidosEmAberto, agora: number): string | null {
+  if (p.abertos < 1) return null;
+  const quantos =
+    p.abertos === 1 ? "1 pedido de ajuda aberto" : `${p.abertos} pedidos de ajuda abertos`;
+  if (!p.maisAntigo) return quantos;
+  // Um só: "1 pedido de ajuda aberto há 3 horas" (o "mais antigo" de um é ele mesmo).
+  const ha = haQuanto(p.maisAntigo, agora);
+  return p.abertos === 1 ? `${quantos} ${ha}` : `${quantos} · o mais antigo ${ha}`;
+}
