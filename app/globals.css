@@ -1046,6 +1046,31 @@ select:focus-visible,
     transform: scale(0.97);
   }
 }
+/* O foguete das Novidades (27/10/2026): sobe do meio das nuvens uma vez e fica
+   pairando. Mexe só em `transform` (o SVG não usa `translate` do Tailwind), e o
+   bloco de movimento reduzido lá embaixo deixa o foguete parado no lugar final. */
+@keyframes foguete-sobe {
+  from {
+    transform: translateY(46px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes foguete-paira {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+.anim-foguete {
+  animation:
+    foguete-sobe 900ms var(--ease-out) both,
+    foguete-paira 3.2s ease-in-out 900ms infinite;
+}
 @keyframes fundo-entra {
   from {
     opacity: 0;
@@ -1259,6 +1284,7 @@ select:focus-visible,
   .gravando,
   .msg-in,
   .anim-flutuante,
+  .anim-foguete,
   .anim-lateral,
   .anim-baixo,
   .anim-fundo,

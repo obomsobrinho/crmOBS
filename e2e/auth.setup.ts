@@ -27,6 +27,18 @@ async function entrar(page: Page, email: string, password: string) {
     timeout: 15_000,
   });
   await expect(page).not.toHaveURL(/\/login/);
+
+  // NOVIDADES (27/10/2026): a empresa de teste já existia antes de cada nota,
+  // então o login de teste vê o diálogo uma vez. Fecha aqui, pelo próprio
+  // "Entendi" (que grava o "já vi" no usuário e renova a sessão), ANTES de
+  // salvar o estado: sem isto o diálogo cobriria a tela dos testes logados.
+  await page.waitForLoadState("networkidle");
+  const novidades = page.locator('[data-slot="novidades"]');
+  if (await novidades.isVisible()) {
+    await novidades.locator('[data-slot="novidades-fechar"]').click();
+    await expect(novidades).toHaveCount(0);
+    await page.waitForLoadState("networkidle");
+  }
 }
 
 setup("autenticar como dono", async ({ page }) => {

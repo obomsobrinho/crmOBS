@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { accessState, type AccessState } from "@/lib/billing";
 import { montagemState, type MontagemState } from "@/lib/onboarding";
 import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
+import { CHAVE_DA_NOVIDADE_VISTA } from "@/lib/novidades";
 
 /** A tela clara de quem tem a conta DESATIVADA pelo dono do produto. */
 const ROTA_CONTA_DESATIVADA = "/conta-desativada";
@@ -58,6 +59,10 @@ export interface MyClient {
    * `processTurn` para todo mundo.
    */
   contaDesativada: boolean;
+  /** `clients.created_at`: quem vê a nota de Novidades (lib/novidades.ts). */
+  criadaEm: string;
+  /** `user_metadata.novidades_vista`: o id da última nota que ESTE usuário fechou. */
+  novidadesVista: unknown;
 }
 
 // Cliente (tenant) do usuário logado. A RLS já restringe `clients` ao(s)
@@ -98,7 +103,7 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     supabase
       .from("clients")
       .select(
-        "id, name, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at, notify_group_jid, vitalicio_desde, bloqueado_em, desativada_em"
+        "id, name, created_at, evolution_instance, imported_at, subscription_status, trial_ends_at, grace_until, billing_plan, agent_config_updated_at, agent_published_at, agent_enabled, onboarding_tested_at, notify_group_jid, vitalicio_desde, bloqueado_em, desativada_em"
       )
       // ⚠️ `order` ANTES do `limit(1)`, e não é detalhe (achado A2): sem ordenação
       // o banco devolve qualquer uma das linhas que a RLS liberou, então um
@@ -159,6 +164,9 @@ export const getMyClient = cache(async function getMyClient(): Promise<MyClient 
     }),
     avisos: client.notify_group_jid ?? null,
     contaDesativada: access.kind === "desativado" && !ehAdminPeloAmbiente(userId),
+    criadaEm: client.created_at,
+    // Vem do próprio JWT (sem ida à rede); o navegador grava e renova a sessão.
+    novidadesVista: claimsData?.claims?.user_metadata?.[CHAVE_DA_NOVIDADE_VISTA] ?? null,
   };
 });
 

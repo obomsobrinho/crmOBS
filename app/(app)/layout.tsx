@@ -9,6 +9,9 @@ import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
 import { barrarContaDesativada, getMyClient } from "@/lib/auth";
 import { estadoDoConsumoDoTenant } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
+import NovidadesModal from "@/components/NovidadesModal";
+import { notaAtual, novidadeParaMostrar } from "@/lib/novidades";
+import { inicioDoDiaSP } from "@/lib/fuso";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +97,21 @@ export default async function AppLayout({
           client.role === "dono" && <AvisoMontagem />}
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
+      {/* Novidades: decidido AQUI, no servidor, pela regra pura; o diálogo só
+          mostra e grava o "já vi". Conta criada depois da nota não vê. */}
+      <NovidadesModal nota={novidadeDoUsuario(client.criadaEm, client.novidadesVista)} />
     </div>
   );
+}
+
+function novidadeDoUsuario(criadaEm: string, vista: unknown) {
+  const nota = notaAtual();
+  if (!nota) return null;
+  return novidadeParaMostrar({
+    nota,
+    empresaCriadaEm: criadaEm,
+    vista,
+    inicioDoDia: inicioDoDiaSP(nota.id),
+    agora: agoraMs(),
+  });
 }

@@ -65,6 +65,12 @@ const conteudoVariants = cva(
         gestao:
           "flex max-h-[85vh] max-w-lg flex-col overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-none max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]",
         /**
+         * As Novidades (27/10/2026): sem respiro na moldura (a ilustração vai de
+         * borda a borda no topo e a ação ocupa o rodapé inteiro), cantos mais
+         * redondos que os outros modais, como nas referências do dono.
+         */
+        novidade: "max-w-md overflow-hidden rounded-[24px] p-0",
+        /**
          * Prévia de um arquivo (imagem ou PDF do contato, 27/10/2026): largo
          * para a imagem respirar, cabeçalho e rodapé fixos, a mídia no meio.
          * No celular é tela cheia, pelo mesmo motivo da `gestao`.
