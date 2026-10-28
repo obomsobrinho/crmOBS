@@ -57,6 +57,7 @@ Reminder
 7. Automatic over WhatsApp, fixed text, no AI cost, 24h before, ALWAYS inside business hours. When
    24h before falls outside them, it goes at the last open moment before that (Monday 9h with
    Sunday closed: Saturday). A booking made less than 24h ahead gets no reminder. Setting: on/off.
+   REPLACED the same day by a single daily run at 9h (section 7).
 
 Settings (Configurações, section Agenda)
 8. An "Agenda" item with an on/off checkbox and a short text. Checked opens the settings below.
@@ -138,7 +139,7 @@ start is the previous end + buffer.
 - `agenda_servicos` (name, `duracao_min` 5..480, `ativo`, `ordem`).
 - `agenda_bloqueios` (start, end, reason).
 - `agendamentos` (phone, name, service snapshot, start, end, status, origin, `resumo` = what it is
-  about, `lembrete_em`, `lembrete_enviado_em`, cancel fields, `remarcado_de`), exclusion constraint
+  about, `lembrete_enviado_em` (claimed by the 9h run), cancel fields, `remarcado_de`), exclusion constraint
   against overlap, partial index on pending reminders.
 - `agenda_etapa_do_funil(p_client, p_ativa)`: on creates (or unarchives) the canonical "Agendado"
   stage right after "Aguardando atendimento"; off archives it. Called by `PUT /api/agenda/config`.
@@ -150,7 +151,7 @@ start is the previous end + buffer.
 | # | Question | What the code does now |
 |---|---|---|
 | P1 | Where each period starts and ends | morning before 12h, afternoon 12h to 18h, evening from 18h (`PERIODOS_DA_AGENDA`) |
-| P2 | "Last open moment" for a reminder that falls outside business hours | 30 min before closing (`LEMBRETE_ANTES_DE_FECHAR_MIN`) |
+| P2 | ~~"Last open moment" for a reminder~~ | decided: a single run at 9h (section 7) |
 | P3 | Reminder on or off by default | on (`AGENDA_PADRAO.lembrete`) |
 | P4 | Where "Configurações" lives in the menu | page `/agenda/configuracoes`, reached by the agenda gear and a link in Agente, "O que ele pode fazer" |
 | P5 | The activation item in onboarding (montagem) | not built |
@@ -158,21 +159,46 @@ start is the previous end + buffer.
 | P7 | Conversations already in "Agendado" when the agenda is turned off | the stage is archived; the conversations keep the key |
 | P8 | Clicking an empty slot of the grid to book there | not built (button "Marcar horário") |
 | P9 | Cancelled bookings on screen | not shown in the grid |
-| P10 | The reminder text and whether the customer can answer "SAIR" | fixed text in `textoDoLembrete`; no opt-out |
+| P10 | The reminder text and "SAIR" | moved to section 7 (R4) |
 
 Decided on 28/10/2026 (was P11): the agenda hours MAY go beyond the business hours, with no block
 (owner: "Pode passar"); the reminder still goes inside the business hours.
 
-## 7. What the automatic reminder still needs (not built, by instruction)
+## 7. Automatic reminder (owner decision of 28/10/2026, "9h"; built, not turned on)
 
-The time is computed and stored at booking (`lembrete_em`, rule `momentoDoLembrete`). Sending it
-needs a scheduler, which is new infrastructure, so it was not built:
-1. A cron (Vercel Cron or an n8n schedule; the n8n option touches production and needs the owner's
-   explicit OK) calling a protected route every few minutes.
-2. The route: read `agendamentos` where `lembrete_em <= now()` and `lembrete_enviado_em is null`
-   (index exists), send `textoDoLembrete` over Evolution (`sendText`, the same pipe as the help
-   notices, DDD 00 never), stamp `lembrete_enviado_em`. A new server-only secret for the cron call.
-3. Owner decisions P10 and the active-messaging rules (daily cap, random interval, "responda SAIR").
+Replaces "24h before, inside business hours", pending P2 and the open scheduler question.
+1. ONE run per day at 9h America/Sao_Paulo, the same for every company (it does not follow each
+   company's opening time).
+2. Scheduler: Vercel Cron, `vercel.json` `"0 12 * * *"` (UTC; 9h in São Paulo), calling
+   `GET /api/agenda/lembretes`. Protected by the env var `CRON_SECRET`: Vercel sends
+   `Authorization: Bearer <CRON_SECRET>` when the variable exists in the project (Vercel, Settings,
+   Environment Variables, Production); without it the route answers 401 and sends nothing. The owner
+   sets the value; none is written anywhere. Nothing in n8n. On the Hobby plan the trigger may fire
+   up to 59 min late (9h00 to 9h59), accepted.
+3. Per company with the agenda on and the reminder on, only on a day the company OPENS (business
+   hours): the confirmed bookings from tomorrow up to and including the next open day
+   (`janelaDoLembrete`; closed Saturday and Sunday: on Friday the run covers Saturday, Sunday and
+   Monday). A booking created after the run that would cover it gets no reminder (the confirmation
+   when booking is enough). Holidays do not count: the product has no holiday calendar.
+4. Sending: `lib/envio-ativo.ts` over the existing Evolution layer (`sendText`), fixed text
+   (`textoDoLembrete`), no AI. Idempotent: each booking is claimed (`lembrete_enviado_em` from null
+   to now, conditional) before sending and released if Evolution refuses, so two runs never send
+   twice. Test phones (DDD 00) and the notices number are skipped.
+5. `lib/envio-ativo.ts` is the single place for active messages, designed for Follow-up to reuse
+   (`enviarMensagemAtiva`, `pausaEntreEnvios`, `RegrasDoEnvioAtivo`).
+6. Screen text: "Lembrete automático pelo WhatsApp, às 9h do dia anterior ao horário marcado (no
+   último dia em que a loja abre antes dele)." The booking detail shows the day of the reminder,
+   "enviado" once sent, or "sem lembrete".
+
+Pending before turning it on (project rules for active messaging, `CLAUDE.md`; values not decided):
+| # | Question | What the code does now |
+|---|---|---|
+| R1 | Daily cap per company | none (`REGRAS_DO_LEMBRETE.tetoDiario = null`) |
+| R2 | Random interval between messages | none (`intervaloMs = null`) |
+| R3 | Recent conversation required? A contact booked by hand by the team may never have written | not checked |
+| R4 | "Responda SAIR" in the text, and what SAIR does | not in the text; no opt-out stored |
+| R5 | Company with an expired trial or late payment | still sends (only deactivated or blocked companies are skipped) |
+| R6 | A run that fails (Evolution down) | the claim is released; the next run covers only its own days, so that reminder is lost |
 
 ## 8. Tests
 
