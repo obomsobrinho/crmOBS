@@ -26,6 +26,10 @@ export const TABELAS_DO_CLIENTE = [
   "knowledge_chunks",
   "knowledge_documents",
   "handoffs",
+  // Agenda propria (28/10/2026): agendamentos antes dos servicos (chave com set null).
+  "agendamentos",
+  "agenda_bloqueios",
+  "agenda_servicos",
   "chat_messages",
   "conversations",
   "tags",
@@ -68,6 +72,7 @@ export const LEITURA_DA_EXPORTACAO: Partial<
   agent_turns: { ordem: ["created_at", "id"] },
   conversation_qualifications: { ordem: ["created_at", "id"] },
   handoffs: { ordem: ["opened_at", "id"] },
+  agendamentos: { ordem: ["inicio", "id"] },
   feedback: { ordem: ["created_at", "id"] },
   billing_events: { ordem: ["created_at", "id"] },
   knowledge_documents: { ordem: ["created_at", "id"] },
@@ -118,5 +123,5 @@ export function nomeDoArquivo(nome: string): string {
  * uma coluna nova não some da exportação LGPD em silêncio).
  */
 export const COLUNAS_DO_CLIENTE =
-  "id, name, created_at, prompt_mode, persona, agent_config, agent_config_updated_at, agent_enabled, agent_published_at, onboarding_tested_at, regras_salvas, evolution_instance, notify_group_jid, imported_at, ia_limite_tokens, subscription_status, trial_ends_at, grace_until, billing_plan, billing_provider, billing_customer_id, billing_subscription_id, billing_seats, billing_updated_at, vitalicio_desde, bloqueado_em, desativada_em";
+  "id, name, created_at, prompt_mode, persona, agent_config, agent_config_updated_at, agenda_config, agent_enabled, agent_published_at, onboarding_tested_at, regras_salvas, evolution_instance, notify_group_jid, imported_at, ia_limite_tokens, subscription_status, trial_ends_at, grace_until, billing_plan, billing_provider, billing_customer_id, billing_subscription_id, billing_seats, billing_updated_at, vitalicio_desde, bloqueado_em, desativada_em";
 

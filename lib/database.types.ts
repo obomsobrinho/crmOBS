@@ -44,6 +44,158 @@ export type Database = {
         }
         Relationships: []
       }
+      agenda_bloqueios: {
+        Row: {
+          client_id: string
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: number
+          inicio: string
+          motivo: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: never
+          inicio: string
+          motivo?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: never
+          inicio?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_bloqueios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_servicos: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          duracao_min: number
+          id: number
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          duracao_min: number
+          id?: never
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          duracao_min?: number
+          id?: never
+          nome?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_servicos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agendamentos: {
+        Row: {
+          cancelado_em: string | null
+          cancelado_por: string | null
+          client_id: string
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: number
+          inicio: string
+          nome: string | null
+          origem: string
+          phone: string
+          remarcado_de: number | null
+          servico_id: number | null
+          servico_nome: string
+          status: string
+        }
+        Insert: {
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          client_id: string
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: never
+          inicio: string
+          nome?: string | null
+          origem: string
+          phone: string
+          remarcado_de?: number | null
+          servico_id?: number | null
+          servico_nome: string
+          status?: string
+        }
+        Update: {
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          client_id?: string
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: never
+          inicio?: string
+          nome?: string | null
+          origem?: string
+          phone?: string
+          remarcado_de?: number | null
+          servico_id?: number | null
+          servico_nome?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_remarcado_de_fkey"
+            columns: ["remarcado_de"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_publications: {
         Row: {
           client_id: string
@@ -257,6 +409,7 @@ export type Database = {
         Row: {
           agent_config: Json | null
           agent_config_updated_at: string | null
+          agenda_config: Json | null
           agent_enabled: boolean
           agent_published_at: string | null
           billing_customer_id: string | null
@@ -286,6 +439,7 @@ export type Database = {
         Insert: {
           agent_config?: Json | null
           agent_config_updated_at?: string | null
+          agenda_config?: Json | null
           agent_enabled?: boolean
           agent_published_at?: string | null
           billing_customer_id?: string | null
@@ -315,6 +469,7 @@ export type Database = {
         Update: {
           agent_config?: Json | null
           agent_config_updated_at?: string | null
+          agenda_config?: Json | null
           agent_enabled?: boolean
           agent_published_at?: string | null
           billing_customer_id?: string | null
