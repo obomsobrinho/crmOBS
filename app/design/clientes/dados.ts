@@ -16,6 +16,13 @@ import type { PreviewDoCliente } from "@/lib/admin-cliente-fonte";
 import { financeiroDe, type Cobranca } from "@/lib/admin-conta";
 import { PLAN_ORDER, PLANS } from "@/lib/billing";
 import type { EstadoDoWhatsApp, PedidosEmAberto } from "@/lib/admin-alertas";
+import {
+  ordenarPedidos,
+  PAGINA_PEDIDOS_DA_CENTRAL,
+  resumoDosPedidos,
+  type PedidoDaCentral,
+  type ResumoDosPedidos,
+} from "@/lib/admin-pedidos";
 import { SERIES_VAZIAS, type JanelaAgregada, type SeriesAgregadas } from "@/lib/painel-agregado";
 import { ORDEM_PERIODOS, type PeriodoKey } from "@/lib/periodo";
 
@@ -142,16 +149,67 @@ function linhasFalsas(agora: number): LinhaEmpresa[] {
   ];
 }
 
-// Pedidos de ajuda abertos (ícone da lista, 27/10/2026): um cliente com vários e
-// antigos, um com um só e recente; o resto sem nenhum (sem ícone).
-// Pelo NOME, e os dois na primeira página da lista (que é em ordem de nome).
-const PEDIDOS_FALSOS: Record<string, (agora: number) => PedidosEmAberto> = {
-  "Barbearia do Zé": (agora) => ({ abertos: 7, maisAntigo: new Date(agora - 5 * D - 3 * H).toISOString() }),
-  "Ateliê Lumière": (agora) => ({ abertos: 1, maisAntigo: new Date(agora - 3 * H).toISOString() }),
+// Pedidos de ajuda abertos (ícone da lista e bloco "Pedidos em aberto", 27/10/2026): um
+// cliente com 12, o mais antigo de 5 dias (mais de uma página de 10, para a rolagem buscar a
+// segunda), um com um só e recente; o resto sem nenhum (sem ícone). Pelo NOME, e os dois na
+// primeira página da lista (que é em ordem de nome). O ícone conta a MESMA lista do bloco.
+const CONTATOS_FALSOS = [
+  { nome: "Marina Alves", motivo: "preco", resumo: "Quer saber o valor do pacote mensal para duas pessoas." },
+  { nome: null, motivo: "pessoa", resumo: "Pediu para falar com alguém do time sobre um pagamento." },
+  { nome: "Rafael Souza", motivo: "falta_info", resumo: "Perguntou se atende aos domingos; a base não diz." },
+  { nome: "Camila Rocha", motivo: "reclamacao", resumo: "Reclamou de uma cobrança em dobro no cartão." },
+  { nome: "Bruno Lima", motivo: "fechar", resumo: "Quer contratar e pediu o link de pagamento." },
+  { nome: "Ana Paula", motivo: null, resumo: null },
+] as const;
+
+// Quem pede o quê, na ordem de abertura: "Falta informação" 5 vezes e "Preço ou orçamento" 3
+// (os repetidos que podem virar regra), o resto uma vez cada, como numa empresa de verdade.
+const ORDEM_FALSA = [2, 0, 2, 1, 2, 0, 3, 2, 4, 0, 2, 5];
+
+function pedidosFalsos(n: number, maisAntigoMs: number, agora: number): PedidoDaCentral[] {
+  return Array.from({ length: n }, (_, i) => {
+    const c = CONTATOS_FALSOS[ORDEM_FALSA[i % ORDEM_FALSA.length]];
+    // Do mais antigo até meia hora atrás, espalhados por igual.
+    const em = n === 1 ? maisAntigoMs : maisAntigoMs + ((agora - 30 * 60_000 - maisAntigoMs) * i) / (n - 1);
+    return {
+      id: 9000 + i,
+      phone: "55000000" + String(100 + i),
+      abertoEm: new Date(em).toISOString(),
+      motivo: c.motivo,
+      resumo: c.resumo,
+      nome: c.nome,
+    };
+  });
+}
+
+const PEDIDOS_FALSOS: Record<string, (agora: number) => PedidoDaCentral[]> = {
+  "Barbearia do Zé": (agora) => pedidosFalsos(12, agora - 5 * D - 3 * H, agora),
+  "Ateliê Lumière": (agora) => pedidosFalsos(1, agora - 3 * H, agora),
 };
 
+/** Os pedidos abertos falsos de um cliente, do mais antigo ao mais novo. */
+export function pedidosFalsosDe(e: EmpresaItem, agora: number): PedidoDaCentral[] {
+  return ordenarPedidos(PEDIDOS_FALSOS[e.nome]?.(agora) ?? []);
+}
+
+/** O mesmo agregado de `admin_pedidos_por_motivo` (por motivo, com o mais antigo), feito sobre a lista falsa. */
+export function resumoFalso(lista: PedidoDaCentral[]): ResumoDosPedidos {
+  const porMotivo = new Map<string | null, { motivo: string | null; abertos: number; mais_antigo: string }>();
+  for (const p of ordenarPedidos(lista)) {
+    const g = porMotivo.get(p.motivo) ?? { motivo: p.motivo, abertos: 0, mais_antigo: p.abertoEm };
+    g.abertos += 1;
+    porMotivo.set(p.motivo, g);
+  }
+  return resumoDosPedidos([...porMotivo.values()]);
+}
+
+function contagemFalsa(nome: string, agora: number): PedidosEmAberto | undefined {
+  const lista = PEDIDOS_FALSOS[nome]?.(agora);
+  return lista && { abertos: lista.length, maisAntigo: ordenarPedidos(lista)[0].abertoEm };
+}
+
 export function clientesFalsos(agora: number): EmpresaItem[] {
-  return linhasFalsas(agora).map((l) => paraEmpresa(l, MODELO, agora, PEDIDOS_FALSOS[l.name]?.(agora)));
+  return linhasFalsas(agora).map((l) => paraEmpresa(l, MODELO, agora, contagemFalsa(l.name, agora)));
 }
 
 // --- Uso de IA falso: o mês até hoje e a grade de 30 dias -------------------
@@ -189,6 +247,12 @@ function historicoFalso(agora: number): { dia: string; horas: number[] }[] {
     const total = 6 + ((Number(dia.slice(8)) * 7) % 13) * 4;
     const pesos = Array.from({ length: 24 }, (_, h) => (dia === hoje && h > horaAtual ? 0 : pesoDaHora(dow, h)));
     const soma = pesos.reduce((s, p) => s + p, 0);
+    // Hoje antes das 8h ainda não tem hora com movimento: o dia fica zerado. Sem isto a conta dividia
+    // zero por zero e o NaN contaminava todos os períodos da aba Uso de IA de madrugada.
+    if (soma === 0) {
+      saida.push({ dia, horas: pesos });
+      continue;
+    }
     const horas = pesos.map((p) => Math.floor((total * p) / soma));
     // O resto da divisão vai para a hora de maior peso, para o total do dia fechar.
     horas[pesos.indexOf(Math.max(...pesos))] += total - horas.reduce((s, n) => s + n, 0);
@@ -334,6 +398,7 @@ export function previewDoCliente(
     atendimento: atendimentoFalso(agora, vazio),
     whatsapp,
     cobrancas: cobrancasFalsas(e, agora),
+    pedidos: pedidosFalsosDe(e, agora),
   };
 }
 
@@ -368,6 +433,10 @@ export function detalheFalso(
     avisosConfigurados: e.publicada,
     donoEmail: `dono@${e.nome.toLowerCase().replace(/[^a-z0-9]+/g, "")}.exemplo`,
     membros: e.nome === "Barbearia do Zé" ? 3 : 1,
+    pedidos: {
+      resumo: resumoFalso(pedidosFalsosDe(e, agora)),
+      primeiros: pedidosFalsosDe(e, agora).slice(0, PAGINA_PEDIDOS_DA_CENTRAL),
+    },
     // Pela MESMA função do servidor (`financeiroDe`): os ids saem mascarados.
     financeiro: financeiroDe({
       billing_plan: PLAN_ORDER.find((k) => PLANS[k].name === e.plano) ?? null,

@@ -269,7 +269,10 @@ test.describe("Central: detalhe de um cliente", () => {
     await expect(page.locator('[data-slot="visao-modo"]')).toHaveText("Guiado");
     await expect(page.locator('[data-slot="visao-avisos"]')).toHaveText("Configurado");
     await expect(page.locator('[data-slot="visao-conexao"]')).toHaveText("Conectado");
-    await expect(page.locator('[data-slot="visao-sem-alertas"]')).toBeVisible();
+    // Nenhum alerta da conta. (A Barbearia tem pedidos de ajuda abertos: eles aparecem no MESMO cartão,
+    // à parte, e por isso o "Nada pede atenção agora" não aparece; e2e/central-pedidos.design.spec.ts.)
+    await expect(page.locator('[data-slot="visao-alertas-lista"]')).toHaveCount(0);
+    await expect(page.locator('[data-bloco="visao-alertas"] [data-slot="visao-alerta-pedidos"]')).toBeVisible();
   });
 
   test("WhatsApp desconectado entra nos alertas e no cabeçalho", async ({ page }) => {
@@ -284,7 +287,10 @@ test.describe("Central: detalhe de um cliente", () => {
   test("WhatsApp reconectando é dito como tal e NÃO vira alerta de desconexão", async ({ page }) => {
     await page.goto(detalhe(1, "&whatsapp=reconectando"));
     await expect(page.locator('[data-slot="visao-conexao"]')).toHaveText("Reconectando");
-    await expect(page.locator('[data-slot="visao-sem-alertas"]')).toBeVisible();
+    // Nenhum alerta da conta. (A Barbearia tem pedidos de ajuda abertos: eles aparecem no MESMO cartão,
+    // à parte, e por isso o "Nada pede atenção agora" não aparece; e2e/central-pedidos.design.spec.ts.)
+    await expect(page.locator('[data-slot="visao-alertas-lista"]')).toHaveCount(0);
+    await expect(page.locator('[data-bloco="visao-alertas"] [data-slot="visao-alerta-pedidos"]')).toBeVisible();
     await expect(page.locator('[data-slot="central-detalhe"] [data-slot="admin-alerta"]')).toHaveCount(0);
   });
 

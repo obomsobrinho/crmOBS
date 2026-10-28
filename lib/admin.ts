@@ -6,8 +6,15 @@ import type { Supa } from "@/lib/supabase/tipos";
 import { ehAdminPeloAmbiente, ehUuid, idsDeAdmin, listaDeAdmins } from "@/lib/admin-acesso";
 import { custoEstimadoUsd, mesSP } from "@/lib/custo-ia";
 import { diaIsoSP } from "@/lib/fuso";
-import { mesmoDestino } from "@/lib/avisos";
+import { grafiasDoNumeroDeAvisos, mesmoDestino } from "@/lib/avisos";
 import { PAGINA_EMPRESAS, paraEmpresa, type EmpresaItem } from "@/lib/admin-empresas";
+import {
+  PAGINA_PEDIDOS_DA_CENTRAL,
+  pedidosDasLinhas,
+  resumoDosPedidos,
+  type PedidoDaCentral,
+  type ResumoDosPedidos,
+} from "@/lib/admin-pedidos";
 import {
   estadoDoWhatsApp,
   type EstadoDoWhatsApp,
@@ -285,11 +292,14 @@ export async function detalheDoCliente(
   agora: number,
   modeloDoSistema: string
 ): Promise<DetalheDoCliente | null> {
-  const [base, extra, membros, modelo] = await Promise.all([
+  const leituraDoCliente = svc.from("clients").select("prompt_mode, notify_group_jid").eq("id", id).maybeSingle();
+  const [base, extra, membros, modelo, pedidos] = await Promise.all([
     empresaEFinanceiro(svc, id, agora, modeloDoSistema),
-    svc.from("clients").select("prompt_mode, notify_group_jid").eq("id", id).maybeSingle(),
+    leituraDoCliente,
     svc.rpc("tenant_members_do_cliente", { p_client: id }),
     modeloDoCliente(svc, id, modeloDoSistema, agora),
+    // O número de avisos sai no banco, então os pedidos esperam o destino (uma leitura por chave).
+    leituraDoCliente.then((c) => pedidosIniciais(svc, id, grafiasDoNumeroDeAvisos(c.data?.notify_group_jid))),
   ]);
   if (extra.error) throw extra.error;
   if (membros.error) throw membros.error;
@@ -305,7 +315,67 @@ export async function detalheDoCliente(
     avisosConfigurados: !!extra.data.notify_group_jid,
     donoEmail: pessoas.find((m) => m.role === "dono")?.email ?? null,
     membros: pessoas.length,
+    pedidos,
   };
+}
+
+/**
+ * Uma página dos pedidos abertos de UM cliente (`admin_pedidos_do_cliente`, do mais antigo ao
+ * mais novo, sem período). `null` = não deu para ler: o detalhe abre do mesmo jeito e o bloco diz
+ * que não carregou (o que mais importa é a página abrir).
+ */
+async function linhasDePedidos(
+  svc: Supa,
+  id: string,
+  depois: { em: string; id: number } | null,
+  fora: string[]
+) {
+  const { data, error } = await svc.rpc("admin_pedidos_do_cliente", {
+    p_client: id,
+    p_cursor_em: depois?.em,
+    p_cursor_id: depois?.id,
+    p_limite: PAGINA_PEDIDOS_DA_CENTRAL,
+    p_fora: fora,
+  });
+  if (error) {
+    console.error("central: falha ao ler os pedidos de ajuda abertos do cliente:", error.message);
+    return null;
+  }
+  return pedidosDasLinhas(data ?? []);
+}
+
+/**
+ * O que o bloco abre com o detalhe: o resumo (quantos por motivo, `admin_pedidos_por_motivo`) e a
+ * primeira página da lista, as duas leituras juntas. `null` se qualquer uma falhar.
+ */
+async function pedidosIniciais(
+  svc: Supa,
+  id: string,
+  fora: string[]
+): Promise<{ resumo: ResumoDosPedidos; primeiros: PedidoDaCentral[] } | null> {
+  const [primeiros, porMotivo] = await Promise.all([
+    linhasDePedidos(svc, id, null, fora),
+    svc.rpc("admin_pedidos_por_motivo", { p_client: id, p_fora: fora }),
+  ]);
+  if (porMotivo.error) {
+    console.error("central: falha ao contar os pedidos abertos por motivo:", porMotivo.error.message);
+    return null;
+  }
+  if (!primeiros) return null;
+  // O gerador marca toda coluna de RPC como não nula; o motivo pode ser nulo (pedido antigo).
+  const linhas: { motivo: string | null; abertos: number; mais_antigo: string | null }[] = porMotivo.data ?? [];
+  return { resumo: resumoDosPedidos(linhas), primeiros };
+}
+
+/** A página seguinte do bloco "Pedidos em aberto" (rota `.../pedidos`). `null` = falhou. */
+export async function pedidosDoCliente(
+  svc: Supa,
+  id: string,
+  depois: { em: string; id: number } | null
+): Promise<PedidoDaCentral[] | null> {
+  const cliente = await svc.from("clients").select("notify_group_jid").eq("id", id).maybeSingle();
+  if (cliente.error) return null;
+  return linhasDePedidos(svc, id, depois, grafiasDoNumeroDeAvisos(cliente.data?.notify_group_jid));
 }
 
 /** As colunas de cobrança que a aba Financeiro mostra (os ids saem mascarados por `financeiroDe`). */

@@ -69,7 +69,7 @@ test.describe("Atendente", () => {
     });
     expect(editar.status()).toBe(404);
     // As rotas das abas da central (docs/plano-central-clientes.md) também.
-    for (const rota of ["uso", "atendimento", "whatsapp", "cobrancas", "exportar"]) {
+    for (const rota of ["uso", "atendimento", "whatsapp", "cobrancas", "exportar", "pedidos"]) {
       const res = await page.request.get(`/api/admin/empresas/${clientId}/${rota}`);
       expect(res.status(), rota).toBe(404);
     }

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Building2, ListFilter, CalendarX2, MessageCircleWarning, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agoraMs } from "@/lib/periodo";
@@ -256,8 +257,11 @@ function BotaoDeFiltro({
  * aberto, e o texto do balão é o da regra (`textoDosPedidosAbertos`). Âmbar porque
  * é "alguém espera por você", o mesmo sentido do âmbar em Pedidos. O texto vai
  * também em `aria-label`: no celular não há ponteiro para abrir o balão.
+ * Clicar nele abre o detalhe na aba Atendimento, já na seção "Pedidos em aberto"
+ * (`?aba=atendimento#pedidos`); o resto da linha continua abrindo a Visão geral.
  */
-function IconeDePedidos({ e }: { e: EmpresaItem }) {
+function IconeDePedidos({ e, href }: { e: EmpresaItem; href: string }) {
+  const router = useRouter();
   const texto = textoDosPedidosAbertos(e.pedidos, agoraMs());
   if (!texto) return null;
   return (
@@ -268,6 +272,17 @@ function IconeDePedidos({ e }: { e: EmpresaItem }) {
           aria-label={texto}
           data-slot="central-pedidos"
           data-abertos={e.pedidos.abertos}
+          // Fica dentro do link da linha (um link não pode morar em outro), então o clique
+          // troca o destino da linha pelo bloco de pedidos.
+          onClick={(ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            // A seção "Pedidos em aberto" mora na aba Atendimento do detalhe.
+            const destino = new URL(href, window.location.origin);
+            destino.searchParams.set("aba", "atendimento");
+            destino.hash = "pedidos";
+            router.push(`${destino.pathname}${destino.search}${destino.hash}`);
+          }}
           className="flex shrink-0 items-center text-warn-ink"
         >
           <MessageCircleWarning size={15} />
@@ -279,6 +294,7 @@ function IconeDePedidos({ e }: { e: EmpresaItem }) {
     </Tooltip>
   );
 }
+
 /** Lembretes da agenda que não saíram (28/10/2026, dono): mesmo desenho do ícone de pedidos. */
 function IconeDeLembretes({ e }: { e: EmpresaItem }) {
   const texto = textoDosLembretesComFalha(e.lembretes, agoraMs());
@@ -323,7 +339,7 @@ function Linha({ e, href, cambio }: { e: EmpresaItem; href: string; cambio: Camb
               <span data-slot="central-nome" className="truncate text-corpo font-semibold text-ink">
                 {e.nome}
               </span>
-              <IconeDePedidos e={e} />
+              <IconeDePedidos e={e} href={href} />
               <IconeDeLembretes e={e} />
             </span>
             <span className="truncate text-legenda text-ink-3">{linhaDoPlano(e)}</span>

@@ -177,6 +177,17 @@ export default function DetalheCliente({
     [detalhe.agora],
   );
 
+  /**
+   * O cartão da Visão geral leva à seção "Pedidos em aberto" da aba Atendimento: abre a aba e conta um
+   * pedido de rolagem, que a seção atende quando o resto da aba já desenhou.
+   */
+  const [rolarAtePedidos, setRolarAtePedidos] = useState(0);
+  const verPedidos = useCallback(() => {
+    setAba("atendimento");
+    setVisitadas((cur) => (cur.has("atendimento") ? cur : new Set(cur).add("atendimento")));
+    setRolarAtePedidos((n) => n + 1);
+  }, []);
+
   function mudarAba(v: string) {
     if (!ehAbaDoCliente(v)) return;
     setAba(v);
@@ -281,6 +292,7 @@ export default function DetalheCliente({
                   alertas={alertas}
                   whatsapp={whatsapp}
                   onChecarWhatsapp={checarDeNovo}
+                  onVerPedidos={verPedidos}
                 />
               </TabsContent>
               <TabsContent value="uso" forceMount>
@@ -296,7 +308,14 @@ export default function DetalheCliente({
                 )}
               </TabsContent>
               <TabsContent value="atendimento" forceMount>
-                {visitadas.has("atendimento") && <AbaAtendimento fonte={fonte} />}
+                {visitadas.has("atendimento") && (
+                  <AbaAtendimento
+                    fonte={fonte}
+                    pedidos={detalhe.pedidos}
+                    agora={detalhe.agora}
+                    rolarAtePedidos={rolarAtePedidos}
+                  />
+                )}
               </TabsContent>
               <TabsContent value="financeiro" forceMount>
                 {visitadas.has("financeiro") && (

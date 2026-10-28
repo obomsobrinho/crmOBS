@@ -27,6 +27,7 @@ import { contagemPorSolucao, type ContagemDeSolucao } from "./solucoes";
 import { ORDEM_PERIODOS, PERIODOS, unidadeDoPeriodo, type PeriodoKey } from "./periodo";
 import type { EmpresaItem } from "./admin-empresas";
 import type { FinanceiroDoCliente } from "./admin-conta";
+import type { PedidoDaCentral, ResumoDosPedidos } from "./admin-pedidos";
 
 // O DETALHE DE UM CLIENTE NA CENTRAL DO DONO (docs/plano-central-clientes.md,
 // entrega 1): as contas das abas "Uso de IA" e "Atendimento" e o formato dos
@@ -965,6 +966,11 @@ export interface DetalheDoCliente {
   financeiro: FinanceiroDoCliente;
   /** O modelo de IA que o cliente usa (o do último turno, ou o do sistema) e de onde veio. */
   modelo: ModeloDoCliente;
+  /**
+   * O bloco "Pedidos em aberto" (lib/admin-pedidos.ts), sem período: o resumo por motivo e a
+   * primeira página da lista, do mais antigo ao mais novo. `null` = não deu para ler agora.
+   */
+  pedidos: { resumo: ResumoDosPedidos; primeiros: PedidoDaCentral[] } | null;
 }
 
 /**

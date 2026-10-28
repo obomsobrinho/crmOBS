@@ -21,6 +21,10 @@ import {
   RotuloDoUso,
   textoDoAgente,
 } from "@/components/admin/pecas";
+import { MessageCircleWarning } from "lucide-react";
+import { Aviso } from "@/components/ui/aviso";
+import { cn } from "@/lib/utils";
+import { textoDosPedidosAbertos } from "@/lib/admin-alertas";
 
 // ABA "VISÃO GERAL" do detalhe de um cliente (central do dono). A página abre pelo que o
 // dono precisa ler primeiro, grande e em cima: a situação, o plano, o uso de IA contra o
@@ -42,6 +46,7 @@ function AbaVisaoGeral({
   alertas,
   whatsapp,
   onChecarWhatsapp,
+  onVerPedidos,
 }: {
   detalhe: DetalheDoCliente;
   /** A cotação PTAX do dólar; `null` = indisponível ou ainda sendo buscada (os custos ficam em US$). */
@@ -50,12 +55,20 @@ function AbaVisaoGeral({
   /** `null` = checando agora (só existe para quem tem instância). */
   whatsapp: EstadoDoWhatsApp | null;
   onChecarWhatsapp: () => void;
+  /** A página seguinte de "Pedidos em aberto" (a fonte do detalhe; estável). */
+  /** Abre a aba Atendimento na seção "Pedidos em aberto" (estável). */
+  onVerPedidos: () => void;
 }) {
   const e = detalhe.empresa;
   const custo = custoCurto(e.custoUsd, cambio);
   const atendentes = Math.max(0, detalhe.membros - 1);
+  const resumoDosPedidos = detalhe.pedidos?.resumo;
+  const fraseDosPedidos =
+    resumoDosPedidos &&
+    textoDosPedidosAbertos({ abertos: resumoDosPedidos.total, maisAntigo: resumoDosPedidos.maisAntigo }, detalhe.agora);
   return (
     <div data-slot="central-aba-visao" className="flex flex-col gap-4">
+
       <div data-bloco="visao-resumo" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <IndicadorDaSituacao e={e} bloco="visao-situacao" slot="visao-situacao" />
 
@@ -119,19 +132,38 @@ function AbaVisaoGeral({
           <StatTopo>
             <StatRotulo>Alertas</StatRotulo>
           </StatTopo>
-          {alertas.length === 0 ? (
+          {/* Pedido aberto É alerta (dono, 28/10/2026): "Nada pede atenção" só quando a conta não tem alerta, NÃO
+              há pedido aberto E a leitura dos pedidos deu certo (sem ela não dá para afirmar que não há). */}
+          {alertas.length === 0 && !fraseDosPedidos && detalhe.pedidos !== null ? (
             <EstadoVazio tamanho="compacto" data-slot="visao-sem-alertas" texto="Nada pede atenção agora." />
           ) : (
-            <ul className="flex flex-wrap gap-1.5" data-slot="visao-alertas-lista">
-              {alertas.map((a) => (
-                <li key={a.chave}>
-                  <ChipAlerta alerta={a} />
-                </li>
-              ))}
-            </ul>
+            <>
+              {alertas.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5" data-slot="visao-alertas-lista">
+                  {alertas.map((a) => (
+                    <li key={a.chave}>
+                      <ChipAlerta alerta={a} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {detalhe.pedidos === null && (
+                <Aviso
+                  tom="neutro"
+                  data-slot="visao-pedidos-sem-leitura"
+                  className={alertas.length > 0 ? "mt-2" : undefined}
+                >
+                  Não deu para ler os pedidos de ajuda agora.
+                </Aviso>
+              )}
+              {fraseDosPedidos && (
+                <AlertaDePedidos frase={fraseDosPedidos} onVer={onVerPedidos} className={alertas.length > 0 ? "mt-2" : undefined} />
+              )}
+            </>
           )}
           <StatLegenda>
-            Do mais urgente ao menos. O primeiro é o que aparece na lista e no topo desta página.
+            Do mais urgente ao menos. O primeiro é o que aparece na lista e no topo desta página
+            {fraseDosPedidos ? "; os pedidos de ajuda abertos ficam à parte, no ícone da lista." : "."}
           </StatLegenda>
         </Stat>
       </div>
@@ -177,6 +209,30 @@ function AbaVisaoGeral({
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Os pedidos de ajuda abertos DENTRO do cartão "Alertas" (dono, 27/10/2026): só com pelo menos um aberto, a
+ * frase do ícone da lista e "Ver pedidos", que leva à seção da aba Atendimento (logo abaixo de "Por que a IA
+ * chamou o time"). Fica fora de `alertasDaConta` de propósito: não disputa o alerta principal da lista e do
+ * topo (a ordem é decisão registrada em `admin.md`). Âmbar porque é "alguém espera", o sentido do ícone.
+ */
+function AlertaDePedidos({ frase, onVer, className }: { frase: string; onVer: () => void; className?: string }) {
+  return (
+    <Aviso
+      tom="warn"
+      data-slot="visao-alerta-pedidos"
+      className={cn("flex flex-wrap items-center gap-x-2.5 gap-y-2", className)}
+    >
+      <MessageCircleWarning size={15} aria-hidden className="shrink-0" />
+      <span data-slot="visao-alerta-pedidos-texto" className="min-w-0 flex-1 font-semibold" suppressHydrationWarning>
+        {frase}
+      </span>
+      <Button variant="outline" size="control" data-slot="visao-ver-pedidos" onClick={onVer} className="shrink-0">
+        Ver pedidos
+      </Button>
+    </Aviso>
   );
 }
 

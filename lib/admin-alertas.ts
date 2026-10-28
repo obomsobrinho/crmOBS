@@ -252,7 +252,7 @@ export const SEM_PEDIDOS: PedidosEmAberto = { abertos: 0, maisAntigo: null };
 const HORA_MS = 3_600_000;
 
 /** "há 5 dias", "há 3 horas", "há menos de 1 hora". */
-function haQuanto(iso: string, agora: number): string {
+export function haQuanto(iso: string, agora: number): string {
   const horas = Math.floor((agora - Date.parse(iso)) / HORA_MS);
   if (!Number.isFinite(horas) || horas < 1) return "há menos de 1 hora";
   if (horas < 24) return `há ${horas} ${plural(horas, "hora", "horas")}`;
