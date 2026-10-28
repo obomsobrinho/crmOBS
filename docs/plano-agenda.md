@@ -230,6 +230,26 @@ refused send is recorded (`lembrete_falhou_em`, icon in the central) and retried
 booking is ahead. The route accepts `Authorization: Bearer <CRON_SECRET>`, the header Vercel Cron
 sends by itself once the env var exists.
 
+### 7b. Confirmation after the reminder (owner, 28/10/2026, "Pode mandar")
+
+- `agendamentos.confirmado_em` (migration file only). The `### AGENDA` block marks each booking of
+  the person: "lembrete enviado, aguardando confirmação" or "confirmado pelo contato", and only
+  while one is waiting it tells the model: on "sim" (or equivalent) use `agenda.acao "confirmar"`
+  with the booking code and answer short ("Perfeito, te espero amanhã às 10h30!"). The code
+  (`decidirAgenda`, `aplicarAgenda`) records `confirmado_em`; reschedule and cancel keep their
+  flow; any other message is answered normally, aware of the reminder.
+- Confirmed shows on the grid card (check), in the booking detail ("Presença") and on the
+  contact card ("Confirmado").
+- NOT done, proposal: recording the reminder in the conversation. The AI memory is
+  `chat_messages` (`processTurn` reads the history there, not `n8n_chat_histories`), so a row
+  `{ bot_message: <text>, message_type: "lembrete" }` inserted by the reminder route would give
+  the team and the AI the message itself, with no n8n change. It needs, in the same delivery: a new
+  type in `lib/mensagem.ts` that is neither an AI nor a team reply, the same exclusion in the SQL
+  copies (`painel_janelas`, `painel_series`, `painel_verbatim`, migration
+  `20261001225553`) and in `docs/instrumentacao-uso.md`, and `e2e/painel-agregado.serial.spec.ts`.
+  Without it, a reminder would count as an AI reply in the panel numbers. Until then the AGENDA
+  block gives the AI the context, and the team sees the state on the agenda and the contact card.
+
 ## 8. Tests
 
 Free (run on this branch): `e2e/agenda-lib.design.spec.ts` (grid modes, buffer, 3 nearest per
