@@ -274,3 +274,30 @@ export function textoDosPedidosAbertos(p: PedidosEmAberto, agora: number): strin
   const ha = haQuanto(p.maisAntigo, agora);
   return p.abertos === 1 ? `${quantos} ${ha}` : `${quantos} · o mais antigo ${ha}`;
 }
+
+// ---------------------------------------------------------------------------
+// Lembretes da agenda que não saíram (28/10/2026, dono)
+// ---------------------------------------------------------------------------
+
+/**
+ * Horários futuros cujo lembrete automático a Evolution recusou e que ainda não
+ * saíram (`admin_lembretes_com_falha`). Mesmo padrão dos pedidos abertos: um
+ * ícone próprio ao lado do nome, fora de `alertasDaConta`. A execução seguinte
+ * das 9h tenta de novo enquanto o horário não passou.
+ */
+export interface LembretesComFalha {
+  falhas: number;
+  /** Quando falhou o mais antigo; nulo quando não há nenhum. */
+  maisAntiga: string | null;
+}
+
+export const SEM_FALHAS_DE_LEMBRETE: LembretesComFalha = { falhas: 0, maisAntiga: null };
+
+/** O texto do ícone, ou `null`. Ex.: "2 lembretes da agenda não saíram · o mais antigo há 3 horas". */
+export function textoDosLembretesComFalha(l: LembretesComFalha, agora: number): string | null {
+  if (l.falhas < 1) return null;
+  const quantos = l.falhas === 1 ? "1 lembrete da agenda não saiu" : `${l.falhas} lembretes da agenda não saíram`;
+  if (!l.maisAntiga) return quantos;
+  const ha = haQuanto(l.maisAntiga, agora);
+  return l.falhas === 1 ? `${quantos} (${ha})` : `${quantos} · o mais antigo ${ha}`;
+}

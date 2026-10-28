@@ -135,6 +135,7 @@ export type Database = {
           phone: string
           remarcado_de: number | null
           lembrete_enviado_em: string | null
+          lembrete_falhou_em: string | null
           resumo: string | null
           servico_id: number | null
           servico_nome: string
@@ -154,6 +155,7 @@ export type Database = {
           phone: string
           remarcado_de?: number | null
           lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome: string
@@ -173,6 +175,7 @@ export type Database = {
           phone?: string
           remarcado_de?: number | null
           lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome?: string
@@ -1160,6 +1163,14 @@ export type Database = {
       agenda_etapa_do_funil: {
         Args: { p_ativa: boolean; p_client: string }
         Returns: undefined
+      }
+      admin_lembretes_com_falha: {
+        Args: { p_clients: string[] }
+        Returns: {
+          client_id: string
+          falhas: number
+          mais_antiga: string
+        }[]
       }
       admin_apagar_cliente: {
         Args: {

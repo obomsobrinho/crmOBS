@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, ListFilter, MessageCircleWarning, RefreshCw } from "lucide-react";
+import { Building2, ListFilter, CalendarX2, MessageCircleWarning, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agoraMs } from "@/lib/periodo";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { custoCurto, type Cambio } from "@/lib/cambio";
 import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
 import {
   FILTROS_DE_SITUACAO,
+  textoDosLembretesComFalha,
   textoDosPedidosAbertos,
   type FiltroDeSituacao,
 } from "@/lib/admin-alertas";
@@ -278,6 +279,24 @@ function IconeDePedidos({ e }: { e: EmpresaItem }) {
     </Tooltip>
   );
 }
+/** Lembretes da agenda que não saíram (28/10/2026, dono): mesmo desenho do ícone de pedidos. */
+function IconeDeLembretes({ e }: { e: EmpresaItem }) {
+  const texto = textoDosLembretesComFalha(e.lembretes, agoraMs());
+  if (!texto) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span role="img" aria-label={texto} data-slot="central-lembretes" data-falhas={e.lembretes.falhas} className="flex shrink-0 items-center text-warn-ink">
+          <CalendarX2 size={15} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="whitespace-nowrap" suppressHydrationWarning>
+        {texto}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 
 const COLUNAS =
   "grid xl:grid-cols-[minmax(200px,1.3fr)_130px_120px_120px_minmax(140px,190px)_130px] xl:gap-3";
@@ -305,6 +324,7 @@ function Linha({ e, href, cambio }: { e: EmpresaItem; href: string; cambio: Camb
                 {e.nome}
               </span>
               <IconeDePedidos e={e} />
+              <IconeDeLembretes e={e} />
             </span>
             <span className="truncate text-legenda text-ink-3">{linhaDoPlano(e)}</span>
             {principal && <ChipAlerta alerta={principal} className="self-start" />}

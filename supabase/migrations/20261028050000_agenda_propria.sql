@@ -63,6 +63,8 @@ create table public.agendamentos (
   -- Lembrete automatico (lib/agenda.ts, janelaDoLembrete): quando saiu. A execucao diaria das 9h
   -- reivindica (null para agora) antes de enviar, entao rodar duas vezes nao manda dois.
   lembrete_enviado_em timestamptz,
+  -- A Evolution recusou o envio: alerta na central e nova tentativa na execucao seguinte.
+  lembrete_falhou_em timestamptz,
   constraint agendamentos_periodo check (fim > inicio),
   -- Cancelamento coerente: a data existe exatamente quando esta cancelado.
   constraint agendamentos_cancelamento_coerente check (
@@ -84,8 +86,8 @@ create index agendamentos_lembrete_pendente on public.agendamentos (client_id, i
 
 -- Coluna "Agendado" do funil: existe so com a agenda ligada (decisao do dono, 28/10/2026).
 -- Ligar: desarquiva a etapa ou cria logo depois de "Aguardando atendimento", empurrando as
--- seguintes uma posicao. Desligar: arquiva (as conversas nela continuam com a chave; o
--- funil mostra etapa arquivada como o resto). Canonica: a IA move para ela ao marcar.
+-- seguintes uma posicao. Desligar: as conversas nela voltam para a coluna anterior e ela e
+-- arquivada (decisao do dono, 28/10/2026). Canonica: a IA move para ela ao marcar.
 create or replace function public.agenda_etapa_do_funil(p_client uuid, p_ativa boolean)
 returns void
 language plpgsql
@@ -96,6 +98,19 @@ declare
   v_pos integer;
 begin
   if not p_ativa then
+    -- Quem esta em "Agendado" volta para a coluna anterior (a etapa ativa logo antes dela,
+    -- normalmente "Aguardando atendimento"); sem anterior, para a etapa padrao.
+    update public.conversations c
+      set stage = coalesce(
+            (select s.key from public.pipeline_stages s
+              where s.client_id = p_client and not s.archived and s.key <> 'agendado'
+                and s.position < (select position from public.pipeline_stages
+                                   where client_id = p_client and key = 'agendado')
+              order by s.position desc limit 1),
+            (select s.key from public.pipeline_stages s where s.client_id = p_client and s.is_default)
+          ),
+          stage_changed_at = now()
+      where c.client_id = p_client and c.stage = 'agendado';
     update public.pipeline_stages set archived = true
       where client_id = p_client and key = 'agendado' and not archived;
     return;
@@ -138,3 +153,30 @@ grant all on public.agenda_servicos, public.agenda_bloqueios, public.agendamento
 -- A tela atualiza UMA linha por evento (useCanalTenant). Sem isto o handler fica mudo.
 alter table public.agendamentos replica identity full;
 alter publication supabase_realtime add table public.agendamentos;
+
+-- Lembrete que nao saiu (Evolution recusou): alerta para o dono do produto na central "Clientes",
+-- o mesmo padrao do icone de pedidos abertos (admin_pedidos_abertos). Para os clientes de UMA
+-- pagina da lista (no maximo 50 ids): quantos horarios FUTUROS tem lembrete com falha e ainda nao
+-- enviado, e a falha mais antiga. A execucao seguinte tenta de novo enquanto o horario nao passou.
+create index agendamentos_lembrete_com_falha on public.agendamentos (client_id, inicio)
+  where lembrete_falhou_em is not null and lembrete_enviado_em is null;
+
+create or replace function public.admin_lembretes_com_falha(
+  p_clients uuid[]
+) returns table (client_id uuid, falhas integer, mais_antiga timestamptz)
+language sql
+stable
+security invoker
+set search_path = ''
+as $$
+  select a.client_id, count(*)::integer, min(a.lembrete_falhou_em)
+  from public.agendamentos a
+  where a.client_id = any (p_clients[1:50])
+    and a.lembrete_falhou_em is not null
+    and a.lembrete_enviado_em is null
+    and a.status = 'confirmado'
+    and a.inicio > now()
+  group by a.client_id;
+$$;
+revoke execute on function public.admin_lembretes_com_falha(uuid[]) from public, anon, authenticated;
+grant execute on function public.admin_lembretes_com_falha(uuid[]) to service_role;
