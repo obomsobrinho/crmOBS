@@ -240,27 +240,32 @@ sends by itself once the env var exists.
   flow; any other message is answered normally, aware of the reminder.
 - Confirmed shows on the grid card (check), in the booking detail ("Presença") and on the
   contact card ("Confirmado").
-- NOT done, proposal: recording the reminder in the conversation. The AI memory is
-  `chat_messages` (`processTurn` reads the history there, not `n8n_chat_histories`), so a row
-  `{ bot_message: <text>, message_type: "lembrete" }` inserted by the reminder route would give
-  the team and the AI the message itself, with no n8n change. It needs, in the same delivery: a new
-  type in `lib/mensagem.ts` that is neither an AI nor a team reply, the same exclusion in the SQL
-  copies (`painel_janelas`, `painel_series`, `painel_verbatim`, migration
-  `20261001225553`) and in `docs/instrumentacao-uso.md`, and `e2e/painel-agregado.serial.spec.ts`.
-  Without it, a reminder would count as an AI reply in the panel numbers. Until then the AGENDA
-  block gives the AI the context, and the team sees the state on the agenda and the contact card.
+- Done (owner approved, "Pode mandar"): the reminder route inserts the sent text into
+  `chat_messages` with `message_type = 'lembrete'`. The team sees it in the conversation with the
+  label "Lembrete automático" (`components/thread/bolhas.ts`, `BubbleView`) and the AI has it in
+  the history (`processTurn` reads `chat_messages`; nothing in n8n). `lembrete` is neither an AI
+  nor a team reply: `lib/mensagem.ts` (`ehLembrete`, `respostaDaIa`), the SQL copies in the NEW
+  migration `20261028060000_lembrete_nao_e_resposta.sql` (`painel_janelas`, `painel_series`,
+  `painel_verbatim`, not applied), `docs/instrumentacao-uso.md` and the mass of
+  `e2e/painel-agregado.serial.spec.ts` (which proves TS and SQL agree once the migration is applied).
 
 ## 8. Tests
 
-Free (run on this branch): `e2e/agenda-lib.design.spec.ts` (grid modes, buffer, 3 nearest per
-period, no day limit, notice escalation, validation, decisions, reminder time, config) and
-`e2e/agenda.design.spec.ts` (weekly grid, mini calendar, detail, team booking inside and outside
-business hours, settings with the buffer note, the 3 start options, the notice sentence, service
-validation, menu without the item when off), plus `cursor`, `rolagem`, `casca.mobile`.
-Needs the migration applied: routes against the database (overlap 409, stage "Agendado" created
-and archived, RLS). Paid, only when named: `test:e2e:ia` and `test:e2e:n8n`, because the output
-schema and the prompt changed for every tenant with the agenda on.
+Final test plan for the deploy approval (in this order):
 
+| Step | What | Cost | State |
+|---|---|---|---|
+| 1 | `npm run typecheck`, `npm run lint`, `npm run checar`, `npm run build` | free | green on this branch |
+| 2 | `npm run test:e2e -- --project=sem-login` and `--project=mobile` (agenda rules, holidays, periods, reminder days and text, confirmation, prompt block, grid, settings, contact card, "who replied" with `lembrete`) | free | green except the known `central-clientes` meter failure, which predates the agenda |
+| 3 | Owner applies both migrations (`20261028050000_agenda_propria.sql`, `20261028060000_lembrete_nao_e_resposta.sql`) and regenerates `lib/database.types.ts` (written by hand here) | free | pending |
+| 4 | `npm run test:e2e:login` (real DB, OBS tenant, includes `painel-agregado.serial` with the new `lembrete` rows); run it alone, nobody else on the test tenant | free | pending (needs step 3) |
+| 5 | Manual on Loja Teste: turn the agenda on, book, reschedule, cancel and block from `/agenda`; the "Agendado" column appears and goes back when turned off | free | pending |
+| 6 | `npm run test:e2e:ia` (12 real-brain traps): the prompt base changed for every tenant (agenda contract, the "Agendar" goal gone) | paid | pending, only when named |
+| 7 | `npm run test:e2e:n8n` (end-to-end attendance through production n8n) before asking the owner to test attendance | paid | pending, only when named |
+| 8 | Reminder: owner creates `CRON_SECRET` on Vercel, confirms the function limit (Fluid Compute, `maxDuration`), then a manual `GET /api/agenda/lembretes` with the header on Loja Teste with a booking for tomorrow | free | pending |
+
+Not covered by any automated test: the real Evolution send and the self-chaining across runs
+(steps 5 and 8 are manual).
 ## 9. Reference: DeskcommCRM
 
 Read only on GitHub (github.com/melgarafael/DeskcommCRM, **MIT license**: reusing ideas is fine;
