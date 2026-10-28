@@ -8,6 +8,7 @@ import {
 } from "@/lib/agenda";
 import type { BusinessHours } from "@/lib/agent-prompt";
 import { inicioDoDiaSP } from "@/lib/fuso";
+import { fonteClientesDoBanco, paramsClientes } from "@/lib/clientes-fonte";
 
 // A ÚNICA porta da tela `/agenda` para os dados (docs/plano-agenda.md). Duas
 // implementações com a mesma interface: o banco (leitura com a sessão do
@@ -41,9 +42,23 @@ export interface BloqueioAgenda {
 
 export type Resultado = { ok: true } | { ok: false; erro: string };
 
+export interface ContatoDaBusca {
+  phone: string;
+  nome: string | null;
+}
+
+/** Quantos contatos a busca do "Marcar horário" mostra. */
+export const LIMITE_DA_BUSCA = 8;
+
 export interface FonteAgenda {
   /** Os confirmados que começam na janela (uma semana). */
   semana(de: number, ate: number): Promise<LinhaAgenda[]>;
+  /**
+   * Contatos por nome ou telefone, para o "Marcar horário". No banco é a MESMA
+   * busca da tela Contatos (`clientes_pagina`: no servidor, por índice, com
+   * limite), nunca a lista inteira. Busca vazia não consulta.
+   */
+  buscarContatos(busca: string): Promise<ContatoDaBusca[]>;
   bloqueios(de: number, ate: number): Promise<BloqueioAgenda[]>;
   /** Horários livres para o TIME marcar: sem antecedência, sem limite de dias; `fora` = fora do expediente. */
   horarios(servicoId: number, dia: string, ignorar?: number, fora?: boolean): Promise<number[]>;
@@ -111,8 +126,14 @@ function resultado(r: { ok: boolean; corpo: Record<string, unknown> }): Resultad
 }
 
 /** Leitura pelo banco com a sessão (RLS por tenant) e escrita pelas rotas. */
-export function fonteDoBancoAgenda(supabase: Supa, clientId: string): FonteAgenda {
+export function fonteDoBancoAgenda(supabase: Supa, clientId: string, fora: string[] = []): FonteAgenda {
+  const contatos = fonteClientesDoBanco(supabase, clientId);
   return {
+    async buscarContatos(busca) {
+      if (busca.trim().length < 2) return [];
+      const lista = await contatos.pagina(paramsClientes("todos", busca, fora, Date.now()), null, LIMITE_DA_BUSCA);
+      return lista.map((c) => ({ phone: c.phone, nome: c.name }));
+    },
     async semana(de, ate) {
       const { data, error } = await supabase
         .from("agendamentos")
@@ -196,6 +217,8 @@ export function fonteDaMemoriaAgenda(dados: {
   hours: BusinessHours;
   config: AgendaConfig;
   agora: number;
+  /** Contatos do preview, para a busca do "Marcar horário". */
+  contatos?: ContatoDaBusca[];
 }): FonteAgenda {
   let linhas = [...dados.linhas];
   let bloqueios = [...dados.bloqueios];
@@ -208,6 +231,14 @@ export function fonteDaMemoriaAgenda(dados: {
     ...bloqueios,
   ];
   return {
+    async buscarContatos(busca) {
+      const q = busca.trim().toLowerCase();
+      if (q.length < 2) return [];
+      const digitos = q.replace(/[^0-9]/g, "");
+      return (dados.contatos ?? [])
+        .filter((c) => (c.nome ?? "").toLowerCase().includes(q) || (digitos.length >= 2 && c.phone.includes(digitos)))
+        .slice(0, LIMITE_DA_BUSCA);
+    },
     async semana(de, ate) {
       return linhas
         .filter((l) => l.status === "confirmado" && l.inicio >= de && l.inicio < ate)

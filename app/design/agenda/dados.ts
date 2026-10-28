@@ -71,3 +71,15 @@ export function bloqueios(agora: number): BloqueioAgenda[] {
   };
   return [em(501, 0, "12:00", "13:00", "Almoço"), em(502, 1, "12:00", "13:00", "Almoço")];
 }
+
+/** Contatos do preview, para a busca do "Marcar horário" (no app, a busca vai ao servidor). */
+export const CONTATOS = [
+  { phone: "5511912345678", nome: "Ana Paula" },
+  { phone: "5511944443333", nome: "Carlos Mendes" },
+  { phone: "5511933332222", nome: "Beatriz Lima" },
+  { phone: "5511988887777", nome: "Juliana Prado" },
+  { phone: "5511977776666", nome: "Marcos Vieira" },
+  { phone: "5511966665555", nome: "Fernanda Costa" },
+  { phone: "5511911110000", nome: "Paulo Henrique" },
+  { phone: "5511955554444", nome: null },
+];

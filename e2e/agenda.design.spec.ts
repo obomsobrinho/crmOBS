@@ -11,11 +11,15 @@ async function abrir(page: Page, query = "") {
 }
 
 test.describe("Agenda: grade semanal (dados em memória)", () => {
-  test("sete colunas, hoje destacado, contador, cartões, bloqueio e a linha do agora", async ({ page }) => {
+  test("sete colunas, hoje destacado, sem contador, cartões e bloqueio; a grade enche a altura", async ({ page }) => {
     await abrir(page);
     await expect(page.locator('[data-agenda="cabecalho-dia"]')).toHaveCount(7);
     await expect(page.locator('[data-agenda="cabecalho-dia"][data-hoje="sim"]')).toHaveCount(1);
-    await expect(page.locator('[data-agenda="contador"]').first()).toBeVisible();
+    await expect(page.locator('[data-agenda="contador"]')).toHaveCount(0);
+    // A grade ocupa a altura toda: nada sobra embaixo da última hora.
+    const area = await page.locator('[data-agenda="grade"]').boundingBox();
+    const coluna = await page.locator('[data-agenda="coluna"]').first().boundingBox();
+    expect(coluna!.height).toBeGreaterThanOrEqual(area!.height - 2);
     await expect(page.locator('[data-agenda="cartao"]').first()).toBeVisible();
     await expect(page.locator('[data-agenda="bloqueio"]').first()).toContainText("Almoço");
     // Cancelado não aparece na grade.
@@ -52,7 +56,10 @@ test.describe("Agenda: grade semanal (dados em memória)", () => {
     await abrir(page);
     await page.getByRole("button", { name: "Marcar horário" }).click();
     const d = page.locator('[data-agenda="marcar"]');
-    await d.getByLabel("WhatsApp do contato").fill("11 98888-1234");
+    // Contato existente pela busca (no app, no servidor, com limite).
+    await d.getByLabel("Buscar contato").fill("jul");
+    await d.locator('[data-agenda="resultados-contato"]').getByRole("button", { name: /Juliana Prado/ }).click();
+    await expect(d.locator('[data-agenda="contato-escolhido"]')).toContainText("Juliana Prado");
     const amanha = await page.evaluate(() =>
       new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + 86_400_000))
     );
@@ -116,5 +123,27 @@ test.describe("Agenda: configurações", () => {
     await page.getByLabel("Nome do serviço 4").fill("Retorno");
     await page.getByRole("button", { name: "Salvar" }).click();
     await expect(page.locator('[data-agenda="configuracoes"]').getByRole("status")).toContainText("Salvo");
+  });
+});
+
+test.describe("Agenda: marcar com contato novo e campos", () => {
+  test("sem achar na busca, segue como contato novo com o telefone já preenchido", async ({ page }) => {
+    await page.goto("/design/agenda");
+    await page.getByRole("button", { name: "Marcar horário" }).click();
+    const d = page.locator('[data-agenda="marcar"]');
+    await d.getByLabel("Buscar contato").fill("11 92020");
+    await expect(d.locator('[data-agenda="resultados-contato"]')).toContainText("Nenhum contato encontrado");
+    await d.getByRole("button", { name: "Contato novo" }).click();
+    await expect(d.getByLabel("WhatsApp do contato")).toHaveValue("11 92020");
+  });
+
+  test("serviço e data com a mesma altura e largura", async ({ page }) => {
+    await page.goto("/design/agenda");
+    await page.getByRole("button", { name: "Marcar horário" }).click();
+    const d = page.locator('[data-agenda="marcar"]');
+    const s = (await d.getByLabel("Serviço").boundingBox())!;
+    const t = (await d.getByLabel("Dia").boundingBox())!;
+    expect(Math.abs(s.height - t.height)).toBeLessThanOrEqual(1);
+    expect(Math.abs(s.width - t.width)).toBeLessThanOrEqual(1);
   });
 });

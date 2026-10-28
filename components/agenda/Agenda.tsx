@@ -14,6 +14,7 @@ import {
   Clock,
   MessagesSquare,
   Phone,
+  Plus,
   Repeat,
   Settings2,
   Sparkles,
@@ -42,7 +43,9 @@ import {
   type AgendaConfig,
   type ServicoDaAgenda,
 } from "@/lib/agenda";
-import { inicioDoDia, type BloqueioAgenda, type FonteAgenda, type LinhaAgenda } from "@/lib/agenda-fonte";
+import { inicioDoDia, type BloqueioAgenda, type ContatoDaBusca, type FonteAgenda, type LinhaAgenda } from "@/lib/agenda-fonte";
+import { useDebounce } from "@/lib/use-debounce";
+import { CampoBusca } from "@/components/ui/campo-busca";
 import { diaIsoSP, mesAnoDoDia, somarDias } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
 import { minutosAgoraSP } from "@/lib/horarios";
@@ -57,7 +60,8 @@ import { cn } from "@/lib/utils";
 // abre o detalhe com remarcar e cancelar. No celular, um dia por vez.
 // Os dados vêm SÓ da `fonte` (banco em `/agenda`, memória em `/design/agenda`).
 
-const HORA_PX = 80;
+/** Altura mínima de uma hora na grade (30 min = nome e horário legíveis). */
+const HORA_PX_MIN = 72;
 const DIA_MS = 86_400_000;
 const CHAVES_DA_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
@@ -147,6 +151,16 @@ export default function Agenda(p: PropsAgenda) {
     return () => document.removeEventListener("visibilitychange", aoVoltar);
   }, [recarregar]);
 
+  // A grade ocupa a altura toda: a hora cresce até a área encher (nunca menor
+  // que `HORA_PX_MIN`, que é o mínimo para nome e horário caberem no cartão).
+  const [alturaDaArea, setAlturaDaArea] = useState(0);
+  const medirArea = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const obs = new ResizeObserver(([e]) => setAlturaDaArea(e.contentRect.height));
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const irPara = (dia: string) => {
     setSemana(segundaDaSemana(dia));
     setDiaCelular(dia);
@@ -166,7 +180,7 @@ export default function Agenda(p: PropsAgenda) {
   }
 
   const [horaDe, horaAte] = faixaDaGrade(dias, p.hours, [...itens, ...bloqueios]);
-  const contagem = (d: string) => itens.filter((l) => diaIsoSP(l.inicio) === d).length;
+  const horaPx = Math.max(HORA_PX_MIN, Math.floor(alturaDaArea / (horaAte - horaDe)));
 
   return (
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
@@ -248,26 +262,22 @@ export default function Agenda(p: PropsAgenda) {
                   {CHAVES_DA_SEMANA[i]}
                 </span>
                 <span className={cn("text-apoio font-semibold tabular-nums", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
-                {contagem(d) > 0 && (
-                  <span className="rounded-md bg-[var(--chip-bg)] px-1.5 text-legenda tabular-nums text-ink-2" data-agenda="contador">
-                    {contagem(d)}
-                  </span>
-                )}
               </div>
             ))}
           </div>
 
+          <div ref={medirArea} className="flex min-h-0 flex-1 flex-col">
           <AreaRolavel className="min-h-0 flex-1" data-agenda="grade">
             <div
               className="relative grid grid-cols-[52px_repeat(7,minmax(0,1fr))] max-md:grid-cols-[44px_minmax(0,1fr)]"
-              style={{ height: (horaAte - horaDe) * HORA_PX }}
+              style={{ height: (horaAte - horaDe) * horaPx }}
             >
               <div className="relative">
                 {Array.from({ length: horaAte - horaDe }, (_, i) => (
                   <span
                     key={i}
                     className="absolute right-2 -translate-y-1/2 text-legenda tabular-nums text-ink-3"
-                    style={{ top: i * HORA_PX }}
+                    style={{ top: i * horaPx }}
                   >
                     {i === 0 ? "" : `${horaDe + i}h`}
                   </span>
@@ -285,10 +295,12 @@ export default function Agenda(p: PropsAgenda) {
                   bloqueios={bloqueios.filter((b) => diaIsoSP(b.inicio) === d)}
                   escondidaNoCelular={d !== diaCelular}
                   onAbrir={setDetalhe}
+                  horaPx={horaPx}
                 />
               ))}
             </div>
           </AreaRolavel>
+          </div>
         </div>
       </div>
 
@@ -341,6 +353,7 @@ function ColunaDoDia({
   bloqueios,
   escondidaNoCelular,
   onAbrir,
+  horaPx,
 }: {
   dia: string;
   hoje: string;
@@ -351,17 +364,18 @@ function ColunaDoDia({
   bloqueios: BloqueioAgenda[];
   escondidaNoCelular: boolean;
   onAbrir: (l: LinhaAgenda) => void;
+  horaPx: number;
 }) {
   const base = inicioDoDia(dia) + horaDe * 3_600_000;
-  const topo = (t: number) => ((t - base) / 60_000 / 60) * HORA_PX;
-  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * HORA_PX - 2);
+  const topo = (t: number) => ((t - base) / 60_000 / 60) * horaPx;
+  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * horaPx - 2);
   const exp = hours ? expedienteDoDia(dia, hours) : null;
   return (
     <div
       data-agenda="coluna"
       data-dia={dia}
       style={{
-        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HORA_PX - 1}px, var(--line-soft) ${HORA_PX - 1}px, var(--line-soft) ${HORA_PX}px)`,
+        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${horaPx - 1}px, var(--line-soft) ${horaPx - 1}px, var(--line-soft) ${horaPx}px)`,
       }}
       className={cn(
         "relative border-l border-line",
@@ -520,54 +534,67 @@ function DetalheDoHorario({
 }) {
   const l = linha;
   const passou = !!l && l.fim <= agora;
+  // Hierarquia (ajuste do dono, 28/10/2026): QUEM e QUANDO em destaque, depois
+  // o serviço; telefone e "do que se trata" são apoio; as ações no rodapé.
   return (
     <Sheet open={!!l} onOpenChange={(v) => !v && onFechar()}>
       <SheetContent data-agenda="detalhe">
         {l && (
           <div className="flex h-full flex-col">
-            <div className="flex items-center gap-3 border-b border-line px-6 py-4">
-              <AvatarContato phone={l.phone} name={l.nome} size="lg" />
-              <div className="min-w-0">
-                <SheetTitle className="truncate">{l.nome || prettyPhone(l.phone)}</SheetTitle>
-                <SheetDescription className="text-apoio text-ink-3">{l.servicoNome}</SheetDescription>
-              </div>
-            </div>
             <AreaRolavel className="min-h-0 flex-1">
-              <dl className="space-y-4 px-6 py-5 text-apoio">
-                <Item icone={Clock} rotulo="Horário">
-                  {diaFalado(l.inicio, agora).replace(/^./, (c) => c.toUpperCase())}, {faixaHoraria(l.inicio, l.fim)}
-                </Item>
-                <Item icone={Phone} rotulo="Telefone">{prettyPhone(l.phone)}</Item>
-                <Item icone={l.origem === "ia" ? Sparkles : UserRound} rotulo="Marcado por">
-                  {l.origem === "ia" ? "IA, na conversa" : "Time, pela agenda"}
-                </Item>
-                <Item icone={MessagesSquare} rotulo="Do que se trata">
-                  {l.resumo || <span className="text-ink-3">Sem descrição.</span>}
-                </Item>
-                <Item icone={l.lembreteEm ? Bell : BellOff} rotulo="Lembrete">
-                  {l.lembreteEm
-                    ? `Automático, ${quandoFalado(l.lembreteEm, agora)}`
-                    : "Sem lembrete (desligado ou marcado com menos de 24h)."}
-                </Item>
-              </dl>
+              <div className="px-6 pb-5 pt-6">
+                <div className="flex items-center gap-3">
+                  <AvatarContato phone={l.phone} name={l.nome} size="xl" />
+                  <SheetTitle className="min-w-0 truncate text-titulo" data-agenda="detalhe-nome">
+                    {l.nome || prettyPhone(l.phone)}
+                  </SheetTitle>
+                </div>
+                <div className="mt-5 rounded-xl border border-line bg-bloco px-4 py-3" data-agenda="detalhe-quando">
+                  <p className="font-display text-cartao text-ink first-letter:uppercase">{diaFalado(l.inicio, agora)}</p>
+                  <p className="mt-0.5 text-titulo tabular-nums">{faixaHoraria(l.inicio, l.fim)}</p>
+                  {passou && <p className="mt-1 text-legenda text-ink-3">Este horário já passou.</p>}
+                </div>
+                <SheetDescription asChild>
+                  <p className="mt-4 flex items-center gap-2 text-corpo text-ink" data-agenda="detalhe-servico">
+                    <span className="size-2.5 shrink-0 rounded-full" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
+                    {l.servicoNome}
+                  </p>
+                </SheetDescription>
+
+                <dl className="mt-6 space-y-3 border-t border-line pt-4 text-apoio" data-agenda="detalhe-apoio">
+                  <Item icone={Phone} rotulo="Telefone">{prettyPhone(l.phone)}</Item>
+                  <Item icone={MessagesSquare} rotulo="Do que se trata">
+                    {l.resumo || <span className="text-ink-3">Sem descrição.</span>}
+                  </Item>
+                  <Item icone={l.origem === "ia" ? Sparkles : UserRound} rotulo="Marcado por">
+                    {l.origem === "ia" ? "IA, na conversa" : "Time, pela agenda"}
+                  </Item>
+                  <Item icone={l.lembreteEm ? Bell : BellOff} rotulo="Lembrete">
+                    {l.lembreteEm
+                      ? `Automático, ${quandoFalado(l.lembreteEm, agora)}`
+                      : "Sem lembrete (desligado ou marcado com menos de 24h)."}
+                  </Item>
+                </dl>
+                <Button variant="link" size="link" className="mt-4" asChild>
+                  <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>
+                    <MessagesSquare size={14} />
+                    Abrir conversa
+                  </Link>
+                </Button>
+              </div>
             </AreaRolavel>
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-6 py-3">
-              <Button variant="outline" size="field" className="px-4" asChild>
-                <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>Abrir conversa</Link>
-              </Button>
-              {!readOnly && !passou && (
-                <>
-                  <Button variant="outline" size="field" className="px-4" onClick={() => onRemarcar(l)}>
-                    <Repeat size={14} />
-                    Remarcar
-                  </Button>
-                  <Button variant="danger" size="field" className="px-4" onClick={() => onCancelar(l)}>
-                    <CalendarX2 size={14} />
-                    Cancelar
-                  </Button>
-                </>
-              )}
-            </div>
+            {!readOnly && !passou && (
+              <div className="grid grid-cols-2 gap-2 border-t border-line px-6 py-3" data-agenda="detalhe-acoes">
+                <Button variant="danger-ghost" size="field" className="justify-center border border-line" onClick={() => onCancelar(l)}>
+                  <CalendarX2 size={15} />
+                  Cancelar
+                </Button>
+                <Button size="field" className="justify-center" onClick={() => onRemarcar(l)}>
+                  <Repeat size={15} />
+                  Remarcar
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </SheetContent>
@@ -577,11 +604,11 @@ function DetalheDoHorario({
 
 function Item({ icone: Icone, rotulo, children }: { icone: typeof Clock; rotulo: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <Icone size={16} className="mt-0.5 shrink-0 text-ink-3" />
+    <div className="flex gap-2.5">
+      <Icone size={14} className="mt-0.5 shrink-0 text-ink-3" />
       <div className="min-w-0">
-        <dt className="text-rotulo uppercase text-ink-3">{rotulo}</dt>
-        <dd className="mt-0.5 text-ink">{children}</dd>
+        <dt className="text-legenda text-ink-3">{rotulo}</dt>
+        <dd className="text-ink-2">{children}</dd>
       </div>
     </div>
   );
@@ -681,6 +708,115 @@ function ForaDoExpediente({ valor, onMudar }: { valor: boolean; onMudar: (v: boo
   );
 }
 
+/** Campo de data que abre o calendário ao clicar em qualquer parte (não só no ícone). */
+function CampoData(props: Omit<React.ComponentProps<typeof Input>, "type">) {
+  return (
+    <Input
+      {...props}
+      type="date"
+      className={cn("w-full cursor-pointer", props.className)}
+      onClick={(e) => {
+        try {
+          e.currentTarget.showPicker?.();
+        } catch {
+          // Navegador sem showPicker: o clique segue o padrão dele.
+        }
+      }}
+    />
+  );
+}
+
+/**
+ * Busca de contato do "Marcar horário" (ajuste do dono, 28/10/2026): por nome
+ * ou telefone, no SERVIDOR (`fonte.buscarContatos`, a mesma busca da tela
+ * Contatos), com debounce e limite; nunca a lista inteira. Sem resultado,
+ * segue como contato novo (telefone e nome digitados).
+ */
+function BuscaDeContato({
+  fonte,
+  escolhido,
+  onEscolher,
+  onNovo,
+}: {
+  fonte: FonteAgenda;
+  escolhido: ContatoDaBusca | null;
+  onEscolher: (c: ContatoDaBusca | null) => void;
+  onNovo: (digitado: string) => void;
+}) {
+  const [busca, setBusca] = useState("");
+  const atrasada = useDebounce(busca, 300);
+  const [resultado, setResultado] = useState<{ chave: string; lista: ContatoDaBusca[] } | null>(null);
+  useEffect(() => {
+    const q = atrasada.trim();
+    if (q.length < 2) return;
+    let vivo = true;
+    fonte
+      .buscarContatos(q)
+      .then((lista) => vivo && setResultado({ chave: q, lista }))
+      .catch(() => vivo && setResultado({ chave: q, lista: [] }));
+    return () => {
+      vivo = false;
+    };
+  }, [fonte, atrasada]);
+
+  if (escolhido) {
+    return (
+      <div className="flex h-[var(--h-field)] items-center gap-2.5 rounded-lg border border-line bg-bloco px-3" data-agenda="contato-escolhido">
+        <AvatarContato phone={escolhido.phone} name={escolhido.nome} size="2xs" />
+        <span className="min-w-0 flex-1 truncate text-apoio">
+          <span className="font-medium">{escolhido.nome || prettyPhone(escolhido.phone)}</span>
+          {escolhido.nome && <span className="text-ink-3"> · {prettyPhone(escolhido.phone)}</span>}
+        </span>
+        <Button variant="link" size="link" onClick={() => onEscolher(null)}>
+          Trocar
+        </Button>
+      </div>
+    );
+  }
+
+  const q = busca.trim();
+  const pronta = resultado && resultado.chave === q ? resultado.lista : null;
+  return (
+    <div data-agenda="busca-contato">
+      <CampoBusca
+        valor={busca}
+        aoMudar={setBusca}
+        placeholder="Buscar contato por nome ou telefone"
+        rotulo="Buscar contato"
+        className="w-full"
+      />
+      {q.length >= 2 && (
+        <div className="mt-1.5 rounded-lg border border-line" data-agenda="resultados-contato">
+          {pronta === null ? (
+            <p className="px-3 py-2 text-legenda text-ink-3">Buscando...</p>
+          ) : (
+            <>
+              {pronta.map((c) => (
+                <Button
+                  key={c.phone}
+                  variant="linha"
+                  size="linha"
+                  className="h-10 w-full gap-2.5"
+                  onClick={() => onEscolher(c)}
+                >
+                  <AvatarContato phone={c.phone} name={c.nome} size="2xs" />
+                  <span className="min-w-0 flex-1 truncate text-apoio">{c.nome || prettyPhone(c.phone)}</span>
+                  {c.nome && <span className="shrink-0 text-legenda text-ink-3">{prettyPhone(c.phone)}</span>}
+                </Button>
+              ))}
+              {pronta.length === 0 && <p className="px-3 py-2 text-legenda text-ink-3">Nenhum contato encontrado.</p>}
+              <Button variant="linha" size="linha" className="h-10 w-full gap-2 border-t border-line text-brand-ink" onClick={() => onNovo(q)}>
+                <Plus size={14} />
+                Contato novo
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DialogoMarcar({
   aberto,
   onFechar,
@@ -696,6 +832,8 @@ function DialogoMarcar({
   hoje: string;
   onFeito: () => void;
 }) {
+  const [contato, setContato] = useState<ContatoDaBusca | null>(null);
+  const [novo, setNovo] = useState(false);
   const [phone, setPhone] = useState("");
   const [nome, setNome] = useState("");
   const [resumo, setResumo] = useState("");
@@ -706,24 +844,48 @@ function DialogoMarcar({
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const servicoAtual = servicoId ?? servicos[0]?.id ?? null;
+  const telefone = contato ? contato.phone : phone.replace(/\D/g, "");
+  const nomeFinal = contato ? contato.nome ?? "" : nome;
+  const limpar = () => {
+    setContato(null); setNovo(false); setPhone(""); setNome(""); setResumo(""); setInicio(null); setErro(null);
+  };
   return (
-    <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
+    <Dialog open={aberto} onOpenChange={(v) => { if (!v) { limpar(); onFechar(); } }}>
       <DialogContent tamanho="confirmacao" className="max-w-md" data-agenda="marcar">
         <DialogTitle>Marcar horário</DialogTitle>
         <DialogDescription className="mt-2 mb-4">O contato não é avisado automaticamente.</DialogDescription>
         <div className="space-y-3">
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="WhatsApp com DDD" aria-label="WhatsApp do contato" inputMode="tel" />
-          <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome (opcional)" aria-label="Nome do contato" />
+          {novo ? (
+            <div className="space-y-2" data-agenda="contato-novo">
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="WhatsApp com DDD" aria-label="WhatsApp do contato" inputMode="tel" />
+              <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome (opcional)" aria-label="Nome do contato" />
+              <Button variant="link" size="link" onClick={() => { setNovo(false); setPhone(""); setNome(""); }}>
+                Buscar um contato existente
+              </Button>
+            </div>
+          ) : (
+            <BuscaDeContato
+              fonte={fonte}
+              escolhido={contato}
+              onEscolher={setContato}
+              onNovo={(digitado) => {
+                setNovo(true);
+                // Digitou um telefone: já vem preenchido; um nome, vai para o nome.
+                if (/\d{4,}/.test(digitado.replace(/\D/g, ""))) setPhone(digitado);
+                else setNome(digitado);
+              }}
+            />
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Select value={servicoAtual === null ? "" : String(servicoAtual)} onValueChange={(v) => { setServicoId(Number(v)); setInicio(null); }}>
-              <SelectTrigger aria-label="Serviço" className="w-full"><SelectValue placeholder="Serviço" /></SelectTrigger>
+              <SelectTrigger size="field" aria-label="Serviço" className="w-full max-md:h-11"><SelectValue placeholder="Serviço" /></SelectTrigger>
               <SelectContent>
                 {servicos.map((s) => (
                   <SelectItem key={s.id} value={String(s.id)}>{s.nome} ({s.duracaoMin} min)</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Input type="date" value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Dia" />
+            <CampoData value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Dia" />
           </div>
           <ForaDoExpediente valor={fora} onMudar={(v) => { setFora(v); setInicio(null); }} />
           <EscolherHorario fonte={fonte} servicoId={servicoAtual} dia={dia} fora={fora} valor={inicio} onEscolher={setInicio} />
@@ -738,14 +900,14 @@ function DialogoMarcar({
             size="field"
             className="px-4"
             carregando={enviando}
-            disabled={!phone.trim() || servicoAtual === null || inicio === null}
+            disabled={telefone.length < 10 || servicoAtual === null || inicio === null}
             onClick={async () => {
               if (servicoAtual === null || inicio === null) return;
               setEnviando(true);
-              const r = await fonte.marcar({ phone: phone.replace(/\D/g, ""), nome, servicoId: servicoAtual, inicio, resumo });
+              const r = await fonte.marcar({ phone: telefone, nome: nomeFinal, servicoId: servicoAtual, inicio, resumo });
               setEnviando(false);
               if (!r.ok) return setErro(r.erro);
-              setPhone(""); setNome(""); setResumo(""); setInicio(null); setErro(null);
+              limpar();
               onFechar();
               onFeito();
             }}
@@ -783,7 +945,7 @@ function DialogoRemarcar({ linha, onFechar, fonte, hoje, onFeito }: { linha: Lin
               {linha.nome || prettyPhone(linha.phone)}, {linha.servicoNome}. Hoje em {rotuloDoDia(diaIsoSP(linha.inicio), hoje).toLowerCase()}, {faixaHoraria(linha.inicio, linha.fim)}.
             </DialogDescription>
             <div className="space-y-3">
-              <Input type="date" value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Novo dia" />
+              <CampoData value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Novo dia" />
               <ForaDoExpediente valor={fora} onMudar={(v) => { setFora(v); setInicio(null); }} />
               <EscolherHorario fonte={fonte} servicoId={linha.servicoId ?? -1} dia={dia} ignorar={linha.id} fora={fora} valor={inicio} onEscolher={setInicio} />
             </div>
@@ -834,7 +996,7 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
         <DialogTitle>Bloquear horário</DialogTitle>
         <DialogDescription className="mt-2 mb-4">A IA não oferece este trecho. O que já está marcado nele continua.</DialogDescription>
         <div className="space-y-3">
-          <Input type="date" value={dia} min={hoje} onChange={(e) => setDia(e.target.value)} aria-label="Dia do bloqueio" />
+          <CampoData value={dia} min={hoje} onChange={(e) => setDia(e.target.value)} aria-label="Dia do bloqueio" />
           <div className="grid grid-cols-2 gap-2">
             <Input type="time" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Das" />
             <Input type="time" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Até" />

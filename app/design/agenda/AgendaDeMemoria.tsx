@@ -6,7 +6,7 @@ import ConfiguracaoDaAgenda from "@/components/agenda/ConfiguracaoDaAgenda";
 import { fonteDaMemoriaAgenda } from "@/lib/agenda-fonte";
 import { segundaDaSemana } from "@/lib/agenda";
 import { diaIsoSP } from "@/lib/fuso";
-import { CONFIG, EMPRESA, EXPEDIENTE, SERVICOS, bloqueios, linhas } from "./dados";
+import { CONFIG, CONTATOS, EMPRESA, EXPEDIENTE, SERVICOS, bloqueios, linhas } from "./dados";
 
 // A tela de verdade (agenda e configurações) com a fonte em MEMÓRIA: as ações
 // só mudam esta aba, com a mesma regra de horário livre do produto.
@@ -18,6 +18,7 @@ function useFonte(agora: number, vazio: boolean, semHorario: boolean) {
       servicos: SERVICOS,
       hours: EXPEDIENTE,
       config: CONFIG,
+      contatos: CONTATOS,
       agora,
     };
     return { fonte: fonteDaMemoriaAgenda(dados), dados, hours: semHorario ? null : EXPEDIENTE };

@@ -53,6 +53,7 @@ export default async function AgendaPage() {
   return (
     <AgendaDoBanco
       clientId={client.id}
+      numeroAvisos={client.avisos}
       agora={agora}
       empresa={client.name}
       dono={client.role === "dono"}
