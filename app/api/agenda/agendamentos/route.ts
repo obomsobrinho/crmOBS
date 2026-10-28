@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
-import { conflita, momentoDoLembrete } from "@/lib/agenda";
-import { horarioCadastrado } from "@/lib/horarios";
+import { conflita } from "@/lib/agenda";
 import { agendaDoTenant, marcarAgendamento, moverParaAgendado, ocupadosDoTenant } from "@/lib/agenda-servidor";
 
 // O TIME marca um horário pela tela `/agenda` (docs/plano-agenda.md). Qualquer
@@ -33,11 +32,7 @@ export async function POST(req: Request) {
   }
 
   const svc = createServiceClient();
-  const [agenda, { data: c }] = await Promise.all([
-    agendaDoTenant(svc, mine.id),
-    svc.from("clients").select("agent_config").eq("id", mine.id).maybeSingle(),
-  ]);
-  const hours = horarioCadastrado(c?.agent_config ?? null);
+  const agenda = await agendaDoTenant(svc, mine.id);
   if (!agenda) return NextResponse.json({ error: "agenda indisponível" }, { status: 503 });
   const servico = agenda.servicos.find((s) => s.id === servicoId);
   if (!servico) return NextResponse.json({ error: "serviço não encontrado" }, { status: 400 });
@@ -59,8 +54,6 @@ export async function POST(req: Request) {
     origem: "time",
     criadoPor: mine.userId,
     resumo,
-    // Lembrete 24h antes, no expediente; marcado com menos de 24h, sem lembrete.
-    lembreteEm: agenda.config.lembrete && hours ? momentoDoLembrete({ inicio, marcadoEm: Date.now(), hours }) : null,
   });
   if (!res.ok) {
     return res.motivo === "conflito"

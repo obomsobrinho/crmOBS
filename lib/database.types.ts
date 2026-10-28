@@ -134,7 +134,6 @@ export type Database = {
           origem: string
           phone: string
           remarcado_de: number | null
-          lembrete_em: string | null
           lembrete_enviado_em: string | null
           resumo: string | null
           servico_id: number | null
@@ -154,7 +153,6 @@ export type Database = {
           origem: string
           phone: string
           remarcado_de?: number | null
-          lembrete_em?: string | null
           lembrete_enviado_em?: string | null
           resumo?: string | null
           servico_id?: number | null
@@ -174,7 +172,6 @@ export type Database = {
           origem?: string
           phone?: string
           remarcado_de?: number | null
-          lembrete_em?: string | null
           lembrete_enviado_em?: string | null
           resumo?: string | null
           servico_id?: number | null

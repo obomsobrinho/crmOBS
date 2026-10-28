@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
-import { conflita, momentoDoLembrete } from "@/lib/agenda";
-import { horarioCadastrado } from "@/lib/horarios";
+import { conflita } from "@/lib/agenda";
 import {
   agendaDoTenant,
   cancelarAgendamento,
@@ -52,11 +51,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return NextResponse.json({ error: "agendamento não encontrado ou já cancelado" }, { status: 404 });
     }
     // A duração segue a do serviço quando ele ainda existe; senão, a de antes.
-    const [agenda, { data: c }] = await Promise.all([
-      agendaDoTenant(svc, mine.id),
-      svc.from("clients").select("agent_config").eq("id", mine.id).maybeSingle(),
-    ]);
-    const hours = horarioCadastrado(c?.agent_config ?? null);
+    const agenda = await agendaDoTenant(svc, mine.id);
     const servico = agenda?.servicos.find((s) => s.id === atual.servico_id);
     const duracao = servico ? servico.duracaoMin * 60_000 : Date.parse(atual.fim) - Date.parse(atual.inicio);
     const fim = inicio + duracao;
@@ -75,7 +70,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       origem: "time",
       criadoPor: mine.userId,
       por: "time",
-      lembreteEm: agenda?.config.lembrete && hours ? momentoDoLembrete({ inicio, marcadoEm: Date.now(), hours }) : null,
     });
     if (!res.ok) {
       return res.motivo === "conflito"

@@ -7,7 +7,10 @@ import {
   hhmm,
   horariosDoTime,
   iniciosDoDia,
-  momentoDoLembrete,
+  diaDoLembrete,
+  execucaoDoDia,
+  janelaDoLembrete,
+  lembreteDoHorario,
   normalizarConfigDaAgenda,
   horarioDaAgenda,
   quandoFalado,
@@ -128,21 +131,6 @@ test.describe("lib/agenda: validar e decidir", () => {
   });
 });
 
-test.describe("lib/agenda: lembrete", () => {
-  test("24h antes, dentro do expediente", () => {
-    expect(momentoDoLembrete({ inicio: em("2026-10-30", "10:00"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-29", "10:00"));
-  });
-  test("24h antes fora do expediente: último momento aberto antes disso", () => {
-    // Segunda 9h com domingo fechado: vai no sábado, 30 min antes de fechar.
-    expect(momentoDoLembrete({ inicio: em("2026-11-02", "09:00"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-31", "11:30"));
-    // Sexta 7h30 (antes de abrir): 24h antes é quinta 7h30, fechado; vai na quarta, 30 min antes de fechar.
-    expect(momentoDoLembrete({ inicio: em("2026-10-30", "07:30"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-28", "17:30"));
-  });
-  test("marcado com menos de 24h: sem lembrete", () => {
-    expect(momentoDoLembrete({ inicio: em("2026-10-29", "07:00"), marcadoEm: AGORA, hours: HORAS })).toBeNull();
-  });
-});
-
 test.describe("lib/agenda: config", () => {
   test("valores fora da lista viram o padrão; antecedência é livre", () => {
     expect(normalizarConfigDaAgenda(null)).toEqual(AGENDA_PADRAO);
@@ -162,5 +150,34 @@ test.describe("lib/agenda: horário próprio", () => {
     expect(normalizarConfigDaAgenda({ horario: { seg: { open: true, from: "10:00", to: "12:00" } } }).horario?.seg).toEqual({
       open: true, from: "10:00", to: "12:00",
     });
+  });
+});
+
+test.describe("lib/agenda: lembrete às 9h do dia anterior aberto", () => {
+  // HORAS: segunda a sexta abertas, sábado só manhã, domingo fechado.
+  const semSabado: BusinessHours = { ...HORAS, sab: { open: false, from: "08:00", to: "12:00" } };
+  test("dia comum: a execução cobre só amanhã", () => {
+    expect(janelaDoLembrete("2026-10-28", HORAS)).toEqual({ de: "2026-10-29", ate: "2026-10-29" });
+  });
+  test("sexta com sábado e domingo fechados: saem os de sábado, domingo e segunda", () => {
+    expect(janelaDoLembrete("2026-10-30", semSabado)).toEqual({ de: "2026-10-31", ate: "2026-11-02" });
+  });
+  test("empresa fechada no dia: não roda", () => {
+    expect(janelaDoLembrete("2026-11-01", HORAS)).toBeNull();
+    expect(janelaDoLembrete("2026-10-31", semSabado)).toBeNull();
+  });
+  test("feriado não entra: vale só o horário semanal", () => {
+    // 02/11 (Finados) é segunda: para o produto, um dia aberto como outro qualquer.
+    expect(janelaDoLembrete("2026-11-02", HORAS)).toEqual({ de: "2026-11-03", ate: "2026-11-03" });
+    expect(diaDoLembrete("2026-11-03", HORAS)).toBe("2026-11-02");
+  });
+  test("o dia do lembrete de um horário e quem fica sem", () => {
+    expect(diaDoLembrete("2026-11-02", semSabado)).toBe("2026-10-30");
+    const inicio = em("2026-11-02", "10:00");
+    expect(lembreteDoHorario({ inicio, marcadoEm: em("2026-10-30", "08:59"), hours: semSabado, ligado: true })).toEqual({ dia: "2026-10-30" });
+    // Marcado depois da execução que o cobriria: sem lembrete.
+    expect(lembreteDoHorario({ inicio, marcadoEm: em("2026-10-30", "09:00"), hours: semSabado, ligado: true })).toBeNull();
+    expect(lembreteDoHorario({ inicio, marcadoEm: AGORA, hours: semSabado, ligado: false })).toBeNull();
+    expect(execucaoDoDia("2026-10-30")).toBe(em("2026-10-30", "09:00"));
   });
 });

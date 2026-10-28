@@ -279,7 +279,7 @@ export default function ConfiguracaoDaAgenda({
                   <label className="flex cursor-pointer items-start gap-2.5">
                     <Checkbox checked={c.lembrete} onCheckedChange={(v) => mudar({ lembrete: v === true })} className="mt-0.5" aria-label="Lembrete automático" />
                     <span className="text-apoio">
-                      Lembrete automático pelo WhatsApp, 24h antes, sempre dentro do horário de atendimento. Horário marcado com menos de 24h não recebe.
+                      Lembrete automático pelo WhatsApp, às 9h do dia anterior ao horário marcado (no último dia em que a loja abre antes dele).
                     </span>
                   </label>
                 </SubBloco>

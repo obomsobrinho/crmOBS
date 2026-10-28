@@ -42,6 +42,7 @@ export function AgendaDeMemoria(props: {
       dono={props.dono}
       disponivel={props.disponivel}
       hours={hours}
+      horarioAtendimento={hours}
       config={CONFIG}
       servicos={SERVICOS}
       inicial={{

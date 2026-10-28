@@ -59,6 +59,7 @@ export default async function AgendaPage() {
       dono={client.role === "dono"}
       disponivel={disponivel}
       hours={horarioDaAgenda(agenda?.config ?? AGENDA_PADRAO, horarioCadastrado(c?.agent_config ?? null))}
+      horarioAtendimento={horarioCadastrado(c?.agent_config ?? null)}
       config={agenda?.config ?? AGENDA_PADRAO}
       servicos={agenda?.servicos ?? []}
       inicial={{ semana, itens, bloqueios }}

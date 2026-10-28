@@ -11,7 +11,8 @@
 //   do expediente;
 // - horário livre dentro da antecedência mínima a IA não marca: escala para o
 //   time (pedido de ajuda), não esconde;
-// - lembrete automático 24h antes, sempre dentro do expediente.
+// - lembrete automático numa execução por dia às 9h, para os horários de
+//   amanhã até o próximo dia aberto.
 // O que ainda não foi decidido está marcado "PENDENTE" ao lado.
 
 import { DAY_LABEL, normalizeHours, type BusinessHours, type DayKey } from "./agent-prompt";
@@ -37,14 +38,14 @@ export interface AgendaConfig {
   /** Intervalo livre depois de cada horário, em minutos. */
   intervaloMin: number;
   inicio: InicioDosHorarios;
-  /** Lembrete automático 24h antes, dentro do expediente. */
+  /** Lembrete automático às 9h do dia anterior (último dia aberto antes do horário). */
   lembrete: boolean;
   /**
    * Dias e horários PRÓPRIOS da agenda (decisão do dono, 28/10/2026: "Sim,
    * horário próprio"), separados do horário de atendimento do agente. É deles
    * que saem os horários livres da IA e a grade. null = nunca salvo: vale a
-   * cópia do horário de atendimento (`horarioDaAgenda`). O lembrete continua
-   * saindo dentro do horário de atendimento da loja.
+   * cópia do horário de atendimento (`horarioDaAgenda`). O lembrete segue os
+   * dias em que a LOJA abre (horário de atendimento, `janelaDoLembrete`).
    */
   horario: BusinessHours | null;
 }
@@ -66,14 +67,6 @@ export const ANTECEDENCIA_MAX = 7 * 24 * 60;
 /** Duração aceita para um serviço, em minutos. Igual ao check da migration. */
 export const DURACAO_MIN = 5;
 export const DURACAO_MAX = 480;
-/** Lembrete: quanto antes do horário. */
-export const LEMBRETE_ANTES_MIN = 24 * 60;
-/**
- * Quando 24h antes cai fora do expediente, o lembrete vai no "último momento
- * aberto antes disso": aqui, este tanto antes de fechar. PENDENTE: valor não
- * decidido pelo dono.
- */
-export const LEMBRETE_ANTES_DE_FECHAR_MIN = 30;
 
 export const OPCOES_INTERVALO = [0, 5, 10, 15, 30] as const;
 
@@ -106,8 +99,8 @@ export function normalizarConfigDaAgenda(raw: unknown): AgendaConfig {
 /**
  * O horário que a AGENDA usa: o próprio, ou, enquanto nunca foi salvo, uma
  * cópia do horário de atendimento. Pode passar do horário de atendimento, sem
- * bloqueio (decisão do dono, 28/10/2026: "Pode passar"); o lembrete continua
- * dentro do horário de atendimento (`momentoDoLembrete`).
+ * bloqueio (decisão do dono, 28/10/2026: "Pode passar"); o lembrete segue
+ * pelo horário de atendimento (`janelaDoLembrete`).
  */
 export function horarioDaAgenda(config: AgendaConfig, atendimento: BusinessHours | null): BusinessHours | null {
   return config.horario ?? atendimento;
@@ -319,31 +312,70 @@ export function horariosDoTime(a: {
 }
 
 // ————————————————————————————————————————————————————————————————
-// Lembrete (24h antes, sempre dentro do expediente)
+// Lembrete (uma execução por dia às 9h de São Paulo, decisão do dono)
 // ————————————————————————————————————————————————————————————————
+//
+// Uma execução por dia, às `HORA_DO_LEMBRETE` (igual para todas as empresas,
+// não segue a abertura de cada uma). Só roda para a empresa em dia que ela ABRE
+// (horário de atendimento) e manda os horários marcados de amanhã até o próximo
+// dia em que ela abre, inclusive: fecha sábado e domingo, na sexta saem os de
+// sábado, domingo e segunda. Horário marcado depois da execução que o cobriria
+// não recebe lembrete (a confirmação na marcação já serve). Feriado não entra:
+// o produto não tem calendário de feriados, vale só o horário semanal.
+
+/** Hora da execução diária do lembrete, em São Paulo. */
+export const HORA_DO_LEMBRETE = 9;
+/** Até quantos dias à frente procurar o próximo dia aberto. */
+const DIAS_DE_BUSCA = 7;
+
+function abreNoDia(dia: string, hours: BusinessHours): boolean {
+  return hours[chaveDoDia(dia)].open;
+}
 
 /**
- * Quando o lembrete sai, ou null. 24h antes do horário; fora do expediente, o
- * último momento aberto antes disso (fechamento menos
- * `LEMBRETE_ANTES_DE_FECHAR_MIN`). Marcação feita com menos de 24h de
- * antecedência não gera lembrete (regra do dono).
+ * Os dias cobertos pela execução de `hoje`: de amanhã até o próximo dia em que
+ * a empresa abre, inclusive. null quando a empresa não abre hoje (não roda) ou
+ * não abre em nenhum dos próximos 7 dias.
  */
-export function momentoDoLembrete(a: { inicio: number; marcadoEm: number; hours: BusinessHours }): number | null {
-  const alvo = a.inicio - LEMBRETE_ANTES_MIN * MIN;
-  if (a.marcadoEm > alvo) return null;
-  // De hoje (dia do alvo) para trás, até 8 dias: o primeiro expediente que
-  // contém o alvo vale o alvo; senão o último fechamento antes dele.
-  const diaDoAlvo = diaIsoSP(alvo);
-  for (let i = -1; i <= 8; i++) {
-    const exp = expedienteDoDia(somarDias(diaDoAlvo, -i), a.hours);
-    if (!exp) continue;
-    if (alvo >= exp.inicio && alvo < exp.fim) return alvo;
-    if (exp.fim <= alvo) {
-      const t = Math.max(exp.inicio, exp.fim - LEMBRETE_ANTES_DE_FECHAR_MIN * MIN);
-      return t > a.marcadoEm ? t : null;
-    }
+export function janelaDoLembrete(hoje: string, hours: BusinessHours): { de: string; ate: string } | null {
+  if (!abreNoDia(hoje, hours)) return null;
+  for (let i = 1; i <= DIAS_DE_BUSCA; i++) {
+    const d = somarDias(hoje, i);
+    if (abreNoDia(d, hours)) return { de: somarDias(hoje, 1), ate: d };
   }
   return null;
+}
+
+/** O dia da execução que cobre um horário: o último dia aberto ANTES dele, ou null. */
+export function diaDoLembrete(diaDoHorario: string, hours: BusinessHours): string | null {
+  for (let i = 1; i <= DIAS_DE_BUSCA; i++) {
+    const d = somarDias(diaDoHorario, -i);
+    if (abreNoDia(d, hours)) return d;
+  }
+  return null;
+}
+
+/** O instante da execução de um dia (9h em São Paulo). */
+export function execucaoDoDia(dia: string): number {
+  return inicioDoDiaSP(dia) + HORA_DO_LEMBRETE * 60 * MIN;
+}
+
+/**
+ * O lembrete deste horário: o dia em que sai, ou null (lembrete desligado, sem
+ * dia aberto antes, ou marcado depois da execução que o cobriria). O Vercel
+ * Cron do plano Hobby pode disparar até 59 min depois das 9h: o que for
+ * marcado nesse meio pode ainda entrar, e a tela diz "sem lembrete".
+ */
+export function lembreteDoHorario(a: {
+  inicio: number;
+  marcadoEm: number;
+  hours: BusinessHours | null;
+  ligado: boolean;
+}): { dia: string } | null {
+  if (!a.ligado || !a.hours) return null;
+  const dia = diaDoLembrete(diaIsoSP(a.inicio), a.hours);
+  if (!dia || a.marcadoEm >= execucaoDoDia(dia)) return null;
+  return { dia };
 }
 
 // ————————————————————————————————————————————————————————————————

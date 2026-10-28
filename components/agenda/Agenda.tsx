@@ -39,6 +39,9 @@ import {
   hhmm,
   quandoFalado,
   rotuloDoDia,
+  HORA_DO_LEMBRETE,
+  execucaoDoDia,
+  lembreteDoHorario,
   segundaDaSemana,
   type AgendaConfig,
   type ServicoDaAgenda,
@@ -72,8 +75,10 @@ export interface PropsAgenda {
   dono: boolean;
   /** false = tabelas ausentes (migration não aplicada) ou leitura falhou. */
   disponivel: boolean;
-  /** Horário de atendimento cadastrado (fonte única com o agente), ou null. */
+  /** O horário da AGENDA (próprio, ou a cópia do de atendimento), ou null. */
   hours: BusinessHours | null;
+  /** O horário de ATENDIMENTO da loja (decide o dia do lembrete). */
+  horarioAtendimento: BusinessHours | null;
   config: AgendaConfig;
   servicos: ServicoDaAgenda[];
   inicial: { semana: string; itens: LinhaAgenda[]; bloqueios: BloqueioAgenda[] };
@@ -313,6 +318,8 @@ export default function Agenda(p: PropsAgenda) {
 
       <DetalheDoHorario
         linha={detalhe}
+        horarioAtendimento={p.horarioAtendimento}
+        lembreteLigado={p.config.lembrete}
         agora={p.agora}
         readOnly={!!p.readOnly}
         onFechar={() => setDetalhe(null)}
@@ -530,6 +537,8 @@ function MiniCalendario({ hoje, semana, onEscolher }: { hoje: string; semana: st
 
 function DetalheDoHorario({
   linha,
+  horarioAtendimento,
+  lembreteLigado,
   agora,
   readOnly,
   onFechar,
@@ -537,6 +546,8 @@ function DetalheDoHorario({
   onCancelar,
 }: {
   linha: LinhaAgenda | null;
+  horarioAtendimento: BusinessHours | null;
+  lembreteLigado: boolean;
   agora: number;
   readOnly: boolean;
   onFechar: () => void;
@@ -545,6 +556,15 @@ function DetalheDoHorario({
 }) {
   const l = linha;
   const passou = !!l && l.fim <= agora;
+  // Lembrete: às 9h do último dia em que a loja abre antes do horário.
+  const textoLembrete = ((): { ok: boolean; texto: string } => {
+    if (!l) return { ok: false, texto: "" };
+    if (l.lembreteEnviadoEm) return { ok: true, texto: `Enviado ${quandoFalado(l.lembreteEnviadoEm, agora)}` };
+    const r = lembreteDoHorario({ inicio: l.inicio, marcadoEm: l.marcadoEm, hours: horarioAtendimento, ligado: lembreteLigado });
+    return r
+      ? { ok: true, texto: `Automático, ${diaFalado(execucaoDoDia(r.dia), agora)}, às ${HORA_DO_LEMBRETE}h` }
+      : { ok: false, texto: "Sem lembrete (desligado ou marcado depois da execução das 9h)." };
+  })();
   // Hierarquia (ajuste do dono, 28/10/2026): QUEM e QUANDO em destaque, depois
   // o serviço; telefone e "do que se trata" são apoio; as ações no rodapé.
   return (
@@ -580,11 +600,7 @@ function DetalheDoHorario({
                   <Item icone={l.origem === "ia" ? Sparkles : UserRound} rotulo="Marcado por">
                     {l.origem === "ia" ? "IA, na conversa" : "Time, pela agenda"}
                   </Item>
-                  <Item icone={l.lembreteEm ? Bell : BellOff} rotulo="Lembrete">
-                    {l.lembreteEm
-                      ? `Automático, ${quandoFalado(l.lembreteEm, agora)}`
-                      : "Sem lembrete (desligado ou marcado com menos de 24h)."}
-                  </Item>
+                  <Item icone={textoLembrete.ok ? Bell : BellOff} rotulo="Lembrete">{textoLembrete.texto}</Item>
                 </dl>
                 <Button variant="link" size="link" className="mt-4" asChild>
                   <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>

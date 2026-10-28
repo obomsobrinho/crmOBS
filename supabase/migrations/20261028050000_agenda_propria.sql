@@ -60,9 +60,8 @@ create table public.agendamentos (
   remarcado_de bigint references public.agendamentos(id) on delete set null,
   -- "Do que se trata": o resumo da conversa quando a IA marca, ou a nota do time.
   resumo text check (resumo is null or char_length(resumo) <= 500),
-  -- Lembrete automatico (lib/agenda.ts, momentoDoLembrete): quando sai e quando saiu.
-  -- null em lembrete_em = sem lembrete (desligado ou marcado com menos de 24h).
-  lembrete_em timestamptz,
+  -- Lembrete automatico (lib/agenda.ts, janelaDoLembrete): quando saiu. A execucao diaria das 9h
+  -- reivindica (null para agora) antes de enviar, entao rodar duas vezes nao manda dois.
   lembrete_enviado_em timestamptz,
   constraint agendamentos_periodo check (fim > inicio),
   -- Cancelamento coerente: a data existe exatamente quando esta cancelado.
@@ -78,9 +77,10 @@ create table public.agendamentos (
 create index agendamentos_do_tenant on public.agendamentos (client_id, inicio, id);
 create index agendamentos_do_contato on public.agendamentos (client_id, phone, inicio)
   where status = 'confirmado';
--- A varredura do lembrete (quando existir): so os pendentes, pela hora de sair.
-create index agendamentos_lembrete_pendente on public.agendamentos (lembrete_em)
-  where status = 'confirmado' and lembrete_em is not null and lembrete_enviado_em is null;
+-- A execucao diaria do lembrete (9h, /api/agenda/lembretes): por empresa, os confirmados ainda
+-- sem lembrete de uma janela de dias, pela hora de inicio.
+create index agendamentos_lembrete_pendente on public.agendamentos (client_id, inicio)
+  where status = 'confirmado' and lembrete_enviado_em is null;
 
 -- Coluna "Agendado" do funil: existe so com a agenda ligada (decisao do dono, 28/10/2026).
 -- Ligar: desarquiva a etapa ou cria logo depois de "Aguardando atendimento", empurrando as

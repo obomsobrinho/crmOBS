@@ -194,8 +194,6 @@ export async function marcarAgendamento(
     remarcadoDe?: number | null;
     /** "Do que se trata": o resumo da conversa (a IA) ou a nota do time. */
     resumo?: string | null;
-    /** Quando o lembrete automático sai (`momentoDoLembrete`), ou null. */
-    lembreteEm?: number | null;
   }
 ): Promise<ResultadoDaMarcacao> {
   const { data, error } = await svc
@@ -212,7 +210,6 @@ export async function marcarAgendamento(
       criado_por: a.criadoPor ?? null,
       remarcado_de: a.remarcadoDe ?? null,
       resumo: a.resumo?.trim() ? a.resumo.trim().slice(0, 500) : null,
-      lembrete_em: a.lembreteEm ? new Date(a.lembreteEm).toISOString() : null,
     })
     .select("id")
     .maybeSingle();
@@ -255,7 +252,6 @@ export async function remarcarAgendamento(
     criadoPor?: string | null;
     por: "cliente" | "time";
     resumo?: string | null;
-    lembreteEm?: number | null;
   }
 ): Promise<ResultadoDaMarcacao> {
   const { data: antigo } = await svc
@@ -279,7 +275,6 @@ export async function remarcarAgendamento(
     criadoPor: a.criadoPor,
     remarcadoDe: a.id,
     resumo: a.resumo,
-    lembreteEm: a.lembreteEm,
   });
   if (!novo.ok) {
     await svc

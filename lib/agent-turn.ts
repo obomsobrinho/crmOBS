@@ -43,7 +43,6 @@ import {
   decidirAgenda,
   diaFalado,
   periodoDe,
-  momentoDoLembrete,
   preferenciaDoHorario,
   quandoFalado,
   textoDaConsulta,
@@ -1172,7 +1171,7 @@ async function aplicarAgenda(a: {
   instancia: string | null;
   destino: string | null;
 }): Promise<{ output: AgentOutput; diag: NonNullable<TurnDiagnostics["agenda"]>; agendou: boolean }> {
-  const { config, servicos, daPessoa, hours, atendimento } = a.agenda;
+  const { config, servicos, daPessoa, hours } = a.agenda;
   const saida = a.output.agenda;
   const responder = (texto: string, extra: Partial<AgentOutput> = {}): AgentOutput => ({
     ...a.output,
@@ -1275,9 +1274,6 @@ async function aplicarAgenda(a: {
           summary: resumo,
         };
         if (a.dryRun) return { output: certo, diag, agendou: true };
-        // O lembrete sai dentro do horário de ATENDIMENTO da loja (decisão do dono).
-        const lembreteEm =
-          config.lembrete && atendimento ? momentoDoLembrete({ inicio, marcadoEm: a.agora, hours: atendimento }) : null;
         const { data: contato } = await a.svc
           .from("dados_cliente")
           .select("display_name, nomewpp")
@@ -1295,7 +1291,6 @@ async function aplicarAgenda(a: {
               origem: "ia",
               por: "cliente",
               resumo,
-              lembreteEm,
             })
           : await marcarAgendamento(a.svc, {
               clientId: a.clientId,
@@ -1307,7 +1302,6 @@ async function aplicarAgenda(a: {
               fim,
               origem: "ia",
               resumo,
-              lembreteEm,
             });
         if (res.ok) return { output: certo, diag, agendou: true };
         diag.falhou = res.motivo;

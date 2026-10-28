@@ -1,7 +1,6 @@
 import type { Supa } from "@/lib/supabase/tipos";
 import {
   horariosDoTime,
-  momentoDoLembrete,
   conflita,
   type AgendaConfig,
   type ServicoDaAgenda,
@@ -29,8 +28,10 @@ export interface LinhaAgenda {
   canceladoPor: "cliente" | "time" | null;
   /** "Do que se trata" (resumo da conversa ou nota do time). */
   resumo: string | null;
-  /** Quando o lembrete automático sai, ou null. */
-  lembreteEm: number | null;
+  /** Quando foi marcado (decide se ainda pega a execução do lembrete). */
+  marcadoEm: number;
+  /** Quando o lembrete saiu, ou null. */
+  lembreteEnviadoEm: number | null;
 }
 
 export interface BloqueioAgenda {
@@ -77,7 +78,7 @@ export interface FonteAgenda {
 export const TETO_DA_SEMANA = 500;
 
 const COLUNAS =
-  "id, phone, nome, servico_id, servico_nome, inicio, fim, status, origem, cancelado_por, resumo, lembrete_em";
+  "id, phone, nome, servico_id, servico_nome, inicio, fim, status, origem, cancelado_por, resumo, created_at, lembrete_enviado_em";
 
 type Bruta = {
   id: number;
@@ -91,7 +92,8 @@ type Bruta = {
   origem: string;
   cancelado_por: string | null;
   resumo: string | null;
-  lembrete_em: string | null;
+  created_at: string;
+  lembrete_enviado_em: string | null;
 };
 
 function daBruta(b: Bruta): LinhaAgenda {
@@ -107,7 +109,8 @@ function daBruta(b: Bruta): LinhaAgenda {
     origem: b.origem === "time" ? "time" : "ia",
     canceladoPor: b.cancelado_por === "cliente" || b.cancelado_por === "time" ? b.cancelado_por : null,
     resumo: b.resumo,
-    lembreteEm: b.lembrete_em ? Date.parse(b.lembrete_em) : null,
+    marcadoEm: Date.parse(b.created_at),
+    lembreteEnviadoEm: b.lembrete_enviado_em ? Date.parse(b.lembrete_enviado_em) : null,
   };
 }
 
@@ -224,8 +227,6 @@ export function fonteDaMemoriaAgenda(dados: {
   let bloqueios = [...dados.bloqueios];
   let servicos = [...dados.servicos];
   let seq = 1000;
-  const lembrete = (inicio: number) =>
-    dados.config.lembrete ? momentoDoLembrete({ inicio, marcadoEm: dados.agora, hours: dados.hours }) : null;
   const ocupados = (ignorar?: number) => [
     ...linhas.filter((l) => l.status === "confirmado" && l.id !== ignorar),
     ...bloqueios,
@@ -268,7 +269,7 @@ export function fonteDaMemoriaAgenda(dados: {
       linhas.push({
         id: ++seq, phone: p.phone, nome: p.nome || null, servicoId: s.id, servicoNome: s.nome,
         inicio: p.inicio, fim, status: "confirmado", origem: "time", canceladoPor: null,
-        resumo: p.resumo.trim() || null, lembreteEm: lembrete(p.inicio),
+        resumo: p.resumo.trim() || null, marcadoEm: dados.agora, lembreteEnviadoEm: null,
       });
       return { ok: true };
     },
@@ -282,7 +283,7 @@ export function fonteDaMemoriaAgenda(dados: {
       const fim = inicio + (l.fim - l.inicio);
       if (conflita(inicio, fim, ocupados(id))) return { ok: false, erro: "esse horário já está ocupado" };
       linhas = linhas.map((x) => (x.id === id ? { ...x, status: "cancelado", canceladoPor: "time" } : x));
-      linhas.push({ ...l, id: ++seq, inicio, fim, lembreteEm: lembrete(inicio) });
+      linhas.push({ ...l, id: ++seq, inicio, fim, marcadoEm: dados.agora, lembreteEnviadoEm: null });
       return { ok: true };
     },
     async bloquear(p) {
