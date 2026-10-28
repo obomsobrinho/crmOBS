@@ -233,3 +233,25 @@ test("horário confirmado pelo contato aparece no cartão e no detalhe", async (
   await cartao.click();
   await expect(page.locator('[data-agenda="detalhe-presenca"]')).toContainText("Confirmada pelo contato");
 });
+
+test("montagem: o mesmo item Agenda no passo 2, sem pergunta, e marcado pede só os serviços", async ({ page }) => {
+  await page.goto("/design/montagem?passo=sabe");
+  const item = page.locator('[data-agenda="item-agenda"]');
+  await expect(item).toContainText("Para quem atende com horário marcado. Ative para a IA marcar, remarcar e cancelar horários pela conversa.");
+  await expect(page.getByText("trabalha com horário marcado?")).toHaveCount(0);
+  // Desmarcado: nada abre, e o Continuar segue sem agenda.
+  await expect(item.locator('[data-agenda="montagem-servicos"]')).toHaveCount(0);
+  await item.getByLabel("Agenda ativa").click();
+  const servicos = item.locator('[data-agenda="montagem-servicos"]');
+  await expect(servicos).toBeVisible();
+  // Só os serviços: nada de horário, intervalo ou antecedência na montagem.
+  await expect(item.getByText("Intervalo entre horários")).toHaveCount(0);
+  await expect(item.getByText("Antecedência mínima")).toHaveCount(0);
+  // Marcada sem serviço: recusa ali mesmo, no passo 2.
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator('[data-agenda="montagem-erro"]')).toHaveText("Cadastre pelo menos um serviço para ligar a agenda.");
+  await servicos.getByRole("button", { name: "Adicionar serviço" }).click();
+  await servicos.getByLabel("Nome do serviço 1").fill("Avaliação");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator('[data-slot="montagem-bancada"]')).toBeVisible();
+});

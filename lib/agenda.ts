@@ -138,6 +138,21 @@ export interface ServicoDaAgenda {
   duracaoMin: number;
 }
 
+/**
+ * O que impede salvar a lista de serviços, na frase da tela, ou null. Usada
+ * pelas Configurações da agenda e pela montagem (a rota confere de novo).
+ */
+export function problemaDosServicos(
+  ativa: boolean,
+  lista: { nome: string; duracaoMin: number }[]
+): string | null {
+  if (ativa && lista.length === 0) return "Cadastre pelo menos um serviço para ligar a agenda.";
+  if (lista.some((s) => !s.nome || !Number.isInteger(s.duracaoMin) || s.duracaoMin < DURACAO_MIN || s.duracaoMin > DURACAO_MAX)) {
+    return `Todo serviço precisa de nome e de uma duração entre ${DURACAO_MIN} e ${DURACAO_MAX} minutos.`;
+  }
+  return null;
+}
+
 /** Um agendamento futuro da pessoa da conversa, com o código do turno. */
 export interface AgendamentoDaPessoa {
   codigo: string;

@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarClock, CalendarDays, Clock, Copy, Plus, Settings2, Trash2 } from "lucide-react";
+import { CalendarClock, Clock, Copy, Settings2 } from "lucide-react";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
+import { ItemAgenda, ListaDeServicos, paraEditar, paraSalvar, type ServicoEditavel } from "@/components/agenda/CamposDaAgenda";
 import { Field, Hint, MOLDURA_LISTA, SubBloco } from "@/components/agente/ui";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,10 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DAY_ORDER, type BusinessHours } from "@/lib/agent-prompt";
 import {
   ANTECEDENCIA_MAX,
-  DURACAO_MAX,
-  DURACAO_MIN,
   OPCOES_INICIO,
   OPCOES_INTERVALO,
+  problemaDosServicos,
   textoDeDuracao,
   type AgendaConfig,
   type InicioDosHorarios,
@@ -33,7 +33,6 @@ import { diaIsoSP, diaMes, somarDias } from "@/lib/fuso";
 // e a cópia já preenchida na primeira ativação. O lembrete segue o horário de
 // atendimento. Só o dono chega aqui (a página guarda; esconder não é trava).
 
-type ServicoEditavel = { id: number | null; chave: string; nome: string; duracao: string };
 type Unidade = "min" | "h";
 
 /** Sem horário de atendimento para copiar: todos os dias fechados, o dono abre. */
@@ -77,9 +76,7 @@ export default function ConfiguracaoDaAgenda({
   const [horario, setHorario] = useState<BusinessHours>(
     () => configInicial.horario ?? horarioAtendimento ?? HORARIO_FECHADO
   );
-  const [servicos, setServicos] = useState<ServicoEditavel[]>(() =>
-    servicosIniciais.map((s) => ({ id: s.id, chave: `s${s.id}`, nome: s.nome, duracao: String(s.duracaoMin) }))
-  );
+  const [servicos, setServicos] = useState<ServicoEditavel[]>(() => servicosIniciais.map(paraEditar));
   const inicial = antecedenciaParaCampo(configInicial.antecedenciaMin);
   const [antValor, setAntValor] = useState(inicial.valor);
   const [antUnidade, setAntUnidade] = useState<Unidade>(inicial.unidade);
@@ -96,19 +93,17 @@ export default function ConfiguracaoDaAgenda({
 
   const salvar = async () => {
     setErro(null);
-    const lista = servicos.map((s) => ({ id: s.id, nome: s.nome.trim(), duracaoMin: Number(s.duracao) }));
-    if (c.ativa && lista.length === 0) return setErro("Cadastre pelo menos um serviço para ligar a agenda.");
-    if (lista.some((s) => !s.nome || !Number.isInteger(s.duracaoMin) || s.duracaoMin < DURACAO_MIN || s.duracaoMin > DURACAO_MAX)) {
-      return setErro(`Todo serviço precisa de nome e de uma duração entre ${DURACAO_MIN} e ${DURACAO_MAX} minutos.`);
-    }
+    const lista = paraSalvar(servicos);
+    const problema = problemaDosServicos(c.ativa, lista);
+    if (problema) return setErro(problema);
     if (!antValida) return setErro("Antecedência mínima inválida.");
-    setEnviando(true);
     if (c.ativa && !DAY_ORDER.some((d) => horario[d].open)) return setErro("Abra pelo menos um dia nos dias e horários da agenda.");
+    setEnviando(true);
     const r = await fonte.salvarConfig({ ...c, antecedenciaMin: antMin, horario }, lista);
     setEnviando(false);
     if (!r.ok) return setErro(r.erro);
     setC(r.config);
-    setServicos(r.servicos.map((s) => ({ id: s.id, chave: `s${s.id}`, nome: s.nome, duracao: String(s.duracaoMin) })));
+    setServicos(r.servicos.map(paraEditar));
     setSalvo(true);
   };
 
@@ -121,21 +116,7 @@ export default function ConfiguracaoDaAgenda({
             <h1 className="text-titulo">Configurações</h1>
           </div>
 
-          <section className="rounded-xl border border-line bg-bloco p-4" data-agenda="item-agenda">
-            <label className="flex cursor-pointer items-start gap-3">
-              <Checkbox checked={c.ativa} onCheckedChange={(v) => mudar({ ativa: v === true })} className="mt-1" aria-label="Agenda ativa" />
-              <span>
-                <span className="flex items-center gap-1.5 font-display text-cartao">
-                  <CalendarDays size={16} className="text-brand-ink" />
-                  Agenda
-                </span>
-                <span className="mt-0.5 block text-apoio text-ink-3">
-                  Para quem atende com horário marcado. Ative para a IA marcar, remarcar e cancelar horários pela conversa.
-                </span>
-              </span>
-            </label>
-
-            {c.ativa && (
+          <ItemAgenda ativa={c.ativa} onAtivar={(v) => mudar({ ativa: v })}>
               <div className="mt-5 space-y-5 border-t border-line pt-5" data-agenda="config-aberta">
                 <SubBloco
                   primeiro
@@ -171,60 +152,13 @@ export default function ConfiguracaoDaAgenda({
                 </SubBloco>
 
                 <SubBloco titulo="Serviços" icone={Clock} descricao="Cada um com quanto tempo ocupa. Com um serviço só, a IA não pergunta qual.">
-                  <div className={MOLDURA_LISTA} data-agenda="servicos">
-                    {servicos.length === 0 && <p className="px-3 py-2.5 text-legenda text-ink-3">Nenhum serviço ainda.</p>}
-                    {servicos.map((s, i) => (
-                      <div key={s.chave} className="flex items-center gap-2 px-3 py-2" data-agenda="servico">
-                        <Input
-                          variant="sutil"
-                          value={s.nome}
-                          placeholder="Nome do serviço"
-                          onChange={(e) => {
-                            setServicos((l) => l.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)));
-                            setSalvo(false);
-                          }}
-                          aria-label={`Nome do serviço ${i + 1}`}
-                          className="min-w-0 flex-1"
-                          maxLength={80}
-                        />
-                        <div className="flex items-center gap-1.5">
-                          <Input
-                            variant="sutil"
-                            inputMode="numeric"
-                            value={s.duracao}
-                            onChange={(e) => {
-                              setServicos((l) => l.map((x, j) => (j === i ? { ...x, duracao: e.target.value.replace(/\D/g, "") } : x)));
-                              setSalvo(false);
-                            }}
-                            aria-label={`Duração em minutos do serviço ${i + 1}`}
-                            className="w-16 text-right tabular-nums"
-                            maxLength={3}
-                          />
-                          <span className="text-legenda text-ink-3">min</span>
-                        </div>
-                        <Button
-                          variant="danger-ghost"
-                          size="icon-control"
-                          aria-label={`Remover serviço ${i + 1}`}
-                          onClick={() => {
-                            setServicos((l) => l.filter((_, j) => j !== i));
-                            setSalvo(false);
-                          }}
-                        >
-                          <Trash2 size={14} />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    variant="link"
-                    size="link"
-                    className="mt-2"
-                    onClick={() => setServicos((l) => [...l, { id: null, chave: `n${l.length}-${Math.random()}`, nome: "", duracao: "30" }])}
-                  >
-                    <Plus size={14} />
-                    Adicionar serviço
-                  </Button>
+                  <ListaDeServicos
+                    servicos={servicos}
+                    onChange={(l) => {
+                      setServicos(l);
+                      setSalvo(false);
+                    }}
+                  />
                 </SubBloco>
 
                 <SubBloco titulo="Como os horários se encaixam" icone={CalendarClock}>
@@ -330,8 +264,7 @@ export default function ConfiguracaoDaAgenda({
                   </label>
                 </SubBloco>
               </div>
-            )}
-          </section>
+          </ItemAgenda>
 
           {!c.ativa && (
             <p className="mt-3 text-legenda text-ink-3" data-agenda="desligada">

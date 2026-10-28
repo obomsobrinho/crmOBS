@@ -3,7 +3,8 @@
 //
 // Nacionais (lei): os fixos e a Sexta-feira Santa (Páscoa menos 2 dias).
 // Pontos facultativos nacionais (Carnaval e Corpus Christi) aparecem marcados,
-// mas NÃO vêm bloqueados: PENDENTE (dono) se também bloqueiam por padrão.
+// mas NÃO bloqueiam (decisão do dono, 28/10/2026: "Não bloqueiam"); quem fecha
+// nesses dias usa o bloqueio de dias inteiros da agenda.
 // Feriado estadual e municipal fica com o bloqueio de período da agenda.
 
 export interface Feriado {

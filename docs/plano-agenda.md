@@ -181,12 +181,12 @@ Decided and built:
 | 11 | Expired trial or late payment: no reminder | `accessState` in the route |
 | 12 | A failed send raises an icon in the owner's central (like open help requests) and is retried by the next run while the booking is still ahead | `lembrete_falhou_em`, `admin_lembretes_com_falha` |
 | R1 | No daily cap (the volume is the number of bookings) | `tetoDiario: null` |
+| H1 | Carnaval and Corpus Christi ("ponto facultativo") do NOT block (owner: "Não bloqueiam"): marked on the grid and the settings list; a business that closes uses the whole-day block | `lib/feriados.ts` (`tipo: "facultativo"`) |
+| P5 | The agenda in onboarding: the SAME "Agenda" item (checkbox and short text, no "você trabalha com horário marcado?") in step 2 ("O que ele sabe"); checked, it asks only for the services; the rest comes from `AGENDA_PADRAO` and the agenda hours are the copy of the business hours. Saved on the step 2 Continuar, right after the agent (so the hours are in the database for the copy) | `components/agenda/CamposDaAgenda.tsx` (shared with the settings), `MontagemWizard` |
 
 Still open:
 | # | Question | What the code does now |
 |---|---|---|
-| P5 | The activation item in onboarding (montagem) | not built |
-| H1 | Carnaval and Corpus Christi (optional days, "ponto facultativo") | shown on the settings list, not blocked |
 | L2 | Vercel function limit | `maxDuration = 300` assumes Fluid Compute (default on new projects); check the project settings, otherwise lower it to 60 and `ORCAMENTO_MS` to 50 s |
 | B1 | The bench (`/api/playground`) reads only whether the agenda is on, not whether it has services and hours | the live turn checks all three |
 

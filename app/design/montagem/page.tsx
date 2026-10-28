@@ -1,5 +1,6 @@
 import Link from "next/link";
 import MontagemWizard from "@/components/MontagemWizard";
+import { AGENDA_PADRAO } from "@/lib/agenda";
 import { EMPTY_CONFIG, type AgentConfig } from "@/lib/agent-prompt";
 import { PASSOS_MONTAGEM, type PassoMontagem } from "@/lib/onboarding";
 import type { KnowledgeDoc } from "@/lib/crm";
@@ -62,6 +63,7 @@ export default async function DesignMontagemPage({
         knowledgeKeyConfigured
         stageNames={{ aguardando_humano: "Aguardando atendimento" }}
         passoDoServidor="quem"
+        agendaInicial={{ config: AGENDA_PADRAO, servicos: [] }}
         passoInicial={inicial}
         // Sem `?passo=` o preview abre como uma conta nova: na abertura.
         aberturaInicial={!ehPasso(passo)}
