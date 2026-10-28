@@ -189,3 +189,37 @@ ia.zapresponder.com.br ("Agendamentos" are scheduled messages; Starter R$ 132 wi
 scheduling); helenacrm.com (agenda through integrators); intercom.help/chatgds article 14744352
 (reminders by Meta templates); intercom.help/clinicanasnuvens article 8387018 (manual confirmation
 list, AI as paid add-on).
+
+## 11. Implementation state (28/10/2026, branch `claude/agenda-plano-0fc545`)
+
+Built:
+- `lib/agenda.ts` (pure): `AGENDA_PADRAO` and every default, `horariosLivres`, `montarOfertas`,
+  `blocoDaAgenda`, `decidirAgenda`, the code-written replies. Specs: `e2e/agenda-lib.design.spec.ts`.
+- `lib/agenda-servidor.ts` (server): reads that return `null` when the tables do not exist,
+  `marcarAgendamento` (23P01 = overlap), `cancelarAgendamento`, `remarcarAgendamento`.
+- Routes: `POST /api/agenda/agendamentos`, `PATCH /api/agenda/agendamentos/[id]`
+  (`cancelar`/`remarcar`), `POST|DELETE /api/agenda/bloqueios`, `PUT /api/agenda/config` (owner),
+  `GET /api/agenda/horarios`. All through `sessaoDaRota`, tenant from the session.
+- Brain: `agendaDoTurno` + `montarOfertas` before the model, `### HORÁRIOS LIVRES` after
+  `### CALENDÁRIO`, field `agenda` in the output schema, `aplicarAgenda` books before replying.
+  `diagnostics.agenda` tells the bench what happened (or would happen in `dryRun`).
+- Screen `/agenda` (`components/agenda/Agenda.tsx` over `lib/agenda-fonte.ts`), menu item
+  between Conversas and Contatos; `/design/agenda` runs the same screen on a memory source.
+- Migration `20261028050000_agenda_propria.sql`, types in `lib/database.types.ts` written BY HAND
+  (no local database tonight): regenerate after applying. The three tables are in
+  `TABELAS_DO_CLIENTE` and the export.
+
+Not built or stubbed:
+- Automatic reminders (D8): manual copy text. Needs a scheduler and the channel decision.
+- Realtime on `/agenda`: the table is in the publication with `REPLICA IDENTITY FULL`, but it
+  is NOT in `ESCUTAS_DO_TENANT` (`lib/use-canal-ao-vivo.ts`): adding it before the migration
+  reaches production would make Supabase refuse the whole tenant channel. Add it after.
+- "Team approves each booking" (D2 alternative): not built; the AI always confirms.
+- The bench shows `diagnostics.agenda` only in the raw diagnostics; no dedicated card.
+- Booking notice still has no "Abrir" link (n8n "Notifica grupo" unchanged).
+- Cost note: every turn of a tenant with the goal `agendar` does one extra read (agenda config
+  and services) even when the agenda is off, because `agenda_config` cannot join the main
+  `clients` select until the migration exists everywhere. Fold it in after.
+
+Before any deploy: apply the migration (owner), regenerate types, then `npm run test:e2e:ia` and
+`npm run test:e2e:n8n` (paid) because the output schema changed for every tenant.
