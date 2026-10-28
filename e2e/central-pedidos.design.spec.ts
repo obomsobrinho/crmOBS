@@ -146,7 +146,7 @@ test.describe("Regra do bloco Pedidos em aberto (lib/admin-pedidos.ts)", () => {
   });
 
   test("o número de avisos sai no banco, nas duas leituras (lista e contagem por motivo)", () => {
-    const sql = readFileSync("supabase/migrations/20261027183844_admin_pedidos_abertos.sql", "utf8");
+    const sql = readFileSync("supabase/migrations/20261028033120_admin_pedidos_abertos.sql", "utf8");
     const fora = "and not (split_part(h.phone, '@', 1) = any (coalesce(p_fora, '{}')))";
     expect(sql.split(fora).length - 1).toBe(2);
   });
