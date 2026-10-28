@@ -18,6 +18,7 @@
 import { DAY_LABEL, normalizeHours, type BusinessHours, type DayKey } from "./agent-prompt";
 import { diaIsoSP, diaMes, inicioDoDiaSP, somarDias } from "./fuso";
 import { horaTexto, minutosAgoraSP } from "./horarios";
+import { feriadoDoDia, type Feriado } from "./feriados";
 
 const MIN = 60_000;
 const DIA_MS = 86_400_000;
@@ -48,6 +49,8 @@ export interface AgendaConfig {
    * dias em que a LOJA abre (horário de atendimento, `janelaDoLembrete`).
    */
   horario: BusinessHours | null;
+  /** Feriados nacionais que o dono LIBEROU (AAAA-MM-DD); os outros vêm bloqueados para a IA. */
+  feriadosLiberados: string[];
 }
 
 export const AGENDA_PADRAO: AgendaConfig = {
@@ -55,9 +58,10 @@ export const AGENDA_PADRAO: AgendaConfig = {
   antecedenciaMin: 120,
   intervaloMin: 0,
   inicio: "meia",
-  // PENDENTE: o dono decidiu "ligado/desligado", não o valor inicial.
+  // Ligado ao ativar a agenda (decisão do dono, 28/10/2026).
   lembrete: true,
   horario: null,
+  feriadosLiberados: [],
 };
 
 /** No máximo quantos horários a IA oferece de uma vez (regra do dono). */
@@ -93,6 +97,9 @@ export function normalizarConfigDaAgenda(raw: unknown): AgendaConfig {
     inicio: o.inicio === "hora" || o.inicio === "meia" || o.inicio === "seguido" ? o.inicio : AGENDA_PADRAO.inicio,
     lembrete: typeof o.lembrete === "boolean" ? o.lembrete : AGENDA_PADRAO.lembrete,
     horario: o.horario && typeof o.horario === "object" ? normalizeHours(o.horario) : null,
+    feriadosLiberados: Array.isArray(o.feriadosLiberados)
+      ? o.feriadosLiberados.filter((d): d is string => typeof d === "string" && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)).slice(0, 60)
+      : [],
   };
 }
 
@@ -244,12 +251,40 @@ export function periodoDe(ms: number): PeriodoDaAgenda {
   return PERIODOS_DA_AGENDA.find((p) => m >= p.de && m < p.ate)?.chave ?? "noite";
 }
 
+/**
+ * Feriado nacional que a agenda NÃO atende: vem bloqueado para a IA por padrão
+ * e o dono libera um feriado específico (`feriadosLiberados`). Ponto
+ * facultativo (Carnaval, Corpus Christi) só aparece marcado. Devolve o feriado
+ * que fecha o dia, ou null.
+ */
+export function feriadoQueFecha(dia: string, config: Pick<AgendaConfig, "feriadosLiberados">): Feriado | null {
+  const f = feriadoDoDia(dia);
+  return f && f.tipo === "nacional" && !config.feriadosLiberados.includes(dia) ? f : null;
+}
+
+/**
+ * Os períodos em que a agenda atende num dia (decisão do dono, 28/10/2026: a
+ * IA entende o período pelo horário da agenda; das 13h às 17h é só à tarde).
+ */
+export function periodosDoDia(dia: string, hours: BusinessHours): PeriodoDaAgenda[] {
+  const exp = expedienteDoDia(dia, hours);
+  if (!exp) return [];
+  const base = inicioDoDiaSP(dia);
+  return PERIODOS_DA_AGENDA.filter((p) => exp.inicio < base + p.ate * MIN && exp.fim > base + p.de * MIN).map(
+    (p) => p.chave
+  );
+}
+
 export type ResultadoDaConsulta =
   /** Até 3 horários do período, os mais próximos. */
   | { tipo: "ofertas"; inicios: number[] }
   /** O período tem livre só dentro da antecedência: a IA escala. */
   | { tipo: "antecedencia"; inicios: number[] }
-  /** Nada livre no período (ou dia fechado, ou já passou). */
+  /** Dia fechado na agenda (dia sem atendimento ou feriado). */
+  | { tipo: "fechado"; feriado: string | null }
+  /** O dia tem agenda, mas não nesse período: diz quais períodos existem. */
+  | { tipo: "semPeriodo"; periodos: PeriodoDaAgenda[] }
+  /** Nada livre no período (tudo ocupado, bloqueado ou já passou). */
   | { tipo: "vazio" };
 
 /** O que a IA pode oferecer para um dia e período (a consulta do turno). */
@@ -262,6 +297,11 @@ export function consultarPeriodo(a: {
   config: AgendaConfig;
   duracaoMin: number;
 }): ResultadoDaConsulta {
+  const feriado = feriadoQueFecha(a.dia, a.config);
+  if (feriado) return { tipo: "fechado", feriado: feriado.nome };
+  const periodos = periodosDoDia(a.dia, a.hours);
+  if (periodos.length === 0) return { tipo: "fechado", feriado: null };
+  if (!periodos.includes(a.periodo)) return { tipo: "semPeriodo", periodos };
   const todos = iniciosDoDia({ ...a, aPartirDe: a.agora }).filter((t) => periodoDe(t) === a.periodo);
   const cedo = a.agora + a.config.antecedenciaMin * MIN;
   const fora = todos.filter((t) => t >= cedo);
@@ -283,6 +323,7 @@ export function validarHorario(a: {
 }): ValidacaoDoHorario {
   if (a.inicio <= a.agora) return "passou";
   const dia = diaIsoSP(a.inicio);
+  if (feriadoQueFecha(dia, a.config)) return "fora";
   // Com os ocupados: em "logo após o anterior" a grade depende do que já está
   // marcado. Expediente que vira a noite: o início pode ser do de ontem.
   const valeNoDia = (d: string) => iniciosDoDia({ ...a, dia: d }).includes(a.inicio);
@@ -304,6 +345,8 @@ export function horariosDoTime(a: {
   foraDoExpediente?: boolean;
 }): number[] {
   const base = inicioDoDiaSP(a.dia);
+  // Feriado fechado conta como dia sem expediente: o time marca só pedindo "fora do expediente".
+  if (!a.foraDoExpediente && feriadoQueFecha(a.dia, a.config)) return [];
   return iniciosDoDia({
     ...a,
     aPartirDe: a.agora,
@@ -435,6 +478,25 @@ export function codigoDoServico(i: number): string {
   return `V${i + 1}`;
 }
 
+/** "segunda a sexta: manhã e tarde; sábado: manhã": os períodos da agenda por dia da semana. */
+export function resumoDosPeriodos(hours: BusinessHours): string {
+  const ordem: DayKey[] = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"];
+  // Uma semana qualquer (a de 05/01/2026 começa na segunda): só importa o dia da semana.
+  const grupos: { dias: DayKey[]; texto: string }[] = [];
+  ordem.forEach((k, i) => {
+    const ps = periodosDoDia(somarDias("2026-01-05", i), hours);
+    if (ps.length === 0) return;
+    const texto = ps.map((p) => PERIODOS_DA_AGENDA.find((x) => x.chave === p)!.nome.replace(/^(de|à) /, "")).join(" e ");
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.texto === texto && ordem.indexOf(ultimo.dias[ultimo.dias.length - 1]) === i - 1) ultimo.dias.push(k);
+    else grupos.push({ dias: [k], texto });
+  });
+  if (grupos.length === 0) return "nenhum";
+  return grupos
+    .map((g) => `${g.dias.length > 1 ? `${DAY_LABEL[g.dias[0]]} a ${DAY_LABEL[g.dias[g.dias.length - 1]]}` : DAY_LABEL[g.dias[0]]}: ${g.texto}`)
+    .join("; ");
+}
+
 /**
  * `### AGENDA` do turno: os serviços (com código quando há mais de um), os
  * agendamentos futuros da pessoa e o contrato. Vai DEPOIS do AGORA e do
@@ -447,6 +509,8 @@ export function blocoDaAgenda(a: {
   daPessoa: AgendamentoDaPessoa[];
   servicos: ServicoDaAgenda[];
   config: AgendaConfig;
+  /** O horário da agenda (para dizer em que períodos ela atende). */
+  hours: BusinessHours;
 }): string {
   const varios = a.servicos.length > 1;
   const linhas = [
@@ -462,6 +526,7 @@ export function blocoDaAgenda(a: {
       (varios ? " e agenda.servico" : "") +
       ". O sistema confere antes de gravar.",
     `Horário com menos de ${textoDeDuracao(a.config.antecedenciaMin)} de antecedência o sistema não marca: ele chama o time.`,
+    `Períodos em que a agenda atende: ${resumoDosPeriodos(a.hours)}. Ofereça só esses; se a pessoa pedir outro, diga quais existem. Feriado nacional a agenda não atende, a menos que o sistema ofereça horário.`,
   ];
   if (varios) {
     linhas.push("Serviços:");
@@ -602,6 +667,18 @@ export function textoDaConsulta(a: {
   }
   if (a.resultado.tipo === "antecedencia") {
     return `${abre}Para ${quando} os horários livres estão muito em cima. Vou confirmar com a equipe e já te retorno.`;
+  }
+  if (a.resultado.tipo === "fechado") {
+    const dia = diaFaladoDoIso(a.dia, diaIsoSP(a.agora));
+    const d = `${dia.charAt(0).toUpperCase()}${dia.slice(1)}`;
+    return a.resultado.feriado
+      ? `${abre}${d} é feriado (${a.resultado.feriado}) e não temos horário. Prefere outro dia?`
+      : `${abre}${d} não temos horário. Prefere outro dia?`;
+  }
+  if (a.resultado.tipo === "semPeriodo") {
+    const dia = diaFaladoDoIso(a.dia, diaIsoSP(a.agora));
+    const nomes = a.resultado.periodos.map(nomeDoPeriodo);
+    return `${abre}${dia.charAt(0).toUpperCase()}${dia.slice(1)} só temos horário ${listaFalada(nomes)}. Pode ser?`;
   }
   return `${abre}Para ${quando} não tenho horário livre. Prefere outro período ou outro dia?`;
 }

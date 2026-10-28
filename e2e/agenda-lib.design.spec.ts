@@ -12,7 +12,10 @@ import {
   janelaDoLembrete,
   lembreteDoHorario,
   normalizarConfigDaAgenda,
+  feriadoQueFecha,
   horarioDaAgenda,
+  periodosDoDia,
+  resumoDosPeriodos,
   quandoFalado,
   textoDaConsulta,
   validarHorario,
@@ -21,6 +24,7 @@ import {
 } from "../lib/agenda";
 import type { BusinessHours } from "../lib/agent-prompt";
 import { inicioDoDiaSP } from "../lib/fuso";
+import { feriadoDoDia, feriadosDoAno, pascoa } from "../lib/feriados";
 
 // AGENDA PRÓPRIA (docs/plano-agenda.md): as regras do dono de 28/10/2026, puras
 // e com relógio FIXO. Quarta, 28/10/2026, 08:00 em São Paulo.
@@ -73,10 +77,10 @@ test.describe("lib/agenda: oferta por dia e período", () => {
     const r = consultarPeriodo({ ...base, agora: em("2026-10-28", "16:30"), dia: "2026-10-28", periodo: "tarde" });
     expect(r.tipo).toBe("antecedencia");
   });
-  test("dia fechado: vazio, e o texto pergunta outro período ou dia", () => {
+  test("dia fechado: diz que não tem horário naquele dia e pergunta outro dia", () => {
     const r = consultarPeriodo({ ...base, dia: "2026-11-01", periodo: "manha" });
-    expect(r.tipo).toBe("vazio");
-    expect(textoDaConsulta({ dia: "2026-11-01", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toContain("Prefere outro período ou outro dia");
+    expect(r.tipo).toBe("fechado");
+    expect(textoDaConsulta({ dia: "2026-11-01", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toContain("não temos horário. Prefere outro dia?");
   });
   test("o texto da oferta diz o dia, o período e até 3 horas", () => {
     const r = consultarPeriodo({ ...base, dia: "2026-10-29", periodo: "tarde" });
@@ -123,7 +127,7 @@ test.describe("lib/agenda: validar e decidir", () => {
     expect(fora.length).toBeGreaterThan(40);
   });
   test("bloco do prompt: sem horários, com o contrato e sem travessão", () => {
-    const b = blocoDaAgenda({ agora: AGORA, daPessoa: [], servicos, config: CFG });
+    const b = blocoDaAgenda({ agora: AGORA, daPessoa: [], servicos, config: CFG, hours: HORAS });
     expect(b).toContain("### AGENDA");
     expect(b).toContain("Só há um serviço");
     expect(b).not.toMatch(/\d{1,2}h\d{0,2}, /);
@@ -179,5 +183,44 @@ test.describe("lib/agenda: lembrete às 9h do dia anterior aberto", () => {
     expect(lembreteDoHorario({ inicio, marcadoEm: em("2026-10-30", "09:00"), hours: semSabado, ligado: true })).toBeNull();
     expect(lembreteDoHorario({ inicio, marcadoEm: AGORA, hours: semSabado, ligado: false })).toBeNull();
     expect(execucaoDoDia("2026-10-30")).toBe(em("2026-10-30", "09:00"));
+  });
+});
+
+test.describe("lib/feriados e lib/agenda: feriados nacionais", () => {
+  test("Páscoa e móveis calculados; fixos do ano", () => {
+    expect(pascoa(2026)).toBe("2026-04-05");
+    expect(pascoa(2027)).toBe("2027-03-28");
+    expect(feriadoDoDia("2026-04-03")).toEqual({ dia: "2026-04-03", nome: "Sexta-feira Santa", tipo: "nacional" });
+    expect(feriadoDoDia("2026-02-17")?.tipo).toBe("facultativo"); // Carnaval
+    expect(feriadoDoDia("2026-11-20")?.nome).toBe("Dia da Consciência Negra");
+    expect(feriadoDoDia("2026-10-28")).toBeNull();
+    expect(feriadosDoAno(2026).filter((x) => x.tipo === "nacional")).toHaveLength(10);
+  });
+  test("feriado nacional vem bloqueado para a IA; o dono libera um específico", () => {
+    const base = { agora: AGORA, hours: HORAS, ocupados: [], duracaoMin: 30, periodo: "manha" as const };
+    // 02/11/2026 é segunda (Finados).
+    const r = consultarPeriodo({ ...base, config: CFG, dia: "2026-11-02" });
+    expect(r).toEqual({ tipo: "fechado", feriado: "Finados" });
+    expect(textoDaConsulta({ dia: "2026-11-02", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toContain("é feriado (Finados)");
+    expect(consultarPeriodo({ ...base, config: { ...CFG, feriadosLiberados: ["2026-11-02"] }, dia: "2026-11-02" }).tipo).toBe("ofertas");
+    expect(validarHorario({ ...base, config: CFG, inicio: em("2026-11-02", "09:00") })).toBe("fora");
+    // Ponto facultativo só aparece marcado: não bloqueia.
+    expect(feriadoQueFecha("2027-02-08", CFG)).toBeNull();
+  });
+});
+
+test.describe("lib/agenda: períodos pelo horário da agenda", () => {
+  const tarde: BusinessHours = { ...HORAS, qui: { open: true, from: "13:00", to: "17:00" } };
+  test("das 13h às 17h é só à tarde; pedir manhã diz o que existe", () => {
+    expect(periodosDoDia("2026-10-29", tarde)).toEqual(["tarde"]);
+    expect(periodosDoDia("2026-10-28", HORAS)).toEqual(["manha", "tarde"]);
+    const r = consultarPeriodo({ agora: AGORA, hours: tarde, ocupados: [], config: CFG, duracaoMin: 30, dia: "2026-10-29", periodo: "manha" });
+    expect(r).toEqual({ tipo: "semPeriodo", periodos: ["tarde"] });
+    expect(textoDaConsulta({ dia: "2026-10-29", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toBe(
+      "Amanhã, quinta, 29/10 só temos horário à tarde. Pode ser?"
+    );
+  });
+  test("o bloco do prompt resume os períodos da semana", () => {
+    expect(resumoDosPeriodos(HORAS)).toBe("segunda a sexta: manhã e tarde; sábado: manhã");
   });
 });

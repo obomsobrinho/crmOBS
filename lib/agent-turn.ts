@@ -545,7 +545,7 @@ export async function processTurn(
     now: agoraDoTurno,
     hours: horasDoTurno,
     agenda: agenda
-      ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config })
+      ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config, hours: agenda.hours })
       : null,
   });
   const raw = run.output;
