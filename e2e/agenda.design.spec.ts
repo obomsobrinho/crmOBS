@@ -164,3 +164,10 @@ test.describe("Agenda: dias e horários próprios", () => {
     await expect(page.locator('[data-agenda="configuracoes"]')).toContainText("ainda não tem horário de atendimento para copiar");
   });
 });
+
+test("o botão de copiar o horário de atendimento vem antes da lista de dias", async ({ page }) => {
+  await page.goto("/design/agenda/configuracoes");
+  const botao = (await page.getByRole("button", { name: "Copiar o horário de atendimento" }).boundingBox())!;
+  const dias = (await page.locator('[data-agenda="horario-agenda"]').boundingBox())!;
+  expect(botao.y).toBeLessThan(dias.y);
+});

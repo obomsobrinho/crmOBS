@@ -131,10 +131,9 @@ export default function ConfiguracaoDaAgenda({
                   icone={CalendarClock}
                   descricao="Quando a agenda aceita horários. É deles que a IA tira os horários livres."
                 >
-                  <div data-agenda="horario-agenda">
-                    <AgentHoursEditor value={horario} onChange={(h) => { setHorario(h); setSalvo(false); }} />
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                  {/* O copiar vem ANTES dos dias (ajuste do dono): quem só o vê depois de
+                      configurar tudo perde o trabalho. */}
+                  <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1" data-agenda="copiar-horario">
                     {horarioAtendimento ? (
                       <Button
                         variant="link"
@@ -153,6 +152,9 @@ export default function ConfiguracaoDaAgenda({
                     <Button variant="link-discreto" size="link" asChild>
                       <Link href={hrefHorario}>Ver o horário de atendimento</Link>
                     </Button>
+                  </div>
+                  <div data-agenda="horario-agenda">
+                    <AgentHoursEditor value={horario} onChange={(h) => { setHorario(h); setSalvo(false); }} />
                   </div>
                 </SubBloco>
 
