@@ -62,7 +62,11 @@ Settings (Configurações, section Agenda)
 8. An "Agenda" item with an on/off checkbox and a short text. Checked opens the settings below.
    Off: the Agenda disappears from the menu, the funnel and the AI prompt. The activation also
    appears in onboarding as the same item.
-9. Days and hours = the existing business hours (single source).
+9. ~~Days and hours = the existing business hours (single source).~~ Replaced the same day (owner:
+   "Sim, horário próprio"): the agenda has its OWN days and hours, edited in its settings (per day
+   open or closed, start and end) with a "Copiar o horário de atendimento" button. On first
+   activation they come prefilled with a copy of the business hours. The AI's free times and the
+   grid come from the agenda hours; the reminder still goes inside the business hours.
 10. Services: list with "+ Adicionar serviço", each with a name and a free duration in minutes.
     Owner only. With a single service the AI does not ask which.
 11. Buffer between bookings: 0, 5, 10, 15 or 30 min.
@@ -89,11 +93,18 @@ Layout
 19. Clicking a booking opens the detail: who (contact, phone), service, time, what it is about, and
     reschedule and cancel.
 
+Adjustments after testing (28/10/2026): no counter on the day headers; the detail shows WHO and
+WHEN first, then the service, with phone and "what it is about" as secondary and the actions in
+the footer; "Marcar horário" searches existing contacts by name or phone on the server (the
+Contatos search, `clientes_pagina`, debounced, 8 results) and falls back to a new contact;
+service and date fields share size; a click anywhere on the date opens the calendar; the grid
+fills the screen height.
+
 ## 4. How it works now (implemented)
 
 ```
 Customer: "queria marcar"
-processTurn (agenda on, business hours registered, at least one service)
+processTurn (agenda on, agenda hours or business hours to copy, at least one service)
   ### AGENDA block (after CALENDÁRIO, cache prefix untouched): the contract, the services
   (codes V1, V2 only when more than one) and the person's future bookings (A1...). NO times.
 AI: asks the service (if several), then the day and the period
@@ -115,14 +126,15 @@ n8n sends the reply and notices the team (unchanged)
 Reschedule: the same two steps with `acao: remarcar` and `agendamento: A1` (the old time does not
 count as busy). Cancel: `acao: cancelar` + `agendamento`, the team is noticed by the app.
 
-Grid of start times (`iniciosDoDia`): "hora" and "meia" walk the marks inside business hours; after
+Grid of start times (`iniciosDoDia`): "hora" and "meia" walk the marks inside the agenda hours; after
 a busy block the next start is end + buffer rounded up to the next mark. "seguido" chains: each
 start is the previous end + buffer.
 
 ## 5. Data model (`supabase/migrations/20261028050000_agenda_propria.sql`, NOT applied)
 
 - `clients.agenda_config jsonb` (null = off): `{ ativa, antecedenciaMin, intervaloMin, inicio,
-  lembrete }`, normalized by `normalizarConfigDaAgenda`.
+  lembrete, horario }`, normalized by `normalizarConfigDaAgenda`. `horario` = the agenda's OWN days and
+  hours (same shape as the business hours); null = a copy of the business hours (`horarioDaAgenda`).
 - `agenda_servicos` (name, `duracao_min` 5..480, `ativo`, `ordem`).
 - `agenda_bloqueios` (start, end, reason).
 - `agendamentos` (phone, name, service snapshot, start, end, status, origin, `resumo` = what it is
@@ -147,6 +159,7 @@ start is the previous end + buffer.
 | P8 | Clicking an empty slot of the grid to book there | not built (button "Marcar horário") |
 | P9 | Cancelled bookings on screen | not shown in the grid |
 | P10 | The reminder text and whether the customer can answer "SAIR" | fixed text in `textoDoLembrete`; no opt-out |
+| P11 | Can the agenda hours go beyond the business hours? | not blocked |
 
 ## 7. What the automatic reminder still needs (not built, by instruction)
 
