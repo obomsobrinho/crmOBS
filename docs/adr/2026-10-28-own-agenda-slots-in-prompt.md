@@ -30,7 +30,8 @@ one strict-JSON call that n8n reads; the persona is the cached prefix.
    `momentoDoLembrete`, the code-written replies. Screens, routes and brain import it. The free
    times come from the agenda's OWN days and hours (`agenda_config.horario`, owner decision of
    2026-10-28 "Sim, horário próprio"; null = a copy of the business hours, `horarioDaAgenda`,
-   prefilled on first activation); the reminder stays inside the business hours.
+   prefilled on first activation). The agenda hours may go beyond the business hours, with no
+   block (owner, 2026-10-28: "Pode passar"); the reminder stays inside the business hours.
 4. Brain: a per-turn `### AGENDA` block (after CALENDÁRIO, cache untouched) carries the contract,
    the services and the person's bookings, never times. The output gains `agenda {acao, servico,
    dia, periodo, hora, agendamento}`. With `consultar` the CODE writes the reply with the times;

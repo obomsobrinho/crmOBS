@@ -159,7 +159,8 @@ start is the previous end + buffer.
 | P8 | Clicking an empty slot of the grid to book there | not built (button "Marcar horário") |
 | P9 | Cancelled bookings on screen | not shown in the grid |
 | P10 | The reminder text and whether the customer can answer "SAIR" | fixed text in `textoDoLembrete`; no opt-out |
-| P11 | Can the agenda hours go beyond the business hours? | not blocked |
+Decided on 28/10/2026 (was P11): the agenda hours MAY go beyond the business hours, with no block
+(owner: "Pode passar"); the reminder still goes inside the business hours.
 
 ## 7. What the automatic reminder still needs (not built, by instruction)
 

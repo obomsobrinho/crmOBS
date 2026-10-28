@@ -105,8 +105,9 @@ export function normalizarConfigDaAgenda(raw: unknown): AgendaConfig {
 
 /**
  * O horário que a AGENDA usa: o próprio, ou, enquanto nunca foi salvo, uma
- * cópia do horário de atendimento. PENDENTE (decisão do dono): se o horário da
- * agenda pode passar do horário de atendimento; hoje não bloqueia.
+ * cópia do horário de atendimento. Pode passar do horário de atendimento, sem
+ * bloqueio (decisão do dono, 28/10/2026: "Pode passar"); o lembrete continua
+ * dentro do horário de atendimento (`momentoDoLembrete`).
  */
 export function horarioDaAgenda(config: AgendaConfig, atendimento: BusinessHours | null): BusinessHours | null {
   return config.horario ?? atendimento;
