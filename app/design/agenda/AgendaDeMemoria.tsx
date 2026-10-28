@@ -65,6 +65,7 @@ export function ConfiguracaoDeMemoria(props: { agora: number; desligada: boolean
       horarioAtendimento={hours}
       hrefHorario="/design/agente"
       hrefAgenda="/design/agenda"
+      agora={props.agora}
     />
   );
 }

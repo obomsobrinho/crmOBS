@@ -43,6 +43,7 @@ import {
   execucaoDoDia,
   lembreteDoHorario,
   segundaDaSemana,
+  feriadoQueFecha,
   type AgendaConfig,
   type ServicoDaAgenda,
 } from "@/lib/agenda";
@@ -53,6 +54,7 @@ import { diaIsoSP, mesAnoDoDia, somarDias } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
 import { minutosAgoraSP } from "@/lib/horarios";
 import { ROTULO_CHAVES, fillDoRotulo } from "@/lib/rotulos";
+import { feriadoDoDia } from "@/lib/feriados";
 import { cn } from "@/lib/utils";
 
 // A tela da AGENDA PRÓPRIA (revisão do dono, 28/10/2026): GRADE SEMANAL no
@@ -123,6 +125,8 @@ export default function Agenda(p: PropsAgenda) {
   const [bloqueios, setBloqueios] = useState(p.inicial.bloqueios);
   const [detalhe, setDetalhe] = useState<LinhaAgenda | null>(null);
   const [marcar, setMarcar] = useState(false);
+  /** Clique num horário vazio da grade: o "Marcar horário" já vem com dia e hora. */
+  const [marcarEm, setMarcarEm] = useState<{ dia: string; inicio: number } | null>(null);
   const [remarcar, setRemarcar] = useState<LinhaAgenda | null>(null);
   const [cancelar, setCancelar] = useState<LinhaAgenda | null>(null);
   const [bloquear, setBloquear] = useState(false);
@@ -263,12 +267,17 @@ export default function Agenda(p: PropsAgenda) {
                 key={d}
                 data-agenda="cabecalho-dia"
                 data-hoje={d === hoje ? "sim" : undefined}
-                className={cn("flex items-center justify-center gap-1.5 border-l border-line py-2", d === hoje && "bg-brand-surface")}
+                className={cn("flex min-w-0 items-center justify-center gap-1.5 border-l border-line px-1 py-2", d === hoje && "bg-brand-surface")}
               >
                 <span className={cn("text-legenda uppercase", d === hoje ? "text-brand-ink" : "text-ink-3")}>
                   {CHAVES_DA_SEMANA[i]}
                 </span>
                 <span className={cn("text-apoio font-semibold tabular-nums", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
+                {feriadoDoDia(d) && (
+                  <span className="min-w-0 truncate text-legenda text-ink-3" title={feriadoDoDia(d)!.nome} data-agenda="feriado">
+                    {feriadoDoDia(d)!.nome}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -303,11 +312,17 @@ export default function Agenda(p: PropsAgenda) {
                   horaDe={horaDe}
                   hours={p.hours}
                   itens={itens.filter((l) => diaIsoSP(l.inicio) === d)}
-                  bloqueios={bloqueios.filter((b) => diaIsoSP(b.inicio) === d)}
+                  bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + 86_400_000 && b.fim > inicioDoDia(d))}
                   escondidaNoCelular={d !== diaCelular}
                   onAbrir={setDetalhe}
                   horaPx={horaPx}
                   nHoras={horaAte - horaDe}
+                  feriado={!!feriadoQueFecha(d, p.config)}
+                  onVazio={(dia, inicio) => {
+                    if (p.readOnly || p.servicos.length === 0) return;
+                    setMarcarEm({ dia, inicio });
+                    setMarcar(true);
+                  }}
                 />
               ))}
             </div>
@@ -332,7 +347,19 @@ export default function Agenda(p: PropsAgenda) {
           setCancelar(l);
         }}
       />
-      <DialogoMarcar aberto={marcar} onFechar={() => setMarcar(false)} fonte={p.fonte} servicos={p.servicos} hoje={hoje} onFeito={recarregar} />
+      <DialogoMarcar
+        aberto={marcar}
+        inicial={marcarEm}
+        horasDaAgenda={p.hours}
+        onFechar={() => {
+          setMarcar(false);
+          setMarcarEm(null);
+        }}
+        fonte={p.fonte}
+        servicos={p.servicos}
+        hoje={hoje}
+        onFeito={recarregar}
+      />
       <DialogoRemarcar linha={remarcar} onFechar={() => setRemarcar(null)} fonte={p.fonte} hoje={hoje} onFeito={recarregar} />
       <DialogoBloquear aberto={bloquear} onFechar={() => setBloquear(false)} fonte={p.fonte} hoje={hoje} onFeito={recarregar} />
       <Dialog open={!!cancelar} onOpenChange={(v) => !v && setCancelar(null)}>
@@ -369,6 +396,8 @@ function ColunaDoDia({
   onAbrir,
   horaPx,
   nHoras,
+  feriado,
+  onVazio,
 }: {
   dia: string;
   hoje: string;
@@ -381,48 +410,74 @@ function ColunaDoDia({
   onAbrir: (l: LinhaAgenda) => void;
   horaPx: number;
   nHoras: number;
+  /** Feriado nacional que a agenda não atende neste dia. */
+  feriado: boolean;
+  onVazio: (dia: string, inicio: number) => void;
 }) {
   const base = inicioDoDia(dia) + horaDe * 3_600_000;
   const topo = (t: number) => ((t - base) / 60_000 / 60) * horaPx;
   const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * horaPx - 2);
-  const exp = hours ? expedienteDoDia(dia, hours) : null;
+  // Feriado que a agenda não atende conta como dia fechado (apagado).
+  const exp = hours && !feriado ? expedienteDoDia(dia, hours) : null;
+  const alturaTotal = nHoras * horaPx;
   return (
     <div
       data-agenda="coluna"
       data-dia={dia}
+      data-feriado={feriado ? "sim" : undefined}
       className={cn(
         "relative border-l border-line",
         dia === hoje && "bg-brand-surface/40",
         escondidaNoCelular && "max-md:hidden"
       )}
     >
+      {/* Clique no vazio: "Marcar horário" com o dia e a hora (de meia em meia hora).
+          Um botão no fundo da coluna; os cartões ficam por cima. */}
+      <Button
+        variant="nu"
+        size="none"
+        aria-label={`Novo horário no dia ${dia.slice(8)}/${dia.slice(5, 7)}`}
+        data-agenda="vazio"
+        className="absolute inset-0 z-0 rounded-none"
+        onClick={(e) => {
+          const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+          const min = Math.floor(((y / horaPx) * 60) / 30) * 30;
+          onVazio(dia, base + min * 60_000);
+        }}
+      />
       {/* Linhas só ENTRE as horas: no topo vale a borda do cabeçalho e no fim a
           borda do cartão (ajuste do dono: eram duas linhas coladas). */}
       {Array.from({ length: Math.max(0, nHoras - 1) }, (_, i) => (
-        <div key={`h${i}`} className="absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * horaPx }} aria-hidden />
+        <div key={`h${i}`} className="pointer-events-none absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * horaPx }} aria-hidden />
       ))}
       {/* Fora do expediente fica apagado: o time ainda marca ali, a IA não. */}
-      {!exp && <div className="absolute inset-0 bg-[var(--chip-bg)] opacity-60" aria-hidden />}
+      {!exp && <div className="pointer-events-none absolute inset-0 bg-[var(--chip-bg)] opacity-60" aria-hidden />}
       {exp && topo(exp.inicio) > 0 && (
-        <div className="absolute inset-x-0 top-0 bg-[var(--chip-bg)] opacity-60" style={{ height: topo(exp.inicio) }} aria-hidden />
+        <div className="pointer-events-none absolute inset-x-0 top-0 bg-[var(--chip-bg)] opacity-60" style={{ height: topo(exp.inicio) }} aria-hidden />
       )}
       {exp && (
-        <div className="absolute inset-x-0 bottom-0 bg-[var(--chip-bg)] opacity-60" style={{ top: topo(exp.fim) }} aria-hidden />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[var(--chip-bg)] opacity-60" style={{ top: topo(exp.fim) }} aria-hidden />
       )}
 
-      {bloqueios.map((b) => (
-        <div
-          key={`b${b.id}`}
-          data-agenda="bloqueio"
-          className="absolute inset-x-1 overflow-hidden rounded-md border border-dashed border-line-strong bg-bloco px-1.5 py-1 text-legenda text-ink-3"
-          style={{ top: topo(b.inicio), height: altura(b.inicio, b.fim) }}
-        >
-          <span className="flex items-center gap-1 truncate">
-            <Ban size={11} className="shrink-0" />
-            {b.motivo || "Bloqueado"}
-          </span>
-        </div>
-      ))}
+      {/* Bloqueio de vários dias aparece em cada dia que cobre, recortado à grade. */}
+      {bloqueios.map((b) => {
+        const de = Math.max(0, topo(b.inicio));
+        const ate = Math.min(alturaTotal, topo(b.fim));
+        if (ate <= de) return null;
+        return (
+          <div
+            key={`b${b.id}`}
+            data-agenda="bloqueio"
+            className="pointer-events-none absolute inset-x-1 overflow-hidden rounded-md border border-dashed border-line-strong bg-bloco px-1.5 py-1 text-legenda text-ink-3"
+            style={{ top: de, height: Math.max(20, ate - de - 2) }}
+          >
+            <span className="flex items-center gap-1 truncate">
+              <Ban size={11} className="shrink-0" />
+              {b.motivo || "Bloqueado"}
+            </span>
+          </div>
+        );
+      })}
 
       {itens.map((l) => {
         const passou = l.fim <= agora;
@@ -846,6 +901,8 @@ function BuscaDeContato({
 
 function DialogoMarcar({
   aberto,
+  inicial,
+  horasDaAgenda,
   onFechar,
   fonte,
   servicos,
@@ -853,6 +910,9 @@ function DialogoMarcar({
   onFeito,
 }: {
   aberto: boolean;
+  /** Veio de um clique num horário vazio da grade: dia e hora já escolhidos. */
+  inicial: { dia: string; inicio: number } | null;
+  horasDaAgenda: BusinessHours | null;
   onFechar: () => void;
   fonte: FonteAgenda;
   servicos: ServicoDaAgenda[];
@@ -870,6 +930,18 @@ function DialogoMarcar({
   const [inicio, setInicio] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Aberto por um clique na grade: dia e hora preenchidos; fora do expediente já liga
+  // a caixa, para o horário clicado aparecer na lista.
+  const [inicialVisto, setInicialVisto] = useState<typeof inicial>(null);
+  if (aberto && inicial !== inicialVisto) {
+    setInicialVisto(inicial);
+    if (inicial) {
+      const exp = horasDaAgenda ? expedienteDoDia(inicial.dia, horasDaAgenda) : null;
+      setDia(inicial.dia);
+      setInicio(inicial.inicio);
+      setFora(!exp || inicial.inicio < exp.inicio || inicial.inicio >= exp.fim);
+    }
+  }
   const servicoAtual = servicoId ?? servicos[0]?.id ?? null;
   const telefone = contato ? contato.phone : phone.replace(/\D/g, "");
   const nomeFinal = contato ? contato.nome ?? "" : nome;
@@ -1007,7 +1079,11 @@ function DialogoRemarcar({ linha, onFechar, fonte, hoje, onFeito }: { linha: Lin
 }
 
 function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: boolean; onFechar: () => void; fonte: FonteAgenda; hoje: string; onFeito: () => void }) {
+  // Dois jeitos (decisão do dono, 28/10/2026): um trecho de um dia (almoço) ou
+  // um período de dias inteiros com motivo (feriado local, recesso, férias).
+  const [diasInteiros, setDiasInteiros] = useState(false);
   const [dia, setDia] = useState(hoje);
+  const [ateDia, setAteDia] = useState(hoje);
   const [de, setDe] = useState("12:00");
   const [ate, setAte] = useState("13:00");
   const [motivo, setMotivo] = useState("");
@@ -1021,14 +1097,27 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
     <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
       <DialogContent tamanho="confirmacao" className="max-w-md" data-agenda="bloquear">
         <DialogTitle>Bloquear horário</DialogTitle>
-        <DialogDescription className="mt-2 mb-4">A IA não oferece este trecho. O que já está marcado nele continua.</DialogDescription>
+        <DialogDescription className="mt-2 mb-4">A IA não oferece este período. O que já está marcado nele continua.</DialogDescription>
         <div className="space-y-3">
-          <CampoData value={dia} min={hoje} onChange={(e) => setDia(e.target.value)} aria-label="Dia do bloqueio" />
-          <div className="grid grid-cols-2 gap-2">
-            <Input type="time" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Das" />
-            <Input type="time" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Até" />
-          </div>
-          <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (opcional)" aria-label="Motivo" maxLength={120} />
+          <label className="flex cursor-pointer items-center gap-2 text-apoio">
+            <Checkbox checked={diasInteiros} onCheckedChange={(v) => setDiasInteiros(v === true)} />
+            Dias inteiros (feriado local, recesso, férias)
+          </label>
+          {diasInteiros ? (
+            <div className="grid grid-cols-2 gap-2">
+              <CampoData value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); if (e.target.value > ateDia) setAteDia(e.target.value); }} aria-label="Do dia" />
+              <CampoData value={ateDia} min={dia} onChange={(e) => setAteDia(e.target.value)} aria-label="Até o dia" />
+            </div>
+          ) : (
+            <>
+              <CampoData value={dia} min={hoje} onChange={(e) => setDia(e.target.value)} aria-label="Dia do bloqueio" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input type="time" value={de} onChange={(e) => setDe(e.target.value)} aria-label="Das" />
+                <Input type="time" value={ate} onChange={(e) => setAte(e.target.value)} aria-label="Até" />
+              </div>
+            </>
+          )}
+          <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder={diasInteiros ? "Motivo (ex.: férias)" : "Motivo (opcional)"} aria-label="Motivo" maxLength={120} />
         </div>
         {erro && <p className="mt-3 text-apoio text-danger-ink" role="alert">{erro}</p>}
         <div className="mt-5 flex justify-end gap-2">
@@ -1039,11 +1128,10 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
             size="field"
             className="px-4"
             carregando={enviando}
-            disabled={!dia || !de || !ate}
+            disabled={!dia || (diasInteiros ? !ateDia : !de || !ate)}
             onClick={async () => {
-              const base = inicioDoDia(dia);
-              const inicio = base + min(de) * 60_000;
-              const fim = base + min(ate) * 60_000;
+              const inicio = diasInteiros ? inicioDoDia(dia) : inicioDoDia(dia) + min(de) * 60_000;
+              const fim = diasInteiros ? inicioDoDia(somarDias(ateDia, 1)) : inicioDoDia(dia) + min(ate) * 60_000;
               if (fim <= inicio) return setErro("O fim precisa ser depois do início.");
               setEnviando(true);
               const r = await fonte.bloquear({ inicio, fim, motivo });

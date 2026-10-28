@@ -180,3 +180,37 @@ test("a grade mostra a faixa do horário da agenda (9h às 18h no preview) e lin
   // 9 horas = 8 linhas internas por coluna; nenhuma no topo nem no fim.
   await expect(page.locator('[data-agenda="coluna"]').first().locator("div.h-px")).toHaveCount(8);
 });
+
+test.describe("Agenda: decisões finais na grade e nas configurações", () => {
+  test("clique num horário vazio abre o Marcar horário com o dia preenchido", async ({ page }) => {
+    await page.goto("/design/agenda");
+    const coluna = page.locator('[data-agenda="coluna"]').nth(4);
+    const dia = await coluna.getAttribute("data-dia");
+    await coluna.locator('[data-agenda="vazio"]').click({ position: { x: 10, y: 5 } });
+    const d = page.locator('[data-agenda="marcar"]');
+    await expect(d).toBeVisible();
+    await expect(d.getByLabel("Dia")).toHaveValue(dia!);
+  });
+
+  test("bloquear dias inteiros mostra o bloqueio em cada dia do período", async ({ page }) => {
+    await page.goto("/design/agenda");
+    await page.getByRole("button", { name: "Bloquear" }).click();
+    const d = page.locator('[data-agenda="bloquear"]');
+    await d.getByText("Dias inteiros").click();
+    const dias = page.locator('[data-agenda="coluna"]');
+    const de = await dias.nth(5).getAttribute("data-dia");
+    const ate = await dias.nth(6).getAttribute("data-dia");
+    await d.getByLabel("Do dia").fill(de!);
+    await d.getByLabel("Até o dia").fill(ate!);
+    await d.getByLabel("Motivo").fill("Recesso");
+    await d.getByRole("button", { name: "Bloquear", exact: true }).click();
+    await expect(dias.nth(5).locator('[data-agenda="bloqueio"]', { hasText: "Recesso" })).toBeVisible();
+    await expect(dias.nth(6).locator('[data-agenda="bloqueio"]', { hasText: "Recesso" })).toBeVisible();
+  });
+
+  test("configurações listam os feriados com a opção de atender", async ({ page }) => {
+    await page.goto("/design/agenda/configuracoes");
+    await expect(page.locator('[data-agenda="feriado-item"]').first()).toBeVisible();
+    await expect(page.locator('[data-agenda="feriados"]')).toContainText("Finados");
+  });
+});

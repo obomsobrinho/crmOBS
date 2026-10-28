@@ -5,6 +5,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { AGENDA_PADRAO } from "@/lib/agenda";
 import { agendaDoTenant } from "@/lib/agenda-servidor";
 import { horarioCadastrado } from "@/lib/horarios";
+import { agoraMs } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export default async function ConfiguracoesDaAgendaPage() {
       horarioAtendimento={horarioCadastrado(c?.agent_config ?? null)}
       hrefHorario="/agente"
       hrefAgenda="/agenda"
+      agora={agoraMs()}
     />
   );
 }

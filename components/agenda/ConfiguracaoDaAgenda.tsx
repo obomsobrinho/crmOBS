@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, CalendarDays, Clock, Copy, Plus, Settings2, Trash2 } from "lucide-react";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
@@ -24,6 +24,8 @@ import {
   type ServicoDaAgenda,
 } from "@/lib/agenda";
 import type { FonteAgenda } from "@/lib/agenda-fonte";
+import { feriadosDoAno } from "@/lib/feriados";
+import { diaIsoSP, diaMes, somarDias } from "@/lib/fuso";
 
 // CONFIGURAÇÕES DA AGENDA (revisão do dono, 28/10/2026). Um item "Agenda" com
 // a caixa de ativar; marcada, abre o resto. Dias e horários são PRÓPRIOS da
@@ -50,6 +52,7 @@ export default function ConfiguracaoDaAgenda({
   horarioAtendimento,
   hrefHorario,
   hrefAgenda,
+  agora,
 }: {
   fonte: FonteAgenda;
   configInicial: AgendaConfig;
@@ -59,8 +62,17 @@ export default function ConfiguracaoDaAgenda({
   /** Onde se vê e edita o horário de atendimento do agente. */
   hrefHorario: string;
   hrefAgenda: string;
+  /** O agora, para listar os próximos feriados. */
+  agora: number;
 }) {
   const [c, setC] = useState(configInicial);
+  // Os feriados dos próximos 12 meses (nacionais e pontos facultativos).
+  const proximosFeriados = useMemo(() => {
+    const hoje = diaIsoSP(agora);
+    const ano = Number(hoje.slice(0, 4));
+    const limite = somarDias(hoje, 365);
+    return [...feriadosDoAno(ano), ...feriadosDoAno(ano + 1)].filter((f) => f.dia >= hoje && f.dia < limite);
+  }, [agora]);
   // Primeira ativação: já vem preenchido com a cópia do horário de atendimento.
   const [horario, setHorario] = useState<BusinessHours>(
     () => configInicial.horario ?? horarioAtendimento ?? HORARIO_FECHADO
@@ -273,6 +285,40 @@ export default function ConfiguracaoDaAgenda({
                       ? `A IA só marca sozinha com pelo menos ${textoDeDuracao(antMin)} de antecedência. Se o cliente pedir um horário mais próximo, ela avisa que vai confirmar e chama você.`
                       : "Digite um número."}
                   </p>
+                </SubBloco>
+
+                <SubBloco
+                  titulo="Feriados"
+                  icone={CalendarClock}
+                  descricao="Os feriados nacionais vêm bloqueados para a IA. Marque os dias em que você atende."
+                >
+                  <ul className={MOLDURA_LISTA} data-agenda="feriados">
+                    {proximosFeriados.map((f) => (
+                      <li key={f.dia} className="flex items-center justify-between gap-3 px-3 py-2 text-apoio" data-agenda="feriado-item">
+                        <span className="min-w-0">
+                          <span className="tabular-nums text-ink-2">{diaMes(f.dia)}</span> {f.nome}
+                          {f.tipo === "facultativo" && <span className="text-legenda text-ink-3"> (ponto facultativo, não bloqueia)</span>}
+                        </span>
+                        {f.tipo === "nacional" && (
+                          <label className="flex shrink-0 cursor-pointer items-center gap-2 text-legenda text-ink-2">
+                            <Checkbox
+                              checked={c.feriadosLiberados.includes(f.dia)}
+                              onCheckedChange={(v) =>
+                                mudar({
+                                  feriadosLiberados:
+                                    v === true
+                                      ? [...c.feriadosLiberados, f.dia]
+                                      : c.feriadosLiberados.filter((d) => d !== f.dia),
+                                })
+                              }
+                              aria-label={`Atender em ${f.nome}`}
+                            />
+                            Atendo
+                          </label>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 </SubBloco>
 
                 <SubBloco titulo="Lembrete" icone={CalendarClock}>
