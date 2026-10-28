@@ -58,7 +58,7 @@ import {
   type LinhaAgenda,
   type RecorteAgenda,
 } from "@/lib/agenda-fonte";
-import { diaIsoSP, somarDias } from "@/lib/fuso";
+import { diaIsoSP, diaMes, somarDias } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
 import { usePaginada } from "@/lib/use-paginada";
 
@@ -166,7 +166,7 @@ export default function Agenda(p: PropsAgenda) {
   const titulo =
     vista === "dia"
       ? rotuloDoDia(dia, hoje)
-      : `${rotuloDoDia(dia, hoje).replace(/^(Hoje|Amanhã), /, "")} a ${rotuloDoDia(somarDias(dia, 6), hoje).replace(/^(Hoje|Amanhã), /, "")}`;
+      : `${diaMes(dia)} a ${diaMes(somarDias(dia, 6))}`;
 
   const agendaLigada = config.ativa && servicos.length > 0 && p.temHorario && p.querAgendar;
 
@@ -438,9 +438,9 @@ function Linha({
 
 function LinhaBloqueio({ b, readOnly, onDesbloquear }: { b: BloqueioAgenda; readOnly: boolean; onDesbloquear: () => void }) {
   return (
-    <li data-agenda="bloqueio" className="flex items-center gap-3 bg-bloco px-3 py-2.5">
-      <p className="w-[104px] shrink-0 text-apoio tabular-nums text-ink-3">{faixaHoraria(b.inicio, b.fim)}</p>
-      <p className="flex min-w-0 flex-1 items-center gap-2 truncate text-apoio text-ink-2">
+    <li data-agenda="bloqueio" className="flex items-center gap-3 bg-bloco px-3 py-2.5 max-sm:flex-wrap">
+      <p className="w-[104px] shrink-0 text-apoio max-sm:w-auto tabular-nums text-ink-3">{faixaHoraria(b.inicio, b.fim)}</p>
+      <p className="flex min-w-0 flex-1 items-center gap-2 text-apoio text-ink-2">
         <Ban size={14} className="shrink-0 text-ink-3" />
         Bloqueado{b.motivo ? `: ${b.motivo}` : ""}
       </p>
