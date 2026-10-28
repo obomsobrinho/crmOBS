@@ -1,26 +1,34 @@
 import NavRail from "@/components/NavRail";
 import { agoraMs } from "@/lib/periodo";
-import AgendaLista from "./AgendaLista";
+import AgendaDeMemoria from "./AgendaDeMemoria";
 import { EMPRESA } from "./dados";
 
-// Protótipo da AGENDA (docs/plano-agenda.md), dev-only, liberado pelo proxy.
-// Sem banco e sem Google: horários falsos de hoje em diante. `?vazio=1` mostra
-// a lista sem horário; `?desconectada=1`, a faixa de quando o Google desconecta.
-// A configuração (o bloco de "O que ele pode fazer") está em
-// /design/agenda/configurar.
+// Preview da AGENDA (docs/plano-agenda.md), dev-only, liberado pelo proxy. A
+// tela de verdade com a fonte em memória: marcar, remarcar, cancelar, bloquear
+// e configurar funcionam nesta aba, sem banco. `?vazio=1` sem horários,
+// `?indisponivel=1` como fica antes da migration, `?semhorario=1` sem horário
+// de atendimento, `?papel=atendente` sem a configuração.
 export const dynamic = "force-dynamic";
 
 export default async function DesignAgendaPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vazio?: string; desconectada?: string }>;
+  searchParams: Promise<{ vazio?: string; indisponivel?: string; semhorario?: string; papel?: string }>;
 }) {
-  const { vazio, desconectada } = await searchParams;
+  const { vazio, indisponivel, semhorario, papel } = await searchParams;
+  const atendente = papel === "atendente";
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
-      {/* "Agenda" ainda é "Em breve" no menu: o protótipo não mexe no NavRail. */}
-      <NavRail clientName={EMPRESA} activeHref="/agenda" role="dono" />
-      <AgendaLista agora={agoraMs()} vazio={vazio === "1"} desconectada={desconectada === "1"} />
+      <NavRail clientName={EMPRESA} activeHref="/agenda" role={atendente ? "atendente" : "dono"} />
+      <AgendaDeMemoria
+        agora={agoraMs()}
+        empresa={EMPRESA}
+        dono={!atendente}
+        disponivel={indisponivel !== "1"}
+        temHorario={semhorario !== "1"}
+        querAgendar
+        vazio={vazio === "1"}
+      />
     </div>
   );
 }

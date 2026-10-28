@@ -1,56 +1,95 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
-// PROTÓTIPO DA AGENDA (docs/plano-agenda.md). Só as telas falsas de /design:
-// nada aqui fala com o Google. Quando a Agenda for construída, a conta de
-// horário livre ganha specs puras em lib/agenda.ts e estes testes passam a
-// olhar a tela de verdade.
+// AGENDA PRÓPRIA (docs/plano-agenda.md): a tela de verdade em /design/agenda,
+// com a fonte em MEMÓRIA (sem banco). Prova layout, textos e o fluxo da tela;
+// o banco (sobreposição recusada, RLS) só depois da migration aplicada.
 
-test.describe("Protótipo da Agenda", () => {
-  test("lista os horários por dia, com o cancelado fora de Próximos", async ({ page }) => {
-    await page.goto("/design/agenda");
-    await expect(page.getByRole("heading", { name: "Agenda", level: 1 })).toBeVisible();
+async function abrir(page: Page, query = "") {
+  await page.goto(`/design/agenda${query}`);
+  await expect(page.getByRole("heading", { name: "Agenda", level: 1 })).toBeVisible();
+}
+
+test.describe("Agenda (preview com dados em memória)", () => {
+  test("semana com horários por dia e os bloqueios na lista", async ({ page }) => {
+    await abrir(page);
     await expect(page.locator('[data-agenda="dia"]').first()).toBeVisible();
+    await expect(page.locator('[data-agenda="linha"][data-situacao="confirmado"]').first()).toBeVisible();
+    await expect(page.locator('[data-agenda="bloqueio"]').first()).toContainText("Almoço");
+    await expect(page.locator('[data-agenda="estado"]')).toContainText("marca sozinha");
+  });
+
+  test("cancelados ficam na outra aba", async ({ page }) => {
+    await abrir(page);
     await expect(page.locator('[data-agenda="linha"][data-situacao="cancelado"]')).toHaveCount(0);
     await page.getByRole("tab", { name: "Cancelados" }).click();
     await expect(page.locator('[data-agenda="linha"][data-situacao="cancelado"]')).toHaveCount(1);
   });
 
-  test("enviar lembrete marca a linha como lembrada", async ({ page }) => {
-    await page.goto("/design/agenda");
-    const linha = page.locator('[data-agenda="linha"][data-situacao="confirmado"]').last();
-    await expect(linha.locator('[data-agenda="lembrete-enviado"]')).toHaveCount(0);
-    await linha.getByRole("button", { name: /Ações do horário/ }).click();
-    await page.getByRole("menuitem", { name: "Enviar lembrete" }).click();
-    await expect(page.getByRole("dialog")).toContainText("Passando para lembrar");
-    await page.getByRole("button", { name: "Enviar", exact: true }).click();
-    await expect(linha.locator('[data-agenda="lembrete-enviado"]')).toBeVisible();
+  test("marcar pelo time: só horários livres, e o novo aparece na lista", async ({ page }) => {
+    await abrir(page);
+    const antes = await page.locator('[data-agenda="linha"]').count();
+    await page.getByRole("button", { name: "Marcar horário" }).click();
+    const dialogo = page.locator('[data-agenda="marcar"]');
+    await dialogo.getByLabel("WhatsApp do contato").fill("11 98888-1234");
+    await dialogo.getByLabel("Nome do contato").fill("Contato de teste");
+    // Amanhã: hoje pode já não ter horário, dependendo da hora em que roda.
+    const amanha = await page.evaluate(() => {
+      const d = new Date(Date.now() + 86_400_000);
+      return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+    });
+    await dialogo.getByLabel("Dia").fill(amanha);
+    const horarios = dialogo.locator('[data-agenda="horarios"] button');
+    await expect(horarios.first()).toBeVisible();
+    // 12:00 é almoço bloqueado e 10:30 já está marcado: nenhum dos dois aparece.
+    await expect(dialogo.locator('[data-agenda="horarios"]')).not.toContainText("12:00");
+    await expect(dialogo.locator('[data-agenda="horarios"]')).not.toContainText("10:30");
+    await horarios.first().click();
+    await dialogo.getByRole("button", { name: "Marcar", exact: true }).click();
+    await expect(dialogo).toBeHidden();
+    await expect(page.locator('[data-agenda="linha"]')).toHaveCount(antes + 1);
   });
 
-  test("estados vazio e desconectada", async ({ page }) => {
-    await page.goto("/design/agenda?vazio=1");
-    await expect(page.getByText("Nenhum horário marcado")).toBeVisible();
-    await page.goto("/design/agenda?desconectada=1");
-    await expect(page.locator('[data-agenda="desconectada"]')).toContainText("A Google Agenda desconectou");
+  test("cancelar tira da lista de marcados", async ({ page }) => {
+    await abrir(page);
+    const futuras = page.locator('[data-agenda="linha"][data-situacao="confirmado"]');
+    const antes = await futuras.count();
+    await futuras.last().getByRole("button", { name: /Ações do horário/ }).click();
+    await page.getByRole("menuitem", { name: "Cancelar horário" }).click();
+    await page.locator('[data-agenda="cancelar"]').getByRole("button", { name: "Cancelar horário" }).click();
+    await expect(futuras).toHaveCount(antes - 1);
   });
 
-  test("configurar: a prévia muda com as regras e some sem conexão", async ({ page }) => {
-    await page.goto("/design/agenda/configurar");
-    const frase = page.locator('[data-agenda="frase"]');
-    await expect(frase).toContainText("Qual fica melhor");
-    const antes = await page.locator('[data-agenda="previa-dia"] span').count();
-    await page.getByRole("button", { name: "30 min" }).click();
-    const depois = await page.locator('[data-agenda="previa-dia"] span').count();
-    expect(depois).toBeLessThanOrEqual(antes);
-    await page.getByRole("button", { name: "Desconectar" }).click();
-    await expect(page.getByRole("button", { name: "Conectar Google Agenda" })).toBeVisible();
-    await expect(frase).toHaveCount(0);
+  test("lembrete mostra o texto pronto e diz que o envio automático não existe", async ({ page }) => {
+    await abrir(page);
+    await page.locator('[data-agenda="linha"][data-situacao="confirmado"]').last().getByRole("button", { name: /Ações do horário/ }).click();
+    await page.getByRole("menuitem", { name: "Lembrete" }).click();
+    await expect(page.locator('[data-agenda="texto-lembrete"]')).toContainText("Passando para lembrar do seu horário");
+    await expect(page.locator('[data-agenda="lembrete"]')).toContainText("envio automático ainda não existe");
   });
 
-  test("nenhum texto fixo com travessão", async ({ page }) => {
-    for (const rota of ["/design/agenda", "/design/agenda/configurar"]) {
-      await page.goto(rota);
-      const texto = await page.locator("body").innerText();
-      expect(texto).not.toMatch(/[–—]/);
-    }
+  test("configurar: o dono vê, o atendente não", async ({ page }) => {
+    await abrir(page);
+    await page.getByRole("button", { name: "Configurar a agenda" }).click();
+    const sheet = page.locator('[data-agenda="configurar"]');
+    await expect(sheet.locator('[data-agenda="servico"]')).toHaveCount(3);
+    await sheet.getByRole("button", { name: "Adicionar serviço" }).click();
+    await sheet.getByRole("button", { name: "Salvar" }).click();
+    await expect(sheet.getByRole("alert")).toContainText("Todo serviço precisa de nome");
+    await abrir(page, "?papel=atendente");
+    await expect(page.getByRole("button", { name: "Configurar a agenda" })).toHaveCount(0);
+  });
+
+  test("estados: vazio, antes da migration e sem horário de atendimento", async ({ page }) => {
+    await abrir(page, "?vazio=1");
+    await expect(page.getByText("Nenhum horário neste período")).toBeVisible();
+    await page.goto("/design/agenda?indisponivel=1");
+    await expect(page.locator('[data-agenda="indisponivel"]')).toContainText("Agenda ainda não disponível");
+    await abrir(page, "?semhorario=1");
+    await expect(page.locator('[data-agenda="estado"]')).toContainText("falta o horário de atendimento");
+  });
+
+  test("nenhum texto com travessão", async ({ page }) => {
+    await abrir(page);
+    expect(await page.locator("body").innerText()).not.toMatch(/[–—]/);
   });
 });

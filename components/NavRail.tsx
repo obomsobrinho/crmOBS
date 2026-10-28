@@ -71,6 +71,9 @@ const NAV: ItemDoMenu[] = [
   // para não deixar esquecer, e é para onde o aviso no WhatsApp leva.
   { href: "/pedidos", label: "Pedidos", icon: HandHelping },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
+  // AGENDA PRÓPRIA (28/10/2026, docs/plano-agenda.md): saiu do "Em breve".
+  // Entre Conversas e Contatos, para dono e atendente (D13, padrão sem o dono).
+  { href: "/agenda", label: "Agenda", icon: Calendar },
   // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
@@ -95,8 +98,8 @@ const NAV: ItemDoMenu[] = [
   { href: "/clientes", label: "Clientes", icon: Building2, adminOnly: true },
 ];
 
-// "Em breve" (26/08/2026). Agenda porque ela saiu do "não construir" e agora vai
-// mesmo ser feita (integrando Google Calendar), então a promessa virou verdade.
+// "Em breve" (26/08/2026). A Agenda saiu daqui em 28/10/2026 (agenda própria,
+// item do menu acima).
 //
 // **Campanhas SAIU.** Manter prometia disparo em massa sobre conexão QR, que é o
 // cenário de banimento que o projeto decidiu não correr, e atrai o cliente
@@ -107,7 +110,6 @@ const NAV: ItemDoMenu[] = [
 // por trás dele nasce restrito a quem JÁ conversou, nunca lista importada nem
 // número frio.
 const SOON = [
-  { label: "Agenda", icon: Calendar },
   { label: "Follow-up", icon: Repeat2 },
 ];
 

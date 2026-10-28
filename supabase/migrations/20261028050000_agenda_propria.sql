@@ -90,4 +90,5 @@ grant select on public.agenda_servicos, public.agenda_bloqueios, public.agendame
 grant all on public.agenda_servicos, public.agenda_bloqueios, public.agendamentos to service_role;
 
 -- A tela atualiza UMA linha por evento (useCanalTenant). Sem isto o handler fica mudo.
+alter table public.agendamentos replica identity full;
 alter publication supabase_realtime add table public.agendamentos;

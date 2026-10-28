@@ -39,12 +39,13 @@ test("a folha Mais leva a Equipe, Perfil, tema, feedback e sair", async ({ page 
   const folha = page.locator('[data-slot="sheet-content"]');
   await expect(folha).toBeVisible();
   // Pipeline foi para cá quando Pedidos entrou na barra (29/09/2026).
-  for (const nome of ["Pipeline", "Equipe", "Perfil"])
+  // Agenda virou item de verdade em 28/10/2026 (agenda própria).
+  for (const nome of ["Agenda", "Pipeline", "Equipe", "Perfil"])
     await expect(folha.getByRole("link", { name: nome })).toBeVisible();
   await expect(folha.getByRole("button", { name: "Enviar feedback" })).toBeVisible();
   await expect(folha.getByRole("button", { name: "Sair" })).toBeVisible();
   // "Em breve" continua sem ação.
-  await expect(folha.getByText("Agenda")).toBeVisible();
+  await expect(folha.getByText("Follow-up")).toBeVisible();
 
   // A folha sobe da borda de baixo, não da direita.
   const f = await folha.boundingBox();
