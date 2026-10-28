@@ -14,6 +14,8 @@ create extension if not exists btree_gist with schema extensions;
 
 -- Configuracao (null = agenda nunca configurada, desligada). Normalizada por
 -- normalizarConfigDaAgenda (lib/agenda.ts). Escrita so pela rota do dono (service_role).
+-- Campos: ativa, antecedenciaMin, intervaloMin, inicio, lembrete e horario (dias e horarios
+-- PROPRIOS da agenda, no formato do horario de atendimento; null = copia do de atendimento).
 alter table public.clients add column if not exists agenda_config jsonb;
 
 create table public.agenda_servicos (

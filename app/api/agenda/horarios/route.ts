@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
-import { horariosDoTime } from "@/lib/agenda";
+import { horarioDaAgenda, horariosDoTime } from "@/lib/agenda";
 import { agendaDoTenant, ocupadosDoTenant } from "@/lib/agenda-servidor";
 import { horarioCadastrado } from "@/lib/horarios";
 import { DEFAULT_HOURS } from "@/lib/agent-prompt";
@@ -35,7 +35,8 @@ export async function GET(req: Request) {
   if (!agenda) return NextResponse.json({ error: "agenda indisponível" }, { status: 503 });
   const servico = agenda.servicos.find((s) => s.id === servicoId);
   if (!servico) return NextResponse.json({ error: "serviço não encontrado" }, { status: 400 });
-  const hours = horarioCadastrado(c?.agent_config ?? null);
+  // O horário PRÓPRIO da agenda (ou a cópia do de atendimento, se nunca salvo).
+  const hours = horarioDaAgenda(agenda.config, horarioCadastrado(c?.agent_config ?? null));
   // Sem horário cadastrado o time ainda marca, no dia inteiro.
   const semHorario = !hours;
   const de = inicioDoDiaSP(dia);

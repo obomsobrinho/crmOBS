@@ -14,7 +14,7 @@
 // - lembrete automático 24h antes, sempre dentro do expediente.
 // O que ainda não foi decidido está marcado "PENDENTE" ao lado.
 
-import { DAY_LABEL, type BusinessHours, type DayKey } from "./agent-prompt";
+import { DAY_LABEL, normalizeHours, type BusinessHours, type DayKey } from "./agent-prompt";
 import { diaIsoSP, diaMes, inicioDoDiaSP, somarDias } from "./fuso";
 import { horaTexto, minutosAgoraSP } from "./horarios";
 
@@ -39,6 +39,14 @@ export interface AgendaConfig {
   inicio: InicioDosHorarios;
   /** Lembrete automático 24h antes, dentro do expediente. */
   lembrete: boolean;
+  /**
+   * Dias e horários PRÓPRIOS da agenda (decisão do dono, 28/10/2026: "Sim,
+   * horário próprio"), separados do horário de atendimento do agente. É deles
+   * que saem os horários livres da IA e a grade. null = nunca salvo: vale a
+   * cópia do horário de atendimento (`horarioDaAgenda`). O lembrete continua
+   * saindo dentro do horário de atendimento da loja.
+   */
+  horario: BusinessHours | null;
 }
 
 export const AGENDA_PADRAO: AgendaConfig = {
@@ -48,6 +56,7 @@ export const AGENDA_PADRAO: AgendaConfig = {
   inicio: "meia",
   // PENDENTE: o dono decidiu "ligado/desligado", não o valor inicial.
   lembrete: true,
+  horario: null,
 };
 
 /** No máximo quantos horários a IA oferece de uma vez (regra do dono). */
@@ -90,7 +99,17 @@ export function normalizarConfigDaAgenda(raw: unknown): AgendaConfig {
         : AGENDA_PADRAO.intervaloMin,
     inicio: o.inicio === "hora" || o.inicio === "meia" || o.inicio === "seguido" ? o.inicio : AGENDA_PADRAO.inicio,
     lembrete: typeof o.lembrete === "boolean" ? o.lembrete : AGENDA_PADRAO.lembrete,
+    horario: o.horario && typeof o.horario === "object" ? normalizeHours(o.horario) : null,
   };
+}
+
+/**
+ * O horário que a AGENDA usa: o próprio, ou, enquanto nunca foi salvo, uma
+ * cópia do horário de atendimento. PENDENTE (decisão do dono): se o horário da
+ * agenda pode passar do horário de atendimento; hoje não bloqueia.
+ */
+export function horarioDaAgenda(config: AgendaConfig, atendimento: BusinessHours | null): BusinessHours | null {
+  return config.horario ?? atendimento;
 }
 
 /** "2h", "30 min", "1h30", "1 dia": a antecedência como a tela e a IA dizem. */

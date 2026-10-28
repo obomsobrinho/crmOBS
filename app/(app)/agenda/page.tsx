@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { agendaDoTenant } from "@/lib/agenda-servidor";
 import { fonteDoBancoAgenda } from "@/lib/agenda-fonte";
-import { AGENDA_PADRAO, segundaDaSemana } from "@/lib/agenda";
+import { AGENDA_PADRAO, horarioDaAgenda, segundaDaSemana } from "@/lib/agenda";
 import { horarioCadastrado } from "@/lib/horarios";
 import { diaIsoSP, inicioDoDiaSP } from "@/lib/fuso";
 import { agoraMs } from "@/lib/periodo";
@@ -58,7 +58,7 @@ export default async function AgendaPage() {
       empresa={client.name}
       dono={client.role === "dono"}
       disponivel={disponivel}
-      hours={horarioCadastrado(c?.agent_config ?? null)}
+      hours={horarioDaAgenda(agenda?.config ?? AGENDA_PADRAO, horarioCadastrado(c?.agent_config ?? null))}
       config={agenda?.config ?? AGENDA_PADRAO}
       servicos={agenda?.servicos ?? []}
       inicial={{ semana, itens, bloqueios }}

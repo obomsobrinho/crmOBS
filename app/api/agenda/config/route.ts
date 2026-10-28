@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DURACAO_MAX, DURACAO_MIN, normalizarConfigDaAgenda } from "@/lib/agenda";
+import { horarioCadastrado } from "@/lib/horarios";
+import { paraJson } from "@/lib/json";
 
 // Configuração da agenda: regras (`clients.agenda_config`), serviços e a coluna
 // "Agendado" do funil (`agenda_etapa_do_funil`). Só o
@@ -34,6 +36,12 @@ export async function PUT(req: Request) {
   }
 
   const svc = createServiceClient();
+  // Primeira ativação sem horário próprio: vem a CÓPIA do horário de atendimento
+  // (decisão do dono, 28/10/2026). Depois disso, os dois andam separados.
+  if (config.ativa && !config.horario) {
+    const { data: c } = await svc.from("clients").select("agent_config").eq("id", mine.id).maybeSingle();
+    config.horario = horarioCadastrado(c?.agent_config ?? null);
+  }
   const { data: atuais, error: lErr } = await svc
     .from("agenda_servicos")
     .select("id")
@@ -60,7 +68,7 @@ export async function PUT(req: Request) {
           .insert({ client_id: mine.id, nome: s.nome, duracao_min: s.duracaoMin, ordem });
     if (error) erros.push(error.message);
   }
-  const { error: cErr } = await svc.from("clients").update({ agenda_config: { ...config } }).eq("id", mine.id);
+  const { error: cErr } = await svc.from("clients").update({ agenda_config: paraJson(config) }).eq("id", mine.id);
   if (cErr) erros.push(cErr.message);
   // A coluna "Agendado" do funil existe só com a agenda ligada (decisão do dono).
   const { error: eErr } = await svc.rpc("agenda_etapa_do_funil", { p_client: mine.id, p_ativa: config.ativa });

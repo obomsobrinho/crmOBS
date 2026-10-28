@@ -9,6 +9,7 @@ import {
   iniciosDoDia,
   momentoDoLembrete,
   normalizarConfigDaAgenda,
+  horarioDaAgenda,
   quandoFalado,
   textoDaConsulta,
   validarHorario,
@@ -149,5 +150,17 @@ test.describe("lib/agenda: config", () => {
       ...AGENDA_PADRAO, ativa: true, antecedenciaMin: 45, inicio: "seguido",
     });
     expect(quandoFalado(em("2026-10-29", "10:30"), AGORA)).toBe("amanhã, quinta, 29/10, às 10h30");
+  });
+});
+
+test.describe("lib/agenda: horário próprio", () => {
+  test("o próprio vale; sem ele, a cópia do de atendimento; o banco guarda normalizado", () => {
+    const proprio: BusinessHours = { ...HORAS, sab: { open: false, from: "08:00", to: "12:00" } };
+    expect(horarioDaAgenda({ ...CFG, horario: proprio }, HORAS)).toBe(proprio);
+    expect(horarioDaAgenda({ ...CFG, horario: null }, HORAS)).toBe(HORAS);
+    expect(horarioDaAgenda({ ...CFG, horario: null }, null)).toBeNull();
+    expect(normalizarConfigDaAgenda({ horario: { seg: { open: true, from: "10:00", to: "12:00" } } }).horario?.seg).toEqual({
+      open: true, from: "10:00", to: "12:00",
+    });
   });
 });

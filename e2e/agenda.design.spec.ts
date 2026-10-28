@@ -94,7 +94,7 @@ test.describe("Agenda: configurações", () => {
   test("ativa abre a configuração; desligada esconde e o menu perde o item", async ({ page }) => {
     await page.goto("/design/agenda/configuracoes");
     await expect(page.locator('[data-agenda="config-aberta"]')).toBeVisible();
-    await expect(page.locator('[data-agenda="horario-atendimento"]')).toContainText("09:00 às 18:00");
+    await expect(page.locator('[data-agenda="horario-agenda"]')).toBeVisible();
     await page.getByLabel("Agenda ativa").click();
     await expect(page.locator('[data-agenda="config-aberta"]')).toHaveCount(0);
     await expect(page.locator('[data-agenda="desligada"]')).toContainText("some do menu");
@@ -145,5 +145,22 @@ test.describe("Agenda: marcar com contato novo e campos", () => {
     const t = (await d.getByLabel("Dia").boundingBox())!;
     expect(Math.abs(s.height - t.height)).toBeLessThanOrEqual(1);
     expect(Math.abs(s.width - t.width)).toBeLessThanOrEqual(1);
+  });
+});
+
+test.describe("Agenda: dias e horários próprios", () => {
+  test("editáveis, com o botão de copiar o horário de atendimento", async ({ page }) => {
+    await page.goto("/design/agenda/configuracoes");
+    const bloco = page.locator('[data-agenda="horario-agenda"]');
+    await expect(bloco).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copiar o horário de atendimento" })).toBeVisible();
+    await page.getByRole("button", { name: "Salvar" }).click();
+    await expect(page.locator('[data-agenda="configuracoes"]').getByRole("status")).toContainText("Salvo");
+  });
+
+  test("sem horário de atendimento, não há o que copiar", async ({ page }) => {
+    await page.goto("/design/agenda/configuracoes?semhorario=1");
+    await expect(page.getByRole("button", { name: "Copiar o horário de atendimento" })).toHaveCount(0);
+    await expect(page.locator('[data-agenda="configuracoes"]')).toContainText("ainda não tem horário de atendimento para copiar");
   });
 });

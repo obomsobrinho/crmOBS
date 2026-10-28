@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { BusinessHours } from "@/lib/agent-prompt";
 import {
+  horarioDaAgenda,
   normalizarConfigDaAgenda,
   type AgendaConfig,
   type AgendamentoDaPessoa,
@@ -145,15 +146,22 @@ export async function agendaDoTurno(a: {
   config: AgendaConfig;
   servicos: ServicoDaAgenda[];
   daPessoa: AgendamentoDaPessoa[];
+  /** O horário da agenda (de onde saem os horários livres). */
   hours: BusinessHours;
+  /** O horário de atendimento da loja (o lembrete sai dentro dele). */
+  atendimento: BusinessHours | null;
 } | null> {
   // A chave é a agenda ligada (revisão de 28/10/2026): o objetivo "Agendar"
   // antigo não decide mais. PENDENTE: o que fazer com aquele objetivo.
-  if (!a.hours) return null;
+  // Sem horário próprio nem de atendimento, não há de onde tirar horário livre.
   const ag = await agendaDoTenant(a.svc, a.clientId);
   if (!ag || !ag.config.ativa || ag.servicos.length === 0) return null;
   const daPessoa = await agendamentosDaPessoa(a.svc, a.clientId, a.phone, a.agora);
-  return { ...ag, daPessoa, hours: a.hours };
+  // Os horários livres saem do horário PRÓPRIO da agenda (ou da cópia do de
+  // atendimento, enquanto nunca foi salvo); o lembrete, do de atendimento.
+  const hours = horarioDaAgenda(ag.config, a.hours);
+  if (!hours) return null;
+  return { ...ag, daPessoa, hours, atendimento: a.hours };
 }
 
 /**

@@ -26,7 +26,7 @@ export default async function ConfiguracoesDaAgendaPage() {
       clientId={client.id}
       configInicial={agenda?.config ?? AGENDA_PADRAO}
       servicosIniciais={agenda?.servicos ?? []}
-      hours={horarioCadastrado(c?.agent_config ?? null)}
+      horarioAtendimento={horarioCadastrado(c?.agent_config ?? null)}
       hrefHorario="/agente"
       hrefAgenda="/agenda"
     />

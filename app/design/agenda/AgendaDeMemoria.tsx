@@ -61,7 +61,7 @@ export function ConfiguracaoDeMemoria(props: { agora: number; desligada: boolean
       fonte={fonte}
       configInicial={{ ...CONFIG, ativa: !props.desligada }}
       servicosIniciais={SERVICOS}
-      hours={hours}
+      horarioAtendimento={hours}
       hrefHorario="/design/agente"
       hrefAgenda="/design/agenda"
     />

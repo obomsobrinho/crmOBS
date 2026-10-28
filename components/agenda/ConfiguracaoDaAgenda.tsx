@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarClock, CalendarDays, Clock, Plus, Settings2, Trash2 } from "lucide-react";
+import { CalendarClock, CalendarDays, Clock, Copy, Plus, Settings2, Trash2 } from "lucide-react";
+import AgentHoursEditor from "@/components/AgentHoursEditor";
 import { Field, Hint, MOLDURA_LISTA, SubBloco } from "@/components/agente/ui";
-import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DAY_LABEL, DAY_ORDER, type BusinessHours } from "@/lib/agent-prompt";
+import { DAY_ORDER, type BusinessHours } from "@/lib/agent-prompt";
 import {
   ANTECEDENCIA_MAX,
   DURACAO_MAX,
@@ -26,12 +26,18 @@ import {
 import type { FonteAgenda } from "@/lib/agenda-fonte";
 
 // CONFIGURAÇÕES DA AGENDA (revisão do dono, 28/10/2026). Um item "Agenda" com
-// a caixa de ativar; marcada, abre o resto. Dias e horários são o horário de
-// atendimento do agente (fonte única): aqui só se lê, e o link leva para onde
-// se edita. Só o dono chega aqui (a página guarda; esconder não é trava).
+// a caixa de ativar; marcada, abre o resto. Dias e horários são PRÓPRIOS da
+// agenda (decisão do dono, 28/10/2026), com "Copiar o horário de atendimento"
+// e a cópia já preenchida na primeira ativação. O lembrete segue o horário de
+// atendimento. Só o dono chega aqui (a página guarda; esconder não é trava).
 
 type ServicoEditavel = { id: number | null; chave: string; nome: string; duracao: string };
 type Unidade = "min" | "h";
+
+/** Sem horário de atendimento para copiar: todos os dias fechados, o dono abre. */
+const HORARIO_FECHADO = Object.fromEntries(
+  DAY_ORDER.map((d) => [d, { open: false, from: "08:00", to: "18:00" }])
+) as BusinessHours;
 
 function antecedenciaParaCampo(min: number): { valor: string; unidade: Unidade } {
   return min % 60 === 0 ? { valor: String(min / 60), unidade: "h" } : { valor: String(min), unidade: "min" };
@@ -41,19 +47,24 @@ export default function ConfiguracaoDaAgenda({
   fonte,
   configInicial,
   servicosIniciais,
-  hours,
+  horarioAtendimento,
   hrefHorario,
   hrefAgenda,
 }: {
   fonte: FonteAgenda;
   configInicial: AgendaConfig;
   servicosIniciais: ServicoDaAgenda[];
-  hours: BusinessHours | null;
-  /** Onde se edita o horário de atendimento (a fonte única). */
+  /** O horário de atendimento do agente: para copiar (e preencher na primeira ativação). */
+  horarioAtendimento: BusinessHours | null;
+  /** Onde se vê e edita o horário de atendimento do agente. */
   hrefHorario: string;
   hrefAgenda: string;
 }) {
   const [c, setC] = useState(configInicial);
+  // Primeira ativação: já vem preenchido com a cópia do horário de atendimento.
+  const [horario, setHorario] = useState<BusinessHours>(
+    () => configInicial.horario ?? horarioAtendimento ?? HORARIO_FECHADO
+  );
   const [servicos, setServicos] = useState<ServicoEditavel[]>(() =>
     servicosIniciais.map((s) => ({ id: s.id, chave: `s${s.id}`, nome: s.nome, duracao: String(s.duracaoMin) }))
   );
@@ -80,7 +91,8 @@ export default function ConfiguracaoDaAgenda({
     }
     if (!antValida) return setErro("Antecedência mínima inválida.");
     setEnviando(true);
-    const r = await fonte.salvarConfig({ ...c, antecedenciaMin: antMin }, lista);
+    if (c.ativa && !DAY_ORDER.some((d) => horario[d].open)) return setErro("Abra pelo menos um dia nos dias e horários da agenda.");
+    const r = await fonte.salvarConfig({ ...c, antecedenciaMin: antMin, horario }, lista);
     setEnviando(false);
     if (!r.ok) return setErro(r.erro);
     setC(r.config);
@@ -113,24 +125,35 @@ export default function ConfiguracaoDaAgenda({
 
             {c.ativa && (
               <div className="mt-5 space-y-5 border-t border-line pt-5" data-agenda="config-aberta">
-                <SubBloco primeiro titulo="Dias e horários" icone={CalendarClock} descricao="O mesmo horário de atendimento do agente. Mudou lá, muda aqui.">
-                  {hours ? (
-                    <ul className={MOLDURA_LISTA} data-agenda="horario-atendimento">
-                      {DAY_ORDER.map((d) => (
-                        <li key={d} className="flex justify-between px-3 py-1.5 text-apoio">
-                          <span className="first-letter:uppercase">{DAY_LABEL[d]}</span>
-                          <span className={hours[d].open ? "tabular-nums" : "text-ink-3"}>
-                            {hours[d].open ? `${hours[d].from} às ${hours[d].to}` : "Fechado"}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <Aviso tom="warn">Sem horário de atendimento cadastrado, a IA não marca. Cadastre no agente.</Aviso>
-                  )}
-                  <Button variant="link" size="link" className="mt-2" asChild>
-                    <Link href={hrefHorario}>Editar o horário de atendimento</Link>
-                  </Button>
+                <SubBloco
+                  primeiro
+                  titulo="Dias e horários"
+                  icone={CalendarClock}
+                  descricao="Quando a agenda aceita horários. É deles que a IA tira os horários livres."
+                >
+                  <div data-agenda="horario-agenda">
+                    <AgentHoursEditor value={horario} onChange={(h) => { setHorario(h); setSalvo(false); }} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {horarioAtendimento ? (
+                      <Button
+                        variant="link"
+                        size="link"
+                        onClick={() => {
+                          setHorario(horarioAtendimento);
+                          setSalvo(false);
+                        }}
+                      >
+                        <Copy size={14} />
+                        Copiar o horário de atendimento
+                      </Button>
+                    ) : (
+                      <span className="text-legenda text-ink-3">O agente ainda não tem horário de atendimento para copiar.</span>
+                    )}
+                    <Button variant="link-discreto" size="link" asChild>
+                      <Link href={hrefHorario}>Ver o horário de atendimento</Link>
+                    </Button>
+                  </div>
                 </SubBloco>
 
                 <SubBloco titulo="Serviços" icone={Clock} descricao="Cada um com quanto tempo ocupa. Com um serviço só, a IA não pergunta qual.">

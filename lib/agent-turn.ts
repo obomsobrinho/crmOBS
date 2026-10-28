@@ -1162,11 +1162,17 @@ async function aplicarAgenda(a: {
   dryRun: boolean;
   agora: number;
   output: AgentOutput;
-  agenda: { config: AgendaConfig; servicos: ServicoDaAgenda[]; daPessoa: AgendamentoDaPessoa[]; hours: BusinessHours };
+  agenda: {
+    config: AgendaConfig;
+    servicos: ServicoDaAgenda[];
+    daPessoa: AgendamentoDaPessoa[];
+    hours: BusinessHours;
+    atendimento: BusinessHours | null;
+  };
   instancia: string | null;
   destino: string | null;
 }): Promise<{ output: AgentOutput; diag: NonNullable<TurnDiagnostics["agenda"]>; agendou: boolean }> {
-  const { config, servicos, daPessoa, hours } = a.agenda;
+  const { config, servicos, daPessoa, hours, atendimento } = a.agenda;
   const saida = a.output.agenda;
   const responder = (texto: string, extra: Partial<AgentOutput> = {}): AgentOutput => ({
     ...a.output,
@@ -1269,7 +1275,9 @@ async function aplicarAgenda(a: {
           summary: resumo,
         };
         if (a.dryRun) return { output: certo, diag, agendou: true };
-        const lembreteEm = config.lembrete ? momentoDoLembrete({ inicio, marcadoEm: a.agora, hours }) : null;
+        // O lembrete sai dentro do horário de ATENDIMENTO da loja (decisão do dono).
+        const lembreteEm =
+          config.lembrete && atendimento ? momentoDoLembrete({ inicio, marcadoEm: a.agora, hours: atendimento }) : null;
         const { data: contato } = await a.svc
           .from("dados_cliente")
           .select("display_name, nomewpp")
