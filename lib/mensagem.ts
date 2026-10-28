@@ -27,6 +27,7 @@
 //   respostaDaIa(m)    <=>  coalesce(bot_message, '') <> ''
 //                           and message_type is distinct from 'manual'
 //                           and message_type is distinct from 'imported'
+//                           and message_type is distinct from 'lembrete'
 //   respostaHumana(m)  <=>  coalesce(bot_message, '') <> ''
 //                           and message_type in ('manual', 'imported')
 //   `!!m.user_message` <=>  coalesce(user_message, '') <> ''   (sem btrim)
@@ -43,10 +44,21 @@
 export const IMPORTADA = "imported";
 /** Alguém do time respondeu pelo CRM. */
 export const MANUAL = "manual";
+/**
+ * Lembrete automático da agenda (28/10/2026, `/api/agenda/lembretes`): o
+ * PRODUTO mandou, sem IA e sem gente. Não é resposta da IA nem do time, e não
+ * entra em nenhuma conta de quem respondeu.
+ */
+export const LEMBRETE = "lembrete";
 
 /** A linha veio do histórico importado (portanto é anterior ao agente). */
 export function ehImportada(messageType: string | null): boolean {
   return messageType === IMPORTADA;
+}
+
+/** A linha é o lembrete automático da agenda (nem IA nem time). */
+export function ehLembrete(messageType: string | null): boolean {
+  return messageType === LEMBRETE;
 }
 
 /** A linha foi enviada por alguém do time pelo CRM (balão enviado, não da IA). */
@@ -65,7 +77,7 @@ export function respostaDaIa(m: {
   message_type: string | null;
 }): boolean {
   return (
-    !!m.bot_message && m.message_type !== MANUAL && m.message_type !== IMPORTADA
+    !!m.bot_message && m.message_type !== MANUAL && m.message_type !== IMPORTADA && m.message_type !== LEMBRETE
   );
 }
 

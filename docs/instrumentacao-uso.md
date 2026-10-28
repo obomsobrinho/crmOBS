@@ -23,9 +23,11 @@ Quem decide acesso é `accessState` (`lib/billing.ts`), nunca estas consultas.
 
 ```ts
 // resposta da IA
-!!m.bot_message && m.message_type !== "manual" && m.message_type !== "imported"
+!!m.bot_message && m.message_type !== "manual" && m.message_type !== "imported" && m.message_type !== "lembrete"
 // resposta de gente
 !!m.bot_message && (m.message_type === "manual" || m.message_type === "imported")
+// o lembrete automático da agenda (message_type "lembrete", 28/10/2026) não é
+// resposta de ninguém: fica fora das duas contas
 ```
 
 **Não é "message_type <> 'manual'".** `imported` também passa nesse teste, e foi
@@ -121,6 +123,7 @@ select
     where m.bot_message is not null
       and m.message_type is distinct from 'manual'
       and m.message_type is distinct from 'imported'
+      and m.message_type is distinct from 'lembrete'
   ) as respostas_ia,
   count(*) filter (
     where m.bot_message is not null and m.message_type = 'manual'
@@ -135,10 +138,12 @@ select
     100.0 * count(*) filter (
       where m.bot_message is not null
         and m.message_type is distinct from 'manual'
-        and m.message_type is distinct from 'imported')
+        and m.message_type is distinct from 'imported'
+        and m.message_type is distinct from 'lembrete')
     / nullif(count(*) filter (
         where m.bot_message is not null
-          and m.message_type is distinct from 'imported'), 0)
+          and m.message_type is distinct from 'imported'
+          and m.message_type is distinct from 'lembrete'), 0)
   ) as pct_ia
 from public.clients c
 left join public.chat_messages m

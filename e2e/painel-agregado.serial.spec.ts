@@ -23,7 +23,7 @@ import type { BusinessHours } from "../lib/agent-prompt";
 //     `agregarLinhas` (a referência executável, que só usa lib/mensagem.ts e
 //     lib/valor.ts) calcula sobre as mesmas linhas. É a paridade da regra
 //     "quem respondeu" escrita em SQL: a massa tem todas as combinações de
-//     message_type (null, text, manual, imported, audio) e de texto (recebida,
+//     message_type (null, text, manual, imported, audio, lembrete) e de texto (recebida,
 //     resposta, mista, só espaços, vazia), as duas grafias do número de avisos,
 //     e limites de janela quebrados (milissegundos) sobre linhas com
 //     microssegundos.
