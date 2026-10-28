@@ -3,6 +3,7 @@ import { FUSO } from "./fuso";
 import { calendarioBlock, diaDosHorarios, notaDeHorarios } from "./horarios";
 import type { BusinessHours } from "./agent-prompt";
 import { MOTIVOS_DO_MODELO, motivosParaPrompt } from "./motivos";
+import type { SaidaDaAgenda } from "./agenda";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -44,6 +45,11 @@ export interface AgentOutput {
    * detalhe, preferência). Insistir, cobrar, agradecer ou repetir é false.
    */
   informacao_nova: boolean;
+  /**
+   * AGENDA PRÓPRIA (28/10/2026): o que o modelo quer marcar, remarcar ou
+   * cancelar, por código. Só o `processTurn` lê (`decidirAgenda`); o n8n ignora.
+   */
+  agenda: SaidaDaAgenda;
 }
 
 export interface ChatTurn {
@@ -169,6 +175,29 @@ const OUTPUT_SCHEMA = {
       description:
         "true SOMENTE quando o cliente trouxe informação nova para o pedido de pedido_aberto (prazo, detalhe, preferência, dado que faltava). Insistir, cobrar, agradecer, confirmar ou repetir o que já está no pedido é false. Com pedido_aberto = 0, false.",
     },
+    // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): só vale quando o turno traz
+    // `### HORÁRIOS LIVRES`. Sem a seção, os três campos vazios. Quem marca é o
+    // processTurn (`decidirAgenda`); o n8n ignora.
+    agenda: {
+      type: "object",
+      properties: {
+        acao: {
+          type: "string",
+          enum: ["", "marcar", "remarcar", "cancelar"],
+          description: 'Só com a seção HORÁRIOS LIVRES. "" quando não há nada a marcar, remarcar ou cancelar neste turno.',
+        },
+        horario: {
+          type: "string",
+          description: 'Código entre colchetes do horário escolhido na seção HORÁRIOS LIVRES (ex.: "S2"), em marcar e remarcar. Vazio no resto.',
+        },
+        agendamento: {
+          type: "string",
+          description: 'Código do agendamento da seção AGENDAMENTOS DESTA PESSOA (ex.: "A1"), em remarcar e cancelar. Vazio no resto.',
+        },
+      },
+      required: ["acao", "horario", "agendamento"],
+      additionalProperties: false,
+    },
   },
   required: [
     "messages",
@@ -179,6 +208,7 @@ const OUTPUT_SCHEMA = {
     "motivo",
     "pedido_aberto",
     "informacao_nova",
+    "agenda",
   ],
   additionalProperties: false,
 } as const;
@@ -233,6 +263,11 @@ export async function runAgent(params: {
    * `### CALENDÁRIO`: sem horário, o bloco sai só com as datas.
    */
   hours?: BusinessHours | null;
+  /**
+   * `### HORÁRIOS LIVRES` (+ agendamentos da pessoa) já montado por
+   * `blocoDaAgenda` (lib/agenda.ts), ou nada quando a agenda está desligada.
+   */
+  agenda?: string | null;
 }): Promise<AgentRun> {
   const { persona, history, message, apiKey } = params;
   const model = params.model || AGENT_MODEL;
@@ -245,6 +280,9 @@ export async function runAgent(params: {
   // O calendário vem colado no AGORA: o modelo errava a conta de dia da semana,
   // expediente e "já passou" (bateria de 05/10/2026), então ela chega pronta.
   parts.push(calendarioBlock(params.now ?? new Date(), params.hours ?? null));
+  // Os horários livres da agenda própria logo depois: mudam a cada minuto e a
+  // cada marcação, então também ficam fora do prefixo do cache.
+  if (params.agenda) parts.push(params.agenda);
   // Depois do AGORA, junto do que muda a cada turno: não mexe no prefixo que o
   // cache de prompt reaproveita (persona).
   if (params.pedidosResolvidos && params.pedidosResolvidos.length > 0) {
@@ -354,6 +392,17 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
         ? raw.pedido_aberto
         : 0,
     informacao_nova: raw.informacao_nova === true,
+    agenda: normalizarSaidaDaAgenda(raw.agenda),
+  };
+}
+
+function normalizarSaidaDaAgenda(v: unknown): SaidaDaAgenda {
+  const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const acao = o.acao === "marcar" || o.acao === "remarcar" || o.acao === "cancelar" ? o.acao : "";
+  return {
+    acao,
+    horario: typeof o.horario === "string" ? o.horario.trim().slice(0, 8) : "",
+    agendamento: typeof o.agendamento === "string" ? o.agendamento.trim().slice(0, 8) : "",
   };
 }
 

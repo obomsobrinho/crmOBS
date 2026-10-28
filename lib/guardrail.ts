@@ -74,6 +74,8 @@ export function applyGuardrail(
     // Resposta barrada nunca atualiza pedido aberto (`atualizacaoDoPedido`).
     pedido_aberto: 0,
     informacao_nova: false,
+    // Resposta barrada nunca marca nada na agenda.
+    agenda: { acao: "", horario: "", agendamento: "" },
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }
