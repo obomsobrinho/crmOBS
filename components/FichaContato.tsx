@@ -16,6 +16,7 @@ import ContactNotes from "./ContactNotes";
 import ContactFields, { CabecalhoBloco } from "./ContactFields";
 import ContactTags from "./ContactTags";
 import ContactArquivos from "./ContactArquivos";
+import ContactAgendamentos, { type AgendamentoDoContato } from "./ContactAgendamentos";
 import type { ArquivoDoContato } from "@/lib/arquivos";
 import PrimeiraMensagemDialog from "./PrimeiraMensagemDialog";
 import AvatarContato from "./AvatarContato";
@@ -93,9 +94,12 @@ export default function FichaContato({
   fotoPath = null,
   contactExists,
   arquivosPreview,
+  agendamentosPreview,
 }: {
   /** Só o preview `/design`: as imagens e documentos, que sem banco não existem. */
   arquivosPreview?: ArquivoDoContato[];
+  /** Só o preview `/design`: os agendamentos do contato. */
+  agendamentosPreview?: AgendamentoDoContato[];
   /** Foto de perfil guardada (lib/fotos.ts). */
   fotoPath?: string | null;
   /** Conta bloqueada (modo leitura) não escreve. Só em `clientes`. */
@@ -313,6 +317,9 @@ export default function FichaContato({
       {/* Depois dos Dados e antes das Notas (27/10/2026): o papel que a pessoa
           mandou é cadastro, e é o que se procura depois de "quem é". */}
       <ContactArquivos clientId={clientId} phone={phone} preview={arquivosPreview} />
+
+      {/* Horários marcados do contato (28/10/2026): futuros, passados e cancelados. */}
+      <ContactAgendamentos clientId={clientId} phone={phone} preview={agendamentosPreview} />
 
       <ContactNotes
         clientId={clientId}

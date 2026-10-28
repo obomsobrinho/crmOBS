@@ -214,3 +214,14 @@ test.describe("Agenda: decisões finais na grade e nas configurações", () => {
     await expect(page.locator('[data-agenda="feriados"]')).toContainText("Finados");
   });
 });
+
+test("a ficha do contato mostra os agendamentos dele (futuro, cancelado e passado), do mais recente para o mais antigo", async ({ page }) => {
+  await page.goto("/design/contatos?sel=1");
+  const bloco = page.locator('[data-slot="painel-agendamentos"]');
+  await expect(bloco).toBeVisible();
+  const itens = bloco.locator('[data-slot="agendamento-do-contato"]');
+  await expect(itens).toHaveCount(3);
+  await expect(itens.nth(0)).toContainText("Marcado");
+  await expect(itens.nth(1)).toContainText("Cancelado");
+  await expect(itens.nth(2)).toContainText("Realizado");
+});

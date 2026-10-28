@@ -137,6 +137,15 @@ export default async function DesignContatosPage({
                 email={aberto.email}
                 birthDate={aberto.birth_date}
                 entendimento={aberto.id === 1 ? "Quer o plano anual e prefere ser atendido na sexta à tarde." : null}
+                agendamentosPreview={
+                  aberto.id === 1
+                    ? [
+                        { id: 3, servicoNome: "Avaliação", inicio: agora + 2 * D, fim: agora + 2 * D + 1_800_000, status: "confirmado", origem: "ia" },
+                        { id: 2, servicoNome: "Avaliação", inicio: agora - 5 * D, fim: agora - 5 * D + 1_800_000, status: "cancelado", origem: "ia" },
+                        { id: 1, servicoNome: "Retorno", inicio: agora - 30 * D, fim: agora - 30 * D + 900_000, status: "confirmado", origem: "time" },
+                      ]
+                    : undefined
+                }
                 simular
                 fotoPath={aberto.foto_path ?? null}
                 contactExists
