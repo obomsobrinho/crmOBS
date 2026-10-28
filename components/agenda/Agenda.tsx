@@ -180,7 +180,9 @@ export default function Agenda(p: PropsAgenda) {
   }
 
   const [horaDe, horaAte] = faixaDaGrade(dias, p.hours, [...itens, ...bloqueios]);
-  const horaPx = Math.max(HORA_PX_MIN, Math.floor(alturaDaArea / (horaAte - horaDe)));
+  // Sem arredondar: a faixa (início mais cedo ao fim mais tarde da semana, mais
+  // o que o time marcou fora dela) enche a altura exata, sem sobra embaixo.
+  const horaPx = Math.max(HORA_PX_MIN, alturaDaArea / (horaAte - horaDe));
 
   return (
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
@@ -273,13 +275,17 @@ export default function Agenda(p: PropsAgenda) {
               style={{ height: (horaAte - horaDe) * horaPx }}
             >
               <div className="relative">
-                {Array.from({ length: horaAte - horaDe }, (_, i) => (
+                {/* Início e fim da faixa aparecem dentro da grade (sem cortar). */}
+                {Array.from({ length: horaAte - horaDe + 1 }, (_, i) => (
                   <span
                     key={i}
-                    className="absolute right-2 -translate-y-1/2 text-legenda tabular-nums text-ink-3"
+                    className={cn(
+                      "absolute right-2 text-legenda tabular-nums text-ink-3",
+                      i === 0 ? "translate-y-0.5" : i === horaAte - horaDe ? "-translate-y-full" : "-translate-y-1/2"
+                    )}
                     style={{ top: i * horaPx }}
                   >
-                    {i === 0 ? "" : `${horaDe + i}h`}
+                    {`${horaDe + i}h`}
                   </span>
                 ))}
               </div>
@@ -296,6 +302,7 @@ export default function Agenda(p: PropsAgenda) {
                   escondidaNoCelular={d !== diaCelular}
                   onAbrir={setDetalhe}
                   horaPx={horaPx}
+                  nHoras={horaAte - horaDe}
                 />
               ))}
             </div>
@@ -354,6 +361,7 @@ function ColunaDoDia({
   escondidaNoCelular,
   onAbrir,
   horaPx,
+  nHoras,
 }: {
   dia: string;
   hoje: string;
@@ -365,6 +373,7 @@ function ColunaDoDia({
   escondidaNoCelular: boolean;
   onAbrir: (l: LinhaAgenda) => void;
   horaPx: number;
+  nHoras: number;
 }) {
   const base = inicioDoDia(dia) + horaDe * 3_600_000;
   const topo = (t: number) => ((t - base) / 60_000 / 60) * horaPx;
@@ -374,15 +383,17 @@ function ColunaDoDia({
     <div
       data-agenda="coluna"
       data-dia={dia}
-      style={{
-        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${horaPx - 1}px, var(--line-soft) ${horaPx - 1}px, var(--line-soft) ${horaPx}px)`,
-      }}
       className={cn(
         "relative border-l border-line",
         dia === hoje && "bg-brand-surface/40",
         escondidaNoCelular && "max-md:hidden"
       )}
     >
+      {/* Linhas só ENTRE as horas: no topo vale a borda do cabeçalho e no fim a
+          borda do cartão (ajuste do dono: eram duas linhas coladas). */}
+      {Array.from({ length: Math.max(0, nHoras - 1) }, (_, i) => (
+        <div key={`h${i}`} className="absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * horaPx }} aria-hidden />
+      ))}
       {/* Fora do expediente fica apagado: o time ainda marca ali, a IA não. */}
       {!exp && <div className="absolute inset-0 bg-[var(--chip-bg)] opacity-60" aria-hidden />}
       {exp && topo(exp.inicio) > 0 && (

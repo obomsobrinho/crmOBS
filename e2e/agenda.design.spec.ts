@@ -171,3 +171,12 @@ test("o botão de copiar o horário de atendimento vem antes da lista de dias", 
   const dias = (await page.locator('[data-agenda="horario-agenda"]').boundingBox())!;
   expect(botao.y).toBeLessThan(dias.y);
 });
+
+test("a grade mostra a faixa do horário da agenda (9h às 18h no preview) e linhas só entre as horas", async ({ page }) => {
+  await page.goto("/design/agenda");
+  const rotulos = page.locator('[data-agenda="grade"] > div > div').first().locator("span");
+  await expect(rotulos.first()).toHaveText("9h");
+  await expect(rotulos.last()).toHaveText("18h");
+  // 9 horas = 8 linhas internas por coluna; nenhuma no topo nem no fim.
+  await expect(page.locator('[data-agenda="coluna"]').first().locator("div.h-px")).toHaveCount(8);
+});
