@@ -247,6 +247,12 @@ function historicoFalso(agora: number): { dia: string; horas: number[] }[] {
     const total = 6 + ((Number(dia.slice(8)) * 7) % 13) * 4;
     const pesos = Array.from({ length: 24 }, (_, h) => (dia === hoje && h > horaAtual ? 0 : pesoDaHora(dow, h)));
     const soma = pesos.reduce((s, p) => s + p, 0);
+    // Hoje antes das 8h ainda não tem hora com movimento: o dia fica zerado. Sem isto a conta dividia
+    // zero por zero e o NaN contaminava todos os períodos da aba Uso de IA de madrugada.
+    if (soma === 0) {
+      saida.push({ dia, horas: pesos });
+      continue;
+    }
     const horas = pesos.map((p) => Math.floor((total * p) / soma));
     // O resto da divisão vai para a hora de maior peso, para o total do dia fechar.
     horas[pesos.indexOf(Math.max(...pesos))] += total - horas.reduce((s, n) => s + n, 0);
