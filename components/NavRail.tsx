@@ -58,6 +58,8 @@ interface ItemDoMenu {
   donoOnly?: boolean;
   /** Só o dono do PRODUTO (`ADMIN_USER_IDS`): a central "Clientes". */
   adminOnly?: boolean;
+  /** Só com a agenda ligada (revisão do dono, 28/10/2026). */
+  soComAgenda?: boolean;
 }
 
 const NAV: ItemDoMenu[] = [
@@ -72,8 +74,8 @@ const NAV: ItemDoMenu[] = [
   { href: "/pedidos", label: "Pedidos", icon: HandHelping },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
   // AGENDA PRÓPRIA (28/10/2026, docs/plano-agenda.md): saiu do "Em breve".
-  // Entre Conversas e Contatos, para dono e atendente (D13, padrão sem o dono).
-  { href: "/agenda", label: "Agenda", icon: Calendar },
+  // Entre Conversas e Contatos, para dono e atendente, SÓ com a agenda ligada.
+  { href: "/agenda", label: "Agenda", icon: Calendar, soComAgenda: true },
   // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
@@ -121,6 +123,7 @@ export default function NavRail({
   ehAdmin = false,
   whatsappConnected = true,
   numeroAvisos = null,
+  agendaAtiva = false,
 }: {
   clientName: string;
   /**
@@ -141,6 +144,8 @@ export default function NavRail({
   whatsappConnected?: boolean;
   /** Destino dos avisos: não conta como conversa não lida (lib/avisos.ts). */
   numeroAvisos?: string | null;
+  /** Agenda ligada (`clients.agenda_config.ativa`, decidido no servidor): mostra "Agenda". */
+  agendaAtiva?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -149,7 +154,8 @@ export default function NavRail({
   // renderização, real ou de /design, passa o papel), e "Clientes" só existe para
   // o dono do produto.
   const visiveis = NAV.filter(
-    (n) => !(n.donoOnly && role !== "dono") && !(n.adminOnly && !ehAdmin),
+    (n) =>
+      !(n.donoOnly && role !== "dono") && !(n.adminOnly && !ehAdmin) && !(n.soComAgenda && !agendaAtiva),
   );
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -76,8 +76,9 @@ export interface TurnDiagnostics {
   // ofereceu, o que o código decidiu com a saída do modelo e o resultado. No
   // dryRun só diz o que marcaria. Ausente = agenda desligada nesta conversa.
   agenda?: {
-    ofertas: number;
-    decisao: "nada" | "marcar" | "remarcar" | "cancelar" | "invalido";
+    /** Quantos horários o código ofereceu neste turno (consulta). */
+    ofertas?: number;
+    decisao: "nada" | "consultar" | "marcar" | "remarcar" | "cancelar" | "escalar" | "indisponivel" | "invalido";
     /** "quinta, 30/10, às 10h30 (Avaliação)" quando marcou (ou marcaria). */
     marcado?: string;
     /** O horário não valia mais (conflito) ou o banco falhou: a resposta foi trocada. */

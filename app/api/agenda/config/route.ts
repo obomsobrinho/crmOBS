@@ -3,7 +3,8 @@ import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DURACAO_MAX, DURACAO_MIN, normalizarConfigDaAgenda } from "@/lib/agenda";
 
-// Configuração da agenda: regras (`clients.agenda_config`) e serviços. Só o
+// Configuração da agenda: regras (`clients.agenda_config`), serviços e a coluna
+// "Agendado" do funil (`agenda_etapa_do_funil`). Só o
 // DONO (D14). Serviço que sai da lista vira `ativo = false` (nunca apagado:
 // agendamentos antigos apontam para ele e guardam o nome).
 export async function PUT(req: Request) {
@@ -61,6 +62,9 @@ export async function PUT(req: Request) {
   }
   const { error: cErr } = await svc.from("clients").update({ agenda_config: { ...config } }).eq("id", mine.id);
   if (cErr) erros.push(cErr.message);
+  // A coluna "Agendado" do funil existe só com a agenda ligada (decisão do dono).
+  const { error: eErr } = await svc.rpc("agenda_etapa_do_funil", { p_client: mine.id, p_ativa: config.ativa });
+  if (eErr) erros.push(eErr.message);
   if (erros.length > 0) {
     console.error("falha ao salvar a agenda:", erros.join("; "));
     return NextResponse.json({ error: "não foi possível salvar tudo" }, { status: 500 });

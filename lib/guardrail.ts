@@ -75,7 +75,7 @@ export function applyGuardrail(
     pedido_aberto: 0,
     informacao_nova: false,
     // Resposta barrada nunca marca nada na agenda.
-    agenda: { acao: "", horario: "", agendamento: "" },
+    agenda: { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" },
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

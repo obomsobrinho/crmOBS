@@ -38,21 +38,26 @@ import {
 } from "@/lib/consumo-ia";
 import { semLoteAtual } from "@/lib/mensagem";
 import {
+  TEXTO_PEDE_DIA_E_PERIODO,
   blocoDaAgenda,
   decidirAgenda,
-  montarOfertas,
-  preferenciaDaOferta,
+  diaFalado,
+  periodoDe,
+  momentoDoLembrete,
+  preferenciaDoHorario,
   quandoFalado,
+  textoDaConsulta,
   textoDoAvisoDaAgenda,
-  textoEscolhaNaLista,
-  textoSemHorario,
+  textosDaEscalada,
+  type AgendaConfig,
   type AgendamentoDaPessoa,
-  type Oferta,
+  type ServicoDaAgenda,
 } from "@/lib/agenda";
 import {
   agendaDoTurno,
   cancelarAgendamento,
   marcarAgendamento,
+  ocupadosDoDia,
   remarcarAgendamento,
 } from "@/lib/agenda-servidor";
 import type {
@@ -515,8 +520,9 @@ export async function processTurn(
       ? new Date(params.agoraTeste)
       : undefined;
 
-  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): com a agenda ligada e o
-  // objetivo "Agendar", o turno leva os horários livres calculados pelo código.
+  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): com a agenda ligada, o turno
+  // leva o contrato `### AGENDA` (serviços e agendamentos da pessoa, sem
+  // horários: quem oferece, no máximo 3, é o código depois do dia e período).
   // Sem migration, sem horário ou desligada: `null`, e o turno segue como antes.
   const agoraMsAgenda = (agoraDoTurno ?? new Date()).getTime();
   const agenda = await agendaDoTurno({
@@ -525,18 +531,7 @@ export async function processTurn(
     phone,
     agora: agoraMsAgenda,
     hours: horasDoTurno,
-    promptMode: client.prompt_mode,
-    agentConfig: client.agent_config,
   });
-  const ofertas = agenda
-    ? montarOfertas({
-        agora: agoraMsAgenda,
-        hours: agenda.hours,
-        ocupados: agenda.ocupados,
-        config: agenda.config,
-        servicos: agenda.servicos,
-      })
-    : [];
 
   // Modelo. Lança AgentError em falha (a rota mapeia para 502).
   const run = await runAgent({
@@ -551,7 +546,7 @@ export async function processTurn(
     now: agoraDoTurno,
     hours: horasDoTurno,
     agenda: agenda
-      ? blocoDaAgenda({ agora: agoraMsAgenda, ofertas, daPessoa: agenda.daPessoa, servicos: agenda.servicos })
+      ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config })
       : null,
   });
   const raw = run.output;
@@ -589,6 +584,7 @@ export async function processTurn(
   // então a resposta nunca afirma um horário que não ficou gravado. A regra é
   // `decidirAgenda` (lib/agenda.ts); aqui só banco e aviso.
   let diagAgenda: TurnDiagnostics["agenda"];
+  let agendou = false;
   if (agenda) {
     const r = await aplicarAgenda({
       svc,
@@ -597,13 +593,13 @@ export async function processTurn(
       dryRun,
       agora: agoraMsAgenda,
       output,
-      ofertas,
-      daPessoa: agenda.daPessoa,
+      agenda,
       instancia: (client.evolution_instance as string | null) ?? null,
       destino: avisos,
     });
     output = r.output;
     diagAgenda = r.diag;
+    agendou = r.agendou;
   }
 
   // Consumo único: em produção, limpa a orientação depois de usada (best-effort;
@@ -698,6 +694,7 @@ export async function processTurn(
         currentStage: params.currentStage ?? null,
         stageSource: params.stageSource ?? null,
         canonical,
+        agendou,
       });
     } else {
       // Persiste a qualificação (alimenta a lista "Precisa de você" e o resumo
@@ -729,7 +726,7 @@ export async function processTurn(
       ]);
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
       if (uErr) console.error("falha ao atualizar o pedido aberto:", uErr.message);
-      stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
+      stageWouldMove = await advanceStage(svc, clientId, phone, output.action, agendou);
 
       // A fila (`entraNaFila`, calculada acima). Best-effort: um erro aqui não
       // pode derrubar a resposta ao cliente.
@@ -1000,7 +997,7 @@ function silentTurn(
       motivo: "",
       pedido_aberto: 0,
       informacao_nova: false,
-      agenda: { acao: "", horario: "", agendamento: "" },
+      agenda: { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" },
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
@@ -1108,7 +1105,8 @@ async function advanceStage(
   svc: ReturnType<typeof createServiceClient>,
   clientId: string,
   phone: string,
-  action: string
+  action: string,
+  agendou = false
 ): Promise<string | null> {
   try {
     const canonical = await loadCanonical(svc, clientId);
@@ -1127,6 +1125,7 @@ async function advanceStage(
       currentStage: (conv.stage as string | null) ?? null,
       stageSource: (conv.stage_source as string | null) ?? null,
       canonical,
+      agendou,
     });
     if (!target) return null;
 
@@ -1148,13 +1147,13 @@ async function advanceStage(
 
 /**
  * AGENDA PRÓPRIA (28/10/2026): aplica a decisão do turno (`decidirAgenda`,
- * lib/agenda.ts). Marca e remarca ANTES de a resposta sair; se o horário não
- * vale mais (outra conversa marcou no mesmo segundo: o banco recusa com 23P01)
- * a resposta do modelo é trocada por uma escrita pelo código, com action none.
- * O aviso de marcar e de remarcar continua sendo o "Notifica grupo" do n8n
- * (action agendar); só o cancelamento, que não é agendar, avisa daqui. No
- * dryRun nada é gravado nem avisado: o diagnóstico diz o que aconteceria.
- * NUNCA lança.
+ * lib/agenda.ts). Consultar: o CÓDIGO escreve a resposta com até 3 horários do
+ * dia e período pedidos. Marcar e remarcar: gravados ANTES de a resposta sair;
+ * se o horário não vale mais, o código oferece outros do mesmo período. Dentro
+ * da antecedência mínima: pedido de ajuda ao time (action pausar), nunca
+ * marcado. O aviso de marcar e remarcar continua sendo o "Notifica grupo" do
+ * n8n (action agendar); só o cancelamento avisa daqui. No dryRun nada é
+ * gravado nem avisado: o diagnóstico diz o que aconteceria. NUNCA lança.
  */
 async function aplicarAgenda(a: {
   svc: ReturnType<typeof createServiceClient>;
@@ -1163,94 +1162,184 @@ async function aplicarAgenda(a: {
   dryRun: boolean;
   agora: number;
   output: AgentOutput;
-  ofertas: Oferta[];
-  daPessoa: AgendamentoDaPessoa[];
+  agenda: { config: AgendaConfig; servicos: ServicoDaAgenda[]; daPessoa: AgendamentoDaPessoa[]; hours: BusinessHours };
   instancia: string | null;
   destino: string | null;
-}): Promise<{ output: AgentOutput; diag: NonNullable<TurnDiagnostics["agenda"]> }> {
-  const decisao = decidirAgenda({
-    action: a.output.action,
-    saida: a.output.agenda,
-    ofertas: a.ofertas,
-    daPessoa: a.daPessoa,
-  });
-  const diag: NonNullable<TurnDiagnostics["agenda"]> = { ofertas: a.ofertas.length, decisao: decisao.tipo };
-  const trocar = (texto: string): AgentOutput => ({
+}): Promise<{ output: AgentOutput; diag: NonNullable<TurnDiagnostics["agenda"]>; agendou: boolean }> {
+  const { config, servicos, daPessoa, hours } = a.agenda;
+  const saida = a.output.agenda;
+  const responder = (texto: string, extra: Partial<AgentOutput> = {}): AgentOutput => ({
     ...a.output,
     messages: [texto],
     action: "none",
     summary: "",
     preferencia_horario: "",
+    ...extra,
   });
+  const diag: NonNullable<TurnDiagnostics["agenda"]> = { decisao: "nada" };
 
   try {
-    if (decisao.tipo === "nada") return { output: a.output, diag };
-    if (decisao.tipo === "invalido") return { output: trocar(textoEscolhaNaLista(a.ofertas, a.agora)), diag };
-
-    if (decisao.tipo === "cancelar") {
-      const g = decisao.agendamento;
-      diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;
-      if (a.dryRun) return { output: a.output, diag };
-      const ok = await cancelarAgendamento(a.svc, a.clientId, g.id, "cliente");
-      if (!ok) {
-        diag.falhou = "erro";
-        return { output: trocar("Não consegui cancelar agora. Vou pedir para alguém do time confirmar com você."), diag };
-      }
-      avisarAgenda({
-        ...a,
-        texto: (nome) =>
-          textoDoAvisoDaAgenda({ tipo: "cancelado", nome, servico: g.servicoNome, antes: g.inicio, agora: a.agora }),
-      });
-      return { output: a.output, diag };
+    // Só lê a agenda do dia em jogo (sem limite de dias à frente).
+    const diaEmJogo = /^\d{4}-\d{2}-\d{2}$/.test(saida.dia) ? saida.dia : null;
+    const ocupados = diaEmJogo ? await ocupadosDoDia(a.svc, a.clientId, diaEmJogo) : [];
+    if (ocupados === null) {
+      diag.falhou = "erro";
+      return { output: a.output, diag, agendou: false };
     }
+    const decisao = decidirAgenda({ action: a.output.action, saida, agora: a.agora, hours, ocupados, config, servicos, daPessoa });
+    diag.decisao = decisao.tipo;
 
-    const oferta = decisao.oferta;
-    diag.marcado = `${quandoFalado(oferta.inicio, a.agora)} (${oferta.servicoNome})`;
-    const preferencia = preferenciaDaOferta(oferta, a.agora);
-    const remarcando = decisao.tipo === "remarcar" ? decisao.agendamento : null;
-    const resumo = remarcando
-      ? `Remarcou ${remarcando.servicoNome} de ${quandoFalado(remarcando.inicio, a.agora)} para ${quandoFalado(oferta.inicio, a.agora)}. ${a.output.summary}`.trim()
-      : a.output.summary;
-    const certo: AgentOutput = { ...a.output, action: "agendar", preferencia_horario: preferencia, summary: resumo };
-    if (a.dryRun) return { output: certo, diag };
-
-    const { data: contato } = await a.svc
-      .from("dados_cliente")
-      .select("display_name, nomewpp")
-      .eq("client_id", a.clientId)
-      .eq("telefone", a.phone)
-      .maybeSingle();
-    const res = remarcando
-      ? await remarcarAgendamento(a.svc, {
-          clientId: a.clientId,
-          id: remarcando.id,
-          inicio: oferta.inicio,
-          fim: oferta.fim,
-          servicoId: oferta.servicoId,
-          servicoNome: oferta.servicoNome,
-          origem: "ia",
-          por: "cliente",
-        })
-      : await marcarAgendamento(a.svc, {
-          clientId: a.clientId,
-          phone: a.phone,
-          nome: nomeDoContato(contato),
-          servicoId: oferta.servicoId,
-          servicoNome: oferta.servicoNome,
-          inicio: oferta.inicio,
-          fim: oferta.fim,
-          origem: "ia",
+    switch (decisao.tipo) {
+      case "nada":
+        return { output: a.output, diag, agendou: false };
+      case "invalido":
+        return { output: responder(TEXTO_PEDE_DIA_E_PERIODO), diag, agendou: false };
+      case "consultar":
+      case "indisponivel": {
+        const texto = textoDaConsulta({
+          dia: decisao.dia,
+          periodo: decisao.periodo,
+          resultado: decisao.resultado,
+          agora: a.agora,
+          antecedenciaMin: config.antecedenciaMin,
+          indisponivel: decisao.tipo === "indisponivel",
         });
-    if (res.ok) return { output: certo, diag };
-    diag.falhou = res.motivo;
-    const outras = a.ofertas.filter((o) => o.servicoId === oferta.servicoId && o.codigo !== oferta.codigo);
-    return { output: trocar(textoSemHorario(outras, a.agora)), diag };
+        if (decisao.resultado.tipo === "antecedencia") {
+          // Livre só em cima da hora: o time decide (pedido de ajuda).
+          const e = textosDaEscalada({
+            servico: decisao.servico.nome,
+            inicio: decisao.resultado.inicios[0],
+            agora: a.agora,
+            antecedenciaMin: config.antecedenciaMin,
+          });
+          return {
+            output: responder(texto, { action: "pausar", summary: e.resumo, motivo: "fechar", pedido_novo: true }),
+            diag,
+            agendou: false,
+          };
+        }
+        diag.ofertas = decisao.resultado.tipo === "ofertas" ? decisao.resultado.inicios.length : 0;
+        return { output: responder(texto), diag, agendou: false };
+      }
+      case "escalar": {
+        const e = textosDaEscalada({
+          servico: decisao.servico.nome,
+          inicio: decisao.inicio,
+          agora: a.agora,
+          antecedenciaMin: config.antecedenciaMin,
+        });
+        diag.marcado = `${quandoFalado(decisao.inicio, a.agora)} (${decisao.servico.nome})`;
+        return {
+          output: responder(e.mensagem, { action: "pausar", summary: e.resumo, motivo: "fechar", pedido_novo: true }),
+          diag,
+          agendou: false,
+        };
+      }
+      case "cancelar": {
+        const g = decisao.agendamento;
+        diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;
+        if (a.dryRun) return { output: a.output, diag, agendou: false };
+        const ok = await cancelarAgendamento(a.svc, a.clientId, g.id, "cliente");
+        if (!ok) {
+          diag.falhou = "erro";
+          return {
+            output: responder("Não consegui cancelar agora. Vou pedir para alguém do time confirmar com você."),
+            diag,
+            agendou: false,
+          };
+        }
+        avisarAgenda({
+          ...a,
+          texto: (nome) => textoDoAvisoDaAgenda({ nome, servico: g.servicoNome, antes: g.inicio, agora: a.agora }),
+        });
+        return { output: a.output, diag, agendou: false };
+      }
+      case "marcar":
+      case "remarcar": {
+        const { servico, inicio, fim } = decisao;
+        diag.marcado = `${quandoFalado(inicio, a.agora)} (${servico.nome})`;
+        const remarcando = decisao.tipo === "remarcar" ? decisao.agendamento : null;
+        const resumo = remarcando
+          ? `Remarcou ${remarcando.servicoNome} de ${quandoFalado(remarcando.inicio, a.agora)} para ${quandoFalado(inicio, a.agora)}. ${a.output.summary}`.trim()
+          : a.output.summary;
+        const certo: AgentOutput = {
+          ...a.output,
+          action: "agendar",
+          preferencia_horario: preferenciaDoHorario(servico.nome, inicio, a.agora),
+          summary: resumo,
+        };
+        if (a.dryRun) return { output: certo, diag, agendou: true };
+        const lembreteEm = config.lembrete ? momentoDoLembrete({ inicio, marcadoEm: a.agora, hours }) : null;
+        const { data: contato } = await a.svc
+          .from("dados_cliente")
+          .select("display_name, nomewpp")
+          .eq("client_id", a.clientId)
+          .eq("telefone", a.phone)
+          .maybeSingle();
+        const res = remarcando
+          ? await remarcarAgendamento(a.svc, {
+              clientId: a.clientId,
+              id: remarcando.id,
+              inicio,
+              fim,
+              servicoId: servico.id,
+              servicoNome: servico.nome,
+              origem: "ia",
+              por: "cliente",
+              resumo,
+              lembreteEm,
+            })
+          : await marcarAgendamento(a.svc, {
+              clientId: a.clientId,
+              phone: a.phone,
+              nome: nomeDoContato(contato),
+              servicoId: servico.id,
+              servicoNome: servico.nome,
+              inicio,
+              fim,
+              origem: "ia",
+              resumo,
+              lembreteEm,
+            });
+        if (res.ok) return { output: certo, diag, agendou: true };
+        diag.falhou = res.motivo;
+        // Outra conversa levou o horário no mesmo instante: oferece outros do período.
+        const outros = (diaEmJogo && (await ocupadosDoDia(a.svc, a.clientId, diaEmJogo))) || ocupados;
+        const nova = decidirAgenda({
+          action: "none",
+          saida: { ...saida, acao: "consultar", periodo: saida.periodo || periodoDe(inicio) },
+          agora: a.agora,
+          hours,
+          ocupados: outros,
+          config,
+          servicos,
+          daPessoa,
+        });
+        const texto =
+          nova.tipo === "consultar"
+            ? textoDaConsulta({
+                dia: nova.dia,
+                periodo: nova.periodo,
+                resultado: nova.resultado,
+                agora: a.agora,
+                antecedenciaMin: config.antecedenciaMin,
+                indisponivel: true,
+              })
+            : `Esse horário acabou de ser preenchido. Quer que eu veja outro horário para ${diaFalado(inicio, a.agora)}?`;
+        return { output: responder(texto), diag, agendou: false };
+      }
+    }
   } catch (e) {
     console.error("falha na agenda do turno:", e);
     diag.falhou = "erro";
-    return decisao.tipo === "nada" || decisao.tipo === "cancelar"
-      ? { output: a.output, diag }
-      : { output: trocar("Não consegui confirmar o horário agora. Vou pedir para alguém do time falar com você."), diag };
+    const queriaMarcar = saida.acao === "marcar" || saida.acao === "remarcar" || a.output.action === "agendar";
+    return queriaMarcar
+      ? {
+          output: responder("Não consegui confirmar o horário agora. Vou pedir para alguém do time falar com você."),
+          diag,
+          agendou: false,
+        }
+      : { output: a.output, diag, agendou: false };
   }
 }
 

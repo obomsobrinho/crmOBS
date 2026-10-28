@@ -98,8 +98,11 @@ export function stageColor(color: string): string {
 
 // ---- Movimento automático do card pela IA (/api/agent) ----
 // Estágio canônico que uma decisão da IA indica. null = não move o card.
-// action=agendar/pausar => a conversa precisa de um humano.
-export function stageForAction(action: string): string | null {
+// action=agendar/pausar => a conversa precisa de um humano. Horário MARCADO na
+// agenda própria (`agendou`) => "agendado", quando a etapa existe (só com a
+// agenda ligada; senão cai no de sempre).
+export function stageForAction(action: string, agendou = false): string | null {
+  if (agendou) return "agendado";
   if (action === "agendar" || action === "pausar") return "aguardando_humano";
   return null;
 }
@@ -113,10 +116,15 @@ export function nextIaStage(params: {
   currentStage: string | null;
   stageSource: string | null;
   canonical: { key: string; position: number }[]; // canônicos ATIVOS do tenant
+  /** O turno marcou um horário de verdade na agenda própria. */
+  agendou?: boolean;
 }): string | null {
   const { action, currentStage, stageSource, canonical } = params;
   if (stageSource === "human") return null;
-  const targetKey = stageForAction(action);
+  const preferida = stageForAction(action, params.agendou);
+  // Sem a etapa "agendado" (agenda desligada, arquivada): a de sempre.
+  const targetKey =
+    preferida && canonical.some((s) => s.key === preferida) ? preferida : stageForAction(action);
   if (!targetKey) return null;
   const target = canonical.find((s) => s.key === targetKey);
   if (!target) return null;

@@ -56,6 +56,12 @@ create table public.agendamentos (
   cancelado_em timestamptz,
   cancelado_por text check (cancelado_por in ('cliente', 'time')),
   remarcado_de bigint references public.agendamentos(id) on delete set null,
+  -- "Do que se trata": o resumo da conversa quando a IA marca, ou a nota do time.
+  resumo text check (resumo is null or char_length(resumo) <= 500),
+  -- Lembrete automatico (lib/agenda.ts, momentoDoLembrete): quando sai e quando saiu.
+  -- null em lembrete_em = sem lembrete (desligado ou marcado com menos de 24h).
+  lembrete_em timestamptz,
+  lembrete_enviado_em timestamptz,
   constraint agendamentos_periodo check (fim > inicio),
   -- Cancelamento coerente: a data existe exatamente quando esta cancelado.
   constraint agendamentos_cancelamento_coerente check (
@@ -70,6 +76,44 @@ create table public.agendamentos (
 create index agendamentos_do_tenant on public.agendamentos (client_id, inicio, id);
 create index agendamentos_do_contato on public.agendamentos (client_id, phone, inicio)
   where status = 'confirmado';
+-- A varredura do lembrete (quando existir): so os pendentes, pela hora de sair.
+create index agendamentos_lembrete_pendente on public.agendamentos (lembrete_em)
+  where status = 'confirmado' and lembrete_em is not null and lembrete_enviado_em is null;
+
+-- Coluna "Agendado" do funil: existe so com a agenda ligada (decisao do dono, 28/10/2026).
+-- Ligar: desarquiva a etapa ou cria logo depois de "Aguardando atendimento", empurrando as
+-- seguintes uma posicao. Desligar: arquiva (as conversas nela continuam com a chave; o
+-- funil mostra etapa arquivada como o resto). Canonica: a IA move para ela ao marcar.
+create or replace function public.agenda_etapa_do_funil(p_client uuid, p_ativa boolean)
+returns void
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_pos integer;
+begin
+  if not p_ativa then
+    update public.pipeline_stages set archived = true
+      where client_id = p_client and key = 'agendado' and not archived;
+    return;
+  end if;
+  if exists (select 1 from public.pipeline_stages where client_id = p_client and key = 'agendado') then
+    update public.pipeline_stages set archived = false where client_id = p_client and key = 'agendado';
+    return;
+  end if;
+  select coalesce(
+    (select position + 1 from public.pipeline_stages where client_id = p_client and key = 'aguardando_humano'),
+    (select coalesce(max(position), -1) + 1 from public.pipeline_stages where client_id = p_client)
+  ) into v_pos;
+  update public.pipeline_stages set position = position + 1
+    where client_id = p_client and position >= v_pos;
+  insert into public.pipeline_stages (client_id, key, name, position, is_canonical, is_default, color)
+    values (p_client, 'agendado', 'Agendado', v_pos, true, false, 'cyan');
+end;
+$$;
+revoke execute on function public.agenda_etapa_do_funil(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.agenda_etapa_do_funil(uuid, boolean) to service_role;
 
 alter table public.agenda_servicos enable row level security;
 alter table public.agenda_bloqueios enable row level security;

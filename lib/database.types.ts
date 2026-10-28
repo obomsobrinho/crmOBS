@@ -134,6 +134,9 @@ export type Database = {
           origem: string
           phone: string
           remarcado_de: number | null
+          lembrete_em: string | null
+          lembrete_enviado_em: string | null
+          resumo: string | null
           servico_id: number | null
           servico_nome: string
           status: string
@@ -151,6 +154,9 @@ export type Database = {
           origem: string
           phone: string
           remarcado_de?: number | null
+          lembrete_em?: string | null
+          lembrete_enviado_em?: string | null
+          resumo?: string | null
           servico_id?: number | null
           servico_nome: string
           status?: string
@@ -168,6 +174,9 @@ export type Database = {
           origem?: string
           phone?: string
           remarcado_de?: number | null
+          lembrete_em?: string | null
+          lembrete_enviado_em?: string | null
+          resumo?: string | null
           servico_id?: number | null
           servico_nome?: string
           status?: string
@@ -1151,6 +1160,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      agenda_etapa_do_funil: {
+        Args: { p_ativa: boolean; p_client: string }
+        Returns: undefined
+      }
       admin_apagar_cliente: {
         Args: {
           p_client: string

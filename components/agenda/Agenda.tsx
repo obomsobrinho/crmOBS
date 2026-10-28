@@ -4,75 +4,61 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Ban,
+  Bell,
+  BellOff,
   CalendarDays,
   CalendarPlus,
   CalendarX2,
   ChevronLeft,
   ChevronRight,
-  Copy,
-  Ellipsis,
+  Clock,
   MessagesSquare,
-  Plus,
+  Phone,
   Repeat,
   Settings2,
   Sparkles,
-  Trash2,
   UserRound,
 } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
-import { Aviso } from "@/components/ui/aviso";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { DAY_LABEL, type BusinessHours } from "@/lib/agent-prompt";
 import {
-  DURACAO_MAX,
-  DURACAO_MIN,
-  OPCOES_DA_AGENDA,
+  expedienteDoDia,
   faixaHoraria,
   hhmm,
+  quandoFalado,
   rotuloDoDia,
-  textoDoLembrete,
+  segundaDaSemana,
   type AgendaConfig,
   type ServicoDaAgenda,
 } from "@/lib/agenda";
-import {
-  PAGINA_AGENDA,
-  inicioDoDia,
-  type BloqueioAgenda,
-  type FonteAgenda,
-  type LinhaAgenda,
-  type RecorteAgenda,
-} from "@/lib/agenda-fonte";
-import { diaIsoSP, diaMes, somarDias } from "@/lib/fuso";
+import { inicioDoDia, type BloqueioAgenda, type FonteAgenda, type LinhaAgenda } from "@/lib/agenda-fonte";
+import { diaIsoSP, mesAnoDoDia, somarDias } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
-import { usePaginada } from "@/lib/use-paginada";
+import { minutosAgoraSP } from "@/lib/horarios";
+import { ROTULO_CHAVES, fillDoRotulo } from "@/lib/rotulos";
+import { cn } from "@/lib/utils";
 
-// A tela da AGENDA PRÓPRIA (docs/plano-agenda.md, seção 3). Lista por dia ou
-// semana (10 por vez, rolagem infinita por (inicio, id)), marcar, remarcar,
-// cancelar, bloquear e, para o dono, configurar serviços e regras. Os dados
-// vêm SÓ da `fonte` (banco em `/agenda`, memória em `/design/agenda`).
-// Sem realtime nesta versão: a lista revalida ao voltar o foco e depois de
-// cada ação desta aba (a tabela entra no canal do tenant depois da migration).
+// A tela da AGENDA PRÓPRIA (revisão do dono, 28/10/2026): GRADE SEMANAL no
+// estilo Google Agenda (referência: Clinic Radar), colunas por dia com
+// contador, a linha do "agora", cartões com barra colorida à esquerda e o dia
+// de hoje destacado. Na lateral, o minicalendário do mês com a semana exibida
+// em destaque (sem a lista de compromissos da referência). Clique num horário
+// abre o detalhe com remarcar e cancelar. No celular, um dia por vez.
+// Os dados vêm SÓ da `fonte` (banco em `/agenda`, memória em `/design/agenda`).
 
-type Vista = "dia" | "semana";
-type Status = RecorteAgenda["status"];
-
+const HORA_PX = 56;
 const DIA_MS = 86_400_000;
+const CHAVES_DA_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
 export interface PropsAgenda {
   fonte: FonteAgenda;
@@ -81,94 +67,89 @@ export interface PropsAgenda {
   dono: boolean;
   /** false = tabelas ausentes (migration não aplicada) ou leitura falhou. */
   disponivel: boolean;
-  /** Há horário de atendimento cadastrado (sem ele a IA não marca). */
-  temHorario: boolean;
-  /** O objetivo "Agendar" está marcado no agente. */
-  querAgendar: boolean;
-  configInicial: AgendaConfig;
-  servicosIniciais: ServicoDaAgenda[];
-  inicial: { itens: LinhaAgenda[]; temMais: boolean; bloqueios: BloqueioAgenda[] };
+  /** Horário de atendimento cadastrado (fonte única com o agente), ou null. */
+  hours: BusinessHours | null;
+  config: AgendaConfig;
+  servicos: ServicoDaAgenda[];
+  inicial: { semana: string; itens: LinhaAgenda[]; bloqueios: BloqueioAgenda[] };
+  /** Onde fica a configuração (a tela real e o preview têm endereços diferentes). */
+  hrefConfig: string;
   readOnly?: boolean;
+}
+
+
+function corDoServico(servicoId: number | null): string {
+  return fillDoRotulo(ROTULO_CHAVES[Math.abs(servicoId ?? 0) % ROTULO_CHAVES.length]);
+}
+
+function minutos(ms: number): number {
+  return minutosAgoraSP(new Date(ms));
+}
+
+/** As horas que a grade mostra: o expediente da semana, esticado para caber o que está marcado. */
+function faixaDaGrade(dias: string[], hours: BusinessHours | null, itens: { inicio: number; fim: number }[]): [number, number] {
+  let de = 24;
+  let ate = 0;
+  for (const d of dias) {
+    const exp = hours ? expedienteDoDia(d, hours) : null;
+    if (!exp) continue;
+    de = Math.min(de, Math.floor(minutos(exp.inicio) / 60));
+    const fim = exp.fim - exp.inicio >= DIA_MS ? 24 : Math.ceil((minutos(exp.fim) || 1440) / 60);
+    ate = Math.max(ate, fim <= de ? 24 : fim);
+  }
+  for (const x of itens) {
+    de = Math.min(de, Math.floor(minutos(x.inicio) / 60));
+    ate = Math.max(ate, Math.ceil((minutos(x.fim) || 1440) / 60));
+  }
+  if (de >= ate) return [8, 18];
+  return [de, Math.min(24, ate)];
 }
 
 export default function Agenda(p: PropsAgenda) {
   const hoje = diaIsoSP(p.agora);
-  const [vista, setVista] = useState<Vista>("semana");
-  const [dia, setDia] = useState(hoje);
-  const [status, setStatus] = useState<Status>("confirmado");
-  const [config, setConfig] = useState(p.configInicial);
-  const [servicos, setServicos] = useState(p.servicosIniciais);
+  const [semana, setSemana] = useState(p.inicial.semana);
+  const [diaCelular, setDiaCelular] = useState(hoje);
+  const [itens, setItens] = useState(p.inicial.itens);
   const [bloqueios, setBloqueios] = useState(p.inicial.bloqueios);
+  const [detalhe, setDetalhe] = useState<LinhaAgenda | null>(null);
   const [marcar, setMarcar] = useState(false);
   const [remarcar, setRemarcar] = useState<LinhaAgenda | null>(null);
   const [cancelar, setCancelar] = useState<LinhaAgenda | null>(null);
-  const [lembrete, setLembrete] = useState<LinhaAgenda | null>(null);
   const [bloquear, setBloquear] = useState(false);
-  const [configurar, setConfigurar] = useState(false);
 
-  const recorte = useMemo<RecorteAgenda>(() => {
-    const de = inicioDoDia(dia);
-    return { de, ate: de + (vista === "dia" ? 1 : 7) * DIA_MS, status };
-  }, [dia, vista, status]);
+  const dias = useMemo(() => Array.from({ length: 7 }, (_, i) => somarDias(semana, i)), [semana]);
 
-  const { itens, temMais, carregando, fimRef, revalidar } = usePaginada<LinhaAgenda, RecorteAgenda>({
-    inicial: p.inicial.itens,
-    temMaisInicial: p.inicial.temMais,
-    params: recorte,
-    buscar: (r, depois, n) => p.fonte.listar(r, depois, n),
-    chave: (l) => l.id,
-    tamanho: PAGINA_AGENDA,
-  });
-
-  const recarregarBloqueios = useCallback(async () => {
+  const recarregar = useCallback(async () => {
+    const de = inicioDoDia(semana);
     try {
-      setBloqueios(await p.fonte.bloqueios(recorte.de, recorte.ate));
+      const [l, b] = await Promise.all([p.fonte.semana(de, de + 7 * DIA_MS), p.fonte.bloqueios(de, de + 7 * DIA_MS)]);
+      setItens(l);
+      setBloqueios(b);
     } catch (e) {
-      console.error("bloqueios da agenda:", e);
+      console.error("agenda da semana:", e);
     }
-  }, [p.fonte, recorte.de, recorte.ate]);
-  // Os bloqueios da semana na tela (poucos por natureza) seguem o recorte.
-  // O primeiro recorte já veio do servidor.
-  const primeiroRecorte = useRef(true);
+  }, [p.fonte, semana]);
+
+  // A primeira semana veio do servidor; as outras, a fonte lê ao navegar.
+  const primeira = useRef(true);
   useEffect(() => {
-    if (primeiroRecorte.current) {
-      primeiroRecorte.current = false;
+    if (primeira.current) {
+      primeira.current = false;
       return;
     }
-    void recarregarBloqueios();
-  }, [recarregarBloqueios]);
+    void recarregar();
+  }, [recarregar]);
+  // Voltar para a aba revalida (sem realtime nesta versão).
+  useEffect(() => {
+    const aoVoltar = () => document.visibilityState === "visible" && void recarregar();
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+  }, [recarregar]);
 
-  const depoisDeAgir = useCallback(() => {
-    void revalidar();
-    void recarregarBloqueios();
-  }, [revalidar, recarregarBloqueios]);
-
-  // Agrupado por dia civil de SP. Os bloqueios entram no dia em que começam.
-  const grupos = useMemo(() => {
-    const m = new Map<string, { linhas: LinhaAgenda[]; bloqueios: BloqueioAgenda[] }>();
-    const de = (d: string) => m.get(d) ?? { linhas: [], bloqueios: [] };
-    for (const l of itens) {
-      const d = diaIsoSP(l.inicio);
-      const g = de(d);
-      m.set(d, { ...g, linhas: [...g.linhas, l] });
-    }
-    if (status === "confirmado") {
-      for (const b of bloqueios) {
-        const d = diaIsoSP(Math.max(b.inicio, recorte.de));
-        const g = de(d);
-        m.set(d, { ...g, bloqueios: [...g.bloqueios, b] });
-      }
-    }
-    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [itens, bloqueios, status, recorte.de]);
-
-  const passo = vista === "dia" ? 1 : 7;
-  const titulo =
-    vista === "dia"
-      ? rotuloDoDia(dia, hoje)
-      : `${diaMes(dia)} a ${diaMes(somarDias(dia, 6))}`;
-
-  const agendaLigada = config.ativa && servicos.length > 0 && p.temHorario && p.querAgendar;
+  const irPara = (dia: string) => {
+    setSemana(segundaDaSemana(dia));
+    setDiaCelular(dia);
+  };
 
   if (!p.disponivel) {
     return (
@@ -183,136 +164,150 @@ export default function Agenda(p: PropsAgenda) {
     );
   }
 
+  const [horaDe, horaAte] = faixaDaGrade(dias, p.hours, [...itens, ...bloqueios]);
+  const contagem = (d: string) => itens.filter((l) => diaIsoSP(l.inicio) === d).length;
+
   return (
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
-      <header className="border-b border-line px-6 pb-3 pt-5 max-md:px-4 max-md:pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <CalendarDays size={20} className="text-brand-ink" />
-            <h1 className="text-titulo">Agenda</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {!p.readOnly && (
-              <>
-                <Button size="control" onClick={() => setMarcar(true)} disabled={servicos.length === 0}>
-                  <CalendarPlus size={14} />
-                  Marcar horário
-                </Button>
-                <Button variant="outline" size="control" onClick={() => setBloquear(true)}>
-                  <Ban size={14} />
-                  Bloquear
-                </Button>
-              </>
-            )}
-            {p.dono && !p.readOnly && (
-              <Button variant="outline" size="icon-control" aria-label="Configurar a agenda" onClick={() => setConfigurar(true)}>
-                <Settings2 size={15} />
-              </Button>
-            )}
-          </div>
-        </div>
-        <p className="mt-1 text-legenda text-ink-3" data-agenda="estado">
-          {agendaLigada
-            ? "A IA oferece os horários livres e marca sozinha. Compromissos fora daqui: bloqueie o horário para a IA não oferecer."
-            : !p.querAgendar
-              ? 'A IA não marca: o objetivo "Agendar" está desligado no agente.'
-              : !p.temHorario
-                ? "A IA não marca: falta o horário de atendimento em Agente, O que ele sabe."
-                : servicos.length === 0
-                  ? "Cadastre um serviço na configuração para a IA começar a marcar."
-                  : "A IA ainda não marca: ligue a agenda na configuração."}
-        </p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon-control" aria-label="Anterior" onClick={() => setDia(somarDias(dia, -passo))}>
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3 max-md:px-4">
+        <div className="flex min-w-0 items-center gap-2">
+          <CalendarDays size={20} className="shrink-0 text-brand-ink" />
+          <h1 className="text-titulo">Agenda</h1>
+          <div className="ml-2 flex items-center gap-1">
+            <Button variant="ghost" size="icon-control" aria-label="Semana anterior" onClick={() => irPara(somarDias(semana, -7))}>
               <ChevronLeft size={16} />
             </Button>
-            <Button variant="ghost" size="icon-control" aria-label="Próximo" onClick={() => setDia(somarDias(dia, passo))}>
+            <Button variant="ghost" size="icon-control" aria-label="Próxima semana" onClick={() => irPara(somarDias(semana, 7))}>
               <ChevronRight size={16} />
             </Button>
-            <Button variant="outline" size="chrome" onClick={() => setDia(hoje)} disabled={dia === hoje}>
+            <Button variant="outline" size="chrome" onClick={() => irPara(hoje)} disabled={dias.includes(hoje)}>
               Hoje
             </Button>
-            <span className="ml-2 text-apoio font-medium" data-agenda="periodo">
-              {titulo}
-            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Tabs value={vista} onValueChange={(v) => setVista(v as Vista)}>
-              <TabsList variant="painel" className="bg-canvas" aria-label="Vista">
-                <TabsTrigger value="dia" variant="painel">Dia</TabsTrigger>
-                <TabsTrigger value="semana" variant="painel">Semana</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <Tabs value={status} onValueChange={(v) => setStatus(v as Status)}>
-              <TabsList variant="painel" className="bg-canvas" aria-label="Situação">
-                <TabsTrigger value="confirmado" variant="painel" data-agenda="aba">Marcados</TabsTrigger>
-                <TabsTrigger value="cancelado" variant="painel" data-agenda="aba">Cancelados</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+          <span className="ml-1 truncate text-apoio font-medium first-letter:uppercase" data-agenda="mes">
+            {mesAnoDoDia(somarDias(semana, 3))}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!p.readOnly && (
+            <>
+              <Button size="control" onClick={() => setMarcar(true)} disabled={p.servicos.length === 0}>
+                <CalendarPlus size={14} />
+                Marcar horário
+              </Button>
+              <Button variant="outline" size="control" onClick={() => setBloquear(true)}>
+                <Ban size={14} />
+                <span className="max-sm:hidden">Bloquear</span>
+              </Button>
+            </>
+          )}
+          {p.dono && (
+            <Button variant="outline" size="icon-control" aria-label="Configurações da agenda" asChild>
+              <Link href={p.hrefConfig}>
+                <Settings2 size={15} />
+              </Link>
+            </Button>
+          )}
         </div>
       </header>
 
-      {grupos.length === 0 && !carregando ? (
-        <EstadoVazio
-          icone={CalendarDays}
-          titulo={status === "confirmado" ? "Nenhum horário neste período" : "Nenhum cancelamento neste período"}
-          texto={
-            status === "confirmado"
-              ? "Quando a IA ou o time marcar um horário, ele aparece aqui."
-              : "Horários cancelados pelo contato ou pelo time aparecem aqui."
-          }
-          tamanho="detalhe"
-        />
-      ) : (
-        <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-          <div className="px-6 pb-6 max-md:px-4">
-            {grupos.map(([d, g]) => (
-              <section key={d} data-agenda="dia" className="pt-4">
-                <h2 className="mb-2 text-rotulo uppercase text-ink-3">{rotuloDoDia(d, hoje)}</h2>
-                <ul className="divide-y divide-line rounded-xl border border-line">
-                  {mesclar(g.linhas, g.bloqueios).map((x) =>
-                    "phone" in x ? (
-                      <Linha
-                        key={`a${x.id}`}
-                        l={x}
-                        passou={x.fim <= p.agora}
-                        readOnly={!!p.readOnly}
-                        onRemarcar={() => setRemarcar(x)}
-                        onCancelar={() => setCancelar(x)}
-                        onLembrete={() => setLembrete(x)}
-                      />
-                    ) : (
-                      <LinhaBloqueio
-                        key={`b${x.id}`}
-                        b={x}
-                        readOnly={!!p.readOnly}
-                        onDesbloquear={async () => {
-                          const r = await p.fonte.desbloquear(x.id);
-                          if (r.ok) setBloqueios((bs) => bs.filter((y) => y.id !== x.id));
-                        }}
-                      />
-                    )
-                  )}
-                </ul>
-              </section>
-            ))}
-            {temMais && <div ref={(el) => { fimRef.current = el; }} className="h-8" aria-hidden />}
-          </div>
-        </AreaRolavel>
-      )}
+      <div className="flex min-h-0 flex-1">
+        <aside className="w-[244px] shrink-0 border-r border-line p-4 max-lg:hidden" data-agenda="lateral">
+          <MiniCalendario hoje={hoje} semana={semana} onEscolher={irPara} />
+        </aside>
 
-      <DialogoMarcar
-        aberto={marcar}
-        onFechar={() => setMarcar(false)}
-        fonte={p.fonte}
-        servicos={servicos}
-        hoje={hoje}
-        onFeito={depoisDeAgir}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Celular: um dia por vez, escolhido na faixa da semana. */}
+          <div className="grid shrink-0 grid-cols-7 gap-1 border-b border-line px-2 py-2 md:hidden" data-agenda="faixa-dias">
+            {dias.map((d, i) => (
+              <Button
+                key={d}
+                variant="alternavel"
+                size="none"
+                aria-pressed={diaCelular === d}
+                onClick={() => setDiaCelular(d)}
+                className="flex h-12 flex-col items-center justify-center rounded-lg text-legenda"
+              >
+                <span className="uppercase">{CHAVES_DA_SEMANA[i]}</span>
+                <span className={cn("text-apoio font-semibold", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
+              </Button>
+            ))}
+          </div>
+
+          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] border-b border-line max-md:hidden" data-agenda="cabecalho-dias">
+            <span />
+            {dias.map((d, i) => (
+              <div
+                key={d}
+                data-agenda="cabecalho-dia"
+                data-hoje={d === hoje ? "sim" : undefined}
+                className={cn("flex items-center justify-center gap-1.5 border-l border-line py-2", d === hoje && "bg-brand-surface")}
+              >
+                <span className={cn("text-legenda uppercase", d === hoje ? "text-brand-ink" : "text-ink-3")}>
+                  {CHAVES_DA_SEMANA[i]}
+                </span>
+                <span className={cn("text-apoio font-semibold tabular-nums", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
+                {contagem(d) > 0 && (
+                  <span className="rounded-md bg-[var(--chip-bg)] px-1.5 text-legenda tabular-nums text-ink-2" data-agenda="contador">
+                    {contagem(d)}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <AreaRolavel className="min-h-0 flex-1" data-agenda="grade">
+            <div
+              className="relative grid grid-cols-[52px_repeat(7,minmax(0,1fr))] max-md:grid-cols-[44px_minmax(0,1fr)]"
+              style={{ height: (horaAte - horaDe) * HORA_PX }}
+            >
+              <div className="relative">
+                {Array.from({ length: horaAte - horaDe }, (_, i) => (
+                  <span
+                    key={i}
+                    className="absolute right-2 -translate-y-1/2 text-legenda tabular-nums text-ink-3"
+                    style={{ top: i * HORA_PX }}
+                  >
+                    {i === 0 ? "" : `${horaDe + i}h`}
+                  </span>
+                ))}
+              </div>
+              {dias.map((d) => (
+                <ColunaDoDia
+                  key={d}
+                  dia={d}
+                  hoje={hoje}
+                  agora={p.agora}
+                  horaDe={horaDe}
+                  hours={p.hours}
+                  itens={itens.filter((l) => diaIsoSP(l.inicio) === d)}
+                  bloqueios={bloqueios.filter((b) => diaIsoSP(b.inicio) === d)}
+                  escondidaNoCelular={d !== diaCelular}
+                  onAbrir={setDetalhe}
+                />
+              ))}
+            </div>
+          </AreaRolavel>
+        </div>
+      </div>
+
+      <DetalheDoHorario
+        linha={detalhe}
+        agora={p.agora}
+        readOnly={!!p.readOnly}
+        onFechar={() => setDetalhe(null)}
+        onRemarcar={(l) => {
+          setDetalhe(null);
+          setRemarcar(l);
+        }}
+        onCancelar={(l) => {
+          setDetalhe(null);
+          setCancelar(l);
+        }}
       />
-      <DialogoRemarcar linha={remarcar} onFechar={() => setRemarcar(null)} fonte={p.fonte} hoje={hoje} onFeito={depoisDeAgir} />
-      <DialogoBloquear aberto={bloquear} onFechar={() => setBloquear(false)} fonte={p.fonte} hoje={hoje} onFeito={depoisDeAgir} />
+      <DialogoMarcar aberto={marcar} onFechar={() => setMarcar(false)} fonte={p.fonte} servicos={p.servicos} hoje={hoje} onFeito={recarregar} />
+      <DialogoRemarcar linha={remarcar} onFechar={() => setRemarcar(null)} fonte={p.fonte} hoje={hoje} onFeito={recarregar} />
+      <DialogoBloquear aberto={bloquear} onFechar={() => setBloquear(false)} fonte={p.fonte} hoje={hoje} onFeito={recarregar} />
       <Dialog open={!!cancelar} onOpenChange={(v) => !v && setCancelar(null)}>
         <DialogContent tamanho="confirmacao" data-agenda="cancelar">
           {cancelar && (
@@ -323,7 +318,7 @@ export default function Agenda(p: PropsAgenda) {
                 const r = await p.fonte.cancelar(cancelar.id);
                 if (r.ok) {
                   setCancelar(null);
-                  depoisDeAgir();
+                  void recarregar();
                 }
                 return r;
               }}
@@ -331,125 +326,256 @@ export default function Agenda(p: PropsAgenda) {
           )}
         </DialogContent>
       </Dialog>
-      <Dialog open={!!lembrete} onOpenChange={(v) => !v && setLembrete(null)}>
-        <DialogContent tamanho="confirmacao" className="max-w-md" data-agenda="lembrete">
-          {lembrete && <Lembrete l={lembrete} empresa={p.empresa} agora={p.agora} />}
-        </DialogContent>
-      </Dialog>
-      {p.dono && (
-        <SheetConfigurar
-          aberto={configurar}
-          onFechar={() => setConfigurar(false)}
-          fonte={p.fonte}
-          config={config}
-          servicos={servicos}
-          onSalvo={(c, s) => {
-            setConfig(c);
-            setServicos(s);
-          }}
-        />
-      )}
     </Card>
   );
 }
 
-function mesclar(linhas: LinhaAgenda[], bloqueios: BloqueioAgenda[]): (LinhaAgenda | BloqueioAgenda)[] {
-  return [...linhas, ...bloqueios].sort((a, b) => a.inicio - b.inicio);
-}
-
-function Linha({
-  l,
-  passou,
-  readOnly,
-  onRemarcar,
-  onCancelar,
-  onLembrete,
+function ColunaDoDia({
+  dia,
+  hoje,
+  agora,
+  horaDe,
+  hours,
+  itens,
+  bloqueios,
+  escondidaNoCelular,
+  onAbrir,
 }: {
-  l: LinhaAgenda;
-  passou: boolean;
-  readOnly: boolean;
-  onRemarcar: () => void;
-  onCancelar: () => void;
-  onLembrete: () => void;
+  dia: string;
+  hoje: string;
+  agora: number;
+  horaDe: number;
+  hours: BusinessHours | null;
+  itens: LinhaAgenda[];
+  bloqueios: BloqueioAgenda[];
+  escondidaNoCelular: boolean;
+  onAbrir: (l: LinhaAgenda) => void;
 }) {
-  const cancelado = l.status === "cancelado";
-  const nome = l.nome || prettyPhone(l.phone);
+  const base = inicioDoDia(dia) + horaDe * 3_600_000;
+  const topo = (t: number) => ((t - base) / 60_000 / 60) * HORA_PX;
+  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * HORA_PX - 2);
+  const exp = hours ? expedienteDoDia(dia, hours) : null;
   return (
-    <li data-agenda="linha" data-situacao={l.status} className="flex items-center gap-3 px-3 py-2.5 max-sm:flex-wrap">
-      <p className={passou || cancelado ? "w-[104px] shrink-0 text-apoio tabular-nums text-ink-3 max-sm:w-auto" : "w-[104px] shrink-0 text-apoio font-semibold tabular-nums max-sm:w-auto"}>
-        {faixaHoraria(l.inicio, l.fim)}
-      </p>
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 max-sm:order-last max-sm:basis-full">
-        <AvatarContato phone={l.phone} name={l.nome} size="sm" />
-        <div className="min-w-0">
-          <p className="truncate text-apoio font-medium">{nome}</p>
-          <p className="flex items-center gap-1 truncate text-legenda text-ink-3">
-            {l.origem === "ia" ? <Sparkles size={12} /> : <UserRound size={12} />}
-            {l.servicoNome}, {l.origem === "ia" ? "marcado pela IA" : "marcado pelo time"}
-          </p>
+    <div
+      data-agenda="coluna"
+      data-dia={dia}
+      className={cn(
+        "relative border-l border-line bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_55px,var(--line-soft)_55px,var(--line-soft)_56px)]",
+        dia === hoje && "bg-brand-surface/40",
+        escondidaNoCelular && "max-md:hidden"
+      )}
+    >
+      {/* Fora do expediente fica apagado: o time ainda marca ali, a IA não. */}
+      {!exp && <div className="absolute inset-0 bg-[var(--chip-bg)] opacity-60" aria-hidden />}
+      {exp && topo(exp.inicio) > 0 && (
+        <div className="absolute inset-x-0 top-0 bg-[var(--chip-bg)] opacity-60" style={{ height: topo(exp.inicio) }} aria-hidden />
+      )}
+      {exp && (
+        <div className="absolute inset-x-0 bottom-0 bg-[var(--chip-bg)] opacity-60" style={{ top: topo(exp.fim) }} aria-hidden />
+      )}
+
+      {bloqueios.map((b) => (
+        <div
+          key={`b${b.id}`}
+          data-agenda="bloqueio"
+          className="absolute inset-x-1 overflow-hidden rounded-md border border-dashed border-line-strong bg-bloco px-1.5 py-1 text-legenda text-ink-3"
+          style={{ top: topo(b.inicio), height: altura(b.inicio, b.fim) }}
+        >
+          <span className="flex items-center gap-1 truncate">
+            <Ban size={11} className="shrink-0" />
+            {b.motivo || "Bloqueado"}
+          </span>
         </div>
-      </div>
-      <div className="flex items-center gap-1.5 max-sm:ml-auto">
-        {cancelado ? (
-          <Badge variant="estado-neutro">{l.canceladoPor === "cliente" ? "Cancelado pelo contato" : "Cancelado pelo time"}</Badge>
-        ) : passou ? (
-          <Badge variant="estado-neutro">Já passou</Badge>
-        ) : (
-          <Badge variant="estado-bom">Confirmado</Badge>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-control" aria-label={`Ações do horário de ${nome}`}>
-              <Ellipsis size={16} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem asChild>
-              <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>
-                <MessagesSquare size={14} />
-                Abrir conversa
-              </Link>
-            </DropdownMenuItem>
-            {!cancelado && !passou && (
-              <DropdownMenuItem onSelect={onLembrete}>
-                <Copy size={14} />
-                Lembrete
-              </DropdownMenuItem>
+      ))}
+
+      {itens.map((l) => {
+        const passou = l.fim <= agora;
+        return (
+          <Button
+            key={l.id}
+            variant="nu"
+            size="none"
+            data-agenda="cartao"
+            data-situacao={l.status}
+            onClick={() => onAbrir(l)}
+            className={cn(
+              "absolute inset-x-1 z-10 flex-col items-start overflow-hidden rounded-md border border-line bg-raised py-1 pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
+              passou && "opacity-60"
             )}
-            {!cancelado && !passou && !readOnly && (
-              <>
-                <DropdownMenuItem onSelect={onRemarcar}>
-                  <Repeat size={14} />
-                  Remarcar
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="perigo" onSelect={onCancelar}>
-                  <CalendarX2 size={14} />
-                  Cancelar horário
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </li>
+            style={{ top: topo(l.inicio), height: altura(l.inicio, l.fim) }}
+          >
+            <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
+            <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">
+              {l.origem === "ia" && <Sparkles size={11} className="shrink-0 text-brand-ink" aria-label="Marcado pela IA" />}
+              <span className="truncate">{l.nome || prettyPhone(l.phone)}</span>
+            </span>
+            <span className="w-full truncate text-legenda tabular-nums text-ink-3">
+              {hhmm(l.inicio)} {l.servicoNome}
+            </span>
+          </Button>
+        );
+      })}
+
+      {dia === hoje && agora >= base && (
+        <div className="pointer-events-none absolute inset-x-0 z-20 flex items-center" style={{ top: topo(agora) }} data-agenda="agora">
+          <span className="-ml-1 size-2 rounded-full bg-brand" />
+          <span className="h-px flex-1 bg-brand" />
+        </div>
+      )}
+    </div>
   );
 }
 
-function LinhaBloqueio({ b, readOnly, onDesbloquear }: { b: BloqueioAgenda; readOnly: boolean; onDesbloquear: () => void }) {
+function MiniCalendario({ hoje, semana, onEscolher }: { hoje: string; semana: string; onEscolher: (d: string) => void }) {
+  const [mes, setMes] = useState(semana.slice(0, 7));
+  const [semanaVista, setSemanaVista] = useState(semana);
+  if (semana !== semanaVista) {
+    setSemanaVista(semana);
+    setMes(somarDias(semana, 3).slice(0, 7));
+  }
+  const primeiro = `${mes}-01`;
+  const inicio = segundaDaSemana(primeiro);
+  const semanas = Array.from({ length: 6 }, (_, w) => Array.from({ length: 7 }, (_, d) => somarDias(inicio, w * 7 + d)));
+  const visiveis = semanas.filter((s) => s.some((d) => d.slice(0, 7) === mes));
+  const trocar = (n: number) => {
+    const [a, m] = mes.split("-").map(Number);
+    const d = new Date(Date.UTC(a, m - 1 + n, 1));
+    setMes(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  };
   return (
-    <li data-agenda="bloqueio" className="flex items-center gap-3 bg-bloco px-3 py-2.5 max-sm:flex-wrap">
-      <p className="w-[104px] shrink-0 text-apoio max-sm:w-auto tabular-nums text-ink-3">{faixaHoraria(b.inicio, b.fim)}</p>
-      <p className="flex min-w-0 flex-1 items-center gap-2 text-apoio text-ink-2">
-        <Ban size={14} className="shrink-0 text-ink-3" />
-        Bloqueado{b.motivo ? `: ${b.motivo}` : ""}
-      </p>
-      {!readOnly && (
-        <Button variant="danger-ghost" size="control" onClick={onDesbloquear}>
-          Desbloquear
-        </Button>
-      )}
-    </li>
+    <div data-agenda="minicalendario">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-apoio font-semibold first-letter:uppercase">{mesAnoDoDia(primeiro)}</span>
+        <div className="flex">
+          <Button variant="ghost" size="icon-chrome" aria-label="Mês anterior" onClick={() => trocar(-1)}>
+            <ChevronLeft size={14} />
+          </Button>
+          <Button variant="ghost" size="icon-chrome" aria-label="Próximo mês" onClick={() => trocar(1)}>
+            <ChevronRight size={14} />
+          </Button>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 text-center text-legenda text-ink-3">
+        {CHAVES_DA_SEMANA.map((c) => (
+          <span key={c} className="py-1">{DAY_LABEL[c].charAt(0).toUpperCase()}</span>
+        ))}
+      </div>
+      <div className="space-y-0.5">
+        {visiveis.map((s) => {
+          const exibida = s[0] === semana;
+          return (
+            <div
+              key={s[0]}
+              data-agenda="mini-semana"
+              data-exibida={exibida ? "sim" : undefined}
+              className={cn("grid grid-cols-7 rounded-lg", exibida && "bg-brand-surface")}
+            >
+              {s.map((d) => (
+                <Button
+                  key={d}
+                  variant="nu"
+                  size="none"
+                  onClick={() => onEscolher(d)}
+                  aria-label={`Ir para a semana de ${d.slice(8)}/${d.slice(5, 7)}`}
+                  className={cn(
+                    "mx-auto flex size-7 items-center justify-center rounded-full text-legenda tabular-nums hover:bg-[var(--active-bg)]",
+                    d.slice(0, 7) !== mes && "text-ink-3",
+                    exibida && "text-brand-ink",
+                    d === hoje && "bg-primary font-semibold text-primary-foreground hover:bg-primary"
+                  )}
+                >
+                  {Number(d.slice(8))}
+                </Button>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function DetalheDoHorario({
+  linha,
+  agora,
+  readOnly,
+  onFechar,
+  onRemarcar,
+  onCancelar,
+}: {
+  linha: LinhaAgenda | null;
+  agora: number;
+  readOnly: boolean;
+  onFechar: () => void;
+  onRemarcar: (l: LinhaAgenda) => void;
+  onCancelar: (l: LinhaAgenda) => void;
+}) {
+  const l = linha;
+  const passou = !!l && l.fim <= agora;
+  return (
+    <Sheet open={!!l} onOpenChange={(v) => !v && onFechar()}>
+      <SheetContent data-agenda="detalhe">
+        {l && (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center gap-3 border-b border-line px-6 py-4">
+              <AvatarContato phone={l.phone} name={l.nome} size="lg" />
+              <div className="min-w-0">
+                <SheetTitle className="truncate">{l.nome || prettyPhone(l.phone)}</SheetTitle>
+                <SheetDescription className="text-apoio text-ink-3">{l.servicoNome}</SheetDescription>
+              </div>
+            </div>
+            <AreaRolavel className="min-h-0 flex-1">
+              <dl className="space-y-4 px-6 py-5 text-apoio">
+                <Item icone={Clock} rotulo="Horário">
+                  {quandoFalado(l.inicio, agora).replace(/^./, (c) => c.toUpperCase())}, {faixaHoraria(l.inicio, l.fim)}
+                </Item>
+                <Item icone={Phone} rotulo="Telefone">{prettyPhone(l.phone)}</Item>
+                <Item icone={l.origem === "ia" ? Sparkles : UserRound} rotulo="Marcado por">
+                  {l.origem === "ia" ? "IA, na conversa" : "Time, pela agenda"}
+                </Item>
+                <Item icone={MessagesSquare} rotulo="Do que se trata">
+                  {l.resumo || <span className="text-ink-3">Sem descrição.</span>}
+                </Item>
+                <Item icone={l.lembreteEm ? Bell : BellOff} rotulo="Lembrete">
+                  {l.lembreteEm
+                    ? `Automático, ${quandoFalado(l.lembreteEm, agora)}`
+                    : "Sem lembrete (desligado ou marcado com menos de 24h)."}
+                </Item>
+              </dl>
+            </AreaRolavel>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-6 py-3">
+              <Button variant="outline" size="field" className="px-4" asChild>
+                <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>Abrir conversa</Link>
+              </Button>
+              {!readOnly && !passou && (
+                <>
+                  <Button variant="outline" size="field" className="px-4" onClick={() => onRemarcar(l)}>
+                    <Repeat size={14} />
+                    Remarcar
+                  </Button>
+                  <Button variant="danger" size="field" className="px-4" onClick={() => onCancelar(l)}>
+                    <CalendarX2 size={14} />
+                    Cancelar
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function Item({ icone: Icone, rotulo, children }: { icone: typeof Clock; rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3">
+      <Icone size={16} className="mt-0.5 shrink-0 text-ink-3" />
+      <div className="min-w-0">
+        <dt className="text-rotulo uppercase text-ink-3">{rotulo}</dt>
+        <dd className="mt-0.5 text-ink">{children}</dd>
+      </div>
+    </div>
   );
 }
 
@@ -486,45 +612,13 @@ function ConfirmarCancelar({ l, hoje, onConfirmar }: { l: LinhaAgenda; hoje: str
   );
 }
 
-function Lembrete({ l, empresa, agora }: { l: LinhaAgenda; empresa: string; agora: number }) {
-  const texto = textoDoLembrete({ empresa, servico: l.servicoNome, inicio: l.inicio, agora });
-  const [copiado, setCopiado] = useState(false);
-  return (
-    <>
-      <DialogTitle>Lembrete</DialogTitle>
-      <DialogDescription className="mt-2 mb-3">
-        Copie e mande na conversa. O envio automático ainda não existe.
-      </DialogDescription>
-      <p className="mb-4 rounded-lg border border-line bg-bloco px-3 py-2 text-apoio" data-agenda="texto-lembrete">{texto}</p>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" size="field" className="px-4" asChild>
-          <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>Abrir conversa</Link>
-        </Button>
-        <Button
-          size="field"
-          className="px-4"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(texto);
-              setCopiado(true);
-            } catch {
-              setCopiado(false);
-            }
-          }}
-        >
-          {copiado ? "Copiado" : "Copiar texto"}
-        </Button>
-      </div>
-    </>
-  );
-}
-
-/** Os horários livres de um dia, como botões de escolha. */
+/** Os horários livres de um dia, como botões de escolha (regra do time: sem antecedência). */
 function EscolherHorario({
   fonte,
   servicoId,
   dia,
   ignorar,
+  fora,
   valor,
   onEscolher,
 }: {
@@ -532,17 +626,18 @@ function EscolherHorario({
   servicoId: number | null;
   dia: string;
   ignorar?: number;
+  fora: boolean;
   valor: number | null;
   onEscolher: (t: number) => void;
 }) {
   const [inicios, setInicios] = useState<number[] | null>(null);
   const [chave, setChave] = useState("");
-  const pedida = `${servicoId}|${dia}|${ignorar ?? ""}`;
+  const pedida = `${servicoId}|${dia}|${ignorar ?? ""}|${fora}`;
   useEffect(() => {
     if (servicoId === null || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) return;
     let vivo = true;
     fonte
-      .horarios(servicoId, dia, ignorar)
+      .horarios(servicoId, dia, ignorar, fora)
       .then((hs) => {
         if (!vivo) return;
         setInicios(hs);
@@ -552,18 +647,29 @@ function EscolherHorario({
     return () => {
       vivo = false;
     };
-  }, [fonte, servicoId, dia, ignorar, pedida]);
+  }, [fonte, servicoId, dia, ignorar, fora, pedida]);
   if (servicoId === null) return null;
   if (inicios === null || chave !== pedida) return <p className="text-legenda text-ink-3">Buscando horários livres...</p>;
   if (inicios.length === 0) return <p className="text-legenda text-ink-3">Nenhum horário livre neste dia.</p>;
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Horários livres" data-agenda="horarios">
-      {inicios.map((t) => (
-        <Button key={t} variant="alternavel" size="chip" aria-pressed={valor === t} onClick={() => onEscolher(t)}>
-          {hhmm(t)}
-        </Button>
-      ))}
-    </div>
+    <AreaRolavel className="max-h-40">
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Horários livres" data-agenda="horarios">
+        {inicios.map((t) => (
+          <Button key={t} variant="alternavel" size="chip" aria-pressed={valor === t} onClick={() => onEscolher(t)}>
+            {hhmm(t)}
+          </Button>
+        ))}
+      </div>
+    </AreaRolavel>
+  );
+}
+
+function ForaDoExpediente({ valor, onMudar }: { valor: boolean; onMudar: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-apoio">
+      <Checkbox checked={valor} onCheckedChange={(v) => onMudar(v === true)} />
+      Mostrar horários fora do expediente
+    </label>
   );
 }
 
@@ -584,8 +690,10 @@ function DialogoMarcar({
 }) {
   const [phone, setPhone] = useState("");
   const [nome, setNome] = useState("");
-  const [servicoId, setServicoId] = useState<number | null>(servicos[0]?.id ?? null);
+  const [resumo, setResumo] = useState("");
+  const [servicoId, setServicoId] = useState<number | null>(null);
   const [dia, setDia] = useState(hoje);
+  const [fora, setFora] = useState(false);
   const [inicio, setInicio] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -609,7 +717,9 @@ function DialogoMarcar({
             </Select>
             <Input type="date" value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Dia" />
           </div>
-          <EscolherHorario fonte={fonte} servicoId={servicoAtual} dia={dia} valor={inicio} onEscolher={setInicio} />
+          <ForaDoExpediente valor={fora} onMudar={(v) => { setFora(v); setInicio(null); }} />
+          <EscolherHorario fonte={fonte} servicoId={servicoAtual} dia={dia} fora={fora} valor={inicio} onEscolher={setInicio} />
+          <Textarea value={resumo} onChange={(e) => setResumo(e.target.value)} rows={2} placeholder="Do que se trata (opcional)" aria-label="Do que se trata" maxLength={500} />
         </div>
         {erro && <p className="mt-3 text-apoio text-danger-ink" role="alert">{erro}</p>}
         <div className="mt-5 flex justify-end gap-2">
@@ -624,10 +734,10 @@ function DialogoMarcar({
             onClick={async () => {
               if (servicoAtual === null || inicio === null) return;
               setEnviando(true);
-              const r = await fonte.marcar({ phone: phone.replace(/\D/g, ""), nome, servicoId: servicoAtual, inicio });
+              const r = await fonte.marcar({ phone: phone.replace(/\D/g, ""), nome, servicoId: servicoAtual, inicio, resumo });
               setEnviando(false);
               if (!r.ok) return setErro(r.erro);
-              setPhone(""); setNome(""); setInicio(null); setErro(null);
+              setPhone(""); setNome(""); setResumo(""); setInicio(null); setErro(null);
               onFechar();
               onFeito();
             }}
@@ -642,6 +752,7 @@ function DialogoMarcar({
 
 function DialogoRemarcar({ linha, onFechar, fonte, hoje, onFeito }: { linha: LinhaAgenda | null; onFechar: () => void; fonte: FonteAgenda; hoje: string; onFeito: () => void }) {
   const [dia, setDia] = useState(hoje);
+  const [fora, setFora] = useState(false);
   const [inicio, setInicio] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -665,7 +776,8 @@ function DialogoRemarcar({ linha, onFechar, fonte, hoje, onFeito }: { linha: Lin
             </DialogDescription>
             <div className="space-y-3">
               <Input type="date" value={dia} min={hoje} onChange={(e) => { setDia(e.target.value); setInicio(null); }} aria-label="Novo dia" />
-              <EscolherHorario fonte={fonte} servicoId={linha.servicoId ?? -1} dia={dia} ignorar={linha.id} valor={inicio} onEscolher={setInicio} />
+              <ForaDoExpediente valor={fora} onMudar={(v) => { setFora(v); setInicio(null); }} />
+              <EscolherHorario fonte={fonte} servicoId={linha.servicoId ?? -1} dia={dia} ignorar={linha.id} fora={fora} valor={inicio} onEscolher={setInicio} />
             </div>
             {erro && <p className="mt-3 text-apoio text-danger-ink" role="alert">{erro}</p>}
             <div className="mt-5 flex justify-end gap-2">
@@ -704,7 +816,7 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const minutos = (s: string) => {
+  const min = (s: string) => {
     const [h, m] = s.split(":").map(Number);
     return h * 60 + m;
   };
@@ -733,8 +845,8 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
             disabled={!dia || !de || !ate}
             onClick={async () => {
               const base = inicioDoDia(dia);
-              const inicio = base + minutos(de) * 60_000;
-              const fim = base + minutos(ate) * 60_000;
+              const inicio = base + min(de) * 60_000;
+              const fim = base + min(ate) * 60_000;
               if (fim <= inicio) return setErro("O fim precisa ser depois do início.");
               setEnviando(true);
               const r = await fonte.bloquear({ inicio, fim, motivo });
@@ -750,176 +862,5 @@ function DialogoBloquear({ aberto, onFechar, fonte, hoje, onFeito }: { aberto: b
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-type ServicoEditavel = { id: number | null; chave: string; nome: string; duracaoMin: number };
-
-function SheetConfigurar({
-  aberto,
-  onFechar,
-  fonte,
-  config,
-  servicos,
-  onSalvo,
-}: {
-  aberto: boolean;
-  onFechar: () => void;
-  fonte: FonteAgenda;
-  config: AgendaConfig;
-  servicos: ServicoDaAgenda[];
-  onSalvo: (c: AgendaConfig, s: ServicoDaAgenda[]) => void;
-}) {
-  const [c, setC] = useState(config);
-  const [lista, setLista] = useState<ServicoEditavel[]>([]);
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [abertoVisto, setAbertoVisto] = useState(false);
-  if (aberto !== abertoVisto) {
-    setAbertoVisto(aberto);
-    if (aberto) {
-      setC(config);
-      setLista(servicos.map((s) => ({ id: s.id, chave: `s${s.id}`, nome: s.nome, duracaoMin: s.duracaoMin })));
-      setErro(null);
-    }
-  }
-  const mudar = (p: Partial<AgendaConfig>) => setC((x) => ({ ...x, ...p }));
-  const rotuloMin = (m: number) => (m === 0 ? "Sem mínimo" : m < 60 ? `${m} min` : m === 1440 ? "1 dia" : `${m / 60} h`);
-  return (
-    <Sheet open={aberto} onOpenChange={(v) => !v && onFechar()}>
-      <SheetContent data-agenda="configurar">
-        <div className="flex h-full flex-col">
-          <div className="border-b border-line px-6 py-4">
-            <SheetTitle>Configurar a agenda</SheetTitle>
-            <SheetDescription className="mt-1 text-apoio text-ink-3">
-              Os horários seguem o horário de atendimento do agente. Os valores sugeridos são padrões, mude como preferir.
-            </SheetDescription>
-          </div>
-          <AreaRolavel className="min-h-0 flex-1">
-            <div className="space-y-6 px-6 py-5">
-              <Switch
-                checked={c.ativa}
-                onCheckedChange={(v) => mudar({ ativa: v })}
-                aria-label="A IA marca horários"
-                className="flex w-full items-center justify-between gap-3 text-left"
-                data-agenda="ligar"
-              >
-                <span>
-                  <span className="block text-apoio font-semibold">A IA marca horários</span>
-                  <span className="block text-legenda text-ink-3">Ela oferece os livres e confirma na hora.</span>
-                </span>
-                <SwitchTrack checked={c.ativa}>
-                  <SwitchThumb checked={c.ativa} />
-                </SwitchTrack>
-              </Switch>
-
-              <div>
-                <p className="mb-2 text-rotulo uppercase text-ink-3">Serviços e duração</p>
-                <div className="divide-y divide-line rounded-xl border border-line">
-                  {lista.length === 0 && <p className="px-3 py-2.5 text-legenda text-ink-3">Nenhum serviço ainda.</p>}
-                  {lista.map((s, i) => (
-                    <div key={s.chave} className="flex items-center gap-2 px-3 py-2" data-agenda="servico">
-                      <Input
-                        variant="sutil"
-                        value={s.nome}
-                        onChange={(e) => setLista((l) => l.map((x, j) => (j === i ? { ...x, nome: e.target.value } : x)))}
-                        aria-label={`Nome do serviço ${i + 1}`}
-                        className="min-w-0 flex-1"
-                        maxLength={80}
-                      />
-                      <Select
-                        value={String(s.duracaoMin)}
-                        onValueChange={(v) => setLista((l) => l.map((x, j) => (j === i ? { ...x, duracaoMin: Number(v) } : x)))}
-                      >
-                        <SelectTrigger aria-label={`Duração do serviço ${i + 1}`} className="w-[96px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {OPCOES_DA_AGENDA.duracaoMin.map((m) => (
-                            <SelectItem key={m} value={String(m)}>{m} min</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button variant="danger-ghost" size="icon-control" aria-label={`Remover serviço ${i + 1}`} onClick={() => setLista((l) => l.filter((_, j) => j !== i))}>
-                        <Trash2 size={14} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  variant="link"
-                  size="link"
-                  className="mt-2"
-                  onClick={() => setLista((l) => [...l, { id: null, chave: `n${Date.now()}`, nome: "", duracaoMin: 30 }])}
-                >
-                  <Plus size={14} />
-                  Adicionar serviço
-                </Button>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Escolha rotulo="Antecedência mínima" valor={c.antecedenciaMin} opcoes={OPCOES_DA_AGENDA.antecedenciaMin} texto={rotuloMin} onMudar={(v) => mudar({ antecedenciaMin: v })} />
-                <Escolha rotulo="Até quantos dias à frente" valor={c.diasAFrente} opcoes={OPCOES_DA_AGENDA.diasAFrente} texto={(d) => `${d} dias`} onMudar={(v) => mudar({ diasAFrente: v })} />
-                <Escolha rotulo="Intervalo entre horários" valor={c.intervaloMin} opcoes={OPCOES_DA_AGENDA.intervaloMin} texto={(m) => (m === 0 ? "Sem intervalo" : `${m} min`)} onMudar={(v) => mudar({ intervaloMin: v })} />
-                <Escolha rotulo="Começa de quanto em quanto" valor={c.passoMin} opcoes={OPCOES_DA_AGENDA.passoMin} texto={(m) => `${m} min`} onMudar={(v) => mudar({ passoMin: v })} />
-              </div>
-              <Aviso tom="neutro">
-                Lembrete automático ainda não existe: na lista, &quot;Lembrete&quot; copia um texto pronto para mandar na conversa.
-              </Aviso>
-            </div>
-          </AreaRolavel>
-          <div className="flex items-center justify-end gap-2 border-t border-line px-6 py-3">
-            {erro && <p className="mr-auto text-apoio text-danger-ink" role="alert">{erro}</p>}
-            <Button variant="outline" size="field" className="px-4" onClick={onFechar}>Cancelar</Button>
-            <Button
-              size="field"
-              className="px-4"
-              carregando={enviando}
-              onClick={async () => {
-                const limpos = lista.map((s) => ({ id: s.id, nome: s.nome.trim(), duracaoMin: s.duracaoMin }));
-                if (limpos.some((s) => !s.nome || s.duracaoMin < DURACAO_MIN || s.duracaoMin > DURACAO_MAX)) {
-                  return setErro("Todo serviço precisa de nome.");
-                }
-                if (c.ativa && limpos.length === 0) return setErro("Cadastre um serviço para ligar a agenda.");
-                setEnviando(true);
-                const r = await fonte.salvarConfig(c, limpos);
-                setEnviando(false);
-                if (!r.ok) return setErro(r.erro);
-                onSalvo(r.config, r.servicos);
-                onFechar();
-              }}
-            >
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-function Escolha({
-  rotulo,
-  valor,
-  opcoes,
-  texto,
-  onMudar,
-}: {
-  rotulo: string;
-  valor: number;
-  opcoes: readonly number[];
-  texto: (v: number) => string;
-  onMudar: (v: number) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-apoio font-medium">{rotulo}</p>
-      <Select value={String(valor)} onValueChange={(v) => onMudar(Number(v))}>
-        <SelectTrigger aria-label={rotulo} className="w-full"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          {opcoes.map((o) => (
-            <SelectItem key={o} value={String(o)}>{texto(o)}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
   );
 }

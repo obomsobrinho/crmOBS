@@ -176,26 +176,39 @@ const OUTPUT_SCHEMA = {
         "true SOMENTE quando o cliente trouxe informação nova para o pedido de pedido_aberto (prazo, detalhe, preferência, dado que faltava). Insistir, cobrar, agradecer, confirmar ou repetir o que já está no pedido é false. Com pedido_aberto = 0, false.",
     },
     // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): só vale quando o turno traz
-    // `### HORÁRIOS LIVRES`. Sem a seção, os três campos vazios. Quem marca é o
-    // processTurn (`decidirAgenda`); o n8n ignora.
+    // `### AGENDA`. Sem a seção, todos os campos vazios. Quem consulta e marca é
+    // o processTurn (`decidirAgenda`); o n8n ignora.
     agenda: {
       type: "object",
       properties: {
         acao: {
           type: "string",
-          enum: ["", "marcar", "remarcar", "cancelar"],
-          description: 'Só com a seção HORÁRIOS LIVRES. "" quando não há nada a marcar, remarcar ou cancelar neste turno.',
+          enum: ["", "consultar", "marcar", "remarcar", "cancelar"],
+          description: 'Só com a seção AGENDA. "" quando não há nada a consultar, marcar, remarcar ou cancelar neste turno.',
         },
-        horario: {
+        servico: {
           type: "string",
-          description: 'Código entre colchetes do horário escolhido na seção HORÁRIOS LIVRES (ex.: "S2"), em marcar e remarcar. Vazio no resto.',
+          description: 'Código do serviço da seção AGENDA (ex.: "V1"), quando há mais de um. Vazio no resto.',
+        },
+        dia: {
+          type: "string",
+          description: "Dia em AAAA-MM-DD (pelo CALENDÁRIO), em consultar, marcar e remarcar. Vazio no resto.",
+        },
+        periodo: {
+          type: "string",
+          enum: ["", "manha", "tarde", "noite"],
+          description: "Período pedido pela pessoa, em consultar. Vazio no resto.",
+        },
+        hora: {
+          type: "string",
+          description: "Hora escolhida em HH:MM, entre as que o sistema ofereceu, em marcar e remarcar. Vazio no resto.",
         },
         agendamento: {
           type: "string",
           description: 'Código do agendamento da seção AGENDAMENTOS DESTA PESSOA (ex.: "A1"), em remarcar e cancelar. Vazio no resto.',
         },
       },
-      required: ["acao", "horario", "agendamento"],
+      required: ["acao", "servico", "dia", "periodo", "hora", "agendamento"],
       additionalProperties: false,
     },
   },
@@ -398,11 +411,16 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
 
 function normalizarSaidaDaAgenda(v: unknown): SaidaDaAgenda {
   const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
-  const acao = o.acao === "marcar" || o.acao === "remarcar" || o.acao === "cancelar" ? o.acao : "";
+  const acao =
+    o.acao === "consultar" || o.acao === "marcar" || o.acao === "remarcar" || o.acao === "cancelar" ? o.acao : "";
+  const curto = (x: unknown, n: number) => (typeof x === "string" ? x.trim().slice(0, n) : "");
   return {
     acao,
-    horario: typeof o.horario === "string" ? o.horario.trim().slice(0, 8) : "",
-    agendamento: typeof o.agendamento === "string" ? o.agendamento.trim().slice(0, 8) : "",
+    servico: curto(o.servico, 8),
+    dia: curto(o.dia, 10),
+    periodo: curto(o.periodo, 8),
+    hora: curto(o.hora, 5),
+    agendamento: curto(o.agendamento, 8),
   };
 }
 
