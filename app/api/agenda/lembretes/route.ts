@@ -7,6 +7,7 @@ import { accessState } from "@/lib/billing";
 import { horarioCadastrado } from "@/lib/horarios";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 import { nomeDoContato } from "@/lib/inbox";
+import { LEMBRETE } from "@/lib/mensagem";
 
 // LEMBRETE DA AGENDA (decisões do dono, 28/10/2026): UMA execução por dia, às
 // 9h de São Paulo, pelo Vercel Cron (`vercel.json`, "0 12 * * *" em UTC; no
@@ -49,6 +50,7 @@ interface Item {
   nome?: string | null;
 }
 interface Fila {
+  clientId: string;
   empresa: string;
   instancia: string | null;
   avisos: string | null;
@@ -102,7 +104,7 @@ export async function GET(req: Request) {
       }
       if (itens.length === 0) continue;
       resumo.empresas++;
-      filas.push({ empresa: e.name, instancia: e.evolution_instance, avisos: e.notify_group_jid, itens });
+      filas.push({ clientId: e.id, empresa: e.name, instancia: e.evolution_instance, avisos: e.notify_group_jid, itens });
     }
     if (empresas.length < LOTE_DE_EMPRESAS) break;
   }
@@ -214,15 +216,17 @@ async function andarFila(
       .is("lembrete_enviado_em", null)
       .select("id");
     if (!meu || meu.length === 0) continue;
-    const res = await enviarMensagemAtiva({
-      instancia: f.instancia,
-      telefone: h.phone,
-      texto: textoDoLembrete({ nome: h.nome, empresa: f.empresa, servico: h.servico_nome, inicio: Date.parse(h.inicio), agora: Date.now() }),
-      numeroDeAvisos: f.avisos,
-    });
+    const texto = textoDoLembrete({ nome: h.nome, empresa: f.empresa, servico: h.servico_nome, inicio: Date.parse(h.inicio), agora: Date.now() });
+    const res = await enviarMensagemAtiva({ instancia: f.instancia, telefone: h.phone, texto, numeroDeAvisos: f.avisos });
     if (res === "enviado") {
       r.enviados++;
       await svc.from("agendamentos").update({ lembrete_falhou_em: null }).eq("id", h.id);
+      // Na conversa do contato: o time vê (rótulo "Lembrete automático") e a IA tem
+      // no histórico. `lembrete` não é resposta da IA nem do time (lib/mensagem.ts).
+      const { error: gErr } = await svc
+        .from("chat_messages")
+        .insert({ client_id: f.clientId, phone: h.phone, bot_message: texto, message_type: LEMBRETE });
+      if (gErr) console.error("lembretes: enviado, mas não gravado na conversa:", gErr.message);
     } else if (res === "recusado") {
       r.recusados++;
       // Não saiu: devolve e marca a falha (alerta na central; nova tentativa amanhã).

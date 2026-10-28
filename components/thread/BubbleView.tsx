@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, CheckCheck, User } from "lucide-react";
+import { Bell, Bot, CheckCheck, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/format";
 import type { Bubble } from "@/lib/types";
@@ -63,6 +63,7 @@ export function BubbleView({ b, showLabel }: { b: Bubble; showLabel: boolean }) 
       <div
         data-slot="conversa-balao"
         data-autor={failed ? "falha" : b.author}
+        data-lembrete={b.lembrete ? "sim" : undefined}
         className={cn(
           // 620px é a largura medida no desenho, e ela é ABSOLUTA e não
           // percentual: o que limita linha de texto é o número de caracteres
@@ -80,7 +81,7 @@ export function BubbleView({ b, showLabel }: { b: Bubble; showLabel: boolean }) 
           b.status === "pending" && "opacity-60",
         )}
       >
-        {b.author !== "cliente" && showLabel && (
+        {b.author !== "cliente" && (showLabel || b.lembrete) && (
           // A autoria dentro do balão, no papel `rotulo` (12px, caixa alta), na
           // mesma tinta da hora. Era 12px em peso 600 com `opacity-70`, e
           // opacidade sobre fundo colorido é tinta que ninguém escolheu.
@@ -90,8 +91,9 @@ export function BubbleView({ b, showLabel }: { b: Bubble; showLabel: boolean }) 
               pele.hora,
             )}
           >
-            {b.author === "ia" ? <Bot size={12} /> : <User size={12} />}
-            {b.author === "ia" ? "IA" : "Você"}
+            {/* O lembrete automático da agenda tem rótulo próprio: não foi a IA nem o time. */}
+            {b.lembrete ? <Bell size={12} /> : b.author === "ia" ? <Bot size={12} /> : <User size={12} />}
+            {b.lembrete ? "Lembrete automático" : b.author === "ia" ? "IA" : "Você"}
           </span>
         )}
         {b.mediaUrl && <MediaView url={b.mediaUrl} type={b.mediaType ?? null} />}

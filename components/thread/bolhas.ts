@@ -1,5 +1,6 @@
-import { ehManual, respostaHumana } from "@/lib/mensagem";
-import { FUSO, formatTime } from "@/lib/format";
+import { ehLembrete, ehManual, respostaHumana } from "@/lib/mensagem";
+import { formatTime } from "@/lib/format";
+import { dataLongaSP } from "@/lib/fuso";
 import { diaSP } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
 import type { Handoff } from "../HandoffCard";
@@ -54,12 +55,13 @@ export function rowsToBubbles(rows: ChatRow[]): Bubble[] {
       // renderizamos como balões separados. Só a IA é dividida (o envio manual do
       // CRM é uma mensagem única e pode conter " | " de propósito).
       const parts =
-        author === "ia" ? r.bot_message.split(" | ") : [r.bot_message];
+        author === "ia" && !ehLembrete(r.message_type) ? r.bot_message.split(" | ") : [r.bot_message];
       parts.forEach((content, i) =>
         bubbles.push({
           key: `b${r.id}-${i}`,
           side: "out",
           author,
+          ...(ehLembrete(r.message_type) ? { lembrete: true } : {}),
           content,
           created_at: r.created_at ?? "",
           // mídia enviada só entra quando a linha não tem mensagem recebida.
@@ -77,12 +79,7 @@ export function dayLabel(iso: string): string {
   const agora = Date.now();
   if (diaSP(t) === diaSP(agora)) return "Hoje";
   if (diaSP(t) === diaSP(agora - 86_400_000)) return "Ontem";
-  return new Date(t).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-    timeZone: FUSO,
-  });
+  return dataLongaSP(iso);
 }
 
 /** A ordem da conversa: chegada no WhatsApp, e o id desempata. */

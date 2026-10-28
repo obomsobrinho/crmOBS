@@ -26,6 +26,8 @@ import {
 import { EMPTY_CONFIG, GOALS, compilePersona, validateConfig, type BusinessHours } from "../lib/agent-prompt";
 import { inicioDoDiaSP } from "../lib/fuso";
 import { feriadoDoDia, feriadosDoAno, pascoa } from "../lib/feriados";
+import { ehLembrete, respostaDaIa, respostaHumana } from "../lib/mensagem";
+import { rowsToBubbles } from "../components/thread/bolhas";
 
 // AGENDA PRÓPRIA (docs/plano-agenda.md): as regras do dono de 28/10/2026, puras
 // e com relógio FIXO. Quarta, 28/10/2026, 08:00 em São Paulo.
@@ -276,4 +278,17 @@ test("texto do lembrete (versão 1 do dono): primeiro nome, serviço, empresa, q
   );
   expect(textoDoLembrete({ nome: null, empresa: "Loja", servico: "Corte", inicio: em("2026-10-29", "10:30"), agora: AGORA })).toMatch(/^Oi! Seu horário de Corte/);
   expect(t).not.toMatch(/[\u2013\u2014]|SAIR/);
+});
+
+test("o lembrete gravado na conversa não é resposta da IA nem do time, e vira balão com rótulo próprio", () => {
+  const lembrete = { bot_message: "Oi, Ana! Seu horário...", message_type: "lembrete" };
+  expect(ehLembrete("lembrete")).toBe(true);
+  expect(respostaDaIa(lembrete)).toBe(false);
+  expect(respostaHumana(lembrete)).toBe(false);
+  expect(respostaDaIa({ bot_message: "oi", message_type: null })).toBe(true);
+  const bolhas = rowsToBubbles([
+    { id: 1, phone: "5511900000000", nomewpp: null, user_message: null, active: null, created_at: "2026-10-28T12:00:00Z", ...lembrete },
+  ]);
+  expect(bolhas).toHaveLength(1);
+  expect(bolhas[0]).toMatchObject({ side: "out", lembrete: true, content: "Oi, Ana! Seu horário..." });
 });
