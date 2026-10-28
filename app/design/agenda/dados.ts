@@ -59,7 +59,7 @@ export function linhas(agora: number): LinhaAgenda[] {
     em(1, "15:00", ajuste, { nome: "Marcos Vieira", phone: "5511977776666" }),
     em(2, "11:00", exame, { nome: "Fernanda Costa", phone: "5511966665555" }),
     em(2, "14:30", retirada, { nome: null, phone: "5511955554444" }),
-    em(4, "09:00", exame, { nome: "Paulo Henrique", phone: "5511911110000" }),
+    em(1, "16:30", exame, { nome: "Paulo Henrique", phone: "5511911110000" }),
   ];
 }
 

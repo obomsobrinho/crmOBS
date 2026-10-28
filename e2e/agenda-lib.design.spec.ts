@@ -134,8 +134,8 @@ test.describe("lib/agenda: lembrete", () => {
   test("24h antes fora do expediente: último momento aberto antes disso", () => {
     // Segunda 9h com domingo fechado: vai no sábado, 30 min antes de fechar.
     expect(momentoDoLembrete({ inicio: em("2026-11-02", "09:00"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-31", "11:30"));
-    // Quinta 7h30 (antes de abrir): quarta, 30 min antes de fechar.
-    expect(momentoDoLembrete({ inicio: em("2026-10-30", "07:30"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-29", "17:30"));
+    // Sexta 7h30 (antes de abrir): 24h antes é quinta 7h30, fechado; vai na quarta, 30 min antes de fechar.
+    expect(momentoDoLembrete({ inicio: em("2026-10-30", "07:30"), marcadoEm: AGORA, hours: HORAS })).toBe(em("2026-10-28", "17:30"));
   });
   test("marcado com menos de 24h: sem lembrete", () => {
     expect(momentoDoLembrete({ inicio: em("2026-10-29", "07:00"), marcadoEm: AGORA, hours: HORAS })).toBeNull();

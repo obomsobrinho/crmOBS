@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  CalendarDays,
   Bot,
   Building2,
   CalendarClock,
@@ -11,6 +12,7 @@ import {
   Store,
   Target,
 } from "lucide-react";
+import Link from "next/link";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
 import AgentBulletList from "@/components/AgentBulletList";
 import KnowledgeManager from "@/components/KnowledgeManager";
@@ -556,6 +558,18 @@ export function CamposOQuePodeFazer({
             );
           })}
         </div>
+      </SubBloco>
+
+      {/* AGENDA PRÓPRIA (28/10/2026): ligar e configurar mora em Configurações da
+          Agenda; aqui só o caminho, porque desligada ela some do menu. */}
+      <SubBloco
+        titulo="Agenda"
+        icone={CalendarDays}
+        descricao="Para quem atende com horário marcado: a IA marca, remarca e cancela pela conversa."
+      >
+        <Button variant="link" size="link" asChild>
+          <Link href={preview ? "/design/agenda/configuracoes" : "/agenda/configuracoes"}>Configurar a agenda</Link>
+        </Button>
       </SubBloco>
 
       {/* AVISOS, SEMPRE VISÍVEL (29/09/2026). Era "Grupo de WhatsApp para

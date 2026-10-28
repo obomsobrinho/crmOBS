@@ -32,6 +32,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { Textarea } from "@/components/ui/textarea";
 import { DAY_LABEL, type BusinessHours } from "@/lib/agent-prompt";
 import {
+  diaFalado,
   expedienteDoDia,
   faixaHoraria,
   hhmm,
@@ -56,7 +57,7 @@ import { cn } from "@/lib/utils";
 // abre o detalhe com remarcar e cancelar. No celular, um dia por vez.
 // Os dados vêm SÓ da `fonte` (banco em `/agenda`, memória em `/design/agenda`).
 
-const HORA_PX = 56;
+const HORA_PX = 80;
 const DIA_MS = 86_400_000;
 const CHAVES_DA_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
@@ -359,8 +360,11 @@ function ColunaDoDia({
     <div
       data-agenda="coluna"
       data-dia={dia}
+      style={{
+        backgroundImage: `repeating-linear-gradient(to bottom, transparent 0, transparent ${HORA_PX - 1}px, var(--line-soft) ${HORA_PX - 1}px, var(--line-soft) ${HORA_PX}px)`,
+      }}
       className={cn(
-        "relative border-l border-line bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_55px,var(--line-soft)_55px,var(--line-soft)_56px)]",
+        "relative border-l border-line",
         dia === hoje && "bg-brand-surface/40",
         escondidaNoCelular && "max-md:hidden"
       )}
@@ -399,7 +403,7 @@ function ColunaDoDia({
             data-situacao={l.status}
             onClick={() => onAbrir(l)}
             className={cn(
-              "absolute inset-x-1 z-10 flex-col items-start overflow-hidden rounded-md border border-line bg-raised py-1 pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
+              "absolute inset-x-1 z-10 flex-col items-start justify-center overflow-hidden rounded-md border border-line bg-raised pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
               passou && "opacity-60"
             )}
             style={{ top: topo(l.inicio), height: altura(l.inicio, l.fim) }}
@@ -407,11 +411,15 @@ function ColunaDoDia({
             <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
             <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">
               {l.origem === "ia" && <Sparkles size={11} className="shrink-0 text-brand-ink" aria-label="Marcado pela IA" />}
+              {/* Cartão baixo (15 min): uma linha só, com a hora na frente. */}
+              {altura(l.inicio, l.fim) < 34 && <span className="shrink-0 tabular-nums text-ink-3">{hhmm(l.inicio)}</span>}
               <span className="truncate">{l.nome || prettyPhone(l.phone)}</span>
             </span>
-            <span className="w-full truncate text-legenda tabular-nums text-ink-3">
-              {hhmm(l.inicio)} {l.servicoNome}
-            </span>
+            {altura(l.inicio, l.fim) >= 34 && (
+              <span className="w-full truncate text-legenda tabular-nums text-ink-3">
+                {hhmm(l.inicio)} {l.servicoNome}
+              </span>
+            )}
           </Button>
         );
       })}
@@ -527,7 +535,7 @@ function DetalheDoHorario({
             <AreaRolavel className="min-h-0 flex-1">
               <dl className="space-y-4 px-6 py-5 text-apoio">
                 <Item icone={Clock} rotulo="Horário">
-                  {quandoFalado(l.inicio, agora).replace(/^./, (c) => c.toUpperCase())}, {faixaHoraria(l.inicio, l.fim)}
+                  {diaFalado(l.inicio, agora).replace(/^./, (c) => c.toUpperCase())}, {faixaHoraria(l.inicio, l.fim)}
                 </Item>
                 <Item icone={Phone} rotulo="Telefone">{prettyPhone(l.phone)}</Item>
                 <Item icone={l.origem === "ia" ? Sparkles : UserRound} rotulo="Marcado por">
