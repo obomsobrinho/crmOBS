@@ -187,14 +187,14 @@ Still open:
 |---|---|---|
 | P5 | The activation item in onboarding (montagem) | not built |
 | H1 | Carnaval and Corpus Christi (optional days, "ponto facultativo") | shown on the settings list, not blocked |
-| L1 | The reminder text (two proposals below) | current fixed text in `textoDoLembrete` until approved |
 | L2 | Vercel function limit | `maxDuration = 300` assumes Fluid Compute (default on new projects); check the project settings, otherwise lower it to 60 and `ORCAMENTO_MS` to 50 s |
 | B1 | The bench (`/api/playground`) reads only whether the agenda is on, not whether it has services and hours | the live turn checks all three |
 
-Reminder text proposals (fixed text, no AI, no "SAIR"), for the owner to pick:
-- Version 1 (active confirmation): "Oi, {nome}! Seu horário de {serviço} na {empresa} está reservado para você {amanhã, quinta, 29/10, às 10h30}. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu remarco por aqui."
-- Version 2 (short, reschedule first): "{nome}, passando para lembrar: {amanhã, quinta, 29/10, às 10h30} você tem {serviço} na {empresa}. Guardamos esse horário só para você. Se não puder vir, me avise por aqui que eu encontro outro horário."
-Both use the contact's name when known (otherwise no name), say the day and time in full, and offer rescheduling instead of cancelling. A "SIM" answer reaches the AI as a normal message; recording a confirmation status is not built.
+Reminder text, chosen by the owner on 28/10/2026 ("Versão 1"; fixed, no AI, no "SAIR"), in
+`textoDoLembrete`: "Oi, {nome}! Seu horário de {serviço} na {empresa} está reservado para você
+{quando}. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu
+remarco por aqui." {nome} is the contact's first name ("Oi!" without a name); {quando} is "amanhã,
+quinta, 29/10, às 10h30". The "SIM" is handled by the confirmation in section 7b.
 
 ## 7. Automatic reminder (owner decision of 28/10/2026, "9h"; built, not turned on)
 

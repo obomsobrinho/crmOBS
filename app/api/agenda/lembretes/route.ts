@@ -6,6 +6,7 @@ import { REGRAS_DO_LEMBRETE, enviarMensagemAtiva, sortearPausa } from "@/lib/env
 import { accessState } from "@/lib/billing";
 import { horarioCadastrado } from "@/lib/horarios";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
+import { nomeDoContato } from "@/lib/inbox";
 
 // LEMBRETE DA AGENDA (decisões do dono, 28/10/2026): UMA execução por dia, às
 // 9h de São Paulo, pelo Vercel Cron (`vercel.json`, "0 12 * * *" em UTC; no
@@ -44,6 +45,8 @@ interface Item {
   phone: string;
   servico_nome: string;
   inicio: string;
+  /** Nome do contato (dados_cliente), para o "Oi, {nome}!" do lembrete. */
+  nome?: string | null;
 }
 interface Fila {
   empresa: string;
@@ -165,7 +168,21 @@ async function pendentesDaEmpresa(
     return null;
   }
   const vistos = new Set<number>();
-  return [...(tentativas.data ?? []), ...(daJanela.data ?? [])].filter((h) => !vistos.has(h.id) && vistos.add(h.id));
+  const itens: Item[] = [...(tentativas.data ?? []), ...(daJanela.data ?? [])].filter(
+    (h) => !vistos.has(h.id) && vistos.add(h.id)
+  );
+  // Os nomes numa leitura só (dados_cliente não tem FK com agendamentos).
+  const fones = [...new Set(itens.map((h) => h.phone))];
+  if (fones.length > 0) {
+    const { data: contatos } = await svc
+      .from("dados_cliente")
+      .select("telefone, display_name, nomewpp")
+      .eq("client_id", clientId)
+      .in("telefone", fones);
+    const nomes = new Map((contatos ?? []).map((c) => [c.telefone, nomeDoContato(c)]));
+    for (const h of itens) h.nome = nomes.get(h.phone) ?? null;
+  }
+  return itens;
 }
 
 /** Manda a fila de UMA empresa, com a pausa aleatória entre as mensagens, até o tempo acabar. */
@@ -200,7 +217,7 @@ async function andarFila(
     const res = await enviarMensagemAtiva({
       instancia: f.instancia,
       telefone: h.phone,
-      texto: textoDoLembrete({ empresa: f.empresa, servico: h.servico_nome, inicio: Date.parse(h.inicio), agora: Date.now() }),
+      texto: textoDoLembrete({ nome: h.nome, empresa: f.empresa, servico: h.servico_nome, inicio: Date.parse(h.inicio), agora: Date.now() }),
       numeroDeAvisos: f.avisos,
     });
     if (res === "enviado") {

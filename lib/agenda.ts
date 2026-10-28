@@ -722,9 +722,15 @@ export function preferenciaDoHorario(servico: string, inicio: number, agora: num
   return `${quandoFalado(inicio, agora)} (${servico}, na agenda)`;
 }
 
-/** O lembrete automático: texto FIXO, sem IA. */
-export function textoDoLembrete(a: { empresa: string; servico: string; inicio: number; agora: number }): string {
-  return `Oi! Passando para lembrar do seu horário na ${a.empresa}: ${quandoFalado(a.inicio, a.agora)} (${a.servico}). Se precisar remarcar, é só responder por aqui.`;
+/**
+ * O lembrete automático: texto FIXO, sem IA (versão 1, escolhida pelo dono em
+ * 28/10/2026: pede o SIM e oferece remarcar). Com o nome do contato, só o
+ * primeiro nome; sem nome, "Oi!".
+ */
+export function textoDoLembrete(a: { nome?: string | null; empresa: string; servico: string; inicio: number; agora: number }): string {
+  const primeiro = (a.nome ?? "").trim().split(/\s+/)[0];
+  const oi = primeiro ? `Oi, ${primeiro}!` : "Oi!";
+  return `${oi} Seu horário de ${a.servico} na ${a.empresa} está reservado para você ${quandoFalado(a.inicio, a.agora)}. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu remarco por aqui.`;
 }
 
 /** O aviso ao time de um cancelamento feito pela IA. */

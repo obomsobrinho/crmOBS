@@ -18,6 +18,7 @@ import {
   resumoDosPeriodos,
   quandoFalado,
   textoDaConsulta,
+  textoDoLembrete,
   validarHorario,
   type AgendaConfig,
   type SaidaDaAgenda,
@@ -266,4 +267,13 @@ test.describe("lib/agenda: confirmação de presença depois do lembrete", () =>
     expect(ok.tipo === "confirmar" && ok.agendamento.id).toBe(9);
     expect(decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "confirmar", agendamento: "A7" } }).tipo).toBe("nada");
   });
+});
+
+test("texto do lembrete (versão 1 do dono): primeiro nome, serviço, empresa, quando, pede o SIM e oferece remarcar", () => {
+  const t = textoDoLembrete({ nome: "Ana Paula", empresa: "Ótica Vision", servico: "Exame de vista", inicio: em("2026-10-29", "10:30"), agora: AGORA });
+  expect(t).toBe(
+    "Oi, Ana! Seu horário de Exame de vista na Ótica Vision está reservado para você amanhã, quinta, 29/10, às 10h30. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu remarco por aqui."
+  );
+  expect(textoDoLembrete({ nome: null, empresa: "Loja", servico: "Corte", inicio: em("2026-10-29", "10:30"), agora: AGORA })).toMatch(/^Oi! Seu horário de Corte/);
+  expect(t).not.toMatch(/[\u2013\u2014]|SAIR/);
 });
