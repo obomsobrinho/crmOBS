@@ -51,7 +51,7 @@ import {
 import { inicioDoDia, type BloqueioAgenda, type ContatoDaBusca, type FonteAgenda, type LinhaAgenda } from "@/lib/agenda-fonte";
 import { useDebounce } from "@/lib/use-debounce";
 import { CampoBusca } from "@/components/ui/campo-busca";
-import { diaIsoSP, mesAnoDoDia, somarDias } from "@/lib/fuso";
+import { diaIsoSP, mesAnoDoDia, somarDias, somarMes } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
 import { minutosAgoraSP } from "@/lib/horarios";
 import { ROTULO_CHAVES, fillDoRotulo } from "@/lib/rotulos";
@@ -534,11 +534,7 @@ function MiniCalendario({ hoje, semana, onEscolher }: { hoje: string; semana: st
   const inicio = segundaDaSemana(primeiro);
   const semanas = Array.from({ length: 6 }, (_, w) => Array.from({ length: 7 }, (_, d) => somarDias(inicio, w * 7 + d)));
   const visiveis = semanas.filter((s) => s.some((d) => d.slice(0, 7) === mes));
-  const trocar = (n: number) => {
-    const [a, m] = mes.split("-").map(Number);
-    const d = new Date(Date.UTC(a, m - 1 + n, 1));
-    setMes(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
-  };
+  const trocar = (n: number) => setMes(somarMes(mes, n));
   return (
     <div data-agenda="minicalendario">
       <div className="mb-2 flex items-center justify-between">

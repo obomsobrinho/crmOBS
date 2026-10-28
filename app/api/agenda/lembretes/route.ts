@@ -88,16 +88,23 @@ export async function GET(req: Request) {
     if (!empresas || empresas.length === 0) break;
     depois = empresas[empresas.length - 1].id;
 
-    for (const e of empresas) {
-      // Desativada, bloqueada, teste vencido ou pagamento atrasado: não manda (dono).
-      const acesso = accessState(e, new Date(t0));
-      if (acesso.blocked || acesso.kind === "carencia") continue;
-      const config = normalizarConfigDaAgenda(e.agenda_config);
-      if (!config.ativa || !config.lembrete) continue;
-      const hours = horarioCadastrado(e.agent_config);
-      const janela = hours ? janelaDoLembrete(hoje, hours) : null;
-      if (!janela) continue;
-      const itens = await pendentesDaEmpresa(svc, e.id, janela, hoje, t0);
+    // As leituras das empresas do lote andam em paralelo (não uma depois da outra).
+    const lidas = await Promise.all(
+      empresas.map(async (e) => {
+        // Desativada, bloqueada, teste vencido ou pagamento atrasado: não manda (dono).
+        const acesso = accessState(e, new Date(t0));
+        if (acesso.blocked || acesso.kind === "carencia") return null;
+        const config = normalizarConfigDaAgenda(e.agenda_config);
+        if (!config.ativa || !config.lembrete) return null;
+        const hours = horarioCadastrado(e.agent_config);
+        const janela = hours ? janelaDoLembrete(hoje, hours) : null;
+        if (!janela) return null;
+        return { e, itens: await pendentesDaEmpresa(svc, e.id, janela, hoje, t0) };
+      })
+    );
+    for (const l of lidas) {
+      if (!l) continue;
+      const { e, itens } = l;
       if (itens === null) {
         resumo.erros++;
         continue;
@@ -211,7 +218,7 @@ async function andarFila(
     // Reivindica antes de enviar: duas execuções nunca mandam o mesmo lembrete.
     const { data: meu } = await svc
       .from("agendamentos")
-      .update({ lembrete_enviado_em: new Date().toISOString() })
+      .update({ lembrete_enviado_em: new Date().toISOString(), lembrete_falhou_em: null })
       .eq("id", h.id)
       .is("lembrete_enviado_em", null)
       .select("id");
@@ -220,7 +227,6 @@ async function andarFila(
     const res = await enviarMensagemAtiva({ instancia: f.instancia, telefone: h.phone, texto, numeroDeAvisos: f.avisos });
     if (res === "enviado") {
       r.enviados++;
-      await svc.from("agendamentos").update({ lembrete_falhou_em: null }).eq("id", h.id);
       // Na conversa do contato: o time vê (rótulo "Lembrete automático") e a IA tem
       // no histórico. `lembrete` não é resposta da IA nem do time (lib/mensagem.ts).
       const { error: gErr } = await svc

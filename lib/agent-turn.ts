@@ -38,6 +38,7 @@ import {
 } from "@/lib/consumo-ia";
 import { semLoteAtual } from "@/lib/mensagem";
 import {
+  SAIDA_DA_AGENDA_VAZIA,
   TEXTO_PEDE_DIA_E_PERIODO,
   blocoDaAgenda,
   decidirAgenda,
@@ -231,7 +232,7 @@ export async function processTurn(
     svc
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, billing_plan, vitalicio_desde, bloqueado_em, desativada_em"
+        "persona, agent_config, agenda_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, billing_plan, vitalicio_desde, bloqueado_em, desativada_em"
       )
       .eq("id", clientId)
       .maybeSingle(),
@@ -408,6 +409,7 @@ export async function processTurn(
     phone,
     agora: agoraMsAgenda,
     hours: horasDoTurno,
+    configGravada: client.agenda_config,
   });
 
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
@@ -587,7 +589,9 @@ export async function processTurn(
   // `decidirAgenda` (lib/agenda.ts); aqui só banco e aviso.
   let diagAgenda: TurnDiagnostics["agenda"];
   let agendou = false;
-  if (agenda) {
+  // Pedido de ajuda (do modelo ou do guardrail que barrou) ganha da agenda: o
+  // turno segue como pausar, sem marcar nem oferecer, e o time assume.
+  if (agenda && output.action !== "pausar" && !guardrail.blocked) {
     const r = await aplicarAgenda({
       svc,
       clientId,
@@ -999,7 +1003,7 @@ function silentTurn(
       motivo: "",
       pedido_aberto: 0,
       informacao_nova: false,
-      agenda: { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" },
+      agenda: SAIDA_DA_AGENDA_VAZIA,
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
@@ -1292,12 +1296,6 @@ async function aplicarAgenda(a: {
           summary: resumo,
         };
         if (a.dryRun) return { output: certo, diag, agendou: true };
-        const { data: contato } = await a.svc
-          .from("dados_cliente")
-          .select("display_name, nomewpp")
-          .eq("client_id", a.clientId)
-          .eq("telefone", a.phone)
-          .maybeSingle();
         const res = remarcando
           ? await remarcarAgendamento(a.svc, {
               clientId: a.clientId,
@@ -1313,7 +1311,8 @@ async function aplicarAgenda(a: {
           : await marcarAgendamento(a.svc, {
               clientId: a.clientId,
               phone: a.phone,
-              nome: nomeDoContato(contato),
+              // O nome só serve à marcação nova (remarcar copia o da linha antiga).
+              nome: await nomeDoTelefone(a.svc, a.clientId, a.phone),
               servicoId: servico.id,
               servicoNome: servico.nome,
               inicio,
@@ -1378,14 +1377,8 @@ function avisarAgenda(a: {
   try {
     after(async () => {
       try {
-        const svc = createServiceClient();
-        const { data: contato } = await svc
-          .from("dados_cliente")
-          .select("display_name, nomewpp")
-          .eq("client_id", a.clientId)
-          .eq("telefone", a.phone)
-          .maybeSingle();
-        const ok = await sendText(instancia, destino, a.texto(nomeDoContato(contato) ?? ""));
+        const nome = await nomeDoTelefone(createServiceClient(), a.clientId, a.phone);
+        const ok = await sendText(instancia, destino, a.texto(nome ?? ""));
         if (!ok) console.error("aviso da agenda recusado pela Evolution");
       } catch (e) {
         console.error("falha ao mandar o aviso da agenda:", e);
@@ -1394,4 +1387,19 @@ function avisarAgenda(a: {
   } catch (e) {
     console.error("falha ao agendar o aviso da agenda:", e);
   }
+}
+
+/** O nome do contato (`nomeDoContato`) pelo telefone, para a agenda; null sem nome. */
+async function nomeDoTelefone(
+  svc: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  phone: string
+): Promise<string | null> {
+  const { data } = await svc
+    .from("dados_cliente")
+    .select("display_name, nomewpp")
+    .eq("client_id", clientId)
+    .eq("telefone", phone)
+    .maybeSingle();
+  return nomeDoContato(data);
 }

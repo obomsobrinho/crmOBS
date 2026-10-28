@@ -1,5 +1,6 @@
 import type { AgentOutput } from "@/lib/agent";
 import type { GuardrailDiag } from "@/lib/agent-diagnostics";
+import { SAIDA_DA_AGENDA_VAZIA } from "@/lib/agenda";
 
 // Guardrail: uma checagem independente da resposta PRONTA do agente, antes de
 // sair. É o reforço do eixo "IA que não inventa": a seção FONTES E HONESTIDADE
@@ -75,7 +76,7 @@ export function applyGuardrail(
     pedido_aberto: 0,
     informacao_nova: false,
     // Resposta barrada nunca marca nada na agenda.
-    agenda: { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" },
+    agenda: SAIDA_DA_AGENDA_VAZIA,
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

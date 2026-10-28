@@ -211,14 +211,9 @@ export default function MontagemWizard({
 
   /** Grava a agenda quando há o que gravar. false = recusou (o erro fica no item). */
   async function gravarAgenda(): Promise<boolean> {
-    if (!agendaBase || (!agendaAtiva && !agendaBase.ativa)) return true;
+    // A lista já foi conferida no Continuar, antes de gravar o agente.
+    if (!agendaBase || (!agendaAtiva && !agendaBase.ativa) || preview) return true;
     const lista = paraSalvar(servicosAgenda);
-    const problema = problemaDosServicos(agendaAtiva, lista);
-    if (problema) {
-      setErroAgenda(problema);
-      return false;
-    }
-    if (preview) return true;
     setGravandoAgenda(true);
     const r = await fonteDoBancoAgenda(createClient(), clientId).salvarConfig({ ...agendaBase, ativa: agendaAtiva }, lista);
     setGravandoAgenda(false);

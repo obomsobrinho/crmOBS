@@ -1,4 +1,5 @@
 import type { Supa } from "@/lib/supabase/tipos";
+import type { Tables } from "@/lib/database.types";
 import {
   horariosDoTime,
   conflita,
@@ -82,22 +83,10 @@ export const TETO_DA_SEMANA = 500;
 const COLUNAS =
   "id, phone, nome, servico_id, servico_nome, inicio, fim, status, origem, cancelado_por, resumo, created_at, lembrete_enviado_em, confirmado_em";
 
-type Bruta = {
-  id: number;
-  phone: string;
-  nome: string | null;
-  servico_id: number | null;
-  servico_nome: string;
-  inicio: string;
-  fim: string;
-  status: string;
-  origem: string;
-  cancelado_por: string | null;
-  resumo: string | null;
-  created_at: string;
-  lembrete_enviado_em: string | null;
-  confirmado_em: string | null;
-};
+type Bruta = Pick<
+  Tables<"agendamentos">,
+  "id" | "phone" | "nome" | "servico_id" | "servico_nome" | "inicio" | "fim" | "status" | "origem" | "cancelado_por" | "resumo" | "created_at" | "lembrete_enviado_em" | "confirmado_em"
+>;
 
 function daBruta(b: Bruta): LinhaAgenda {
   return {
@@ -152,7 +141,7 @@ export function fonteDoBancoAgenda(supabase: Supa, clientId: string, fora: strin
         .order("inicio")
         .limit(TETO_DA_SEMANA);
       if (error) throw new Error(error.message);
-      return (data ?? []).map((b) => daBruta(b as Bruta));
+      return (data ?? []).map(daBruta);
     },
     async bloqueios(de, ate) {
       // Uma semana de bloqueios de uma agenda: poucos por natureza.

@@ -23,13 +23,6 @@ type Svc = ReturnType<typeof createServiceClient>;
 
 const MIN = 60_000;
 
-/** O objetivo "Agendar" está ligado? Guiado: `goals`; avançado: sempre (como `buildBaseTail`). */
-export function querAgendar(promptMode: string | null | undefined, agentConfig: unknown): boolean {
-  if (promptMode === "avancado") return true;
-  const goals = (agentConfig as { goals?: unknown } | null)?.goals;
-  return Array.isArray(goals) && goals.includes("agendar");
-}
-
 export interface AgendaDoTenant {
   config: AgendaConfig;
   servicos: ServicoDaAgenda[];
@@ -144,6 +137,11 @@ export async function agendaDoTurno(a: {
   phone: string;
   agora: number;
   hours: BusinessHours | null;
+  /**
+   * `clients.agenda_config` já lido pelo turno: desligada, volta null sem
+   * consulta nenhuma (a maioria dos tenants não paga a ida ao banco).
+   */
+  configGravada?: unknown;
 }): Promise<{
   config: AgendaConfig;
   servicos: ServicoDaAgenda[];
@@ -156,9 +154,13 @@ export async function agendaDoTurno(a: {
   // A chave é a agenda ligada (revisão de 28/10/2026): o objetivo "Agendar"
   // antigo não decide mais. PENDENTE: o que fazer com aquele objetivo.
   // Sem horário próprio nem de atendimento, não há de onde tirar horário livre.
-  const ag = await agendaDoTenant(a.svc, a.clientId);
+  if (a.configGravada !== undefined && !normalizarConfigDaAgenda(a.configGravada).ativa) return null;
+  // As duas leituras juntas: ligada, a conversa vai precisar das duas.
+  const [ag, daPessoa] = await Promise.all([
+    agendaDoTenant(a.svc, a.clientId),
+    agendamentosDaPessoa(a.svc, a.clientId, a.phone, a.agora),
+  ]);
   if (!ag || !ag.config.ativa || ag.servicos.length === 0) return null;
-  const daPessoa = await agendamentosDaPessoa(a.svc, a.clientId, a.phone, a.agora);
   // Os horários livres saem do horário PRÓPRIO da agenda (ou da cópia do de
   // atendimento, enquanto nunca foi salvo); o lembrete, do de atendimento.
   const hours = horarioDaAgenda(ag.config, a.hours);

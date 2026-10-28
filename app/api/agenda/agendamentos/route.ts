@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { sessaoDaRota } from "@/lib/rota";
 import { createServiceClient } from "@/lib/supabase/service";
 import { conflita } from "@/lib/agenda";
+import { jidDoNumero, normalizarNumero } from "@/lib/avisos";
 import { agendaDoTenant, marcarAgendamento, moverParaAgendado, ocupadosDoTenant } from "@/lib/agenda-servidor";
 
 // O TIME marca um horário pela tela `/agenda` (docs/plano-agenda.md). Qualquer
@@ -19,12 +20,18 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
-  const phone = typeof body.phone === "string" ? body.phone.replace(/\D/g, "") : "";
+  // O contato escolhido vem com o JID gravado (dados_cliente.telefone,
+  // "5511...@s.whatsapp.net"): fica como está, para casar com a conversa, a
+  // ficha e o turno da IA. O número digitado à mão vira o mesmo formato
+  // (`normalizarNumero` + `jidDoNumero`, lib/avisos.ts).
+  const bruto = typeof body.phone === "string" ? body.phone.trim() : "";
+  const digitos = bruto.includes("@") ? bruto.replace(/@.*$/, "").replace(/\D/g, "") : normalizarNumero(bruto) ?? "";
+  const phone = bruto.includes("@") ? bruto : digitos ? jidDoNumero(digitos) : "";
   const nome = typeof body.nome === "string" && body.nome.trim() ? body.nome.trim().slice(0, 80) : null;
   const resumo = typeof body.resumo === "string" ? body.resumo.trim().slice(0, 500) : "";
   const servicoId = typeof body.servicoId === "number" ? body.servicoId : NaN;
   const inicio = typeof body.inicio === "string" ? Date.parse(body.inicio) : NaN;
-  if (phone.length < 10 || phone.length > 15) {
+  if (digitos.length < 10 || digitos.length > 15) {
     return NextResponse.json({ error: "telefone inválido" }, { status: 400 });
   }
   if (!Number.isInteger(servicoId) || !Number.isFinite(inicio)) {
