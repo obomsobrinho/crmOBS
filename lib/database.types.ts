@@ -1112,6 +1112,32 @@ export type Database = {
           mais_antigo: string
         }[]
       }
+      admin_pedidos_do_cliente: {
+        Args: {
+          p_client: string
+          p_cursor_em?: string
+          p_cursor_id?: number
+          p_fora?: string[]
+          p_limite?: number
+        }
+        Returns: {
+          display_name: string
+          id: number
+          motivo: string
+          nomewpp: string
+          opened_at: string
+          phone: string
+          summary: string
+        }[]
+      }
+      admin_pedidos_por_motivo: {
+        Args: { p_client: string; p_fora?: string[] }
+        Returns: {
+          abertos: number
+          mais_antigo: string
+          motivo: string
+        }[]
+      }
       admin_mudar_limite_ia: {
         Args: {
           p_client: string

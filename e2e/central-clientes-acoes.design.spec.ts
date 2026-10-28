@@ -256,6 +256,7 @@ test.describe("A tela da conta desativada (/design/conta-desativada)", () => {
     for (const [metodo, rota] of [
       ["PUT", "conta"],
       ["GET", "cobrancas"],
+      ["GET", "pedidos"],
       ["GET", "exportar"],
       ["POST", "apagar"],
     ] as const) {

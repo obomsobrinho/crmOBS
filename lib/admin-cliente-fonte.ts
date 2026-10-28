@@ -14,6 +14,7 @@ import { diaIsoSP } from "./fuso";
 import { picosDeHistorico } from "./picos";
 import type { Cobranca, FinanceiroDoCliente, PedidoDeAcao } from "./admin-conta";
 import type { EmpresaItem } from "./admin-empresas";
+import { PAGINA_PEDIDOS_DA_CENTRAL, consultaDoCursor, ordenarPedidos, type PedidoDaCentral } from "./admin-pedidos";
 
 // DE ONDE O DETALHE DE UM CLIENTE LE AS ABAS (central do dono). Dois formatos, o
 // mesmo contrato: o navegador chama as rotas do admin (o service_role nunca sai
@@ -46,6 +47,8 @@ export interface FonteDoCliente {
   atendimento(): Promise<AtendimentoPorPeriodo>;
   /** Ao vivo na Evolution; falha vira `desconhecido`. */
   whatsapp(): Promise<EstadoDoWhatsApp>;
+  /** A página de pedidos abertos depois de `depois` (a primeira vem com o detalhe). */
+  pedidos(depois: PedidoDaCentral): Promise<PedidoDaCentral[]>;
   /** As cobranças da assinatura no Asaas; `null` = sem assinatura. */
   cobrancas(): Promise<Cobranca[] | null>;
   /** Uma ação do Financeiro ou das Ações (`PUT .../conta`). */
@@ -122,6 +125,10 @@ export function fonteDoClienteDaApi(id: string): FonteDoCliente {
         return "desconhecido";
       }
     },
+    async pedidos(depois) {
+      const corpo = await lerJson<{ pedidos?: PedidoDaCentral[] }>(`${base}/pedidos?${consultaDoCursor(depois)}`, "pedidos");
+      return corpo.pedidos ?? [];
+    },
     async cobrancas() {
       const corpo = await lerJson<{ cobrancas?: Cobranca[] | null }>(`${base}/cobrancas`, "cobranças");
       return corpo.cobrancas ?? null;
@@ -160,6 +167,8 @@ export interface PreviewDoCliente {
   atendimento: AtendimentoPorPeriodo;
   whatsapp: EstadoDoWhatsApp;
   cobrancas: Cobranca[] | null;
+  /** TODOS os pedidos abertos falsos; o preview pagina pela mesma ordem do banco. */
+  pedidos: PedidoDaCentral[];
 }
 
 /** Preview: responde da memória; as ações validam e não gravam. */
@@ -170,6 +179,11 @@ export function fonteDoClienteDaMemoria(p: PreviewDoCliente): FonteDoCliente {
     atendimento: async () => p.atendimento,
     whatsapp: async () => p.whatsapp,
     cobrancas: async () => p.cobrancas,
+    async pedidos(depois) {
+      const todos = ordenarPedidos(p.pedidos);
+      const i = todos.findIndex((x) => x.id === depois.id);
+      return todos.slice(i + 1, i + 1 + PAGINA_PEDIDOS_DA_CENTRAL);
+    },
     mudarConta: async () => ({ ok: true, simulado: true }),
     mudarLimite: async () => ({ ok: true }),
     apagar: async () => ({ ok: true, pendencias: [], simulado: true }),

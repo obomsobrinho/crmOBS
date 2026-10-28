@@ -693,6 +693,7 @@ test.describe("Trava por rota da central", () => {
     "app/api/admin/empresas/[id]/conta/route.ts",
     "app/api/admin/empresas/[id]/exportar/route.ts",
     "app/api/admin/empresas/[id]/limite/route.ts",
+    "app/api/admin/empresas/[id]/pedidos/route.ts",
     "app/api/admin/empresas/[id]/uso/route.ts",
     "app/api/admin/empresas/[id]/whatsapp/route.ts",
     "app/api/admin/empresas/route.ts",

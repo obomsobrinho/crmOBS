@@ -60,6 +60,12 @@ const badgeVariants = cva(
         solucao:
           "inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-line bg-brand-surface px-2 py-0.5 text-legenda font-semibold text-brand-ink",
         /** Tag do contato. */
+        /**
+         * Uma sugestão de ação para o dono, como "Pode virar regra" na central (27/10/2026). Tom
+         * da MARCA pelo mesmo motivo da `solucao`: não é estado (nem bom, nem ruim), é convite.
+         */
+        sugestao:
+          "inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-line bg-brand-surface px-2 py-0.5 text-legenda font-semibold text-brand-ink",
         tag: "flex items-center gap-1.5 rounded-full border border-line py-0.5 text-legenda",
         /**
          * Variação de um indicador (cartão `Stat`). O TOM vem de `lib/delta.ts`,

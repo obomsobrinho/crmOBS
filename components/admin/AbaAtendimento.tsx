@@ -35,11 +35,13 @@ import {
   type AtendimentoDoCliente,
   type AtendimentoPorPeriodo,
   type BarraDeMovimento,
+  type DetalheDoCliente,
   type FatiaDeSolucao,
 } from "@/lib/admin-cliente";
 import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
 import { useCarga } from "@/lib/use-carga";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
+import BlocoDePedidos from "@/components/admin/BlocoDePedidos";
 import { FalhaAoLer, Indicador } from "@/components/admin/pecas";
 import IndicadorComparado from "@/components/admin/IndicadorComparado";
 
@@ -54,7 +56,19 @@ import IndicadorComparado from "@/components/admin/IndicadorComparado";
 // `lib/solucoes.ts`), montadas em `lib/admin-cliente.ts`. Os QUATRO períodos do
 // painel (`lib/periodo.ts`) chegam numa leitura só; trocar de período não busca
 // nada.
-function AbaAtendimento({ fonte }: { fonte: FonteDoCliente }) {
+function AbaAtendimento({
+  fonte,
+  pedidos,
+  agora,
+  rolarAtePedidos,
+}: {
+  fonte: FonteDoCliente;
+  /** A seção "Pedidos em aberto" (do detalhe, sem período). */
+  pedidos: DetalheDoCliente["pedidos"];
+  agora: number;
+  /** Muda quando o cartão da Visão geral pede para ver os pedidos. */
+  rolarAtePedidos: number;
+}) {
   const [periodo, setPeriodo] = useState<PeriodoKey>(PERIODO_PADRAO);
   const { dados, erro, tentarDeNovo } = useCarga<AtendimentoPorPeriodo>(fonte.atendimento);
 
@@ -76,6 +90,16 @@ function AbaAtendimento({ fonte }: { fonte: FonteDoCliente }) {
       ) : (
         <Conteudo a={dados[periodo]} />
       )}
+
+      {/* Logo abaixo de "Por que a IA chamou o time", e FORA do período: pedido aberto sempre precisa
+          ser resolvido. Não espera a leitura do atendimento (vem pronta com o detalhe). */}
+      <BlocoDePedidos
+        pedidos={pedidos}
+        agora={agora}
+        buscar={fonte.pedidos}
+        rolar={rolarAtePedidos}
+        pronto={!!dados || !!erro}
+      />
     </div>
   );
 }
