@@ -8,24 +8,25 @@ import { ehNumeroDeAvisos, telefoneImpossivel } from "@/lib/avisos";
 // mensagem ativa (CLAUDE.md: só com conversa recente, teto diário, intervalo
 // aleatório, "responda SAIR") morarem num lugar.
 //
-// ⚠️ OS VALORES DAS REGRAS SÃO PENDENTES DO DONO: `null` = a regra ainda não é
-// aplicada. Nenhum envio ativo deve ir ao ar com teto e intervalo nulos.
+// Cada uso tem as suas regras (`RegrasDoEnvioAtivo`); `null` = a regra não se
+// aplica a esse uso, por decisão do dono.
 
 export interface RegrasDoEnvioAtivo {
-  /** Máximo de mensagens ativas por empresa por dia. null = PENDENTE (sem teto). */
+  /** Máximo de mensagens ativas por empresa por dia. null = sem teto. */
   tetoDiario: number | null;
-  /** Pausa aleatória entre duas mensagens, em ms [mín, máx]. null = PENDENTE (sem pausa). */
+  /** Pausa aleatória entre duas mensagens da MESMA empresa, em ms [mín, máx]. null = sem pausa. */
   intervaloMs: [number, number] | null;
 }
 
 /**
- * As regras do lembrete da agenda. PENDENTE (dono): teto, intervalo, se exige
- * conversa recente (quem o time marcou à mão pode nunca ter escrito) e o
- * "responda SAIR" no texto.
+ * As regras do lembrete da agenda (decisões do dono, 28/10/2026): sem teto
+ * diário (o volume é o número de horários marcados), pausa aleatória de 20 a
+ * 60 s entre as mensagens da mesma empresa, manda mesmo para quem nunca
+ * escreveu e sem "responda SAIR" no texto.
  */
 export const REGRAS_DO_LEMBRETE: RegrasDoEnvioAtivo = {
   tetoDiario: null,
-  intervaloMs: null,
+  intervaloMs: [20_000, 60_000],
 };
 
 export type ResultadoDoEnvio = "enviado" | "recusado" | "pulado";
@@ -51,9 +52,9 @@ export async function enviarMensagemAtiva(a: {
   }
 }
 
-/** A pausa entre duas mensagens ativas (aleatória dentro das regras), ou nenhuma. */
-export async function pausaEntreEnvios(regras: RegrasDoEnvioAtivo): Promise<void> {
-  if (!regras.intervaloMs) return;
+/** A pausa aleatória entre duas mensagens ativas (ms), dentro das regras; 0 sem intervalo. */
+export function sortearPausa(regras: RegrasDoEnvioAtivo): number {
+  if (!regras.intervaloMs) return 0;
   const [min, max] = regras.intervaloMs;
-  await new Promise((r) => setTimeout(r, min + Math.random() * Math.max(0, max - min)));
+  return Math.round(min + Math.random() * Math.max(0, max - min));
 }
