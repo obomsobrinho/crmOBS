@@ -31,7 +31,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "presta serviços de advocacia e orientação jurídica.",
       tone: "profissional",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca dar parecer ou orientação jurídica pelo WhatsApp",
         "nunca prometer resultado de processo",
@@ -52,7 +52,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "é uma clínica odontológica.",
       tone: "amigavel",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca dar diagnóstico ou orientação clínica pelo WhatsApp",
         "nunca prometer resultado de tratamento",
@@ -73,7 +73,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "é um consultório de pediatria.",
       tone: "amigavel",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       // Pediatria é o segmento em que responder demais custa mais caro: quem
       // escreve está com uma criança doente do outro lado, e uma frase
       // tranquilizadora errada atrasa atendimento. Por isso os limites aqui
@@ -99,7 +99,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "presta serviços de engenharia e projetos.",
       tone: "profissional",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca estimar prazo ou valor de um projeto por conta própria",
         "nunca opinar sobre viabilidade técnica sem uma visita",
@@ -120,7 +120,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "é uma clínica de estética e cuidados com a pele.",
       tone: "amigavel",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca prometer resultado garantido",
         "nunca indicar procedimento sem uma avaliação",
@@ -181,7 +181,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "trabalha com compra, venda e locação de imóveis.",
       tone: "profissional",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca inventar valor, condição ou disponibilidade de um imóvel",
         "nunca prometer aprovação de financiamento",
@@ -201,7 +201,7 @@ export const AGENT_PRESETS: AgentPreset[] = [
     config: preset({
       companyWhat: "é um salão de beleza.",
       tone: "amigavel",
-      goals: ["duvidas", "qualificar", "agendar"],
+      goals: ["duvidas", "qualificar"],
       dontDo: [
         "nunca confirmar um horário sem passar pro time",
         "nunca prometer um resultado específico",

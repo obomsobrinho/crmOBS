@@ -181,7 +181,7 @@ function personaDoTenant(client: {
   prompt_mode?: unknown;
   regras_salvas?: unknown;
   name?: unknown;
-}): { persona: string; origem: PersonaOrigem } {
+}, agendaAtiva = false): { persona: string; origem: PersonaOrigem } {
   const salva = texto(client.persona);
   // Sem normalizar para "a empresa" aqui: `buildFallbackPersona` já faz esse
   // default. Duas cópias do mesmo literal é uma para esquecer de mudar.
@@ -194,7 +194,7 @@ function personaDoTenant(client: {
       agent_config: client.agent_config,
       prompt_mode: client.prompt_mode,
       regras_salvas: client.regras_salvas,
-    });
+    }, undefined, agendaAtiva);
     if (r.ok) return { persona: r.persona, origem: "montada" };
     // ⚠️ "longo" NÃO cai para a salva: quem salva recusa acima do limite, mas no
     // atendimento trocar o prompt de hoje por um de meses atrás é pior que servir
@@ -385,6 +385,31 @@ export async function processTurn(
     return t;
   }
 
+  // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
+  // com datas (`horarioCadastrado`). O avançado também tem horário salvo
+  // (`agent_config.hours`, gravado à parte do prompt).
+  const horasDoTurno =
+    dryRun && params.horarioOverride !== undefined
+      ? params.horarioOverride
+      : horarioCadastrado(client.agent_config);
+  const agoraDoTurno =
+    dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
+      ? new Date(params.agoraTeste)
+      : undefined;
+
+  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): com a agenda ligada, o turno
+  // leva o contrato `### AGENDA` (serviços e agendamentos da pessoa, sem
+  // horários: quem oferece, no máximo 3, é o código depois do dia e período).
+  // Sem migration, sem horário ou desligada: `null`, e o turno segue como antes.
+  const agoraMsAgenda = (agoraDoTurno ?? new Date()).getTime();
+  const agenda = await agendaDoTurno({
+    svc,
+    clientId,
+    phone,
+    agora: agoraMsAgenda,
+    hours: horasDoTurno,
+  });
+
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
   // dryRun: fora dele a única fonte é o banco.
   const emEdicao = dryRun ? texto(params.personaOverride) : null;
@@ -392,7 +417,9 @@ export async function processTurn(
   // `personaDoTenant` são silenciosas por construção (servir o prompt antigo é
   // melhor que emudecer), e sem registrar isso uma regressão em que TODO tenant
   // volta para a persona salva seria invisível. "salva" em produção é ALARME.
-  const doTenant = emEdicao ? null : personaDoTenant(client);
+  // A agenda ligada (e valendo para este turno) muda o prompt: o objetivo
+  // "Agendar" antigo saiu (decisão do dono, 28/10/2026).
+  const doTenant = emEdicao ? null : personaDoTenant(client, agenda !== null);
   const persona = emEdicao ?? doTenant!.persona;
   const personaOrigem: PersonaOrigem = emEdicao ? "override" : doTenant!.origem;
 
@@ -507,30 +534,6 @@ export async function processTurn(
   // decisão de atualizar usa a mesma (`atualizacaoDoPedido`).
   const listaDoModelo = abertos.filter((p) => (p.summary ?? "").trim() !== "");
 
-  // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
-  // com datas (`horarioCadastrado`). O avançado também tem horário salvo
-  // (`agent_config.hours`, gravado à parte do prompt).
-  const horasDoTurno =
-    dryRun && params.horarioOverride !== undefined
-      ? params.horarioOverride
-      : horarioCadastrado(client.agent_config);
-  const agoraDoTurno =
-    dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
-      ? new Date(params.agoraTeste)
-      : undefined;
-
-  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): com a agenda ligada, o turno
-  // leva o contrato `### AGENDA` (serviços e agendamentos da pessoa, sem
-  // horários: quem oferece, no máximo 3, é o código depois do dia e período).
-  // Sem migration, sem horário ou desligada: `null`, e o turno segue como antes.
-  const agoraMsAgenda = (agoraDoTurno ?? new Date()).getTime();
-  const agenda = await agendaDoTurno({
-    svc,
-    clientId,
-    phone,
-    agora: agoraMsAgenda,
-    hours: horasDoTurno,
-  });
 
   // Modelo. Lança AgentError em falha (a rota mapeia para 502).
   const run = await runAgent({

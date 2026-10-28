@@ -292,7 +292,7 @@ export async function runAgent(params: {
   parts.push(agoraBlock(params.now));
   // O calendário vem colado no AGORA: o modelo errava a conta de dia da semana,
   // expediente e "já passou" (bateria de 05/10/2026), então ela chega pronta.
-  parts.push(calendarioBlock(params.now ?? new Date(), params.hours ?? null));
+  parts.push(calendarioBlock(params.now ?? new Date(), params.hours ?? null, !!params.agenda));
   // Os horários livres da agenda própria logo depois: mudam a cada minuto e a
   // cada marcação, então também ficam fora do prefixo do cache.
   if (params.agenda) parts.push(params.agenda);

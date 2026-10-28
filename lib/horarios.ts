@@ -199,7 +199,12 @@ function listaDeHoras(hs: number[]): string {
  * resolvida: fechado, aberto, ainda não abriu, já encerrou. Vai DEPOIS do AGORA
  * (`runAgent`), porque muda a cada minuto e não pode mexer no prefixo do cache.
  */
-export function calendarioBlock(now: Date, hours: BusinessHours | null): string {
+export function calendarioBlock(
+  now: Date,
+  hours: BusinessHours | null,
+  /** Agenda própria ligada: quem oferece horário é o sistema (seção AGENDA), não esta lista. */
+  semOfertas = false
+): string {
   const [y, m, d0] = diaIsoSP(now).split("-").map(Number);
   const agora = minutosAgoraSP(now);
   const linhas: string[] = [];
@@ -248,7 +253,7 @@ export function calendarioBlock(now: Date, hours: BusinessHours | null): string 
   if (proxima) linhas.push(`- Fechado agora. Próxima abertura: ${proxima}. Ao dizer que está fechado, diga também quando abre.`);
   // Os horários por período de hoje e de amanhã, já resolvidos pelo expediente
   // (decisão do dono, 06/10/2026). Sem horário cadastrado, a linha não existe.
-  if (hours) {
+  if (hours && !semOfertas) {
     const diaDe = (i: number) => hours[CHAVE_POR_DIA[new Date(Date.UTC(y, m - 1, d0 + i, 12)).getUTCDay()]];
     const doDia = (i: number) =>
       PERIODOS_DO_DIA.map((p) => ({ p, hs: horariosDoPeriodo(p.chave, i === 0 ? agora : null, diaDe(i)) }))

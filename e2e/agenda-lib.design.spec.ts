@@ -22,7 +22,7 @@ import {
   type AgendaConfig,
   type SaidaDaAgenda,
 } from "../lib/agenda";
-import type { BusinessHours } from "../lib/agent-prompt";
+import { EMPTY_CONFIG, GOALS, compilePersona, validateConfig, type BusinessHours } from "../lib/agent-prompt";
 import { inicioDoDiaSP } from "../lib/fuso";
 import { feriadoDoDia, feriadosDoAno, pascoa } from "../lib/feriados";
 
@@ -222,5 +222,27 @@ test.describe("lib/agenda: períodos pelo horário da agenda", () => {
   });
   test("o bloco do prompt resume os períodos da semana", () => {
     expect(resumoDosPeriodos(HORAS)).toBe("segunda a sexta: manhã e tarde; sábado: manhã");
+  });
+});
+
+test.describe("Prompt do agente: a agenda ligada substitui o objetivo Agendar", () => {
+  const cfg = { ...EMPTY_CONFIG, companyName: "Loja", companyWhat: "vende coisas.", agentName: "Ana", goals: ["duvidas", "agendar"] };
+  test("sem agenda ninguém marca, nem o avançado", () => {
+    const g = compilePersona({ mode: "guiado", config: cfg });
+    expect(g.ok && g.persona).toContain('NUNCA use "agendar"');
+    expect(g.ok && g.persona).toContain("Você não marca horários nem conversas");
+    const a = compilePersona({ mode: "avancado", persona: "### IDENTIDADE\nVocê é a Ana. Confirmou dia e período: use agendar." });
+    expect(a.ok && a.persona).toContain('NUNCA use "agendar"');
+  });
+  test("com agenda, o prompt manda seguir a seção AGENDA e o sistema oferece os horários", () => {
+    const g = compilePersona({ mode: "guiado", config: cfg, agendaAtiva: true });
+    expect(g.ok && g.persona).toContain("siga a seção AGENDA");
+    expect(g.ok && g.persona).toContain("um dos horários que o sistema ofereceu");
+    expect(g.ok && g.persona).not.toMatch(/[\u2013\u2014]/);
+  });
+  test("o objetivo Agendar sumiu da lista e da config", () => {
+    expect(GOALS.map((g) => g.value)).toEqual(["duvidas", "qualificar"]);
+    const v = validateConfig(cfg);
+    expect(v.ok && v.value.goals).toEqual(["duvidas"]);
   });
 });

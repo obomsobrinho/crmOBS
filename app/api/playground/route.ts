@@ -3,6 +3,7 @@ import { sessaoDaRota } from "@/lib/rota";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
+import { agendaAtivaDoTenant } from "@/lib/agenda-servidor";
 import { compilePersona, normalizarRegras, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
 
@@ -102,11 +103,13 @@ export async function POST(req: NextRequest) {
       regrasSalvas = normalizarRegras(data?.regras_salvas);
     }
   }
+  // A bancada monta o prompt como o turno: com a agenda ligada, o texto de agenda (28/10/2026).
+  const agendaAtiva = await agendaAtivaDoTenant(client.id);
   if (body.mode === "guiado") {
     // Mesma validação do save. Config incompleta não é teste válido: uma persona
     // sem nome de empresa responde outra coisa, e o teste diria pouco. Devolve os
     // campos que faltam para a bancada apontar onde.
-    const r = compilePersona({ mode: "guiado", config: body.config, regrasSalvas });
+    const r = compilePersona({ mode: "guiado", config: body.config, regrasSalvas, agendaAtiva });
     if (!r.ok) {
       if (r.motivo === "campos") {
         return NextResponse.json(
@@ -129,6 +132,7 @@ export async function POST(req: NextRequest) {
       handoffNotice:
         typeof body.handoffNotice === "string" ? body.handoffNotice : undefined,
       regrasSalvas,
+      agendaAtiva,
     });
     if (!r.ok) {
       return NextResponse.json(

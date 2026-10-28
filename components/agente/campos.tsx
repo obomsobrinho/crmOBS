@@ -523,7 +523,7 @@ export function CamposOQuePodeFazer({
         required
         primeiro
       >
-        <div className="grid gap-1 sm:grid-cols-3">
+        <div className="grid gap-1 sm:grid-cols-2">
           {GOALS.map((g) => {
             const active = cfg.goals.includes(g.value as Goal);
             return (

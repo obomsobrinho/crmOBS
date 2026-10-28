@@ -10,8 +10,8 @@
 import { chavesDosMotivos } from "./motivos";
 
 export type Tone = "formal" | "profissional" | "amigavel" | "descontraido";
-// "agendar" = marcar uma conversa com o time (rótulo na UI). O valor interno é
-// mantido como "agendar" porque é o que o n8n (action) espera. NÃO é agenda.
+// O objetivo "agendar" (marcar uma conversa com o time) SAIU em 28/10/2026: quem
+// marca é a agenda própria ligada. O valor só fica no tipo para ler config antiga.
 export type Goal = "duvidas" | "qualificar" | "agendar";
 export type DayKey = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
 
@@ -172,11 +172,6 @@ export const GOALS: { value: Goal; label: string; hint: string }[] = [
     value: "qualificar",
     label: "Qualificar",
     hint: "Entender o que a pessoa precisa antes de encaminhar.",
-  },
-  {
-    value: "agendar",
-    label: "Agendar",
-    hint: "A pessoa combina um dia e um horário e a conversa vai para o time confirmar.",
   },
 ];
 
@@ -413,12 +408,14 @@ function ehSecaoGerada(corpo: string[]): boolean {
 // buildPersona — compila o AgentConfig no system prompt
 // ————————————————————————————————————————————————————————————————
 
-export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = []): string {
+export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = [], agendaAtiva = false): string {
   const name = cfg.agentName.trim() || "o atendente";
   const company = cfg.companyName.trim() || "a empresa";
   const role = cfg.agentRole.trim();
   const goals = cfg.goals;
-  const wantsAgendar = goals.includes("agendar");
+  // O objetivo "Agendar" antigo saiu (decisão do dono, 28/10/2026): quem marca é
+  // a agenda ligada (`agendaAtiva`), com a seção AGENDA do turno.
+  const wantsAgendar = agendaAtiva;
   const wantsQualificar = goals.includes("qualificar");
 
   const identidade = section("IDENTIDADE", [
@@ -445,7 +442,7 @@ export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = []): str
     wantsQualificar &&
       "Entender o que a pessoa precisa e o contexto dela (o que procura, para quando, situação atual) antes de encaminhar.",
     wantsAgendar &&
-      "Levar a conversa até uma conversa marcada com o time, com dia e horário combinados pela pessoa.",
+      "Marcar, remarcar e cancelar horários pela conversa, seguindo a seção AGENDA do fim deste prompt.",
   ]);
 
   const abertura = [
@@ -532,13 +529,13 @@ export function buildPersona(cfg: AgentConfig, regrasSalvas: string[] = []): str
   }
   if (wantsAgendar) {
     fluxoLines.push(
-      "5. Quando o caso estiver pronto para uma conversa com o time, convide a pessoa a marcar, ancorando no que ela ganha com isso. Convide uma vez: se ela não aceitou, não convide de novo. Se ainda falta algo acontecer antes (um exame, um documento, um retorno), o convite espera.",
-      "6. Aceitou: pergunte o dia e o horário. Se vier só o dia ou só um período (\"amanhã à tarde\"), pergunte o que falta, por exemplo que horário fica melhor. Nunca confirme com informação incompleta.",
-      "7. Dia E horário combinados: recapitule com as palavras da pessoa (repita o horário que ela disse, nunca troque por um período), avise que alguém do time confirma, agradeça e se despeça. Use action agendar."
+      "5. Quando a pessoa quiser um horário (ou o caso estiver pronto para um), convide uma vez a marcar, ancorando no que ela ganha. Se ainda falta algo acontecer antes (um exame, um documento, um retorno), o convite espera.",
+      "6. Para marcar, remarcar ou cancelar, siga a seção AGENDA: pergunte o dia e o período; quem oferece os horários livres (no máximo 3) é o sistema. Nunca diga um horário por conta própria.",
+      "7. Horário marcado: confirme o dia e a hora em poucas palavras, agradeça e siga a conversa se a pessoa quiser."
     );
   } else {
     fluxoLines.push(
-      "Você não marca conversas nem horários. Se a pessoa quiser falar com alguém, use action pausar para passar pro time."
+      "Você não marca horários nem conversas. Se a pessoa quiser marcar um horário ou falar com alguém, diga que vai passar para o time e use action pausar."
     );
   }
   const fluxo = fluxoLines.join("\n");
@@ -730,7 +727,8 @@ export interface BaseTailOpts {
  * a regra de handoff, que precisou ser colada na mão na persona da OBM.
  */
 export function buildBaseTail(opts: BaseTailOpts = {}): string {
-  const allowAgendar = opts.allowAgendar !== false;
+  // Sem a agenda ligada ninguém marca (o objetivo "Agendar" antigo saiu, 28/10/2026).
+  const allowAgendar = opts.allowAgendar === true;
   const notice = sanitizeText(
     (opts.handoffNotice ?? "").trim() || DEFAULT_HANDOFF_NOTICE,
     LIMITS.handoffNotice
@@ -820,16 +818,16 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
       (allowAgendar ? " ou agendar" : "") +
       ".",
     allowAgendar
-      ? // ⚠️ 06/10/2026, decisão do dono: "amanhã à tarde" não marca nada; a IA
-        // pergunta o horário. Mora AQUI, no contrato da base, porque vale para
-        // todo tenant e passa por cima do texto de cada um ("dia e período").
-        '- action: "none" para continuar a conversa, "agendar" quando a pessoa combinou dia E horário (também ao remarcar), "pausar" quando a conversa precisa de alguém do time. Só dia ou só período ("amanhã à tarde") ainda é none: ofereça os horários do período que o CALENDÁRIO lista, dizendo o dia (sem dia, pergunte o dia).'
-      : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca conversas.',
+      ? // Agenda própria (28/10/2026): "agendar" só com um horário que o SISTEMA
+        // ofereceu; dia e período viram consulta (seção AGENDA). Mora AQUI, no
+        // contrato da base, porque vale para todo tenant e passa por cima do texto dele.
+        '- action: "none" para continuar a conversa, "agendar" quando a pessoa escolheu um dos horários que o sistema ofereceu (também ao remarcar), "pausar" quando a conversa precisa de alguém do time. Dia e período sem horário escolhido ainda é none: siga a seção AGENDA.'
+      : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca horários nem conversas.',
     "- summary: vazio quando action for none. Em " +
       (allowAgendar ? "agendar ou pausar" : "pausar") +
       ", escreva direto o que a pessoa precisa agora e o contexto útil pra quem vai continuar. Sem floreio. O pedido é o que a pessoa pediu ou disse, nunca o que você sugeriu. Inclua o que já foi combinado (dia e horário) e o que, combinado, não aconteceu, com quando foi combinado.",
     allowAgendar
-      ? '- preferencia_horario: preencha só quando action for agendar, no formato "terça às 15h".'
+      ? "- preferencia_horario: deixe vazio; o sistema preenche com o horário marcado."
       : "- preferencia_horario: nunca preencha.",
     // Motivo do pedido de ajuda (06/10/2026, P1 item 4): o cliente vê no Painel
     // por que a IA o chamou. A lista é de `lib/motivos.ts`.
@@ -928,8 +926,8 @@ export type CompiladoPersona =
 
 export function compilePersona(
   input:
-    | { mode: "guiado"; config: unknown; regrasSalvas?: string[] }
-    | { mode: "avancado"; persona: unknown; handoffNotice?: string; regrasSalvas?: string[] }
+    | { mode: "guiado"; config: unknown; regrasSalvas?: string[]; agendaAtiva?: boolean }
+    | { mode: "avancado"; persona: unknown; handoffNotice?: string; regrasSalvas?: string[]; agendaAtiva?: boolean }
 ): CompiladoPersona {
   // As regras salvas pelo time (`clients.regras_salvas`, já normalizadas por
   // `normalizarRegras`) entram nos dois modos pela MESMA seção. Para uma linha
@@ -937,7 +935,7 @@ export function compilePersona(
   if (input.mode === "guiado") {
     const r = validateConfig(input.config);
     if (!r.ok) return { ok: false, motivo: "campos", fields: r.errors };
-    const persona = buildPersona(r.value, input.regrasSalvas);
+    const persona = buildPersona(r.value, input.regrasSalvas, input.agendaAtiva ?? false);
     if (persona.length > LIMITS.persona)
       return { ok: false, motivo: "longo", persona };
     return { ok: true, persona, config: r.value };
@@ -951,6 +949,8 @@ export function compilePersona(
   const persona = buildAdvancedPersona(escrito, {
     handoffNotice: input.handoffNotice,
     regrasSalvas: input.regrasSalvas,
+    // Sem agenda ligada o avançado também não marca (o antigo "agendar" saiu).
+    allowAgendar: input.agendaAtiva ?? false,
   });
   if (persona.length > LIMITS.persona)
     return { ok: false, motivo: "longo", persona };
@@ -971,7 +971,12 @@ export interface LinhaDoTenant {
  * rota das regras (`agent-rules`, que passa a lista NOVA em `regrasOverride`).
  * O `handoffNotice` vem do `agent_config` quando existe (no avançado ele pode faltar).
  */
-export function compilarDoTenant(row: LinhaDoTenant, regrasOverride?: string[]): CompiladoPersona {
+export function compilarDoTenant(
+  row: LinhaDoTenant,
+  regrasOverride?: string[],
+  /** Agenda ligada e valendo para o turno: troca o antigo objetivo "Agendar" (28/10/2026). */
+  agendaAtiva = false
+): CompiladoPersona {
   const regrasSalvas = regrasOverride ?? normalizarRegras(row.regras_salvas);
   if (row.prompt_mode === "avancado") {
     const cfg = row.agent_config && typeof row.agent_config === "object" ? (row.agent_config as Record<string, unknown>) : {};
@@ -979,10 +984,11 @@ export function compilarDoTenant(row: LinhaDoTenant, regrasOverride?: string[]):
       mode: "avancado",
       persona: row.persona,
       handoffNotice: typeof cfg.handoffNotice === "string" ? cfg.handoffNotice : undefined,
+      agendaAtiva,
       regrasSalvas,
     });
   }
-  return compilePersona({ mode: "guiado", config: row.agent_config, regrasSalvas });
+  return compilePersona({ mode: "guiado", config: row.agent_config, regrasSalvas, agendaAtiva });
 }
 
 // Prompt mínimo para tenant que ainda não configurou nada (persona nula).
@@ -1081,7 +1087,8 @@ export function validateConfig(
   const agentName = asString(src.agentName).trim();
 
   const goalsRaw = Array.isArray(src.goals) ? src.goals : [];
-  const validGoals: Goal[] = ["duvidas", "qualificar", "agendar"];
+  // "agendar" saiu (28/10/2026): config antiga que o tenha perde o valor ao normalizar.
+  const validGoals: Goal[] = ["duvidas", "qualificar"];
   const goals = validGoals.filter((g) => goalsRaw.includes(g));
 
   const validTones: Tone[] = ["formal", "profissional", "amigavel", "descontraido"];
