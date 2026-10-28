@@ -246,3 +246,24 @@ test.describe("Prompt do agente: a agenda ligada substitui o objetivo Agendar", 
     expect(v.ok && v.value.goals).toEqual(["duvidas"]);
   });
 });
+
+test.describe("lib/agenda: confirmação de presença depois do lembrete", () => {
+  const servicos = [{ id: 7, nome: "Avaliação", duracaoMin: 30 }];
+  const base = { codigo: "A1", id: 9, servicoId: 7, servicoNome: "Avaliação", inicio: em("2026-10-29", "10:30"), fim: em("2026-10-29", "11:00") };
+  test("o bloco diz o estado de cada horário e só pede confirmação quando há lembrete aguardando", () => {
+    const aguardando = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [{ ...base, lembreteEnviadoEm: AGORA - 1, confirmadoEm: null }] });
+    expect(aguardando).toContain("[A1] Avaliação, amanhã, quinta, 29/10, às 10h30 (lembrete enviado, aguardando confirmação)");
+    expect(aguardando).toContain('agenda.acao "confirmar"');
+    const confirmado = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [{ ...base, lembreteEnviadoEm: AGORA - 2, confirmadoEm: AGORA - 1 }] });
+    expect(confirmado).toContain("(confirmado pelo contato)");
+    expect(confirmado).not.toContain('agenda.acao "confirmar"');
+    const semLembrete = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [base] });
+    expect(semLembrete).not.toContain("aguardando confirmação");
+  });
+  test("decidirAgenda: confirmar com código válido grava; sem código, nada", () => {
+    const ctx = { agora: AGORA, hours: HORAS, ocupados: [], config: CFG, servicos, daPessoa: [base] };
+    const ok = decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "confirmar", agendamento: "a1" } });
+    expect(ok.tipo === "confirmar" && ok.agendamento.id).toBe(9);
+    expect(decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "confirmar", agendamento: "A7" } }).tipo).toBe("nada");
+  });
+});

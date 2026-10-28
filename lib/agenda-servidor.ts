@@ -115,7 +115,7 @@ export async function agendamentosDaPessoa(
   try {
     const { data } = await svc
       .from("agendamentos")
-      .select("id, servico_id, servico_nome, inicio, fim")
+      .select("id, servico_id, servico_nome, inicio, fim, lembrete_enviado_em, confirmado_em")
       .eq("client_id", clientId)
       .eq("phone", phone)
       .eq("status", "confirmado")
@@ -129,6 +129,8 @@ export async function agendamentosDaPessoa(
       servicoNome: g.servico_nome,
       inicio: Date.parse(g.inicio),
       fim: Date.parse(g.fim),
+      lembreteEnviadoEm: g.lembrete_enviado_em ? Date.parse(g.lembrete_enviado_em) : null,
+      confirmadoEm: g.confirmado_em ? Date.parse(g.confirmado_em) : null,
     }));
   } catch {
     return [];

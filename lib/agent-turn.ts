@@ -1243,6 +1243,21 @@ async function aplicarAgenda(a: {
           agendou: false,
         };
       }
+      case "confirmar": {
+        const g = decisao.agendamento;
+        diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;
+        if (a.dryRun) return { output: a.output, diag, agendou: false };
+        // Só grava; a resposta curta ("Perfeito, te espero...") é da IA.
+        const { error } = await a.svc
+          .from("agendamentos")
+          .update({ confirmado_em: new Date().toISOString() })
+          .eq("id", g.id)
+          .eq("client_id", a.clientId)
+          .eq("status", "confirmado")
+          .is("confirmado_em", null);
+        if (error) diag.falhou = "erro";
+        return { output: a.output, diag, agendou: false };
+      }
       case "cancelar": {
         const g = decisao.agendamento;
         diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;

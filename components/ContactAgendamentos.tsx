@@ -24,6 +24,8 @@ export interface AgendamentoDoContato {
   fim: number;
   status: "confirmado" | "cancelado";
   origem: "ia" | "time";
+  /** O contato confirmou presença depois do lembrete. */
+  confirmado?: boolean;
 }
 
 const PAGINA = 10;
@@ -31,7 +33,7 @@ const PAGINA = 10;
 async function lerPagina(clientId: string, phone: string, depois: AgendamentoDoContato | null): Promise<AgendamentoDoContato[] | null> {
   let q = createClient()
     .from("agendamentos")
-    .select("id, servico_nome, inicio, fim, status, origem")
+    .select("id, servico_nome, inicio, fim, status, origem, confirmado_em")
     .eq("client_id", clientId)
     .eq("phone", phone)
     .order("inicio", { ascending: false })
@@ -50,6 +52,7 @@ async function lerPagina(clientId: string, phone: string, depois: AgendamentoDoC
     fim: Date.parse(a.fim),
     status: a.status === "cancelado" ? "cancelado" : "confirmado",
     origem: a.origem === "time" ? "time" : "ia",
+    confirmado: !!a.confirmado_em,
   }));
 }
 
@@ -104,7 +107,7 @@ export default function ContactAgendamentos({
                 ) : passou ? (
                   <Badge variant="estado-neutro">Realizado</Badge>
                 ) : (
-                  <Badge variant="estado-bom">Marcado</Badge>
+                  <Badge variant="estado-bom">{a.confirmado ? "Confirmado" : "Marcado"}</Badge>
                 )}
               </div>
               <p className="mt-0.5 flex items-center gap-1 text-legenda tabular-nums text-ink-3">

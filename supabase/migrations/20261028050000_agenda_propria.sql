@@ -65,6 +65,9 @@ create table public.agendamentos (
   lembrete_enviado_em timestamptz,
   -- A Evolution recusou o envio: alerta na central e nova tentativa na execucao seguinte.
   lembrete_falhou_em timestamptz,
+  -- O contato confirmou presenca na conversa depois do lembrete (a IA devolve agenda.acao
+  -- "confirmar"; o codigo grava). Remarcar cria outra linha, sem confirmacao.
+  confirmado_em timestamptz,
   constraint agendamentos_periodo check (fim > inicio),
   -- Cancelamento coerente: a data existe exatamente quando esta cancelado.
   constraint agendamentos_cancelamento_coerente check (

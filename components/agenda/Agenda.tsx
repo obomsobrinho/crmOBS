@@ -11,6 +11,7 @@ import {
   CalendarX2,
   ChevronLeft,
   ChevronRight,
+  CheckCircle2,
   Clock,
   MessagesSquare,
   Phone,
@@ -498,6 +499,7 @@ function ColunaDoDia({
             <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
             <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">
               {l.origem === "ia" && <Sparkles size={11} className="shrink-0 text-brand-ink" aria-label="Marcado pela IA" />}
+              {l.confirmadoEm && <CheckCircle2 size={11} className="shrink-0 text-human-ink" aria-label="Presença confirmada" data-agenda="cartao-confirmado" />}
               {/* Cartão baixo (15 min): uma linha só, com a hora na frente. */}
               {altura(l.inicio, l.fim) < 34 && <span className="shrink-0 tabular-nums text-ink-3">{hhmm(l.inicio)}</span>}
               <span className="truncate">{l.nome || prettyPhone(l.phone)}</span>
@@ -656,6 +658,13 @@ function DetalheDoHorario({
                     {l.origem === "ia" ? "IA, na conversa" : "Time, pela agenda"}
                   </Item>
                   <Item icone={textoLembrete.ok ? Bell : BellOff} rotulo="Lembrete">{textoLembrete.texto}</Item>
+                  {l.lembreteEnviadoEm && (
+                    <Item icone={l.confirmadoEm ? CheckCircle2 : Clock} rotulo="Presença">
+                      <span data-agenda="detalhe-presenca">
+                        {l.confirmadoEm ? `Confirmada pelo contato ${quandoFalado(l.confirmadoEm, agora)}` : "Aguardando confirmação do contato"}
+                      </span>
+                    </Item>
+                  )}
                 </dl>
                 <Button variant="link" size="link" className="mt-4" asChild>
                   <Link href={`/inbox/${encodeURIComponent(l.phone)}`}>

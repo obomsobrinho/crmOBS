@@ -146,6 +146,10 @@ export interface AgendamentoDaPessoa {
   servicoNome: string;
   inicio: number;
   fim: number;
+  /** Quando o lembrete saiu (null = não saiu). */
+  lembreteEnviadoEm?: number | null;
+  /** Quando o contato confirmou presença (null = não confirmou). */
+  confirmadoEm?: number | null;
 }
 
 /**
@@ -534,11 +538,23 @@ export function blocoDaAgenda(a: {
   }
   if (a.daPessoa.length > 0) {
     linhas.push("", "### AGENDAMENTOS DESTA PESSOA");
-    for (const g of a.daPessoa) linhas.push(`- [${g.codigo}] ${g.servicoNome}, ${quandoFalado(g.inicio, a.agora)}`);
+    for (const g of a.daPessoa) {
+      const estado = g.confirmadoEm
+        ? " (confirmado pelo contato)"
+        : g.lembreteEnviadoEm
+          ? " (lembrete enviado, aguardando confirmação)"
+          : "";
+      linhas.push(`- [${g.codigo}] ${g.servicoNome}, ${quandoFalado(g.inicio, a.agora)}${estado}`);
+    }
     linhas.push(
       'Remarcar: siga os passos 2 e 3 com agenda.acao "remarcar" e agenda.agendamento com o código (ex.: "A1").',
       'Cancelar: confirme com a pessoa uma vez; confirmado, action none, agenda.acao "cancelar" e agenda.agendamento com o código.'
     );
+    if (a.daPessoa.some((g) => g.lembreteEnviadoEm && !g.confirmadoEm)) {
+      linhas.push(
+        'Confirmar presença: se a pessoa confirmar (sim, confirmo, ok, estarei lá) um horário com "lembrete enviado, aguardando confirmação", use action none, agenda.acao "confirmar" e agenda.agendamento com o código, e responda curto com o dia e a hora (ex.: "Perfeito, te espero amanhã às 10h30!"). Qualquer outra mensagem você atende normal, sabendo do lembrete.'
+      );
+    }
   }
   return linhas.join("\n");
 }
@@ -547,7 +563,7 @@ export function blocoDaAgenda(a: {
 // Decisão do turno (o que o código faz com a saída do modelo)
 // ————————————————————————————————————————————————————————————————
 
-export type AcaoDaAgenda = "" | "consultar" | "marcar" | "remarcar" | "cancelar";
+export type AcaoDaAgenda = "" | "consultar" | "marcar" | "remarcar" | "cancelar" | "confirmar";
 
 /** O campo `agenda` da saída do modelo (`lib/agent.ts`). */
 export interface SaidaDaAgenda {
@@ -575,6 +591,8 @@ export type DecisaoDaAgenda =
   | { tipo: "marcar"; servico: ServicoDaAgenda; inicio: number; fim: number }
   | { tipo: "remarcar"; servico: ServicoDaAgenda; inicio: number; fim: number; agendamento: AgendamentoDaPessoa }
   | { tipo: "cancelar"; agendamento: AgendamentoDaPessoa }
+  /** O contato confirmou presença (normalmente depois do lembrete). */
+  | { tipo: "confirmar"; agendamento: AgendamentoDaPessoa }
   /** Horário escolhido dentro da antecedência mínima: pedido de ajuda ao time. */
   | { tipo: "escalar"; servico: ServicoDaAgenda; inicio: number }
   /** O horário escolhido não vale (ocupado, fora da grade): o código oferece outros do período. */
@@ -616,6 +634,8 @@ export function decidirAgenda(a: {
 }): DecisaoDaAgenda {
   const agendamento = a.daPessoa.find((g) => g.codigo === a.saida.agendamento.trim().toUpperCase()) ?? null;
   if (a.saida.acao === "cancelar") return agendamento ? { tipo: "cancelar", agendamento } : { tipo: "nada" };
+  // Confirmação de presença (depois do lembrete): só grava, a resposta é da IA.
+  if (a.saida.acao === "confirmar") return agendamento ? { tipo: "confirmar", agendamento } : { tipo: "nada" };
 
   const servico = servicoDaSaida(a.saida.servico, a.servicos);
   if (a.saida.acao === "consultar") {

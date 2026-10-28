@@ -32,6 +32,8 @@ export interface LinhaAgenda {
   marcadoEm: number;
   /** Quando o lembrete saiu, ou null. */
   lembreteEnviadoEm: number | null;
+  /** Quando o contato confirmou presença (depois do lembrete), ou null. */
+  confirmadoEm: number | null;
 }
 
 export interface BloqueioAgenda {
@@ -78,7 +80,7 @@ export interface FonteAgenda {
 export const TETO_DA_SEMANA = 500;
 
 const COLUNAS =
-  "id, phone, nome, servico_id, servico_nome, inicio, fim, status, origem, cancelado_por, resumo, created_at, lembrete_enviado_em";
+  "id, phone, nome, servico_id, servico_nome, inicio, fim, status, origem, cancelado_por, resumo, created_at, lembrete_enviado_em, confirmado_em";
 
 type Bruta = {
   id: number;
@@ -94,6 +96,7 @@ type Bruta = {
   resumo: string | null;
   created_at: string;
   lembrete_enviado_em: string | null;
+  confirmado_em: string | null;
 };
 
 function daBruta(b: Bruta): LinhaAgenda {
@@ -111,6 +114,7 @@ function daBruta(b: Bruta): LinhaAgenda {
     resumo: b.resumo,
     marcadoEm: Date.parse(b.created_at),
     lembreteEnviadoEm: b.lembrete_enviado_em ? Date.parse(b.lembrete_enviado_em) : null,
+    confirmadoEm: b.confirmado_em ? Date.parse(b.confirmado_em) : null,
   };
 }
 
@@ -269,7 +273,7 @@ export function fonteDaMemoriaAgenda(dados: {
       linhas.push({
         id: ++seq, phone: p.phone, nome: p.nome || null, servicoId: s.id, servicoNome: s.nome,
         inicio: p.inicio, fim, status: "confirmado", origem: "time", canceladoPor: null,
-        resumo: p.resumo.trim() || null, marcadoEm: dados.agora, lembreteEnviadoEm: null,
+        resumo: p.resumo.trim() || null, marcadoEm: dados.agora, lembreteEnviadoEm: null, confirmadoEm: null,
       });
       return { ok: true };
     },
@@ -283,7 +287,7 @@ export function fonteDaMemoriaAgenda(dados: {
       const fim = inicio + (l.fim - l.inicio);
       if (conflita(inicio, fim, ocupados(id))) return { ok: false, erro: "esse horário já está ocupado" };
       linhas = linhas.map((x) => (x.id === id ? { ...x, status: "cancelado", canceladoPor: "time" } : x));
-      linhas.push({ ...l, id: ++seq, inicio, fim, marcadoEm: dados.agora, lembreteEnviadoEm: null });
+      linhas.push({ ...l, id: ++seq, inicio, fim, marcadoEm: dados.agora, lembreteEnviadoEm: null, confirmadoEm: null });
       return { ok: true };
     },
     async bloquear(p) {

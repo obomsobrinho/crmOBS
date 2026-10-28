@@ -183,8 +183,8 @@ const OUTPUT_SCHEMA = {
       properties: {
         acao: {
           type: "string",
-          enum: ["", "consultar", "marcar", "remarcar", "cancelar"],
-          description: 'Só com a seção AGENDA. "" quando não há nada a consultar, marcar, remarcar ou cancelar neste turno.',
+          enum: ["", "consultar", "marcar", "remarcar", "cancelar", "confirmar"],
+          description: 'Só com a seção AGENDA. "" quando não há nada a consultar, marcar, remarcar, cancelar ou confirmar neste turno.',
         },
         servico: {
           type: "string",
@@ -205,7 +205,7 @@ const OUTPUT_SCHEMA = {
         },
         agendamento: {
           type: "string",
-          description: 'Código do agendamento da seção AGENDAMENTOS DESTA PESSOA (ex.: "A1"), em remarcar e cancelar. Vazio no resto.',
+          description: 'Código do agendamento da seção AGENDAMENTOS DESTA PESSOA (ex.: "A1"), em remarcar, cancelar e confirmar. Vazio no resto.',
         },
       },
       required: ["acao", "servico", "dia", "periodo", "hora", "agendamento"],
@@ -412,7 +412,9 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
 function normalizarSaidaDaAgenda(v: unknown): SaidaDaAgenda {
   const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   const acao =
-    o.acao === "consultar" || o.acao === "marcar" || o.acao === "remarcar" || o.acao === "cancelar" ? o.acao : "";
+    o.acao === "consultar" || o.acao === "marcar" || o.acao === "remarcar" || o.acao === "cancelar" || o.acao === "confirmar"
+      ? o.acao
+      : "";
   const curto = (x: unknown, n: number) => (typeof x === "string" ? x.trim().slice(0, n) : "");
   return {
     acao,

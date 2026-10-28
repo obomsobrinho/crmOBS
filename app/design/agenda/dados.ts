@@ -47,7 +47,7 @@ export function linhas(agora: number): LinhaAgenda[] {
     return {
       id: id++, servicoId: servico.id, servicoNome: servico.nome, inicio, fim: inicio + servico.duracaoMin * MIN,
       status: "confirmado", origem: "ia", canceladoPor: null, resumo: null,
-      marcadoEm: agora - 2 * 86_400_000, lembreteEnviadoEm: null, ...resto,
+      marcadoEm: agora - 2 * 86_400_000, lembreteEnviadoEm: null, confirmadoEm: null, ...resto,
     };
   };
   const [exame, ajuste, retirada] = SERVICOS;
@@ -56,7 +56,8 @@ export function linhas(agora: number): LinhaAgenda[] {
     em(0, "11:00", retirada, { nome: "Carlos Mendes", phone: "5511944443333" }),
     em(0, "16:30", exame, { nome: "Beatriz Lima", phone: "5511933332222", origem: "time" }),
     em(0, "17:30", ajuste, { nome: "Rafael Souza", phone: "5511922221111", status: "cancelado", canceladoPor: "cliente" }),
-    em(1, "10:30", exame, { nome: "Juliana Prado", phone: "5511988887777", resumo: "Quer trocar as lentes por multifocais." }),
+    em(1, "10:30", exame, { nome: "Juliana Prado", phone: "5511988887777", resumo: "Quer trocar as lentes por multifocais.",
+      lembreteEnviadoEm: agora - 3_600_000, confirmadoEm: agora - 1_800_000 }),
     em(1, "15:00", ajuste, { nome: "Marcos Vieira", phone: "5511977776666" }),
     em(2, "11:00", exame, { nome: "Fernanda Costa", phone: "5511966665555" }),
     em(2, "14:30", retirada, { nome: null, phone: "5511955554444" }),

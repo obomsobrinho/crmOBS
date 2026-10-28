@@ -225,3 +225,11 @@ test("a ficha do contato mostra os agendamentos dele (futuro, cancelado e passad
   await expect(itens.nth(1)).toContainText("Cancelado");
   await expect(itens.nth(2)).toContainText("Realizado");
 });
+
+test("horário confirmado pelo contato aparece no cartão e no detalhe", async ({ page }) => {
+  await page.goto("/design/agenda");
+  const cartao = page.locator('[data-agenda="cartao"]', { hasText: "Juliana Prado" });
+  await expect(cartao.locator('[data-agenda="cartao-confirmado"]')).toBeVisible();
+  await cartao.click();
+  await expect(page.locator('[data-agenda="detalhe-presenca"]')).toContainText("Confirmada pelo contato");
+});

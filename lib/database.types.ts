@@ -136,6 +136,7 @@ export type Database = {
           remarcado_de: number | null
           lembrete_enviado_em: string | null
           lembrete_falhou_em: string | null
+          confirmado_em: string | null
           resumo: string | null
           servico_id: number | null
           servico_nome: string
@@ -156,6 +157,7 @@ export type Database = {
           remarcado_de?: number | null
           lembrete_enviado_em?: string | null
           lembrete_falhou_em?: string | null
+          confirmado_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome: string
@@ -176,6 +178,7 @@ export type Database = {
           remarcado_de?: number | null
           lembrete_enviado_em?: string | null
           lembrete_falhou_em?: string | null
+          confirmado_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome?: string
