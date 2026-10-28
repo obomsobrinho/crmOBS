@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -125,18 +125,18 @@ export type Database = {
           cancelado_em: string | null
           cancelado_por: string | null
           client_id: string
+          confirmado_em: string | null
           created_at: string
           criado_por: string | null
           fim: string
           id: number
           inicio: string
+          lembrete_enviado_em: string | null
+          lembrete_falhou_em: string | null
           nome: string | null
           origem: string
           phone: string
           remarcado_de: number | null
-          lembrete_enviado_em: string | null
-          lembrete_falhou_em: string | null
-          confirmado_em: string | null
           resumo: string | null
           servico_id: number | null
           servico_nome: string
@@ -146,18 +146,18 @@ export type Database = {
           cancelado_em?: string | null
           cancelado_por?: string | null
           client_id: string
+          confirmado_em?: string | null
           created_at?: string
           criado_por?: string | null
           fim: string
           id?: never
           inicio: string
+          lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
           nome?: string | null
           origem: string
           phone: string
           remarcado_de?: number | null
-          lembrete_enviado_em?: string | null
-          lembrete_falhou_em?: string | null
-          confirmado_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome: string
@@ -167,18 +167,18 @@ export type Database = {
           cancelado_em?: string | null
           cancelado_por?: string | null
           client_id?: string
+          confirmado_em?: string | null
           created_at?: string
           criado_por?: string | null
           fim?: string
           id?: never
           inicio?: string
+          lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
           nome?: string | null
           origem?: string
           phone?: string
           remarcado_de?: number | null
-          lembrete_enviado_em?: string | null
-          lembrete_falhou_em?: string | null
-          confirmado_em?: string | null
           resumo?: string | null
           servico_id?: number | null
           servico_nome?: string
@@ -419,9 +419,9 @@ export type Database = {
       }
       clients: {
         Row: {
+          agenda_config: Json | null
           agent_config: Json | null
           agent_config_updated_at: string | null
-          agenda_config: Json | null
           agent_enabled: boolean
           agent_published_at: string | null
           billing_customer_id: string | null
@@ -449,9 +449,9 @@ export type Database = {
           vitalicio_desde: string | null
         }
         Insert: {
+          agenda_config?: Json | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
-          agenda_config?: Json | null
           agent_enabled?: boolean
           agent_published_at?: string | null
           billing_customer_id?: string | null
@@ -479,9 +479,9 @@ export type Database = {
           vitalicio_desde?: string | null
         }
         Update: {
+          agenda_config?: Json | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
-          agenda_config?: Json | null
           agent_enabled?: boolean
           agent_published_at?: string | null
           billing_customer_id?: string | null
@@ -1163,18 +1163,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      agenda_etapa_do_funil: {
-        Args: { p_ativa: boolean; p_client: string }
-        Returns: undefined
-      }
-      admin_lembretes_com_falha: {
-        Args: { p_clients: string[] }
-        Returns: {
-          client_id: string
-          falhas: number
-          mais_antiga: string
-        }[]
-      }
       admin_apagar_cliente: {
         Args: {
           p_client: string
@@ -1193,6 +1181,10 @@ export type Database = {
           nome: string
         }[]
       }
+      admin_cliente_picos: {
+        Args: { p_ate: string[]; p_client: string; p_de: string[] }
+        Returns: Json
+      }
       admin_cliente_solucoes: {
         Args: {
           p_ate?: string[]
@@ -1206,10 +1198,6 @@ export type Database = {
           n: number
           solucao: string
         }[]
-      }
-      admin_cliente_picos: {
-        Args: { p_ate: string[]; p_client: string; p_de: string[] }
-        Returns: Json
       }
       admin_cliente_uso: {
         Args: {
@@ -1273,6 +1261,14 @@ export type Database = {
           linha: Json
         }[]
       }
+      admin_lembretes_com_falha: {
+        Args: { p_clients: string[] }
+        Returns: {
+          client_id: string
+          falhas: number
+          mais_antiga: string
+        }[]
+      }
       admin_mudar_conta: {
         Args: {
           p_acao: string
@@ -1282,14 +1278,6 @@ export type Database = {
           p_quem: string
         }
         Returns: string
-      }
-      admin_pedidos_abertos: {
-        Args: { p_clients: string[] }
-        Returns: {
-          abertos: number
-          client_id: string
-          mais_antigo: string
-        }[]
       }
       admin_mudar_limite_ia: {
         Args: {
@@ -1305,16 +1293,57 @@ export type Database = {
           depois: number
         }[]
       }
+      admin_pedidos_abertos: {
+        Args: { p_clients: string[] }
+        Returns: {
+          abertos: number
+          client_id: string
+          mais_antigo: string
+        }[]
+      }
+      admin_pedidos_do_cliente: {
+        Args: {
+          p_client: string
+          p_cursor_em?: string
+          p_cursor_id?: number
+          p_fora?: string[]
+          p_limite?: number
+        }
+        Returns: {
+          display_name: string
+          id: number
+          motivo: string
+          nomewpp: string
+          opened_at: string
+          phone: string
+          summary: string
+        }[]
+      }
+      admin_pedidos_por_motivo: {
+        Args: { p_client: string; p_fora?: string[] }
+        Returns: {
+          abertos: number
+          mais_antigo: string
+          motivo: string
+        }[]
+      }
       admin_registrar_exportacao: {
         Args: { p_client: string; p_quem: string }
         Returns: boolean
       }
-      admin_tabelas_fora_da_purga: { Args: { p_tabelas: string[] }; Returns: string[] }
+      admin_tabelas_fora_da_purga: {
+        Args: { p_tabelas: string[] }
+        Returns: string[]
+      }
       admin_usuarios_so_do_cliente: {
         Args: { p_client: string }
         Returns: {
           user_id: string
         }[]
+      }
+      agenda_etapa_do_funil: {
+        Args: { p_ativa: boolean; p_client: string }
+        Returns: undefined
       }
       chat_resumo_conversa: {
         Args: { p_phone: string }

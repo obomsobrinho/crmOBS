@@ -5,7 +5,7 @@
 -- painel_series e painel_verbatim, recriadas iguais a 20261001225553 com essa unica mudanca.
 -- Prova: e2e/painel-agregado.serial.spec.ts.
 --
--- NAO APLICADA. Escrita junto com a agenda; aplicar so com o OK do dono (supabase/README.md).
+-- Aplicada em 28/10/2026 com o OK do dono, depois de 20261028193508 (sequencia de deploy da agenda).
 
 create or replace function public.painel_janelas(
   p_client uuid,

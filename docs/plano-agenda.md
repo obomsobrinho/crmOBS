@@ -146,7 +146,7 @@ start is the previous end + buffer.
   so the model has no list of its own to offer from.
 - This changes the prompt base for every tenant: `npm run test:e2e:ia` (paid) before any deploy.
 
-## 5. Data model (`supabase/migrations/20261028050000_agenda_propria.sql`, NOT applied)
+## 5. Data model (`supabase/migrations/20261028193508_agenda_propria.sql`, NOT applied)
 
 - `clients.agenda_config jsonb` (null = off): `{ ativa, antecedenciaMin, intervaloMin, inicio,
   lembrete, horario }`, normalized by `normalizarConfigDaAgenda`. `horario` = the agenda's OWN days and
@@ -245,7 +245,7 @@ sends by itself once the env var exists.
   label "Lembrete automático" (`components/thread/bolhas.ts`, `BubbleView`) and the AI has it in
   the history (`processTurn` reads `chat_messages`; nothing in n8n). `lembrete` is neither an AI
   nor a team reply: `lib/mensagem.ts` (`ehLembrete`, `respostaDaIa`), the SQL copies in the NEW
-  migration `20261028060000_lembrete_nao_e_resposta.sql` (`painel_janelas`, `painel_series`,
+  migration `20261028193556_lembrete_nao_e_resposta.sql` (`painel_janelas`, `painel_series`,
   `painel_verbatim`, not applied), `docs/instrumentacao-uso.md` and the mass of
   `e2e/painel-agregado.serial.spec.ts` (which proves TS and SQL agree once the migration is applied).
 
@@ -257,7 +257,7 @@ Final test plan for the deploy approval (in this order):
 |---|---|---|---|
 | 1 | `npm run typecheck`, `npm run lint`, `npm run checar`, `npm run build` | free | green on this branch |
 | 2 | `npm run test:e2e -- --project=sem-login` and `--project=mobile` (agenda rules, holidays, periods, reminder days and text, confirmation, prompt block, grid, settings, contact card, "who replied" with `lembrete`) | free | green except the known `central-clientes` meter failure, which predates the agenda |
-| 3 | Owner applies both migrations (`20261028050000_agenda_propria.sql`, `20261028060000_lembrete_nao_e_resposta.sql`) and regenerates `lib/database.types.ts` (written by hand here) | free | pending |
+| 3 | Owner applies both migrations (`20261028193508_agenda_propria.sql`, `20261028193556_lembrete_nao_e_resposta.sql`) and regenerates `lib/database.types.ts` (written by hand here) | free | pending |
 | 4 | `npm run test:e2e:login` (real DB, OBS tenant, includes `painel-agregado.serial` with the new `lembrete` rows); run it alone, nobody else on the test tenant | free | pending (needs step 3) |
 | 5 | Manual on Loja Teste: turn the agenda on, book, reschedule, cancel and block from `/agenda`; the "Agendado" column appears and goes back when turned off | free | pending |
 | 6 | `npm run test:e2e:ia` (12 real-brain traps): the prompt base changed for every tenant (agenda contract, the "Agendar" goal gone) | paid | pending, only when named |

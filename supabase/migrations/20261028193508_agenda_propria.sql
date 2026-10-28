@@ -3,7 +3,7 @@
 -- tenant, servicos com duracao, bloqueios e agendamentos. A conta de horario livre mora em
 -- lib/agenda.ts; aqui so o que o banco precisa garantir.
 --
--- NAO APLICADA. Escrita numa madrugada sem o dono; aplicar so com o OK dele (supabase/README.md).
+-- Aplicada em 28/10/2026 com o OK do dono (sequencia de deploy da agenda, docs/plano-agenda.md secao 8).
 --
 -- Escrita: so rotas do servidor e o cerebro (service_role). Leitura: membros do tenant, por RLS.
 -- Dois agendamentos confirmados do mesmo tenant nunca se sobrepoem: exclusion constraint com
