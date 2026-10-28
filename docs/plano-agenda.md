@@ -131,6 +131,21 @@ Grid of start times (`iniciosDoDia`): "hora" and "meia" walk the marks inside th
 a busy block the next start is end + buffer rounded up to the next mark. "seguido" chains: each
 start is the previous end + buffer.
 
+### 4b. Agent prompt (what changed on 28/10/2026)
+
+- The "Agendar" goal left the form and the config (`GOALS`, `validateConfig` drops it from old
+  configs and presets). The agenda switch, valid for the turn (agenda on, hours, at least one
+  service), decides it: `personaDoTenant(client, agenda !== null)` and the bench pass
+  `agendaAtiva` to `compilePersona`.
+- Agenda off (guided and advanced): the base contract says "NUNCA use agendar"; a request for a
+  time becomes `pausar` (help request). This also changes tenants in advanced mode whose text
+  says "use agendar" (the base wins by PRECEDÊNCIA).
+- Agenda on: OBJETIVO, FLUXO and OUTPUT send the model to the `### AGENDA` section; `agendar` only
+  for a time the system offered; `preferencia_horario` is filled by the system. The
+  `### CALENDÁRIO` block stops listing hours per period (`calendarioBlock(..., semOfertas)`),
+  so the model has no list of its own to offer from.
+- This changes the prompt base for every tenant: `npm run test:e2e:ia` (paid) before any deploy.
+
 ## 5. Data model (`supabase/migrations/20261028050000_agenda_propria.sql`, NOT applied)
 
 - `clients.agenda_config jsonb` (null = off): `{ ativa, antecedenciaMin, intervaloMin, inicio,
@@ -146,23 +161,40 @@ start is the previous end + buffer.
 - RLS on, members read, writes only by server routes and the brain. `agendamentos` in the realtime
   publication with `REPLICA IDENTITY FULL`. All three tables in `TABELAS_DO_CLIENTE`.
 
-## 6. Still open (not decided by the owner; marked PENDENTE in the code)
+## 6. Final decisions of 28/10/2026 (owner, item by item) and what is still open
 
+Decided and built:
+| # | Decision | Where |
+|---|---|---|
+| A | National holidays (fixed and Good Friday, computed, no API) are marked on the grid and blocked for the AI; the owner releases a specific one in the settings | `lib/feriados.ts`, `feriadoQueFecha`, `agenda_config.feriadosLiberados` |
+| B | Block one or more whole days with a reason (local holiday, recess, vacation); the AI offers nothing and the grid shows the block on every day it covers | "Bloquear" dialog, "Dias inteiros" |
+| C | The contact's bookings (future, past, cancelled) on the contact card, newest first, 10 at a time; titled "Horários marcados" (mixed audience) | `components/ContactAgendamentos.tsx` |
+| 1 | The AI reads the periods from the agenda hours (13h to 17h means afternoon only); morning before 12h, afternoon 12h to 18h, evening from 18h | `periodosDoDia`, `resumoDosPeriodos`, `textoDaConsulta` |
+| 2 | Reminder on by default | `AGENDA_PADRAO.lembrete` |
+| 3 | Settings: gear on the Agenda plus an entry in the agent | `/agenda/configuracoes` |
+| 4 | The old "Agendar" goal is gone; the agenda switch drives the prompt (see section 4b) | `lib/agent-prompt.ts` |
+| 5 | Turning the agenda off sends "Agendado" contacts back to the previous column and archives it | `agenda_etapa_do_funil` (migration file) |
+| 6 | Clicking an empty slot opens "Marcar horário" with day and time filled | grid |
+| 7 | Cancelled bookings stay off the grid and live on the contact card | grid, card |
+| 9 | Random 20 to 60 s between messages of the same company; companies in parallel | `REGRAS_DO_LEMBRETE`, `/api/agenda/lembretes` |
+| 10 | A contact who never wrote still gets the reminder | no check |
+| 11 | Expired trial or late payment: no reminder | `accessState` in the route |
+| 12 | A failed send raises an icon in the owner's central (like open help requests) and is retried by the next run while the booking is still ahead | `lembrete_falhou_em`, `admin_lembretes_com_falha` |
+| R1 | No daily cap (the volume is the number of bookings) | `tetoDiario: null` |
+
+Still open:
 | # | Question | What the code does now |
 |---|---|---|
-| P1 | Where each period starts and ends | morning before 12h, afternoon 12h to 18h, evening from 18h (`PERIODOS_DA_AGENDA`) |
-| P2 | ~~"Last open moment" for a reminder~~ | decided: a single run at 9h (section 7) |
-| P3 | Reminder on or off by default | on (`AGENDA_PADRAO.lembrete`) |
-| P4 | Where "Configurações" lives in the menu | page `/agenda/configuracoes`, reached by the agenda gear and a link in Agente, "O que ele pode fazer" |
 | P5 | The activation item in onboarding (montagem) | not built |
-| P6 | What happens to the old "Agendar" goal (team confirms) now that the agenda switch decides | the agenda switch wins; the goal still drives the prompt when the agenda is off |
-| P7 | Conversations already in "Agendado" when the agenda is turned off | the stage is archived; the conversations keep the key |
-| P8 | Clicking an empty slot of the grid to book there | not built (button "Marcar horário") |
-| P9 | Cancelled bookings on screen | not shown in the grid |
-| P10 | The reminder text and "SAIR" | moved to section 7 (R4) |
+| H1 | Carnaval and Corpus Christi (optional days, "ponto facultativo") | shown on the settings list, not blocked |
+| L1 | The reminder text (two proposals below) | current fixed text in `textoDoLembrete` until approved |
+| L2 | Vercel function limit | `maxDuration = 300` assumes Fluid Compute (default on new projects); check the project settings, otherwise lower it to 60 and `ORCAMENTO_MS` to 50 s |
+| B1 | The bench (`/api/playground`) reads only whether the agenda is on, not whether it has services and hours | the live turn checks all three |
 
-Decided on 28/10/2026 (was P11): the agenda hours MAY go beyond the business hours, with no block
-(owner: "Pode passar"); the reminder still goes inside the business hours.
+Reminder text proposals (fixed text, no AI, no "SAIR"), for the owner to pick:
+- Version 1 (active confirmation): "Oi, {nome}! Seu horário de {serviço} na {empresa} está reservado para você {amanhã, quinta, 29/10, às 10h30}. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu remarco por aqui."
+- Version 2 (short, reschedule first): "{nome}, passando para lembrar: {amanhã, quinta, 29/10, às 10h30} você tem {serviço} na {empresa}. Guardamos esse horário só para você. Se não puder vir, me avise por aqui que eu encontro outro horário."
+Both use the contact's name when known (otherwise no name), say the day and time in full, and offer rescheduling instead of cancelling. A "SIM" answer reaches the AI as a normal message; recording a confirmation status is not built.
 
 ## 7. Automatic reminder (owner decision of 28/10/2026, "9h"; built, not turned on)
 
@@ -190,15 +222,13 @@ Replaces "24h before, inside business hours", pending P2 and the open scheduler 
    último dia em que a loja abre antes dele)." The booking detail shows the day of the reminder,
    "enviado" once sent, or "sem lembrete".
 
-Pending before turning it on (project rules for active messaging, `CLAUDE.md`; values not decided):
-| # | Question | What the code does now |
-|---|---|---|
-| R1 | Daily cap per company | none (`REGRAS_DO_LEMBRETE.tetoDiario = null`) |
-| R2 | Random interval between messages | none (`intervaloMs = null`) |
-| R3 | Recent conversation required? A contact booked by hand by the team may never have written | not checked |
-| R4 | "Responda SAIR" in the text, and what SAIR does | not in the text; no opt-out stored |
-| R5 | Company with an expired trial or late payment | still sends (only deactivated or blocked companies are skipped) |
-| R6 | A run that fails (Evolution down) | the claim is released; the next run covers only its own days, so that reminder is lost |
+Decided on 28/10/2026 (was R1 to R6): no daily cap; 20 to 60 s between messages of the same
+company, companies in parallel; a run that does not fit in the function time stops with a margin
+and calls itself (`?continuacao=1`), starting every queue with a full pause so the gap never
+drops below 20 s; contacts who never wrote get it; expired trial or late payment get none; a
+refused send is recorded (`lembrete_falhou_em`, icon in the central) and retried while the
+booking is ahead. The route accepts `Authorization: Bearer <CRON_SECRET>`, the header Vercel Cron
+sends by itself once the env var exists.
 
 ## 8. Tests
 

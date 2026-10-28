@@ -58,3 +58,15 @@ one strict-JSON call that n8n reads; the persona is the cached prefix.
   be regenerated after applying.
 - The layout reads `agenda_config` once per navigation for the menu (`agendaAtivaDoTenant`); fold
   it into `getMyClient` after the migration is in production.
+
+## Final decisions (owner, 2026-10-28)
+- National holidays (computed in `lib/feriados.ts`) are blocked for the AI unless the owner releases
+  one (`agenda_config.feriadosLiberados`); optional days only show. Whole-day blocks with a reason.
+- The AI reads the periods from the agenda hours (`periodosDoDia`).
+- The old "Agendar" goal is gone: the agenda switch drives OBJETIVO, FLUXO and OUTPUT; without it
+  nobody books (guided and advanced), a request for a time becomes `pausar`.
+- Turning the agenda off sends "Agendado" contacts back to the previous column.
+- Reminder: 20 to 60 s between messages per company, companies in parallel, self-chaining runs;
+  never to an expired or late account; a refused send is recorded and retried, with an icon in the
+  owner's central.
+- The contact card shows the contact's bookings ("Horários marcados").
