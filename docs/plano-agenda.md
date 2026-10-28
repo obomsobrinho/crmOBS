@@ -2,8 +2,9 @@
 
 **Status: owner decided on 28/10/2026: OWN agenda, not Google Calendar** ("vamos seguir com a nossa
 mesmo"). The MVP is implemented on branch `claude/agenda-plano-0fc545`, NOT deployed and with the
-migration NOT applied anywhere. Every other business choice below is a DEFAULT picked overnight
-for the owner to confirm or change; they all live in one place, `AGENDA_PADRAO` in `lib/agenda.ts`.
+migration NOT applied anywhere. The owner reviewed the screens and decided the rules on 28/10/2026
+(section 3); what is still open is listed in section 6. Every value lives in `lib/agenda.ts`.
+
 ADR: `docs/adr/2026-10-28-own-agenda-slots-in-prompt.md` (Proposed until the owner approves the
 build).
 
@@ -36,106 +37,138 @@ Market (see section 9): clinic and salon tools (GestãoDS/ChatGDS, Clínica nas 
 the agenda; the AI receptionist atenda.pt integrates with "a sua agenda" (provider not stated);
 DeskcommCRM owns it and syncs to Google as an option.
 
-## 3. MVP scope (implemented)
+## 3. Owner's decisions of 28/10/2026 (review of `/design/agenda`, "Pode mandar")
 
-- **Services with duration** per tenant (`agenda_servicos`).
-- **Availability** = business hours already in the agent config (`horarioCadastrado`) minus
-  bookings minus **blocked times** (`agenda_bloqueios`), with minimum notice, horizon and buffer.
-- **Conflict prevention** in the database: an exclusion constraint makes two confirmed bookings
-  of the same tenant that overlap impossible (`btree_gist`). The code also checks blocks.
-- **Panel `/agenda`**: day or week list, create, cancel, reschedule, block times, settings
-  (owner). `/design/agenda` shows the same screen with fake data.
-- **AI booking**: when the tenant turned the agenda on and has the goal `agendar`, each turn gets
-  `### HORÁRIOS LIVRES` computed by code with short codes; the model picks one code; the code
-  validates, books, and fixes the reply if the slot was taken in between. Reschedule and cancel in
-  the chat use the same contract.
-- **Notice to the team**: booking keeps going through n8n's "Notifica grupo" (unchanged), now with
-  the exact slot in `preferencia_horario`; cancel and reschedule are noticed by the app (same
-  destination, `notify_group_jid`), DDD 00 never noticed.
-- **Reminders: stub.** A one-click "Lembrete" in the panel copies a ready text and opens the
-  conversation. Automatic reminders need a scheduler plus active messaging over QR or the Official
-  API: not built (decision D8).
+These replace the overnight defaults D2 to D15 wherever they differ.
 
-Out: several professionals or rooms, recurring blocks, waiting list, Google sync, public booking
-page, automatic reminders.
+AI rules
+1. The AI confirms by itself.
+2. The AI ALWAYS asks the day and the period (morning, afternoon, evening) first, and only then
+   offers at most 3 times of that period, the nearest ones. Never more than 3, even when more are
+   free.
+3. No limit of days ahead for the AI: it offers the nearest within the requested day and period.
+4. Minimum notice, configurable, default 2h. A free time INSIDE that window (free at 14h, asked at
+   13h30) the AI does not book: it says it will confirm with the team and opens a help request
+   (`pausar`) for the owner to decide. It escalates, it does not hide.
+5. The customer reschedules and cancels in the chat.
+6. The team books by hand outside business hours and with no day limit; the AI does not.
 
-## 4. Flow
+Reminder
+7. Automatic over WhatsApp, fixed text, no AI cost, 24h before, ALWAYS inside business hours. When
+   24h before falls outside them, it goes at the last open moment before that (Monday 9h with
+   Sunday closed: Saturday). A booking made less than 24h ahead gets no reminder. Setting: on/off.
+
+Settings (Configurações, section Agenda)
+8. An "Agenda" item with an on/off checkbox and a short text. Checked opens the settings below.
+   Off: the Agenda disappears from the menu, the funnel and the AI prompt. The activation also
+   appears in onboarding as the same item.
+9. Days and hours = the existing business hours (single source).
+10. Services: list with "+ Adicionar serviço", each with a name and a free duration in minutes.
+    Owner only. With a single service the AI does not ask which.
+11. Buffer between bookings: 0, 5, 10, 15 or 30 min.
+12. "Os horários começam": on the hour (8h, 9h, 10h); on the hour or half hour (8h, 8h30, 9h,
+    default); right after the previous one (8h, 8h40, 9h20). When the buffer is above 0: "O
+    intervalo de N min entre horários já entra na conta." (end + buffer, rounded up to the next
+    mark of the option).
+13. Minimum notice: free value, default 2h, with the sentence "A IA só marca sozinha com pelo menos
+    2h de antecedência. Se o cliente pedir um horário mais próximo, ela avisa que vai confirmar e
+    chama você."
+14. One agenda per company, all plans.
+
+Funnel and menu
+15. With the agenda on, the funnel gets an "Agendado" column (suggested name) and booking moves the
+    contact there. Without the agenda, the column does not exist.
+16. Menu: Agenda between Conversas and Contatos, only with the agenda on.
+
+Layout
+17. Weekly grid in the Google Calendar and Teams style (reference: Clinic Radar on Dribbble): day
+    columns with a counter, the "now" line, cards with a colored left bar, name and time, today
+    highlighted.
+18. No side list of appointments. Instead a month mini calendar with the shown week highlighted;
+    clicking a week moves the grid; arrows and the month on top also navigate.
+19. Clicking a booking opens the detail: who (contact, phone), service, time, what it is about, and
+    reschedule and cancel.
+
+## 4. How it works now (implemented)
 
 ```
 Customer: "queria marcar"
-processTurn (agenda on + goal agendar)
-  1. read services, config, future bookings and blocks of the tenant (one query each, bounded)
-  2. lib/agenda.ts: free slots per service -> ### HORÁRIOS LIVRES with codes (S1, S2, ...)
-     plus ### AGENDAMENTOS DESTA PESSOA (future bookings of this phone, codes A1...)
-  3. runAgent: one call, same strict JSON + `agenda` {acao, horario, agendamento}
-AI: "Tenho quinta, 30/10, às 9h, 10h30 ou 14h. Qual fica melhor?"   (action none)
-Customer: "10h30"
-AI: action agendar, agenda {acao: marcar, horario: S2}
-  4. code: S2 must be in THIS turn's list; insert into agendamentos
-     ok   -> reply as written; preferencia_horario = "quinta, 30/10, às 10h30"
-     23P01 (overlap) or invalid -> replace the reply with a code-written one offering
-             the next free slots; action none
-  5. n8n sends the reply and notices the team (unchanged)
-Reschedule: acao remarcar + horario + agendamento (A1): new booking, old one cancelled.
-Cancel: acao cancelar + agendamento: booking cancelled, team noticed by the app.
+processTurn (agenda on, business hours registered, at least one service)
+  ### AGENDA block (after CALENDÁRIO, cache prefix untouched): the contract, the services
+  (codes V1, V2 only when more than one) and the person's future bookings (A1...). NO times.
+AI: asks the service (if several), then the day and the period
+Customer: "quinta à tarde"
+AI output: agenda {acao: consultar, dia: 2026-10-29, periodo: tarde}
+  code reads ONLY that day (no day limit), consultarPeriodo():
+    up to 3 nearest free times of the period, outside the notice window -> CODE writes the reply
+      "Amanhã, quinta, 29/10, à tarde, tenho 14h, 14h30 ou 15h. Qual fica melhor?"
+    free only inside the notice window -> code writes "vou confirmar com a equipe", action pausar
+    nothing free -> "não tenho horário livre. Prefere outro período ou outro dia?"
+Customer: "14h30"
+AI output: action agendar, agenda {acao: marcar, dia, hora: 14:30}
+  code: validarHorario() -> ok: book (DB exclusion constraint), reminder time stored,
+        conversation moves to "Agendado"; inside the notice window: help request;
+        taken or off the grid: code offers the 3 nearest of the same period
+n8n sends the reply and notices the team (unchanged)
 ```
 
-Without the agenda on, nothing changes. If the agenda tables are missing (migration not applied)
-or a read fails, the turn runs exactly as today.
+Reschedule: the same two steps with `acao: remarcar` and `agendamento: A1` (the old time does not
+count as busy). Cancel: `acao: cancelar` + `agendamento`, the team is noticed by the app.
+
+Grid of start times (`iniciosDoDia`): "hora" and "meia" walk the marks inside business hours; after
+a busy block the next start is end + buffer rounded up to the next mark. "seguido" chains: each
+start is the previous end + buffer.
 
 ## 5. Data model (`supabase/migrations/20261028050000_agenda_propria.sql`, NOT applied)
 
-- `clients.agenda_config jsonb` (null = off): `{ ativa, antecedenciaMin, diasAFrente,
-  intervaloMin }`, normalized by `normalizarConfigDaAgenda`.
-- `agenda_servicos` (id, client_id, nome, duracao_min 5..480, ativo, ordem).
-- `agenda_bloqueios` (id, client_id, inicio, fim, motivo, criado_por).
-- `agendamentos` (id, client_id, phone, nome, servico_id, servico_nome snapshot, inicio, fim,
-  status `confirmado`/`cancelado`, origem `ia`/`time`, criado_por, cancelado_em, cancelado_por
-  `cliente`/`time`, remarcado_de) with `exclude using gist (client_id with =, tstzrange(inicio,
-  fim) with &&) where (status = 'confirmado')`.
-- RLS on, members read their tenant, writes only through server routes (service_role) and the
-  brain. No grant to `anon`. `agendamentos` in `supabase_realtime`. All three in
-  `TABELAS_DO_CLIENTE`.
+- `clients.agenda_config jsonb` (null = off): `{ ativa, antecedenciaMin, intervaloMin, inicio,
+  lembrete }`, normalized by `normalizarConfigDaAgenda`.
+- `agenda_servicos` (name, `duracao_min` 5..480, `ativo`, `ordem`).
+- `agenda_bloqueios` (start, end, reason).
+- `agendamentos` (phone, name, service snapshot, start, end, status, origin, `resumo` = what it is
+  about, `lembrete_em`, `lembrete_enviado_em`, cancel fields, `remarcado_de`), exclusion constraint
+  against overlap, partial index on pending reminders.
+- `agenda_etapa_do_funil(p_client, p_ativa)`: on creates (or unarchives) the canonical "Agendado"
+  stage right after "Aguardando atendimento"; off archives it. Called by `PUT /api/agenda/config`.
+- RLS on, members read, writes only by server routes and the brain. `agendamentos` in the realtime
+  publication with `REPLICA IDENTITY FULL`. All three tables in `TABELAS_DO_CLIENTE`.
 
-## 6. Defaults I chose (the owner decides; all in `AGENDA_PADRAO`, `lib/agenda.ts`)
+## 6. Still open (not decided by the owner; marked PENDENTE in the code)
 
-| # | Question | Default | Alternatives |
-|---|---|---|---|
-| D2 | Who confirms | AI confirms on the spot | team approves each |
-| D3 | Minimum notice | 2 hours | none, 1h, 4h, 1 day |
-| D4 | How far ahead | 14 days | 7, 30, 60 |
-| D5 | Buffer between bookings | 0 min | 10, 15, 30 |
-| D6 | Slot grid | every 30 min | 15, 60 |
-| D7 | Slots offered at once | up to 3, spread across the day | whole day |
-| D8 | Reminders | manual (copy text, open conversation) | automatic over QR under the active-messaging rules; automatic on the Official API |
-| D9 | Customer reschedules or cancels in the chat | yes, AI does it, team noticed | goes to the team |
-| D10 | Funnel stage after booking | unchanged (`agendar` still moves to `aguardando_humano`) | new canonical "Agendado" |
-| D11 | Several professionals | no (one agenda per tenant) | yes |
-| D12 | Plans | all plans | Profissional and up; add-on |
-| D13 | Menu | "Agenda" leaves "Em breve", between Conversas and Contatos, for owner and attendants | owner only |
-| D14 | Who edits services, hours rules, blocks | owner edits services and rules; any member blocks times and books | owner only |
-| D15 | Team booking outside business hours | allowed (warning only) | blocked |
+| # | Question | What the code does now |
+|---|---|---|
+| P1 | Where each period starts and ends | morning before 12h, afternoon 12h to 18h, evening from 18h (`PERIODOS_DA_AGENDA`) |
+| P2 | "Last open moment" for a reminder that falls outside business hours | 30 min before closing (`LEMBRETE_ANTES_DE_FECHAR_MIN`) |
+| P3 | Reminder on or off by default | on (`AGENDA_PADRAO.lembrete`) |
+| P4 | Where "Configurações" lives in the menu | page `/agenda/configuracoes`, reached by the agenda gear and a link in Agente, "O que ele pode fazer" |
+| P5 | The activation item in onboarding (montagem) | not built |
+| P6 | What happens to the old "Agendar" goal (team confirms) now that the agenda switch decides | the agenda switch wins; the goal still drives the prompt when the agenda is off |
+| P7 | Conversations already in "Agendado" when the agenda is turned off | the stage is archived; the conversations keep the key |
+| P8 | Clicking an empty slot of the grid to book there | not built (button "Marcar horário") |
+| P9 | Cancelled bookings on screen | not shown in the grid |
+| P10 | The reminder text and whether the customer can answer "SAIR" | fixed text in `textoDoLembrete`; no opt-out |
 
-## 7. Risks
+## 7. What the automatic reminder still needs (not built, by instruction)
 
-| Risk | Answer |
-|---|---|
-| Double booking from two chats at once | DB exclusion constraint; the losing turn gets a code-written reply with the next slots |
-| Owner books outside the panel | blocked times in the panel; residual risk stated on the screen |
-| Model books a time never offered | only a code from this turn's list is accepted |
-| Timezone | all math in America/Sao_Paulo (`lib/fuso.ts`), SP has no DST since 2019 |
-| No business hours registered | the agenda cannot be turned on (settings say why) |
-| Prompt size | 3 days x up to 6 slots per service, max 6 services; block only when on |
-| Mixed audience | screen text says "horário" and "serviço"; segment words come from the service names |
+The time is computed and stored at booking (`lembrete_em`, rule `momentoDoLembrete`). Sending it
+needs a scheduler, which is new infrastructure, so it was not built:
+1. A cron (Vercel Cron or an n8n schedule; the n8n option touches production and needs the owner's
+   explicit OK) calling a protected route every few minutes.
+2. The route: read `agendamentos` where `lembrete_em <= now()` and `lembrete_enviado_em is null`
+   (index exists), send `textoDoLembrete` over Evolution (`sendText`, the same pipe as the help
+   notices, DDD 00 never), stamp `lembrete_enviado_em`. A new server-only secret for the cron call.
+3. Owner decisions P10 and the active-messaging rules (daily cap, random interval, "responda SAIR").
 
 ## 8. Tests
 
-- Pure specs of `lib/agenda.ts` (slots, notice, horizon, buffer, blocks, midnight, codes,
-  decision of the booking) and the decision applied to a mocked model output: `sem-login`, free.
-- `/design/agenda` screens: `sem-login` and 390px, free.
-- After the migration is applied to a Supabase branch or a local stack: `logado-serial` spec for
-  the routes (create, overlap 409, cancel, reschedule). Written later, needs the DB.
-- Paid, only when named: `test:e2e:ia` and `test:e2e:n8n` before any deploy that turns it on.
+Free (run on this branch): `e2e/agenda-lib.design.spec.ts` (grid modes, buffer, 3 nearest per
+period, no day limit, notice escalation, validation, decisions, reminder time, config) and
+`e2e/agenda.design.spec.ts` (weekly grid, mini calendar, detail, team booking inside and outside
+business hours, settings with the buffer note, the 3 start options, the notice sentence, service
+validation, menu without the item when off), plus `cursor`, `rolagem`, `casca.mobile`.
+Needs the migration applied: routes against the database (overlap 409, stage "Agendado" created
+and archived, RLS). Paid, only when named: `test:e2e:ia` and `test:e2e:n8n`, because the output
+schema and the prompt changed for every tenant with the agenda on.
 
 ## 9. Reference: DeskcommCRM
 
@@ -190,36 +223,3 @@ scheduling); helenacrm.com (agenda through integrators); intercom.help/chatgds a
 (reminders by Meta templates); intercom.help/clinicanasnuvens article 8387018 (manual confirmation
 list, AI as paid add-on).
 
-## 11. Implementation state (28/10/2026, branch `claude/agenda-plano-0fc545`)
-
-Built:
-- `lib/agenda.ts` (pure): `AGENDA_PADRAO` and every default, `horariosLivres`, `montarOfertas`,
-  `blocoDaAgenda`, `decidirAgenda`, the code-written replies. Specs: `e2e/agenda-lib.design.spec.ts`.
-- `lib/agenda-servidor.ts` (server): reads that return `null` when the tables do not exist,
-  `marcarAgendamento` (23P01 = overlap), `cancelarAgendamento`, `remarcarAgendamento`.
-- Routes: `POST /api/agenda/agendamentos`, `PATCH /api/agenda/agendamentos/[id]`
-  (`cancelar`/`remarcar`), `POST|DELETE /api/agenda/bloqueios`, `PUT /api/agenda/config` (owner),
-  `GET /api/agenda/horarios`. All through `sessaoDaRota`, tenant from the session.
-- Brain: `agendaDoTurno` + `montarOfertas` before the model, `### HORÁRIOS LIVRES` after
-  `### CALENDÁRIO`, field `agenda` in the output schema, `aplicarAgenda` books before replying.
-  `diagnostics.agenda` tells the bench what happened (or would happen in `dryRun`).
-- Screen `/agenda` (`components/agenda/Agenda.tsx` over `lib/agenda-fonte.ts`), menu item
-  between Conversas and Contatos; `/design/agenda` runs the same screen on a memory source.
-- Migration `20261028050000_agenda_propria.sql`, types in `lib/database.types.ts` written BY HAND
-  (no local database tonight): regenerate after applying. The three tables are in
-  `TABELAS_DO_CLIENTE` and the export.
-
-Not built or stubbed:
-- Automatic reminders (D8): manual copy text. Needs a scheduler and the channel decision.
-- Realtime on `/agenda`: the table is in the publication with `REPLICA IDENTITY FULL`, but it
-  is NOT in `ESCUTAS_DO_TENANT` (`lib/use-canal-ao-vivo.ts`): adding it before the migration
-  reaches production would make Supabase refuse the whole tenant channel. Add it after.
-- "Team approves each booking" (D2 alternative): not built; the AI always confirms.
-- The bench shows `diagnostics.agenda` only in the raw diagnostics; no dedicated card.
-- Booking notice still has no "Abrir" link (n8n "Notifica grupo" unchanged).
-- Cost note: every turn of a tenant with the goal `agendar` does one extra read (agenda config
-  and services) even when the agenda is off, because `agenda_config` cannot join the main
-  `clients` select until the migration exists everywhere. Fold it in after.
-
-Before any deploy: apply the migration (owner), regenerate types, then `npm run test:e2e:ia` and
-`npm run test:e2e:n8n` (paid) because the output schema changed for every tenant.
