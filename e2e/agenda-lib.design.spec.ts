@@ -3,6 +3,11 @@ import { test, expect } from "@playwright/test";
 import {
   AGENDA_PADRAO,
   acoesDoTurno,
+  diaDaSaida,
+  pedidoDeHorario,
+  consultaDeSeguranca,
+  saidaComODiaDaPessoa,
+  textoPedeDia,
   travaSemAgenda,
   blocoDaAgenda,
   consultarPeriodo,
@@ -111,15 +116,103 @@ test.describe("lib/agenda: validar e decidir", () => {
       decidirAgenda({ ...ctx, action, saida: { ...VAZIA, ...saida }, servicos, daPessoa });
     expect(d("none", {}).tipo).toBe("nada");
     expect(d("none", { acao: "consultar", dia: "2026-10-29", periodo: "manha" }).tipo).toBe("consultar");
-    expect(d("none", { acao: "consultar", dia: "2026-10-29" }).tipo).toBe("invalido");
+    // Sem período e o dia tem manhã e tarde: pergunta entre os dois (nunca "inválido").
+    expect(d("none", { acao: "consultar", dia: "2026-10-29" })).toEqual({ tipo: "pedePeriodo", dia: "2026-10-29", periodos: ["manha", "tarde"] });
+    expect(d("none", { acao: "consultar" }).tipo).toBe("pedeDia");
     expect(d("agendar", { acao: "marcar", dia: "2026-10-29", hora: "11:00" }).tipo).toBe("marcar");
     expect(d("agendar", { acao: "marcar", dia: "2026-10-28", hora: "09:00" }).tipo).toBe("escalar");
     expect(d("agendar", { acao: "marcar", dia: "2026-10-29", hora: "10:00" }).tipo).toBe("indisponivel");
-    expect(d("agendar", {}).tipo).toBe("invalido");
+    expect(d("agendar", {}).tipo).toBe("pedeDia");
+    // Quis marcar com o dia e sem hora: vira consulta do dia.
+    expect(d("agendar", { acao: "marcar", dia: "2026-10-29", periodo: "tarde" }).tipo).toBe("consultar");
     const g = { codigo: "A1", id: 9, servicoId: 7, servicoNome: "Avaliação", inicio: em("2026-10-30", "09:00"), fim: em("2026-10-30", "09:30") };
     expect(decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "cancelar", agendamento: "A1" }, servicos, daPessoa: [g] }).tipo).toBe("cancelar");
     const rem = decidirAgenda({ ...ctx, action: "agendar", saida: { ...VAZIA, acao: "remarcar", dia: "2026-10-30", hora: "14:00", agendamento: "a1" }, servicos, daPessoa: [g] });
     expect(rem.tipo === "remarcar" && rem.agendamento.id).toBe(9);
+  });
+  test("o caso da OBS (29/10): agenda só à tarde, \"amanhã\" sem período já oferece a tarde", () => {
+    const tarde = { open: true, from: "13:00", to: "18:00" };
+    const obs: BusinessHours = { seg: tarde, ter: tarde, qua: tarde, qui: tarde, sex: tarde, sab: { ...tarde, open: false }, dom: { ...tarde, open: false } };
+    const agora = em("2026-10-29", "11:15");
+    const cfg = { ...CFG, inicio: "hora" as const, intervaloMin: 15 };
+    const r = decidirAgenda({ agora, hours: obs, ocupados: [], config: cfg, action: "none", saida: { ...VAZIA, acao: "consultar", dia: "amanhã" }, servicos, daPessoa: [] });
+    expect(r.tipo).toBe("consultar");
+    if (r.tipo !== "consultar") return;
+    expect(r.dia).toBe("2026-10-30");
+    expect(r.periodo).toBe("tarde");
+    expect(textoDaConsulta({ dia: r.dia, periodo: r.periodo, resultado: r.resultado, agora, antecedenciaMin: 120 })).toBe(
+      "Amanhã, sexta, 30/10, à tarde, tenho 13h, 14h ou 15h. Qual fica melhor?"
+    );
+    // A lista do prompt traz a data completa e o período do dia; nada de "manhã".
+    const b = blocoDaAgenda({ agora, daPessoa: [], servicos, config: cfg, hours: obs });
+    expect(b).toContain("- amanhã, sexta, 30/10 = 2026-10-30: tarde (13h às 18h)");
+    expect(b).toContain("- sábado, 31/10 = 2026-10-31: sem horário");
+    expect(b).toContain("Períodos em que a agenda atende: segunda a sexta: tarde");
+    // Falta o dia: pergunta só o dia, dizendo o período que existe.
+    expect(textoPedeDia(obs)).toBe("Qual dia fica melhor pra você? A agenda atende segunda a sexta: tarde.");
+  });
+  test("o dia como a pessoa fala: amanhã, segunda, dia 05, 5 de novembro, 30/10", () => {
+    const agora = em("2026-10-29", "11:15"); // quinta
+    const casos: [string, string | null][] = [
+      ["2026-11-03", "2026-11-03"],
+      ["hoje", "2026-10-29"],
+      ["amanhã", "2026-10-30"],
+      ["Amanha", "2026-10-30"],
+      ["depois de amanhã", "2026-10-31"],
+      ["segunda", "2026-11-02"],
+      ["segunda-feira", "2026-11-02"],
+      ["terça", "2026-11-03"],
+      ["quinta", "2026-11-05"],
+      ["sábado", "2026-10-31"],
+      ["dia 05", "2026-11-05"],
+      ["05", "2026-11-05"],
+      ["30", "2026-10-30"],
+      ["5 de novembro", "2026-11-05"],
+      ["05 de outubro", "2027-10-05"],
+      ["30/10", "2026-10-30"],
+      ["5/11", "2026-11-05"],
+      ["10/01", "2027-01-10"],
+      ["30/10/2026", "2026-10-30"],
+      ["semana que vem", null],
+      ["", null],
+      ["32", null],
+    ];
+    for (const [dito, esperado] of casos) expect(diaDaSaida(dito, agora), dito).toBe(esperado);
+  });
+  test("a rede do código: a pessoa disse o dia e o modelo não consultou", () => {
+    const agora = em("2026-10-29", "11:15"); // quinta
+    expect(pedidoDeHorario("sim, vamos marcar para amanhã", agora)).toEqual({ dia: "2026-10-30", periodo: "" });
+    expect(pedidoDeHorario("pode marcar 30/10 de manhã", agora)).toEqual({ dia: "2026-10-30", periodo: "manha" });
+    expect(pedidoDeHorario("terça que vem, à tarde", agora)).toEqual({ dia: "2026-11-03", periodo: "tarde" });
+    expect(pedidoDeHorario("dia 05 de manhã", agora)).toEqual({ dia: "2026-11-05", periodo: "manha" });
+    expect(pedidoDeHorario("5 de novembro à noite", agora)).toEqual({ dia: "2026-11-05", periodo: "noite" });
+    expect(pedidoDeHorario("Boa tarde, pode ser segunda-feira?", agora)).toEqual({ dia: "2026-11-02", periodo: "" });
+    expect(pedidoDeHorario("amanhã", agora)?.periodo).toBe("");
+    expect(pedidoDeHorario("quero melhorar meu atendimento", agora)).toBeNull();
+    const base = { agora, motivo: "", acao: "" };
+    // Perguntou "manhã ou tarde?" sem consultar: o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "sim, vamos marcar para amanhã", resposta: "Prefere manhã ou tarde?", action: "none" })).toEqual({ dia: "2026-10-30", periodo: "" });
+    // Passou para o time "para ver os horários": o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "terça que vem, à tarde", resposta: "Vou ver os horários disponíveis e já te confirmo.", action: "pausar", motivo: "fechar" })).toEqual({ dia: "2026-11-03", periodo: "tarde" });
+    // Pedido de ajuda de outro motivo, ou o modelo já consultou: não mexe.
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero falar com alguém amanhã sobre o horário", resposta: "Vou chamar alguém.", action: "pausar", motivo: "pessoa" })).toBeNull();
+    expect(consultaDeSeguranca({ ...base, mensagem: "amanhã à tarde", resposta: "", action: "none", acao: "consultar" })).toBeNull();
+    // Dia sem conversa de horário: não mexe ("chego amanhã na loja").
+    expect(consultaDeSeguranca({ ...base, mensagem: "chego amanhã na loja", resposta: "Combinado, te espero!", action: "none" })).toBeNull();
+    // Retomada (sem mensagem nova): não mexe.
+    expect(consultaDeSeguranca({ ...base, mensagem: null, resposta: "horário", action: "none" })).toBeNull();
+    // Passou para o time marcando "falta de informação" para ver horário: o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "dia 05 de manhã", resposta: "Vou ver os horários e te passo.", action: "pausar", motivo: "falta_info" })).toEqual({ dia: "2026-11-05", periodo: "manha" });
+    // Consultou E pediu ajuda junto: a consulta vale (com o dia da conversa, se a mensagem não traz).
+    expect(consultaDeSeguranca({ ...base, mensagem: "pode ser à tarde", resposta: "Vou verificar os horários.", action: "pausar", motivo: "falta_info", acao: "consultar", dia: "2026-11-04", periodo: "tarde" })).toEqual({ dia: "2026-11-04", periodo: "tarde" });
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero cancelar amanhã", resposta: "Vou ver o horário.", action: "pausar", motivo: "fechar", acao: "cancelar" })).toBeNull();
+    // Dois dias na mesma frase: ambíguo, o código não escolhe.
+    expect(pedidoDeHorario("não posso amanhã, pode ser segunda?", agora)).toBeNull();
+    expect(pedidoDeHorario("depois de amanhã à tarde", agora)).toEqual({ dia: "2026-10-31", periodo: "tarde" });
+    // O dia dito pela pessoa vale mais que a conta do modelo ("segunda" é Finados; o modelo pôs terça).
+    const s = saidaComODiaDaPessoa({ ...VAZIA, acao: "consultar", dia: "2026-11-03", periodo: "tarde" }, "pode ser segunda-feira à tarde", agora);
+    expect(s.dia).toBe("2026-11-02");
+    expect(saidaComODiaDaPessoa({ ...VAZIA, acao: "marcar", dia: "2026-11-03", hora: "14:00" }, "pode ser às 14h", agora).dia).toBe("2026-11-03");
   });
   test("com mais de um serviço, sem código válido é inválido", () => {
     const dois = [...servicos, { id: 8, nome: "Retorno", duracaoMin: 15 }];

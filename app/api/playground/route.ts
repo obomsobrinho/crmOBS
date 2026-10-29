@@ -4,6 +4,7 @@ import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
 import { agendaAtivaDoTenant } from "@/lib/agenda-servidor";
+import { normalizarConfigDaAgenda, problemaDosServicos } from "@/lib/agenda";
 import { compilePersona, normalizarRegras, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
 
@@ -61,6 +62,11 @@ export async function POST(req: NextRequest) {
      * tenant. A rota é sempre dryRun, então nunca chega ao atendimento.
      */
     hours?: unknown;
+    /**
+     * Agenda ligada de teste (`{ config, servicos }`), para a suíte paga
+     * conversar com a agenda sem ligar a do tenant. A rota é sempre dryRun.
+     */
+    agendaTeste?: { config?: unknown; servicos?: unknown };
   };
   try {
     body = await req.json();
@@ -104,7 +110,8 @@ export async function POST(req: NextRequest) {
     }
   }
   // A bancada monta o prompt como o turno: com a agenda ligada, o texto de agenda (28/10/2026).
-  const agendaAtiva = await agendaAtivaDoTenant(client.id);
+  const agendaOverride = agendaDoCorpo(body.agendaTeste);
+  const agendaAtiva = agendaOverride ? true : await agendaAtivaDoTenant(client.id);
   if (body.mode === "guiado") {
     // Mesma validação do save. Config incompleta não é teste válido: uma persona
     // sem nome de empresa responde outra coisa, e o teste diria pouco. Devolve os
@@ -175,6 +182,7 @@ export async function POST(req: NextRequest) {
       personaOverride,
       agoraTeste: typeof body.agoraTeste === "string" ? body.agoraTeste : null,
       horarioOverride,
+      agendaOverride,
     });
 
     // Marca `onboarding_tested_at` na primeira conversa que der certo.
@@ -205,4 +213,19 @@ export async function POST(req: NextRequest) {
     console.error("erro inesperado no /api/playground:", e);
     return NextResponse.json({ error: "erro inesperado no agente" }, { status: 500 });
   }
+}
+
+/** A agenda de teste do corpo, normalizada pelas regras da agenda, ou undefined. */
+function agendaDoCorpo(raw: { config?: unknown; servicos?: unknown } | undefined) {
+  if (!raw || typeof raw !== "object") return undefined;
+  const config = { ...normalizarConfigDaAgenda(raw.config), ativa: true };
+  const lista = Array.isArray(raw.servicos) ? raw.servicos.slice(0, 20) : [];
+  const servicos = lista
+    .map((s: { nome?: unknown; duracaoMin?: unknown }, i: number) => ({
+      id: -(i + 1),
+      nome: typeof s?.nome === "string" ? s.nome.trim().slice(0, 80) : "",
+      duracaoMin: typeof s?.duracaoMin === "number" ? s.duracaoMin : NaN,
+    }))
+    .filter((s) => s.nome && !problemaDosServicos(true, [s]));
+  return servicos.length > 0 ? { config, servicos } : undefined;
 }

@@ -40,9 +40,15 @@ import { semLoteAtual } from "@/lib/mensagem";
 import {
   SAIDA_DA_AGENDA_VAZIA,
   TEXTO_PEDE_DIA_E_PERIODO,
+  textoPedeDia,
+  textoPedePeriodo,
   travaSemAgenda,
   blocoDaAgenda,
+  consultaDeSeguranca,
+  saidaComODiaDaPessoa,
   decidirAgenda,
+  horarioDaAgenda,
+  diaDaSaida,
   diaFalado,
   periodoDe,
   preferenciaDoHorario,
@@ -135,6 +141,12 @@ export interface ProcessTurnParams {
    * mexendo sem salvar. `undefined` = usa o cadastrado no tenant.
    */
   horarioOverride?: BusinessHours | null;
+  /**
+   * Agenda ligada de teste (config e serviços), SÓ em `dryRun` (29/10/2026):
+   * a suíte paga conversa com a agenda sem ligar a de um tenant real. Lê os
+   * ocupados do tenant de verdade e não grava nada (dryRun).
+   */
+  agendaOverride?: { config: AgendaConfig; servicos: ServicoDaAgenda[] };
   /**
    * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
    * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
@@ -404,14 +416,21 @@ export async function processTurn(
   // horários: quem oferece, no máximo 3, é o código depois do dia e período).
   // Sem migration, sem horário ou desligada: `null`, e o turno segue como antes.
   const agoraMsAgenda = (agoraDoTurno ?? new Date()).getTime();
-  const agenda = await agendaDoTurno({
-    svc,
-    clientId,
-    phone,
-    agora: agoraMsAgenda,
-    hours: horasDoTurno,
-    configGravada: client.agenda_config,
-  });
+  // A suíte paga (`e2e/agenda.ia.spec.ts`) manda a agenda no corpo, SÓ em
+  // dryRun, para conversar com a agenda ligada sem mexer na de um tenant real.
+  const agendaTeste = dryRun ? params.agendaOverride : undefined;
+  const horasDaAgendaTeste = agendaTeste ? horarioDaAgenda(agendaTeste.config, horasDoTurno) : null;
+  const agenda =
+    agendaTeste && horasDaAgendaTeste && agendaTeste.servicos.length > 0
+      ? { ...agendaTeste, daPessoa: [], hours: horasDaAgendaTeste, atendimento: horasDoTurno }
+      : await agendaDoTurno({
+          svc,
+          clientId,
+          phone,
+          agora: agoraMsAgenda,
+          hours: horasDoTurno,
+          configGravada: client.agenda_config,
+        });
 
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
   // dryRun: fora dele a única fonte é o banco.
@@ -591,6 +610,25 @@ export async function processTurn(
   // `decidirAgenda` (lib/agenda.ts); aqui só banco e aviso.
   let diagAgenda: TurnDiagnostics["agenda"];
   let agendou = false;
+  // A pessoa disse o dia e o modelo não consultou (perguntou o período ou
+  // passou para o time "para ver horário"): o código consulta no lugar dele
+  // (`consultaDeSeguranca`, lib/agenda.ts). Nunca com o guardrail barrando.
+  if (agenda && !guardrail.blocked) {
+    const rede = consultaDeSeguranca({
+      mensagem: message || null,
+      resposta: output.messages.join(" "),
+      action: output.action,
+      motivo: output.motivo,
+      acao: output.agenda.acao,
+      dia: output.agenda.dia,
+      periodo: output.agenda.periodo,
+      agora: agoraMsAgenda,
+    });
+    if (rede) {
+      output = { ...output, action: "none", summary: "", agenda: { ...output.agenda, acao: "consultar", dia: rede.dia, periodo: rede.periodo } };
+    }
+    output = { ...output, agenda: saidaComODiaDaPessoa(output.agenda, message || null, agoraMsAgenda) };
+  }
   // Pedido de ajuda (do modelo ou do guardrail que barrou) ganha da agenda: o
   // turno segue como pausar, sem marcar nem oferecer, e o time assume.
   if (agenda && output.action !== "pausar" && !guardrail.blocked) {
@@ -1194,7 +1232,7 @@ async function aplicarAgenda(a: {
 
   try {
     // Só lê a agenda do dia em jogo (sem limite de dias à frente).
-    const diaEmJogo = /^\d{4}-\d{2}-\d{2}$/.test(saida.dia) ? saida.dia : null;
+    const diaEmJogo = diaDaSaida(saida.dia, a.agora);
     const ocupados = diaEmJogo ? await ocupadosDoDia(a.svc, a.clientId, diaEmJogo) : [];
     if (ocupados === null) {
       diag.falhou = "erro";
@@ -1208,6 +1246,10 @@ async function aplicarAgenda(a: {
         return { output: a.output, diag, agendou: false };
       case "invalido":
         return { output: responder(TEXTO_PEDE_DIA_E_PERIODO), diag, agendou: false };
+      case "pedeDia":
+        return { output: responder(textoPedeDia(hours)), diag, agendou: false };
+      case "pedePeriodo":
+        return { output: responder(textoPedePeriodo(decisao.dia, decisao.periodos, a.agora)), diag, agendou: false };
       case "consultar":
       case "indisponivel": {
         const texto = textoDaConsulta({

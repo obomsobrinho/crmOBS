@@ -747,7 +747,11 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // avançado da OBS manda "confirme recapitulando... use agendar", e a IA
     // respondia "deixei para amanhã às 18h" com action none, sem avisar ninguém.
     ...(allowAgendar
-      ? []
+      ? [
+          // ⚠️ 29/10/2026, teste do dono na OBS: o texto dela manda "pergunte dia
+          // e período" e a IA ofereceu manhã numa agenda que só atende à tarde.
+          'Esta conta tem agenda ligada: para marcar, remarcar e cancelar, siga a seção AGENDA, mesmo que o texto acima diga outro jeito (perguntar "manhã ou tarde", confirmar sozinho, "deixei reservado"). Nunca pergunte o período: com o dia dito, use agenda.acao "consultar".',
+        ]
       : [
           'Esta conta não tem agenda ligada: você NUNCA confirma, reserva nem marca horário ou conversa, mesmo que o texto acima mande (por exemplo "confirme recapitulando", "use agendar" ou "deixei reservado"). Quando a pessoa quiser marcar ou confirmar um horário, diga que vai confirmar com o time e use action pausar.',
         ]),

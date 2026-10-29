@@ -78,7 +78,7 @@ export interface TurnDiagnostics {
   agenda?: {
     /** Quantos horários o código ofereceu neste turno (consulta). */
     ofertas?: number;
-    decisao: "nada" | "consultar" | "marcar" | "remarcar" | "cancelar" | "confirmar" | "escalar" | "indisponivel" | "invalido";
+    decisao: "nada" | "consultar" | "marcar" | "remarcar" | "cancelar" | "confirmar" | "escalar" | "indisponivel" | "pedeDia" | "pedePeriodo" | "invalido";
     /** "quinta, 30/10, às 10h30 (Avaliação)" quando marcou (ou marcaria). */
     marcado?: string;
     /** O horário não valia mais (conflito) ou o banco falhou: a resposta foi trocada. */

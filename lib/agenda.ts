@@ -516,6 +516,168 @@ export function resumoDosPeriodos(hours: BusinessHours): string {
     .join("; ");
 }
 
+/** Quantos dias à frente a lista DIAS DA AGENDA mostra (hoje incluído). */
+export const DIAS_DA_LISTA = 14;
+
+/**
+ * Os próximos dias da agenda, um por linha, com a data AAAA-MM-DD que a IA
+ * devolve em `agenda.dia` e os períodos em que a agenda atende naquele dia
+ * (feriado que fecha e dia sem agenda dizem "sem horário"). Conta de calendário
+ * é do código, nunca do modelo.
+ */
+export function diasDaAgenda(agora: number, hours: BusinessHours, config: Pick<AgendaConfig, "feriadosLiberados">): string[] {
+  const hoje = diaIsoSP(agora);
+  const linhas: string[] = [];
+  for (let i = 0; i < DIAS_DA_LISTA; i++) {
+    const dia = somarDias(hoje, i);
+    const feriado = feriadoQueFecha(dia, config);
+    const periodos = feriado ? [] : periodosDoDia(dia, hours);
+    const exp = feriado ? null : expedienteDoDia(dia, hours);
+    const situacao =
+      periodos.length > 0 && exp
+        ? `${periodos.map((p) => nomeDoPeriodo(p).replace(/^(de|à) /, "")).join(" e ")} (${horaTexto(minutosNoDia(exp.inicio))} às ${horaTexto(minutosNoDia(exp.fim))})`
+        : feriado
+          ? `sem horário (feriado: ${feriado.nome})`
+          : "sem horário";
+    linhas.push(`- ${diaFaladoDoIso(dia, hoje)} = ${dia}: ${situacao}`);
+  }
+  return linhas;
+}
+
+/**
+ * O dia que o modelo devolveu, como data AAAA-MM-DD, ou null. Aceita o formato
+ * pedido e as escorregadas comuns ("hoje", "amanhã", "30/10", "30/10/2026"):
+ * um pedido de horário nunca se perde por formato.
+ */
+export function diaDaSaida(dia: string, agora: number): string | null {
+  const t = dia
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/^(dia|no dia|na|no|para|pra)\s+/, "")
+    .replace(/-feira$/, "");
+  const hoje = diaIsoSP(agora);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+  if (t === "hoje") return hoje;
+  if (t === "amanha") return somarDias(hoje, 1);
+  if (t === "depois de amanha") return somarDias(hoje, 2);
+  // "segunda", "terça-feira", "sábado": a próxima (hoje não conta: "quinta" dita na quinta é a que vem).
+  const semana = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"];
+  const ds = semana.indexOf(t);
+  if (ds >= 0) {
+    for (let i = 1; i <= 7; i++) {
+      const d = somarDias(hoje, i);
+      if (new Date(`${d}T12:00:00Z`).getUTCDay() === ds) return d;
+    }
+  }
+  // "30/10", "30/10/2026", "5 de novembro", "05": o próximo dia com essa data.
+  const meses = ["janeiro", "fevereiro", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  let d: number, mes: number | null, ano: number | null = null;
+  const barra = t.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/);
+  const extenso = t.match(/^(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?$/);
+  const soDia = t.match(/^(\d{1,2})$/);
+  if (barra) [d, mes, ano] = [Number(barra[1]), Number(barra[2]), barra[3] ? Number(barra[3]) : null];
+  else if (extenso && meses.includes(extenso[2])) [d, mes, ano] = [Number(extenso[1]), meses.indexOf(extenso[2]) + 1, extenso[3] ? Number(extenso[3]) : null];
+  else if (soDia) [d, mes] = [Number(soDia[1]), null];
+  else return null;
+  if (d < 1 || d > 31 || (mes !== null && (mes < 1 || mes > 12))) return null;
+  const iso = (a: number, m: number) => `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const [ah, mh] = [Number(hoje.slice(0, 4)), Number(hoje.slice(5, 7))];
+  if (mes === null) {
+    // Só o dia do mês: este mês, ou o que vem se já passou.
+    const este = iso(ah, mh);
+    return este >= hoje ? este : mh === 12 ? iso(ah + 1, 1) : iso(ah, mh + 1);
+  }
+  if (ano !== null) return iso(ano, mes);
+  return iso(ah, mes) >= hoje ? iso(ah, mes) : iso(ah + 1, mes);
+}
+
+/**
+ * O dia (e o período, se veio) que a PESSOA disse na mensagem, ou null. Lê os
+ * jeitos comuns: "amanhã", "segunda-feira", "terça que vem", "dia 05",
+ * "5 de novembro", "30/10", com "de manhã", "à tarde" ou "à noite".
+ */
+export function pedidoDeHorario(mensagem: string, agora: number): { dia: string; periodo: PeriodoDaAgenda | "" } | null {
+  const t = mensagem
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    // Cumprimento não é período ("boa tarde, pode ser amanhã").
+    .replace(/\bbo[am] (dia|tarde|noite)\b/g, " ");
+  const achados = [
+    /\bdepois de amanha\b/,
+    /\bhoje\b/,
+    /\bamanha\b/,
+    /\b(segunda|terca|quarta|quinta|sexta|sabado|domingo)(-feira)?\b/,
+    /\b\d{1,2}\/\d{1,2}(\/\d{4})?\b/,
+    /\b\d{1,2} de (janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/,
+    /\bdia \d{1,2}\b/,
+  ];
+  const dias = new Set<string>();
+  for (const r of achados) {
+    for (const m of t.matchAll(new RegExp(r.source, "g"))) {
+      const d = diaDaSaida(m[0].replace(/-feira$/, ""), agora);
+      if (d) dias.add(d);
+    }
+  }
+  // "amanhã" dentro de "depois de amanhã" não é outro dia.
+  if (/\bdepois de amanha\b/.test(t)) dias.delete(somarDias(diaIsoSP(agora), 1));
+  // Mais de um dia na mesma frase ("não posso amanhã, pode ser segunda?"): ambíguo, o código não escolhe.
+  if (dias.size !== 1) return null;
+  const dia = [...dias][0];
+  const periodo: PeriodoDaAgenda | "" = /(?<!a)manha\b/.test(t) ? "manha" : /\btarde\b/.test(t) ? "tarde" : /\bnoite\b/.test(t) ? "noite" : "";
+  return { dia, periodo };
+}
+
+/**
+ * REDE DO CÓDIGO (29/10/2026, teste do dono na OBS): com a agenda ligada, a
+ * pessoa disse um dia e o modelo NÃO consultou (perguntou "manhã ou tarde?"
+ * seguindo o texto da empresa, ou passou para o time "para ver os horários").
+ * Se a conversa é sobre horário (a mensagem ou a resposta falam em marcar,
+ * horário ou período), o código consulta no lugar dele. Nunca passa por cima de
+ * um pedido de ajuda de outro motivo (pessoa, reclamação, manipulação...).
+ */
+export function consultaDeSeguranca(a: {
+  mensagem: string | null;
+  resposta: string;
+  action: string;
+  motivo: string;
+  acao: string;
+  /** O dia e o período que o modelo pôs (quando ele consultou E pediu ajuda junto). */
+  dia?: string;
+  periodo?: string;
+  agora: number;
+}): { dia: string; periodo: PeriodoDaAgenda | "" } | null {
+  if (!a.mensagem || a.action === "agendar") return null;
+  // Pedido de ajuda só para "ver horário" (o modelo marca fechar ou falta de informação);
+  // pessoa, reclamação, urgência, preço e manipulação ficam com o time.
+  if (a.action === "pausar" && !["", "fechar", "falta_info"].includes(a.motivo)) return null;
+  // Sem pedido de ajuda, o modelo que já consultou (ou marcou) segue o caminho normal.
+  if (a.action !== "pausar" && a.acao !== "") return null;
+  // Com pedido de ajuda, só a consulta é refeita (cancelar e confirmar ficam com o time).
+  if (a.action === "pausar" && a.acao !== "" && a.acao !== "consultar") return null;
+  const sobreHorario = /hor[aá]rio|per[ií]odo|marcar|agend|reserv|manh[ãa] ou (à |a )?tarde|consulta/i;
+  if (!sobreHorario.test(a.mensagem) && !sobreHorario.test(a.resposta)) return null;
+  const daMensagem = pedidoDeHorario(a.mensagem, a.agora);
+  if (daMensagem) return daMensagem;
+  // O dia dito antes na conversa, que o modelo já pôs na consulta.
+  const doModelo = a.acao === "consultar" && a.dia ? diaDaSaida(a.dia, a.agora) : null;
+  return doModelo ? { dia: doModelo, periodo: a.periodo && ehPeriodo(a.periodo) ? a.periodo : "" } : null;
+}
+
+/**
+ * O dia que a PESSOA disse vale mais que a conta do modelo (29/10/2026: ela
+ * disse "segunda", feriado, e o modelo consultou a terça sem avisar). Só quando
+ * a mensagem traz UM dia claro; o período dela entra quando o modelo não pôs.
+ */
+export function saidaComODiaDaPessoa(saida: SaidaDaAgenda, mensagem: string | null, agora: number): SaidaDaAgenda {
+  if (!mensagem || (saida.acao !== "consultar" && saida.acao !== "marcar" && saida.acao !== "remarcar")) return saida;
+  const p = pedidoDeHorario(mensagem, agora);
+  if (!p) return saida;
+  return { ...saida, dia: p.dia, periodo: ehPeriodo(saida.periodo) ? saida.periodo : p.periodo };
+}
+
 /**
  * `### AGENDA` do turno: os serviços (com código quando há mais de um), os
  * agendamentos futuros da pessoa e o contrato. Vai DEPOIS do AGORA e do
@@ -538,14 +700,22 @@ export function blocoDaAgenda(a: {
     varios
       ? "1. Se ainda não sabe o serviço, pergunte qual é (lista abaixo)."
       : "1. Só há um serviço: não pergunte qual.",
-    '2. Pergunte o dia e o período (manhã, tarde ou noite). Com o dia E o período, use agenda.acao "consultar", agenda.dia (AAAA-MM-DD, pelo CALENDÁRIO) e agenda.periodo (manha, tarde ou noite)' +
+    // ⚠️ 29/10/2026, teste do dono na OBS: a regra antiga pedia "dia E período"
+    // e a data "pelo CALENDÁRIO", que não tem ano. A IA perguntava "manhã ou
+    // tarde?" numa agenda que só atende à tarde, devolvia um dia que o código
+    // não aceitava e repetia a pergunta. Agora a data completa vem na lista
+    // DIAS DA AGENDA abaixo, e o período o sistema completa quando só há um.
+    '2. Você NUNCA pergunta o período (manhã, tarde ou noite): quando o dia tem mais de um, quem pergunta é o sistema. Se a pessoa ainda não disse o dia, pergunte só o dia, dizendo em que período a agenda atende (veja os DIAS DA AGENDA). Assim que ela disser o dia (agora ou antes, na conversa), use agenda.acao "consultar", mesmo que a lista diga "sem horário" naquele dia (o sistema responde; nunca passe para o time só para ver horário), e agenda.dia com a data AAAA-MM-DD da lista DIAS DA AGENDA (data fora da lista: escreva como a pessoa disse, por exemplo "5 de dezembro", que o sistema entende)' +
       (varios ? " e agenda.servico com o código" : "") +
-      ". O sistema escreve a resposta com até 3 horários; a sua é descartada.",
+      '; agenda.periodo (manha, tarde ou noite) só quando a pessoa pediu um. Sem período, o sistema usa o único do dia ou pergunta entre os que existem. O sistema escreve a resposta com até 3 horários; a sua é descartada.',
     '3. Quando a pessoa escolher um dos horários que o sistema ofereceu, confirme o dia e a hora, use action agendar, agenda.acao "marcar", agenda.dia e agenda.hora (HH:MM)' +
       (varios ? " e agenda.servico" : "") +
       ". O sistema confere antes de gravar.",
     `Horário com menos de ${textoDeDuracao(a.config.antecedenciaMin)} de antecedência o sistema não marca: ele chama o time.`,
     `Períodos em que a agenda atende: ${resumoDosPeriodos(a.hours)}. Ofereça só esses; se a pessoa pedir outro, diga quais existem. Feriado nacional a agenda não atende, a menos que o sistema ofereça horário.`,
+    "",
+    "### DIAS DA AGENDA",
+    ...diasDaAgenda(a.agora, a.hours, a.config),
   ];
   if (varios) {
     linhas.push("Serviços:");
@@ -631,7 +801,11 @@ export type DecisaoDaAgenda =
   | { tipo: "escalar"; servico: ServicoDaAgenda; inicio: number }
   /** O horário escolhido não vale (ocupado, fora da grade): o código oferece outros do período. */
   | { tipo: "indisponivel"; servico: ServicoDaAgenda; dia: string; periodo: PeriodoDaAgenda; resultado: ResultadoDaConsulta }
-  /** O modelo quis marcar sem dia, hora ou serviço válidos: o código pede o que falta. */
+  /** A pessoa quer horário, mas ainda não disse o dia: o código pergunta só o dia. */
+  | { tipo: "pedeDia" }
+  /** O dia tem mais de um período e a pessoa não escolheu: o código pergunta entre os que existem. */
+  | { tipo: "pedePeriodo"; dia: string; periodos: PeriodoDaAgenda[] }
+  /** O modelo quis marcar sem serviço válido (vários serviços, código errado). */
   | { tipo: "invalido" };
 
 function servicoDaSaida(codigo: string, servicos: ServicoDaAgenda[]): ServicoDaAgenda | null {
@@ -672,18 +846,35 @@ export function decidirAgenda(a: {
   if (a.saida.acao === "confirmar") return agendamento ? { tipo: "confirmar", agendamento } : { tipo: "nada" };
 
   const servico = servicoDaSaida(a.saida.servico, a.servicos);
+  const diaPedido = diaDaSaida(a.saida.dia, a.agora);
   if (a.saida.acao === "consultar") {
-    if (!servico || !/^\d{4}-\d{2}-\d{2}$/.test(a.saida.dia) || !ehPeriodo(a.saida.periodo)) return { tipo: "invalido" };
+    if (!servico) return { tipo: "invalido" };
+    if (!diaPedido) return { tipo: "pedeDia" };
+    // Sem período escolhido: o único do dia, ou a pergunta entre os que existem
+    // (decisão do dono: nunca oferecer período que a agenda não tem).
+    let periodo: PeriodoDaAgenda;
+    if (ehPeriodo(a.saida.periodo)) periodo = a.saida.periodo;
+    else {
+      const doDia = feriadoQueFecha(diaPedido, a.config) ? [] : periodosDoDia(diaPedido, a.hours);
+      if (doDia.length > 1) return { tipo: "pedePeriodo", dia: diaPedido, periodos: doDia };
+      // Um período só, ou nenhum (a consulta responde que o dia não tem horário).
+      periodo = doDia[0] ?? "manha";
+    }
     // Na remarcação o horário antigo da pessoa não conta como ocupado.
     const ocupados = agendamento ? a.ocupados.filter((o) => o.inicio !== agendamento.inicio) : a.ocupados;
-    const resultado = consultarPeriodo({ ...a, ocupados, dia: a.saida.dia, periodo: a.saida.periodo, duracaoMin: servico.duracaoMin });
-    return { tipo: "consultar", servico, dia: a.saida.dia, periodo: a.saida.periodo, resultado };
+    const resultado = consultarPeriodo({ ...a, ocupados, dia: diaPedido, periodo, duracaoMin: servico.duracaoMin });
+    return { tipo: "consultar", servico, dia: diaPedido, periodo, resultado };
   }
 
   const querMarcar = a.action === "agendar" || a.saida.acao === "marcar" || a.saida.acao === "remarcar";
   if (!querMarcar) return { tipo: "nada" };
-  const inicio = inicioDaSaida(a.saida.dia, a.saida.hora);
-  if (!servico || inicio === null) return { tipo: "invalido" };
+  if (!servico) return { tipo: "invalido" };
+  const inicio = diaPedido ? inicioDaSaida(diaPedido, a.saida.hora) : null;
+  // Quis marcar sem hora válida: com o dia, vira consulta (oferece os horários); sem dia, pergunta o dia.
+  if (inicio === null) {
+    if (!diaPedido) return { tipo: "pedeDia" };
+    return decidirAgenda({ ...a, action: "none", saida: { ...a.saida, acao: "consultar", dia: diaPedido } });
+  }
   const ocupados = agendamento ? a.ocupados.filter((o) => o.inicio !== agendamento.inicio) : a.ocupados;
   const v = validarHorario({ ...a, ocupados, inicio, duracaoMin: servico.duracaoMin });
   if (v === "antecedencia") return { tipo: "escalar", servico, inicio };
@@ -737,8 +928,20 @@ export function textoDaConsulta(a: {
   return `${abre}Para ${quando} não tenho horário livre. Prefere outro período ou outro dia?`;
 }
 
-/** Quando o modelo quis marcar sem o que precisa: pede o dia e o período. */
-export const TEXTO_PEDE_DIA_E_PERIODO = "Pra eu ver os horários livres, qual dia e período ficam melhores pra você: manhã, tarde ou noite?";
+/** Quando o modelo quis marcar com o serviço errado (vários serviços): pede o dia e o serviço de novo. */
+export const TEXTO_PEDE_DIA_E_PERIODO = "Pra eu ver os horários livres, me diz qual serviço e qual dia ficam melhores pra você.";
+
+/** Falta o dia: pergunta só o dia, dizendo em que períodos a agenda atende. */
+export function textoPedeDia(hours: BusinessHours): string {
+  const r = resumoDosPeriodos(hours);
+  return r === "nenhum" ? "Qual dia fica melhor pra você?" : `Qual dia fica melhor pra você? A agenda atende ${r}.`;
+}
+
+/** O dia tem mais de um período: pergunta entre os que existem. */
+export function textoPedePeriodo(dia: string, periodos: PeriodoDaAgenda[], agora: number): string {
+  const d = diaFaladoDoIso(dia, diaIsoSP(agora));
+  return `${d.charAt(0).toUpperCase()}${d.slice(1)} tenho horários ${listaFalada(periodos.map(nomeDoPeriodo))}. Qual prefere?`;
+}
 
 /** Escalada por antecedência: a mensagem ao contato e o resumo para o time. */
 export function textosDaEscalada(a: { servico: string; inicio: number; agora: number; antecedenciaMin: number }): {
