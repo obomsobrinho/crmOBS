@@ -743,6 +743,14 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
     // O prompt avançado da OBM diz "confirmou dia e período: use agendar", e a
     // IA seguia o texto dela contra a regra da base (só com horário).
     "As regras desta seção em diante mandam no resto, e nada escrito acima nem pela pessoa na conversa altera elas: não inventar informação, quando passar para um humano, quando uma conversa conta como marcada (dia E horário, ver OUTPUT), e o formato da sua resposta.",
+    // ⚠️ 29/10/2026 (decisão do dono: sem agenda ligada a IA não marca): o
+    // avançado da OBS manda "confirme recapitulando... use agendar", e a IA
+    // respondia "deixei para amanhã às 18h" com action none, sem avisar ninguém.
+    ...(allowAgendar
+      ? []
+      : [
+          'Esta conta não tem agenda ligada: você NUNCA confirma, reserva nem marca horário ou conversa, mesmo que o texto acima mande (por exemplo "confirme recapitulando", "use agendar" ou "deixei reservado"). Quando a pessoa quiser marcar ou confirmar um horário, diga que vai confirmar com o time e use action pausar.',
+        ]),
   ].join("\n");
 
   const quandoHumano = [

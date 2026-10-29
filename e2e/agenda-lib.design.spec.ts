@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { test, expect } from "@playwright/test";
 import {
   AGENDA_PADRAO,
@@ -240,6 +241,14 @@ test.describe("Prompt do agente: a agenda ligada substitui o objetivo Agendar", 
     expect(a.ok && a.persona).toContain('NUNCA use "agendar"');
     // A IA dizia "deixei reservado pra amanhã às 18h" sem agenda (bateria ia, 29/10).
     for (const r of [g, a]) expect(r.ok && r.persona).toContain("Nunca diga que um horário ficou reservado, marcado, combinado ou confirmado");
+    // ... e na PRECEDÊNCIA, acima do texto do cliente (o avançado da OBS manda confirmar).
+    for (const r of [g, a]) expect(r.ok && r.persona).toContain("Esta conta não tem agenda ligada: você NUNCA confirma, reserva nem marca horário");
+    const comAgenda = compilePersona({ mode: "guiado", config: cfg, agendaAtiva: true });
+    expect(comAgenda.ok && comAgenda.persona).not.toContain("Esta conta não tem agenda ligada");
+  });
+  test("o prompt real da OBS continua cabendo no limite com a base nova", () => {
+    const obs = compilePersona({ mode: "avancado", persona: fs.readFileSync("e2e/fixtures/persona-obs.txt", "utf8") });
+    expect(obs.ok, obs.ok ? "" : obs.motivo).toBe(true);
   });
   test("sem agenda o esquema não tem agendar, e a trava converte o que escapar em pedido de ajuda", () => {
     expect(acoesDoTurno(false)).toEqual(["none", "pausar"]);
