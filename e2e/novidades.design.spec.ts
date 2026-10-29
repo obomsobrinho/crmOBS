@@ -41,11 +41,16 @@ test.describe("Regra das Novidades (lib/novidades.ts)", () => {
   test("o texto da nota segue as regras de escrita", () => {
     for (const n of NOVIDADES) {
       expect(n.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      const tudo = [n.titulo, n.resumo, ...n.itens.flatMap((i) => [i.titulo, i.texto])].join("\n");
-      // O formato do diálogo: título curto e UMA linha por novidade.
+      const tudo = [n.titulo, n.resumo ?? "", n.acao?.rotulo ?? "", ...n.itens.flatMap((i) => [i.titulo ?? "", i.texto])].join("\n");
+      // O formato do diálogo: título curto e UMA linha por novidade; sem título,
+      // a frase sozinha é o item (a nota da Agenda) e cabe em até duas linhas.
       for (const i of n.itens) {
-        expect(i.titulo.length, i.titulo).toBeLessThanOrEqual(28);
-        expect(i.texto.length, i.texto).toBeLessThanOrEqual(64);
+        if (i.titulo) {
+          expect(i.titulo.length, i.titulo).toBeLessThanOrEqual(28);
+          expect(i.texto.length, i.texto).toBeLessThanOrEqual(64);
+        } else {
+          expect(i.texto.length, i.texto).toBeLessThanOrEqual(90);
+        }
       }
       // Sem travessão e sem meia-risca.
       expect(tudo).not.toMatch(/[–—]/);
@@ -73,7 +78,7 @@ test.describe("Diálogo de Novidades (/design/novidades)", () => {
     const dialogo = page.locator('[data-slot="novidades"]');
     await expect(dialogo.locator('[data-slot="novidades-ilustracao"]')).toBeVisible();
     await expect(dialogo.locator(".anim-foguete")).toHaveCount(1);
-    await expect(dialogo.getByText(NOVIDADES[0].resumo)).toBeVisible();
+    if (NOVIDADES[0].resumo) await expect(dialogo.getByText(NOVIDADES[0].resumo)).toBeVisible();
     // A nuvem da frente tem a cor do corpo, nos dois temas: é ela que "vira" o corpo.
     for (const tema of ["light", "dark"]) {
       await page.evaluate((t) => (document.documentElement.dataset.theme = t), tema);
@@ -83,6 +88,23 @@ test.describe("Diálogo de Novidades (/design/novidades)", () => {
       ]);
       expect(nuvem, tema).toBe(corpo);
     }
+  });
+
+  test("a nota da Agenda: texto aprovado, botão Ativar a agenda só para o dono", async ({ page }) => {
+    const nota = NOVIDADES[0];
+    expect(nota.titulo).toBe("Agenda chegou");
+    expect(nota.itens.map((i) => i.texto)).toEqual([
+      "A IA marca, remarca e cancela horários pela conversa, no horário que você definir.",
+      "Lembrete automático no dia anterior, pedindo a confirmação do cliente.",
+      "Veja a semana inteira e marque horários você mesmo, em Agenda.",
+    ]);
+    expect(nota.acao).toEqual({ rotulo: "Ativar a agenda", href: "/agenda/configuracoes", soDono: true });
+    await page.goto("/design/novidades");
+    const dialogo = page.locator('[data-slot="novidades"]');
+    await expect(dialogo.locator('[data-slot="novidades-acao"]')).toHaveText("Ativar a agenda");
+    await page.goto("/design/novidades?atendente=1");
+    await expect(page.locator('[data-slot="novidades"] [data-slot="novidades-acao"]')).toHaveCount(0);
+    await expect(page.locator('[data-slot="novidades-fechar"]')).toBeVisible();
   });
 
   test("com movimento reduzido o foguete fica parado", async ({ page }) => {

@@ -14,10 +14,18 @@ export interface Novidade {
   /** O dia da nota em São Paulo, AAAA-MM-DD. É também o id gravado no usuário. */
   id: string;
   titulo: string;
-  /** Uma frase sob o título. */
-  resumo: string;
-  /** Cada novidade: um título curto e UMA linha (o diálogo é de leitura rápida). */
-  itens: { titulo: string; texto: string }[];
+  /** Uma frase sob o título (opcional: a nota da Agenda não tem). */
+  resumo?: string;
+  /**
+   * Cada novidade: um título curto e UMA linha (o diálogo é de leitura rápida),
+   * ou só a frase, sem título (a nota da Agenda, como o dono aprovou).
+   */
+  itens: { titulo?: string; texto: string }[];
+  /**
+   * Um botão que leva a uma tela (além do "Entendi"). `soDono`: a tela é do dono
+   * e o atendente seria mandado de volta, então ele não vê o botão.
+   */
+  acao?: { rotulo: string; href: string; soDono: boolean };
 }
 
 /** A chave em `user_metadata` com o id da última nota que o usuário fechou. */
@@ -25,6 +33,17 @@ export const CHAVE_DA_NOVIDADE_VISTA = "novidades_vista";
 
 /** Mais recente primeiro. Só a primeira é mostrada. */
 export const NOVIDADES: Novidade[] = [
+  {
+    // A Agenda (texto aprovado pelo dono em 29/10/2026, "Aprovo"; o `id` é o dia do deploy).
+    id: "2026-10-29",
+    titulo: "Agenda chegou",
+    itens: [
+      { texto: "A IA marca, remarca e cancela horários pela conversa, no horário que você definir." },
+      { texto: "Lembrete automático no dia anterior, pedindo a confirmação do cliente." },
+      { texto: "Veja a semana inteira e marque horários você mesmo, em Agenda." },
+    ],
+    acao: { rotulo: "Ativar a agenda", href: "/agenda/configuracoes", soDono: true },
+  },
   {
     // Aprovada pelo dono e publicada em 27/10/2026 (o `id` é o dia do deploy).
     id: "2026-10-27",
