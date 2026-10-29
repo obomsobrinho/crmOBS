@@ -1,5 +1,5 @@
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
-import { varianteDaOrdem } from "@/lib/prospeccao";
+import { diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
 import {
   leadsDoFiltro,
   type Busca,
@@ -117,6 +117,92 @@ function enviar(
   });
 }
 
+// ── O histórico gerado ──────────────────────────────────────────────────
+
+const SUFIXOS = [
+  "Central", "Prime", "Bem Viver", "Nova Era", "Real", "Vida", "Top", "Família", "Excellence", "Premium",
+  "do Bairro", "Avenida", "Santa Luzia", "São José", "Ideal", "Mais", "Express", "Point", "Master", "Elite",
+  "Primavera", "Horizonte", "Bela Vista", "Jardim", "Esperança", "Aliança", "Vitória", "Estrela", "Sol", "Luz",
+  "Harmonia", "Equilíbrio", "Movimento", "Essencial", "Origem", "Raiz", "Ponto Certo", "Conceito", "Moderna", "Clássica",
+  "Avanço", "Leste", "Oeste", "Norte", "Sul", "Centro Sul", "Boa Vista", "Planalto", "Serrana", "Vale",
+];
+const BAIRROS = ["Centro", "Jardim", "Vila Nova", "São Pedro", "Bela Vista", "Santa Rita", "Industrial", "Esplanada"];
+
+function baseGerada(prefixo: string, quantos: number, sorteio: () => number): Base[] {
+  return Array.from({ length: quantos }, (_, i) => {
+    const r = sorteio();
+    const tel = r < 0.8 ? "cel" : r < 0.92 ? "fixo" : "sem";
+    const s = sorteio();
+    const slug = SUFIXOS[i % SUFIXOS.length].toLowerCase().normalize("NFD").replace(/[^a-z]/g, "");
+    const site = s < 0.35 ? null : s < 0.65 ? `instagram.com/${slug}` : `${slug}.exemplo`;
+    const temNota = sorteio() > 0.06;
+    return [
+      `${prefixo} ${SUFIXOS[i % SUFIXOS.length]}${i >= SUFIXOS.length ? " II" : ""}`,
+      BAIRROS[Math.floor(sorteio() * BAIRROS.length)],
+      tel,
+      site,
+      temNota ? Math.round((3.8 + sorteio() * 1.2) * 10) / 10 : null,
+      temNota ? Math.round(5 + sorteio() * sorteio() * 400) : null,
+    ] as Base;
+  });
+}
+
+interface Historico {
+  termo: string;
+  segmento: string;
+  prefixo: string;
+  cidade: string;
+  ddd: string;
+  leads: number;
+  diasAtras: number;
+  campanha?: { nome: string; tamanho: number; situacao: Campanha["situacao"]; ate?: number };
+}
+
+const HISTORICO: Historico[] = [
+  { termo: "academia", segmento: "Academia", prefixo: "Academia", cidade: "Governador Valadares", ddd: "33", leads: 48, diasAtras: 52, campanha: { nome: "Academias de Governador Valadares", tamanho: 40, situacao: "concluida" } },
+  { termo: "pet shop", segmento: "Pet shop", prefixo: "Pet Shop", cidade: "Ipatinga", ddd: "31", leads: 41, diasAtras: 44, campanha: { nome: "Pet shops de Ipatinga", tamanho: 35, situacao: "concluida" } },
+  { termo: "salão de beleza", segmento: "Salão de beleza", prefixo: "Salão", cidade: "Caratinga", ddd: "33", leads: 36, diasAtras: 36, campanha: { nome: "Salões de Caratinga", tamanho: 30, situacao: "concluida" } },
+  { termo: "ótica", segmento: "Ótica", prefixo: "Ótica", cidade: "Teófilo Otoni", ddd: "33", leads: 34, diasAtras: 28, campanha: { nome: "Óticas de Teófilo Otoni", tamanho: 30, situacao: "concluida" } },
+  { termo: "nutricionista", segmento: "Nutricionista", prefixo: "Nutri", cidade: "Viçosa", ddd: "31", leads: 29, diasAtras: 22, campanha: { nome: "Nutricionistas de Viçosa", tamanho: 25, situacao: "concluida" } },
+  { termo: "fisioterapia", segmento: "Fisioterapia", prefixo: "Fisio", cidade: "Muriaé", ddd: "32", leads: 33, diasAtras: 17, campanha: { nome: "Fisioterapia em Muriaé", tamanho: 30, situacao: "concluida" } },
+  { termo: "imobiliária", segmento: "Imobiliária", prefixo: "Imobiliária", cidade: "Ponte Nova", ddd: "31", leads: 44, diasAtras: 11, campanha: { nome: "Imobiliárias de Ponte Nova", tamanho: 40, situacao: "pausada", ate: 25 } },
+  { termo: "autoescola", segmento: "Autoescola", prefixo: "Autoescola", cidade: "Timóteo", ddd: "31", leads: 38, diasAtras: 2, campanha: { nome: "Autoescolas de Timóteo", tamanho: 35, situacao: "rodando" } },
+  { termo: "clínica veterinária", segmento: "Clínica veterinária", prefixo: "Clínica Veterinária", cidade: "Aimorés", ddd: "33", leads: 22, diasAtras: 5 },
+  { termo: "estúdio de pilates", segmento: "Pilates", prefixo: "Pilates", cidade: "Coronel Fabriciano", ddd: "31", leads: 18, diasAtras: 1 },
+];
+
+/** O peso de resposta por hora do envio, por dia da semana (0 = domingo) e por variante. */
+const PESO_DA_HORA: Record<number, number> = { 8: 0.8, 9: 1.4, 10: 1.5, 11: 1.1, 12: 0.6, 13: 0.7, 14: 1.3, 15: 1.1, 16: 0.9, 17: 0.7 };
+const PESO_DO_DIA = [0.5, 1, 1.4, 1.3, 1.1, 0.9, 0.6];
+const PESO_DA_VARIANTE = [1, 1.45, 0.85];
+
+/** Os envios de uma campanha a 10 por dia desde `inicio`, cada um numa faixa de 1h sorteada; respostas pelo padrão. */
+function enviarComPadrao(leads: Lead[], inicio: string, agora: number, sorteio: () => number, ate?: number): EnvioDaCampanha[] {
+  let faixas: number[] = [];
+  return leads.map((l, ordem) => {
+    if (ordem % 10 === 0) {
+      // Fisher-Yates: o mesmo embaralhamento no servidor e no navegador.
+      faixas = Array.from({ length: 10 }, (_, i) => i);
+      for (let i = faixas.length - 1; i > 0; i--) {
+        const j = Math.floor(sorteio() * (i + 1));
+        [faixas[i], faixas[j]] = [faixas[j], faixas[i]];
+      }
+    }
+    const variante = varianteDaOrdem(ordem, 3);
+    const dia = somarDias(inicio, Math.floor(ordem / 10));
+    const hora = 8 + faixas[ordem % 10];
+    const enviadoEm = Math.round(inicioDoDiaSP(dia) + hora * H + sorteio() * 50 * MIN);
+    if (enviadoEm > agora || (ate !== undefined && ordem >= ate))
+      return { leadId: l.id, situacao: "na_fila", variante: null, enviadoEm: null, respondeuEm: null };
+    const p = 0.17 * PESO_DA_HORA[hora] * PESO_DO_DIA[diaDaSemanaSP(enviadoEm)] * PESO_DA_VARIANTE[variante];
+    const r = sorteio();
+    if (r < 0.03) return { leadId: l.id, situacao: "falhou", variante, enviadoEm: null, respondeuEm: null };
+    if (r >= 0.03 + p) return { leadId: l.id, situacao: "enviado", variante, enviadoEm, respondeuEm: null };
+    const respondeuEm = Math.min(agora - 5 * MIN, Math.round(enviadoEm + (6 + sorteio() * sorteio() * 600) * MIN));
+    return { leadId: l.id, situacao: sorteio() < 0.18 ? "parou" : "respondeu", variante, enviadoEm, respondeuEm };
+  });
+}
+
 export interface DadosDeMentira {
   buscas: Busca[];
   leads: Lead[];
@@ -186,8 +272,41 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
     passo: 4,
   });
 
-  for (const c of [c1, c2]) for (const e of c.envios) leads.find((l) => l.id === e.leadId)!.campanhaIds.push(c.id);
-  for (const c of [c1, c2]) for (const e of c.envios) if (e.situacao === "parou") leads.find((l) => l.id === e.leadId)!.parouEm = e.respondeuEm;
+  // O histórico: buscas e campanhas antigas geradas com um padrão de resposta
+  // (melhor de manhã e no meio da tarde, de terça a quinta, a variante 2 à
+  // frente), para os gráficos e a paginação terem o que mostrar.
+  const geradas: Campanha[] = [];
+  HISTORICO.forEach((h, k) => {
+    const buscaId = `h${k + 1}`;
+    buscas.push({
+      id: buscaId,
+      termo: h.termo,
+      cidade: h.cidade,
+      criadaEm: agora - (h.diasAtras + 1) * D - 3 * H,
+      situacao: "pronta",
+      total: h.leads,
+      erro: null,
+    });
+    leads.push(...leadsDaBusca(buscaId, h.cidade, h.segmento, h.ddd, baseGerada(h.prefixo, h.leads, sorteio), 1000 + k * 100));
+    if (!h.campanha) return;
+    const filtro = { buscaId, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null };
+    const daBusca = leadsDoFiltro(leads, filtro, []).slice(0, h.campanha.tamanho);
+    const inicio = somarDias(diaIsoSP(agora), -h.diasAtras);
+    geradas.push(
+      base(`g${k + 1}`, h.campanha.nome, {
+        situacao: h.campanha.situacao,
+        filtro,
+        envios: enviarComPadrao(daBusca, inicio, agora, sorteio, h.campanha.ate),
+        criadaEm: agora - (h.diasAtras + 1) * D,
+        salvaEm: agora - h.diasAtras * D,
+        passo: 4,
+      }),
+    );
+  });
+
+  for (const c of [c1, c2, ...geradas]) for (const e of c.envios) leads.find((l) => l.id === e.leadId)!.campanhaIds.push(c.id);
+  for (const c of [c1, c2, ...geradas])
+    for (const e of c.envios) if (e.situacao === "parou") leads.find((l) => l.id === e.leadId)!.parouEm = e.respondeuEm;
 
   // Quem não respondeu aos dentistas: agendada para amanhã às 8h.
   const c4Filtro = { buscaId: "todas" as const, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: "c2" };
@@ -210,7 +329,11 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
     passo: 2,
   });
 
-  return { buscas, leads, campanhas: [c3, c1, c4, c2] };
+  buscas.sort((a, b) => b.criadaEm - a.criadaEm);
+  const campanhas = [c3, c1, c4, c2, ...geradas].sort((a, b) =>
+    a.situacao === "rascunho" ? -1 : b.situacao === "rascunho" ? 1 : b.criadaEm - a.criadaEm,
+  );
+  return { buscas, leads, campanhas };
 }
 
 /** As empresas que uma busca nova de mentira "acha" depois de alguns segundos. */

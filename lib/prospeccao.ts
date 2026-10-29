@@ -349,8 +349,42 @@ export interface ResultadoDaCampanha extends Taxa {
   porVariante: Taxa[];
   /** Por hora do ENVIO (8h a 17h): a taxa de resposta de quem recebeu naquela hora. */
   porHoraDoEnvio: (Taxa & { hora: number })[];
+  /** Por dia da semana do ENVIO, de segunda a domingo (`dow` 0 = domingo). */
+  porDiaDaSemana: (Taxa & { dow: number })[];
   /** Por hora da RESPOSTA: quantas respostas chegaram em cada hora (0 a 23). */
   porHoraDaResposta: { hora: number; respostas: number }[];
+  /** A mediana do tempo entre o envio e a resposta, em minutos; null sem resposta. */
+  minutosAteResponder: number | null;
+}
+
+/** Segunda a domingo, a ordem dos gráficos por dia da semana (`dow` 0 = domingo). */
+export const DIAS_DA_SEMANA = ([1, 2, 3, 4, 5, 6, 0] as const).map((dow) => ({
+  dow,
+  curto: (["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const)[dow],
+  longo: (["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"] as const)[dow],
+}));
+
+/** O dia da semana (0 = domingo) de um dia civil AAAA-MM-DD, sem fuso no meio. */
+export function diaDaSemanaDoDia(dia: string): number {
+  return new Date(`${dia}T12:00:00Z`).getUTCDay();
+}
+
+/** O dia da semana (0 = domingo) do instante em São Paulo. */
+export function diaDaSemanaSP(t: number): number {
+  return diaDaSemanaDoDia(diaIsoSP(t));
+}
+
+/** "terça, 28/10": o dia de uma coluna, no balão. */
+export function textoDoDiaDeEnvio(dia: string): string {
+  const dow = diaDaSemanaDoDia(dia);
+  return `${DIAS_DA_SEMANA.find((d) => d.dow === dow)!.longo}, ${dia.slice(8, 10)}/${dia.slice(5, 7)}`;
+}
+
+function mediana(valores: number[]): number | null {
+  if (valores.length === 0) return null;
+  const v = [...valores].sort((a, b) => a - b);
+  const m = Math.floor(v.length / 2);
+  return v.length % 2 ? v[m] : Math.round((v[m - 1] + v[m]) / 2);
 }
 
 /**
@@ -373,11 +407,17 @@ export function resultadoDaCampanha(
     const na = enviados.filter((e) => horaSP(e.enviadoEm as number) === h);
     porHoraDoEnvio.push({ hora: h, ...taxa(na.length, resp(na)) });
   }
+  const porDiaDaSemana = DIAS_DA_SEMANA.map(({ dow }) => {
+    const no = enviados.filter((e) => diaDaSemanaSP(e.enviadoEm as number) === dow);
+    return { dow, ...taxa(no.length, resp(no)) };
+  });
   const horasDeResposta = new Map<number, number>();
+  const espera: number[] = [];
   for (const e of enviados) {
     if (e.respondeuEm === null) continue;
     const h = horaSP(e.respondeuEm);
     horasDeResposta.set(h, (horasDeResposta.get(h) ?? 0) + 1);
+    espera.push(Math.max(0, Math.round((e.respondeuEm - (e.enviadoEm as number)) / 60_000)));
   }
   return {
     total: envios.length,
@@ -387,6 +427,135 @@ export function resultadoDaCampanha(
     ...taxa(enviados.length, resp(enviados)),
     porVariante,
     porHoraDoEnvio,
+    porDiaDaSemana,
     porHoraDaResposta: [...horasDeResposta.entries()].sort((a, b) => a[0] - b[0]).map(([hora, respostas]) => ({ hora, respostas })),
+    minutosAteResponder: mediana(espera),
+  };
+}
+
+/**
+ * O índice da MAIOR taxa de uma comparação, ou null quando não há o que
+ * comparar (menos de duas linhas com envio, ou todas empatadas). É o destaque
+ * dos gráficos "melhor dia", "melhor horário" e "melhor mensagem".
+ */
+export function indiceDaMelhorTaxa(linhas: Taxa[]): number | null {
+  const comEnvio = linhas.map((l, i) => ({ ...l, i })).filter((l) => l.enviados > 0 && l.taxa !== null);
+  if (comEnvio.length < 2) return null;
+  const melhor = comEnvio.reduce((a, b) => ((b.taxa as number) > (a.taxa as number) ? b : a));
+  return comEnvio.every((l) => l.taxa === melhor.taxa) ? null : melhor.i;
+}
+
+/** "42 min", "3 h", "2 dias": o tempo até responder, curto. */
+export function textoDoTempo(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+  const h = Math.round(minutos / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "1 dia" : `${d} dias`;
+}
+
+export interface DiaDeEnvio {
+  /** AAAA-MM-DD em São Paulo. */
+  dia: string;
+  enviados: number;
+  /** Responderam (pedir para parar também conta: foi uma resposta). */
+  responderam: number;
+}
+
+/**
+ * Os envios por dia civil de São Paulo nos `dias` dias que terminam em `hoje`
+ * (inclusive), com zero nos dias sem envio: a coluna de cada dia existe sempre,
+ * para o eixo não pular datas. A resposta conta no dia do ENVIO dela.
+ */
+export function enviosPorDia(envios: EnvioParaResultado[], hoje: string, dias: number): DiaDeEnvio[] {
+  const serie = Array.from({ length: dias }, (_, i) => ({ dia: somarDias(hoje, i - dias + 1), enviados: 0, responderam: 0 }));
+  const indice = new Map(serie.map((d, i) => [d.dia, i]));
+  for (const e of envios) {
+    if (e.enviadoEm === null) continue;
+    const i = indice.get(diaIsoSP(e.enviadoEm));
+    if (i === undefined) continue;
+    serie[i].enviados++;
+    if (e.respondeuEm !== null) serie[i].responderam++;
+  }
+  return serie;
+}
+
+// ── A base de leads (o painel da aba Leads) ─────────────────────────────
+
+export interface LeadParaResumo extends SinaisDoLead {
+  cidade: string;
+  marcacao: MarcacaoDoLead;
+  parouEm: number | null;
+  /** Por quantas campanhas passou. */
+  campanhas: number;
+  /** Respondeu a alguma campanha. */
+  respondeu: boolean;
+}
+
+export interface CidadeDaBase {
+  cidade: string;
+  total: number;
+  /** Prontos para a próxima campanha (a mesma regra do passo Contatos). */
+  aContatar: number;
+  contatados: number;
+}
+
+export type FaixaDaPontuacao = ReturnType<typeof faixaDaPontuacao>;
+
+export interface ResumoDaBase {
+  total: number;
+  /** Com celular válido (os únicos que podem entrar numa campanha). */
+  comCelular: number;
+  bons: number;
+  contatados: number;
+  responderam: number;
+  aContatar: number;
+  porCidade: CidadeDaBase[];
+  porSite: Record<SiteDoLead, number>;
+  porFaixa: Record<FaixaDaPontuacao, number>;
+}
+
+/**
+ * Os números da base inteira, para o painel da aba Leads. De verdade é uma
+ * função SQL que agrega (nunca as linhas no navegador); esta é a MESMA conta em
+ * memória, para o preview e os testes. As duas ficam iguais.
+ */
+export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
+  const cidades = new Map<string, CidadeDaBase>();
+  const porSite: Record<SiteDoLead, number> = { sim: 0, so_rede_social: 0, nao: 0 };
+  const porFaixa: Record<FaixaDaPontuacao, number> = { alta: 0, media: 0, baixa: 0 };
+  let comCelular = 0;
+  let bons = 0;
+  let contatados = 0;
+  let responderam = 0;
+  let aContatar = 0;
+  for (const l of leads) {
+    const c = cidades.get(l.cidade) ?? { cidade: l.cidade, total: 0, aContatar: 0, contatados: 0 };
+    c.total++;
+    if (podeEntrarNaCampanha(l)) {
+      c.aContatar++;
+      aContatar++;
+    }
+    if (l.campanhas > 0) {
+      c.contatados++;
+      contatados++;
+    }
+    cidades.set(l.cidade, c);
+    if (telefoneDoLead(l.telefone)) comCelular++;
+    if (l.marcacao === "bom") bons++;
+    if (l.respondeu) responderam++;
+    porSite[siteDoLead(l.site)]++;
+    porFaixa[faixaDaPontuacao(pontuarLead(l).pontos)]++;
+  }
+  return {
+    total: leads.length,
+    comCelular,
+    bons,
+    contatados,
+    responderam,
+    aContatar,
+    porCidade: [...cidades.values()].sort((a, b) => b.total - a.total || a.cidade.localeCompare(b.cidade, "pt-BR")),
+    porSite,
+    porFaixa,
   };
 }

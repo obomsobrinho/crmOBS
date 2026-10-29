@@ -37,24 +37,37 @@ offer, objections or a qualified criterion.
 `lib/prospeccao.ts` was rewritten to the v2 rules; the old exports (angle, voice, touches, daily queue,
 site x-ray) are gone.
 
-## 3. Structure: two tabs
+## 3. Structure: two sections, a menu on the left
 
-Where it lives: one admin-only page with two tabs, Leads and Campanhas (D1 decides the route). The guard
-is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns it exists.
+Where it lives: one admin-only page (D1 decides the route). The guard is `adminDaPagina` like
+`/clientes`; a non-admin is redirected and never learns it exists. Owner's review of 29/10/2026 (second
+round): no page title, a narrow menu on the LEFT with Leads and Campanhas (each with its count) that
+swaps the whole view, and the body uses the full width. On a phone the menu becomes a row on top. Each
+section is the same shape (references: Dribbble "CRM Leads & People data table", "CRM SaaS leads table
+view", "CRM Dashboard for Sales Performance"): a dashboard on top, then ONE table below, paginated, with
+search by typing and filters in a toolbar, and a "Mostrando 20 de 137" footer.
 
 ### 3.1 Leads (the base)
 
-- **Searches list**: one card per search with the term and city ("clínica de estética · Mutum"), date,
-  status (buscando / pronta / falhou) and, when ready, found / usable (valid mobile, not stopped) /
-  already contacted.
+- **Dashboard of the base** (`resumoDaBase`, pure; the real one is one SQL aggregate, never rows in the
+  browser): five numbers (Na base with the number of cities, Com celular, A contatar with the days at 10
+  per day, Marcados como bons, Responderam with the share of contacted), "Leads por cidade" (stacked
+  horizontal bars: contacted, still to contact, out of campaigns; top 8 cities), "Funil da base" (in the
+  base, with mobile, contacted, replied, each step with its share of the previous one), and two donuts,
+  "Presença online" (no site / social only / own site) and "Pontuação" (high / medium / low).
+- **Table**, two views in a `painel` tab pair: **Buscas** (term and city, status, found, with mobile,
+  good, contacted of those with mobile as a `Medidor` plus replies, when; chips by status and search by
+  segment or city) and **Todos os leads** (the lead table below, over the whole base).
 - **"Nova busca"**: term and city. It runs in the background (section 6); the owner can leave and come
-  back. A card in "buscando" says so; "falhou" says why in one sentence and nothing is saved.
-- **Search detail**: a table of companies with name, Google rating and review count, site (yes / social
-  only / no, `siteDoLead` over `classeDaUrl`), phone (flagged "Fixo", "Inválido" or "Sem telefone" when
-  it is not a valid BR mobile, `tipoDoTelefone`), score (`pontuarLead`, reasons in the tooltip) and a
-  badge with every campaign the lead went through.
-- **Actions**: mark as good (toggle), discard (toggle). **Filters** (chips): not contacted, has site,
-  rating 4.5 or more. "Criar campanha com esta busca" opens the wizard with that search picked.
+  back. A row in "buscando" says so; "falhou" says why in one sentence and nothing is saved.
+- **Search detail**: five numbers for that search and the lead table filtered to it.
+- **Lead table** (both places): name with neighborhood and city, Google rating and review count, site
+  (yes / social only / no, `siteDoLead` over `classeDaUrl`), phone (flagged "Fixo", "Inválido" or "Sem
+  telefone" when it is not a valid BR mobile, `tipoDoTelefone`), score (`pontuarLead`, reasons in the
+  tooltip), "Respondeu" plus a badge with every campaign the lead went through, and the actions.
+- **Actions**: mark as good (toggle), discard (toggle). **Filters**: chips (not contacted, marked as good,
+  no own site, rating 4.5 or more), a city select and search by name or phone. "Criar campanha com esta
+  busca" opens the wizard with that search picked.
 - **Campaign marking**: a lead that went through a campaign keeps that badge forever. It only enters
   another campaign if the owner picks it explicitly ("Nova campanha com quem não respondeu").
 - **Opt-out**: a lead who asked to stop shows "Pediu para parar" and never enters a list again
@@ -64,10 +77,12 @@ is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns 
 
 ### 3.2 Campaigns
 
-- **Home**: one card per campaign with status (rascunho / agendada / rodando / pausada / concluída),
-  sending number, progress (sent / total, a `Medidor`) and replies with the reply rate. A draft card
-  says the step where it stopped and when it was saved, and reopens the wizard. "Nova campanha" sits at
-  the top, "Resultados" next to it once any campaign has sent.
+- **Home**: the results dashboard on top (section 4; a campaign select, "Todas as campanhas" by default,
+  and the panel's period selector `SeletorDePeriodo`, Mês by default), then the **campaign table**:
+  name with the sending number, status, progress (sent of total as a `Medidor`; a draft shows the step
+  where it stopped), replies with the rate, a 14 day sparkline of sends, when (saved, starts, created).
+  Chips by status with counts and search by name. A row opens the detail (a draft reopens the wizard).
+  "Nova campanha" sits at the top. There is no separate "Resultados" screen any more.
 - **Creation wizard** (reference: Dribbble "Asset Group Setup 2/3"): stepper on top; each section is a
   row with a check on the left and the summary of what was chosen on the right; the row expands to
   edit; footer with "Salvo agora" and Cancelar / Voltar / Continuar. Every change autosaves the draft,
@@ -86,24 +101,33 @@ is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns 
      an unknown field blocks the step (`problemasDaVariante`).
   4. **Confirmar**: summary rows (each reopens its step) plus the sending rules and the estimated last
      day; "Iniciar" or "Agendar".
-- **Campaign detail**: the four numbers on top (sent of total, replied, reply rate, asked to stop with
-  failures), the comparisons (by variant, by hour of sending, the hours replies arrived), the leads table
-  with status (na fila / enviado / respondeu / falhou / pediu para parar) and chips by status, "Pausar" /
+- **Campaign detail**: the same results dashboard over the whole campaign ("desde o início"), then the
+  leads table (company, variant, sent at, replied at, time to reply, status na fila / enviado / respondeu
+  / falhou / pediu para parar), paginated, with chips by status and search by name, "Pausar" /
   "Retomar", and "Nova campanha com quem não respondeu" (a new draft, step 2, with the leads that got the
   message and did not answer, picked on purpose; they again get one single first message).
 
 ## 4. Results
 
-- Per campaign (in its detail) and in a general view ("Resultados") with a campaign filter, all from
-  `resultadoDaCampanha` (pure; counts what happened, so a lead who asked to stop also counts as replied
-  and sent).
-- **Key comparisons**: reply rate per message variant and per hour of sending (8h to 17h); the best rate
-  is the only bar in the brand color, and only when there are two lines with sends to compare.
-- **The hour metric needs time**: 10 sends a day makes it slow, so the scheduler spreads the sends across
-  the window on purpose (section 5.2). Below `AMOSTRA_MINIMA_PROVISORIA` sends (30, provisional, D5) the
-  cards say "Ainda pouco para comparar".
-- Numbers are bars with the number written next to them (`Medidor` rows), not charts: each line already
-  carries its value in text, so no chart and no text table view are needed.
+One block, `PainelDeResultados`, on top of the Campanhas home (all campaigns or one, in the period, with
+the previous equal window for the badges) and of the campaign detail (since the start). Everything comes
+from `resultadoDaCampanha` and `enviosPorDia` (pure; counts what happened, so a lead who asked to stop
+also counts as replied and sent). The owner found the first version weak (no best day, hours shown as
+bars of text); this one:
+- **Five numbers**: Enviadas and Responderam (sparkline per day, badge against the previous window),
+  Taxa de resposta ("21 de 96 enviadas"), Tempo até responder (median, plus the hour most replies arrive),
+  Pediram para parar (amber when above zero).
+- **Envios por dia**: stacked columns per São Paulo day (replied in brand, no reply neutral), legend
+  with totals, the reply counted on the day of its send.
+- **Melhor mensagem**: horizontal bars of reply rate per variant, the texts behind "Ver os textos".
+- **Melhor dia da semana** and **Melhor horário de envio** (8h to 17h): columns of reply rate with the
+  value on top; the best one is the only column in brand color (`indiceDaMelhorTaxa`: only with two
+  lines with sends and not all tied) and its name sits large in the card header ("Quarta, 28%
+  responderam", "10h às 11h").
+- Every chart goes through `components/ui/chart.tsx` (tooltip, legend with two series, text table).
+- **The hour and day metrics need time**: 10 sends a day makes them slow, so the scheduler spreads the
+  sends across the window on purpose (section 5.2). Below `AMOSTRA_MINIMA_PROVISORIA` sends (30,
+  provisional, D5) a line under the numbers says it is still too little to compare.
 
 ## 5. Sending rules
 
@@ -189,6 +213,11 @@ is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns 
   The other tables have no `client_id` (the base belongs to the product owner, not to a tenant).
 - Every admin write leaves an `admin_acoes` row in the same transaction (admin rule), through one SQL
   function per action when the backend lands.
+- The dashboards aggregate in SQL, never over fetched rows (the PostgREST 1000 row cap): one function for
+  the base (`resumoDaBase` in memory is its twin: totals, per city, per site class, per score band) and
+  one for the results (per variant, weekday and hour of sending in São Paulo, per day, median time to
+  reply, for a window and the previous one). Score and site class are stored on the lead row so SQL can
+  group by them. To be written with the backend, after the owner approves this layout.
 
 ## 8. Code map (backend phase)
 
@@ -197,10 +226,15 @@ is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns 
   `ehPedidoParaParar`, `podeEntrarNaCampanha`, `resultadoDaCampanha`.
 - Screens: `components/admin/campanhas/*` (done in the prototype, reading props); the real page passes
   server data and a source (`lib/campanhas-fonte.ts`) instead of the fake data.
-- Routes (`rotaDoAdmin`, 404 for non-admins): `GET/POST /api/admin/campanhas/buscas`,
-  `GET /api/admin/campanhas/buscas/[id]/leads` (10 per page, filters), `PUT .../leads/[id]` (mark),
-  `GET/POST/PUT /api/admin/campanhas` (draft autosave, start, pause), `GET .../[id]` (detail and
-  results). Outside admin: `/api/prospeccao/cron`, `/api/prospeccao/apify`.
+- Routes (`rotaDoAdmin`, 404 for non-admins): `GET/POST /api/admin/campanhas/buscas` (10 per page,
+  keyset, search by term or city, status filter), `GET /api/admin/campanhas/leads` (10 per page, keyset,
+  search by name or phone, filters, optional search id), `PUT .../leads/[id]` (mark),
+  `GET/POST/PUT /api/admin/campanhas` (10 per page, search by name, status filter; draft autosave,
+  start, pause), `GET .../[id]` (detail), `GET .../[id]/leads` (10 per page), and the two dashboard
+  reads (`.../resumo` for the base, `.../resultados?campanha=&periodo=`). Each table's footer total is a
+  count, never rows. Outside admin: `/api/prospeccao/cron`, `/api/prospeccao/apify`.
+- The prototype pages over memory through the same `usePaginada` (`usePaginadaDaMemoria`,
+  `components/admin/campanhas/tabela.tsx`), so the real screens only swap the source.
 - `e2e/central-clientes-lib.design.spec.ts` lists admin pages and routes: the new ones go in it.
 
 ## 9. Suggested message variants (the owner approves before use; pre-filled in the prototype)
@@ -218,14 +252,16 @@ is `adminDaPagina` like `/clientes`; a non-admin is redirected and never learns 
 ## 10. Layout
 
 Atenda design system (`docs/design-system/`), dark first with the purple accent, base layer only
-(`Card`, `Badge estado-*`, `Button` `chip`/`alternavel`/`nu`, `Medidor`, `Indicador`, `EstadoVazio`,
-`AreaRolavel`). Calm and spacious: cards on the canvas, one primary action per screen, few elements per
-row, max widths of 3xl (wizard), 5xl (homes) and 6xl (tables). Empty states say the next step ("Nenhuma
-busca ainda. Comece buscando um segmento e uma cidade."). Desktop first; tables become stacked rows
-below 1024px and the wizard stepper becomes "Passo 2 de 4" on phones. No dash in any text.
+(`Card`, `Badge estado-*`, `Button` `chip`/`alternavel`/`nu`/`linha`, `Medidor`, `Indicador`,
+`IndicadorComparado`, `CampoBusca`, `SeletorDePeriodo`, `EstadoVazio`, `AreaRolavel`, charts only through
+`chart.tsx`). Left menu, full width body, dashboard then table in both sections. Empty states say the
+next step ("Nenhuma busca ainda. Comece buscando um segmento e uma cidade."). Desktop first; table rows
+stack below 1280px and the wizard stepper becomes "Passo 2 de 4" on phones. No dash in any text.
 
-Prototype URLs (`/design/campanhas`, 404 in production): `?tela=leads|busca|campanhas|campanha|rascunho|resultados`,
-`?cenario=vazio` for the empty states. "Nova busca" finishes after 4 seconds with fake companies.
+Prototype URLs (`/design/campanhas`, 404 in production): `?tela=leads|busca|campanhas|campanha|rascunho`,
+`?cenario=vazio` for the empty states. The fake history has 14 searches, 12 campaigns and about 370 leads
+with a reply pattern (better mid morning and mid afternoon, Tuesday to Thursday), so the charts and the
+pagination have something to show. "Nova busca" finishes after 4 seconds with fake companies.
 
 ## 11. Risks
 

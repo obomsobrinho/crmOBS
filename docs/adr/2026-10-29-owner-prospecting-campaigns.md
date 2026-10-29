@@ -33,12 +33,15 @@ dia"; on the number: "eu coloco qualquer um ali e segue o baile"; on this round:
 o plano para ja mandarmos ver".
 
 ## Decision (proposed)
-- **Two tabs, admin only.** Leads: one card per search (term and city, background run, buscando / pronta
-  / falhou, found / usable / contacted), a search detail table (rating, reviews, site yes / social only /
-  no, phone flagged when not a valid BR mobile, score, campaign badges), mark as good and discard, filters.
-  Campanhas: home cards (status rascunho / agendada / rodando / pausada / concluída, progress, replies),
-  a four-step wizard (Campanha, Contatos, Mensagem, Confirmar) with autosave, and the campaign detail
-  (numbers, comparisons, leads table, Pausar, "Nova campanha com quem não respondeu").
+- **Two sections, admin only, a menu on the left** (second review, same day: no page title, full width,
+  dashboard on top and one paginated table below in each section). Leads: the dashboard of the base
+  (numbers, leads per city, funnel, online presence, score) and a table of searches or of all leads
+  (rating, reviews, site yes / social only / no, phone flagged when not a valid BR mobile, score, campaign
+  badges, mark as good and discard, search by typing and filters); a search opens its own lead table.
+  Campanhas: the results dashboard (numbers, sends per day, best message, best weekday, best hour, with a
+  campaign and period filter) and the campaign table; a four-step wizard (Campanha, Contatos, Mensagem,
+  Confirmar) with autosave; the campaign detail (the same dashboard since the start, the leads table,
+  Pausar, "Nova campanha com quem não respondeu").
 - **One message per lead, no follow-up.** One fixed text for everyone, 1 to 3 variants rotating in queue
   order, one variable `{empresa}`. A lead that went through a campaign is marked with it forever and only
   enters another one when the owner picks it explicitly. A lead who asked to stop never enters a list

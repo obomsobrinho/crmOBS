@@ -1,20 +1,55 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Megaphone, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
+import { numeroBR } from "@/lib/format";
 import { pontuarLead, telefoneDoLead } from "@/lib/prospeccao";
 import AbaLeads from "./AbaLeads";
 import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
-import ResultadosGerais from "./Resultados";
 import { leadsDoFiltro, type Busca, type Campanha, type ConexaoDisponivel, type Lead, type Tela } from "./tipos";
 
-// CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). Duas
-// abas: Leads (a base, por busca) e Campanhas (home, assistente, detalhe e
-// resultados). Hoje só o preview `/design/campanhas` monta esta tela, com dados
-// de mentira: buscar, marcar, salvar e iniciar mudam só o estado da página.
+// CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). Um
+// menu à esquerda troca a tela inteira: Leads (o painel da base e as tabelas de
+// buscas e de leads) e Campanhas (o painel de resultados, a tabela de
+// campanhas, o assistente e o detalhe). Hoje só o preview `/design/campanhas`
+// monta esta tela, com dados de mentira: buscar, marcar, salvar e iniciar mudam
+// só o estado da página.
+
+function ItemDoMenu({
+  ativo,
+  icone: Icone,
+  rotulo,
+  contagem,
+  aoClicar,
+  slot,
+}: {
+  ativo: boolean;
+  icone: typeof Users;
+  rotulo: string;
+  contagem: number;
+  aoClicar: () => void;
+  slot: string;
+}) {
+  return (
+    <Button
+      variant="nu"
+      size="linha"
+      onClick={aoClicar}
+      aria-current={ativo ? "page" : undefined}
+      data-slot={slot}
+      className="flex-1 justify-start text-ink-2 hover:bg-[var(--active-bg)] hover:text-ink aria-[current=page]:bg-[var(--active-bg)] aria-[current=page]:font-semibold aria-[current=page]:text-ink md:w-full md:flex-none"
+    >
+      <Icone size={18} aria-hidden className={ativo ? "text-brand-ink" : "text-ink-3"} />
+      {rotulo}
+      <span className="ml-auto text-legenda font-normal tabular-nums text-ink-3">{numeroBR(contagem)}</span>
+    </Button>
+  );
+}
 
 export default function CentralDeCampanhas({
   telaInicial,
@@ -83,7 +118,7 @@ export default function CentralDeCampanhas({
       window.setTimeout(() => {
         setLeads((atual) => {
           const ja = new Set(atual.map((l) => telefoneDoLead(l.telefone)).filter(Boolean));
-          const achados = simularBusca(id, termo, cidade, 300 + atual.length);
+          const achados = simularBusca(id, termo, cidade, 3000 + atual.length);
           const novos = achados.filter((l) => !ja.has(telefoneDoLead(l.telefone)));
           setBuscas((b) => b.map((x) => (x.id === id ? { ...x, situacao: "pronta", total: achados.length } : x)));
           return [...atual, ...novos];
@@ -121,51 +156,58 @@ export default function CentralDeCampanhas({
   );
   const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" ? campanhas.find((c) => c.id === tela.id) : undefined;
   const emDetalhe = tela.aba === "campanhas" && tela.vista === "detalhe" ? campanhas.find((c) => c.id === tela.id) : undefined;
-
-  if (emEdicao) {
-    return (
-      <section aria-label="Nova campanha" className="flex min-h-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line">
-        <Assistente
-          campanha={emEdicao}
-          buscas={buscas}
-          leads={leads}
-          campanhas={campanhas}
-          conexoes={conexoes}
-          agora={agora}
-          montadoEm={agora}
-          aoMudar={(patch) => mudarCampanha(emEdicao.id, patch)}
-          aoSair={() => setTela({ aba: "campanhas", vista: "lista" })}
-          aoIniciar={() => iniciar(emEdicao.id)}
-          irParaLeads={() => {
-            setRascunhoEsperando(emEdicao.id);
-            setTela({ aba: "leads", busca: null });
-          }}
-        />
-      </section>
-    );
-  }
+  const irParaCampanhas = () => setTela({ aba: "campanhas", vista: "lista" });
 
   return (
-    <section aria-label="Campanhas" data-slot="campanhas" className="flex min-h-0 flex-1 flex-col">
-      <Tabs
-        value={tela.aba}
-        onValueChange={(v) => setTela(v === "leads" ? { aba: "leads", busca: null } : { aba: "campanhas", vista: "lista" })}
-        className="flex min-h-0 flex-1 flex-col"
-      >
-        <div className="flex items-center justify-between gap-3 px-4 pt-4 md:px-8 md:pt-6">
-          <h1 className="text-rotulo uppercase text-ink-3">Prospecção da OBS</h1>
-          <TabsList variant="painel" aria-label="Seções">
-            <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
-              Leads
-            </TabsTrigger>
-            <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
-              Campanhas
-            </TabsTrigger>
-          </TabsList>
-        </div>
+    <section aria-label="Prospecção" data-slot="campanhas" className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row">
+      <Card asChild variant="conteudo" className="shrink-0 max-md:rounded-none md:w-56">
+        <nav aria-label="Prospecção" className="flex gap-1 p-2 md:flex-col md:p-3" data-slot="campanhas-menu">
+          <ItemDoMenu
+            ativo={tela.aba === "leads"}
+            icone={Users}
+            rotulo="Leads"
+            contagem={leads.length}
+            aoClicar={() => setTela({ aba: "leads", busca: null })}
+            slot="campanhas-aba-leads"
+          />
+          <ItemDoMenu
+            ativo={tela.aba === "campanhas"}
+            icone={Megaphone}
+            rotulo="Campanhas"
+            contagem={campanhas.length}
+            aoClicar={irParaCampanhas}
+            slot="campanhas-aba-campanhas"
+          />
+        </nav>
+      </Card>
 
-        <AreaRolavel tamanho={DISSOLVER_PADRAO} className="min-h-0 flex-1">
-          <div className="px-4 py-6 md:px-8 md:py-8">
+      {emEdicao ? (
+        <section aria-label="Nova campanha" className="flex min-h-0 min-w-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line">
+          <Assistente
+            campanha={emEdicao}
+            buscas={buscas}
+            leads={leads}
+            campanhas={campanhas}
+            conexoes={conexoes}
+            agora={agora}
+            montadoEm={agora}
+            aoMudar={(patch) => mudarCampanha(emEdicao.id, patch)}
+            aoSair={irParaCampanhas}
+            aoIniciar={() => iniciar(emEdicao.id)}
+            irParaLeads={() => {
+              setRascunhoEsperando(emEdicao.id);
+              setTela({ aba: "leads", busca: null });
+            }}
+          />
+        </section>
+      ) : (
+        // A chave troca a cada tela: abrir outra tela começa do topo, não de onde a anterior parou.
+        <AreaRolavel
+          key={tela.aba === "leads" ? `leads-${tela.busca ?? ""}` : `campanhas-${"id" in tela ? tela.id : ""}`}
+          tamanho={DISSOLVER_PADRAO}
+          className="min-h-0 min-w-0 flex-1"
+        >
+          <div className="px-4 py-6 md:px-2 md:py-2">
             {tela.aba === "leads" ? (
               <AbaLeads
                 buscas={buscas}
@@ -188,14 +230,13 @@ export default function CentralDeCampanhas({
                   setRascunhoEsperando(null);
                 }}
               />
-            ) : tela.vista === "resultados" ? (
-              <ResultadosGerais campanhas={campanhas} voltar={() => setTela({ aba: "campanhas", vista: "lista" })} />
             ) : emDetalhe ? (
               <DetalheDaCampanha
                 campanha={emDetalhe}
                 leads={leads}
                 conexoes={conexoes}
-                voltar={() => setTela({ aba: "campanhas", vista: "lista" })}
+                agora={agora}
+                voltar={irParaCampanhas}
                 pausarOuRetomar={() =>
                   mudarCampanha(emDetalhe.id, { situacao: emDetalhe.situacao === "pausada" ? "rodando" : "pausada" })
                 }
@@ -217,12 +258,11 @@ export default function CentralDeCampanhas({
                 abrir={(id) => setTela({ aba: "campanhas", vista: "detalhe", id })}
                 editar={(id) => setTela({ aba: "campanhas", vista: "editar", id })}
                 nova={() => novoRascunho({})}
-                verResultados={() => setTela({ aba: "campanhas", vista: "resultados" })}
               />
             )}
           </div>
         </AreaRolavel>
-      </Tabs>
+      )}
     </section>
   );
 }

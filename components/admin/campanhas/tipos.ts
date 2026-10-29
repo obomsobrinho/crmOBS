@@ -93,7 +93,7 @@ export interface ConexaoDisponivel {
 /** Onde a central está (as duas abas e as telas de cada uma). */
 export type Tela =
   | { aba: "leads"; busca: string | null }
-  | { aba: "campanhas"; vista: "lista" | "resultados" }
+  | { aba: "campanhas"; vista: "lista" }
   | { aba: "campanhas"; vista: "detalhe" | "editar"; id: string };
 
 /**
