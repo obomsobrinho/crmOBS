@@ -89,9 +89,8 @@ function AbaFila({
     <AreaRolavel tamanho={DISSOLVER_LISTA} className="h-full">
       <div className="flex flex-col gap-3 px-4 py-4 md:px-5">
         <Aviso tom="neutro" icone={CalendarClock} data-slot="fila-ritmo">
-          Número dedicado {numero.conectado ? "conectado" : "desconectado"}
-          {numero.idadeDias !== null && ` há ${numero.idadeDias} dias`}: teto de <strong>{teto} por dia</strong>
-          {numero.idadeDias !== null && numero.idadeDias < 7 && " na primeira semana"}. {numero.enviadasHoje}{" "}
+          Número da OBS {numero.conectado ? "conectado" : "desconectado"}: teto de <strong>{teto} por dia</strong>,
+          acompanhamentos incluídos. {numero.enviadasHoje}{" "}
           {numero.enviadasHoje === 1 ? "enviada" : "enviadas"} hoje, {restam === 1 ? "resta 1" : `restam ${restam}`}.
           Envios de {textoDaJanela(config.janela)}, com pausa
           sorteada de {config.pausaMinutos[0]} a {config.pausaMinutos[1]} minutos.

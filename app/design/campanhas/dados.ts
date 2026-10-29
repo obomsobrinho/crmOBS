@@ -1,4 +1,4 @@
-import { JANELA_PROVISORIA, type SituacaoDoLead } from "@/lib/prospeccao";
+import { JANELA_PROVISORIA, PAUSA_PROVISORIA_MINUTOS, TETO_MAXIMO_DIARIO, type SituacaoDoLead } from "@/lib/prospeccao";
 import type {
   ConfigDaCampanha,
   EmpresaAchada,
@@ -135,11 +135,11 @@ export const CONFIG_DE_MENTIRA: ConfigDaCampanha = {
     "Oi de novo! Só para mostrar como seria: um atendente com IA responde quem chama a {nome} em segundos, até de noite, e passa para vocês quando precisa. Quer ver funcionando?",
     "Vou parar por aqui para não incomodar. Se um dia fizer sentido ter o WhatsApp da {nome} respondendo sozinho fora do horário, é só me chamar.",
   ],
-  tetoDiario: 5,
-  pausaMinutos: [4, 12],
+  tetoDiario: TETO_MAXIMO_DIARIO,
+  pausaMinutos: PAUSA_PROVISORIA_MINUTOS,
   janela: JANELA_PROVISORIA,
   baseLegalRef: "Avaliação de exemplo (preview, a de verdade é sua)",
   ativa: true,
 };
 
-export const NUMERO_DE_MENTIRA: NumeroDaProspeccao = { conectado: true, idadeDias: 3, enviadasHoje: 1 };
+export const NUMERO_DE_MENTIRA: NumeroDaProspeccao = { conectado: true, enviadasHoje: 1 };

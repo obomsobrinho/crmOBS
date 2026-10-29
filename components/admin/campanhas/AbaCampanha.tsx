@@ -9,7 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
-import { CADENCIA_PROVISORIA, LINHA_DE_SAIDA, camposDoLead, textoDaJanela, textoDoToque } from "@/lib/prospeccao";
+import {
+  CADENCIA_PROVISORIA,
+  LINHA_DE_SAIDA,
+  TETO_MAXIMO_DIARIO,
+  camposDoLead,
+  textoDaJanela,
+  textoDoToque,
+} from "@/lib/prospeccao";
 import type { ConfigDaCampanha, LeadDaCampanha } from "./tipos";
 
 // CAMPANHA: os textos de cada toque (com campos entre chaves e a prévia com um
@@ -30,7 +37,7 @@ function AbaCampanha({
   const [rascunho, setRascunho] = useState(config);
   const [recado, setRecado] = useState<string | null>(null);
   const semBaseLegal = rascunho.baseLegalRef.trim().length < 3;
-  const tetoValido = Number.isInteger(rascunho.tetoDiario) && rascunho.tetoDiario >= 1 && rascunho.tetoDiario <= 50;
+  const tetoValido = Number.isInteger(rascunho.tetoDiario) && rascunho.tetoDiario >= 1 && rascunho.tetoDiario <= TETO_MAXIMO_DIARIO;
   const [pMin, pMax] = rascunho.pausaMinutos;
   const pausaValida = pMin >= 1 && pMax >= pMin;
 
@@ -133,8 +140,8 @@ function AbaCampanha({
         <Card variant="secao">
           <h2 className="text-cartao">Limites</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
-            Valores de partida, não medidos. Na primeira semana do número o teto fica em 5 por dia, seja qual for o valor
-            aqui.
+            Sai pelo número da OBS. O máximo é {TETO_MAXIMO_DIARIO} por dia, acompanhamentos incluídos (sua decisão);
+            a pausa e o horário são valores de partida, não medidos.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <label>
@@ -143,7 +150,7 @@ function AbaCampanha({
                 className="mt-1"
                 type="number"
                 min={1}
-                max={50}
+                max={TETO_MAXIMO_DIARIO}
                 value={rascunho.tetoDiario}
                 onChange={(e) => mudar({ tetoDiario: Number(e.target.value) })}
               />
@@ -174,7 +181,7 @@ function AbaCampanha({
           </p>
           {(!tetoValido || !pausaValida) && (
             <Aviso tom="warn" className="mt-2">
-              {!tetoValido ? "O máximo por dia vai de 1 a 50." : "A pausa máxima precisa ser maior ou igual à mínima."}
+              {!tetoValido ? `O máximo por dia vai de 1 a ${TETO_MAXIMO_DIARIO}.` : "A pausa máxima precisa ser maior ou igual à mínima."}
             </Aviso>
           )}
         </Card>

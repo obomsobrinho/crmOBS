@@ -60,7 +60,7 @@ function AbaResultados({
           <Card variant="secao" data-slot="resultados-respostas">
             <h2 className="text-cartao">Respostas recentes</h2>
             <p className="mt-0.5 text-legenda text-ink-3">
-              Quem responde cai em Conversas da empresa de prospecção e a IA continua a conversa.
+              Quem responde cai em Conversas da OBS e a IA da OBS continua a conversa.
             </p>
             {respostas.length === 0 ? (
               <EstadoVazio tamanho="compacto" icone={MessageCircle} texto="Ninguém respondeu ainda." />
@@ -81,10 +81,10 @@ function AbaResultados({
           </Card>
 
           <Card variant="secao" data-slot="resultados-numero">
-            <h2 className="text-cartao">Número dedicado</h2>
+            <h2 className="text-cartao">Número da OBS</h2>
             <p className="mt-0.5 text-apoio text-ink-2">
               {numero.conectado ? "Conectado" : "Desconectado: a campanha pausa sozinha"}
-              {numero.idadeDias !== null && `, há ${numero.idadeDias} dias`}.
+              . Se ele for bloqueado, o atendimento da OBS para junto (risco aceito).
             </p>
             <p className="mt-3 text-rotulo uppercase text-ink-3">Envios de hoje</p>
             <p className="mt-1 text-apoio text-ink">

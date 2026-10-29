@@ -2,6 +2,8 @@
 -- RASCUNHO NAO APLICADO: espera as decisoes do dono (D1 a D17). Nao aplicar antes da aprovacao;
 -- depois de aplicar, regenerar lib/database.types.ts e pôr prospeccao_campanhas em
 -- TABELAS_DO_CLIENTE (lib/admin-purga.ts), porque ela tem client_id.
+-- Decisoes do dono em 29/10/2026: manda pelo numero da propria OBS (client_id = a empresa OBS) e no
+-- maximo 10 abordagens por dia (teto_diario ate 10).
 -- Tudo so service_role: o navegador fala apenas com /api/admin/campanhas/*.
 
 create table if not exists public.prospeccao_campanhas (
@@ -12,7 +14,7 @@ create table if not exists public.prospeccao_campanhas (
   cidade text not null default '',
   textos jsonb not null default '[]'::jsonb,
   cadencia jsonb not null default '[0, 3, 7]'::jsonb,
-  teto_diario int not null check (teto_diario between 1 and 50),
+  teto_diario int not null check (teto_diario between 1 and 10),
   intervalo_min_s int not null check (intervalo_min_s >= 60),
   intervalo_max_s int not null,
   janela jsonb not null,
@@ -26,7 +28,7 @@ create table if not exists public.prospeccao_campanhas (
   check (intervalo_max_s >= intervalo_min_s)
 );
 
--- Uma campanha ativa por empresa de prospeccao (o mesmo freio do Deskcomm).
+-- Uma campanha ativa por empresa (o mesmo freio do Deskcomm): duas ativas mandariam 10 cada.
 create unique index if not exists prospeccao_uma_ativa
   on public.prospeccao_campanhas (client_id) where status = 'ativa';
 

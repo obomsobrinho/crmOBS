@@ -215,19 +215,22 @@ export function textoDoToque(
 /** Dias depois do primeiro toque em que cada toque sai. ⚠️ PROVISÓRIO (D6): 0, 3 e 7. */
 export const CADENCIA_PROVISORIA = [0, 3, 7] as const;
 
-/** ⚠️ PROVISÓRIO (D7): 5 por dia na primeira semana do número, 10 depois; pausa de 4 a 12 minutos. */
-export const RITMO_PROVISORIO = {
-  tetoPrimeiraSemana: 5,
-  tetoDepois: 10,
-  pausaMs: [4 * 60_000, 12 * 60_000] as [number, number],
-};
+/**
+ * Decisão do dono (29/10/2026): no máximo 10 abordagens por dia, primeiras
+ * mensagens e acompanhamentos somados, pelo número da própria OBS. A tabela tem
+ * a mesma trava (`teto_diario between 1 and 10`). Mudar aqui é decisão dele.
+ */
+export const TETO_MAXIMO_DIARIO = 10;
+
+/** ⚠️ PROVISÓRIO (D7): pausa sorteada de 4 a 12 minutos entre duas mensagens. */
+export const PAUSA_PROVISORIA_MINUTOS: [number, number] = [4, 12];
 
 const DIA_MS = 86_400_000;
 
-/** Teto de hoje pela idade do número (dias desde que conectou). Desconhecida = o degrau mais lento. */
-export function tetoDeHoje(idadeDoNumeroDias: number | null): number {
-  if (idadeDoNumeroDias === null || idadeDoNumeroDias < 7) return RITMO_PROVISORIO.tetoPrimeiraSemana;
-  return RITMO_PROVISORIO.tetoDepois;
+/** O teto de hoje: o da campanha, nunca acima de `TETO_MAXIMO_DIARIO` nem abaixo de zero. */
+export function tetoDeHoje(tetoDaCampanha: number): number {
+  if (!Number.isFinite(tetoDaCampanha)) return 0;
+  return Math.max(0, Math.min(TETO_MAXIMO_DIARIO, Math.floor(tetoDaCampanha)));
 }
 
 /** Quando sai o próximo toque; null = a sequência acabou. */

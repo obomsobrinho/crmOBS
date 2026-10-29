@@ -1,20 +1,24 @@
 # Plan: Campanhas, the product owner's own prospecting
 
-Status: DRAFT for the owner's review (written 29/10/2026, overnight, nothing decided). Every choice
-below that changes product behavior is listed in section 12 ("Owner decisions") with a
-recommendation; none of them was taken by the agent. ADR: `docs/adr/2026-10-29-owner-prospecting-campaigns.md` (Proposed).
+Status: DRAFT for the owner's review (written 29/10/2026, overnight). Every choice below that changes
+product behavior is listed in section 12 ("Owner decisions") with a recommendation. **Decided by the
+owner on 29/10/2026** (literal: "vamos usar o da obs mesmo, a campanha vou rodar com no maximo 10
+contatos por dia"): D1 go ahead despite the opt-in policy, D2 OBS's own number and account (no
+dedicated chip, no second company), D7 cap of 10 approaches per day. Everything else is still open. ADR: `docs/adr/2026-10-29-owner-prospecting-campaigns.md` (Proposed).
 
 ## 1. Problem
 
 Week priority of the owner: bring companies to Atenda by finding leads with a company search tool,
 choosing the best ones and approaching about 10 per day. His decision (21 and 22/10/2026): this
-prospecting runs inside Atenda itself, as **Campanhas**, a feature **only for OBS** (dedicated
-number, daily cap, interval). Never a tenant feature, never on the sales page.
+prospecting runs inside Atenda itself, as **Campanhas**, a feature **only for OBS** (on OBS's own
+number since 29/10/2026, daily cap of 10, interval). Never a tenant feature, never on the sales page.
 
 What exists today:
 - The exception is already written: `CLAUDE.md` and `docs/adr/2026-08-26-no-mass-messaging-over-qr.md`
   allow "the owner's OWN prospecting inside `/admin`, his user only, dedicated number, daily cap and
-  interval (not built yet; never a tenant feature)". The plan works inside that exception.
+  interval (not built yet; never a tenant feature)". The plan works inside that exception, except for
+  the "dedicated number": the owner chose OBS's own number on 29/10/2026, so that line of `CLAUDE.md`
+  and of the 26/08 ADR needs new wording when this plan is accepted (section 12, D14).
 - The rule it collides with: active messaging only to contacts with a recent conversation, never cold
   lists. Prospecting is cold by definition. The exception covers the owner; it does not change the
   tenant rule, and the menu rule "Campanhas is out" stays true for tenants.
@@ -186,11 +190,11 @@ reply, any SAIR, a block or a failure stops the sequence. Never more than 3 touc
 
 ## 4. Options
 
-| | A. Deskcomm way: fully automatic cold WhatsApp over QR | B. Official API marketing template | C. Warm first: lead starts the chat (e-mail, Instagram, visit, ad with wa.me link) | D. **Approved daily batch over a dedicated QR number** (A with the owner approving every message) |
+| | A. Deskcomm way: fully automatic cold WhatsApp over QR | B. Official API marketing template | C. Warm first: lead starts the chat (e-mail, Instagram, visit, ad with wa.me link) | D. **Approved daily batch over QR** (A with the owner approving every message; on OBS's own number by his decision) |
 |---|---|---|---|---|
 | Policy | violates opt-in | **also violates opt-in** | compliant | violates opt-in, lowest exposure |
-| Ban or penalty | dedicated number lost | portfolio quality and limits, can hit future official numbers | none | dedicated number lost, lower odds (low volume, human pace, personal text) |
-| Cost per month at 10/day | chip + leads (cents) | about US$ 0.0625 x 400 = US$ 25 + Business Manager setup | owner's time | chip + leads (cents) |
+| Ban or penalty | the sending number lost | portfolio quality and limits, can hit future official numbers | none | **OBS's main number** lost (accepted by the owner, section 10.1), lower odds (low volume, human pace, personal text) |
+| Cost per month at 10/day | leads (cents) | about US$ 0.0625 x 400 = US$ 25 + Business Manager setup | owner's time | leads (cents) |
 | Setup | days of code | business verification, template approval | none | days of code |
 | Reply quality | depends on the AI text | template, no personalization freedom | best (they chose to talk) | best of the cold options (owner reads each text) |
 | Owner time | almost none | low | high | 5 to 10 minutes a day |
@@ -199,12 +203,12 @@ reply, any SAIR, a block or a failure stops the sequence. Never more than 3 touc
 
 **D as the main lane, C as a cheap parallel lane, and start this week with zero code.**
 
-1. **Phase 0, this week, no code** (decision D16): create a second company "OBS Prospecção" through the
-   normal signup with a **dedicated chip**, mark it Vitalício in the central, write an SDR prompt in
-   advanced mode (the AI answers whoever replies, qualifies and offers the 7 day trial), and approach
-   10 per day by hand with "criar contato e iniciar conversa" in `/contatos` (it exists, with the cold
-   contact alert). Pick companies on Google Maps by hand. This proves the text and the reply rate
-   before any code, and the owner prospects tomorrow instead of in two weeks.
+1. **Phase 0, this week, no code** (decision D16): from the OBS company itself, approach up to 10 per
+   day by hand with "criar contato e iniciar conversa" in `/contatos` (it exists, with the cold contact
+   alert), picking companies on Google Maps by hand. Before the first one, the OBS agent prompt
+   (advanced mode) learns to handle a reply to a prospecting message: say who OBS is, qualify, offer
+   the 7 day trial, and acknowledge SAIR in one line. This proves the text and the reply rate before
+   any code, and the owner prospects tomorrow instead of in two weeks.
 2. **Phase 1, the Campanhas module** in the owner's central (sections 6 to 9): search, score, save the
    chosen leads, daily queue that the owner approves, paced sender, 3 touch cadence, exit and
    suppression, results.
@@ -217,10 +221,11 @@ quality control. Why not B: it costs money, needs Meta setup and is not more leg
 
 ## 6. Where it lives
 
-- **Conversations live in a separate tenant** ("OBS Prospecção", D2). No multi-number support exists
-  (and "múltiplos números por conta" is in "Não construir"); a separate tenant gets the dedicated
-  instance, its own agent prompt, inbox, funnel and notices for free, and keeps prospecting out of the
-  OBS attendance numbers and panel. If the number is banned, only that tenant loses its connection.
+- **Conversations live in the OBS tenant, on OBS's own number** (owner's decision D2, 29/10/2026). No
+  multi-number support is needed. Consequences the owner accepted: prospect conversations share the
+  OBS inbox, funnel, panel numbers and AI usage with OBS's other conversations (they are told apart by
+  the `prospeccao` message type and by `prospeccao_leads.contato_id`), the OBS agent prompt answers
+  them, and a ban takes OBS's main number down (section 10.1).
 - **The Campanhas screen lives in the owner's central**: route `/campanhas` (admin only, same guard as
   `/clientes`: `adminDaPagina`, non-admin redirected to `/contatos` and never told it exists; API under
   `/api/admin/campanhas/*` with `rotaDoAdmin`, 404 for anyone else). Menu item "Campanhas" with
@@ -253,21 +258,21 @@ quality control. Why not B: it costs money, needs Meta setup and is not more leg
 5. **Send**: a scheduler tick (D15) inside the window (D7) sends **at most one** approved message when
    `proximo_envio_em <= now`, then sets the next slot with a random pause (jitter only delays). Sending
    goes through `enviarMensagemAtiva` (`lib/envio-ativo.ts`) with a new `REGRAS_DA_PROSPECCAO`
-   (cap and interval), on the prospecting tenant's instance. Before each send it re-checks: not in
+   (cap and interval), on the OBS instance. Before each send it re-checks: not in
    suppression, no reply arrived, instance connected, account not blocked. The send creates the
-   contact in `dados_cliente` of the prospecting tenant and records the outgoing text in
+   contact in `dados_cliente` of the OBS tenant and records the outgoing text in
    `chat_messages` with `message_type = 'prospeccao'` through service role, the same way the agenda
    reminder does, so the conversation shows it and the AI reads it when the lead answers.
-6. **Reply**: nothing new in n8n. The prospecting tenant's instance webhook already lands the inbound
-   in the inbox and calls `/api/agent`; the SDR prompt answers. The campaign learns about the reply by
+6. **Reply**: nothing new in n8n. The OBS instance webhook already lands the inbound in the inbox and
+   calls `/api/agent`; the OBS agent prompt answers (it must know about the campaign, Phase 0). The campaign learns about the reply by
    reading `chat_messages` (indexed `(client_id, phone, created_at)`) for a `user_message` after the
    last touch, before each send and when the results screen loads. No change in `processTurn`, so the
    attendance path is untouched.
 7. **Exit**: an inbound whose whole text is SAIR (normalized, accents and case) puts the phone in the
-   suppression list forever and stops the sequence; the SDR prompt acknowledges it in one line. A
+   suppression list forever and stops the sequence; the OBS agent acknowledges it in one line. A
    failed send (number without WhatsApp) marks the lead and never retries the same touch.
-8. **Funnel**: the prospecting tenant's pipeline (for example Abordado, Respondeu, Testando, Cadastrou,
-   Perdido; names are the owner's). The AI qualification moves the card as today. "Converted" = the
+8. **Funnel**: the OBS pipeline, shared with OBS's other conversations (stage names are the owner's;
+   whether prospects get their own stages is open). The AI qualification moves the card as today. "Converted" = the
    company signed up (D13).
 
 ## 8. Data model (proposed, migration file only, NOT applied)
@@ -275,12 +280,13 @@ quality control. Why not B: it costs money, needs Meta setup and is not more leg
 All tables: RLS on, no grant to `anon` or `authenticated`, `service_role` only (the browser talks to
 `/api/admin/campanhas/*`). Names follow the central (Portuguese columns).
 
-- `prospeccao_campanhas`: `id`, `nome`, `client_id` (the prospecting tenant, FK `clients`), `segmento`,
+- `prospeccao_campanhas`: `id`, `nome`, `client_id` (the OBS tenant, FK `clients`), `segmento`,
   `cidade`, `textos` jsonb (one text per touch, with variants), `cadencia` jsonb (days between touches),
-  `teto_diario` int (1 to 50), `intervalo_min_s` and `intervalo_max_s`, `janela` jsonb (weekdays, start
+  `teto_diario` int (1 to 10, the owner's ceiling), `intervalo_min_s` and `intervalo_max_s`, `janela` jsonb (weekdays, start
   and end hour in São Paulo), `base_legal_ref` text NOT NULL, `status` (`rascunho`, `ativa`, `pausada`,
   `encerrada`), `pausada_motivo`, `proximo_envio_em`, `criada_por`, `criada_em`, `atualizada_em`.
-  At most one `ativa` per prospecting tenant (partial unique index), like Deskcomm.
+  At most one `ativa` per tenant (partial unique index), like Deskcomm: two active campaigns would
+  each send 10.
 - `prospeccao_leads`: `id`, `campanha_id`, `fonte` (`google_places`, `apify`, `cnpj`, `manual`),
   `fonte_id`, `nome`, `telefone` (digits), `segmento`, `cidade`, `bairro`, `site`, `nota`, `avaliacoes`,
   `horario` jsonb, `sinais` jsonb, `pontuacao` int, `status` (`escolhido`, `na_fila`, `abordado`,
@@ -303,7 +309,7 @@ All tables: RLS on, no grant to `anon` or `authenticated`, `service_role` only (
 
 Per campaign and total, by period (`lib/periodo.ts` chips): approached, replied (rate), left with SAIR
 (rate, the ban signal), failed (no WhatsApp), qualified by the AI, converted (signed up), and cost
-(leads source plus AI tokens of the prospecting tenant, `agent_turns`). Health card: number connected,
+(leads source plus the AI tokens of the prospect conversations, `agent_turns` of those phones in OBS). Health card: number connected,
 sends today against the cap, next slot, last pause and why.
 
 Auto-pause (D9, thresholds are the owner's): instance disconnected or banned (`lib/whatsapp-estado.ts`);
@@ -311,8 +317,7 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
 
 ## 10. Risks
 
-1. **Number ban** (high): dedicated chip only, warm up, cap, pace, window, personal text, exit. The
-   residual risk is accepted by the owner's 29/09 decision; a ban costs the chip and its history only.
+1. **Ban of OBS's main number** (high, ACCEPTED by the owner on 29/10/2026): see 10.1.
 2. **Policy and legal** (medium): cold contact breaks the WhatsApp opt-in policy on any channel; the
    Meta page on unofficial clients also documents legal action against those who "assist" abuse. Keep
    it the owner's own use, never sell or advertise it, never mention it on the sales page.
@@ -322,6 +327,34 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
 5. **Google terms** (medium if Places API is stored, D3).
 6. **Attendance regression** (low): the plan does not touch `processTurn` or n8n; the only shared
    piece is `lib/envio-ativo.ts`, which belongs to the agenda branch and must be merged first.
+
+### 10.1 Accepted risk: OBS's main number
+
+The owner decided to prospect from OBS's own number instead of a dedicated chip. If WhatsApp bans it:
+- OBS's own attendance stops on that number (the AI and the team stop receiving and answering there)
+  until a new number is connected by QR; the history stays in the database, but contacts must learn
+  the new number.
+- OBS is the test tenant: `npm run test:e2e:n8n` and the login suites that run on OBS stop working
+  until it reconnects, and the notices of OBS go silent.
+- Recovery is not "unban": no third party can unban (WhatsApp FAQ 465883178708358), and a temporary
+  ban can become permanent.
+
+Mitigations that remain (all in the plan and in the prototype):
+1. Hard ceiling of 10 approaches per day (first messages and follow-ups together), enforced by the
+   code and by the database check; one active campaign per tenant.
+2. One message at a time, random pause between them (jitter only delays), only inside business hours.
+3. The owner approves every text; a text with a missing field cannot be approved; personal text with
+   a fact about the company, no link in the first message.
+4. Exit line in the first message, deterministic; SAIR goes to the suppression list forever.
+5. Any reply, SAIR, block or failure ends the sequence; at most 3 touches per company; a phone is
+   approached once in its life; only mobile numbers enter the queue.
+6. Auto-pause when the number disconnects and when SAIR or failures pass the owner's threshold (D9).
+7. Ready contingency (to prepare, no code): a spare chip and the reconnect steps for OBS written down,
+   so a ban costs hours, not days.
+8. Ramp observation: watch the SAIR rate and "no WhatsApp" failures of the first days before keeping 10.
+
+What is NOT available on this number and was in the earlier recommendation: losing only a disposable
+chip, and warming up a new number (OBS's number is not new; the warm up caps no longer apply).
 
 ## 11. Delivery plan
 
@@ -337,7 +370,7 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
 
 - `/design/campanhas` (dev only, `notFound()` in production), fake companies and phones (prefix 90000),
   no search API, no send, no database. `?aba=fila|leads|resultados|campanha`, `?cenario=vazia`.
-- Tabs: **Fila do dia** (rhythm notice with the number's age and cap, each proposed message editable,
+- Tabs: **Fila do dia** (rhythm notice with OBS's number, the cap of 10 and today's sends, each proposed message editable,
   "Aprovar"/"Pular hoje"/"Aprovar todas", missing fields block approval, approved items show the
   drawn send time), **Leads** (search by segment and city sorted by score with the reasons in a
   tooltip, impediments disable the checkbox, "Escolher N empresas"; chosen list with situation,
@@ -346,31 +379,31 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
   with a live preview on a real lead of the list, the fixed exit line, limits, required legal basis
   that blocks activation).
 - Real rule behind it: `lib/prospeccao.ts` (pure: `tipoDoTelefone`, `pontuarLead`, `camposDoLead`,
-  `textoDoToque`, `comSaida`, `ehPedidoDeSaida`, `filaDoDia`, `tetoDeHoje`, `proximoToqueEm`,
-  `sortearPausaMs`, `resumoDaCampanha`). Weights, ICP segments, cadence and caps there are marked
-  PROVISIONAL until D6, D7 and D17.
+  `textoDoToque`, `comSaida`, `ehPedidoDeSaida`, `filaDoDia`, `tetoDeHoje` (min of the campaign's cap and `TETO_MAXIMO_DIARIO` = 10), `encaixarNaJanela`, `proximoToqueEm`,
+  `sortearPausaMs`, `resumoDaCampanha`). Weights, ICP segments, cadence, pause and window there are
+  marked PROVISIONAL until D6, D7 (pace and window) and D17; the cap of 10 is the owner's decision.
 - Not built: the real `/campanhas` route and menu item, admin API routes, provider adapter, scheduler,
   migration applied, tests. `sortearPausaMs` duplicates `sortearPausa` of `lib/envio-ativo.ts` (agenda
   branch, not in `main`); keep only one when the agenda merges.
 
-## 12. Owner decisions (each with a recommendation; nothing decided)
+## 12. Owner decisions (each with a recommendation; decided ones marked)
 
 | # | Decision | Recommendation |
 |---|---|---|
-| D1 | Accept that cold prospecting breaks the WhatsApp opt-in policy on ANY channel and go ahead on a dedicated QR number at low volume | Yes, within the 29/09 exception; amend the `CLAUDE.md` line to say "prospecting" explicitly and keep it his user only |
-| D2 | Where the conversations live | Separate tenant "OBS Prospecção" with the dedicated chip, Vitalício |
+| D1 | Accept that cold prospecting breaks the WhatsApp opt-in policy on ANY channel and go ahead at low volume | **DECIDED 29/10/2026: go ahead.** Keep it his user only, never a tenant feature |
+| D2 | Where the conversations live, which number sends | **DECIDED 29/10/2026: OBS's own number and account**, no dedicated chip, no second company. Ban of the main number accepted (10.1) |
 | D3 | Lead source | Google Places API (official, free at this volume), persisting only chosen leads with the place id; legal reading of the storage terms before Phase 1 code. Alternative: Apify (what Deskcomm uses, cheaper per lead, scraping) |
 | D4 | Approval | The owner approves the day's batch; nothing leaves unapproved |
 | D5 | First message text | Phase 1: 2 or 3 variants written by him with fields; Phase 2: AI draft from the x-ray, still approved |
 | D6 | Cadence | 3 touches on days 0, 3 and 7; stop on any reply, SAIR, block or failure |
-| D7 | Cap, pace and window | Week 1: 5 per day; then 10 if SAIR stays low; random 4 to 12 minutes; Monday to Friday, 9h to 17h São Paulo. No numbers here are measured; they are a starting point |
+| D7 | Cap, pace and window | **Cap DECIDED 29/10/2026: at most 10 per day.** Still open: random pause 4 to 12 minutes and Monday to Friday, 9h to 17h São Paulo (recommended starting point, not measured) |
 | D8 | Exit | "Se não quiser receber mais mensagens, responda SAIR." in the FIRST message, deterministic, never written by the AI |
 | D9 | Auto-pause thresholds | Pause on disconnect; pause when 2 SAIR or 3 failures happen in one day (placeholder numbers for him to set) |
 | D10 | LGPD | Write the LIA (ANPD annex II model) before the first send; required field; delete silent leads after 90 days (placeholder) |
 | D11 | "Auditoria de atendimento" bait (writing to their WhatsApp as a customer) | Keep it manual and honest, never automated inside Campanhas |
 | D12 | Screen and menu | Admin only route `/campanhas`, menu item visible only to him |
 | D13 | Converted | Phase 1: he marks it; Phase 2: match the signup phone or e-mail with the lead |
-| D14 | Docs correction | Fix "Só volta com API Oficial, onde é legal" in `proximos-passos.md` and the ADR (opt-in applies to the API too); move the 1,000 free service messages from hypothesis to fact in `estrategia-2026-07.md` |
+| D14 | Docs correction | Reword the prospecting exception in `CLAUDE.md` and `docs/adr/2026-08-26-no-mass-messaging-over-qr.md` (OBS's own number, cap 10, instead of "dedicated number"); fix "Só volta com API Oficial, onde é legal" in `proximos-passos.md` and the ADR (opt-in applies to the API too); move the 1,000 free service messages from hypothesis to fact in `estrategia-2026-07.md` |
 | D15 | Scheduler | Vercel Cron every 10 minutes in the window if the Vercel plan allows it (to verify; the agenda uses one daily cron); otherwise the tick runs from an n8n schedule calling the route (needs his OK, n8n is production) |
-| D16 | Start this week with Phase 0, no code | Yes |
+| D16 | Start this week with Phase 0, no code, from OBS's `/contatos` | Yes, after teaching the OBS prompt about prospect replies |
 | D17 | Score weights and ICP segment list | His list; the prototype uses placeholder weights, marked as such |

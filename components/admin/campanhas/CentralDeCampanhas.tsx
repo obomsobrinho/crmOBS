@@ -35,7 +35,7 @@ export default function CentralDeCampanhas({
   const [leads, setLeads] = useState(leadsIniciais);
   const [config, setConfig] = useState(configInicial);
 
-  const teto = tetoDeHoje(numero.idadeDias);
+  const teto = tetoDeHoje(config.tetoDiario);
   const restamHoje = Math.max(0, teto - numero.enviadasHoje);
   const fila = useMemo(
     () =>
@@ -93,7 +93,7 @@ export default function CentralDeCampanhas({
               <span className="text-apoio text-ink-2">{config.nome}</span>
             </div>
             <p className="mt-1 text-legenda text-ink-3">
-              Prospecção da OBS pelo número dedicado. Só você vê esta tela; nada sai sem a sua aprovação.
+              Prospecção pelo número da OBS, no máximo 10 por dia. Só você vê esta tela; nada sai sem a sua aprovação.
             </p>
             <TabsList aria-label="Seções de Campanhas" className="mt-3">
               <TabsTrigger value="fila" data-slot="campanhas-aba-fila">

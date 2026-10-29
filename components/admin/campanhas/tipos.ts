@@ -47,11 +47,9 @@ export interface ConfigDaCampanha {
   ativa: boolean;
 }
 
-/** O número dedicado da prospecção, como a tela de saúde mostra. */
+/** O número da OBS (decisão do dono, 29/10/2026: a prospecção sai dele), como a tela de saúde mostra. */
 export interface NumeroDaProspeccao {
   conectado: boolean;
-  /** Dias desde que o número conectou; null = desconhecido (vale o degrau mais lento). */
-  idadeDias: number | null;
   enviadasHoje: number;
 }
 
