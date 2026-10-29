@@ -9,7 +9,7 @@ import AbaFila from "./AbaFila";
 import AbaLeads from "./AbaLeads";
 import AbaResultados from "./AbaResultados";
 import AbaCampanha from "./AbaCampanha";
-import type { AbaDeCampanhas, ConfigDaCampanha, EmpresaAchada, LeadDaCampanha, NumeroDaProspeccao } from "./tipos";
+import type { AbaDeCampanhas, ConexaoDisponivel, ConfigDaCampanha, EmpresaAchada, LeadDaCampanha } from "./tipos";
 
 // CAMPANHAS, a prospecção do dono do produto (docs/plano-campanhas.md). Hoje só
 // o preview `/design/campanhas` monta esta tela, com dados de mentira e sem
@@ -20,14 +20,15 @@ export default function CentralDeCampanhas({
   agora,
   leadsIniciais,
   config: configInicial,
-  numero,
+  conexoes,
   buscar,
 }: {
   abaInicial: AbaDeCampanhas;
   agora: number;
   leadsIniciais: LeadDaCampanha[];
   config: ConfigDaCampanha;
-  numero: NumeroDaProspeccao;
+  /** As conexões de WhatsApp que podem enviar (o campo "Número que envia" da campanha). */
+  conexoes: ConexaoDisponivel[];
   /** A busca de empresas (no preview, um filtro em memória; de verdade, a rota do admin). */
   buscar: (segmento: string) => EmpresaAchada[];
 }) {
@@ -35,8 +36,10 @@ export default function CentralDeCampanhas({
   const [leads, setLeads] = useState(leadsIniciais);
   const [config, setConfig] = useState(configInicial);
 
+  // O número que envia é o que a campanha escolheu; sem número escolhido, nada sai.
+  const numero = conexoes.find((c) => c.id === config.conexaoId) ?? null;
   const teto = tetoDeHoje(config.tetoDiario);
-  const restamHoje = Math.max(0, teto - numero.enviadasHoje);
+  const restamHoje = numero ? Math.max(0, teto - numero.enviadasHoje) : 0;
   const fila = useMemo(
     () =>
       filaDoDia(
@@ -93,7 +96,8 @@ export default function CentralDeCampanhas({
               <span className="text-apoio text-ink-2">{config.nome}</span>
             </div>
             <p className="mt-1 text-legenda text-ink-3">
-              Prospecção pelo número da OBS, no máximo 10 por dia. Só você vê esta tela; nada sai sem a sua aprovação.
+              {numero ? `Envia pelo WhatsApp de ${numero.nome}` : "Sem número escolhido"}, no máximo 10 por dia. Só você vê
+              esta tela; nada sai sem a sua aprovação.
             </p>
             <TabsList aria-label="Seções de Campanhas" className="mt-3">
               <TabsTrigger value="fila" data-slot="campanhas-aba-fila">
@@ -126,6 +130,7 @@ export default function CentralDeCampanhas({
             <AbaLeads
               leads={leads}
               ofertas={config.ofertas}
+              objecoes={config.objecoes}
               buscar={buscar}
               aoEscolher={escolher}
               aoDescartar={descartar}
@@ -135,7 +140,7 @@ export default function CentralDeCampanhas({
             <AbaResultados leads={leads} numero={numero} teto={teto} config={config} />
           </TabsContent>
           <TabsContent value="campanha" className="min-h-0 flex-1">
-            <AbaCampanha config={config} aoSalvar={setConfig} leads={leads} />
+            <AbaCampanha config={config} aoSalvar={setConfig} leads={leads} conexoes={conexoes} />
           </TabsContent>
         </Tabs>
       </section>

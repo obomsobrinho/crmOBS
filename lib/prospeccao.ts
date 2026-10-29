@@ -13,20 +13,24 @@ import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
 /** Situação do lead na campanha (a mesma lista da coluna `status` proposta no plano). */
 export type SituacaoDoLead =
+  | "sem_telefone"
   | "escolhido"
   | "na_fila"
   | "abordado"
   | "respondeu"
+  | "qualificado"
   | "convertido"
   | "descartado"
   | "saiu"
   | "falhou";
 
 export const ROTULO_DA_SITUACAO: Record<SituacaoDoLead, string> = {
+  sem_telefone: "Sem celular válido",
   escolhido: "Escolhido",
   na_fila: "Na fila",
   abordado: "Abordado",
   respondeu: "Respondeu",
+  qualificado: "Qualificado",
   convertido: "Cadastrou",
   descartado: "Descartado",
   saiu: "Pediu para sair",
@@ -62,19 +66,49 @@ export function tipoDoTelefone(telefone: string): TipoDeTelefone {
 export type ClasseDoSite = "sem_site" | "so_rede_social" | "fora_do_ar" | "com_falhas" | "bom";
 
 /** O que se confere numa página aberta. Vocabulário fechado: nada fora disto chega à tela nem ao texto. */
-export type ItemDoSite = "telefone_clicavel" | "whatsapp" | "endereco" | "mapa" | "celular" | "https";
+export type ItemDoSite =
+  | "telefone_clicavel"
+  | "whatsapp"
+  | "endereco"
+  | "mapa"
+  | "email"
+  | "fotos"
+  | "redes"
+  | "celular"
+  | "https"
+  | "descricao";
 
 export const ROTULO_DO_ITEM: Record<ItemDoSite, string> = {
   telefone_clicavel: "telefone clicável",
   whatsapp: "botão de WhatsApp",
   endereco: "endereço",
   mapa: "mapa",
+  email: "e-mail de contato",
+  fotos: "fotos da empresa",
+  redes: "links das redes sociais",
   celular: "versão para celular",
   https: "cadeado de segurança",
+  descricao: "descrição no Google",
+};
+
+/** Artigo de cada item, para a frase da mensagem ("o mapa", "a versão para celular"). */
+const ARTIGO_DO_ITEM: Record<ItemDoSite, "o" | "a" | "as" | "os"> = {
+  telefone_clicavel: "o",
+  whatsapp: "o",
+  endereco: "o",
+  mapa: "o",
+  email: "o",
+  fotos: "as",
+  redes: "os",
+  celular: "a",
+  https: "o",
+  descricao: "a",
 };
 
 export interface RaioXDoSite {
   classe: ClasseDoSite;
+  /** O que o site tem (o lado "tem" da auditoria, para o dono ver na ficha). */
+  tem: ItemDoSite[];
   /** O que falta (só em `com_falhas`; vazio nas outras classes). */
   falta: ItemDoSite[];
 }
@@ -136,7 +170,7 @@ export function faltaNoSite(r: RaioXDoSite): string | null {
   if (r.classe === "so_rede_social") return "não tem site próprio, só a rede social";
   if (r.classe === "fora_do_ar") return "está com o site fora do ar";
   if (r.classe !== "com_falhas" || r.falta.length === 0) return null;
-  const nomes = r.falta.map((i) => `${i === "celular" ? "a" : "o"} ${ROTULO_DO_ITEM[i]}`);
+  const nomes = r.falta.map((i) => `${ARTIGO_DO_ITEM[i]} ${ROTULO_DO_ITEM[i]}`);
   return nomes.length === 1 ? `não tem ${nomes[0]} no site` : `não tem ${nomes.slice(0, -1).join(", ")} nem ${nomes[nomes.length - 1]} no site`;
 }
 
@@ -226,12 +260,13 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
     motivos.push("Já vende pelo WhatsApp (botão no site)");
   }
   const tipo = tipoDoTelefone(s.telefone);
+  // Fixo ou inválido = "sem celular válido": não entra na fila nem é contatado.
   const impedimento = s.bloqueado
     ? IMPEDIMENTO[s.bloqueado]
     : tipo === "fixo"
       ? "Telefone fixo, sem WhatsApp"
       : tipo === "invalido"
-        ? "Telefone inválido"
+        ? "Sem celular válido"
         : null;
   return { pontos, motivos, impedimento };
 }
@@ -382,14 +417,19 @@ export function modeloDoToque(t: TextosDaCampanha, toque: number, angulo: Angulo
   return toque === 1 ? t.primeira[angulo] : toque === 2 ? t.segundo : t.terceiro;
 }
 
-/** O texto pronto de um toque: modelo preenchido e, no primeiro toque, a linha de saída (D8). */
+/** Em qual mensagem a linha de saída entra (D8): na primeira (recomendado) ou adiada para a segunda. */
+export type MomentoDaSaida = "primeira" | "segunda";
+
+/** O texto pronto de um toque: modelo preenchido e, no toque escolhido, a linha de saída. */
 export function textoDoToque(
   modelo: string,
   campos: CamposDoTexto,
   toque: number,
+  saida: MomentoDaSaida = "primeira",
 ): { texto: string; faltando: string[] } {
   const { texto, faltando } = preencherTexto(modelo, campos);
-  return { texto: toque === 1 ? comSaida(texto) : texto, faltando };
+  const comLinha = toque === (saida === "primeira" ? 1 : 2);
+  return { texto: comLinha ? comSaida(texto) : texto, faltando };
 }
 
 // ── Cadência e fila do dia ───────────────────────────────────────────────
@@ -501,8 +541,11 @@ export function filaDoDia(leads: LeadParaFila[], teto: number, agora: number): I
 // ── Acompanhamento ───────────────────────────────────────────────────────
 
 export interface ResumoDaCampanha {
+  /** Escolhidos que não podem ser contatados (sem celular válido). */
+  semTelefone: number;
   abordados: number;
   responderam: number;
+  qualificados: number;
   sairam: number;
   semWhatsapp: number;
   cadastraram: number;
@@ -518,15 +561,20 @@ export interface ResumoDaCampanha {
 export function resumoDaCampanha(
   leads: { situacao: SituacaoDoLead; abordadoEm: number | null; respondeuEm: number | null }[],
 ): ResumoDaCampanha {
+  const semTelefone = leads.filter((l) => l.situacao === "sem_telefone").length;
   const abordados = leads.filter((l) => l.abordadoEm !== null).length;
   const responderam = leads.filter((l) => l.respondeuEm !== null).length;
+  // Quem cadastrou também foi qualificado antes.
+  const qualificados = leads.filter((l) => l.situacao === "qualificado" || l.situacao === "convertido").length;
   const sairam = leads.filter((l) => l.situacao === "saiu").length;
   const semWhatsapp = leads.filter((l) => l.situacao === "falhou").length;
   const cadastraram = leads.filter((l) => l.situacao === "convertido").length;
   const taxa = (n: number) => (abordados === 0 ? null : Math.round((n / abordados) * 100));
   return {
+    semTelefone,
     abordados,
     responderam,
+    qualificados,
     sairam,
     semWhatsapp,
     cadastraram,

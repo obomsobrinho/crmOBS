@@ -10,7 +10,7 @@ import { Indicador } from "@/components/admin/pecas";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { resumoDaCampanha, textoDaJanela } from "@/lib/prospeccao";
 import { SeloDaSituacao } from "./pecas";
-import type { ConfigDaCampanha, LeadDaCampanha, NumeroDaProspeccao } from "./tipos";
+import type { ConfigDaCampanha, LeadDaCampanha, ConexaoDisponivel } from "./tipos";
 
 // RESULTADOS: o que a campanha fez desde o início (contado pelo que aconteceu com
 // cada lead, `resumoDaCampanha`), a saúde do número e as respostas recentes. A
@@ -29,7 +29,7 @@ function AbaResultados({
   config,
 }: {
   leads: LeadDaCampanha[];
-  numero: NumeroDaProspeccao;
+  numero: ConexaoDisponivel | null;
   teto: number;
   config: ConfigDaCampanha;
 }) {
@@ -42,7 +42,13 @@ function AbaResultados({
   return (
     <AreaRolavel tamanho={DISSOLVER_PADRAO} className="h-full">
       <div className="flex flex-col gap-4 px-4 py-4 md:px-5">
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5" data-slot="resultados-numeros">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6" data-slot="resultados-numeros">
+          <Indicador
+            rotulo="Sem celular válido"
+            valor={r.semTelefone}
+            frase="Escolhidos que não dá para contatar"
+            legenda={LEGENDA}
+          />
           <Indicador rotulo="Abordados" valor={r.abordados} frase="Receberam a primeira mensagem" legenda={LEGENDA} />
           <Indicador rotulo="Responderam" valor={r.responderam} frase={taxa(r.taxaDeResposta)} legenda={LEGENDA} />
           <Indicador
@@ -52,7 +58,7 @@ function AbaResultados({
             legenda={LEGENDA}
             classeDoValor={r.sairam > 0 ? "text-warn-ink" : undefined}
           />
-          <Indicador rotulo="Sem WhatsApp" valor={r.semWhatsapp} frase="O número não tem WhatsApp" legenda={LEGENDA} />
+          <Indicador rotulo="Qualificados" valor={r.qualificados} frase="Pelo critério da campanha" legenda={LEGENDA} />
           <Indicador rotulo="Cadastraram" valor={r.cadastraram} frase="Viraram teste no Atenda" legenda={LEGENDA} />
         </div>
 
@@ -60,7 +66,7 @@ function AbaResultados({
           <Card variant="secao" data-slot="resultados-respostas">
             <h2 className="text-cartao">Respostas recentes</h2>
             <p className="mt-0.5 text-legenda text-ink-3">
-              Quem responde cai em Conversas da OBS e a IA da OBS continua a conversa.
+              Quem responde cai em Conversas da empresa do número que envia, e a IA dela continua a conversa.
             </p>
             {respostas.length === 0 ? (
               <EstadoVazio tamanho="compacto" icone={MessageCircle} texto="Ninguém respondeu ainda." />
@@ -81,16 +87,27 @@ function AbaResultados({
           </Card>
 
           <Card variant="secao" data-slot="resultados-numero">
-            <h2 className="text-cartao">Número da OBS</h2>
-            <p className="mt-0.5 text-apoio text-ink-2">
-              {numero.conectado ? "Conectado" : "Desconectado: a campanha pausa sozinha"}
-              . Se ele for bloqueado, o atendimento da OBS para junto (risco aceito).
-            </p>
-            <p className="mt-3 text-rotulo uppercase text-ink-3">Envios de hoje</p>
-            <p className="mt-1 text-apoio text-ink">
-              {numero.enviadasHoje} de {teto}
-            </p>
-            <Medidor className="mt-1.5" valor={(numero.enviadasHoje / teto) * 100} rotulo={`Envios de hoje: ${numero.enviadasHoje} de ${teto}`} />
+            <h2 className="text-cartao">Número que envia</h2>
+            {numero ? (
+              <>
+                <p className="mt-0.5 text-apoio text-ink-2">
+                  WhatsApp de {numero.nome},{" "}
+                  {numero.conectado ? "conectado" : "desconectado: a campanha pausa sozinha"}. Se ele for bloqueado, o
+                  atendimento desse número para junto (risco aceito).
+                </p>
+                <p className="mt-3 text-rotulo uppercase text-ink-3">Envios de hoje</p>
+                <p className="mt-1 text-apoio text-ink">
+                  {numero.enviadasHoje} de {teto}
+                </p>
+                <Medidor
+                  className="mt-1.5"
+                  valor={(numero.enviadasHoje / teto) * 100}
+                  rotulo={`Envios de hoje: ${numero.enviadasHoje} de ${teto}`}
+                />
+              </>
+            ) : (
+              <p className="mt-0.5 text-apoio text-ink-2">Nenhum escolhido. Escolha na aba Campanha.</p>
+            )}
             <p className="mt-3 text-legenda text-ink-3">
               Pausa sozinha se o número desconectar ou se muita gente pedir para sair no mesmo dia (limites a decidir).
               Janela: {textoDaJanela(config.janela)}.

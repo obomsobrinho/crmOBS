@@ -2,8 +2,8 @@
 -- RASCUNHO NAO APLICADO: espera as decisoes do dono (D1 a D17). Nao aplicar antes da aprovacao;
 -- depois de aplicar, regenerar lib/database.types.ts e pôr prospeccao_campanhas em
 -- TABELAS_DO_CLIENTE (lib/admin-purga.ts), porque ela tem client_id.
--- Decisoes do dono em 29/10/2026: manda pelo numero da propria OBS (client_id = a empresa OBS) e no
--- maximo 10 abordagens por dia (teto_diario ate 10).
+-- Decisoes do dono em 29/10/2026: o numero que envia e um campo da campanha (client_id = a empresa da
+-- conexao escolhida, a OBS hoje; sem regra de numero dedicado) e no maximo 10 abordagens por dia.
 -- Tudo so service_role: o navegador fala apenas com /api/admin/campanhas/*.
 
 create table if not exists public.prospeccao_campanhas (
@@ -14,6 +14,10 @@ create table if not exists public.prospeccao_campanhas (
   cidade text not null default '',
   ofertas text[] not null default '{site,atenda}' check (ofertas <@ array['site', 'atenda'] and cardinality(ofertas) > 0),
   voz jsonb not null default '{}'::jsonb,
+  como_comecar text not null default '',
+  qualificado text not null default '',
+  objecoes jsonb not null default '[]'::jsonb,
+  saida text not null default 'primeira' check (saida in ('primeira', 'segunda')),
   textos jsonb not null default '{}'::jsonb,
   cadencia jsonb not null default '[0, 3, 7]'::jsonb,
   teto_diario int not null check (teto_diario between 1 and 10),
@@ -48,13 +52,14 @@ create table if not exists public.prospeccao_leads (
   nota numeric(2, 1),
   avaliacoes int,
   horario jsonb,
-  -- O raio-X do site: classe (sem_site, so_rede_social, fora_do_ar, com_falhas, bom) e o que falta.
+  -- O raio-X do site: classe (sem_site, so_rede_social, fora_do_ar, com_falhas, bom), o que tem e o que falta.
   raio_x jsonb,
   angulo text check (angulo in ('site', 'atenda', 'site_e_atenda')),
   sinais jsonb not null default '{}'::jsonb,
   pontuacao int not null default 0 check (pontuacao between 0 and 100),
   status text not null default 'escolhido' check (status in (
-    'escolhido', 'na_fila', 'abordado', 'respondeu', 'convertido', 'descartado', 'saiu', 'falhou'
+    'sem_telefone', 'escolhido', 'na_fila', 'abordado', 'respondeu', 'qualificado', 'convertido',
+    'descartado', 'saiu', 'falhou'
   )),
   toque int not null default 0 check (toque between 0 and 3),
   proximo_toque_em timestamptz,

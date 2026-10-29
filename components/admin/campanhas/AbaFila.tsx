@@ -22,7 +22,7 @@ import {
   type ItemDaFila,
 } from "@/lib/prospeccao";
 import { SeloDaPontuacao } from "./pecas";
-import type { ConfigDaCampanha, LeadDaCampanha, NumeroDaProspeccao } from "./tipos";
+import type { ConexaoDisponivel, ConfigDaCampanha, LeadDaCampanha } from "./tipos";
 
 // A FILA DO DIA: o que o sistema propõe mandar hoje (toques de acompanhamento
 // vencidos primeiro, depois os escolhidos pela pontuação, até o teto). O dono
@@ -40,7 +40,8 @@ function AbaFila({
   fila: ItemDaFila[];
   leads: LeadDaCampanha[];
   config: ConfigDaCampanha;
-  numero: NumeroDaProspeccao;
+  /** A conexão escolhida na campanha; null = nenhuma escolhida, nada sai. */
+  numero: ConexaoDisponivel | null;
   teto: number;
   agora: number;
   irParaLeads: () => void;
@@ -58,6 +59,7 @@ function AbaFila({
         modeloDoToque(config.textos, f.toque, angulo.angulo),
         camposDoLead(lead, config.voz),
         f.toque,
+        config.saida,
       );
       const texto = editados[f.id] ?? pronto.texto;
       // Campo que o dono já resolveu à mão deixa de faltar.
@@ -91,18 +93,24 @@ function AbaFila({
   }
 
   const prontosParaAprovar = itens.filter((i) => aprovados[i.id] === undefined && i.faltando.length === 0);
-  const restam = Math.max(0, teto - numero.enviadasHoje);
+  const restam = numero ? Math.max(0, teto - numero.enviadasHoje) : 0;
 
   return (
     <AreaRolavel tamanho={DISSOLVER_LISTA} className="h-full">
       <div className="flex flex-col gap-3 px-4 py-4 md:px-5">
-        <Aviso tom="neutro" icone={CalendarClock} data-slot="fila-ritmo">
-          Número da OBS {numero.conectado ? "conectado" : "desconectado"}: teto de <strong>{teto} por dia</strong>,
-          acompanhamentos incluídos. {numero.enviadasHoje}{" "}
-          {numero.enviadasHoje === 1 ? "enviada" : "enviadas"} hoje, {restam === 1 ? "resta 1" : `restam ${restam}`}.
-          Envios de {textoDaJanela(config.janela)}, com pausa
-          sorteada de {config.pausaMinutos[0]} a {config.pausaMinutos[1]} minutos.
-        </Aviso>
+        {numero ? (
+          <Aviso tom="neutro" icone={CalendarClock} data-slot="fila-ritmo">
+            Envia pelo WhatsApp de {numero.nome} ({numero.conectado ? "conectado" : "desconectado"}): teto de{" "}
+            <strong>{teto} por dia</strong>, acompanhamentos incluídos. {numero.enviadasHoje}{" "}
+            {numero.enviadasHoje === 1 ? "enviada" : "enviadas"} hoje, {restam === 1 ? "resta 1" : `restam ${restam}`}.
+            Envios de {textoDaJanela(config.janela)}, com pausa sorteada de {config.pausaMinutos[0]} a{" "}
+            {config.pausaMinutos[1]} minutos.
+          </Aviso>
+        ) : (
+          <Aviso tom="warn" icone={CalendarClock} data-slot="fila-sem-numero">
+            Escolha o número que envia na aba Campanha. Sem número, nada sai.
+          </Aviso>
+        )}
 
         {itens.length === 0 ? (
           <EstadoVazio
@@ -110,7 +118,9 @@ function AbaFila({
             icone={Inbox}
             titulo="Nada para hoje"
             texto={
-              restam === 0
+              !numero
+                ? "A fila aparece quando a campanha tiver um número que envia."
+                : restam === 0
                 ? "O teto de hoje já foi usado. Amanhã a fila volta."
                 : "Nenhum acompanhamento vencido e nenhum lead escolhido esperando. Escolha empresas em Leads."
             }

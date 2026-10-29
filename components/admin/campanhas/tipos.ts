@@ -1,5 +1,6 @@
 import type {
   JanelaDeEnvio,
+  MomentoDaSaida,
   Oferta,
   SinaisDoLead,
   SituacaoDoLead,
@@ -47,6 +48,19 @@ export interface ConfigDaCampanha {
   cidade: string;
   /** O que a campanha oferece (a OBS vende sites e o Atenda); decide o ângulo de cada lead. */
   ofertas: Oferta[];
+  /**
+   * A conexão (número de WhatsApp) que envia. Decisão do dono (29/10/2026): um campo simples, ele
+   * escolhe qualquer uma; o produto não exige número dedicado. A resposta cai na empresa dessa conexão.
+   */
+  conexaoId: string | null;
+  /** "O que oferecer e como começar": a instrução para a IA que continua a conversa. */
+  comoComecar: string;
+  /** Quando considerar o lead qualificado (a IA marca e o funil anda). */
+  qualificado: string;
+  /** Objeções esperadas e a resposta de cada uma (para o dono e para a IA). */
+  objecoes: { objecao: string; resposta: string }[];
+  /** Em qual mensagem entra a linha "responda SAIR". */
+  saida: MomentoDaSaida;
   /** Quem assina e o que diz de si (voz e vocabulário). */
   voz: VozDaCampanha;
   /** Os modelos de texto, com campos entre chaves; a primeira mensagem muda com o ângulo. */
@@ -58,9 +72,13 @@ export interface ConfigDaCampanha {
   ativa: boolean;
 }
 
-/** O número da OBS (decisão do dono, 29/10/2026: a prospecção sai dele), como a tela de saúde mostra. */
-export interface NumeroDaProspeccao {
+/** Uma conexão de WhatsApp que pode enviar a campanha (uma por empresa no produto de hoje). */
+export interface ConexaoDisponivel {
+  id: string;
+  /** O nome da empresa dona da conexão (onde as respostas caem). */
+  nome: string;
   conectado: boolean;
+  /** Mensagens desta campanha que já saíram hoje por esta conexão. */
   enviadasHoje: number;
 }
 

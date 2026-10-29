@@ -39,10 +39,12 @@ export function SeloDaPontuacao({ sinais }: { sinais: SinaisDoLead }) {
 }
 
 const VARIANTE_DA_SITUACAO: Record<SituacaoDoLead, "estado-bom" | "estado-aviso" | "estado-perigo" | "estado-neutro" | "contorno"> = {
+  sem_telefone: "estado-neutro",
   escolhido: "contorno",
   na_fila: "contorno",
   abordado: "estado-neutro",
   respondeu: "estado-bom",
+  qualificado: "estado-bom",
   convertido: "estado-bom",
   descartado: "estado-neutro",
   saiu: "estado-aviso",

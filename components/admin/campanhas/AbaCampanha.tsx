@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
@@ -20,12 +21,13 @@ import {
   textoDaJanela,
   textoDoToque,
   type Angulo,
+  type MomentoDaSaida,
   type Oferta,
   type VozDaCampanha,
 } from "@/lib/prospeccao";
-import type { ConfigDaCampanha, LeadDaCampanha } from "./tipos";
+import type { ConexaoDisponivel, ConfigDaCampanha, LeadDaCampanha } from "./tipos";
 
-// CAMPANHA: o que a campanha oferece (site, Atenda ou os dois), a voz de quem
+// CAMPANHA: o número que envia (um campo simples, decisão do dono), o que a campanha oferece (site, Atenda ou os dois), a voz de quem
 // assina, os textos (a primeira mensagem muda com o ângulo de cada lead, com a
 // prévia num lead da lista), a cadência, os limites e a base legal. A linha de
 // saída entra sozinha na primeira mensagem e não se edita (D8).
@@ -40,6 +42,11 @@ const CAMPOS_DA_VOZ: { chave: keyof VozDaCampanha; rotulo: string; dica: string 
   { chave: "minhaEmpresa", rotulo: "Sua empresa", dica: "Por exemplo, OBS" },
   { chave: "oQueFaco", rotulo: "O que você faz", dica: "Uma frase" },
   { chave: "diferencial", rotulo: "Seu diferencial", dica: "O que só você oferece" },
+];
+
+const SAIDAS: { chave: MomentoDaSaida; rotulo: string }[] = [
+  { chave: "primeira", rotulo: "na primeira mensagem (recomendado)" },
+  { chave: "segunda", rotulo: "na segunda" },
 ];
 
 /** Os ângulos que a campanha pode usar, pelas ofertas marcadas. */
@@ -73,15 +80,18 @@ function AbaCampanha({
   config,
   aoSalvar,
   leads,
+  conexoes,
 }: {
   config: ConfigDaCampanha;
   aoSalvar: (c: ConfigDaCampanha) => void;
   leads: LeadDaCampanha[];
+  conexoes: ConexaoDisponivel[];
 }) {
   const [rascunho, setRascunho] = useState(config);
   const [recado, setRecado] = useState<string | null>(null);
   const semBaseLegal = rascunho.baseLegalRef.trim().length < 3;
   const semOferta = rascunho.ofertas.length === 0;
+  const semNumero = !conexoes.some((c) => c.id === rascunho.conexaoId);
   const tetoValido =
     Number.isInteger(rascunho.tetoDiario) && rascunho.tetoDiario >= 1 && rascunho.tetoDiario <= TETO_MAXIMO_DIARIO;
   const [pMin, pMax] = rascunho.pausaMinutos;
@@ -104,7 +114,7 @@ function AbaCampanha({
         ? leads[0]
         : leads.find((x) => anguloDaAbordagem(x.sinais, rascunho.ofertas).angulo === angulo);
     if (!l) return null;
-    const p = textoDoToque(modelo, camposDoLead(l, rascunho.voz), toque);
+    const p = textoDoToque(modelo, camposDoLead(l, rascunho.voz), toque, rascunho.saida);
     return <Previa texto={p.texto} faltando={p.faltando} nome={l.nome} />;
   }
 
@@ -126,7 +136,7 @@ function AbaCampanha({
             </label>
             <Switch
               checked={rascunho.ativa}
-              disabled={(semBaseLegal || semOferta) && !rascunho.ativa}
+              disabled={(semBaseLegal || semOferta || semNumero) && !rascunho.ativa}
               onCheckedChange={(v) => mudar({ ativa: v })}
               aria-label="Campanha ativa"
               className="flex items-center gap-2 self-end text-apoio"
@@ -136,6 +146,24 @@ function AbaCampanha({
                 <SwitchThumb checked={rascunho.ativa} />
               </SwitchTrack>
             </Switch>
+          </div>
+          <div className="mt-3">
+            <span className="text-rotulo uppercase text-ink-3">Número que envia</span>
+            <Select value={rascunho.conexaoId ?? ""} onValueChange={(v) => mudar({ conexaoId: v })}>
+              <SelectTrigger size="field" aria-label="Número que envia" className="mt-1 w-full">
+                <SelectValue placeholder="Escolha a conexão de WhatsApp" />
+              </SelectTrigger>
+              <SelectContent>
+                {conexoes.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome} {c.conectado ? "(conectado)" : "(desconectado)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-legenda text-ink-3">
+              As respostas caem em Conversas da empresa desse número, e a IA dela continua a conversa.
+            </p>
           </div>
           <label className="mt-3 block">
             <span className="text-rotulo uppercase text-ink-3">Base legal (avaliação de legítimo interesse)</span>
@@ -178,6 +206,50 @@ function AbaCampanha({
           )}
         </Card>
 
+        <Card variant="secao" data-slot="campanha-ia">
+          <h2 className="text-cartao">Para a IA que continua a conversa</h2>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            Entra no prompt da empresa do número que envia. A empresa só entra no funil quando é abordada.
+          </p>
+          <label className="mt-3 block">
+            <span className="text-rotulo uppercase text-ink-3">O que oferecer e como começar</span>
+            <Textarea
+              className="mt-1 min-h-20"
+              value={rascunho.comoComecar}
+              onChange={(e) => mudar({ comoComecar: e.target.value })}
+            />
+          </label>
+          <label className="mt-3 block">
+            <span className="text-rotulo uppercase text-ink-3">Quando considerar qualificado</span>
+            <Input
+              className="mt-1"
+              value={rascunho.qualificado}
+              onChange={(e) => mudar({ qualificado: e.target.value })}
+            />
+          </label>
+          <p className="mt-3 text-rotulo uppercase text-ink-3">Objeções e respostas</p>
+          <ul className="mt-1 flex flex-col gap-3" data-slot="campanha-objecoes">
+            {rascunho.objecoes.map((o, i) => (
+              <li key={i} className="grid gap-1.5 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                <Input
+                  aria-label={`Objeção ${i + 1}`}
+                  value={o.objecao}
+                  onChange={(e) =>
+                    mudar({ objecoes: rascunho.objecoes.map((x, j) => (j === i ? { ...x, objecao: e.target.value } : x)) })
+                  }
+                />
+                <Input
+                  aria-label={`Resposta à objeção ${i + 1}`}
+                  value={o.resposta}
+                  onChange={(e) =>
+                    mudar({ objecoes: rascunho.objecoes.map((x, j) => (j === i ? { ...x, resposta: e.target.value } : x)) })
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </Card>
+
         <Card variant="secao" data-slot="campanha-voz">
           <h2 className="text-cartao">Sua voz</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
@@ -206,8 +278,24 @@ function AbaCampanha({
           </div>
           <p className="mt-0.5 text-legenda text-ink-3">
             Campos: {"{nome}"}, {"{cidade}"}, {"{falta_no_site}"} (o que o raio-X achou), {"{horario_curto}"} e os da
-            sua voz. No fim entra sempre, sem edição: “{LINHA_DE_SAIDA}”
+            sua voz.
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5" data-slot="campanha-saida">
+            <span className="mr-1 text-apoio text-ink-2">“{LINHA_DE_SAIDA}” entra</span>
+            {SAIDAS.map((o) => (
+              <Button
+                key={o.chave}
+                type="button"
+                variant="chip"
+                size="chip"
+                data-ativo={rascunho.saida === o.chave ? "sim" : undefined}
+                aria-pressed={rascunho.saida === o.chave}
+                onClick={() => mudar({ saida: o.chave })}
+              >
+                {o.rotulo}
+              </Button>
+            ))}
+          </div>
           {angulosDas(rascunho.ofertas).map((a) => (
             <div key={a} className="mt-4">
               <p className="text-rotulo uppercase text-ink-3">Ângulo {ROTULO_DO_ANGULO[a]}</p>
@@ -243,7 +331,7 @@ function AbaCampanha({
         <Card variant="secao">
           <h2 className="text-cartao">Limites</h2>
           <p className="mt-0.5 text-legenda text-ink-3">
-            Sai pelo número da OBS. O máximo é {TETO_MAXIMO_DIARIO} por dia, acompanhamentos incluídos (sua decisão);
+            Sai pelo número escolhido acima. O máximo é {TETO_MAXIMO_DIARIO} por dia, acompanhamentos incluídos (sua decisão);
             a pausa e o horário são valores de partida, não medidos.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -293,7 +381,7 @@ function AbaCampanha({
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" variant="brand" size="control" disabled={!tetoValido || !pausaValida || semOferta}>
+          <Button type="submit" variant="brand" size="control" disabled={!tetoValido || !pausaValida || semOferta || semNumero}>
             Salvar campanha
           </Button>
           {recado && (

@@ -2,6 +2,7 @@ import {
   JANELA_PROVISORIA,
   PAUSA_PROVISORIA_MINUTOS,
   TETO_MAXIMO_DIARIO,
+  ROTULO_DO_ITEM,
   classeDaUrl,
   type ItemDoSite,
   type RaioXDoSite,
@@ -11,7 +12,7 @@ import type {
   ConfigDaCampanha,
   EmpresaAchada,
   LeadDaCampanha,
-  NumeroDaProspeccao,
+  ConexaoDisponivel,
 } from "@/components/admin/campanhas/tipos";
 
 // DADOS DE MENTIRA do preview de Campanhas (`/design/campanhas`). Empresas,
@@ -58,21 +59,22 @@ const BASE: Base[] = [
 
 /** O que o raio-X "achou" em cada site de mentira (o que falta), e o que está fora do ar. */
 const FALTA_NO_SITE: Record<string, ItemDoSite[]> = {
-  "f-01": ["mapa"],
+  "f-01": ["mapa", "fotos"],
   "f-04": ["telefone_clicavel", "mapa"],
   "f-06": ["celular", "https"],
   "f-11": ["telefone_clicavel", "mapa"],
   "f-17": ["endereco", "mapa"],
-  "f-18": ["mapa"],
+  "f-18": ["mapa", "email"],
 };
 const FORA_DO_AR = new Set(["f-14"]);
 
 function raioX(b: Base): RaioXDoSite {
   const pelaUrl = classeDaUrl(b.site);
-  if (pelaUrl) return { classe: pelaUrl, falta: [] };
-  if (FORA_DO_AR.has(b.fonteId)) return { classe: "fora_do_ar", falta: [] };
+  if (pelaUrl) return { classe: pelaUrl, tem: [], falta: [] };
+  if (FORA_DO_AR.has(b.fonteId)) return { classe: "fora_do_ar", tem: [], falta: [] };
   const falta = [...(FALTA_NO_SITE[b.fonteId] ?? []), ...(b.whatsappNoSite ? [] : (["whatsapp"] as ItemDoSite[]))];
-  return { classe: falta.length > 0 ? "com_falhas" : "bom", falta };
+  const tem = (Object.keys(ROTULO_DO_ITEM) as ItemDoSite[]).filter((i) => !falta.includes(i));
+  return { classe: falta.length > 0 ? "com_falhas" : "bom", tem, falta };
 }
 
 function empresa(b: Base): EmpresaAchada {
@@ -114,7 +116,8 @@ interface Andamento {
 
 /** Os leads já escolhidos, cada um num ponto da campanha. */
 const ANDAMENTO: Andamento[] = [
-  { fonteId: "f-01", situacao: "respondeu", toque: 1, abordadoHa: 2 * D, respondeuHa: 2 * D - 40 * 60_000, resposta: "Oi Franck! Fica sim, principalmente no sábado à tarde. Como funciona?" },
+  { fonteId: "f-04", situacao: "sem_telefone", toque: 0 },
+  { fonteId: "f-01", situacao: "qualificado", toque: 1, abordadoHa: 2 * D, respondeuHa: 2 * D - 40 * 60_000, resposta: "Oi Franck! Fica sim, principalmente no sábado à tarde. Como funciona?" },
   { fonteId: "f-03", situacao: "convertido", toque: 1, abordadoHa: 6 * D, respondeuHa: 6 * D - 2 * H, resposta: "Me manda o link que eu testo hoje" },
   { fonteId: "f-02", situacao: "abordado", toque: 1, abordadoHa: 3 * D + 2 * H },
   { fonteId: "f-05", situacao: "abordado", toque: 2, abordadoHa: 7 * D + H },
@@ -159,6 +162,16 @@ export const CONFIG_DE_MENTIRA: ConfigDaCampanha = {
   segmento: "Clínicas, estética, salões e barbearias",
   cidade: CIDADE,
   ofertas: ["site", "atenda"],
+  conexaoId: "obs",
+  comoComecar:
+    "Quem respondeu recebeu uma mensagem da OBS sobre o site ou o WhatsApp da empresa. Agradeça, mande o diagnóstico curto do que foi visto e pergunte se faz sentido uma conversa rápida. Ofereça o teste de 7 dias do Atenda quando o assunto for atendimento.",
+  qualificado: "Confirmou a necessidade e topou uma conversa de diagnóstico ou uma demonstração.",
+  objecoes: [
+    { objecao: "Já tenho site", resposta: "Ótimo. A ideia não é trocar por trocar: é corrigir o que faz o cliente desistir, como o telefone que não dá para tocar no celular." },
+    { objecao: "Já tenho Instagram, não preciso de site", resposta: "O Instagram fala com quem já segue; o site aparece para quem pesquisa no Google sem conhecer a empresa." },
+    { objecao: "Não tenho tempo para responder WhatsApp", resposta: "É por isso: o atendente com IA responde na hora e só chama vocês quando precisa." },
+  ],
+  saida: "primeira",
   voz: {
     meuNome: "Franck",
     minhaEmpresa: "OBS",
@@ -181,4 +194,8 @@ export const CONFIG_DE_MENTIRA: ConfigDaCampanha = {
   ativa: true,
 };
 
-export const NUMERO_DE_MENTIRA: NumeroDaProspeccao = { conectado: true, enviadasHoje: 1 };
+/** As conexões que aparecem no campo "Número que envia" (uma por empresa; de mentira). */
+export const CONEXOES_DE_MENTIRA: ConexaoDisponivel[] = [
+  { id: "obs", nome: "OBS", conectado: true, enviadasHoje: 1 },
+  { id: "loja-teste", nome: "Loja Teste", conectado: false, enviadasHoje: 0 },
+];
