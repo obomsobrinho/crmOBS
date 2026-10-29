@@ -294,6 +294,10 @@ All tables: RLS on, no grant to `anon` or `authenticated`, `service_role` only (
   before every send and every search result.
 - Retention (D10): leads that never answered are deleted N days after the last touch; exclusions are
   kept (they are the promise not to write again).
+- `prospeccao_campanhas` has `client_id`, so it goes into `TABELAS_DO_CLIENTE` (`lib/admin-purga.ts`)
+  in the same delivery that applies the migration (the purge and the export must cover it).
+- Draft file: `supabase/migrations/20261029060000_prospeccao_do_dono.sql` (NOT applied; types not
+  regenerated).
 
 ## 9. Results screen (metrics)
 
@@ -328,6 +332,26 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
 - Phase 2: AI draft per lead, auto-pause, conversion link, C lane tasks.
 - Gate (owner's flow): plan, development, owner approves layout and rules, tests (`fechar-entrega`;
   nothing paid without being named), `/simplify` and `/code-review`, then `main`.
+
+### 11.1 State of the prototype (29/10/2026, branch `claude/campanhas-plano-1c34fe`)
+
+- `/design/campanhas` (dev only, `notFound()` in production), fake companies and phones (prefix 90000),
+  no search API, no send, no database. `?aba=fila|leads|resultados|campanha`, `?cenario=vazia`.
+- Tabs: **Fila do dia** (rhythm notice with the number's age and cap, each proposed message editable,
+  "Aprovar"/"Pular hoje"/"Aprovar todas", missing fields block approval, approved items show the
+  drawn send time), **Leads** (search by segment and city sorted by score with the reasons in a
+  tooltip, impediments disable the checkbox, "Escolher N empresas"; chosen list with situation,
+  server-style search and 10 per page through `usePaginada`), **Resultados** (five numbers counted by
+  what happened, recent replies, number health with today's sends), **Campanha** (texts per touch
+  with a live preview on a real lead of the list, the fixed exit line, limits, required legal basis
+  that blocks activation).
+- Real rule behind it: `lib/prospeccao.ts` (pure: `tipoDoTelefone`, `pontuarLead`, `camposDoLead`,
+  `textoDoToque`, `comSaida`, `ehPedidoDeSaida`, `filaDoDia`, `tetoDeHoje`, `proximoToqueEm`,
+  `sortearPausaMs`, `resumoDaCampanha`). Weights, ICP segments, cadence and caps there are marked
+  PROVISIONAL until D6, D7 and D17.
+- Not built: the real `/campanhas` route and menu item, admin API routes, provider adapter, scheduler,
+  migration applied, tests. `sortearPausaMs` duplicates `sortearPausa` of `lib/envio-ativo.ts` (agenda
+  branch, not in `main`); keep only one when the agenda merges.
 
 ## 12. Owner decisions (each with a recommendation; nothing decided)
 
