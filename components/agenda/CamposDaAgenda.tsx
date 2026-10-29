@@ -5,7 +5,8 @@ import { MOLDURA_LISTA } from "@/components/agente/ui";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import type { ServicoDaAgenda } from "@/lib/agenda";
+import { problemaDosServicos, type ServicoDaAgenda } from "@/lib/agenda";
+import { cn } from "@/lib/utils";
 
 // Os campos da agenda que aparecem em DOIS lugares (decisão do dono,
 // 28/10/2026): o item "Agenda" com a caixa de ativar e a lista de serviços,
@@ -55,14 +56,24 @@ export function ItemAgenda({
 export function ListaDeServicos({
   servicos,
   onChange,
+  comErro = false,
 }: {
   servicos: ServicoEditavel[];
   onChange: (lista: ServicoEditavel[]) => void;
+  /**
+   * O salvar recusou a lista (29/10/2026, dono: o erro do serviço não ficava
+   * claro): a moldura fica vermelha e cada campo errado é marcado.
+   */
+  comErro?: boolean;
 }) {
   const trocar = (i: number, p: Partial<ServicoEditavel>) => onChange(servicos.map((x, j) => (j === i ? { ...x, ...p } : x)));
+  const [nomeRuim, duracaoRuim] = [
+    (s: ServicoEditavel) => comErro && !s.nome.trim(),
+    (s: ServicoEditavel) => comErro && !!problemaDosServicos(false, [{ nome: "x", duracaoMin: Number(s.duracao) }]),
+  ];
   return (
     <>
-      <div className={MOLDURA_LISTA} data-agenda="servicos">
+      <div className={cn(MOLDURA_LISTA, comErro && "border-danger-line")} data-agenda="servicos" data-erro={comErro ? "" : undefined}>
         {servicos.length === 0 && <p className="px-3 py-2.5 text-legenda text-ink-3">Nenhum serviço ainda.</p>}
         {servicos.map((s, i) => (
           <div key={s.chave} className="flex items-center gap-2 px-3 py-2" data-agenda="servico">
@@ -72,7 +83,8 @@ export function ListaDeServicos({
               placeholder="Nome do serviço"
               onChange={(e) => trocar(i, { nome: e.target.value })}
               aria-label={`Nome do serviço ${i + 1}`}
-              className="min-w-0 flex-1"
+              aria-invalid={nomeRuim(s) || undefined}
+              className={cn("min-w-0 flex-1", nomeRuim(s) && "border-danger-line")}
               maxLength={80}
             />
             <div className="flex items-center gap-1.5">
@@ -82,7 +94,8 @@ export function ListaDeServicos({
                 value={s.duracao}
                 onChange={(e) => trocar(i, { duracao: e.target.value.replace(/\D/g, "") })}
                 aria-label={`Duração em minutos do serviço ${i + 1}`}
-                className="w-16 text-right tabular-nums"
+                aria-invalid={duracaoRuim(s) || undefined}
+                className={cn("w-16 text-right tabular-nums", duracaoRuim(s) && "border-danger-line")}
                 maxLength={3}
               />
               <span className="text-legenda text-ink-3">min</span>

@@ -563,6 +563,7 @@ export default function MontagemWizard({
                         </p>
                         <ListaDeServicos
                           servicos={servicosAgenda}
+                          comErro={!!erroAgenda}
                           onChange={(l) => {
                             setServicosAgenda(l);
                             setErroAgenda(null);

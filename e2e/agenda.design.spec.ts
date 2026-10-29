@@ -255,3 +255,19 @@ test("montagem: o mesmo item Agenda no passo 2, sem pergunta, e marcado pede só
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(page.locator('[data-slot="montagem-bancada"]')).toBeVisible();
 });
+
+test("configurações: serviço com erro fica vermelho, com a mensagem no bloco, e a tela rola até ele", async ({ page }) => {
+  await page.goto("/design/agenda/configuracoes");
+  await page.getByRole("button", { name: "Adicionar serviço" }).click();
+  // Serviço novo sem nome: salvar recusa.
+  await page.getByRole("button", { name: "Salvar", exact: true }).click();
+  const bloco = page.locator('[data-agenda="bloco-servicos"]');
+  await expect(bloco.locator('[data-agenda="servicos"]')).toHaveAttribute("data-erro", "");
+  await expect(bloco).toContainText("Todo serviço precisa de nome");
+  const ultimo = bloco.getByRole("textbox", { name: /Nome do serviço/ }).last();
+  await expect(ultimo).toHaveAttribute("aria-invalid", "true");
+  await expect(bloco).toBeInViewport();
+  // Corrigiu: o vermelho sai.
+  await ultimo.fill("Retorno");
+  await expect(bloco.locator('[data-agenda="servicos"]')).not.toHaveAttribute("data-erro", "");
+});

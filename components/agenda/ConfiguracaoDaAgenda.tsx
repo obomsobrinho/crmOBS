@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, Clock, Copy, Settings2 } from "lucide-react";
 import AgentHoursEditor from "@/components/AgentHoursEditor";
@@ -82,6 +82,9 @@ export default function ConfiguracaoDaAgenda({
   const [antUnidade, setAntUnidade] = useState<Unidade>(inicial.unidade);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // O salvar recusou os serviços: o bloco fica vermelho e a tela rola até ele.
+  const [erroServicos, setErroServicos] = useState<string | null>(null);
+  const blocoServicos = useRef<HTMLDivElement>(null);
   const [salvo, setSalvo] = useState(false);
   const mudar = (p: Partial<AgendaConfig>) => {
     setC((x) => ({ ...x, ...p }));
@@ -93,9 +96,15 @@ export default function ConfiguracaoDaAgenda({
 
   const salvar = async () => {
     setErro(null);
+    setErroServicos(null);
     const lista = paraSalvar(servicos);
     const problema = problemaDosServicos(c.ativa, lista);
-    if (problema) return setErro(problema);
+    if (problema) {
+      setErro(problema);
+      setErroServicos(problema);
+      blocoServicos.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     if (!antValida) return setErro("Antecedência mínima inválida.");
     if (c.ativa && !DAY_ORDER.some((d) => horario[d].open)) return setErro("Abra pelo menos um dia nos dias e horários da agenda.");
     setEnviando(true);
@@ -151,15 +160,24 @@ export default function ConfiguracaoDaAgenda({
                   </div>
                 </SubBloco>
 
-                <SubBloco titulo="Serviços" icone={Clock} descricao="Cada um com quanto tempo ocupa. Com um serviço só, a IA não pergunta qual.">
-                  <ListaDeServicos
-                    servicos={servicos}
-                    onChange={(l) => {
-                      setServicos(l);
-                      setSalvo(false);
-                    }}
-                  />
-                </SubBloco>
+                <div ref={blocoServicos} className="scroll-mt-4" data-agenda="bloco-servicos">
+                  <SubBloco
+                    titulo="Serviços"
+                    icone={Clock}
+                    descricao="Cada um com quanto tempo ocupa. Com um serviço só, a IA não pergunta qual."
+                    error={erroServicos ?? undefined}
+                  >
+                    <ListaDeServicos
+                      servicos={servicos}
+                      comErro={!!erroServicos}
+                      onChange={(l) => {
+                        setServicos(l);
+                        setSalvo(false);
+                        setErroServicos(null);
+                      }}
+                    />
+                  </SubBloco>
+                </div>
 
                 <SubBloco titulo="Como os horários se encaixam" icone={CalendarClock}>
                   <div className="grid gap-4 sm:grid-cols-2">
