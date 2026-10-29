@@ -1,6 +1,8 @@
 import { test, expect } from "@playwright/test";
 import {
   AGENDA_PADRAO,
+  acoesDoTurno,
+  travaSemAgenda,
   blocoDaAgenda,
   consultarPeriodo,
   decidirAgenda,
@@ -236,6 +238,18 @@ test.describe("Prompt do agente: a agenda ligada substitui o objetivo Agendar", 
     expect(g.ok && g.persona).toContain("Você não marca horários nem conversas");
     const a = compilePersona({ mode: "avancado", persona: "### IDENTIDADE\nVocê é a Ana. Confirmou dia e período: use agendar." });
     expect(a.ok && a.persona).toContain('NUNCA use "agendar"');
+    // A IA dizia "deixei reservado pra amanhã às 18h" sem agenda (bateria ia, 29/10).
+    for (const r of [g, a]) expect(r.ok && r.persona).toContain("Nunca diga que um horário ficou reservado, marcado, combinado ou confirmado");
+  });
+  test("sem agenda o esquema não tem agendar, e a trava converte o que escapar em pedido de ajuda", () => {
+    expect(acoesDoTurno(false)).toEqual(["none", "pausar"]);
+    expect(acoesDoTurno(true)).toEqual(["none", "agendar", "pausar"]);
+    const escapou = { action: "agendar", pedido_novo: false, summary: "quer amanhã às 18h" };
+    expect(travaSemAgenda(escapou, false)).toEqual({ action: "pausar", pedido_novo: true, summary: "quer amanhã às 18h" });
+    // Com a agenda ligada a trava não mexe (quem decide é decidirAgenda).
+    expect(travaSemAgenda(escapou, true)).toBe(escapou);
+    const nada = { action: "none", pedido_novo: false };
+    expect(travaSemAgenda(nada, false)).toBe(nada);
   });
   test("com agenda, o prompt manda seguir a seção AGENDA e o sistema oferece os horários", () => {
     const g = compilePersona({ mode: "guiado", config: cfg, agendaAtiva: true });

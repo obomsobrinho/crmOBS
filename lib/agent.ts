@@ -3,7 +3,7 @@ import { FUSO } from "./fuso";
 import { calendarioBlock, diaDosHorarios, notaDeHorarios } from "./horarios";
 import type { BusinessHours } from "./agent-prompt";
 import { MOTIVOS_DO_MODELO, motivosParaPrompt } from "./motivos";
-import type { SaidaDaAgenda } from "./agenda";
+import { acoesDoTurno, type SaidaDaAgenda } from "./agenda";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -226,6 +226,20 @@ const OUTPUT_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/**
+ * O esquema do turno: sem a agenda ligada o enum de `action` não tem `agendar`
+ * (`acoesDoTurno`, lib/agenda.ts), então o modelo não consegue marcar nada.
+ */
+function esquemaDaSaida(comAgenda: boolean) {
+  return {
+    ...OUTPUT_SCHEMA,
+    properties: {
+      ...OUTPUT_SCHEMA.properties,
+      action: { ...OUTPUT_SCHEMA.properties.action, enum: acoesDoTurno(comAgenda) },
+    },
+  };
+}
+
 export class AgentError extends Error {}
 
 /**
@@ -331,7 +345,7 @@ export async function runAgent(params: {
         messages,
         response_format: {
           type: "json_schema",
-          json_schema: { name: "resposta_agente", strict: true, schema: OUTPUT_SCHEMA },
+          json_schema: { name: "resposta_agente", strict: true, schema: esquemaDaSaida(!!params.agenda) },
         },
       }),
     });

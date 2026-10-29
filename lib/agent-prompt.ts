@@ -822,7 +822,7 @@ export function buildBaseTail(opts: BaseTailOpts = {}): string {
         // ofereceu; dia e período viram consulta (seção AGENDA). Mora AQUI, no
         // contrato da base, porque vale para todo tenant e passa por cima do texto dele.
         '- action: "none" para continuar a conversa, "agendar" quando a pessoa escolheu um dos horários que o sistema ofereceu (também ao remarcar), "pausar" quando a conversa precisa de alguém do time. Dia e período sem horário escolhido ainda é none: siga a seção AGENDA.'
-      : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca horários nem conversas.',
+      : '- action: "none" para continuar a conversa, "pausar" quando a conversa precisa de alguém do time. NUNCA use "agendar": você não marca horários nem conversas. Nunca diga que um horário ficou reservado, marcado, combinado ou confirmado: quando a pessoa quiser marcar, diga que vai confirmar com o time e use pausar.',
     "- summary: vazio quando action for none. Em " +
       (allowAgendar ? "agendar ou pausar" : "pausar") +
       ", escreva direto o que a pessoa precisa agora e o contexto útil pra quem vai continuar. Sem floreio. O pedido é o que a pessoa pediu ou disse, nunca o que você sugeriu. Inclua o que já foi combinado (dia e horário) e o que, combinado, não aconteceu, com quando foi combinado.",

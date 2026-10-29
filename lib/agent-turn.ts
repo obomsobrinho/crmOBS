@@ -40,6 +40,7 @@ import { semLoteAtual } from "@/lib/mensagem";
 import {
   SAIDA_DA_AGENDA_VAZIA,
   TEXTO_PEDE_DIA_E_PERIODO,
+  travaSemAgenda,
   blocoDaAgenda,
   decidirAgenda,
   diaFalado,
@@ -582,7 +583,8 @@ export async function processTurn(
   //
   // O guardrail continua protegido: quando ele reprova, ele mesmo já troca as
   // mensagens pela frase neutra antes de chegar aqui, então nada inventado sai.
-  let output = guarded.output;
+  // Sem agenda ligada ninguém marca: `agendar` que escapar vira pedido de ajuda.
+  let output = travaSemAgenda(guarded.output, agenda !== null);
 
   // AGENDA PRÓPRIA: o código marca, remarca ou cancela ANTES de responder,
   // então a resposta nunca afirma um horário que não ficou gravado. A regra é

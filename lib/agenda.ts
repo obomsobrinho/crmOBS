@@ -578,6 +578,25 @@ export function blocoDaAgenda(a: {
 // Decisão do turno (o que o código faz com a saída do modelo)
 // ————————————————————————————————————————————————————————————————
 
+/**
+ * As ações que o modelo PODE devolver no turno (enum do esquema, `lib/agent.ts`).
+ * Sem a agenda ligada não existe `agendar` (decisão do dono, 28/10/2026: quem
+ * quer marcar vira pedido de ajuda): o modelo não consegue nem escolher.
+ */
+export function acoesDoTurno(comAgenda: boolean): string[] {
+  return comAgenda ? ["none", "agendar", "pausar"] : ["none", "pausar"];
+}
+
+/**
+ * A TRAVA de quando o modelo escapa do esquema (o enum já tira `agendar` sem
+ * agenda): `agendar` sem agenda ligada vira pedido de ajuda (`pausar`, pedido
+ * novo). Com a agenda ligada não mexe (quem decide é `decidirAgenda`).
+ */
+export function travaSemAgenda<T extends { action: string; pedido_novo: boolean }>(output: T, comAgenda: boolean): T {
+  if (comAgenda || output.action !== "agendar") return output;
+  return { ...output, action: "pausar", pedido_novo: true };
+}
+
 export type AcaoDaAgenda = "" | "consultar" | "marcar" | "remarcar" | "cancelar" | "confirmar";
 
 /** O campo `agenda` da saída do modelo (`lib/agent.ts`). */
