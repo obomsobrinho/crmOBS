@@ -87,7 +87,7 @@ function PainelDeResultados({
   const pouco = r.enviados > 0 && r.enviados < AMOSTRA_MINIMA_PROVISORIA;
 
   const cartaoDaVariante = (
-    <Card variant="conteudo" className="flex flex-col p-6" data-bloco="resultado-variantes">
+    <Card variant="conteudo" className="flex flex-col p-6 lg:col-span-2 xl:col-span-1" data-bloco="resultado-variantes">
       <CabecalhoDoGrafico
         titulo="Melhor mensagem"
         destaque={
@@ -160,17 +160,14 @@ function PainelDeResultados({
         </p>
       )}
 
-      {serie ? (
-        <div className="grid gap-4 xl:grid-cols-3">
-          <Card variant="conteudo" className="p-6 xl:col-span-2" data-bloco="resultado-dias">
-            <GraficoDeEnviosPorDia serie={serie} />
-          </Card>
-          {cartaoDaVariante}
-        </div>
-      ) : null}
+      {serie && (
+        <Card variant="conteudo" className="p-6" data-bloco="resultado-dias">
+          <GraficoDeEnviosPorDia serie={serie} />
+        </Card>
+      )}
 
-      <div className={serie ? "grid gap-4 lg:grid-cols-2" : "grid gap-4 lg:grid-cols-2 xl:grid-cols-3"}>
-        {!serie && cartaoDaVariante}
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {cartaoDaVariante}
         <Card variant="conteudo" className="p-6" data-bloco="resultado-semana">
           <CabecalhoDoGrafico
             titulo="Melhor dia da semana"

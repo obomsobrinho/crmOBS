@@ -480,6 +480,86 @@ export function enviosPorDia(envios: EnvioParaResultado[], hoje: string, dias: n
   return serie;
 }
 
+// ── A busca: as opções que vão para a fonte de leads ────────────────────
+//
+// O diálogo "Nova busca" (dono, 29/10/2026: "a apify oferece mais
+// configurações"). Os nomes aqui são nossos; quem traduz para a fonte é
+// `lib/fonte-apify.ts` (backend). Campos do actor `compass/crawler-google-places`
+// conferidos no esquema de entrada em 29/10/2026: `searchStringsArray`,
+// `locationQuery`, `maxCrawledPlacesPerSearch`, `language`, `placeMinimumStars`,
+// `website`, `skipClosedPlaces`, `scrapeContacts`. ⚠️ O esquema não lista os
+// valores aceitos de `placeMinimumStars` e `website` (só os exemplos `""` e
+// `"allPlaces"`): confirmar numa execução real antes de mapear.
+
+/** As 27 unidades da federação (o estado vai junto da cidade para a fonte não confundir homônimas). */
+export const UFS = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
+  "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+] as const;
+
+/** Quantas empresas por termo (o teto de custo da busca). 50 é a recomendação do plano (D7, em aberto). */
+export const QUANTIDADES_POR_TERMO = [50, 100, 200] as const;
+
+/** Preço de tabela do actor no Apify Store em 29/10/2026: "from $1.50 / 1,000 scraped places". */
+export const PRECO_POR_MIL_LUGARES_USD = 1.5;
+
+export type NotaMinima = null | 3.5 | 4 | 4.5;
+export type FiltroDeSiteDaBusca = "todos" | "sem_site" | "com_site";
+
+export interface OpcoesDaBusca {
+  /** Um ou mais segmentos ("clínica de estética", "estética"). */
+  termos: string[];
+  cidade: string;
+  uf: string;
+  porTermo: number;
+  notaMinima: NotaMinima;
+  site: FiltroDeSiteDaBusca;
+  ignorarFechados: boolean;
+  /** E-mail e redes sociais tirados do site da empresa (custa a mais por empresa na fonte). */
+  buscarContatos: boolean;
+}
+
+export const OPCOES_PADRAO: OpcoesDaBusca = {
+  termos: [],
+  cidade: "",
+  uf: "",
+  porTermo: QUANTIDADES_POR_TERMO[0],
+  notaMinima: null,
+  site: "todos",
+  ignorarFechados: true,
+  buscarContatos: false,
+};
+
+/** O que falta para buscar (vazio = pode buscar). */
+export function problemasDaBusca(o: OpcoesDaBusca): string[] {
+  const p: string[] = [];
+  if (o.termos.filter((t) => t.trim().length >= 3).length === 0) p.push("Falta o segmento");
+  if (o.cidade.trim().length < 2) p.push("Falta a cidade");
+  if (!UFS.includes(o.uf as (typeof UFS)[number])) p.push("Falta o estado");
+  return p;
+}
+
+/** O máximo de empresas que a busca pode trazer (antes de tirar as repetidas). */
+export function maximoDaBusca(o: OpcoesDaBusca): number {
+  return o.termos.length * o.porTermo;
+}
+
+/** O custo mínimo em dólar pelo preço de tabela (contatos e detalhes custam a mais). */
+export function custoMinimoDaBuscaUsd(o: OpcoesDaBusca): number {
+  return (maximoDaBusca(o) * PRECO_POR_MIL_LUGARES_USD) / 1000;
+}
+
+/** As opções em pílulas curtas, para a tela da busca ("50 por termo", "Nota 4 ou mais"). */
+export function resumoDasOpcoes(o: OpcoesDaBusca): string[] {
+  const r = [`${o.porTermo} por termo`];
+  if (o.notaMinima !== null) r.push(`Nota ${String(o.notaMinima).replace(".", ",")} ou mais`);
+  if (o.site === "sem_site") r.push("Só sem site");
+  if (o.site === "com_site") r.push("Só com site");
+  if (o.ignorarFechados) r.push("Sem fechadas");
+  if (o.buscarContatos) r.push("Com e-mail e redes");
+  return r;
+}
+
 // ── A base de leads (o painel da aba Leads) ─────────────────────────────
 
 export interface LeadParaResumo extends SinaisDoLead {
@@ -492,15 +572,32 @@ export interface LeadParaResumo extends SinaisDoLead {
   respondeu: boolean;
 }
 
-export interface CidadeDaBase {
-  cidade: string;
+/** Um grupo da base (uma cidade, um segmento): quantos, quantos contatados e quantos responderam. */
+export interface GrupoDaBase {
+  nome: string;
   total: number;
   /** Prontos para a próxima campanha (a mesma regra do passo Contatos). */
   aContatar: number;
   contatados: number;
+  responderam: number;
 }
 
 export type FaixaDaPontuacao = ReturnType<typeof faixaDaPontuacao>;
+
+/** As faixas de nota no Google, da pior para a melhor. */
+export const FAIXAS_DE_NOTA = [
+  { chave: "sem", rotulo: "Sem nota", eixo: "Sem nota" },
+  { chave: "ate4", rotulo: "Abaixo de 4", eixo: "Abaixo de 4" },
+  { chave: "4", rotulo: "De 4 a 4,4", eixo: "4 a 4,4" },
+  { chave: "45", rotulo: "De 4,5 a 4,7", eixo: "4,5 a 4,7" },
+  { chave: "48", rotulo: "4,8 ou mais", eixo: "4,8 ou mais" },
+] as const;
+export type FaixaDeNota = (typeof FAIXAS_DE_NOTA)[number]["chave"];
+
+export function faixaDaNota(nota: number | null): FaixaDeNota {
+  if (nota === null) return "sem";
+  return nota < 4 ? "ate4" : nota < 4.5 ? "4" : nota < 4.8 ? "45" : "48";
+}
 
 export interface ResumoDaBase {
   total: number;
@@ -510,10 +607,24 @@ export interface ResumoDaBase {
   contatados: number;
   responderam: number;
   aContatar: number;
-  porCidade: CidadeDaBase[];
+  porCidade: GrupoDaBase[];
+  porSegmento: GrupoDaBase[];
   porSite: Record<SiteDoLead, number>;
   porFaixa: Record<FaixaDaPontuacao, number>;
+  porNota: Record<FaixaDeNota, number>;
 }
+
+function somarNoGrupo(m: Map<string, GrupoDaBase>, nome: string, l: LeadParaResumo, pode: boolean) {
+  const g = m.get(nome) ?? { nome, total: 0, aContatar: 0, contatados: 0, responderam: 0 };
+  g.total++;
+  if (pode) g.aContatar++;
+  if (l.campanhas > 0) g.contatados++;
+  if (l.respondeu) g.responderam++;
+  m.set(nome, g);
+}
+
+const porTamanho = (m: Map<string, GrupoDaBase>) =>
+  [...m.values()].sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
 
 /**
  * Os números da base inteira, para o painel da aba Leads. De verdade é uma
@@ -521,31 +632,28 @@ export interface ResumoDaBase {
  * memória, para o preview e os testes. As duas ficam iguais.
  */
 export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
-  const cidades = new Map<string, CidadeDaBase>();
+  const cidades = new Map<string, GrupoDaBase>();
+  const segmentos = new Map<string, GrupoDaBase>();
   const porSite: Record<SiteDoLead, number> = { sim: 0, so_rede_social: 0, nao: 0 };
   const porFaixa: Record<FaixaDaPontuacao, number> = { alta: 0, media: 0, baixa: 0 };
+  const porNota: Record<FaixaDeNota, number> = { sem: 0, ate4: 0, "4": 0, "45": 0, "48": 0 };
   let comCelular = 0;
   let bons = 0;
   let contatados = 0;
   let responderam = 0;
   let aContatar = 0;
   for (const l of leads) {
-    const c = cidades.get(l.cidade) ?? { cidade: l.cidade, total: 0, aContatar: 0, contatados: 0 };
-    c.total++;
-    if (podeEntrarNaCampanha(l)) {
-      c.aContatar++;
-      aContatar++;
-    }
-    if (l.campanhas > 0) {
-      c.contatados++;
-      contatados++;
-    }
-    cidades.set(l.cidade, c);
+    const pode = podeEntrarNaCampanha(l);
+    somarNoGrupo(cidades, l.cidade, l, pode);
+    somarNoGrupo(segmentos, l.segmento || "Sem segmento", l, pode);
+    if (pode) aContatar++;
+    if (l.campanhas > 0) contatados++;
     if (telefoneDoLead(l.telefone)) comCelular++;
     if (l.marcacao === "bom") bons++;
     if (l.respondeu) responderam++;
     porSite[siteDoLead(l.site)]++;
     porFaixa[faixaDaPontuacao(pontuarLead(l).pontos)]++;
+    porNota[faixaDaNota(l.nota)]++;
   }
   return {
     total: leads.length,
@@ -554,8 +662,25 @@ export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
     contatados,
     responderam,
     aContatar,
-    porCidade: [...cidades.values()].sort((a, b) => b.total - a.total || a.cidade.localeCompare(b.cidade, "pt-BR")),
+    porCidade: porTamanho(cidades),
+    porSegmento: porTamanho(segmentos),
     porSite,
     porFaixa,
+    porNota,
   };
+}
+
+/**
+ * Leads que entraram na base por semana (a data da busca que os trouxe), nas
+ * `semanas` semanas que terminam hoje: a tendência do número "Na base".
+ */
+export function leadsPorSemana(datas: number[], agora: number, semanas: number): { inicio: string; n: number }[] {
+  const hoje = diaIsoSP(agora);
+  const serie = Array.from({ length: semanas }, (_, i) => ({ inicio: somarDias(hoje, -7 * (semanas - i) + 1), n: 0 }));
+  for (const t of datas) {
+    const dias = Math.round((inicioDoDiaSP(hoje) - inicioDoDiaSP(diaIsoSP(t))) / 86_400_000);
+    const i = semanas - 1 - Math.floor(dias / 7);
+    if (i >= 0 && i < semanas) serie[i].n++;
+  }
+  return serie;
 }

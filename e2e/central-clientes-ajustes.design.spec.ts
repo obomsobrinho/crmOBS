@@ -866,14 +866,26 @@ test.describe("Rodada de 16/10: medidor com gasto ideal, modelo, reais, variaç�
   test("a barra de meta fica vermelha acima do ritmo e verde no ou abaixo dele, claro e escuro, e a porcentagem continua no cartão", async ({ page }) => {
     for (const tema of ["light", "dark"] as const) {
       await page.context().addCookies([{ name: "theme", value: tema, url: "http://localhost" }]);
-      await page.goto(detalhe(2, "uso")); // 85% de 10 mi: acima do ritmo em qualquer dia antes do fim do mês
+      // 85% de 10 mi. Acima ou abaixo do ritmo depende do DIA do mês (o ideal passa de 85% perto do
+      // fim do mês: em 29/10 era 93%), então o estado esperado sai do próprio marcador, e a cor segue o estado.
+      await page.goto(detalhe(2, "uso"));
       const m = page.locator('[data-bloco="central-uso"] [data-slot="medidor-de-meta"]');
-      await expect(m).toHaveAttribute("data-estado", "ruim");
+      const usado2 = Number(await m.getAttribute("aria-valuenow"));
+      const ideal2 = Number(await m.getAttribute("data-ideal-pct"));
+      const acima = usado2 > ideal2;
+      await expect(m).toHaveAttribute("data-estado", acima ? "ruim" : "bom");
       const cor = await m.locator("[data-medidor-cheio]").evaluate((e) => getComputedStyle(e).backgroundColor);
       const [r, g, b] = cor.match(/\d+(\.\d+)?/g)!.map(Number);
-      expect(r).toBeGreaterThan(g + 40);
-      expect(r).toBeGreaterThan(b + 40);
-      await expect(page.locator('[data-bloco="central-uso"] [data-slot="central-ritmo-frase"]')).toHaveAttribute("data-ritmo", "acima");
+      if (acima) {
+        expect(r).toBeGreaterThan(g + 40);
+        expect(r).toBeGreaterThan(b + 40);
+      } else {
+        expect(g).toBeGreaterThan(r + 20);
+      }
+      await expect(page.locator('[data-bloco="central-uso"] [data-slot="central-ritmo-frase"]')).toHaveAttribute(
+        "data-ritmo",
+        acima ? "acima" : "abaixo",
+      );
       await expect(page.locator('[data-bloco="central-uso"] [data-slot="central-percentual"]')).toContainText("85%");
       await page.goto(detalhe(1, "uso")); // 18% de 13 mi
       const m1 = page.locator('[data-bloco="central-uso"] [data-slot="medidor-de-meta"]');

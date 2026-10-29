@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
-import { pontuarLead, telefoneDoLead } from "@/lib/prospeccao";
+import { pontuarLead, telefoneDoLead, type OpcoesDaBusca } from "@/lib/prospeccao";
 import AbaLeads from "./AbaLeads";
 import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
@@ -78,14 +78,16 @@ export default function CentralDeCampanhas({
   );
 
   const aoBuscar = useCallback(
-    (termo: string, cidade: string) => {
+    (opcoes: OpcoesDaBusca) => {
       const id = `b${Date.now()}`;
-      setBuscas((atual) => [{ id, termo, cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null }, ...atual]);
+      const termo = opcoes.termos.join(", ");
+      const cidade = opcoes.cidade;
+      setBuscas((atual) => [{ id, termo, cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null, opcoes }, ...atual]);
       // A fonte de verdade avisa por webhook; aqui, alguns segundos de espera.
       window.setTimeout(() => {
         setLeads((atual) => {
           const ja = new Set(atual.map((l) => telefoneDoLead(l.telefone)).filter(Boolean));
-          const achados = simularBusca(id, termo, cidade, 3000 + atual.length);
+          const achados = simularBusca(id, opcoes.termos[0], cidade, 3000 + atual.length);
           const novos = achados.filter((l) => !ja.has(telefoneDoLead(l.telefone)));
           setBuscas((b) => b.map((x) => (x.id === id ? { ...x, situacao: "pronta", total: achados.length } : x)));
           return [...atual, ...novos];

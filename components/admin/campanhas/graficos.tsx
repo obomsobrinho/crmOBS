@@ -71,7 +71,7 @@ export function GraficoDeEnviosPorDia({ serie }: { serie: DiaDeEnvio[] }) {
           <ChartContainer config={CONFIG_DIAS} className="mt-4 h-56" role="img" aria-label="Envios por dia">
             <BarChart data={barras} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="24%">
               <CartesianGrid vertical={false} stroke="var(--chart-grade)" />
-              <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval="preserveStartEnd" minTickGap={18} />
+              <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval={Math.max(0, Math.ceil(barras.length / 8) - 1)} />
               <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} />
               <ChartTooltip
                 cursor={CURSOR}
@@ -217,7 +217,7 @@ export function GraficoDeTaxaDeitado({ nome, barras }: { nome: string; barras: B
       <ChartContainer
         config={CONFIG_TAXA}
         className="mt-4"
-        style={{ height: Math.max(96, barras.length * 44 + 8) }}
+        style={{ height: 192 }}
         role="img"
         aria-label={nome}
       >
@@ -258,171 +258,61 @@ function TabelaDeTaxa({ nome, barras }: { nome: string; barras: BarraDeTaxa[] })
   );
 }
 
-// ── Leads: barras deitadas empilhadas (por cidade) e o funil ───────────
+// ── Colunas de contagem (nota no Google) ────────────────────────────────
 
-export interface BarraDeCidade {
+export interface ColunaDeContagem {
   chave: string;
-  rotulo: string;
-  contatados: number;
-  aContatar: number;
-  /** Sem celular, descartados ou que pediram para parar. */
-  fora: number;
-  total: number;
-}
-
-const CONFIG_CIDADES: ChartConfig = {
-  contatados: { label: "Contatados", color: "var(--chart-1)" },
-  aContatar: { label: "A contatar", color: "var(--chart-rampa-2)" },
-  fora: { label: "Fora das campanhas", color: "var(--chart-barra-neutra)" },
-};
-
-export function GraficoPorCidade({ barras }: { barras: BarraDeCidade[] }) {
-  const animar = useAnimacaoDoGrafico();
-  const soma = (k: "contatados" | "aContatar" | "fora") => barras.reduce((s, b) => s + b[k], 0);
-  return (
-    <>
-      <ChartContainer
-        config={CONFIG_CIDADES}
-        className="mt-4"
-        style={{ height: Math.max(120, barras.length * 34 + 8) }}
-        role="img"
-        aria-label="Leads por cidade"
-      >
-        <BarChart data={barras} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }} barCategoryGap="30%">
-          <CartesianGrid horizontal={false} stroke="var(--chart-grade)" />
-          <XAxis type="number" hide allowDecimals={false} />
-          <YAxis type="category" dataKey="rotulo" width={132} tickLine={false} axisLine={false} interval={0} />
-          <ChartTooltip
-            cursor={CURSOR}
-            content={
-              <ChartTooltipContent<BarraDeCidade>
-                titulo={(b) => b.rotulo}
-                formatarValor={(v) => numeroBR(v)}
-                rodape={(b) => (
-                  <ChartTooltipLinha rotulo="Na base" data-linha="total">
-                    {numeroBR(b.total)}
-                  </ChartTooltipLinha>
-                )}
-              />
-            }
-          />
-          <Bar dataKey="contatados" stackId="c" fill="var(--color-contatados)" stroke="var(--s-raised)" strokeWidth={1} maxBarSize={18} isAnimationActive={animar} />
-          <Bar dataKey="aContatar" stackId="c" fill="var(--color-aContatar)" stroke="var(--s-raised)" strokeWidth={1} maxBarSize={18} isAnimationActive={animar} />
-          <Bar
-            dataKey="fora"
-            stackId="c"
-            fill="var(--color-fora)"
-            stroke="var(--s-raised)"
-            strokeWidth={1}
-            radius={[0, 4, 4, 0]}
-            maxBarSize={18}
-            isAnimationActive={animar}
-          >
-            <LabelList dataKey="total" position="right" className="fill-ink" fontSize={12} fontWeight={600} />
-          </Bar>
-        </BarChart>
-      </ChartContainer>
-      <ChartLegenda
-        className="mt-3"
-        itens={[
-          { chave: "contatados", rotulo: "Contatados", cor: "var(--chart-1)", valor: numeroBR(soma("contatados")) },
-          { chave: "aContatar", rotulo: "A contatar", cor: "var(--chart-rampa-2)", valor: numeroBR(soma("aContatar")) },
-          { chave: "fora", rotulo: "Fora das campanhas", cor: "var(--chart-barra-neutra)", valor: numeroBR(soma("fora")) },
-        ]}
-      />
-      <ChartTabela
-        nome="leads-por-cidade"
-        legenda="Leads por cidade"
-        colunas={["Cidade", "Na base", "Contatados", "A contatar", "Fora"]}
-        linhas={barras.map((b) => ({
-          chave: b.chave,
-          atributos: { "data-cidade": b.chave, "data-total": b.total },
-          celulas: [b.rotulo, numeroBR(b.total), numeroBR(b.contatados), numeroBR(b.aContatar), numeroBR(b.fora)],
-        }))}
-      />
-    </>
-  );
-}
-
-export interface DegrauDoFunil {
-  chave: string;
+  eixo: string;
   rotulo: string;
   n: number;
-  /** % do degrau anterior (null no primeiro). */
-  doAnterior: number | null;
-  fill: string;
 }
 
-/** O funil da base: cada degrau uma barra deitada, mais cheia quanto mais perto da resposta. */
-export function GraficoDoFunil({ degraus }: { degraus: DegrauDoFunil[] }) {
+/** Colunas de uma série só (quantos leads em cada faixa), com o número em cima e a parte do total no balão. */
+export function GraficoDeContagem({ nome, colunas }: { nome: string; colunas: ColunaDeContagem[] }) {
   const animar = useAnimacaoDoGrafico();
+  const total = colunas.reduce((s, c) => s + c.n, 0);
   return (
     <>
-      <ChartContainer
-        config={{ n: { label: "Leads", color: "var(--chart-1)" } }}
-        className="mt-4"
-        style={{ height: degraus.length * 44 + 8 }}
-        role="img"
-        aria-label="Funil da base"
-      >
-        <BarChart data={degraus} layout="vertical" margin={{ top: 0, right: 44, left: 0, bottom: 0 }} barCategoryGap="22%">
-          <XAxis type="number" hide domain={[0, "dataMax"]} />
-          <YAxis type="category" dataKey="rotulo" width={96} tickLine={false} axisLine={false} interval={0} />
+      <ChartContainer config={{ n: { label: "Leads", color: "var(--chart-1)" } }} className="mt-4 h-44" role="img" aria-label={nome}>
+        <BarChart data={colunas} margin={{ top: 20, right: 4, left: 0, bottom: 0 }} barCategoryGap="22%">
+          <CartesianGrid vertical={false} stroke="var(--chart-grade)" />
+          <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval={0} />
+          <YAxis hide allowDecimals={false} />
           <ChartTooltip
             cursor={CURSOR}
             content={
-              <ChartTooltipContent<DegrauDoFunil>
+              <ChartTooltipContent<ColunaDeContagem>
                 semSeries
-                titulo={(d) => d.rotulo}
-                rodape={(d) => (
+                titulo={(c) => c.rotulo}
+                rodape={(c) => (
                   <>
                     <ChartTooltipLinha rotulo="Leads" data-linha="n">
-                      {numeroBR(d.n)}
+                      {numeroBR(c.n)}
                     </ChartTooltipLinha>
-                    {d.doAnterior !== null && (
-                      <ChartTooltipLinha rotulo="Do degrau anterior" data-linha="anterior">
-                        {d.doAnterior}%
-                      </ChartTooltipLinha>
-                    )}
+                    <ChartTooltipLinha rotulo="Do total" data-linha="fracao">
+                      {pct(c.n, total)}%
+                    </ChartTooltipLinha>
                   </>
                 )}
               />
             }
           />
-          <Bar dataKey="n" shape={FormaDaBarra} radius={[0, 4, 4, 0]} maxBarSize={24} isAnimationActive={animar}>
-            <LabelList
-              dataKey="n"
-              position="right"
-              className="fill-ink"
-              fontSize={12}
-              fontWeight={600}
-              formatter={(v: unknown) => numeroBR(Number(v))}
-            />
+          <Bar dataKey="n" fill="var(--color-n)" radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={animar}>
+            <LabelList dataKey="n" position="top" className="fill-ink-2" fontSize={11} formatter={(v: unknown) => numeroBR(Number(v))} />
           </Bar>
         </BarChart>
       </ChartContainer>
       <ChartTabela
-        nome="leads-funil"
-        legenda="Funil da base"
-        colunas={["Degrau", "Leads", "Do anterior"]}
-        linhas={degraus.map((d) => ({
-          chave: d.chave,
-          atributos: { "data-degrau": d.chave, "data-n": d.n },
-          celulas: [d.rotulo, numeroBR(d.n), d.doAnterior === null ? "" : `${d.doAnterior}%`],
+        nome={nome}
+        legenda={nome}
+        linhas={colunas.map((c) => ({
+          chave: c.chave,
+          atributos: { "data-faixa": c.chave, "data-n": c.n },
+          celulas: [c.rotulo, numeroBR(c.n), `${pct(c.n, total)}%`],
         }))}
       />
     </>
   );
-}
-
-/** Monta os degraus do funil; a cor sobe na rampa da marca a cada degrau. */
-export function degrausDoFunil(passos: { chave: string; rotulo: string; n: number }[]): DegrauDoFunil[] {
-  const rampa = ["var(--chart-rampa-2)", "var(--chart-rampa-3)", "var(--chart-rampa-4)"];
-  return passos.map((p, i) => ({
-    ...p,
-    doAnterior: i === 0 ? null : pct(p.n, passos[i - 1].n),
-    fill: rampa[Math.min(rampa.length - 1, i + Math.max(0, rampa.length - passos.length))],
-  }));
 }
 
 // ── Rosca (presença online, pontuação) ──────────────────────────────────
@@ -443,7 +333,7 @@ export function Rosca({ nome, fatias, unidade }: { nome: string; fatias: FatiaDa
   );
   if (total === 0) return <EstadoVazio tamanho="compacto" texto="Nada a mostrar ainda." />;
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-6">
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
       <div className="relative w-36 shrink-0">
         <ChartContainer config={config} className="h-36" role="img" aria-label={nome}>
           <PieChart>
@@ -488,8 +378,8 @@ export function Rosca({ nome, fatias, unidade }: { nome: string; fatias: FatiaDa
         </div>
       </div>
       <ChartLegenda
-        className="min-w-0 flex-1 flex-col items-start gap-y-2"
-        itens={fatias.map((f) => ({ chave: f.chave, rotulo: f.rotulo, cor: f.fill, valor: `${numeroBR(f.n)} (${pct(f.n, total)}%)` }))}
+        className="flex-col items-start gap-y-2"
+        itens={fatias.map((f) => ({ chave: f.chave, rotulo: f.rotulo, cor: f.fill, valor: `${numeroBR(f.n)} · ${pct(f.n, total)}%` }))}
       />
       <ChartTabela
         nome={nome}

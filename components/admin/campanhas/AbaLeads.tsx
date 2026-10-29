@@ -1,14 +1,12 @@
 "use client";
 
 import { memo, useCallback, useMemo, useState } from "react";
-import { AlertCircle, ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
+import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
-import { Input } from "@/components/ui/input";
 import { Aviso } from "@/components/ui/aviso";
 import { Medidor } from "@/components/ui/medidor";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,18 +14,24 @@ import { normalizar } from "@/lib/clientes";
 import { mascaraTelefoneBR, numeroBR, pct, plural } from "@/lib/format";
 import { diaMesHoraSP } from "@/lib/fuso";
 import {
+  FAIXAS_DE_NOTA,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
+  leadsPorSemana,
   resumoDaBase,
+  resumoDasOpcoes,
   siteDoLead,
   telefoneDoLead,
   tipoDoTelefone,
+  type OpcoesDaBusca,
   type ResumoDaBase,
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
-import { CabecalhoDoGrafico, GraficoDoFunil, GraficoPorCidade, Rosca, degrausDoFunil } from "./graficos";
+import NovaBusca from "./NovaBusca";
+import { CabecalhoDoGrafico, GraficoDeContagem, Rosca } from "./graficos";
+import { FunilDaBase, RankingDaBase } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
 import type { Busca, Campanha, Lead } from "./tipos";
@@ -43,21 +47,13 @@ function resumir(leads: Lead[], responderam: Set<string>): ResumoDaBase {
 
 // ── O painel da base ────────────────────────────────────────────────────
 
-function PainelDaBase({ r }: { r: ResumoDaBase }) {
-  const cidades = r.porCidade.slice(0, 8).map((c) => ({
-    chave: c.cidade,
-    rotulo: c.cidade,
-    contatados: c.contatados,
-    aContatar: c.aContatar,
-    fora: c.total - c.contatados - c.aContatar,
-    total: c.total,
-  }));
-  const funil = degrausDoFunil([
+function PainelDaBase({ r, porSemana }: { r: ResumoDaBase; porSemana: { inicio: string; n: number }[] }) {
+  const funil = [
     { chave: "base", rotulo: "Na base", n: r.total },
     { chave: "celular", rotulo: "Com celular", n: r.comCelular },
     { chave: "contatados", rotulo: "Contatados", n: r.contatados },
     { chave: "responderam", rotulo: "Responderam", n: r.responderam },
-  ]);
+  ];
   return (
     <div className="flex flex-col gap-4" data-slot="leads-painel">
       <FaixaDeNumeros
@@ -66,44 +62,63 @@ function PainelDaBase({ r }: { r: ResumoDaBase }) {
             chave: "base",
             rotulo: "Na base",
             valor: numeroBR(r.total),
-            frase: `${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}`,
+            frase: `${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}, ${numeroBR(r.porSegmento.length)} ${plural(r.porSegmento.length, "segmento", "segmentos")}`,
+            serie: {
+              pontos: porSemana.map((s) => ({ chave: s.inicio, rotulo: `Semana de ${s.inicio.slice(8, 10)}/${s.inicio.slice(5, 7)}`, valor: s.n })),
+              nome: "Leads novos",
+              formatar: numeroBR,
+            },
           },
           {
             chave: "celular",
             rotulo: "Com celular",
             valor: numeroBR(r.comCelular),
             complemento: `${pct(r.comCelular, r.total)}%`,
-            frase: "da base",
+            frase: "da base pode receber WhatsApp",
+            barra: pct(r.comCelular, r.total),
           },
           {
             chave: "contatados",
             rotulo: "Contatados",
             valor: numeroBR(r.contatados),
             complemento: `${pct(r.contatados, r.comCelular)}%`,
-            frase: `${numeroBR(r.aContatar)} ainda a contatar`,
+            frase: `dos com celular, ${numeroBR(r.aContatar)} ainda a contatar`,
+            barra: pct(r.contatados, r.comCelular),
           },
           {
             chave: "responderam",
             rotulo: "Responderam",
             valor: numeroBR(r.responderam),
             complemento: r.contatados > 0 ? `${pct(r.responderam, r.contatados)}%` : undefined,
-            frase: "dos contatados",
+            frase: `dos contatados, ${numeroBR(r.bons)} marcados como bons`,
+            barra: pct(r.responderam, r.contatados),
           },
         ]}
       />
 
-      <div className="grid gap-4 xl:grid-cols-3">
-        <Card variant="conteudo" className="p-6 xl:col-span-2" data-bloco="leads-cidades">
-          <CabecalhoDoGrafico titulo="Leads por cidade" />
-          <GraficoPorCidade barras={cidades} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card variant="conteudo" className="p-6" data-bloco="leads-cidades">
+          <CabecalhoDoGrafico titulo="Por cidade" />
+          <RankingDaBase grupos={r.porCidade} total={r.total} unidade={["cidade", "cidades"]} slot="leads-ranking-cidades" />
         </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="leads-funil">
-          <CabecalhoDoGrafico titulo="Funil da base" />
-          <GraficoDoFunil degraus={funil} />
+        <Card variant="conteudo" className="p-6" data-bloco="leads-segmentos">
+          <CabecalhoDoGrafico titulo="Por segmento" />
+          <RankingDaBase grupos={r.porSegmento} total={r.total} unidade={["segmento", "segmentos"]} slot="leads-ranking-segmentos" />
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+        <Card variant="conteudo" className="flex flex-col p-6" data-bloco="leads-funil">
+          <CabecalhoDoGrafico titulo="Funil da base" />
+          <FunilDaBase passos={funil} />
+        </Card>
+        <Card variant="conteudo" className="p-6" data-bloco="leads-nota">
+          <CabecalhoDoGrafico titulo="Nota no Google" />
+          <GraficoDeContagem
+            nome="Leads por nota no Google"
+            colunas={FAIXAS_DE_NOTA.map((f) => ({ chave: f.chave, eixo: f.eixo, rotulo: f.rotulo, n: r.porNota[f.chave] }))}
+          />
+        </Card>
         <Card variant="conteudo" className="p-6" data-bloco="leads-site">
           <CabecalhoDoGrafico titulo="Presença online" />
           <Rosca
@@ -122,9 +137,9 @@ function PainelDaBase({ r }: { r: ResumoDaBase }) {
             nome="Leads por pontuação"
             unidade={["lead", "leads"]}
             fatias={[
-              { chave: "alta", rotulo: "Alta (70 ou mais)", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
-              { chave: "media", rotulo: "Média (40 a 69)", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
-              { chave: "baixa", rotulo: "Baixa (abaixo de 40)", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
+              { chave: "alta", rotulo: "Alta", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
+              { chave: "media", rotulo: "Média", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
+              { chave: "baixa", rotulo: "Baixa", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
             ]}
           />
         </Card>
@@ -568,6 +583,14 @@ function HomeDosLeads({
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
   const r = useMemo(() => resumir(leads, responderam), [leads, responderam]);
+  const porSemana = useMemo(() => {
+    const quando = new Map(buscas.map((b) => [b.id, b.criadaEm]));
+    return leadsPorSemana(
+      leads.map((l) => quando.get(l.buscaId) ?? agora),
+      agora,
+      8,
+    );
+  }, [buscas, leads, agora]);
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
@@ -618,7 +641,7 @@ function HomeDosLeads({
         </Card>
       ) : (
         <>
-          <PainelDaBase r={r} />
+          <PainelDaBase r={r} porSemana={porSemana} />
           <Card variant="conteudo" className="overflow-hidden" data-bloco="leads-tabela">
             {vista === "buscas" ? (
               <TabelaDeBuscas
@@ -677,7 +700,7 @@ function DetalheDaBusca({
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}
-        apoio={`Busca de ${diaMesHoraSP(busca.criadaEm)}`}
+        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, `${busca.cidade}, ${busca.opcoes.uf}`, ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
       />
 
       <FaixaDeNumeros
@@ -714,61 +737,6 @@ function DetalheDaBusca({
   );
 }
 
-// ── Nova busca ──────────────────────────────────────────────────────────
-
-function DialogoDeNovaBusca({
-  aberto,
-  aoMudar,
-  aoBuscar,
-}: {
-  aberto: boolean;
-  aoMudar: (v: boolean) => void;
-  aoBuscar: (termo: string, cidade: string) => void;
-}) {
-  const [termo, setTermo] = useState("");
-  const [cidade, setCidade] = useState("");
-  const pronto = termo.trim().length >= 3 && cidade.trim().length >= 2;
-  return (
-    <Dialog open={aberto} onOpenChange={aoMudar}>
-      <DialogContent tamanho="gestao" data-slot="nova-busca">
-        <DialogTitle>Nova busca</DialogTitle>
-        <DialogDescription>Procura empresas no Google Maps. Leva alguns minutos e roda em segundo plano.</DialogDescription>
-        <form
-          className="mt-4 flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!pronto) return;
-            aoBuscar(termo.trim(), cidade.trim());
-            setTermo("");
-            setCidade("");
-          }}
-        >
-          <label className="flex flex-col gap-1.5">
-            <span className="text-apoio font-semibold text-ink">Segmento</span>
-            <Input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="clínica de estética" autoFocus />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-apoio font-semibold text-ink">Cidade</span>
-            <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Mutum" />
-          </label>
-          <p className="flex items-start gap-2 text-legenda text-ink-3">
-            <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
-            Cada busca gasta crédito da fonte de leads.
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => aoMudar(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={!pronto}>
-              Buscar
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── A aba ───────────────────────────────────────────────────────────────
 
 function AbaLeads({
@@ -794,7 +762,7 @@ function AbaLeads({
   buscaAberta: string | null;
   rascunho: Campanha | null;
   abrirBusca: (id: string | null) => void;
-  aoBuscar: (termo: string, cidade: string) => void;
+  aoBuscar: (o: OpcoesDaBusca) => void;
   marcar: (id: string, m: Lead["marcacao"]) => void;
   criarCampanhaDaBusca: (buscaId: string) => void;
   voltarAoRascunho: () => void;
@@ -833,12 +801,12 @@ function AbaLeads({
           voltarAoRascunho={voltarAoRascunho}
         />
       )}
-      <DialogoDeNovaBusca
+      <NovaBusca
         aberto={dialogo}
         aoMudar={setDialogo}
-        aoBuscar={(t, c) => {
+        aoBuscar={(o) => {
           setDialogo(false);
-          aoBuscar(t, c);
+          aoBuscar(o);
         }}
       />
     </>

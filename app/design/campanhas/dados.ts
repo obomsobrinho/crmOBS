@@ -1,5 +1,5 @@
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
-import { diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
+import { OPCOES_PADRAO, diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
 import {
   leadsDoFiltro,
   type Busca,
@@ -214,7 +214,7 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
   const sorteio = sorteador(29102026);
   const D = 24 * H;
 
-  const buscas: Busca[] = [
+  const buscas: Omit<Busca, "opcoes">[] = [
     { id: "b3", termo: "barbearia", cidade: "Caratinga", criadaEm: agora - 6 * MIN, situacao: "buscando", total: 0, erro: null },
     { id: "b1", termo: "clínica de estética", cidade: "Mutum", criadaEm: agora - 3 * D, situacao: "pronta", total: ESTETICA.length, erro: null },
     { id: "b4", termo: "ótica", cidade: "Ipatinga", criadaEm: agora - 4 * D, situacao: "falhou", total: 0, erro: "A fonte não respondeu a tempo. Nada foi gravado; dá para buscar de novo." },
@@ -330,10 +330,14 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
   });
 
   buscas.sort((a, b) => b.criadaEm - a.criadaEm);
+  const comOpcoes: Busca[] = buscas.map((b, i) => ({
+    ...b,
+    opcoes: { ...OPCOES_PADRAO, termos: [b.termo], cidade: b.cidade, uf: "MG", porTermo: b.total > 40 ? 100 : 50, notaMinima: i % 4 === 1 ? 4 : null },
+  }));
   const campanhas = [c3, c1, c4, c2, ...geradas].sort((a, b) =>
     a.situacao === "rascunho" ? -1 : b.situacao === "rascunho" ? 1 : b.criadaEm - a.criadaEm,
   );
-  return { buscas, leads, campanhas };
+  return { buscas: comOpcoes, leads, campanhas };
 }
 
 /** As empresas que uma busca nova de mentira "acha" depois de alguns segundos. */

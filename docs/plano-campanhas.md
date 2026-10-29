@@ -56,16 +56,27 @@ plan, not as captions.
 ### 3.1 Leads (the base)
 
 - **Dashboard of the base** (`resumoDaBase`, pure; the real one is one SQL aggregate, never rows in the
-  browser): a band of four numbers (`FaixaDeNumeros`: Na base with the cities, Com celular with its
-  share, Contatados with its share and how many are still to contact, Responderam with the share of
-  contacted), "Leads por cidade" (stacked
-  horizontal bars: contacted, still to contact, out of campaigns; top 8 cities), "Funil da base" (in the
-  base, with mobile, contacted, replied, each step with its share of the previous one), and two donuts,
-  "Presença online" (no site / social only / own site) and "Pontuação" (high / medium / low).
+  browser), fourth round: a band of four numbers (`FaixaDeNumeros`: Na base with cities, segments and a
+  sparkline of new leads per week, `leadsPorSemana`; Com celular, Contatados and Responderam each with its
+  share and a thin bar), then "Por cidade" and "Por segmento" as RANKINGS (`RankingDaBase`: the 6 largest,
+  each with count, share of the base as a bar, contacted and replied, and one "Outras N" line with the
+  rest, so the card keeps its size with 300 cities; the stacked bar chart per city grew without limit and
+  its "fora das campanhas" read as "no phone"), then "Funil da base" (a list of steps with bars and the
+  share of the previous step, `FunilDaBase`), "Nota no Google" (columns per band, `FAIXAS_DE_NOTA`) and
+  two donuts, "Presença online" (no site / social only / own site) and "Pontuação" (high / medium / low).
 - **Table**, two views in a `painel` tab pair: **Buscas** (term and city, status, found, with mobile,
   good, contacted of those with mobile as a `Medidor` plus replies, when; the filter button by status and
   search by segment or city) and **Todos os leads** (the lead table below, over the whole base).
-- **"Nova busca"**: term and city. It runs in the background (section 6); the owner can leave and come
+- **"Nova busca"** (fourth round, owner: "não está muito pobre?"; `NovaBusca.tsx`, `OpcoesDaBusca` in
+  `lib/prospeccao.ts`): one or more segments (Enter adds another), city plus state (`UFS`, so homonym
+  cities do not mix), how many companies per segment (50, 100, 200; the cost cap, D7), minimum Google
+  rating (any, 3.5, 4, 4.5), site (all, only without, only with), leave closed places out (on by default)
+  and "e-mail and social profiles from the company site" (off, costs extra at the source). The footer shows
+  the maximum of companies and the minimum cost at the list price. Mapped to the actor fields
+  `searchStringsArray`, `locationQuery`, `maxCrawledPlacesPerSearch`, `placeMinimumStars`, `website`,
+  `skipClosedPlaces`, `scrapeContacts`, `language` (input schema read on 29/10/2026; the accepted values of
+  `placeMinimumStars` and `website` are not listed there, confirm on a real run before mapping). The
+  search detail shows the chosen options. It runs in the background (section 6); the owner can leave and come
   back. A row in "buscando" says so; "falhou" says why in one sentence and nothing is saved.
 - **Search detail**: the same band of four numbers for that search and the lead table filtered to it.
 - **Lead table** (both places): name with neighborhood and city, Google rating and review count, site

@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { ChartSparkline, type PontoDeTendencia } from "@/components/ui/chart";
+import { Medidor } from "@/components/ui/medidor";
 import { StatRotulo, StatValor } from "@/components/ui/stat";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,8 @@ export interface CelulaDaFaixa {
   serie?: { pontos: PontoDeTendencia[]; nome: string; formatar: (v: number) => string } | null;
   /** Cor de estado no número (o âmbar de "pediram para parar"). */
   classeDoValor?: string;
+  /** A parte de um todo (0 a 100), numa barra fina embaixo. */
+  barra?: number;
 }
 
 export function FaixaDeNumeros({ celulas, className }: { celulas: CelulaDaFaixa[]; className?: string }) {
@@ -66,6 +69,9 @@ export function FaixaDeNumeros({ celulas, className }: { celulas: CelulaDaFaixa[
               />
             )}
           </div>
+          {c.barra !== undefined && (
+            <Medidor valor={c.barra} tom="marca" rotulo={`${c.rotulo}: ${Math.round(c.barra)}%`} data-bloco="faixa-barra" />
+          )}
         </div>
       ))}
     </Card>

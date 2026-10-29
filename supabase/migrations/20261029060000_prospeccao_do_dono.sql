@@ -14,6 +14,9 @@ create table if not exists public.prospeccao_buscas (
   status text not null default 'buscando' check (status in ('buscando', 'pronta', 'falhou')),
   -- A fonte e trocavel (lib/fonte-de-leads.ts): o id da execucao dela, para o webhook e a consulta.
   fonte text not null,
+  -- O que foi pedido à fonte (OpcoesDaBusca, lib/prospeccao.ts): termos, cidade, UF, quantidade por termo,
+  -- nota mínima, site, fechadas, contatos. `termo` e `cidade` acima ficam para a lista e a busca da tela.
+  opcoes jsonb not null default '{}'::jsonb,
   fonte_execucao_id text,
   total int not null default 0 check (total >= 0),
   erro text,

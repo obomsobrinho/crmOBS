@@ -2,6 +2,7 @@ import {
   podeEntrarNaCampanha,
   siteDoLead,
   type MarcacaoDoLead,
+  type OpcoesDaBusca,
   type SituacaoDaBusca,
   type SituacaoDaCampanha,
   type SituacaoNaCampanha,
@@ -22,6 +23,8 @@ export interface Busca {
   total: number;
   /** Por que falhou, em uma frase para a tela. */
   erro: string | null;
+  /** O que foi pedido à fonte (termos, estado, quantidade, filtros). `termo` acima é os termos juntos, para a tela. */
+  opcoes: OpcoesDaBusca;
 }
 
 /** Uma empresa na base de leads, deduplicada pelo telefone. */
