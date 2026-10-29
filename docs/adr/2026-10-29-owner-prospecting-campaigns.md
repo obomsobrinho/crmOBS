@@ -1,100 +1,95 @@
-# Owner prospecting (Campanhas): approved daily batch, sending number is a campaign field, at most 10 a day
+# Owner prospecting (Campanhas v2): lead base by search, one message per lead, 10 a day spread over 8h to 18h
 - Date: 2026-10-29
-- Status: Proposed. Decided by the owner on 29/10/2026: go ahead despite the opt-in policy, the sending
-  number is a simple campaign field (OBS's today, no dedicated number rule), cap of 10 per day. Still
-  open: D3 to D6 and D8 to D22 in `docs/plano-campanhas.md`.
+- Status: Proposed. v2 after the owner's review of the first prototype on 29/10/2026 (structure
+  rejected). Decided: go ahead despite the opt-in policy, the sending number is a simple campaign field
+  (OBS's today, ban risk accepted), at most 10 per day per campaign, one message only, Apify as the lead
+  source, the two-tab structure below. Still open: D1 to D9 in `docs/plano-campanhas.md`.
 - Area: product, admin
 
 ## Context
-The owner wants to bring companies to Atenda by approaching about 10 leads a day, from inside Atenda,
-as a feature only for OBS. `docs/adr/2026-08-26-no-mass-messaging-over-qr.md` already carries the
-exception (29/09/2026): his own prospecting in the central, his user only, dedicated number, daily cap
-and interval. Nothing is built.
+The owner wants to bring companies to Atenda by approaching about 10 leads a day from inside Atenda, as a
+feature only for OBS. `docs/adr/2026-08-26-no-mass-messaging-over-qr.md` carries the exception
+(29/09/2026): his own prospecting in the central, his user only, daily cap and interval.
 
-Evidence gathered on 29/10/2026 (sources in the plan, section 3):
-- WhatsApp Business Messaging Policy (updated 23/09/2026) requires the recipient's opt-in to be
-  contacted, on any channel. The Official API does not make a cold first message legal; the earlier
-  line "Campanhas only comes back with the Official API, where it is legal" is wrong for cold contacts.
-- Official API marketing in Brazil costs about US$ 0.0625 per message; new business portfolios start
-  at 250 business initiated conversations per 24 h.
+The v1 plan (same day) had a daily queue approved item by item, three touches (days 0, 3, 7), a site
+audit used as the hook with a per-lead angle (Site / Atenda), voice fields, objections and a qualified
+criterion on the campaign screen, and AI drafts in phase 2. The owner reviewed the `/design/campanhas`
+prototype and rejected that structure: he wants a lead base built by searches, campaigns made in a
+step-by-step wizard, one fixed message (with rotating variants) per lead, and the results by variant and
+by hour. Tone and offer belong to the OBS account prompt, not to the campaign.
+
+Evidence kept from v1 (sources in the plan, appendix A):
+- WhatsApp Business Messaging Policy (updated 23/09/2026) requires the recipient's opt-in on any channel;
+  the Official API does not make a cold first message legal.
 - QR: Baileys issue 2707 (error 463 "Reachout Timelock") is a temporary ban for starting chats with
   numbers that never wrote, which is this use case. No warm up makes a number immune.
-- Deskcomm (MIT, read at eeb3b9c) ships the same feature fully automatic after setup: Apify search,
-  site audit, SDR agent, 1 to 50 per day, 5 minute minimum interval, cold caps 5/13/25/50 by number
-  age, deterministic "responda PARAR" footer, required legal basis reference, unique phone per org.
-  Their video used 5 sends per 24 h, 3 minutes apart, and 50 companies for US$ 0.33.
-- Google Places API: up to 1,000 free Enterprise Text Search calls a month covers about 600 candidates;
-  its policies forbid storing content other than the place id.
+- The Deskcomm author (video of 23/10/2026) warns never to use the company's official number.
+- Apify: `compass/crawler-google-places` ("Google Maps Scraper", store page read on 29/10/2026, listed as
+  maintained by Apify), pay per event from US$ 1.50 per 1,000 places; US$ 5 free credit per month. The
+  v1 video: 50 companies for US$ 0.33.
 
-Owner's decision (29/10/2026, literal): "vamos usar o da obs mesmo, a campanha vou rodar com no maximo
-10 contatos por dia". The agent had recommended a dedicated chip in a separate company; the owner chose
-OBS's own number and account. Refined the same day: "na parte de numero é só colocar o campo do numero
-que vai ser usado, simples. eu coloco qualquer um ali e segue o baile".
+Owner's words (29/10/2026): "vamos usar o da obs mesmo, a campanha vou rodar com no maximo 10 contatos por
+dia"; on the number: "eu coloco qualquer um ali e segue o baile"; on this round: "capricha no layout e gere
+o plano para ja mandarmos ver".
 
-The full transcript of the video (29/10/2026) added: Google rating and reviews per company, switches per
-search (audit, e-mails and profiles, message preview), the audit's "has" and "missing" sides,
-objections with answers, "what to offer and how to start", a qualified criterion, the company enters the
-funnel only when approached, the stop offer in the first or second message, the state "no valid Brazilian
-phone", a side panel with the lead in the inbox, and a demo where the lead's own AI answered.
-
-## Decision (proposed, with the owner's three decisions)
-- Main lane: the owner approves each day's batch; a scheduler sends at most one approved message per
-  tick inside a business hours window, with a random pause, through `lib/envio-ativo.ts`. **At most 10
-  approaches per day** (first messages and follow-ups together), enforced in `lib/prospeccao.ts`
-  (`TETO_MAXIMO_DIARIO`) and by the table check. Up to 3 touches (days 0, 3, 7); any reply, SAIR, block
-  or failure stops the sequence. Exit line deterministic, in the first message (recommended) or the
-  second, as a campaign option. Global suppression
-  list; a phone is approached once in its life.
-- **Site audit is the hook and the priority of Phase 1** (OBS sells sites and Atenda): each lead gets a
-  deterministic x-ray of its site (no site, only a social profile, offline, or which of clickable phone,
-  WhatsApp button, address, map, mobile version and https are missing; the server opens the page once,
-  with guards) and of its attendance (short hours, reviews, selling on WhatsApp). `anguloDaAbordagem`
-  picks "Site", "Atenda" or "Site e Atenda" among the campaign's offers, and the first message has one
-  version per angle citing the concrete gap; no fact means the owner writes it by hand. The owner's
-  "voice" (name, company, what he does, edge) feeds the texts and, in Phase 2, the AI draft.
-- **The sending number is a field of the campaign** ("Número que envia": one of the existing WhatsApp
-  connections, one per company; OBS's today). No dedicated number rule in the product. Conversations
-  live in that company and its agent prompt answers them with the campaign's "what to offer and how to
-  start", qualified criterion and objections. The company enters the funnel only when approached.
-- The conversation gets an admin only "Prospecção" side panel block with the lead card (source, audit,
-  offer, touches).
-- Screen at `/campanhas`, admin only (same guard family as `/clientes`), API under
-  `/api/admin/campanhas/*`, service role only, actions logged in `admin_acoes`.
-- The reply is detected by reading `chat_messages`, never by changing `processTurn` or n8n.
-- Phase 0 with zero code: the owner starts this week from OBS's `/contatos` ("criar contato e iniciar
-  conversa"), up to 10 a day.
+## Decision (proposed)
+- **Two tabs, admin only.** Leads: one card per search (term and city, background run, buscando / pronta
+  / falhou, found / usable / contacted), a search detail table (rating, reviews, site yes / social only /
+  no, phone flagged when not a valid BR mobile, score, campaign badges), mark as good and discard, filters.
+  Campanhas: home cards (status rascunho / agendada / rodando / pausada / concluída, progress, replies),
+  a four-step wizard (Campanha, Contatos, Mensagem, Confirmar) with autosave, and the campaign detail
+  (numbers, comparisons, leads table, Pausar, "Nova campanha com quem não respondeu").
+- **One message per lead, no follow-up.** One fixed text for everyone, 1 to 3 variants rotating in queue
+  order, one variable `{empresa}`. A lead that went through a campaign is marked with it forever and only
+  enters another one when the owner picks it explicitly. A lead who asked to stop never enters a list
+  again.
+- **Pace**: at most 10 per day per campaign (`TETO_DIARIO`, also a table check), 8h to 18h
+  America/Sao_Paulo, random pause of 4 to 12 minutes. A Vercel cron sends one message per due campaign
+  per run through `enviarMensagemAtiva` (`lib/envio-ativo.ts`) and sets the next time with
+  `proximoEnvioEm`, which spreads the sends over the window (one random instant per 1 hour slot) so the
+  reply rate by hour can be measured.
+- **Replies**: land in the inbox of the sending company and its AI answers (n8n and `processTurn`
+  unchanged). The cron reads the first inbound message after the send to mark "respondeu" and its hour;
+  "não quero" / "pare" (provisional list) marks "pediu para parar".
+- **Source behind a module** (`lib/fonte-de-leads.ts` + server-only `lib/fonte-apify.ts`), async with an
+  Apify webhook or polling; dedupe by phone. `APIFY_TOKEN` is set by the owner in Vercel.
+- **Rules in one pure module**: `lib/prospeccao.ts` (phone, site class, score, statuses, eligibility,
+  variants, stop phrases, schedule, results), used by the screens, the routes and the cron.
+- Data: `prospeccao_buscas`, `prospeccao_leads` (unique phone), `prospeccao_busca_leads`,
+  `prospeccao_campanhas`, `prospeccao_variantes`, `prospeccao_campanha_leads`; RLS on, service role only;
+  migration drafted, applied only when the owner releases DDL.
 
 ## Accepted risk
-A ban of the picked number, OBS's main number today (owner's decision, 29/10/2026), against the agent's recommendation and
-the explicit advice of the Deskcomm author in the video ("never the company's official number", since
-prospecting runs on a non official API). It stops OBS's own attendance on that number
-until a new one is connected, silences OBS's notices and breaks the suites that run on the OBS tenant
-(`test:e2e:n8n`, login suites) until then; no third party can unban. Remaining mitigations: the cap of
-10, one message at a time with a random pause, business hours only, every text approved, exit line and
-permanent suppression, sequence ends on any reply, 3 touches at most, mobile numbers only, auto-pause
-on disconnect and on a SAIR threshold, a spare chip and written reconnect steps ready (plan, 10.1).
+A ban of the picked number, OBS's main number today (owner's decision, 29/10/2026), against the agent's
+recommendation and the explicit advice of the Deskcomm author. It stops OBS's own attendance on that
+number until a new one is connected, silences OBS's notices and breaks the suites that run on the OBS
+tenant (`test:e2e:n8n`, login suites) until then; no third party can unban. Mitigations: 10 a day, one
+message per lead, spread over the window with random pauses, business hours, rotating variants,
+permanent opt-out, auto-pause on disconnect, a spare chip and reconnect steps ready. v2 drops two v1
+mitigations by the owner's choice: the per-item approval of each text and the explicit "responda SAIR"
+line (risk 4 and D4 in the plan).
 
 ## Consequences
-- The tenant rules do not change: active messaging for tenants stays "recent conversation only"; the
+- Tenant rules do not change: active messaging for tenants stays "recent conversation only"; the
   tenants' menu never shows Campanhas.
-- With OBS picked, prospect conversations share the OBS inbox, funnel, panel numbers and AI usage; they are told apart
-  by `message_type = 'prospeccao'`, which must stay out of "who replied" (`lib/mensagem.ts` and its SQL
-  copies), like `lembrete`.
-- New tables (`prospeccao_campanhas`, `prospeccao_leads`, `prospeccao_envios`, `prospeccao_exclusoes`)
-  with RLS on and no user grants; `prospeccao_campanhas` goes into `TABELAS_DO_CLIENTE`.
+- With OBS picked, prospect conversations share the OBS inbox, funnel, panel numbers and AI usage.
+- Two routes live outside `/api/admin/*` (cron and Apify webhook), each guarded by its own secret,
+  because `proxy.ts` answers 404 there to anyone without an admin session.
+- `prospeccao_campanhas` goes into `TABELAS_DO_CLIENTE`; the lead base has no `client_id` (it belongs to
+  the product owner).
 - Depends on the agenda branch (`lib/envio-ativo.ts`) being merged first.
 - Docs to correct when accepted: the prospecting exception in `CLAUDE.md` and in the 26/08 ADR (a
-  campaign field for the sending number and cap 10 instead of "dedicated number"), `docs/proximos-passos.md` ("Não construir" item
-  on campaigns) and `docs/estrategia-2026-07.md` (1,000 free service messages per number per month is
-  now on Meta's page).
+  campaign field for the sending number instead of "dedicated number"), `docs/proximos-passos.md`
+  ("Não construir" item on campaigns) and `docs/estrategia-2026-07.md` (1,000 free service messages per
+  number per month is now on Meta's page).
 
 ## Alternatives considered
-- Dedicated chip in a separate company ("OBS Prospecção"): recommended by the agent to keep a ban away
-  from the main number; declined by the owner on 29/10/2026 (the field still allows it: connect a spare
-  chip as another company and pick it).
-- Fully automatic cold WhatsApp (Deskcomm): rejected for now; 10 a day does not need it and approval is
-  the quality control.
-- Official API marketing templates: rejected for cold prospecting; paid, Meta setup, and still against
-  the opt-in policy, with the penalty on the business portfolio.
-- Lead starts the chat (e-mail, Instagram, visit with a wa.me link): compliant and kept as a parallel
-  lane in phase 2.
+- v1 structure (daily queue approved item by item, three touches, per-lead angle from a site audit, voice
+  fields, AI drafts): rejected by the owner on 29/10/2026.
+- Dedicated chip in a separate company: recommended by the agent; declined by the owner (the field still
+  allows it: connect a spare chip as another company and pick it).
+- Fully automatic cold WhatsApp with an SDR agent (Deskcomm): not needed for 10 a day.
+- Official API marketing templates: paid, Meta setup, and still against the opt-in policy for cold
+  contacts.
+- Google Places API as the source: 1,000 free Enterprise calls a month, but its terms forbid storing
+  anything other than the place id; kept as a swap behind the source module.

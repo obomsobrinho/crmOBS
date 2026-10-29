@@ -1,28 +1,39 @@
 import NavRail from "@/components/NavRail";
-import { ABAS_DE_CAMPANHAS, type AbaDeCampanhas } from "@/components/admin/campanhas/tipos";
+import type { Tela } from "@/components/admin/campanhas/tipos";
 import { agoraMs } from "@/lib/periodo";
 import PreviaDeCampanhas from "./PreviaDeCampanhas";
 
-// Preview de Campanhas, a prospecção do dono do produto (docs/plano-campanhas.md).
+// Preview de Campanhas v2, a prospecção do dono do produto (docs/plano-campanhas.md).
 // Dev-only, sem banco e sem sessão: empresas de mentira, nenhuma busca paga,
-// nenhuma mensagem enviada. `?aba=fila|leads|resultados|campanha` abre na aba;
-// `?cenario=vazia` mostra a campanha sem nenhum lead.
+// nenhuma mensagem enviada. `?tela=` abre direto numa tela:
+// leads | busca | campanhas | campanha | rascunho | resultados;
+// `?cenario=vazio` mostra tudo sem dados (os estados vazios).
 export const dynamic = "force-dynamic";
+
+const TELAS: Record<string, Tela> = {
+  leads: { aba: "leads", busca: null },
+  busca: { aba: "leads", busca: "b1" },
+  campanhas: { aba: "campanhas", vista: "lista" },
+  campanha: { aba: "campanhas", vista: "detalhe", id: "c1" },
+  rascunho: { aba: "campanhas", vista: "editar", id: "c3" },
+  resultados: { aba: "campanhas", vista: "resultados" },
+};
 
 export default async function DesignCampanhasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string; cenario?: string }>;
+  searchParams: Promise<{ tela?: string; cenario?: string }>;
 }) {
-  const { aba, cenario } = await searchParams;
-  const abaInicial: AbaDeCampanhas = ABAS_DE_CAMPANHAS.includes(aba as AbaDeCampanhas) ? (aba as AbaDeCampanhas) : "fila";
+  const { tela, cenario } = await searchParams;
+  const vazio = cenario === "vazio";
+  const inicial = (!vazio && tela && TELAS[tela]) || (tela === "leads" ? TELAS.leads : TELAS.campanhas);
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
-      {/* Sem item próprio no menu: a rota de verdade ainda não existe (decisão D12). */}
+      {/* Sem item próprio no menu: a rota de verdade ainda não existe. */}
       <NavRail clientName="O Bom Sobrinho" activeHref="/clientes" role="dono" ehAdmin />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
-        <PreviaDeCampanhas aba={abaInicial} agora={agoraMs()} vazia={cenario === "vazia"} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <PreviaDeCampanhas tela={inicial} agora={agoraMs()} vazio={vazio} />
       </div>
     </div>
   );

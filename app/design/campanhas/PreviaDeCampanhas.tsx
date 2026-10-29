@@ -2,29 +2,23 @@
 
 import { useMemo } from "react";
 import CentralDeCampanhas from "@/components/admin/campanhas/CentralDeCampanhas";
-import type { AbaDeCampanhas } from "@/components/admin/campanhas/tipos";
-import { CONEXOES_DE_MENTIRA, CONFIG_DE_MENTIRA, buscarDeMentira, leadsDeMentira } from "./dados";
+import type { Tela } from "@/components/admin/campanhas/tipos";
+import { CONEXOES_DE_MENTIRA, VARIANTES_SUGERIDAS, dadosDeMentira, resultadoDaBuscaDeMentira } from "./dados";
 
 // A ponte do preview: a busca de mentira é uma função, e função não atravessa do
 // servidor para o navegador, então os dados de mentira entram aqui.
-export default function PreviaDeCampanhas({
-  aba,
-  agora,
-  vazia,
-}: {
-  aba: AbaDeCampanhas;
-  agora: number;
-  vazia: boolean;
-}) {
-  const leads = useMemo(() => (vazia ? [] : leadsDeMentira(agora)), [vazia, agora]);
+export default function PreviaDeCampanhas({ tela, agora, vazio }: { tela: Tela; agora: number; vazio: boolean }) {
+  const dados = useMemo(() => dadosDeMentira(agora, vazio), [agora, vazio]);
   return (
     <CentralDeCampanhas
-      abaInicial={aba}
+      telaInicial={tela}
       agora={agora}
-      leadsIniciais={leads}
-      config={CONFIG_DE_MENTIRA}
-      conexoes={vazia ? CONEXOES_DE_MENTIRA.map((c) => ({ ...c, enviadasHoje: 0 })) : CONEXOES_DE_MENTIRA}
-      buscar={buscarDeMentira}
+      buscasIniciais={dados.buscas}
+      leadsIniciais={dados.leads}
+      campanhasIniciais={dados.campanhas}
+      conexoes={CONEXOES_DE_MENTIRA}
+      variantesSugeridas={VARIANTES_SUGERIDAS}
+      simularBusca={resultadoDaBuscaDeMentira}
     />
   );
 }

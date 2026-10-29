@@ -1,51 +1,26 @@
 import { normalizar } from "./clientes";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
-// CAMPANHAS (29/10/2026, docs/plano-campanhas.md): a prospecção do DONO DO
-// PRODUTO, nunca recurso dos clientes. Módulo puro (sem I/O): o raio-X do site e
-// do atendimento, o ângulo da abordagem (a OBS vende sites e o Atenda), a
-// pontuação do lead, o tipo do telefone, a fila do dia, a saída ("responda
-// SAIR") e os números do acompanhamento. Tela e servidor usam as MESMAS funções.
+// CAMPANHAS v2 (29/10/2026, docs/plano-campanhas.md): a prospecção do DONO DO
+// PRODUTO, nunca recurso dos clientes. Módulo puro (sem I/O): o telefone, o site
+// pela URL, a pontuação do lead, as situações, a rotação das variantes, a
+// agenda de envio (10 por dia, das 8h às 18h, espalhados na janela), o pedido
+// para parar e os números do resultado. Tela, rota e cron usam as MESMAS funções.
 //
-// ⚠️ RASCUNHO: os pesos, os segmentos e os limites abaixo são PROVISÓRIOS,
-// marcados como tal, até o dono decidir (D6, D7, D17 do plano). Nada aqui é
-// número medido.
+// ⚠️ Os pesos da pontuação e a amostra mínima são PROVISÓRIOS, marcados como
+// tal, até o dono decidir (plano, seção 12). Nada aqui é número medido.
 
-/** Situação do lead na campanha (a mesma lista da coluna `status` proposta no plano). */
-export type SituacaoDoLead =
-  | "sem_telefone"
-  | "escolhido"
-  | "na_fila"
-  | "abordado"
-  | "respondeu"
-  | "qualificado"
-  | "convertido"
-  | "descartado"
-  | "saiu"
-  | "falhou";
-
-export const ROTULO_DA_SITUACAO: Record<SituacaoDoLead, string> = {
-  sem_telefone: "Sem celular válido",
-  escolhido: "Escolhido",
-  na_fila: "Na fila",
-  abordado: "Abordado",
-  respondeu: "Respondeu",
-  qualificado: "Qualificado",
-  convertido: "Cadastrou",
-  descartado: "Descartado",
-  saiu: "Pediu para sair",
-  falhou: "Sem WhatsApp",
-};
+// ── Telefone ─────────────────────────────────────────────────────────────
 
 export type TipoDeTelefone = "celular" | "fixo" | "invalido";
 
 /**
  * Celular, fixo ou inválido, pelos dígitos (com ou sem 55). Celular BR = DDD +
  * 9 dígitos começando por 9; fixo = DDD + 8 dígitos começando de 2 a 5. Só
- * celular pode receber WhatsApp com alguma chance; o fixo fica fora da fila.
+ * celular pode receber WhatsApp com alguma chance; o resto fica fora das campanhas.
  */
-export function tipoDoTelefone(telefone: string): TipoDeTelefone {
-  let d = telefone.replace(/\D/g, "");
+export function tipoDoTelefone(telefone: string | null | undefined): TipoDeTelefone {
+  let d = (telefone ?? "").replace(/\D/g, "");
   if (d.length >= 12 && d.startsWith("55")) d = d.slice(2);
   if (d.length < 10 || d.length > 11) return "invalido";
   const ddd = Number(d.slice(0, 2));
@@ -56,62 +31,23 @@ export function tipoDoTelefone(telefone: string): TipoDeTelefone {
   return "invalido";
 }
 
-// ── Raio-X do site ───────────────────────────────────────────────────────
-
-/**
- * A situação do site da empresa. `sem_site` e `so_rede_social` saem só da URL
- * (`classeDaUrl`); as outras exigem abrir a página, o que é trabalho do
- * servidor (com trava contra endereço interno), nunca da tela.
- */
-export type ClasseDoSite = "sem_site" | "so_rede_social" | "fora_do_ar" | "com_falhas" | "bom";
-
-/** O que se confere numa página aberta. Vocabulário fechado: nada fora disto chega à tela nem ao texto. */
-export type ItemDoSite =
-  | "telefone_clicavel"
-  | "whatsapp"
-  | "endereco"
-  | "mapa"
-  | "email"
-  | "fotos"
-  | "redes"
-  | "celular"
-  | "https"
-  | "descricao";
-
-export const ROTULO_DO_ITEM: Record<ItemDoSite, string> = {
-  telefone_clicavel: "telefone clicável",
-  whatsapp: "botão de WhatsApp",
-  endereco: "endereço",
-  mapa: "mapa",
-  email: "e-mail de contato",
-  fotos: "fotos da empresa",
-  redes: "links das redes sociais",
-  celular: "versão para celular",
-  https: "cadeado de segurança",
-  descricao: "descrição no Google",
-};
-
-/** Artigo de cada item, para a frase da mensagem ("o mapa", "a versão para celular"). */
-const ARTIGO_DO_ITEM: Record<ItemDoSite, "o" | "a" | "as" | "os"> = {
-  telefone_clicavel: "o",
-  whatsapp: "o",
-  endereco: "o",
-  mapa: "o",
-  email: "o",
-  fotos: "as",
-  redes: "os",
-  celular: "a",
-  https: "o",
-  descricao: "a",
-};
-
-export interface RaioXDoSite {
-  classe: ClasseDoSite;
-  /** O que o site tem (o lado "tem" da auditoria, para o dono ver na ficha). */
-  tem: ItemDoSite[];
-  /** O que falta (só em `com_falhas`; vazio nas outras classes). */
-  falta: ItemDoSite[];
+/** A chave de deduplicação do lead: 55 + DDD + número, só dígitos; null quando não é celular BR. */
+export function telefoneDoLead(telefone: string | null | undefined): string | null {
+  if (tipoDoTelefone(telefone) !== "celular") return null;
+  const d = (telefone ?? "").replace(/\D/g, "");
+  return d.startsWith("55") && d.length >= 12 ? d : `55${d}`;
 }
+
+// ── Site (só pela URL que a busca trouxe) ────────────────────────────────
+
+/** Tem site: sim, só rede social, ou não. */
+export type SiteDoLead = "sim" | "so_rede_social" | "nao";
+
+export const ROTULO_DO_SITE: Record<SiteDoLead, string> = {
+  sim: "Tem site",
+  so_rede_social: "Só rede social",
+  nao: "Sem site",
+};
 
 /** Endereços que são perfil, agregador de links ou atalho de conversa, não site próprio. */
 export const DOMINIOS_QUE_NAO_SAO_SITE = [
@@ -126,7 +62,7 @@ export const DOMINIOS_QUE_NAO_SAO_SITE = [
   "forms.gle",
 ] as const;
 
-/** O que dá para saber só pela URL, sem abrir nada; null = precisa abrir a página. */
+/** O que dá para saber só pela URL, sem abrir nada; null = é um site próprio. */
 export function classeDaUrl(url: string | null | undefined): "sem_site" | "so_rede_social" | null {
   if (!url || url.trim() === "") return "sem_site";
   let host: string;
@@ -139,68 +75,27 @@ export function classeDaUrl(url: string | null | undefined): "sem_site" | "so_re
   return DOMINIOS_QUE_NAO_SAO_SITE.some((d) => host === d || host.endsWith(`.${d}`)) ? "so_rede_social" : null;
 }
 
-/** "a, b e c" */
-function listaEmTexto(itens: string[]): string {
-  if (itens.length <= 1) return itens.join("");
-  return `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
+export function siteDoLead(url: string | null | undefined): SiteDoLead {
+  const c = classeDaUrl(url);
+  return c === "sem_site" ? "nao" : c === "so_rede_social" ? "so_rede_social" : "sim";
 }
 
-/** A linha curta da tela: "Sem site", "Só rede social", "Site sem mapa e telefone clicável"... */
-export function resumoDoSite(r: RaioXDoSite): string {
-  switch (r.classe) {
-    case "sem_site":
-      return "Sem site";
-    case "so_rede_social":
-      return "Só rede social, sem site próprio";
-    case "fora_do_ar":
-      return "Site fora do ar";
-    case "bom":
-      return "Site completo";
-    case "com_falhas":
-      return `Site sem ${listaEmTexto(r.falta.map((i) => ROTULO_DO_ITEM[i]))}`;
-  }
-}
+// ── Pontuação ────────────────────────────────────────────────────────────
 
-/**
- * O que falta, para o texto da mensagem ("não tem o mapa nem o telefone
- * clicável"); null quando não há falha concreta para citar.
- */
-export function faltaNoSite(r: RaioXDoSite): string | null {
-  if (r.classe === "sem_site") return "ainda não tem site";
-  if (r.classe === "so_rede_social") return "não tem site próprio, só a rede social";
-  if (r.classe === "fora_do_ar") return "está com o site fora do ar";
-  if (r.classe !== "com_falhas" || r.falta.length === 0) return null;
-  const nomes = r.falta.map((i) => `${ARTIGO_DO_ITEM[i]} ${ROTULO_DO_ITEM[i]}`);
-  return nomes.length === 1 ? `não tem ${nomes[0]} no site` : `não tem ${nomes.slice(0, -1).join(", ")} nem ${nomes[nomes.length - 1]} no site`;
-}
-
-/** O site já leva para o WhatsApp (botão ou link): a empresa já vende por conversa. */
-export function vendePeloWhatsapp(r: RaioXDoSite): boolean {
-  return (r.classe === "bom" || r.classe === "com_falhas") && !r.falta.includes("whatsapp");
-}
-
-// ── Sinais e pontuação ───────────────────────────────────────────────────
-
-/** O que a busca e o raio-X (site e atendimento) acharam sobre a empresa (entrada da pontuação). */
+/** O que a busca trouxe sobre a empresa (entrada da pontuação). */
 export interface SinaisDoLead {
-  telefone: string;
+  telefone: string | null;
   segmento: string;
-  avaliacoes: number | null;
+  site: string | null;
   nota: number | null;
-  /** Fecha antes das 18h em algum dia útil. */
-  fechaCedo: boolean;
-  /** Fechado no domingo ou no sábado à tarde. */
-  fechaNoFimDeSemana: boolean;
-  /** O raio-X do site (classe e o que falta). */
-  site: RaioXDoSite;
-  /** O número já é cliente, já foi abordado ou pediu para sair. */
-  bloqueado: "cliente" | "abordado" | "saiu" | null;
+  avaliacoes: number | null;
 }
 
-/** ⚠️ PROVISÓRIO (D17): a lista de segmentos do ICP é do dono. */
+/** ⚠️ PROVISÓRIO: a lista de segmentos do ICP é do dono. */
 export const SEGMENTOS_DO_ICP = [
   "clinica",
   "odontologia",
+  "dentista",
   "estetica",
   "salao",
   "barbearia",
@@ -210,36 +105,28 @@ export const SEGMENTOS_DO_ICP = [
   "academia",
 ] as const;
 
-/** ⚠️ PROVISÓRIO (D17): pesos de exemplo, somam 100. O site pesa mais porque é o gancho da OBS. */
+/** ⚠️ PROVISÓRIO: pesos de exemplo, somam 100. */
 export const PESOS_PROVISORIOS = {
-  oportunidadeNoSite: 25,
-  segmento: 20,
-  avaliacoes: 20,
-  foraDoHorario: 20,
-  vendePeloWhatsapp: 15,
+  semSiteProprio: 30,
+  segmento: 25,
+  avaliacoes: 25,
+  nota: 20,
 } as const;
 
 export interface Pontuacao {
   pontos: number;
-  /** Os motivos que deram ponto, na ordem do peso, prontos para a tela. */
+  /** Os motivos que deram ponto, na ordem do peso, prontos para o balão da tela. */
   motivos: string[];
-  /** Por que o lead não entra na fila; null = pode entrar. */
-  impedimento: string | null;
 }
 
-const IMPEDIMENTO: Record<NonNullable<SinaisDoLead["bloqueado"]>, string> = {
-  cliente: "Já é cliente",
-  abordado: "Já foi abordado",
-  saiu: "Pediu para sair",
-};
-
-/** 0 a 100 com os motivos. Sem celular, ou bloqueado, não entra na fila (impedimento). */
+/** 0 a 100 com os motivos. Telefone não pontua: celular inválido é um impedimento, não um peso. */
 export function pontuarLead(s: SinaisDoLead): Pontuacao {
   const motivos: string[] = [];
   let pontos = 0;
-  if (s.site.classe !== "bom") {
-    pontos += PESOS_PROVISORIOS.oportunidadeNoSite;
-    motivos.push(resumoDoSite(s.site));
+  const site = siteDoLead(s.site);
+  if (site !== "sim") {
+    pontos += PESOS_PROVISORIOS.semSiteProprio;
+    motivos.push(site === "nao" ? "Sem site" : "Só rede social, sem site próprio");
   }
   const seg = normalizar(s.segmento);
   if (SEGMENTOS_DO_ICP.some((p) => seg.includes(p))) {
@@ -251,68 +138,11 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
     pontos += s.avaliacoes >= 200 ? PESOS_PROVISORIOS.avaliacoes : Math.round(PESOS_PROVISORIOS.avaliacoes / 2);
     motivos.push(`${s.avaliacoes} avaliações no Google: muito movimento`);
   }
-  if (s.fechaCedo || s.fechaNoFimDeSemana) {
-    pontos += PESOS_PROVISORIOS.foraDoHorario;
-    motivos.push(s.fechaNoFimDeSemana ? "Fechado no fim de semana: a IA cobre" : "Fecha cedo: a IA cobre a noite");
+  if (s.nota !== null && s.nota >= 4.5) {
+    pontos += PESOS_PROVISORIOS.nota;
+    motivos.push(`Nota ${s.nota.toFixed(1).replace(".", ",")}: cuida da reputação`);
   }
-  if (vendePeloWhatsapp(s.site)) {
-    pontos += PESOS_PROVISORIOS.vendePeloWhatsapp;
-    motivos.push("Já vende pelo WhatsApp (botão no site)");
-  }
-  const tipo = tipoDoTelefone(s.telefone);
-  // Fixo ou inválido = "sem celular válido": não entra na fila nem é contatado.
-  const impedimento = s.bloqueado
-    ? IMPEDIMENTO[s.bloqueado]
-    : tipo === "fixo"
-      ? "Telefone fixo, sem WhatsApp"
-      : tipo === "invalido"
-        ? "Sem celular válido"
-        : null;
-  return { pontos, motivos, impedimento };
-}
-
-// ── Ângulo da abordagem ──────────────────────────────────────────────────
-
-/** O que a campanha oferece (a OBS vende sites e o Atenda). */
-export type Oferta = "site" | "atenda";
-export type Angulo = "site" | "atenda" | "site_e_atenda";
-
-export const ROTULO_DO_ANGULO: Record<Angulo, string> = {
-  site: "Site",
-  atenda: "Atenda",
-  site_e_atenda: "Site e Atenda",
-};
-
-/**
- * Qual oferta abre a conversa com este lead, e por quê. O gancho precisa ser um
- * FATO que o texto cita: site com problema puxa a oferta de site (`{falta_no_site}`);
- * horário curto puxa o Atenda (`{horario_curto}`). Muito movimento e venda pelo
- * WhatsApp reforçam o Atenda (entram no porquê e na pontuação), mas sozinhos não
- * dão frase. Só escolhe entre o que a campanha oferece; sem gancho, fica com a
- * primeira oferta e a fila pede o texto à mão.
- */
-export function anguloDaAbordagem(
-  s: SinaisDoLead,
-  ofertas: Oferta[],
-): { angulo: Angulo; porque: string; temGancho: boolean } {
-  const precisaSite = s.site.classe !== "bom";
-  const ganchoAtenda = s.fechaCedo || s.fechaNoFimDeSemana;
-  const motivosAtenda = [
-    ganchoAtenda ? "fecha cedo ou no fim de semana" : null,
-    vendePeloWhatsapp(s.site) ? "já vende pelo WhatsApp" : null,
-    s.avaliacoes !== null && s.avaliacoes >= 50 ? "tem muito movimento" : null,
-  ].filter((m): m is string => m !== null);
-  const vendeSite = ofertas.includes("site");
-  const vendeAtenda = ofertas.includes("atenda");
-  if (vendeSite && vendeAtenda && precisaSite && ganchoAtenda) {
-    return { angulo: "site_e_atenda", porque: `${resumoDoSite(s.site)}; ${listaEmTexto(motivosAtenda)}`, temGancho: true };
-  }
-  if (vendeSite && precisaSite) return { angulo: "site", porque: resumoDoSite(s.site), temGancho: true };
-  if (vendeAtenda && ganchoAtenda) {
-    return { angulo: "atenda", porque: `Site em ordem; ${listaEmTexto(motivosAtenda)}`, temGancho: true };
-  }
-  const primeira: Angulo = ofertas[0] ?? "atenda";
-  return { angulo: primeira, porque: resumoDoSite(s.site), temGancho: false };
+  return { pontos, motivos };
 }
 
 /** Faixa da pontuação para o selo da tela (estado, não decoração). */
@@ -320,265 +150,243 @@ export function faixaDaPontuacao(pontos: number): "alta" | "media" | "baixa" {
   return pontos >= 70 ? "alta" : pontos >= 40 ? "media" : "baixa";
 }
 
-// ── A saída ──────────────────────────────────────────────────────────────
+// ── Situações ────────────────────────────────────────────────────────────
+
+export type SituacaoDaBusca = "buscando" | "pronta" | "falhou";
+
+export const ROTULO_DA_BUSCA: Record<SituacaoDaBusca, string> = {
+  buscando: "Buscando",
+  pronta: "Pronta",
+  falhou: "Falhou",
+};
+
+/** A marcação do dono na base de leads; null = ainda não olhou. */
+export type MarcacaoDoLead = "bom" | "descartado" | null;
+
+export type SituacaoDaCampanha = "rascunho" | "agendada" | "rodando" | "pausada" | "concluida";
+
+export const ROTULO_DA_CAMPANHA: Record<SituacaoDaCampanha, string> = {
+  rascunho: "Rascunho",
+  agendada: "Agendada",
+  rodando: "Rodando",
+  pausada: "Pausada",
+  concluida: "Concluída",
+};
+
+/** O lead dentro de uma campanha (a coluna `status` de `prospeccao_campanha_leads`). */
+export type SituacaoNaCampanha = "na_fila" | "enviado" | "respondeu" | "falhou" | "parou";
+
+export const ROTULO_NA_CAMPANHA: Record<SituacaoNaCampanha, string> = {
+  na_fila: "Na fila",
+  enviado: "Enviado",
+  respondeu: "Respondeu",
+  falhou: "Falhou",
+  parou: "Pediu para parar",
+};
 
 /**
- * A linha de saída, determinística (nunca escrita pela IA): a mesma palavra que
- * `ehPedidoDeSaida` reconhece. Sem ela, a saída que a pessoa usa é "denunciar",
- * que o sistema não vê e que é o gatilho de bloqueio que mais pesa.
+ * Pode entrar numa campanha nova? Nunca quem pediu para parar, nem sem celular
+ * válido, nem descartado. Quem já passou por campanha só entra se o dono o
+ * escolher de propósito (`escolhidoDePropósito`), por exemplo em "Nova campanha
+ * com quem não respondeu".
  */
-export const LINHA_DE_SAIDA = "Se não quiser receber mais mensagens, responda SAIR.";
-
-/** O texto com a linha de saída no fim, sem duplicar se já estiver lá. */
-export function comSaida(texto: string): string {
-  const corpo = texto.trimEnd();
-  return corpo.endsWith(LINHA_DE_SAIDA) ? corpo : `${corpo}\n\n${LINHA_DE_SAIDA}`;
+export function podeEntrarNaCampanha(
+  l: { telefone: string | null; parouEm: number | null; marcacao: MarcacaoDoLead; campanhas: number },
+  escolhidoDeProposito = false,
+): boolean {
+  if (l.parouEm !== null) return false;
+  if (telefoneDoLead(l.telefone) === null) return false;
+  if (l.marcacao === "descartado") return false;
+  return l.campanhas === 0 || escolhidoDeProposito;
 }
 
-/** A mensagem inteira é o pedido de saída (sem acento, sem caixa, sem pontuação em volta). */
-export function ehPedidoDeSaida(texto: string): boolean {
-  return normalizar(texto).replace(/[^a-z]/g, "") === "sair";
-}
+// ── A mensagem ───────────────────────────────────────────────────────────
 
-// ── O texto de cada toque ────────────────────────────────────────────────
+/** A única variável da mensagem. */
+export const CAMPO_EMPRESA = "{empresa}";
 
-/** Os campos que um modelo de texto pode usar, entre chaves: `{nome}`, `{cidade}`... */
-export type CamposDoTexto = Record<string, string | null | undefined>;
+/** Até 3 variantes, que se revezam. */
+export const MAXIMO_DE_VARIANTES = 3;
 
-/**
- * Preenche o modelo. Campo sem valor fica de fora da mensagem pronta e volta em
- * `faltando`: a tela não deixa aprovar texto com buraco.
- */
-export function preencherTexto(modelo: string, campos: CamposDoTexto): { texto: string; faltando: string[] } {
-  const faltando: string[] = [];
-  const texto = modelo.replace(/\{(\w+)\}/g, (inteiro, chave: string) => {
-    const v = campos[chave];
-    if (v === null || v === undefined || v.trim() === "") {
-      if (!faltando.includes(chave)) faltando.push(chave);
-      return inteiro;
-    }
-    return v;
-  });
-  return { texto, faltando };
+/** O texto pronto para um lead: `{empresa}` vira o nome da empresa. */
+export function textoParaLead(modelo: string, empresa: string): string {
+  return modelo.replaceAll(CAMPO_EMPRESA, empresa.trim());
 }
 
 /**
- * "Voz e vocabulário": quem assina e o que diz de si, para os textos (e, na fase
- * 2, para o rascunho da IA) soarem como o dono.
+ * Problemas de uma variante antes de iniciar: vazia, sem `{empresa}` (vira
+ * mensagem genérica, que é o que mais parece disparo) ou com outra chave
+ * desconhecida entre chaves.
  */
-export interface VozDaCampanha {
-  meuNome: string;
-  minhaEmpresa: string;
-  oQueFaco: string;
-  diferencial: string;
+export function problemasDaVariante(modelo: string): string[] {
+  const p: string[] = [];
+  if (modelo.trim() === "") return ["A mensagem está vazia"];
+  if (!modelo.includes(CAMPO_EMPRESA)) p.push("Falta {empresa} no texto");
+  const outras = [...modelo.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((c) => c !== "empresa");
+  if (outras.length > 0) p.push(`Campo desconhecido: {${outras[0]}}`);
+  return p;
 }
 
-/**
- * Os campos que os textos podem usar, a partir do lead e da voz. `horario_curto`
- * sai do horário ("fecha no fim de semana") e `falta_no_site` do raio-X ("não tem
- * o mapa nem o telefone clicável no site"); sem fato, o campo fica sem valor e o
- * texto que o usa não pode ser aprovado como está.
- */
-export function camposDoLead(
-  l: { nome: string; cidade: string; segmento: string; sinais: SinaisDoLead },
-  voz: VozDaCampanha,
-): CamposDoTexto {
-  const { fechaCedo, fechaNoFimDeSemana } = l.sinais;
-  const horario_curto =
-    fechaCedo && fechaNoFimDeSemana
-      ? "fecha cedo e no fim de semana"
-      : fechaNoFimDeSemana
-        ? "fecha no fim de semana"
-        : fechaCedo
-          ? "fecha cedo durante a semana"
-          : null;
-  return {
-    nome: l.nome,
-    cidade: l.cidade,
-    segmento: l.segmento.toLowerCase(),
-    horario_curto,
-    falta_no_site: faltaNoSite(l.sinais.site),
-    meu_nome: voz.meuNome,
-    minha_empresa: voz.minhaEmpresa,
-    o_que_faco: voz.oQueFaco,
-    diferencial: voz.diferencial,
-  };
+/** Qual variante (0, 1, 2) vai para o lead na posição `ordem` da fila: revezamento simples. */
+export function varianteDaOrdem(ordem: number, quantas: number): number {
+  return quantas <= 0 ? 0 : ((ordem % quantas) + quantas) % quantas;
 }
 
-/** Os textos da campanha: a primeira mensagem muda com o ângulo; os acompanhamentos são um só. */
-export interface TextosDaCampanha {
-  primeira: Record<Angulo, string>;
-  segundo: string;
-  terceiro: string;
+// ── Pedido para parar ────────────────────────────────────────────────────
+
+/** ⚠️ PROVISÓRIO: as frases que contam como "pare" (o dono revisa a lista). */
+export const FRASES_DE_PARADA = ["nao quero", "pare", "parar", "para de mandar", "sair", "remover", "nao tenho interesse"] as const;
+
+/** A resposta pede para parar? Sem acento e sem caixa, por palavra inteira. */
+export function ehPedidoParaParar(texto: string): boolean {
+  const t = ` ${normalizar(texto).replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim()} `;
+  return FRASES_DE_PARADA.some((f) => t.includes(` ${f} `));
 }
 
-/** O modelo de texto deste toque para este ângulo. */
-export function modeloDoToque(t: TextosDaCampanha, toque: number, angulo: Angulo): string {
-  return toque === 1 ? t.primeira[angulo] : toque === 2 ? t.segundo : t.terceiro;
-}
+// ── Agenda de envio ──────────────────────────────────────────────────────
 
-/** Em qual mensagem a linha de saída entra (D8): na primeira (recomendado) ou adiada para a segunda. */
-export type MomentoDaSaida = "primeira" | "segunda";
+/** Decisão do dono (29/10/2026): no máximo 10 por dia por campanha. A tabela tem a mesma trava. */
+export const TETO_DIARIO = 10;
 
-/** O texto pronto de um toque: modelo preenchido e, no toque escolhido, a linha de saída. */
-export function textoDoToque(
-  modelo: string,
-  campos: CamposDoTexto,
-  toque: number,
-  saida: MomentoDaSaida = "primeira",
-): { texto: string; faltando: string[] } {
-  const { texto, faltando } = preencherTexto(modelo, campos);
-  const comLinha = toque === (saida === "primeira" ? 1 : 2);
-  return { texto: comLinha ? comSaida(texto) : texto, faltando };
-}
+/** Pausa sorteada entre dois envios, em minutos (o mínimo nunca é encurtado). */
+export const PAUSA_MINUTOS: [number, number] = [4, 12];
 
-// ── Cadência e fila do dia ───────────────────────────────────────────────
-
-/** Dias depois do primeiro toque em que cada toque sai. ⚠️ PROVISÓRIO (D6): 0, 3 e 7. */
-export const CADENCIA_PROVISORIA = [0, 3, 7] as const;
-
-/**
- * Decisão do dono (29/10/2026): no máximo 10 abordagens por dia, primeiras
- * mensagens e acompanhamentos somados, pelo número da própria OBS. A tabela tem
- * a mesma trava (`teto_diario between 1 and 10`). Mudar aqui é decisão dele.
- */
-export const TETO_MAXIMO_DIARIO = 10;
-
-/** ⚠️ PROVISÓRIO (D7): pausa sorteada de 4 a 12 minutos entre duas mensagens. */
-export const PAUSA_PROVISORIA_MINUTOS: [number, number] = [4, 12];
-
-const DIA_MS = 86_400_000;
-
-/** O teto de hoje: o da campanha, nunca acima de `TETO_MAXIMO_DIARIO` nem abaixo de zero. */
-export function tetoDeHoje(tetoDaCampanha: number): number {
-  if (!Number.isFinite(tetoDaCampanha)) return 0;
-  return Math.max(0, Math.min(TETO_MAXIMO_DIARIO, Math.floor(tetoDaCampanha)));
-}
-
-/** Quando sai o próximo toque; null = a sequência acabou. */
-export function proximoToqueEm(primeiroToqueMs: number, toqueFeito: number): number | null {
-  const dias = CADENCIA_PROVISORIA[toqueFeito];
-  return dias === undefined ? null : primeiroToqueMs + dias * DIA_MS;
-}
-
-/** A pausa até o próximo envio, sorteada no intervalo. O sorteio só atrasa: nunca abaixo do mínimo. */
-export function sortearPausaMs([min, max]: [number, number], sorteio: () => number = Math.random): number {
-  return Math.round(min + sorteio() * Math.max(0, max - min));
-}
-
-/** A janela de envio, no horário de São Paulo. Dias como `getDay` (0 = domingo). */
+/** A janela de envio, no horário de São Paulo. `dias` como `getDay` (0 = domingo). */
 export interface JanelaDeEnvio {
   dias: number[];
   inicioHora: number;
   fimHora: number;
 }
 
-/** ⚠️ PROVISÓRIO (D7): segunda a sexta, das 9h às 17h. */
-export const JANELA_PROVISORIA: JanelaDeEnvio = { dias: [1, 2, 3, 4, 5], inicioHora: 9, fimHora: 17 };
+/**
+ * Das 8h às 18h (brief do dono, 29/10/2026). Os dias da semana ainda são
+ * decisão dele (plano, D4): até lá, todos.
+ */
+export const JANELA: JanelaDeEnvio = { dias: [0, 1, 2, 3, 4, 5, 6], inicioHora: 8, fimHora: 18 };
 
-const NOME_DO_DIA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+const HORA_MS = 3_600_000;
+const MINUTO_MS = 60_000;
 
-/** "seg a sex, das 9h às 17h" (dias seguidos viram faixa). */
-export function textoDaJanela(j: JanelaDeEnvio): string {
-  const dias = [...j.dias].sort((a, b) => a - b);
-  const seguidos = dias.length > 2 && dias.every((d, i) => i === 0 || d === dias[i - 1] + 1);
-  const textoDias = seguidos
-    ? `${NOME_DO_DIA[dias[0]]} a ${NOME_DO_DIA[dias[dias.length - 1]]}`
-    : dias.map((d) => NOME_DO_DIA[d]).join(", ");
-  return `${textoDias}, das ${j.inicioHora}h às ${j.fimHora}h`;
+/** Quantos dias uma lista leva a 10 por dia. */
+export function diasParaEnviar(leads: number, teto = TETO_DIARIO): number {
+  return leads <= 0 ? 0 : Math.ceil(leads / Math.max(1, teto));
 }
 
-/**
- * O primeiro instante a partir de `t` que cai dentro da janela (São Paulo).
- * Fora dela, empurra para a abertura do próximo dia de envio. Nunca adianta.
- */
-export function encaixarNaJanela(t: number, j: JanelaDeEnvio): number {
-  if (j.dias.length === 0 || j.fimHora <= j.inicioHora) return t;
-  let dia = diaIsoSP(t);
+/** A hora cheia (0 a 23) do instante em São Paulo. */
+export function horaSP(t: number): number {
+  return Math.floor((t - inicioDoDiaSP(diaIsoSP(t))) / HORA_MS);
+}
+
+/** A abertura da janela no próximo dia de envio a partir do dia `dia` (inclusive). */
+function aberturaAPartirDe(dia: string, j: JanelaDeEnvio): number {
+  let d = dia;
   for (let i = 0; i < 8; i++) {
-    const semana = new Date(`${dia}T12:00:00Z`).getUTCDay();
-    const abre = inicioDoDiaSP(dia) + j.inicioHora * 3_600_000;
-    const fecha = inicioDoDiaSP(dia) + j.fimHora * 3_600_000;
-    if (j.dias.includes(semana) && t < fecha) return Math.max(t, abre);
-    dia = somarDias(dia, 1);
+    const semana = new Date(`${d}T12:00:00Z`).getUTCDay();
+    if (j.dias.includes(semana)) return inicioDoDiaSP(d) + j.inicioHora * HORA_MS;
+    d = somarDias(d, 1);
   }
-  return t;
-}
-
-export interface LeadParaFila {
-  id: string;
-  situacao: SituacaoDoLead;
-  pontos: number;
-  impedimento: string | null;
-  /** Toques já enviados (0 = nunca abordado). */
-  toque: number;
-  proximoToqueEm: number | null;
-}
-
-export interface ItemDaFila {
-  id: string;
-  /** Qual toque sai (1, 2 ou 3). */
-  toque: number;
+  return inicioDoDiaSP(dia) + j.inicioHora * HORA_MS;
 }
 
 /**
- * A fila proposta para hoje: primeiro os toques de acompanhamento vencidos (quem
- * já recebeu e não respondeu), depois os escolhidos novos pela pontuação. Nada
- * com impedimento, nada além do teto. O dono ainda aprova item por item.
+ * Quando sai o próximo envio da campanha. ESPALHA de propósito: a janela do dia
+ * é cortada em `teto` faixas iguais (10h / 10 = 1h cada) e o envio número N do
+ * dia cai num instante sorteado da faixa N, para a métrica "resposta por hora"
+ * receber todas as horas. Nunca antes de `agora` + a pausa sorteada (4 a 12
+ * min), nunca fora da janela; cota do dia cheia = primeira faixa do próximo dia.
  */
-export function filaDoDia(leads: LeadParaFila[], teto: number, agora: number): ItemDaFila[] {
-  const seguimentos = leads
-    .filter((l) => l.situacao === "abordado" && l.proximoToqueEm !== null && l.proximoToqueEm <= agora)
-    .sort((a, b) => (a.proximoToqueEm ?? 0) - (b.proximoToqueEm ?? 0))
-    .map((l) => ({ id: l.id, toque: l.toque + 1 }));
-  const novos = leads
-    .filter((l) => l.situacao === "escolhido" && l.impedimento === null)
-    .sort((a, b) => b.pontos - a.pontos)
-    .map((l) => ({ id: l.id, toque: 1 }));
-  return [...seguimentos, ...novos].slice(0, Math.max(0, teto));
+export function proximoEnvioEm(
+  agora: number,
+  enviadosHoje: number,
+  { janela = JANELA, teto = TETO_DIARIO, sorteio = Math.random }: { janela?: JanelaDeEnvio; teto?: number; sorteio?: () => number } = {},
+): number {
+  const faixa = ((janela.fimHora - janela.inicioHora) * HORA_MS) / Math.max(1, teto);
+  // Folga no fim da faixa: o envio seguinte nunca fica a menos da pausa mínima.
+  const dentroDaFaixa = (inicio: number) => inicio + sorteio() * Math.max(0, faixa - PAUSA_MINUTOS[0] * MINUTO_MS);
+  const hoje = diaIsoSP(agora);
+  const amanha = () => {
+    const abre = aberturaAPartirDe(somarDias(hoje, 1), janela);
+    return Math.round(dentroDaFaixa(abre));
+  };
+  if (enviadosHoje >= teto) return amanha();
+  const abreHoje = aberturaAPartirDe(hoje, janela);
+  if (diaIsoSP(abreHoje) !== hoje) return Math.round(dentroDaFaixa(abreHoje));
+  const fechaHoje = inicioDoDiaSP(hoje) + janela.fimHora * HORA_MS;
+  const pausa = (PAUSA_MINUTOS[0] + sorteio() * (PAUSA_MINUTOS[1] - PAUSA_MINUTOS[0])) * MINUTO_MS;
+  const candidato = Math.max(dentroDaFaixa(abreHoje + enviadosHoje * faixa), agora + pausa);
+  return candidato < fechaHoje ? Math.round(candidato) : amanha();
 }
 
-// ── Acompanhamento ───────────────────────────────────────────────────────
+// ── Resultado ────────────────────────────────────────────────────────────
 
-export interface ResumoDaCampanha {
-  /** Escolhidos que não podem ser contatados (sem celular válido). */
-  semTelefone: number;
-  abordados: number;
+/** ⚠️ PROVISÓRIO: abaixo disto a tela avisa "ainda pouco para comparar". */
+export const AMOSTRA_MINIMA_PROVISORIA = 30;
+
+export interface EnvioParaResultado {
+  situacao: SituacaoNaCampanha;
+  /** 0, 1 ou 2; null enquanto está na fila. */
+  variante: number | null;
+  enviadoEm: number | null;
+  respondeuEm: number | null;
+}
+
+export interface Taxa {
+  enviados: number;
   responderam: number;
-  qualificados: number;
-  sairam: number;
-  semWhatsapp: number;
-  cadastraram: number;
-  /** % sobre os abordados; null sem abordados (a tela mostra "sem dados", nunca 0%). */
-  taxaDeResposta: number | null;
-  taxaDeSaida: number | null;
+  /** % sobre os enviados; null sem envio (a tela mostra "sem envios", nunca 0%). */
+  taxa: number | null;
+}
+
+function taxa(enviados: number, responderam: number): Taxa {
+  return { enviados, responderam, taxa: enviados === 0 ? null : Math.round((responderam / enviados) * 100) };
+}
+
+export interface ResultadoDaCampanha extends Taxa {
+  total: number;
+  naFila: number;
+  falharam: number;
+  pararam: number;
+  porVariante: Taxa[];
+  /** Por hora do ENVIO (8h a 17h): a taxa de resposta de quem recebeu naquela hora. */
+  porHoraDoEnvio: (Taxa & { hora: number })[];
+  /** Por hora da RESPOSTA: quantas respostas chegaram em cada hora (0 a 23). */
+  porHoraDaResposta: { hora: number; respostas: number }[];
 }
 
 /**
- * Conta pelo que aconteceu com cada lead, não pela situação de agora: quem
- * respondeu também foi abordado; quem cadastrou também respondeu.
+ * Conta pelo que aconteceu, não pela situação de agora: quem pediu para parar
+ * também respondeu (a resposta foi o pedido) e também foi enviado.
  */
-export function resumoDaCampanha(
-  leads: { situacao: SituacaoDoLead; abordadoEm: number | null; respondeuEm: number | null }[],
-): ResumoDaCampanha {
-  const semTelefone = leads.filter((l) => l.situacao === "sem_telefone").length;
-  const abordados = leads.filter((l) => l.abordadoEm !== null).length;
-  const responderam = leads.filter((l) => l.respondeuEm !== null).length;
-  // Quem cadastrou também foi qualificado antes.
-  const qualificados = leads.filter((l) => l.situacao === "qualificado" || l.situacao === "convertido").length;
-  const sairam = leads.filter((l) => l.situacao === "saiu").length;
-  const semWhatsapp = leads.filter((l) => l.situacao === "falhou").length;
-  const cadastraram = leads.filter((l) => l.situacao === "convertido").length;
-  const taxa = (n: number) => (abordados === 0 ? null : Math.round((n / abordados) * 100));
+export function resultadoDaCampanha(
+  envios: EnvioParaResultado[],
+  quantasVariantes: number,
+  janela: JanelaDeEnvio = JANELA,
+): ResultadoDaCampanha {
+  const enviados = envios.filter((e) => e.enviadoEm !== null);
+  const resp = (lista: EnvioParaResultado[]) => lista.filter((e) => e.respondeuEm !== null).length;
+  const porVariante = Array.from({ length: Math.max(1, quantasVariantes) }, (_, v) => {
+    const da = enviados.filter((e) => e.variante === v);
+    return taxa(da.length, resp(da));
+  });
+  const porHoraDoEnvio = [];
+  for (let h = janela.inicioHora; h < janela.fimHora; h++) {
+    const na = enviados.filter((e) => horaSP(e.enviadoEm as number) === h);
+    porHoraDoEnvio.push({ hora: h, ...taxa(na.length, resp(na)) });
+  }
+  const horasDeResposta = new Map<number, number>();
+  for (const e of enviados) {
+    if (e.respondeuEm === null) continue;
+    const h = horaSP(e.respondeuEm);
+    horasDeResposta.set(h, (horasDeResposta.get(h) ?? 0) + 1);
+  }
   return {
-    semTelefone,
-    abordados,
-    responderam,
-    qualificados,
-    sairam,
-    semWhatsapp,
-    cadastraram,
-    taxaDeResposta: taxa(responderam),
-    taxaDeSaida: taxa(sairam),
+    total: envios.length,
+    naFila: envios.filter((e) => e.situacao === "na_fila").length,
+    falharam: envios.filter((e) => e.situacao === "falhou").length,
+    pararam: envios.filter((e) => e.situacao === "parou").length,
+    ...taxa(enviados.length, resp(enviados)),
+    porVariante,
+    porHoraDoEnvio,
+    porHoraDaResposta: [...horasDeResposta.entries()].sort((a, b) => a[0] - b[0]).map(([hora, respostas]) => ({ hora, respostas })),
   };
 }

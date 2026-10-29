@@ -1,365 +1,490 @@
 "use client";
 
 import { memo, useMemo, useState } from "react";
-import { Search, SearchX, Star, Users } from "lucide-react";
+import { AlertCircle, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { CampoBusca } from "@/components/ui/campo-busca";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
-import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
-import { normalizar } from "@/lib/clientes";
-import { diaMesCurtoSP } from "@/lib/fuso";
-import { numeroBR } from "@/lib/format";
-import { useDebounce } from "@/lib/use-debounce";
-import { usePaginada } from "@/lib/use-paginada";
-import {
-  ROTULO_DO_ANGULO,
-  anguloDaAbordagem,
-  pontuarLead,
-  resumoDoSite,
-  tipoDoTelefone,
-  type Oferta,
-} from "@/lib/prospeccao";
-import FichaDoLead from "./FichaDoLead";
-import { SeloDaPontuacao, SeloDaSituacao } from "./pecas";
-import type { ConfigDaCampanha, EmpresaAchada, LeadDaCampanha } from "./tipos";
+import { Aviso } from "@/components/ui/aviso";
+import { mascaraTelefoneBR, numeroBR, plural } from "@/lib/format";
+import { diaMesHoraSP } from "@/lib/fuso";
+import { podeEntrarNaCampanha, siteDoLead, tipoDoTelefone } from "@/lib/prospeccao";
+import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
+import type { Busca, Campanha, Lead } from "./tipos";
 
-// LEADS: buscar empresas (segmento e cidade), ver a pontuação com os motivos e
-// escolher as melhores; e a lista dos já escolhidos com a situação de cada um.
-// Só o que o dono escolhe é gravado (minimização, plano seção 7).
+// LEADS, a base: uma busca por cartão (termo e cidade, roda em segundo plano) e,
+// dentro dela, a tabela de empresas com nota, site, telefone, pontuação e a
+// campanha por onde cada uma passou. Marcar como bom e descartar mudam a base.
 
-type Modo = "buscar" | "escolhidos";
-
-function textoDoAngulo(sinais: EmpresaAchada["sinais"], ofertas: Oferta[]): string {
-  const a = anguloDaAbordagem(sinais, ofertas);
-  return a.temGancho ? `Oferta: ${ROTULO_DO_ANGULO[a.angulo]}.` : "Sem gancho claro.";
+interface ContagemDaBusca {
+  total: number;
+  aproveitaveis: number;
+  contatados: number;
 }
 
-/** Lista vazia estável: um `[]` novo a cada render recomeçaria a paginação. */
-const NENHUMA: EmpresaAchada[] = [];
-
-/**
- * Lista em memória com a MESMA paginação de 10 e rolagem infinita das listas de
- * verdade (`usePaginada`). Na tela real, `buscar` é a rota do admin.
- */
-function usePaginaDeMemoria<T>(lista: T[], chave: (t: T) => string) {
-  const inicial = useMemo(() => lista.slice(0, 10), [lista]);
-  return usePaginada<T, T[]>({
-    inicial,
-    temMaisInicial: lista.length > 10,
-    params: lista,
-    chave,
-    revalidarAoVoltar: false,
-    buscar: async (todos, depois, n) => {
-      const i = depois === null ? 0 : todos.findIndex((t) => chave(t) === chave(depois)) + 1;
-      return todos.slice(i, i + n);
-    },
-  });
+function contar(leads: Lead[]): ContagemDaBusca {
+  return {
+    total: leads.length,
+    aproveitaveis: leads.filter((l) => podeEntrarNaCampanha({ ...l, campanhas: 0 })).length,
+    contatados: leads.filter((l) => l.campanhaIds.length > 0).length,
+  };
 }
 
-function AbaLeads({
-  leads,
-  ofertas,
-  objecoes,
-  buscar,
-  aoEscolher,
-  aoDescartar,
+// ── Lista de buscas ─────────────────────────────────────────────────────
+
+function CartaoDaBusca({
+  busca,
+  contagem,
+  agora,
+  abrir,
 }: {
-  leads: LeadDaCampanha[];
-  ofertas: Oferta[];
-  objecoes: ConfigDaCampanha["objecoes"];
-  buscar: (segmento: string) => EmpresaAchada[];
-  aoEscolher: (empresas: EmpresaAchada[]) => void;
-  aoDescartar: (id: string) => void;
+  busca: Busca;
+  contagem: ContagemDaBusca;
+  agora: number;
+  abrir: () => void;
 }) {
-  const [modo, setModo] = useState<Modo>("buscar");
-  const [ficha, setFicha] = useState<EmpresaAchada | null>(null);
-  const escolhidos = leads.filter((l) => l.situacao !== "descartado");
-
+  const pronta = busca.situacao === "pronta";
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-1.5 px-4 pt-4 md:px-5">
-        <Button
-          variant="chip"
-          size="chip"
-          data-ativo={modo === "buscar" ? "sim" : undefined}
-          aria-pressed={modo === "buscar"}
-          onClick={() => setModo("buscar")}
-        >
-          Buscar empresas
-        </Button>
-        <Button
-          variant="chip"
-          size="chip"
-          data-ativo={modo === "escolhidos" ? "sim" : undefined}
-          aria-pressed={modo === "escolhidos"}
-          onClick={() => setModo("escolhidos")}
-        >
-          Escolhidos
-          <span className="font-bold tabular-nums opacity-75">{escolhidos.length}</span>
+    <li>
+      <Button
+        variant="nu"
+        size="none"
+        onClick={abrir}
+        disabled={!pronta}
+        data-slot="busca-cartao"
+        data-busca={busca.id}
+        className="flex h-full w-full flex-col items-stretch gap-4 rounded-xl border border-line bg-raised p-5 text-left transition-colors hover:border-line-strong disabled:cursor-default disabled:opacity-100"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-cartao text-ink">{busca.termo}</p>
+            <p className="mt-0.5 flex items-center gap-1 text-apoio text-ink-2">
+              <MapPin size={14} aria-hidden className="text-ink-3" />
+              {busca.cidade}
+            </p>
+          </div>
+          <SeloDaBusca situacao={busca.situacao} />
+        </div>
+
+        {busca.situacao === "buscando" && (
+          <p className="flex items-center gap-2 text-apoio text-ink-2">
+            <Loader2 size={14} aria-hidden className="animate-spin text-ink-3 motion-reduce:animate-none" />
+            Procurando empresas. Pode sair desta tela, a busca continua.
+          </p>
+        )}
+        {busca.situacao === "falhou" && <p className="text-apoio text-ink-2">{busca.erro}</p>}
+        {pronta && (
+          <dl className="grid grid-cols-3 gap-3">
+            {(
+              [
+                ["Achadas", contagem.total],
+                ["Aproveitáveis", contagem.aproveitaveis],
+                ["Contatadas", contagem.contatados],
+              ] as const
+            ).map(([rotulo, n]) => (
+              <div key={rotulo} className="min-w-0">
+                <dt className="text-rotulo uppercase text-ink-3">{rotulo}</dt>
+                <dd className="mt-1 text-titulo tabular-nums text-ink">{numeroBR(n)}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <p className="mt-auto text-legenda text-ink-3">Criada {haQuanto(busca.criadaEm, agora)}</p>
+      </Button>
+    </li>
+  );
+}
+
+function ListaDeBuscas({
+  buscas,
+  leads,
+  agora,
+  rascunho,
+  abrir,
+  novaBusca,
+  voltarAoRascunho,
+}: {
+  buscas: Busca[];
+  leads: Lead[];
+  agora: number;
+  rascunho: Campanha | null;
+  abrir: (id: string) => void;
+  novaBusca: () => void;
+  voltarAoRascunho: () => void;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-titulo text-ink">Leads</h2>
+          <p className="mt-1 text-apoio text-ink-2">Cada busca traz empresas de um segmento numa cidade. A base guarda todas.</p>
+        </div>
+        <Button onClick={novaBusca} data-slot="leads-nova-busca">
+          <Plus aria-hidden />
+          Nova busca
         </Button>
       </div>
-      {modo === "buscar" ? (
-        <Busca buscar={buscar} leads={leads} ofertas={ofertas} aoEscolher={aoEscolher} aoAbrir={setFicha} />
-      ) : (
-        <Escolhidos leads={escolhidos} aoDescartar={aoDescartar} aoAbrir={setFicha} />
+
+      {rascunho && (
+        <Aviso tom="neutro" forma="faixa" data-bloco="leads-rascunho" className="flex-wrap justify-between">
+          <span>
+            A campanha <strong className="font-semibold">{rascunho.nome || "sem nome"}</strong> está esperando os contatos.
+          </span>
+          <Button variant="link" size="link" onClick={voltarAoRascunho}>
+            Voltar para a campanha
+          </Button>
+        </Aviso>
       )}
-      <FichaDoLead empresa={ficha} ofertas={ofertas} objecoes={objecoes} aoFechar={() => setFicha(null)} />
+
+      {buscas.length === 0 ? (
+        <Card variant="conteudo" className="py-4">
+          <EstadoVazio
+            icone={Search}
+            titulo="Nenhuma busca ainda"
+            texto="Comece buscando um segmento e uma cidade, por exemplo clínica de estética em Mutum."
+          >
+            <Button className="mt-2" onClick={novaBusca}>
+              <Plus aria-hidden />
+              Nova busca
+            </Button>
+          </EstadoVazio>
+        </Card>
+      ) : (
+        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-slot="leads-buscas">
+          {buscas.map((b) => (
+            <CartaoDaBusca
+              key={b.id}
+              busca={b}
+              contagem={contar(leads.filter((l) => l.buscaId === b.id))}
+              agora={agora}
+              abrir={() => abrir(b.id)}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
 
-function Busca({
-  buscar,
-  leads,
-  ofertas,
-  aoEscolher,
-  aoAbrir,
-}: {
-  buscar: (segmento: string) => EmpresaAchada[];
-  leads: LeadDaCampanha[];
-  ofertas: Oferta[];
-  aoEscolher: (empresas: EmpresaAchada[]) => void;
-  aoAbrir: (e: EmpresaAchada) => void;
-}) {
-  const [segmento, setSegmento] = useState("");
-  const [cidade, setCidade] = useState("Cidade Exemplo");
-  const [resultado, setResultado] = useState<EmpresaAchada[] | null>(null);
-  const [marcados, setMarcados] = useState<Set<string>>(new Set());
-  // As opções de cada busca, como no Deskcomm: auditar o site, buscar e-mails e redes, prévia com IA.
-  const [auditar, setAuditar] = useState(true);
-  const [contatos, setContatos] = useState(false);
+// ── Detalhe da busca ────────────────────────────────────────────────────
 
-  const jaNaCampanha = useMemo(() => new Set(leads.map((l) => l.fonteId)), [leads]);
-  const ordenado = resultado ?? NENHUMA;
-  const { itens, temMais, fimRef } = usePaginaDeMemoria(ordenado, (e) => e.fonteId);
+type Filtro = "nao_contatados" | "tem_site" | "nota";
 
-  function alternar(id: string, marcado: boolean) {
-    setMarcados((m) => {
-      const novo = new Set(m);
-      if (marcado) novo.add(id);
-      else novo.delete(id);
-      return novo;
-    });
-  }
+const FILTROS: { chave: Filtro; rotulo: string }[] = [
+  { chave: "nao_contatados", rotulo: "Não contatados" },
+  { chave: "tem_site", rotulo: "Tem site" },
+  { chave: "nota", rotulo: "Nota 4,5 ou mais" },
+];
 
-  function escolher() {
-    aoEscolher(ordenado.filter((e) => marcados.has(e.fonteId)));
-    setMarcados(new Set());
-  }
-
+function Telefone({ telefone }: { telefone: string | null }) {
+  const tipo = tipoDoTelefone(telefone);
+  if (!telefone) return <Badge variant="estado-aviso">Sem telefone</Badge>;
   return (
-    <>
-      <form
-        className="flex flex-wrap items-center gap-2 border-b border-line px-4 pb-3 pt-3 md:px-5"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          // Os que dá para escolher primeiro e, entre eles, os melhores: a fonte devolve na
-          // ordem dela. A ordem fica a da busca: escolher alguém não reordena a lista.
-          const fora = (e: EmpresaAchada) => (jaNaCampanha.has(e.fonteId) || pontuarLead(e.sinais).impedimento ? 1 : 0);
-          setResultado(
-            [...buscar(segmento)].sort((a, b) => fora(a) - fora(b) || pontuarLead(b.sinais).pontos - pontuarLead(a.sinais).pontos),
-          );
-          setMarcados(new Set());
-        }}
-      >
-        <Input
-          className="min-w-0 flex-1 md:max-w-64"
-          aria-label="Segmento"
-          placeholder="Segmento, por exemplo barbearia"
-          value={segmento}
-          onChange={(e) => setSegmento(e.target.value)}
-        />
-        <Input
-          className="min-w-0 flex-1 md:max-w-48"
-          aria-label="Cidade"
-          placeholder="Cidade"
-          value={cidade}
-          onChange={(e) => setCidade(e.target.value)}
-        />
-        <Button type="submit" variant="outline" size="control" data-slot="leads-buscar">
-          <Search size={14} />
-          Buscar
-        </Button>
-        {marcados.size > 0 && (
-          <Button type="button" variant="brand" size="control" className="ml-auto" data-slot="leads-escolher" onClick={escolher}>
-            Escolher {marcados.size} {marcados.size === 1 ? "empresa" : "empresas"}
-          </Button>
-        )}
-        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5" data-slot="leads-opcoes">
-          <label className="flex cursor-pointer items-center gap-2 text-apoio text-ink">
-            <Checkbox checked={auditar} onCheckedChange={(v) => setAuditar(v === true)} />
-            Auditar o site
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-apoio text-ink">
-            <Checkbox checked={contatos} onCheckedChange={(v) => setContatos(v === true)} />
-            Buscar e-mails e redes
-          </label>
-          <label className="flex items-center gap-2 text-apoio text-ink-3">
-            <Checkbox checked={false} disabled />
-            Prévia da mensagem com IA (fase 2)
-          </label>
-        </div>
-        <p className="w-full text-legenda text-ink-3">
-          Prévia com empresas de mentira. A fonte de verdade (Google Places ou Apify) é decisão sua; nenhuma busca
-          paga é feita aqui.
-        </p>
-      </form>
-
-      <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-        {resultado === null ? (
-          <EstadoVazio
-            icone={Search}
-            titulo="Busque por segmento e cidade"
-            texto="Cada empresa vem com uma pontuação e os motivos. Telefone fixo, quem já é cliente e quem pediu para sair não entram na fila."
-          />
-        ) : ordenado.length === 0 ? (
-          <EstadoVazio icone={SearchX} titulo={`Nada para “${segmento}”`} texto="Tente outro segmento." />
-        ) : (
-          <ul data-slot="leads-resultado">
-            {itens.map((e) => {
-              const p = pontuarLead(e.sinais);
-              const naCampanha = jaNaCampanha.has(e.fonteId);
-              const bloqueado = p.impedimento !== null || naCampanha;
-              return (
-                <li
-                  key={e.fonteId}
-                  className="flex items-start gap-2 border-b border-line-soft px-4 py-3 md:px-5"
-                  data-slot="leads-empresa"
-                >
-                  <label className={bloqueado ? "flex min-w-0 flex-1 gap-3" : "flex min-w-0 flex-1 cursor-pointer gap-3"}>
-                    <Checkbox
-                      className="mt-1"
-                      disabled={bloqueado}
-                      checked={marcados.has(e.fonteId)}
-                      onCheckedChange={(v) => alternar(e.fonteId, v === true)}
-                      aria-label={`Escolher ${e.nome}`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-corpo font-semibold text-ink">{e.nome}</span>
-                        <SeloDaPontuacao sinais={e.sinais} />
-                        {naCampanha && <span className="text-legenda text-ink-3">Já está na campanha</span>}
-                      </span>
-                      <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-apoio text-ink-2">
-                        <span>
-                          {e.segmento}, {e.bairro}
-                        </span>
-                        {e.nota !== null && (
-                          <span className="inline-flex items-center gap-1">
-                            <Star size={12} className="text-ink-3" aria-hidden />
-                            {numeroBR(e.nota)} ({numeroBR(e.avaliacoes ?? 0)})
-                          </span>
-                        )}
-                        <span>{tipoDoTelefone(e.telefone) === "celular" ? "Celular" : "Fixo"}</span>
-                      </span>
-                      <span className="mt-0.5 block text-legenda text-ink-3">{e.horario}</span>
-                      {auditar && (
-                        <span className="mt-1 block text-apoio text-ink-2" data-slot="leads-raio-x">
-                          <span className="font-semibold text-ink">{textoDoAngulo(e.sinais, ofertas)}</span>{" "}
-                          {resumoDoSite(e.sinais.site)}.
-                        </span>
-                      )}
-                    </span>
-                  </label>
-                  <Button variant="ghost" size="control" onClick={() => aoAbrir(e)}>
-                    Detalhes
-                  </Button>
-                </li>
-              );
-            })}
-            {temMais && (
-              <li
-                ref={(el) => {
-                  fimRef.current = el;
-                }}
-                aria-hidden
-                className="h-px"
-              />
-            )}
-          </ul>
-        )}
-      </AreaRolavel>
-    </>
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span className="whitespace-nowrap tabular-nums text-ink-2">{mascaraTelefoneBR(telefone)}</span>
+      {tipo !== "celular" && (
+        <Badge variant="estado-aviso" data-slot="lead-telefone-invalido">
+          {tipo === "fixo" ? "Fixo" : "Inválido"}
+        </Badge>
+      )}
+    </span>
   );
 }
 
-function Escolhidos({
-  leads,
-  aoDescartar,
-  aoAbrir,
+const COLUNAS = "lg:grid lg:grid-cols-[minmax(0,2.2fr)_0.9fr_0.9fr_1.3fr_0.5fr_1.1fr_auto] lg:items-center lg:gap-4";
+
+function LinhaDoLead({
+  lead,
+  campanhas,
+  marcar,
 }: {
-  leads: LeadDaCampanha[];
-  aoDescartar: (id: string) => void;
-  aoAbrir: (e: EmpresaAchada) => void;
+  lead: Lead;
+  campanhas: Campanha[];
+  marcar: (m: Lead["marcacao"]) => void;
 }) {
-  const [q, setQ] = useState("");
-  const busca = useDebounce(q, 300);
-  const filtrados = useMemo(() => {
-    const t = normalizar(busca.trim());
-    return t === "" ? leads : leads.filter((l) => normalizar(l.nome).includes(t));
-  }, [leads, busca]);
-  const { itens, temMais, fimRef } = usePaginaDeMemoria(filtrados, (l) => l.id);
+  const descartado = lead.marcacao === "descartado";
+  return (
+    <li
+      data-slot="lead-linha"
+      data-lead={lead.id}
+      data-marcacao={lead.marcacao ?? "nenhuma"}
+      className={`flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-4 ${COLUNAS} ${descartado ? "opacity-55" : ""}`}
+    >
+      <div className="min-w-0 basis-full lg:basis-auto">
+        <p className="truncate text-corpo font-semibold text-ink">{lead.nome}</p>
+        <p className="truncate text-legenda text-ink-3">{lead.bairro}</p>
+      </div>
+      <p className="flex items-center gap-1 text-apoio text-ink-2" aria-label={lead.nota === null ? "Sem nota" : `Nota ${lead.nota}, ${lead.avaliacoes ?? 0} avaliações`}>
+        {lead.nota === null ? (
+          "Sem nota"
+        ) : (
+          <>
+            <Star size={13} aria-hidden className="text-ink-3" />
+            <span className="tabular-nums text-ink">{lead.nota.toFixed(1).replace(".", ",")}</span>
+            <span className="tabular-nums text-ink-3">({numeroBR(lead.avaliacoes ?? 0)})</span>
+          </>
+        )}
+      </p>
+      <p className="whitespace-nowrap text-apoio">
+        <TextoDoSite url={lead.site} />
+      </p>
+      <div className="text-apoio">
+        <Telefone telefone={lead.telefone} />
+      </div>
+      <div>
+        <SeloDaPontuacao sinais={lead} />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {lead.parouEm !== null ? (
+          <Badge variant="estado-aviso">Pediu para parar</Badge>
+        ) : lead.campanhaIds.length === 0 ? (
+          <span className="text-apoio text-ink-3">Nenhuma</span>
+        ) : (
+          lead.campanhaIds.map((id) => (
+            <Badge key={id} variant="contorno" data-slot="lead-campanha" className="max-w-full truncate">
+              {campanhas.find((c) => c.id === id)?.nome ?? "Campanha"}
+            </Badge>
+          ))
+        )}
+      </div>
+      <div className="ml-auto flex items-center gap-1 lg:ml-0">
+        <Button
+          variant="alternavel"
+          size="chip"
+          aria-pressed={lead.marcacao === "bom"}
+          onClick={() => marcar(lead.marcacao === "bom" ? null : "bom")}
+          data-slot="lead-marcar-bom"
+        >
+          <ThumbsUp aria-hidden />
+          Bom
+        </Button>
+        <Button
+          variant="danger-ghost"
+          size="icon-chrome"
+          aria-label={descartado ? `Desfazer descarte de ${lead.nome}` : `Descartar ${lead.nome}`}
+          aria-pressed={descartado}
+          onClick={() => marcar(descartado ? null : "descartado")}
+          data-slot="lead-descartar"
+        >
+          <X aria-hidden />
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function DetalheDaBusca({
+  busca,
+  leads,
+  campanhas,
+  voltar,
+  marcar,
+  criarCampanha,
+}: {
+  busca: Busca;
+  leads: Lead[];
+  campanhas: Campanha[];
+  voltar: () => void;
+  marcar: (id: string, m: Lead["marcacao"]) => void;
+  criarCampanha: () => void;
+}) {
+  const [filtros, setFiltros] = useState<Set<Filtro>>(new Set());
+  const daBusca = useMemo(() => leads.filter((l) => l.buscaId === busca.id), [leads, busca.id]);
+  const c = contar(daBusca);
+  const visiveis = daBusca.filter(
+    (l) =>
+      (!filtros.has("nao_contatados") || l.campanhaIds.length === 0) &&
+      (!filtros.has("tem_site") || siteDoLead(l.site) === "sim") &&
+      (!filtros.has("nota") || (l.nota ?? 0) >= 4.5),
+  );
+  const alternar = (f: Filtro) =>
+    setFiltros((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(f)) novo.delete(f);
+      else novo.add(f);
+      return novo;
+    });
 
   return (
-    <>
-      <div className="border-b border-line px-4 pb-3 pt-3 md:px-5">
-        <CampoBusca
-          className="md:max-w-[420px]"
-          valor={q}
-          aoMudar={setQ}
-          placeholder="Buscar pelo nome da empresa"
-          rotulo="Buscar leads escolhidos"
-          aoLimpar={() => setQ("")}
-          mostrarLimpar={q !== ""}
-        />
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6" data-slot="busca-detalhe">
+      <TopoDeDetalhe
+        voltar={voltar}
+        rotuloDoVoltar="Leads"
+        titulo={`${busca.termo} · ${busca.cidade}`}
+        selo={<SeloDaBusca situacao={busca.situacao} />}
+        apoio={`Busca de ${diaMesHoraSP(busca.criadaEm)}. ${numeroBR(c.total)} ${plural(c.total, "empresa achada", "empresas achadas")}, ${numeroBR(c.aproveitaveis)} com celular válido, ${numeroBR(c.contatados)} já ${plural(c.contatados, "contatada", "contatadas")}.`}
+      >
+        <Button onClick={criarCampanha} data-slot="busca-criar-campanha">
+          Criar campanha com esta busca
+        </Button>
+      </TopoDeDetalhe>
+
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtros">
+        {FILTROS.map((f) => (
+          <Button
+            key={f.chave}
+            variant="chip"
+            size="chip"
+            aria-pressed={filtros.has(f.chave)}
+            onClick={() => alternar(f.chave)}
+            data-slot="busca-filtro"
+            data-filtro={f.chave}
+          >
+            {f.rotulo}
+          </Button>
+        ))}
+        <span className="ml-auto text-legenda text-ink-3" aria-live="polite">
+          {numeroBR(visiveis.length)} de {numeroBR(daBusca.length)}
+        </span>
       </div>
-      <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-        {filtrados.length === 0 ? (
-          <EstadoVazio
-            icone={Users}
-            titulo={busca ? `Nenhum lead para “${busca}”` : "Nenhum lead escolhido"}
-            texto={busca ? "A busca olha o nome da empresa." : "Escolha empresas em Buscar empresas."}
-          />
+
+      <Card variant="conteudo" className="overflow-hidden">
+        <div className={`hidden border-b border-line px-5 py-3 text-rotulo uppercase text-ink-3 ${COLUNAS}`} aria-hidden>
+          <span>Empresa</span>
+          <span>Google</span>
+          <span>Site</span>
+          <span>Telefone</span>
+          <span>Pontos</span>
+          <span>Campanha</span>
+          <span className="w-[108px]" />
+        </div>
+        {visiveis.length === 0 ? (
+          <EstadoVazio tamanho="compacto" texto="Nenhuma empresa com esses filtros. Tire um filtro para ver mais." />
         ) : (
-          <ul data-slot="leads-escolhidos">
-            {itens.map((l) => (
-              <li key={l.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-soft px-4 py-3 md:px-5">
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-corpo font-semibold text-ink">{l.nome}</span>
-                    <SeloDaSituacao situacao={l.situacao} />
-                    <SeloDaPontuacao sinais={l.sinais} />
-                  </span>
-                  <span className="mt-0.5 block text-apoio text-ink-2">
-                    {l.segmento}, {l.bairro}, {resumoDoSite(l.sinais.site).toLowerCase()}
-                    {l.abordadoEm !== null && ` · abordado em ${diaMesCurtoSP(new Date(l.abordadoEm).toISOString())}`}
-                    {l.toque > 0 && `, ${l.toque} de 3 toques`}
-                  </span>
-                </span>
-                <Button variant="ghost" size="control" onClick={() => aoAbrir(l)}>
-                  Detalhes
-                </Button>
-                {l.situacao === "escolhido" && (
-                  <Button variant="ghost" size="control" onClick={() => aoDescartar(l.id)}>
-                    Descartar
-                  </Button>
-                )}
-              </li>
+          <ul className="divide-y divide-line-soft" data-slot="busca-leads">
+            {visiveis.map((l) => (
+              <LinhaDoLead key={l.id} lead={l} campanhas={campanhas} marcar={(m) => marcar(l.id, m)} />
             ))}
-            {temMais && (
-              <li
-                ref={(el) => {
-                  fimRef.current = el;
-                }}
-                aria-hidden
-                className="h-px"
-              />
-            )}
           </ul>
         )}
-      </AreaRolavel>
+      </Card>
+      <p className="text-legenda text-ink-3">
+        Telefone fixo, inválido ou de quem pediu para parar nunca entra numa campanha. Quem já passou por uma campanha só
+        entra em outra se você escolher.
+      </p>
+    </div>
+  );
+}
+
+// ── Nova busca ──────────────────────────────────────────────────────────
+
+function DialogoDeNovaBusca({
+  aberto,
+  aoMudar,
+  aoBuscar,
+}: {
+  aberto: boolean;
+  aoMudar: (v: boolean) => void;
+  aoBuscar: (termo: string, cidade: string) => void;
+}) {
+  const [termo, setTermo] = useState("");
+  const [cidade, setCidade] = useState("");
+  const pronto = termo.trim().length >= 3 && cidade.trim().length >= 2;
+  return (
+    <Dialog open={aberto} onOpenChange={aoMudar}>
+      <DialogContent tamanho="gestao" data-slot="nova-busca">
+        <DialogTitle>Nova busca</DialogTitle>
+        <DialogDescription>
+          Procura empresas no Google Maps. Leva alguns minutos e roda em segundo plano: pode fechar e voltar depois.
+        </DialogDescription>
+        <form
+          className="mt-4 flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!pronto) return;
+            aoBuscar(termo.trim(), cidade.trim());
+            setTermo("");
+            setCidade("");
+          }}
+        >
+          <label className="flex flex-col gap-1.5">
+            <span className="text-apoio font-semibold text-ink">Segmento</span>
+            <Input value={termo} onChange={(e) => setTermo(e.target.value)} placeholder="clínica de estética" autoFocus />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-apoio font-semibold text-ink">Cidade</span>
+            <Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Mutum" />
+          </label>
+          <p className="flex items-start gap-2 text-legenda text-ink-3">
+            <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
+            Cada busca gasta crédito da fonte de leads. Empresas que já estão na base não são duplicadas.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => aoMudar(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!pronto}>
+              Buscar
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── A aba ───────────────────────────────────────────────────────────────
+
+function AbaLeads({
+  buscas,
+  leads,
+  campanhas,
+  agora,
+  buscaAberta,
+  rascunho,
+  abrirBusca,
+  aoBuscar,
+  marcar,
+  criarCampanhaDaBusca,
+  voltarAoRascunho,
+}: {
+  buscas: Busca[];
+  leads: Lead[];
+  campanhas: Campanha[];
+  agora: number;
+  buscaAberta: string | null;
+  rascunho: Campanha | null;
+  abrirBusca: (id: string | null) => void;
+  aoBuscar: (termo: string, cidade: string) => void;
+  marcar: (id: string, m: Lead["marcacao"]) => void;
+  criarCampanhaDaBusca: (buscaId: string) => void;
+  voltarAoRascunho: () => void;
+}) {
+  const [dialogo, setDialogo] = useState(false);
+  const busca = buscas.find((b) => b.id === buscaAberta) ?? null;
+  return (
+    <>
+      {busca ? (
+        <DetalheDaBusca
+          busca={busca}
+          leads={leads}
+          campanhas={campanhas}
+          voltar={() => abrirBusca(null)}
+          marcar={marcar}
+          criarCampanha={() => criarCampanhaDaBusca(busca.id)}
+        />
+      ) : (
+        <ListaDeBuscas
+          buscas={buscas}
+          leads={leads}
+          agora={agora}
+          rascunho={rascunho}
+          abrir={abrirBusca}
+          novaBusca={() => setDialogo(true)}
+          voltarAoRascunho={voltarAoRascunho}
+        />
+      )}
+      <DialogoDeNovaBusca
+        aberto={dialogo}
+        aoMudar={setDialogo}
+        aoBuscar={(t, c) => {
+          setDialogo(false);
+          aoBuscar(t, c);
+        }}
+      />
     </>
   );
 }

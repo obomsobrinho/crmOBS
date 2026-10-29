@@ -1,34 +1,88 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  ROTULO_DA_SITUACAO,
+  ROTULO_DA_BUSCA,
+  ROTULO_DA_CAMPANHA,
+  ROTULO_DO_SITE,
+  ROTULO_NA_CAMPANHA,
   faixaDaPontuacao,
   pontuarLead,
+  siteDoLead,
   type SinaisDoLead,
-  type SituacaoDoLead,
+  type SituacaoDaBusca,
+  type SituacaoDaCampanha,
+  type SituacaoNaCampanha,
 } from "@/lib/prospeccao";
 
-// Peças pequenas das telas de Campanhas.
+// Peças pequenas das telas de Campanhas: os selos de situação, a pontuação e o
+// cabeçalho com "voltar". Verde, âmbar e vermelho só como ESTADO.
 
-const VARIANTE_DA_FAIXA = { alta: "estado-bom", media: "estado-neutro", baixa: "contorno" } as const;
+type Variante = "estado-bom" | "estado-aviso" | "estado-perigo" | "estado-neutro" | "contorno";
 
-/** A pontuação do lead com os motivos no balão (ou o impedimento, quando não pode entrar na fila). */
+const DA_BUSCA: Record<SituacaoDaBusca, Variante> = { buscando: "estado-aviso", pronta: "estado-bom", falhou: "estado-perigo" };
+
+export function SeloDaBusca({ situacao }: { situacao: SituacaoDaBusca }) {
+  return (
+    <Badge variant={DA_BUSCA[situacao]} data-slot="busca-situacao" data-situacao={situacao}>
+      {ROTULO_DA_BUSCA[situacao]}
+    </Badge>
+  );
+}
+
+const DA_CAMPANHA: Record<SituacaoDaCampanha, Variante> = {
+  rascunho: "contorno",
+  agendada: "estado-neutro",
+  rodando: "estado-bom",
+  pausada: "estado-aviso",
+  concluida: "estado-neutro",
+};
+
+export function SeloDaCampanha({ situacao }: { situacao: SituacaoDaCampanha }) {
+  return (
+    <Badge variant={DA_CAMPANHA[situacao]} data-slot="campanha-situacao" data-situacao={situacao}>
+      {ROTULO_DA_CAMPANHA[situacao]}
+    </Badge>
+  );
+}
+
+const NA_CAMPANHA: Record<SituacaoNaCampanha, Variante> = {
+  na_fila: "contorno",
+  enviado: "estado-neutro",
+  respondeu: "estado-bom",
+  falhou: "estado-perigo",
+  parou: "estado-aviso",
+};
+
+export function SeloNaCampanha({ situacao }: { situacao: SituacaoNaCampanha }) {
+  return (
+    <Badge variant={NA_CAMPANHA[situacao]} data-slot="envio-situacao" data-situacao={situacao}>
+      {ROTULO_NA_CAMPANHA[situacao]}
+    </Badge>
+  );
+}
+
+const DA_FAIXA = { alta: "estado-bom", media: "estado-neutro", baixa: "contorno" } as const;
+
+/** A pontuação com os motivos no balão. */
 export function SeloDaPontuacao({ sinais }: { sinais: SinaisDoLead }) {
   const p = pontuarLead(sinais);
-  const texto = p.impedimento ?? (p.motivos.length > 0 ? p.motivos.join(". ") : "Nenhum sinal forte achado");
+  const texto = p.motivos.length > 0 ? p.motivos.join(". ") : "Nenhum sinal forte achado";
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Badge
           tabIndex={0}
-          variant={p.impedimento ? "estado-neutro" : VARIANTE_DA_FAIXA[faixaDaPontuacao(p.pontos)]}
+          variant={DA_FAIXA[faixaDaPontuacao(p.pontos)]}
           data-slot="lead-pontuacao"
           data-pontos={p.pontos}
           aria-label={`Pontuação ${p.pontos}. ${texto}`}
+          className="tabular-nums"
         >
-          {p.impedimento ? p.impedimento : `${p.pontos} pts`}
+          {p.pontos}
         </Badge>
       </TooltipTrigger>
       <TooltipContent side="top" className="max-w-72">
@@ -38,23 +92,64 @@ export function SeloDaPontuacao({ sinais }: { sinais: SinaisDoLead }) {
   );
 }
 
-const VARIANTE_DA_SITUACAO: Record<SituacaoDoLead, "estado-bom" | "estado-aviso" | "estado-perigo" | "estado-neutro" | "contorno"> = {
-  sem_telefone: "estado-neutro",
-  escolhido: "contorno",
-  na_fila: "contorno",
-  abordado: "estado-neutro",
-  respondeu: "estado-bom",
-  qualificado: "estado-bom",
-  convertido: "estado-bom",
-  descartado: "estado-neutro",
-  saiu: "estado-aviso",
-  falhou: "estado-perigo",
-};
-
-export function SeloDaSituacao({ situacao }: { situacao: SituacaoDoLead }) {
+/** Tem site: sim, só rede social, não. Texto discreto: é informação, não estado. */
+export function TextoDoSite({ url }: { url: string | null }) {
+  const s = siteDoLead(url);
   return (
-    <Badge variant={VARIANTE_DA_SITUACAO[situacao]} data-slot="lead-situacao" data-situacao={situacao}>
-      {ROTULO_DA_SITUACAO[situacao]}
-    </Badge>
+    <span data-slot="lead-site" data-site={s} className={s === "sim" ? "text-ink-2" : "text-ink"}>
+      {ROTULO_DO_SITE[s]}
+    </span>
   );
+}
+
+/** O topo de uma tela de detalhe: voltar, título, apoio e as ações à direita. */
+export function TopoDeDetalhe({
+  voltar,
+  rotuloDoVoltar,
+  titulo,
+  selo,
+  apoio,
+  children,
+}: {
+  voltar: () => void;
+  rotuloDoVoltar: string;
+  titulo: React.ReactNode;
+  selo?: React.ReactNode;
+  apoio?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Button variant="link-discreto" size="link" className="self-start" onClick={voltar}>
+        <ArrowLeft aria-hidden />
+        {rotuloDoVoltar}
+      </Button>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-titulo text-ink">{titulo}</h2>
+            {selo}
+          </div>
+          {apoio && <p className="mt-1 text-apoio text-ink-2">{apoio}</p>}
+        </div>
+        {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** "há 3 dias", "há 2 h", "agora" (o tempo relativo dos cartões). */
+export function haQuanto(t: number, agora: number): string {
+  const min = Math.max(0, Math.round((agora - t) / 60_000));
+  if (min < 1) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "ontem" : `há ${d} dias`;
+}
+
+/** "33%" ou "sem envios". */
+export function textoDaTaxa(taxa: number | null): string {
+  return taxa === null ? "sem envios" : `${taxa}%`;
 }

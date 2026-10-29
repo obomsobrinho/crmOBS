@@ -1,149 +1,228 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { filaDoDia, pontuarLead, tetoDeHoje } from "@/lib/prospeccao";
-import AbaFila from "./AbaFila";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
+import { pontuarLead, telefoneDoLead } from "@/lib/prospeccao";
 import AbaLeads from "./AbaLeads";
-import AbaResultados from "./AbaResultados";
-import AbaCampanha from "./AbaCampanha";
-import type { AbaDeCampanhas, ConexaoDisponivel, ConfigDaCampanha, EmpresaAchada, LeadDaCampanha } from "./tipos";
+import AbaCampanhas from "./AbaCampanhas";
+import Assistente from "./Assistente";
+import DetalheDaCampanha from "./DetalheDaCampanha";
+import ResultadosGerais from "./Resultados";
+import { leadsDoFiltro, type Busca, type Campanha, type ConexaoDisponivel, type Lead, type Tela } from "./tipos";
 
-// CAMPANHAS, a prospecção do dono do produto (docs/plano-campanhas.md). Hoje só
-// o preview `/design/campanhas` monta esta tela, com dados de mentira e sem
-// gravar nada: escolher, aprovar e salvar mudam só o estado da página.
+// CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). Duas
+// abas: Leads (a base, por busca) e Campanhas (home, assistente, detalhe e
+// resultados). Hoje só o preview `/design/campanhas` monta esta tela, com dados
+// de mentira: buscar, marcar, salvar e iniciar mudam só o estado da página.
 
 export default function CentralDeCampanhas({
-  abaInicial,
+  telaInicial,
   agora,
+  buscasIniciais,
   leadsIniciais,
-  config: configInicial,
+  campanhasIniciais,
   conexoes,
-  buscar,
+  variantesSugeridas,
+  simularBusca,
 }: {
-  abaInicial: AbaDeCampanhas;
+  telaInicial: Tela;
   agora: number;
-  leadsIniciais: LeadDaCampanha[];
-  config: ConfigDaCampanha;
-  /** As conexões de WhatsApp que podem enviar (o campo "Número que envia" da campanha). */
+  buscasIniciais: Busca[];
+  leadsIniciais: Lead[];
+  campanhasIniciais: Campanha[];
   conexoes: ConexaoDisponivel[];
-  /** A busca de empresas (no preview, um filtro em memória; de verdade, a rota do admin). */
-  buscar: (segmento: string) => EmpresaAchada[];
+  /** O texto pré-preenchido de uma campanha nova (o dono edita). */
+  variantesSugeridas: string[];
+  /** A busca de mentira do preview; de verdade, a rota que dispara a fonte de leads. */
+  simularBusca: (buscaId: string, termo: string, cidade: string, inicio: number) => Lead[];
 }) {
-  const [aba, setAba] = useState<AbaDeCampanhas>(abaInicial);
+  const [tela, setTela] = useState<Tela>(telaInicial);
+  const [buscas, setBuscas] = useState(buscasIniciais);
   const [leads, setLeads] = useState(leadsIniciais);
-  const [config, setConfig] = useState(configInicial);
+  const [campanhas, setCampanhas] = useState(campanhasIniciais);
+  /** O rascunho que mandou para Leads ("Falta lead? Fazer uma nova busca"). */
+  const [rascunhoEsperando, setRascunhoEsperando] = useState<string | null>(null);
 
-  // O número que envia é o que a campanha escolheu; sem número escolhido, nada sai.
-  const numero = conexoes.find((c) => c.id === config.conexaoId) ?? null;
-  const teto = tetoDeHoje(config.tetoDiario);
-  const restamHoje = numero ? Math.max(0, teto - numero.enviadasHoje) : 0;
-  const fila = useMemo(
-    () =>
-      filaDoDia(
-        leads.map((l) => ({
-          id: l.id,
-          situacao: l.situacao,
-          pontos: pontuarLead(l.sinais).pontos,
-          impedimento: pontuarLead(l.sinais).impedimento,
-          toque: l.toque,
-          proximoToqueEm: l.proximoToqueEm,
-        })),
-        restamHoje,
-        agora,
-      ),
-    [leads, restamHoje, agora],
-  );
-
-  const escolher = useCallback(
-    (empresas: EmpresaAchada[]) =>
-      setLeads((atual) => {
-        const ja = new Set(atual.map((l) => l.fonteId));
-        const novos = empresas
-          .filter((e) => !ja.has(e.fonteId))
-          .map<LeadDaCampanha>((e, i) => ({
-            ...e,
-            id: `novo-${atual.length + i + 1}`,
-            situacao: "escolhido",
-            toque: 0,
-            abordadoEm: null,
-            respondeuEm: null,
-            proximoToqueEm: null,
-            ultimaResposta: null,
-          }));
-        return [...novos, ...atual];
-      }),
+  const mudarCampanha = useCallback(
+    (id: string, patch: Partial<Campanha>) =>
+      setCampanhas((atual) => atual.map((c) => (c.id === id ? { ...c, ...patch, salvaEm: Date.now() } : c))),
     [],
   );
 
-  const descartar = useCallback(
-    (id: string) => setLeads((atual) => atual.map((l) => (l.id === id ? { ...l, situacao: "descartado" } : l))),
+  const novoRascunho = useCallback(
+    (extra: Partial<Campanha>) => {
+      const id = `c${Date.now()}`;
+      const conectada = conexoes.find((c) => c.conectado) ?? null;
+      const agoraMs = Date.now();
+      const rascunho: Campanha = {
+        id,
+        nome: "",
+        situacao: "rascunho",
+        agendadaPara: null,
+        conexaoId: conectada?.id ?? null,
+        filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+        variantes: [...variantesSugeridas],
+        envios: [],
+        criadaEm: agoraMs,
+        salvaEm: agoraMs,
+        passo: 1,
+        ...extra,
+      };
+      setCampanhas((atual) => [rascunho, ...atual]);
+      setTela({ aba: "campanhas", vista: "editar", id });
+    },
+    [conexoes, variantesSugeridas],
+  );
+
+  const aoBuscar = useCallback(
+    (termo: string, cidade: string) => {
+      const id = `b${Date.now()}`;
+      setBuscas((atual) => [{ id, termo, cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null }, ...atual]);
+      // A fonte de verdade avisa por webhook; aqui, alguns segundos de espera.
+      window.setTimeout(() => {
+        setLeads((atual) => {
+          const ja = new Set(atual.map((l) => telefoneDoLead(l.telefone)).filter(Boolean));
+          const achados = simularBusca(id, termo, cidade, 300 + atual.length);
+          const novos = achados.filter((l) => !ja.has(telefoneDoLead(l.telefone)));
+          setBuscas((b) => b.map((x) => (x.id === id ? { ...x, situacao: "pronta", total: achados.length } : x)));
+          return [...atual, ...novos];
+        });
+      }, 4000);
+    },
+    [simularBusca],
+  );
+
+  const marcar = useCallback(
+    (id: string, marcacao: Lead["marcacao"]) => setLeads((atual) => atual.map((l) => (l.id === id ? { ...l, marcacao } : l))),
     [],
   );
+
+  const iniciar = useCallback(
+    (id: string) => {
+      const c = campanhas.find((x) => x.id === id);
+      if (!c) return;
+      // A fila sai na ordem da pontuação: os melhores leads recebem primeiro.
+      const fila = leadsDoFiltro(leads, c.filtro, campanhas).sort((a, b) => pontuarLead(b).pontos - pontuarLead(a).pontos);
+      const ids = new Set(fila.map((l) => l.id));
+      setLeads((atual) => atual.map((l) => (ids.has(l.id) ? { ...l, campanhaIds: [...l.campanhaIds, id] } : l)));
+      mudarCampanha(id, {
+        situacao: c.agendadaPara ? "agendada" : "rodando",
+        envios: fila.map((l) => ({ leadId: l.id, situacao: "na_fila", variante: null, enviadoEm: null, respondeuEm: null })),
+      });
+      setTela({ aba: "campanhas", vista: "detalhe", id });
+    },
+    [campanhas, leads, mudarCampanha],
+  );
+
+  const rascunho = useMemo(
+    () => (rascunhoEsperando ? (campanhas.find((c) => c.id === rascunhoEsperando) ?? null) : null),
+    [campanhas, rascunhoEsperando],
+  );
+  const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" ? campanhas.find((c) => c.id === tela.id) : undefined;
+  const emDetalhe = tela.aba === "campanhas" && tela.vista === "detalhe" ? campanhas.find((c) => c.id === tela.id) : undefined;
+
+  if (emEdicao) {
+    return (
+      <section aria-label="Nova campanha" className="flex min-h-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line">
+        <Assistente
+          campanha={emEdicao}
+          buscas={buscas}
+          leads={leads}
+          campanhas={campanhas}
+          conexoes={conexoes}
+          agora={agora}
+          montadoEm={agora}
+          aoMudar={(patch) => mudarCampanha(emEdicao.id, patch)}
+          aoSair={() => setTela({ aba: "campanhas", vista: "lista" })}
+          aoIniciar={() => iniciar(emEdicao.id)}
+          irParaLeads={() => {
+            setRascunhoEsperando(emEdicao.id);
+            setTela({ aba: "leads", busca: null });
+          }}
+        />
+      </section>
+    );
+  }
 
   return (
-    <Card asChild variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <section aria-label="Campanhas" data-slot="campanhas">
-        <Tabs value={aba} onValueChange={(v) => setAba(v as AbaDeCampanhas)} className="min-h-0 flex-1">
-          <div className="border-b border-line px-4 pb-0 pt-4 md:px-5">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-titulo">Campanhas</h1>
-              <Badge variant={config.ativa ? "estado-bom" : "estado-neutro"} data-slot="campanhas-estado">
-                {config.ativa ? "Ativa" : "Pausada"}
-              </Badge>
-              <span className="text-apoio text-ink-2">{config.nome}</span>
-            </div>
-            <p className="mt-1 text-legenda text-ink-3">
-              {numero ? `Envia pelo WhatsApp de ${numero.nome}` : "Sem número escolhido"}, no máximo 10 por dia. Só você vê
-              esta tela; nada sai sem a sua aprovação.
-            </p>
-            <TabsList aria-label="Seções de Campanhas" className="mt-3">
-              <TabsTrigger value="fila" data-slot="campanhas-aba-fila">
-                {fila.length > 0 ? `Fila do dia (${fila.length})` : "Fila do dia"}
-              </TabsTrigger>
-              <TabsTrigger value="leads" data-slot="campanhas-aba-leads">
-                Leads
-              </TabsTrigger>
-              <TabsTrigger value="resultados" data-slot="campanhas-aba-resultados">
-                Resultados
-              </TabsTrigger>
-              <TabsTrigger value="campanha" data-slot="campanhas-aba-campanha">
-                Campanha
-              </TabsTrigger>
-            </TabsList>
-          </div>
+    <section aria-label="Campanhas" data-slot="campanhas" className="flex min-h-0 flex-1 flex-col">
+      <Tabs
+        value={tela.aba}
+        onValueChange={(v) => setTela(v === "leads" ? { aba: "leads", busca: null } : { aba: "campanhas", vista: "lista" })}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="flex items-center justify-between gap-3 px-4 pt-4 md:px-8 md:pt-6">
+          <h1 className="text-rotulo uppercase text-ink-3">Prospecção da OBS</h1>
+          <TabsList variant="painel" aria-label="Seções">
+            <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
+              Leads
+            </TabsTrigger>
+            <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
+              Campanhas
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-          <TabsContent value="fila" className="min-h-0 flex-1">
-            <AbaFila
-              fila={fila}
-              leads={leads}
-              config={config}
-              numero={numero}
-              teto={teto}
-              agora={agora}
-              irParaLeads={() => setAba("leads")}
-            />
-          </TabsContent>
-          <TabsContent value="leads" className="min-h-0 flex-1">
-            <AbaLeads
-              leads={leads}
-              ofertas={config.ofertas}
-              objecoes={config.objecoes}
-              buscar={buscar}
-              aoEscolher={escolher}
-              aoDescartar={descartar}
-            />
-          </TabsContent>
-          <TabsContent value="resultados" className="min-h-0 flex-1">
-            <AbaResultados leads={leads} numero={numero} teto={teto} config={config} />
-          </TabsContent>
-          <TabsContent value="campanha" className="min-h-0 flex-1">
-            <AbaCampanha config={config} aoSalvar={setConfig} leads={leads} conexoes={conexoes} />
-          </TabsContent>
-        </Tabs>
-      </section>
-    </Card>
+        <AreaRolavel tamanho={DISSOLVER_PADRAO} className="min-h-0 flex-1">
+          <div className="px-4 py-6 md:px-8 md:py-8">
+            {tela.aba === "leads" ? (
+              <AbaLeads
+                buscas={buscas}
+                leads={leads}
+                campanhas={campanhas}
+                agora={agora}
+                buscaAberta={tela.busca}
+                rascunho={rascunho}
+                abrirBusca={(id) => setTela({ aba: "leads", busca: id })}
+                aoBuscar={aoBuscar}
+                marcar={marcar}
+                criarCampanhaDaBusca={(buscaId) => {
+                  const b = buscas.find((x) => x.id === buscaId);
+                  const nome = b ? `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}` : "";
+                  novoRascunho({ nome, filtro: { buscaId, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
+                }}
+                voltarAoRascunho={() => {
+                  if (!rascunhoEsperando) return;
+                  setTela({ aba: "campanhas", vista: "editar", id: rascunhoEsperando });
+                  setRascunhoEsperando(null);
+                }}
+              />
+            ) : tela.vista === "resultados" ? (
+              <ResultadosGerais campanhas={campanhas} voltar={() => setTela({ aba: "campanhas", vista: "lista" })} />
+            ) : emDetalhe ? (
+              <DetalheDaCampanha
+                campanha={emDetalhe}
+                leads={leads}
+                conexoes={conexoes}
+                voltar={() => setTela({ aba: "campanhas", vista: "lista" })}
+                pausarOuRetomar={() =>
+                  mudarCampanha(emDetalhe.id, { situacao: emDetalhe.situacao === "pausada" ? "rodando" : "pausada" })
+                }
+                reenviarParaQuemNaoRespondeu={() =>
+                  novoRascunho({
+                    nome: `${emDetalhe.nome}, segunda chance`,
+                    conexaoId: emDetalhe.conexaoId,
+                    variantes: [...emDetalhe.variantes],
+                    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: emDetalhe.id },
+                    passo: 2,
+                  })
+                }
+              />
+            ) : (
+              <AbaCampanhas
+                campanhas={campanhas}
+                conexoes={conexoes}
+                agora={agora}
+                abrir={(id) => setTela({ aba: "campanhas", vista: "detalhe", id })}
+                editar={(id) => setTela({ aba: "campanhas", vista: "editar", id })}
+                nova={() => novoRascunho({})}
+                verResultados={() => setTela({ aba: "campanhas", vista: "resultados" })}
+              />
+            )}
+          </div>
+        </AreaRolavel>
+      </Tabs>
+    </section>
   );
 }
