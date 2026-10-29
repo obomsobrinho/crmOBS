@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import {
   cadastroCompleto,
   casaBusca,
@@ -14,6 +14,20 @@ import {
   type ContatoClienteRow,
 } from "../lib/clientes";
 import { buildInbox, type ConvRow } from "../lib/inbox";
+
+// O filtro de Contatos é o botão de ícone da central (29/10/2026): abre o menu e escolhe.
+async function abrirFiltro(page: Page) {
+  // O menu anterior precisa ter fechado, senão o clique fecha em vez de abrir.
+  await expect(page.locator('[data-menu="clientes-filtro"]')).toHaveCount(0);
+  await page.locator('[data-slot="clientes-filtro"]').click();
+}
+function opcao(page: Page, texto: string) {
+  return page.locator('[data-menu="clientes-filtro"] [data-filtro]', { hasText: texto });
+}
+async function filtrar(page: Page, texto: string) {
+  await abrirFiltro(page);
+  await opcao(page, texto).click();
+}
 
 // TELA DE CLIENTES, fatia A (30/09/2026, docs/plano-clientes.md).
 //
@@ -149,12 +163,14 @@ test.describe("Tela de Clientes (/design/contatos)", () => {
     await expect(page.locator('[data-slot="clientes-vazio"]')).toContainText("Nenhum contato para");
     await page.getByLabel("Limpar busca").click();
 
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Em conversa" }).click();
+    await filtrar(page, "Em conversa");
     await expect(itens).toHaveCount(2);
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Cadastro incompleto" }).click();
+    await filtrar(page, "Cadastro incompleto");
     // Completos no dado falso (nome dado pelo time, nascimento e e-mail):
     // Marina, Helena e Juliana. Os outros 14 são incompletos.
-    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Cadastro incompleto" })).toContainText("14");
+    await abrirFiltro(page);
+    await expect(opcao(page, "Cadastro incompleto")).toContainText("14");
+    await page.keyboard.press("Escape");
     await rolarAteOFim(page);
     await expect(itens).toHaveCount(14);
 
@@ -167,7 +183,8 @@ test.describe("Tela de Clientes (/design/contatos)", () => {
   test("filtro de contato frio: 60+ dias, e quem nunca escreveu fica de fora", async ({ page }) => {
     await page.goto("/design/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
-    const chip = page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato há 60+ dias" });
+    await abrirFiltro(page);
+    const chip = opcao(page, "Sem contato há 60+ dias");
     await expect(chip).toContainText("6");
     await chip.click();
     await expect(itens).toHaveCount(6);
@@ -175,22 +192,24 @@ test.describe("Tela de Clientes (/design/contatos)", () => {
     await expect(page.locator('[data-slot="clientes-item"]:not([data-frio])')).toHaveCount(0);
     await expect(itens.filter({ hasText: "Ana Clara" })).toHaveCount(0);
 
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Todos" }).click();
+    await filtrar(page, "Todos");
     await expect(itens).toHaveCount(10);
     await rolarAteOFim(page);
     const ana = itens.filter({ hasText: "Ana Clara" });
     await expect(ana).toContainText("Nunca escreveu");
     await expect(ana).not.toHaveAttribute("data-frio", /.*/);
 
-    // Chip com zero some (D4, a mesma regra das Conversas): na conta nova
+    // Opção com zero some (D4, a mesma regra das Conversas): na conta nova
     // ninguém esfriou, e o chip nem aparece.
     await page.goto("/design/contatos?cenario=nova");
-    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" })).toHaveCount(0);
-    await expect(page.locator('[data-slot="clientes-chip"]', { hasText: "Em conversa" })).toHaveCount(1);
+    await abrirFiltro(page);
+    await expect(opcao(page, "Sem contato")).toHaveCount(0);
+    await expect(opcao(page, "Em conversa")).toHaveCount(1);
+    await page.keyboard.press("Escape");
 
-    // Com um chip só, a faixa inteira some.
+    // Com uma opção só, o botão de filtro some.
     await page.goto("/design/contatos?cenario=vazia");
-    await expect(page.locator('[data-slot="clientes-chip"]')).toHaveCount(0);
+    await expect(page.locator('[data-slot="clientes-filtro"]')).toHaveCount(0);
   });
 
   test("a ficha do contato frio diz há quanto tempo, e a de quem está em dia não diz", async ({ page }) => {
@@ -237,7 +256,7 @@ test.describe("Tela de Clientes (/design/contatos)", () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 
     // O número de dias do contato frio cabe inteiro na linha dele.
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Sem contato" }).click();
+    await filtrar(page, "Sem contato");
     const linha = page.locator('[data-slot="clientes-contato-celular"]').last();
     await expect(linha).toHaveText("Sem contato há 150 dias");
     expect(await linha.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -307,7 +326,7 @@ test.describe("Novo cliente e primeira mensagem (/design/contatos)", () => {
 
   test("filtro 'Nunca escreveram' e o peso de cada ação na ficha", async ({ page }) => {
     await page.goto("/design/contatos");
-    await page.locator('[data-slot="clientes-chip"]', { hasText: "Nunca escreveram" }).click();
+    await filtrar(page, "Nunca escreveram");
     await expect(page.locator('[data-slot="clientes-item"]')).toHaveCount(1);
     await expect(page.locator('[data-slot="clientes-item"]')).toContainText("Ana Clara");
 

@@ -24,22 +24,11 @@ import { textoDoDiaDeEnvio, type DiaDeEnvio, type Taxa } from "@/lib/prospeccao"
 
 const CURSOR = { fill: "var(--chart-cursor)", fillOpacity: 0.4 };
 
-/** O cabeçalho de um bloco de gráfico: o nome em rótulo, a frase e, à direita, o destaque. */
-export function CabecalhoDoGrafico({
-  titulo,
-  frase,
-  destaque,
-}: {
-  titulo: string;
-  frase: React.ReactNode;
-  destaque?: React.ReactNode;
-}) {
+/** O cabeçalho de um bloco de gráfico: o nome em rótulo e, à direita, o destaque. Sem frase de regra (dono, 29/10/2026). */
+export function CabecalhoDoGrafico({ titulo, destaque }: { titulo: string; destaque?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h3 className="text-rotulo uppercase text-ink-3">{titulo}</h3>
-        <p className="mt-1 text-legenda text-ink-3">{frase}</p>
-      </div>
+    <div className="flex min-h-11 flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <h3 className="text-rotulo uppercase text-ink-3">{titulo}</h3>
       {destaque}
     </div>
   );
@@ -64,7 +53,7 @@ const CONFIG_DIAS: ChartConfig = {
   semResposta: { label: "Sem resposta", color: "var(--chart-barra-neutra)" },
 };
 
-export function GraficoDeEnviosPorDia({ serie, legenda }: { serie: DiaDeEnvio[]; legenda: string }) {
+export function GraficoDeEnviosPorDia({ serie }: { serie: DiaDeEnvio[] }) {
   const animar = useAnimacaoDoGrafico();
   const barras = useMemo<BarraDoDia[]>(
     () => serie.map((d) => ({ ...d, eixo: diaMes(d.dia), rotulo: textoDoDiaDeEnvio(d.dia), semResposta: d.enviados - d.responderam })),
@@ -74,10 +63,7 @@ export function GraficoDeEnviosPorDia({ serie, legenda }: { serie: DiaDeEnvio[];
   const responderam = serie.reduce((s, d) => s + d.responderam, 0);
   return (
     <>
-      <CabecalhoDoGrafico
-        titulo="Envios por dia"
-        frase={`Cada coluna é um dia (fuso de São Paulo), ${legenda}. A resposta conta no dia em que a mensagem saiu.`}
-      />
+      <CabecalhoDoGrafico titulo="Envios por dia" />
       {enviados === 0 ? (
         <EstadoVazio tamanho="compacto" texto="Nenhuma mensagem enviada no período." />
       ) : (

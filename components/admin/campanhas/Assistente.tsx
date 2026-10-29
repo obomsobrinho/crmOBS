@@ -15,7 +15,6 @@ import { diaIsoSP, diaMesHoraSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 import {
   JANELA,
   MAXIMO_DE_VARIANTES,
-  PAUSA_MINUTOS,
   TETO_DIARIO,
   diasParaEnviar,
   problemasDaVariante,
@@ -127,7 +126,7 @@ function Secao({
         )}
       </Button>
       {children && aberta && (
-        <div id={`secao-${id}`} className="px-5 pb-6 sm:pl-[64px]">
+        <div id={`secao-${id}`} className="px-5 pb-6 pt-3 sm:pl-[64px]">
           {children}
         </div>
       )}
@@ -233,7 +232,7 @@ function Assistente({
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8 md:px-8">
           {passo === 1 && (
             <>
-              <Cabecalho titulo="Campanha" texto="O nome é só para você. O número é o WhatsApp que manda as mensagens e recebe as respostas." />
+              <Cabecalho titulo="Campanha" />
               <ListaDeSecoes>
                 <Secao
                   id="nome"
@@ -311,10 +310,6 @@ function Assistente({
                       ))}
                     </SelectContent>
                   </Select>
-                  <p className="mt-2 text-legenda text-ink-3">
-                    As respostas caem em Conversas dessa empresa e a IA dela continua. Se o número desconectar, a campanha pausa
-                    sozinha.
-                  </p>
                 </Secao>
               </ListaDeSecoes>
             </>
@@ -322,10 +317,7 @@ function Assistente({
 
           {passo === 2 && (
             <>
-              <Cabecalho
-                titulo="Contatos"
-                texto="Quem recebe a mensagem. Nunca entram: quem já passou por outra campanha, quem pediu para parar, descartados e telefone fixo ou inválido."
-              />
+              <Cabecalho titulo="Contatos" />
               <ListaDeSecoes>
                 <Secao
                   id="lista"
@@ -339,7 +331,7 @@ function Assistente({
                     <div className="flex flex-col gap-3">
                       <p className="text-apoio text-ink-2">
                         Os leads de <span className="font-semibold text-ink">{origem.nome}</span> que receberam e não
-                        responderam. Eles recebem de novo uma única primeira mensagem.
+                        responderam.
                       </p>
                       <Button
                         variant="link"
@@ -447,10 +439,7 @@ function Assistente({
 
           {passo === 3 && (
             <>
-              <Cabecalho
-                titulo="Mensagem"
-                texto={`Um texto igual para todos, sem edição por lead. Com 2 ou 3 variantes, elas se revezam: protege o número e mostra qual faz mais gente responder. ${"{empresa}"} vira o nome de cada empresa.`}
-              />
+              <Cabecalho titulo="Mensagem" />
               <ListaDeSecoes>
                 {campanha.variantes.map((texto, i) => (
                   <Secao
@@ -515,7 +504,7 @@ function Assistente({
 
           {passo === 4 && (
             <>
-              <Cabecalho titulo="Confirmar" texto="Confira antes de começar. Depois de iniciada, dá para pausar a qualquer hora." />
+              <Cabecalho titulo="Confirmar" />
               <ListaDeSecoes>
                 <Secao id="r-campanha" titulo="Campanha" resumo={`${campanha.nome} · ${numero?.nome ?? "sem número"}`} completa={completos[0]} aberta={false} alternar={() => irPara(1)} />
                 <Secao
@@ -550,11 +539,6 @@ function Assistente({
                   aberta={false}
                 />
               </ListaDeSecoes>
-              <p className="text-legenda text-ink-3">
-                Uma mensagem por lead, sem segunda tentativa. Entre um envio e outro, pausa sorteada de {PAUSA_MINUTOS[0]} a{" "}
-                {PAUSA_MINUTOS[1]} minutos, espalhando os envios pela janela. Quem responder &quot;não quero&quot; ou
-                &quot;pare&quot; sai de toda lista futura.
-              </p>
             </>
           )}
         </div>
@@ -591,15 +575,8 @@ function Assistente({
   );
 }
 
-function Cabecalho({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <div className="mb-1">
-      <h3 className="text-cartao text-ink">{titulo}</h3>
-      <p className="mt-1 max-w-2xl text-apoio text-ink-2" style={{ textWrap: "pretty" }}>
-        {texto}
-      </p>
-    </div>
-  );
+function Cabecalho({ titulo }: { titulo: string }) {
+  return <h3 className="mb-1 text-cartao text-ink">{titulo}</h3>;
 }
 
 export default memo(Assistente);

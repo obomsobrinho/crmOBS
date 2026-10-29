@@ -2,9 +2,9 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 import { ChevronRight, Megaphone, Plus } from "lucide-react";
+import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CampoBusca } from "@/components/ui/campo-busca";
 import { ChartSparkline } from "@/components/ui/chart";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Medidor } from "@/components/ui/medidor";
@@ -18,32 +18,29 @@ import { enviosPorDia, textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/
 import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, haQuanto, textoDaTaxa } from "./pecas";
-import { CabecalhoDaTabela, RodapeDaTabela, usePaginadaDaMemoria } from "./tabela";
+import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
 import type { Campanha, ConexaoDisponivel, EnvioDaCampanha } from "./tipos";
 
 // CAMPANHAS: o painel de resultados no topo (todas as campanhas ou uma, no
 // período) e embaixo a tabela de campanhas, 10 por página, com busca pelo nome
-// e recorte por situação. Clicar numa linha abre o detalhe (ou o assistente,
+// e o filtro por situação. Clicar numa linha abre o detalhe (ou o assistente,
 // no rascunho).
 
 const PASSOS = ["Campanha", "Contatos", "Mensagem", "Confirmar"];
 const DIAS_DA_LINHA = 14;
 const GRADE = "xl:grid xl:grid-cols-[minmax(0,2.4fr)_120px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_20px] xl:items-center xl:gap-5";
 
-type Recorte = "todas" | SituacaoDaCampanha;
-const RECORTES: Recorte[] = ["todas", "rodando", "agendada", "pausada", "rascunho", "concluida"];
-const ROTULO_DO_RECORTE: Record<Recorte, string> = {
-  todas: "Todas",
-  rodando: "Rodando",
-  agendada: "Agendadas",
-  pausada: "Pausadas",
-  rascunho: "Rascunhos",
-  concluida: "Concluídas",
-};
+const SITUACOES: { chave: SituacaoDaCampanha; rotulo: string }[] = [
+  { chave: "rodando", rotulo: "Rodando" },
+  { chave: "agendada", rotulo: "Agendadas" },
+  { chave: "pausada", rotulo: "Pausadas" },
+  { chave: "rascunho", rotulo: "Rascunhos" },
+  { chave: "concluida", rotulo: "Concluídas" },
+];
 
 interface ParamsDaTabela {
   busca: string;
-  recorte: Recorte;
+  situacao: SituacaoDaCampanha | null;
 }
 
 function LinhaDaCampanha({
@@ -142,6 +139,7 @@ function LinhaDaCampanha({
 }
 
 function AbaCampanhas({
+  abas,
   campanhas,
   conexoes,
   agora,
@@ -149,6 +147,8 @@ function AbaCampanhas({
   editar,
   nova,
 }: {
+  /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
+  abas: React.ReactNode;
   campanhas: Campanha[];
   conexoes: ConexaoDisponivel[];
   agora: number;
@@ -170,7 +170,7 @@ function AbaCampanhas({
     return {
       envios: todos.filter((e) => e.enviadoEm !== null && e.enviadoEm >= de),
       anteriores: todos.filter((e) => e.enviadoEm !== null && e.enviadoEm >= deAntes && e.enviadoEm < de),
-      serie: enviosPorDia(todos, hoje, dias),
+      serie: enviosPorDia(todos, hoje, Math.max(7, dias)),
       variantes: das.length === 1 ? das[0].variantes : [],
     };
   }, [campanhas, escolhida, hoje, dias]);
@@ -178,33 +178,54 @@ function AbaCampanhas({
   // ── A tabela ──
   const [q, setQ] = useState("");
   const busca = useDebounce(normalizar(q.trim()), 300);
-  const [recorte, setRecorte] = useState<Recorte>("todas");
-  const params = useMemo<ParamsDaTabela>(() => ({ busca, recorte }), [busca, recorte]);
+  const [situacao, setSituacao] = useState<SituacaoDaCampanha | null>(null);
+  const params = useMemo<ParamsDaTabela>(() => ({ busca, situacao }), [busca, situacao]);
   const filtrar = useCallback(
     (p: ParamsDaTabela) =>
-      campanhas.filter(
-        (c) => (p.recorte === "todas" || c.situacao === p.recorte) && (!p.busca || normalizar(c.nome).includes(p.busca)),
-      ),
+      campanhas.filter((c) => (p.situacao === null || c.situacao === p.situacao) && (!p.busca || normalizar(c.nome).includes(p.busca))),
     [campanhas],
   );
-  const { itens, temMais, carregando, fimRef, total } = usePaginadaDaMemoria({
-    params,
-    filtrar,
-    chave: (c: Campanha) => c.id,
-    versao: campanhas,
-  });
-  const porId = useMemo(() => new Map(campanhas.map((c) => [c.id, c])), [campanhas]);
-  const contagem = (r: Recorte) => (r === "todas" ? campanhas.length : campanhas.filter((c) => c.situacao === r).length);
+  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
+
+  const topo = (
+    <div className="flex flex-wrap items-center gap-2">
+      {abas}
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        {comEnvio.length > 0 && (
+          <>
+            <Select value={escolhida} onValueChange={setEscolhida}>
+              <SelectTrigger className="w-56" aria-label="Campanha do painel" data-slot="resultados-filtro">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas as campanhas</SelectItem>
+                {comEnvio.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <SeletorDePeriodo valor={periodo} aoMudar={setPeriodo} />
+          </>
+        )}
+        <Button onClick={nova} data-slot="campanhas-nova">
+          <Plus aria-hidden />
+          Nova campanha
+        </Button>
+      </div>
+    </div>
+  );
 
   if (campanhas.length === 0) {
     return (
       <div className="flex flex-col gap-6">
-        <Topo nova={nova} />
+        {topo}
         <Card variant="conteudo" className="py-4">
           <EstadoVazio
             icone={Megaphone}
             titulo="Nenhuma campanha ainda"
-            texto="Uma campanha manda uma mensagem para os leads de uma busca, 10 por dia. Os resultados aparecem aqui assim que a primeira sair."
+            texto="Crie a primeira campanha a partir de uma busca de leads. Os resultados aparecem aqui."
           >
             <Button className="mt-2" onClick={nova}>
               <Plus aria-hidden />
@@ -217,121 +238,70 @@ function AbaCampanhas({
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <Topo nova={nova}>
-          {comEnvio.length > 0 && (
-            <Select value={escolhida} onValueChange={setEscolhida}>
-              <SelectTrigger className="w-60" aria-label="Campanha do painel" data-slot="resultados-filtro">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas as campanhas</SelectItem>
-                {comEnvio.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <SeletorDePeriodo valor={periodo} aoMudar={setPeriodo} />
-        </Topo>
-        <PainelDeResultados
-          envios={painel.envios}
-          anteriores={painel.anteriores}
-          contra={`os ${dias} dias anteriores`}
-          serie={painel.serie}
-          quantasVariantes={3}
-          variantes={painel.variantes}
-          legenda={PERIODOS[periodo].legenda}
+    <div className="flex flex-col gap-6">
+      {topo}
+      <PainelDeResultados
+        envios={painel.envios}
+        anteriores={painel.anteriores}
+        contra={`os ${dias} dias anteriores`}
+        serie={painel.serie}
+        quantasVariantes={3}
+        variantes={painel.variantes}
+        legenda={PERIODOS[periodo].legenda}
+      />
+
+      <Card variant="conteudo" className="overflow-hidden" data-bloco="campanhas-tabela">
+        <BarraDaTabela
+          busca={q}
+          aoBuscar={setQ}
+          placeholder="Buscar campanha"
+          rotuloDaBusca="Buscar campanha pelo nome"
+          filtro={
+            <BotaoDeFiltro
+              slot="campanhas-filtro"
+              ativos={situacao ? 1 : 0}
+              rotulo={situacao ? `Filtrar por situação: ${SITUACOES.find((s) => s.chave === situacao)?.rotulo}` : "Filtrar por situação"}
+              grupos={[
+                {
+                  titulo: "Situação",
+                  opcoes: [
+                    { chave: "todas", rotulo: "Todas", contagem: campanhas.length, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                    ...SITUACOES.map((s) => ({
+                      chave: s.chave,
+                      rotulo: s.rotulo,
+                      contagem: campanhas.filter((c) => c.situacao === s.chave).length,
+                      marcado: situacao === s.chave,
+                      aoEscolher: () => setSituacao(s.chave),
+                    })),
+                  ],
+                },
+              ]}
+            />
+          }
+        >
+          <h3 className="text-cartao text-ink">Campanhas</h3>
+        </BarraDaTabela>
+        <CabecalhoDaTabela
+          grade={GRADE}
+          colunas={["Campanha", "Situação", "Progresso", "Respostas", `${DIAS_DA_LINHA} dias`, "Quando", ""]}
         />
-      </div>
-
-      <section className="flex flex-col gap-3" aria-labelledby="campanhas-tabela-titulo">
-        <h3 id="campanhas-tabela-titulo" className="text-cartao text-ink">
-          Todas as campanhas
-        </h3>
-        <Card variant="conteudo" className="overflow-hidden">
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Situação">
-              {RECORTES.map((r) => (
-                <Button
-                  key={r}
-                  variant="chip"
-                  size="chip"
-                  aria-pressed={recorte === r}
-                  onClick={() => setRecorte(r)}
-                  data-slot="campanhas-recorte"
-                  data-recorte={r}
-                >
-                  {ROTULO_DO_RECORTE[r]}
-                  <span className="tabular-nums opacity-70">{contagem(r)}</span>
-                </Button>
-              ))}
-            </div>
-            <CampoBusca
-              className="ml-auto w-full sm:w-64"
-              valor={q}
-              aoMudar={setQ}
-              placeholder="Buscar campanha"
-              rotulo="Buscar campanha pelo nome"
-              aoLimpar={() => setQ("")}
-              mostrarLimpar={q !== ""}
-            />
-          </div>
-          <CabecalhoDaTabela
-            grade={GRADE}
-            colunas={["Campanha", "Situação", "Progresso", "Respostas", `${DIAS_DA_LINHA} dias`, "Quando", ""]}
-          />
-          {itens.length === 0 && !carregando ? (
-            <EstadoVazio
-              tamanho="compacto"
-              texto={busca ? `Nenhuma campanha com "${q.trim()}".` : "Nenhuma campanha nesta situação."}
-            />
-          ) : (
-            <ul className="divide-y divide-line-soft" data-slot="campanhas-lista">
-              {itens.map((c) => (
-                <LinhaDaCampanha
-                  key={c.id}
-                  campanha={porId.get(c.id) ?? c}
-                  conexoes={conexoes}
-                  agora={agora}
-                  abrir={() => (c.situacao === "rascunho" ? editar(c.id) : abrir(c.id))}
-                />
-              ))}
-            </ul>
-          )}
-          <RodapeDaTabela
-            mostrando={itens.length}
-            total={total}
-            temMais={temMais}
-            carregando={carregando}
-            fimRef={fimRef}
-            slot="campanhas"
-          />
-        </Card>
-      </section>
-    </div>
-  );
-}
-
-function Topo({ nova, children }: { nova: () => void; children?: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
-      <div className="min-w-0">
-        <h2 className="text-titulo text-ink">Campanhas</h2>
-        <p className="mt-1 text-apoio text-ink-2">
-          Uma mensagem só para cada lead, no máximo 10 por dia, das 8h às 18h. Quem responde cai em Conversas.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {children}
-        <Button onClick={nova} data-slot="campanhas-nova">
-          <Plus aria-hidden />
-          Nova campanha
-        </Button>
-      </div>
+        {itens.length === 0 ? (
+          <EstadoVazio tamanho="compacto" texto={busca ? `Nenhuma campanha com "${q.trim()}".` : "Nenhuma campanha nesta situação."} />
+        ) : (
+          <ul className="divide-y divide-line-soft" data-slot="campanhas-lista">
+            {itens.map((c) => (
+              <LinhaDaCampanha
+                key={c.id}
+                campanha={c}
+                conexoes={conexoes}
+                agora={agora}
+                abrir={() => (c.situacao === "rascunho" ? editar(c.id) : abrir(c.id))}
+              />
+            ))}
+          </ul>
+        )}
+        <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="campanhas" />
+      </Card>
     </div>
   );
 }

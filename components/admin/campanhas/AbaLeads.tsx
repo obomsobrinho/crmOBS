@@ -2,40 +2,39 @@
 
 import { memo, useCallback, useMemo, useState } from "react";
 import { AlertCircle, ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
+import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CampoBusca } from "@/components/ui/campo-busca";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
 import { Aviso } from "@/components/ui/aviso";
 import { Medidor } from "@/components/ui/medidor";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Indicador } from "@/components/admin/pecas";
 import { normalizar } from "@/lib/clientes";
 import { mascaraTelefoneBR, numeroBR, pct, plural } from "@/lib/format";
 import { diaMesHoraSP } from "@/lib/fuso";
 import {
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
-  telefoneDoLead,
   resumoDaBase,
   siteDoLead,
+  telefoneDoLead,
   tipoDoTelefone,
   type ResumoDaBase,
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
+import { FaixaDeNumeros } from "./faixa";
 import { CabecalhoDoGrafico, GraficoDoFunil, GraficoPorCidade, Rosca, degrausDoFunil } from "./graficos";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
-import { CabecalhoDaTabela, RodapeDaTabela, usePaginadaDaMemoria } from "./tabela";
+import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
 import type { Busca, Campanha, Lead } from "./tipos";
 
 // LEADS, a base: o painel no topo (quantos, onde, quantos já contatados e quem
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,
-// com busca digitando e filtros. A busca abre o detalhe com os leads dela.
+// com busca digitando e o botão de filtro. A busca abre o detalhe com os leads dela.
 
 /** O resumo pela regra pura; quem respondeu sai das campanhas. */
 function resumir(leads: Lead[], responderam: Set<string>): ResumoDaBase {
@@ -44,7 +43,7 @@ function resumir(leads: Lead[], responderam: Set<string>): ResumoDaBase {
 
 // ── O painel da base ────────────────────────────────────────────────────
 
-function PainelDaBase({ r, legenda }: { r: ResumoDaBase; legenda: string }) {
+function PainelDaBase({ r }: { r: ResumoDaBase }) {
   const cidades = r.porCidade.slice(0, 8).map((c) => ({
     chave: c.cidade,
     rotulo: c.cidade,
@@ -61,74 +60,52 @@ function PainelDaBase({ r, legenda }: { r: ResumoDaBase; legenda: string }) {
   ]);
   return (
     <div className="flex flex-col gap-4" data-slot="leads-painel">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <Indicador
-          variant="elevado"
-          rotulo="Na base"
-          valor={numeroBR(r.total)}
-          frase={`${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}`}
-          legenda={legenda}
-          data-indicador="base"
-        />
-        <Indicador
-          variant="elevado"
-          rotulo="Com celular"
-          valor={numeroBR(r.comCelular)}
-          frase={`${pct(r.comCelular, r.total)}% podem receber WhatsApp`}
-          legenda={legenda}
-          data-indicador="celular"
-        />
-        <Indicador
-          variant="elevado"
-          rotulo="A contatar"
-          valor={numeroBR(r.aContatar)}
-          frase={`Cerca de ${numeroBR(Math.ceil(r.aContatar / 10))} ${plural(Math.ceil(r.aContatar / 10), "dia", "dias")} a 10 por dia`}
-          legenda={legenda}
-          data-indicador="a-contatar"
-        />
-        <Indicador
-          variant="elevado"
-          rotulo="Marcados como bons"
-          valor={numeroBR(r.bons)}
-          frase="Você escolheu na tabela"
-          legenda={legenda}
-          data-indicador="bons"
-        />
-        <Indicador
-          variant="elevado"
-          rotulo="Responderam"
-          valor={numeroBR(r.responderam)}
-          frase={r.contatados > 0 ? `${pct(r.responderam, r.contatados)}% dos contatados` : "Ninguém contatado ainda"}
-          legenda={legenda}
-          className="col-span-2 md:col-span-1"
-          data-indicador="responderam"
-        />
-      </div>
+      <FaixaDeNumeros
+        celulas={[
+          {
+            chave: "base",
+            rotulo: "Na base",
+            valor: numeroBR(r.total),
+            frase: `${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}`,
+          },
+          {
+            chave: "celular",
+            rotulo: "Com celular",
+            valor: numeroBR(r.comCelular),
+            complemento: `${pct(r.comCelular, r.total)}%`,
+            frase: "da base",
+          },
+          {
+            chave: "contatados",
+            rotulo: "Contatados",
+            valor: numeroBR(r.contatados),
+            complemento: `${pct(r.contatados, r.comCelular)}%`,
+            frase: `${numeroBR(r.aContatar)} ainda a contatar`,
+          },
+          {
+            chave: "responderam",
+            rotulo: "Responderam",
+            valor: numeroBR(r.responderam),
+            complemento: r.contatados > 0 ? `${pct(r.responderam, r.contatados)}%` : undefined,
+            frase: "dos contatados",
+          },
+        ]}
+      />
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card variant="conteudo" className="p-6 xl:col-span-2" data-bloco="leads-cidades">
-          <CabecalhoDoGrafico
-            titulo="Leads por cidade"
-            frase={
-              r.porCidade.length > cidades.length
-                ? `As ${cidades.length} cidades com mais leads, de ${r.porCidade.length}.`
-                : "Quantos já receberam a mensagem, quantos ainda podem receber e quantos ficam fora (sem celular, descartados ou que pediram para parar)."
-            }
-          />
+          <CabecalhoDoGrafico titulo="Leads por cidade" />
           <GraficoPorCidade barras={cidades} />
         </Card>
         <Card variant="conteudo" className="p-6" data-bloco="leads-funil">
-          <CabecalhoDoGrafico titulo="Funil da base" frase="De quem a busca achou até quem respondeu a uma campanha." />
+          <CabecalhoDoGrafico titulo="Funil da base" />
           <GraficoDoFunil degraus={funil} />
         </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card variant="conteudo" className="p-6" data-bloco="leads-site">
-          <CabecalhoDoGrafico
-            titulo="Presença online"
-            frase="Quem não tem site próprio costuma ser quem mais precisa de um atendimento organizado."
-          />
+          <CabecalhoDoGrafico titulo="Presença online" />
           <Rosca
             nome="Leads por presença online"
             unidade={["lead", "leads"]}
@@ -140,10 +117,7 @@ function PainelDaBase({ r, legenda }: { r: ResumoDaBase; legenda: string }) {
           />
         </Card>
         <Card variant="conteudo" className="p-6" data-bloco="leads-pontuacao">
-          <CabecalhoDoGrafico
-            titulo="Pontuação"
-            frase="Celular válido, segmento, site e avaliações no Google. Os pesos ainda são provisórios."
-          />
+          <CabecalhoDoGrafico titulo="Pontuação" />
           <Rosca
             nome="Leads por pontuação"
             unidade={["lead", "leads"]}
@@ -163,8 +137,6 @@ function PainelDaBase({ r, legenda }: { r: ResumoDaBase; legenda: string }) {
 
 const GRADE_BUSCAS =
   "xl:grid xl:grid-cols-[minmax(0,2.2fr)_110px_repeat(3,minmax(0,0.8fr))_minmax(0,1.4fr)_minmax(0,0.9fr)_20px] xl:items-center xl:gap-5";
-
-type RecorteDaBusca = "todas" | SituacaoDaBusca;
 
 interface ContagemDaBusca {
   total: number;
@@ -233,8 +205,7 @@ function LinhaDaBusca({
             ))}
             <span className="flex min-w-[140px] flex-1 flex-col gap-1.5 xl:min-w-0">
               <span className="text-legenda tabular-nums text-ink-2">
-                <span className="font-semibold text-ink">{numeroBR(contagem.contatados)}</span> de{" "}
-                {numeroBR(contagem.comCelular)} contatados
+                <span className="font-semibold text-ink">{numeroBR(contagem.contatados)}</span> de {numeroBR(contagem.comCelular)}
                 {contagem.responderam > 0 && <span className="text-ink-3"> · {numeroBR(contagem.responderam)} responderam</span>}
               </span>
               <Medidor
@@ -249,7 +220,7 @@ function LinhaDaBusca({
             {busca.situacao === "buscando" ? (
               <>
                 <Loader2 size={14} aria-hidden className="animate-spin text-ink-3 motion-reduce:animate-none" />
-                Procurando empresas. Pode sair desta tela, a busca continua.
+                Procurando empresas
               </>
             ) : (
               busca.erro
@@ -263,13 +234,17 @@ function LinhaDaBusca({
   );
 }
 
+const SITUACOES_DA_BUSCA: SituacaoDaBusca[] = ["pronta", "buscando", "falhou"];
+
 function TabelaDeBuscas({
+  esquerda,
   buscas,
   leads,
   responderam,
   agora,
   abrir,
 }: {
+  esquerda: React.ReactNode;
   buscas: Busca[];
   leads: Lead[];
   responderam: Set<string>;
@@ -278,24 +253,16 @@ function TabelaDeBuscas({
 }) {
   const [q, setQ] = useState("");
   const busca = useDebounce(normalizar(q.trim()), 300);
-  const [recorte, setRecorte] = useState<RecorteDaBusca>("todas");
-  const params = useMemo(() => ({ busca, recorte }), [busca, recorte]);
+  const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
+  const params = useMemo(() => ({ busca, situacao }), [busca, situacao]);
   const filtrar = useCallback(
-    (p: { busca: string; recorte: RecorteDaBusca }) =>
+    (p: { busca: string; situacao: SituacaoDaBusca | null }) =>
       buscas.filter(
-        (b) =>
-          (p.recorte === "todas" || b.situacao === p.recorte) &&
-          (!p.busca || normalizar(`${b.termo} ${b.cidade}`).includes(p.busca)),
+        (b) => (p.situacao === null || b.situacao === p.situacao) && (!p.busca || normalizar(`${b.termo} ${b.cidade}`).includes(p.busca)),
       ),
     [buscas],
   );
-  const { itens, temMais, carregando, fimRef, total } = usePaginadaDaMemoria({
-    params,
-    filtrar,
-    chave: (b: Busca) => b.id,
-    versao: buscas,
-  });
-  const porId = useMemo(() => new Map(buscas.map((b) => [b.id, b])), [buscas]);
+  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
   const porBusca = useMemo(() => {
     const m = new Map<string, Lead[]>();
     for (const l of leads) m.set(l.buscaId, [...(m.get(l.buscaId) ?? []), l]);
@@ -304,55 +271,47 @@ function TabelaDeBuscas({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Situação da busca">
-          {(["todas", "pronta", "buscando", "falhou"] as RecorteDaBusca[]).map((r) => (
-            <Button
-              key={r}
-              variant="chip"
-              size="chip"
-              aria-pressed={recorte === r}
-              onClick={() => setRecorte(r)}
-              data-slot="buscas-recorte"
-              data-recorte={r}
-            >
-              {r === "todas" ? "Todas" : ROTULO_DA_BUSCA[r]}
-              <span className="tabular-nums opacity-70">
-                {r === "todas" ? buscas.length : buscas.filter((b) => b.situacao === r).length}
-              </span>
-            </Button>
-          ))}
-        </div>
-        <CampoBusca
-          className="ml-auto w-full sm:w-64"
-          valor={q}
-          aoMudar={setQ}
-          placeholder="Segmento ou cidade"
-          rotulo="Buscar por segmento ou cidade"
-          aoLimpar={() => setQ("")}
-          mostrarLimpar={q !== ""}
-        />
-      </div>
-      <CabecalhoDaTabela
-        grade={GRADE_BUSCAS}
-        colunas={["Busca", "Situação", "Achadas", "Com celular", "Bons", "Contatados", "Quando", ""]}
-      />
-      {itens.length === 0 && !carregando ? (
+      <BarraDaTabela
+        busca={q}
+        aoBuscar={setQ}
+        placeholder="Segmento ou cidade"
+        rotuloDaBusca="Buscar por segmento ou cidade"
+        filtro={
+          <BotaoDeFiltro
+            slot="buscas-filtro"
+            ativos={situacao ? 1 : 0}
+            rotulo={situacao ? `Filtrar buscas: ${ROTULO_DA_BUSCA[situacao]}` : "Filtrar buscas"}
+            grupos={[
+              {
+                titulo: "Situação",
+                opcoes: [
+                  { chave: "todas", rotulo: "Todas", contagem: buscas.length, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                  ...SITUACOES_DA_BUSCA.map((s) => ({
+                    chave: s,
+                    rotulo: ROTULO_DA_BUSCA[s],
+                    contagem: buscas.filter((b) => b.situacao === s).length,
+                    marcado: situacao === s,
+                    aoEscolher: () => setSituacao(s),
+                  })),
+                ],
+              },
+            ]}
+          />
+        }
+      >
+        {esquerda}
+      </BarraDaTabela>
+      <CabecalhoDaTabela grade={GRADE_BUSCAS} colunas={["Busca", "Situação", "Achadas", "Com celular", "Bons", "Contatados", "Quando", ""]} />
+      {itens.length === 0 ? (
         <EstadoVazio tamanho="compacto" texto={busca ? `Nenhuma busca com "${q.trim()}".` : "Nenhuma busca nesta situação."} />
       ) : (
         <ul className="divide-y divide-line-soft" data-slot="leads-buscas">
           {itens.map((b) => (
-            <LinhaDaBusca
-              key={b.id}
-              busca={porId.get(b.id) ?? b}
-              contagem={contar(porBusca.get(b.id) ?? [], responderam)}
-              agora={agora}
-              abrir={() => abrir(b.id)}
-            />
+            <LinhaDaBusca key={b.id} busca={b} contagem={contar(porBusca.get(b.id) ?? [], responderam)} agora={agora} abrir={() => abrir(b.id)} />
           ))}
         </ul>
       )}
-      <RodapeDaTabela mostrando={itens.length} total={total} temMais={temMais} carregando={carregando} fimRef={fimRef} slot="buscas" />
+      <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="buscas" />
     </>
   );
 }
@@ -373,7 +332,7 @@ const GRADE_LEADS =
 
 interface ParamsDosLeads {
   busca: string;
-  cidade: string;
+  cidade: string | null;
   filtros: Filtro[];
 }
 
@@ -483,11 +442,13 @@ function LinhaDoLead({
 }
 
 function TabelaDeLeads({
+  esquerda,
   leads,
   campanhas,
   responderam,
   marcar,
 }: {
+  esquerda: React.ReactNode;
   /** O escopo: todos os leads, ou os de uma busca. */
   leads: Lead[];
   campanhas: Campanha[];
@@ -496,87 +457,76 @@ function TabelaDeLeads({
 }) {
   const [q, setQ] = useState("");
   const busca = useDebounce(normalizar(q.trim()), 300);
-  const [cidade, setCidade] = useState("todas");
+  const [cidade, setCidade] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<Filtro[]>([]);
   const cidades = useMemo(() => [...new Set(leads.map((l) => l.cidade))].sort((a, b) => a.localeCompare(b, "pt-BR")), [leads]);
   const params = useMemo<ParamsDosLeads>(() => ({ busca, cidade, filtros }), [busca, cidade, filtros]);
   const filtrar = useCallback(
-    (p: ParamsDosLeads) =>
-      leads.filter(
+    (p: ParamsDosLeads) => {
+      const digitos = p.busca.replace(/\D/g, "");
+      return leads.filter(
         (l) =>
-          (!p.busca || normalizar(l.nome).includes(p.busca) || (l.telefone ?? "").includes(p.busca.replace(/\D/g, "") || "#")) &&
-          (p.cidade === "todas" || l.cidade === p.cidade) &&
+          (!p.busca || normalizar(l.nome).includes(p.busca) || (digitos.length >= 3 && (l.telefone ?? "").includes(digitos))) &&
+          (p.cidade === null || l.cidade === p.cidade) &&
           (!p.filtros.includes("nao_contatados") || l.campanhaIds.length === 0) &&
           (!p.filtros.includes("bons") || l.marcacao === "bom") &&
           (!p.filtros.includes("sem_site") || siteDoLead(l.site) !== "sim") &&
           (!p.filtros.includes("nota") || (l.nota ?? 0) >= 4.5),
-      ),
+      );
+    },
     [leads],
   );
-  const { itens, temMais, carregando, fimRef, total } = usePaginadaDaMemoria({
-    params,
-    filtrar,
-    chave: (l: Lead) => l.id,
-    versao: leads,
-  });
-  const porId = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
+  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
   const porCampanha = useMemo(() => new Map(campanhas.map((c) => [c.id, c])), [campanhas]);
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
 
+  const grupos = [
+    {
+      titulo: "Mostrar só",
+      multiplo: true,
+      opcoes: FILTROS.map((f) => ({ chave: f.chave, rotulo: f.rotulo, marcado: filtros.includes(f.chave), aoEscolher: () => alternar(f.chave) })),
+    },
+    ...(cidades.length > 1
+      ? [
+          {
+            titulo: "Cidade",
+            opcoes: [
+              { chave: "cidade-todas", rotulo: "Todas as cidades", marcado: cidade === null, aoEscolher: () => setCidade(null) },
+              ...cidades.map((c) => ({ chave: `cidade-${c}`, rotulo: c, marcado: cidade === c, aoEscolher: () => setCidade(c) })),
+            ],
+          },
+        ]
+      : []),
+  ];
+
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filtros">
-          {FILTROS.map((f) => (
-            <Button
-              key={f.chave}
-              variant="chip"
-              size="chip"
-              aria-pressed={filtros.includes(f.chave)}
-              onClick={() => alternar(f.chave)}
-              data-slot="leads-filtro"
-              data-filtro={f.chave}
-            >
-              {f.rotulo}
-            </Button>
-          ))}
-        </div>
-        <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {cidades.length > 1 && (
-            <Select value={cidade} onValueChange={setCidade}>
-              <SelectTrigger className="w-44" aria-label="Cidade" data-slot="leads-cidade">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas as cidades</SelectItem>
-                {cidades.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <CampoBusca
-            className="min-w-0 flex-1 sm:w-64 sm:flex-none"
-            valor={q}
-            aoMudar={setQ}
-            placeholder="Nome ou telefone"
-            rotulo="Buscar lead pelo nome ou telefone"
-            aoLimpar={() => setQ("")}
-            mostrarLimpar={q !== ""}
+      <BarraDaTabela
+        busca={q}
+        aoBuscar={setQ}
+        placeholder="Nome ou telefone"
+        rotuloDaBusca="Buscar lead pelo nome ou telefone"
+        filtro={
+          <BotaoDeFiltro
+            slot="leads-filtro"
+            largura="w-60"
+            ativos={filtros.length + (cidade ? 1 : 0)}
+            rotulo={filtros.length + (cidade ? 1 : 0) > 0 ? `Filtrar leads: ${filtros.length + (cidade ? 1 : 0)} ligados` : "Filtrar leads"}
+            grupos={grupos}
           />
-        </div>
-      </div>
+        }
+      >
+        {esquerda}
+      </BarraDaTabela>
       <CabecalhoDaTabela grade={GRADE_LEADS} colunas={["Empresa", "Google", "Site", "Telefone", "Pontos", "Campanhas", ""]} />
-      {itens.length === 0 && !carregando ? (
-        <EstadoVazio tamanho="compacto" texto="Nenhum lead com esses filtros. Tire um filtro ou mude a busca." />
+      {itens.length === 0 ? (
+        <EstadoVazio tamanho="compacto" texto="Nenhum lead com esses filtros." />
       ) : (
         <ul className="divide-y divide-line-soft" data-slot="leads-tabela">
           {itens.map((l) => (
             <LinhaDoLead
               key={l.id}
-              lead={porId.get(l.id) ?? l}
+              lead={l}
               campanhas={porCampanha}
               respondeu={responderam.has(l.id)}
               marcar={(m) => marcar(l.id, m)}
@@ -584,7 +534,7 @@ function TabelaDeLeads({
           ))}
         </ul>
       )}
-      <RodapeDaTabela mostrando={itens.length} total={total} temMais={temMais} carregando={carregando} fimRef={fimRef} slot="leads" />
+      <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="leads" />
     </>
   );
 }
@@ -592,6 +542,7 @@ function TabelaDeLeads({
 // ── A home da aba e o detalhe da busca ─────────────────────────────────
 
 function HomeDosLeads({
+  abas,
   buscas,
   leads,
   campanhas,
@@ -603,6 +554,7 @@ function HomeDosLeads({
   marcar,
   voltarAoRascunho,
 }: {
+  abas: React.ReactNode;
   buscas: Busca[];
   leads: Lead[];
   campanhas: Campanha[];
@@ -616,83 +568,79 @@ function HomeDosLeads({
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
   const r = useMemo(() => resumir(leads, responderam), [leads, responderam]);
+  const seletorDaVista = (
+    <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
+      <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
+        <TabsTrigger value="buscas" variant="painel" data-slot="leads-ver-buscas">
+          Buscas
+          <span className="ml-1.5 tabular-nums text-ink-3">{buscas.length}</span>
+        </TabsTrigger>
+        <TabsTrigger value="leads" variant="painel" data-slot="leads-ver-todos">
+          Todos os leads
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(leads.length)}</span>
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-titulo text-ink">Leads</h2>
-            <p className="mt-1 text-apoio text-ink-2">
-              Cada busca traz empresas de um segmento numa cidade. A base guarda todas, sem repetir telefone.
-            </p>
-          </div>
-          <Button onClick={novaBusca} data-slot="leads-nova-busca">
-            <Plus aria-hidden />
-            Nova busca
-          </Button>
-        </div>
-
-        {rascunho && (
-          <Aviso tom="neutro" forma="faixa" data-bloco="leads-rascunho" className="flex-wrap justify-between">
-            <span>
-              A campanha <strong className="font-semibold">{rascunho.nome || "sem nome"}</strong> está esperando os contatos.
-            </span>
-            <Button variant="link" size="link" onClick={voltarAoRascunho}>
-              Voltar para a campanha
-            </Button>
-          </Aviso>
-        )}
-
-        {buscas.length === 0 ? (
-          <Card variant="conteudo" className="py-4">
-            <EstadoVazio
-              icone={Search}
-              titulo="Nenhuma busca ainda"
-              texto="Comece buscando um segmento e uma cidade, por exemplo clínica de estética em Mutum. O painel da base aparece assim que a primeira terminar."
-            >
-              <Button className="mt-2" onClick={novaBusca}>
-                <Plus aria-hidden />
-                Nova busca
-              </Button>
-            </EstadoVazio>
-          </Card>
-        ) : (
-          <PainelDaBase r={r} legenda="A base inteira" />
-        )}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center gap-2">
+        {abas}
+        <Button className="ml-auto" onClick={novaBusca} data-slot="leads-nova-busca">
+          <Plus aria-hidden />
+          Nova busca
+        </Button>
       </div>
 
-      {buscas.length > 0 && (
-        <section className="flex flex-col gap-3" aria-label="Tabela da base">
-          <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
-            <TabsList variant="painel" aria-label="Ver por">
-              <TabsTrigger value="buscas" variant="painel" data-slot="leads-ver-buscas">
-                Buscas
-                <span className="ml-1.5 tabular-nums text-ink-3">{buscas.length}</span>
-              </TabsTrigger>
-              <TabsTrigger value="leads" variant="painel" data-slot="leads-ver-todos">
-                Todos os leads
-                <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(leads.length)}</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Card variant="conteudo" className="overflow-hidden">
+      {rascunho && (
+        <Aviso tom="neutro" forma="faixa" data-bloco="leads-rascunho" className="flex-wrap justify-between">
+          <span>
+            A campanha <strong className="font-semibold">{rascunho.nome || "sem nome"}</strong> está esperando os contatos.
+          </span>
+          <Button variant="link" size="link" onClick={voltarAoRascunho}>
+            Voltar para a campanha
+          </Button>
+        </Aviso>
+      )}
+
+      {buscas.length === 0 ? (
+        <Card variant="conteudo" className="py-4">
+          <EstadoVazio
+            icone={Search}
+            titulo="Nenhuma busca ainda"
+            texto="Comece buscando um segmento e uma cidade, por exemplo clínica de estética em Mutum."
+          >
+            <Button className="mt-2" onClick={novaBusca}>
+              <Plus aria-hidden />
+              Nova busca
+            </Button>
+          </EstadoVazio>
+        </Card>
+      ) : (
+        <>
+          <PainelDaBase r={r} />
+          <Card variant="conteudo" className="overflow-hidden" data-bloco="leads-tabela">
             {vista === "buscas" ? (
-              <TabelaDeBuscas buscas={buscas} leads={leads} responderam={responderam} agora={agora} abrir={abrir} />
+              <TabelaDeBuscas
+                esquerda={seletorDaVista}
+                buscas={buscas}
+                leads={leads}
+                responderam={responderam}
+                agora={agora}
+                abrir={abrir}
+              />
             ) : (
-              <TabelaDeLeads leads={leads} campanhas={campanhas} responderam={responderam} marcar={marcar} />
+              <TabelaDeLeads esquerda={seletorDaVista} leads={leads} campanhas={campanhas} responderam={responderam} marcar={marcar} />
             )}
           </Card>
-          <p className="text-legenda text-ink-3">
-            Telefone fixo, inválido ou de quem pediu para parar nunca entra numa campanha. Quem já passou por uma campanha só
-            entra em outra se você escolher.
-          </p>
-        </section>
+        </>
       )}
     </div>
   );
 }
 
 function DetalheDaBusca({
+  abas,
   busca,
   leads,
   campanhas,
@@ -701,6 +649,7 @@ function DetalheDaBusca({
   marcar,
   criarCampanha,
 }: {
+  abas: React.ReactNode;
   busca: Busca;
   leads: Lead[];
   campanhas: Campanha[];
@@ -711,9 +660,14 @@ function DetalheDaBusca({
 }) {
   const daBusca = useMemo(() => leads.filter((l) => l.buscaId === busca.id), [leads, busca.id]);
   const c = contar(daBusca, responderam);
-  const legenda = `Busca de ${diaMesHoraSP(busca.criadaEm)}`;
   return (
     <div className="flex flex-col gap-6" data-slot="busca-detalhe">
+      <div className="flex flex-wrap items-center gap-2">
+        {abas}
+        <Button className="ml-auto" onClick={criarCampanha} data-slot="busca-criar-campanha">
+          Criar campanha com esta busca
+        </Button>
+      </div>
       <TopoDeDetalhe
         voltar={voltar}
         rotuloDoVoltar="Leads"
@@ -723,42 +677,38 @@ function DetalheDaBusca({
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}
-        apoio={`${legenda}. ${numeroBR(c.total)} ${plural(c.total, "empresa achada", "empresas achadas")}.`}
-      >
-        <Button onClick={criarCampanha} data-slot="busca-criar-campanha">
-          Criar campanha com esta busca
-        </Button>
-      </TopoDeDetalhe>
+        apoio={`Busca de ${diaMesHoraSP(busca.criadaEm)}`}
+      />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        <Indicador variant="elevado" rotulo="Achadas" valor={numeroBR(c.total)} frase="Sem repetir telefone da base" legenda={legenda} />
-        <Indicador
-          variant="elevado"
-          rotulo="Com celular"
-          valor={numeroBR(c.comCelular)}
-          frase="Os únicos que podem receber"
-          legenda={legenda}
-        />
-        <Indicador variant="elevado" rotulo="Bons" valor={numeroBR(c.bons)} frase="Você marcou" legenda={legenda} />
-        <Indicador
-          variant="elevado"
-          rotulo="Contatados"
-          valor={numeroBR(c.contatados)}
-          frase={`${pct(c.contatados, Math.max(1, c.comCelular))}% dos com celular`}
-          legenda={legenda}
-        />
-        <Indicador
-          variant="elevado"
-          rotulo="Responderam"
-          valor={numeroBR(c.responderam)}
-          frase={c.contatados > 0 ? `${pct(c.responderam, c.contatados)}% dos contatados` : "Ninguém contatado ainda"}
-          legenda={legenda}
-          className="col-span-2 md:col-span-1"
-        />
-      </div>
+      <FaixaDeNumeros
+        celulas={[
+          { chave: "achadas", rotulo: "Achadas", valor: numeroBR(c.total), frase: `${numeroBR(c.bons)} marcadas como boas` },
+          { chave: "celular", rotulo: "Com celular", valor: numeroBR(c.comCelular), complemento: `${pct(c.comCelular, c.total)}%`, frase: "das achadas" },
+          {
+            chave: "contatados",
+            rotulo: "Contatados",
+            valor: numeroBR(c.contatados),
+            complemento: `${pct(c.contatados, Math.max(1, c.comCelular))}%`,
+            frase: "dos com celular",
+          },
+          {
+            chave: "responderam",
+            rotulo: "Responderam",
+            valor: numeroBR(c.responderam),
+            complemento: c.contatados > 0 ? `${pct(c.responderam, c.contatados)}%` : undefined,
+            frase: "dos contatados",
+          },
+        ]}
+      />
 
-      <Card variant="conteudo" className="overflow-hidden">
-        <TabelaDeLeads leads={daBusca} campanhas={campanhas} responderam={responderam} marcar={marcar} />
+      <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
+        <TabelaDeLeads
+          esquerda={<h3 className="text-cartao text-ink">Leads</h3>}
+          leads={daBusca}
+          campanhas={campanhas}
+          responderam={responderam}
+          marcar={marcar}
+        />
       </Card>
     </div>
   );
@@ -782,9 +732,7 @@ function DialogoDeNovaBusca({
     <Dialog open={aberto} onOpenChange={aoMudar}>
       <DialogContent tamanho="gestao" data-slot="nova-busca">
         <DialogTitle>Nova busca</DialogTitle>
-        <DialogDescription>
-          Procura empresas no Google Maps. Leva alguns minutos e roda em segundo plano: pode fechar e voltar depois.
-        </DialogDescription>
+        <DialogDescription>Procura empresas no Google Maps. Leva alguns minutos e roda em segundo plano.</DialogDescription>
         <form
           className="mt-4 flex flex-col gap-4"
           onSubmit={(e) => {
@@ -805,7 +753,7 @@ function DialogoDeNovaBusca({
           </label>
           <p className="flex items-start gap-2 text-legenda text-ink-3">
             <AlertCircle size={14} aria-hidden className="mt-0.5 shrink-0" />
-            Cada busca gasta crédito da fonte de leads. Empresas que já estão na base não são duplicadas.
+            Cada busca gasta crédito da fonte de leads.
           </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => aoMudar(false)}>
@@ -824,6 +772,7 @@ function DialogoDeNovaBusca({
 // ── A aba ───────────────────────────────────────────────────────────────
 
 function AbaLeads({
+  abas,
   buscas,
   leads,
   campanhas,
@@ -836,6 +785,8 @@ function AbaLeads({
   criarCampanhaDaBusca,
   voltarAoRascunho,
 }: {
+  /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
+  abas: React.ReactNode;
   buscas: Busca[];
   leads: Lead[];
   campanhas: Campanha[];
@@ -858,6 +809,7 @@ function AbaLeads({
     <>
       {busca ? (
         <DetalheDaBusca
+          abas={abas}
           busca={busca}
           leads={leads}
           campanhas={campanhas}
@@ -868,6 +820,7 @@ function AbaLeads({
         />
       ) : (
         <HomeDosLeads
+          abas={abas}
           buscas={buscas}
           leads={leads}
           campanhas={campanhas}

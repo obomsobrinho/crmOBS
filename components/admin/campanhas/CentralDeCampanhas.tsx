@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Megaphone, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
 import { pontuarLead, telefoneDoLead } from "@/lib/prospeccao";
@@ -13,43 +11,12 @@ import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
 import { leadsDoFiltro, type Busca, type Campanha, type ConexaoDisponivel, type Lead, type Tela } from "./tipos";
 
-// CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). Um
-// menu à esquerda troca a tela inteira: Leads (o painel da base e as tabelas de
+// CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
+// par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
 // buscas e de leads) e Campanhas (o painel de resultados, a tabela de
 // campanhas, o assistente e o detalhe). Hoje só o preview `/design/campanhas`
 // monta esta tela, com dados de mentira: buscar, marcar, salvar e iniciar mudam
 // só o estado da página.
-
-function ItemDoMenu({
-  ativo,
-  icone: Icone,
-  rotulo,
-  contagem,
-  aoClicar,
-  slot,
-}: {
-  ativo: boolean;
-  icone: typeof Users;
-  rotulo: string;
-  contagem: number;
-  aoClicar: () => void;
-  slot: string;
-}) {
-  return (
-    <Button
-      variant="nu"
-      size="linha"
-      onClick={aoClicar}
-      aria-current={ativo ? "page" : undefined}
-      data-slot={slot}
-      className="flex-1 justify-start text-ink-2 hover:bg-[var(--active-bg)] hover:text-ink aria-[current=page]:bg-[var(--active-bg)] aria-[current=page]:font-semibold aria-[current=page]:text-ink md:w-full md:flex-none"
-    >
-      <Icone size={18} aria-hidden className={ativo ? "text-brand-ink" : "text-ink-3"} />
-      {rotulo}
-      <span className="ml-auto text-legenda font-normal tabular-nums text-ink-3">{numeroBR(contagem)}</span>
-    </Button>
-  );
-}
 
 export default function CentralDeCampanhas({
   telaInicial,
@@ -158,28 +125,27 @@ export default function CentralDeCampanhas({
   const emDetalhe = tela.aba === "campanhas" && tela.vista === "detalhe" ? campanhas.find((c) => c.id === tela.id) : undefined;
   const irParaCampanhas = () => setTela({ aba: "campanhas", vista: "lista" });
 
+  // Leads | Campanhas: o par de abas no canto esquerdo da linha de cima de cada tela (dono, 29/10/2026).
+  const abas = (
+    <Tabs
+      value={tela.aba}
+      onValueChange={(v) => (v === "leads" ? setTela({ aba: "leads", busca: null }) : irParaCampanhas())}
+    >
+      <TabsList variant="painel" aria-label="Seções">
+        <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
+          Leads
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(leads.length)}</span>
+        </TabsTrigger>
+        <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
+          Campanhas
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(campanhas.length)}</span>
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+
   return (
-    <section aria-label="Prospecção" data-slot="campanhas" className="flex min-h-0 flex-1 flex-col gap-3 md:flex-row">
-      <Card asChild variant="conteudo" className="shrink-0 max-md:rounded-none md:w-56">
-        <nav aria-label="Prospecção" className="flex gap-1 p-2 md:flex-col md:p-3" data-slot="campanhas-menu">
-          <ItemDoMenu
-            ativo={tela.aba === "leads"}
-            icone={Users}
-            rotulo="Leads"
-            contagem={leads.length}
-            aoClicar={() => setTela({ aba: "leads", busca: null })}
-            slot="campanhas-aba-leads"
-          />
-          <ItemDoMenu
-            ativo={tela.aba === "campanhas"}
-            icone={Megaphone}
-            rotulo="Campanhas"
-            contagem={campanhas.length}
-            aoClicar={irParaCampanhas}
-            slot="campanhas-aba-campanhas"
-          />
-        </nav>
-      </Card>
+    <section aria-label="Prospecção" data-slot="campanhas" className="flex min-h-0 flex-1 flex-col">
 
       {emEdicao ? (
         <section aria-label="Nova campanha" className="flex min-h-0 min-w-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line">
@@ -207,9 +173,10 @@ export default function CentralDeCampanhas({
           tamanho={DISSOLVER_PADRAO}
           className="min-h-0 min-w-0 flex-1"
         >
-          <div className="px-4 py-6 md:px-2 md:py-2">
+          <div className="px-4 py-4 md:px-1 md:py-1">
             {tela.aba === "leads" ? (
               <AbaLeads
+                abas={abas}
                 buscas={buscas}
                 leads={leads}
                 campanhas={campanhas}
@@ -232,10 +199,10 @@ export default function CentralDeCampanhas({
               />
             ) : emDetalhe ? (
               <DetalheDaCampanha
+                abas={abas}
                 campanha={emDetalhe}
                 leads={leads}
                 conexoes={conexoes}
-                agora={agora}
                 voltar={irParaCampanhas}
                 pausarOuRetomar={() =>
                   mudarCampanha(emDetalhe.id, { situacao: emDetalhe.situacao === "pausada" ? "rodando" : "pausada" })
@@ -252,6 +219,7 @@ export default function CentralDeCampanhas({
               />
             ) : (
               <AbaCampanhas
+                abas={abas}
                 campanhas={campanhas}
                 conexoes={conexoes}
                 agora={agora}

@@ -1,65 +1,74 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { numeroBR } from "@/lib/format";
-import { usePaginada } from "@/lib/use-paginada";
+import { useState } from "react";
+import { CampoBusca } from "@/components/ui/campo-busca";
+import { Paginacao } from "@/components/ui/paginacao";
 import { cn } from "@/lib/utils";
 
-// AS TABELAS de Campanhas (campanhas, buscas, leads): cabeçalho de colunas, 10
-// linhas por página com rolagem infinita e o rodapé "Mostrando 20 de 137". De
-// verdade cada página é uma rota (keyset no servidor, busca com debounce e o
-// total por contagem); no preview a página sai da memória pela MESMA porta
-// (`usePaginada`), para a tela já nascer paginada.
+// AS TABELAS de Campanhas (campanhas, buscas, leads): a barra de cima (busca
+// digitando e o botão de filtro, igual a Clientes), o cabeçalho de colunas e a
+// paginação numerada embaixo (29/10/2026, dono: páginas de 10, "Mostrando 11 a
+// 20 de 137"). De verdade cada página é uma rota (página e total por contagem
+// no servidor); no preview a página sai da memória pela mesma forma.
 
 export const POR_PAGINA = 10;
 
 /**
- * A lista paginada do preview: `filtrar(p)` devolve o recorte inteiro da
- * memória e a página sai dele. Quando os dados mudam (`versao`), relê as linhas
- * já carregadas sem voltar para a primeira página.
+ * Uma página do recorte da memória. Trocar o recorte (`params`) volta para a
+ * página 1; a página nunca passa da última (um filtro que encolhe a lista).
  */
-export function usePaginadaDaMemoria<T, P>({
-  params,
-  filtrar,
-  chave,
-  versao,
+export function usePaginaDaMemoria<T, P>({ params, filtrar }: { params: P; filtrar: (p: P) => T[] }) {
+  const [pagina, setPagina] = useState(1);
+  const [paramsVistos, setParamsVistos] = useState(params);
+  if (params !== paramsVistos) {
+    setParamsVistos(params);
+    setPagina(1);
+  }
+  const lista = filtrar(params);
+  const ultima = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
+  const atual = Math.min(pagina, ultima);
+  return {
+    itens: lista.slice((atual - 1) * POR_PAGINA, atual * POR_PAGINA),
+    pagina: atual,
+    setPagina,
+    total: lista.length,
+  };
+}
+
+/** A barra de cima da tabela: à esquerda o que a tela quiser (as abas), à direita a busca e o filtro. */
+export function BarraDaTabela({
+  busca,
+  aoBuscar,
+  placeholder,
+  rotuloDaBusca,
+  filtro,
+  children,
 }: {
-  /** Estável (useMemo): mudar a identidade volta para a primeira página. */
-  params: P;
-  filtrar: (p: P) => T[];
-  chave: (t: T) => string;
-  /** Muda quando os dados mudam (a lista da memória). */
-  versao: unknown;
+  busca: string;
+  aoBuscar: (v: string) => void;
+  placeholder: string;
+  rotuloDaBusca: string;
+  /** O `BotaoDeFiltro`. */
+  filtro?: React.ReactNode;
+  children?: React.ReactNode;
 }) {
-  const filtrarRef = useRef(filtrar);
-  useEffect(() => {
-    filtrarRef.current = filtrar;
-  });
-  const [inicial] = useState(() => filtrar(params).slice(0, POR_PAGINA));
-  const pagina = useRef(async (p: P, depois: T | null, n: number) => {
-    const lista = filtrarRef.current(p);
-    const i = depois ? lista.findIndex((x) => chave(x) === chave(depois)) + 1 : 0;
-    return lista.slice(i, i + n);
-  });
-  const lista = usePaginada<T, P>({
-    inicial,
-    temMaisInicial: filtrar(params).length > POR_PAGINA,
-    params,
-    buscar: (p, depois, n) => pagina.current(p, depois, n),
-    chave,
-    tamanho: POR_PAGINA,
-    revalidarAoVoltar: false,
-  });
-  const { revalidar } = lista;
-  const primeira = useRef(true);
-  useEffect(() => {
-    if (primeira.current) {
-      primeira.current = false;
-      return;
-    }
-    void revalidar();
-  }, [versao, revalidar]);
-  return { ...lista, total: filtrar(params).length };
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-line px-5 py-3">
+      {children}
+      <div className="ml-auto flex w-full min-w-0 items-center gap-2 sm:w-auto">
+        <CampoBusca
+          className="min-w-0 flex-1 sm:w-72 sm:flex-none"
+          valor={busca}
+          aoMudar={aoBuscar}
+          placeholder={placeholder}
+          rotulo={rotuloDaBusca}
+          aoLimpar={() => aoBuscar("")}
+          mostrarLimpar={busca !== ""}
+        />
+        {filtro}
+      </div>
+    </div>
+  );
 }
 
 /** A grade das colunas: só no desktop largo; abaixo dele cada linha empilha. */
@@ -67,45 +76,27 @@ export function CabecalhoDaTabela({ grade, colunas }: { grade: string; colunas: 
   return (
     <div aria-hidden className={cn("hidden border-b border-line px-5 py-2.5 text-rotulo uppercase text-ink-3", grade)}>
       {colunas.map((c, i) => (
-        <span key={`${c}-${i}`}>
-          {c}
-        </span>
+        <span key={`${c}-${i}`}>{c}</span>
       ))}
     </div>
   );
 }
 
-/** O fim da lista: o marcador da próxima página e "Mostrando 20 de 137". */
+/** O rodapé: a paginação numerada. */
 export function RodapeDaTabela({
-  mostrando,
+  pagina,
   total,
-  temMais,
-  carregando,
-  fimRef,
+  aoMudar,
   slot,
 }: {
-  mostrando: number;
+  pagina: number;
   total: number;
-  temMais: boolean;
-  carregando: boolean;
-  fimRef: React.RefObject<HTMLElement | null>;
+  aoMudar: (p: number) => void;
   slot: string;
 }) {
   return (
-    <>
-      {temMais && (
-        <div
-          ref={(el) => {
-            fimRef.current = el;
-          }}
-          data-slot={`${slot}-mais`}
-          aria-hidden
-          className="h-px"
-        />
-      )}
-      <p className="border-t border-line-soft px-5 py-3 text-legenda text-ink-3" data-slot={`${slot}-rodape`} aria-live="polite">
-        {carregando ? "Carregando…" : `Mostrando ${numeroBR(mostrando)} de ${numeroBR(total)}`}
-      </p>
-    </>
+    <div className="border-t border-line-soft px-5 py-3" data-slot={`${slot}-rodape`}>
+      <Paginacao pagina={pagina} porPagina={POR_PAGINA} total={total} aoMudar={aoMudar} />
+    </div>
   );
 }

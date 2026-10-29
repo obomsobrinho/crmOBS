@@ -3,19 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, ListFilter, MessageCircleWarning, RefreshCw } from "lucide-react";
+import { Building2, MessageCircleWarning, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agoraMs } from "@/lib/periodo";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItemMarcado,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
@@ -139,7 +132,30 @@ export default function ListaCentral({
               aoLimpar={() => setQ("")}
               mostrarLimpar={q !== ""}
             />
-            <BotaoDeFiltro valor={situacao} aoEscolher={setSituacao} />
+            <BotaoDeFiltro
+              slot="central-filtro"
+              largura="w-52"
+              ativos={situacao ? 1 : 0}
+              rotulo={
+                situacao
+                  ? `Filtrar por situação: ${FILTROS_DE_SITUACAO.find((f) => f.chave === situacao)?.rotulo}`
+                  : "Filtrar por situação"
+              }
+              grupos={[
+                {
+                  titulo: "Situação",
+                  opcoes: [
+                    { chave: "todos", rotulo: "Todos", marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                    ...FILTROS_DE_SITUACAO.map((f) => ({
+                      chave: f.chave,
+                      rotulo: f.rotulo,
+                      marcado: situacao === f.chave,
+                      aoEscolher: () => setSituacao(f.chave),
+                    })),
+                  ],
+                },
+              ]}
+            />
           </div>
         </div>
 
@@ -203,53 +219,6 @@ export default function ListaCentral({
   );
 }
 
-/** O botão de ícone que filtra por situação: abre a lista, marca a escolhida e mostra "1" quando há filtro. */
-function BotaoDeFiltro({
-  valor,
-  aoEscolher,
-}: {
-  valor: FiltroDeSituacao | null;
-  aoEscolher: (f: FiltroDeSituacao | null) => void;
-}) {
-  const atual = FILTROS_DE_SITUACAO.find((f) => f.chave === valor);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon-control"
-          className="relative shrink-0"
-          data-slot="central-filtro"
-          data-ativo={valor ?? undefined}
-          aria-label={atual ? `Filtrar por situação: ${atual.rotulo}` : "Filtrar por situação"}
-        >
-          <ListFilter size={15} />
-          {valor && (
-            <Badge variant="nao-lidas" data-slot="central-filtro-contagem" className="absolute -right-1.5 -top-1.5">
-              1
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52" data-menu="central-filtro">
-        <DropdownMenuLabel>Situação</DropdownMenuLabel>
-        <DropdownMenuItemMarcado data-filtro="todos" marcado={valor === null} onSelect={() => aoEscolher(null)}>
-          Todos
-        </DropdownMenuItemMarcado>
-        {FILTROS_DE_SITUACAO.map((f) => (
-          <DropdownMenuItemMarcado
-            key={f.chave}
-            data-filtro={f.chave}
-            marcado={valor === f.chave}
-            onSelect={() => aoEscolher(f.chave)}
-          >
-            {f.rotulo}
-          </DropdownMenuItemMarcado>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 /**
  * O ícone dos pedidos de ajuda abertos (27/10/2026, dono): aparece com UM pedido

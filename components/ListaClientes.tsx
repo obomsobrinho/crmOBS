@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus, UsersRound } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
+import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
@@ -194,40 +195,39 @@ export default function ListaClientes({
             )}
           </div>
 
-          <CampoBusca
-            className="mt-3 md:max-w-[420px]"
-            valor={q}
-            aoMudar={setQ}
-            placeholder="Buscar por nome, telefone ou dado"
-            rotulo="Buscar contatos"
-            aoLimpar={() => setQ("")}
-            mostrarLimpar={temBusca}
-          />
-
-          {/* A MESMA regra da lista de conversas (D4, 30/09/2026): chip com zero
-              some, menos "Todos" e o que estiver ligado; com um chip só, a faixa
-              inteira some. */}
-          {chipsVisiveis.length > 1 && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            {chipsVisiveis.map((k) => {
-              const on = filtro === k;
-              return (
-                <Button
-                  key={k}
-                  variant="chip"
-                  size="chip"
-                  data-slot="clientes-chip"
-                  data-ativo={on ? "sim" : undefined}
-                  aria-pressed={on}
-                  onClick={() => setFiltro(k)}
-                >
-                  {ROTULO_FILTRO[k]}
-                  <span className="font-bold tabular-nums opacity-75">{contagem[k]}</span>
-                </Button>
-              );
-            })}
+          <div className="mt-3 flex items-center gap-2">
+            <CampoBusca
+              className="min-w-0 flex-1 md:max-w-[420px]"
+              valor={q}
+              aoMudar={setQ}
+              placeholder="Buscar por nome, telefone ou dado"
+              rotulo="Buscar contatos"
+              aoLimpar={() => setQ("")}
+              mostrarLimpar={temBusca}
+            />
+            {/* O filtro igual ao da central (29/10/2026, dono). A MESMA regra da lista de
+                conversas (D4, 30/09/2026): opção com zero some, menos "Todos" e a ligada;
+                com uma opção só, o botão some. */}
+            {chipsVisiveis.length > 1 && (
+              <BotaoDeFiltro
+                slot="clientes-filtro"
+                ativos={filtro === "todos" ? 0 : 1}
+                rotulo={filtro === "todos" ? "Filtrar contatos" : `Filtrar contatos: ${ROTULO_FILTRO[filtro]}`}
+                grupos={[
+                  {
+                    titulo: "Mostrar",
+                    opcoes: chipsVisiveis.map((k) => ({
+                      chave: k,
+                      rotulo: ROTULO_FILTRO[k],
+                      contagem: contagem[k],
+                      marcado: filtro === k,
+                      aoEscolher: () => setFiltro(k),
+                    })),
+                  },
+                ]}
+              />
+            )}
           </div>
-          )}
         </div>
 
         {/* Cabeçalho das colunas: só no computador. No celular cada linha é um
