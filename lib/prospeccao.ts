@@ -2,9 +2,10 @@ import { normalizar } from "./clientes";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
 // CAMPANHAS (29/10/2026, docs/plano-campanhas.md): a prospecção do DONO DO
-// PRODUTO, nunca recurso dos clientes. Módulo puro (sem I/O): a pontuação do
-// lead, o tipo do telefone, a fila do dia, a saída ("responda SAIR") e os
-// números do acompanhamento. Tela e servidor usam as MESMAS funções.
+// PRODUTO, nunca recurso dos clientes. Módulo puro (sem I/O): o raio-X do site e
+// do atendimento, o ângulo da abordagem (a OBS vende sites e o Atenda), a
+// pontuação do lead, o tipo do telefone, a fila do dia, a saída ("responda
+// SAIR") e os números do acompanhamento. Tela e servidor usam as MESMAS funções.
 //
 // ⚠️ RASCUNHO: os pesos, os segmentos e os limites abaixo são PROVISÓRIOS,
 // marcados como tal, até o dono decidir (D6, D7, D17 do plano). Nada aqui é
@@ -51,7 +52,102 @@ export function tipoDoTelefone(telefone: string): TipoDeTelefone {
   return "invalido";
 }
 
-/** O que a busca e o raio-X do atendimento acharam sobre a empresa (entrada da pontuação). */
+// ── Raio-X do site ───────────────────────────────────────────────────────
+
+/**
+ * A situação do site da empresa. `sem_site` e `so_rede_social` saem só da URL
+ * (`classeDaUrl`); as outras exigem abrir a página, o que é trabalho do
+ * servidor (com trava contra endereço interno), nunca da tela.
+ */
+export type ClasseDoSite = "sem_site" | "so_rede_social" | "fora_do_ar" | "com_falhas" | "bom";
+
+/** O que se confere numa página aberta. Vocabulário fechado: nada fora disto chega à tela nem ao texto. */
+export type ItemDoSite = "telefone_clicavel" | "whatsapp" | "endereco" | "mapa" | "celular" | "https";
+
+export const ROTULO_DO_ITEM: Record<ItemDoSite, string> = {
+  telefone_clicavel: "telefone clicável",
+  whatsapp: "botão de WhatsApp",
+  endereco: "endereço",
+  mapa: "mapa",
+  celular: "versão para celular",
+  https: "cadeado de segurança",
+};
+
+export interface RaioXDoSite {
+  classe: ClasseDoSite;
+  /** O que falta (só em `com_falhas`; vazio nas outras classes). */
+  falta: ItemDoSite[];
+}
+
+/** Endereços que são perfil, agregador de links ou atalho de conversa, não site próprio. */
+export const DOMINIOS_QUE_NAO_SAO_SITE = [
+  "instagram.com",
+  "facebook.com",
+  "linktr.ee",
+  "linkbio.co",
+  "bio.link",
+  "beacons.ai",
+  "wa.me",
+  "api.whatsapp.com",
+  "forms.gle",
+] as const;
+
+/** O que dá para saber só pela URL, sem abrir nada; null = precisa abrir a página. */
+export function classeDaUrl(url: string | null | undefined): "sem_site" | "so_rede_social" | null {
+  if (!url || url.trim() === "") return "sem_site";
+  let host: string;
+  try {
+    host = new URL(/^https?:\/\//i.test(url.trim()) ? url.trim() : `https://${url.trim()}`).hostname.toLowerCase();
+  } catch {
+    return "sem_site";
+  }
+  host = host.replace(/^www\./, "");
+  return DOMINIOS_QUE_NAO_SAO_SITE.some((d) => host === d || host.endsWith(`.${d}`)) ? "so_rede_social" : null;
+}
+
+/** "a, b e c" */
+function listaEmTexto(itens: string[]): string {
+  if (itens.length <= 1) return itens.join("");
+  return `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
+}
+
+/** A linha curta da tela: "Sem site", "Só rede social", "Site sem mapa e telefone clicável"... */
+export function resumoDoSite(r: RaioXDoSite): string {
+  switch (r.classe) {
+    case "sem_site":
+      return "Sem site";
+    case "so_rede_social":
+      return "Só rede social, sem site próprio";
+    case "fora_do_ar":
+      return "Site fora do ar";
+    case "bom":
+      return "Site completo";
+    case "com_falhas":
+      return `Site sem ${listaEmTexto(r.falta.map((i) => ROTULO_DO_ITEM[i]))}`;
+  }
+}
+
+/**
+ * O que falta, para o texto da mensagem ("não tem o mapa nem o telefone
+ * clicável"); null quando não há falha concreta para citar.
+ */
+export function faltaNoSite(r: RaioXDoSite): string | null {
+  if (r.classe === "sem_site") return "ainda não tem site";
+  if (r.classe === "so_rede_social") return "não tem site próprio, só a rede social";
+  if (r.classe === "fora_do_ar") return "está com o site fora do ar";
+  if (r.classe !== "com_falhas" || r.falta.length === 0) return null;
+  const nomes = r.falta.map((i) => `${i === "celular" ? "a" : "o"} ${ROTULO_DO_ITEM[i]}`);
+  return nomes.length === 1 ? `não tem ${nomes[0]} no site` : `não tem ${nomes.slice(0, -1).join(", ")} nem ${nomes[nomes.length - 1]} no site`;
+}
+
+/** O site já leva para o WhatsApp (botão ou link): a empresa já vende por conversa. */
+export function vendePeloWhatsapp(r: RaioXDoSite): boolean {
+  return (r.classe === "bom" || r.classe === "com_falhas") && !r.falta.includes("whatsapp");
+}
+
+// ── Sinais e pontuação ───────────────────────────────────────────────────
+
+/** O que a busca e o raio-X (site e atendimento) acharam sobre a empresa (entrada da pontuação). */
 export interface SinaisDoLead {
   telefone: string;
   segmento: string;
@@ -61,8 +157,8 @@ export interface SinaisDoLead {
   fechaCedo: boolean;
   /** Fechado no domingo ou no sábado à tarde. */
   fechaNoFimDeSemana: boolean;
-  /** O site ou o perfil já leva para o WhatsApp (wa.me, botão). */
-  whatsappNoSite: boolean;
+  /** O raio-X do site (classe e o que falta). */
+  site: RaioXDoSite;
   /** O número já é cliente, já foi abordado ou pediu para sair. */
   bloqueado: "cliente" | "abordado" | "saiu" | null;
 }
@@ -80,12 +176,13 @@ export const SEGMENTOS_DO_ICP = [
   "academia",
 ] as const;
 
-/** ⚠️ PROVISÓRIO (D17): pesos de exemplo, somam 100. */
+/** ⚠️ PROVISÓRIO (D17): pesos de exemplo, somam 100. O site pesa mais porque é o gancho da OBS. */
 export const PESOS_PROVISORIOS = {
-  segmento: 30,
-  avaliacoes: 25,
-  foraDoHorario: 25,
-  whatsappNoSite: 20,
+  oportunidadeNoSite: 25,
+  segmento: 20,
+  avaliacoes: 20,
+  foraDoHorario: 20,
+  vendePeloWhatsapp: 15,
 } as const;
 
 export interface Pontuacao {
@@ -106,6 +203,10 @@ const IMPEDIMENTO: Record<NonNullable<SinaisDoLead["bloqueado"]>, string> = {
 export function pontuarLead(s: SinaisDoLead): Pontuacao {
   const motivos: string[] = [];
   let pontos = 0;
+  if (s.site.classe !== "bom") {
+    pontos += PESOS_PROVISORIOS.oportunidadeNoSite;
+    motivos.push(resumoDoSite(s.site));
+  }
   const seg = normalizar(s.segmento);
   if (SEGMENTOS_DO_ICP.some((p) => seg.includes(p))) {
     pontos += PESOS_PROVISORIOS.segmento;
@@ -120,9 +221,9 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
     pontos += PESOS_PROVISORIOS.foraDoHorario;
     motivos.push(s.fechaNoFimDeSemana ? "Fechado no fim de semana: a IA cobre" : "Fecha cedo: a IA cobre a noite");
   }
-  if (s.whatsappNoSite) {
-    pontos += PESOS_PROVISORIOS.whatsappNoSite;
-    motivos.push("Já vende pelo WhatsApp (link no site)");
+  if (vendePeloWhatsapp(s.site)) {
+    pontos += PESOS_PROVISORIOS.vendePeloWhatsapp;
+    motivos.push("Já vende pelo WhatsApp (botão no site)");
   }
   const tipo = tipoDoTelefone(s.telefone);
   const impedimento = s.bloqueado
@@ -133,6 +234,50 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
         ? "Telefone inválido"
         : null;
   return { pontos, motivos, impedimento };
+}
+
+// ── Ângulo da abordagem ──────────────────────────────────────────────────
+
+/** O que a campanha oferece (a OBS vende sites e o Atenda). */
+export type Oferta = "site" | "atenda";
+export type Angulo = "site" | "atenda" | "site_e_atenda";
+
+export const ROTULO_DO_ANGULO: Record<Angulo, string> = {
+  site: "Site",
+  atenda: "Atenda",
+  site_e_atenda: "Site e Atenda",
+};
+
+/**
+ * Qual oferta abre a conversa com este lead, e por quê. O gancho precisa ser um
+ * FATO que o texto cita: site com problema puxa a oferta de site (`{falta_no_site}`);
+ * horário curto puxa o Atenda (`{horario_curto}`). Muito movimento e venda pelo
+ * WhatsApp reforçam o Atenda (entram no porquê e na pontuação), mas sozinhos não
+ * dão frase. Só escolhe entre o que a campanha oferece; sem gancho, fica com a
+ * primeira oferta e a fila pede o texto à mão.
+ */
+export function anguloDaAbordagem(
+  s: SinaisDoLead,
+  ofertas: Oferta[],
+): { angulo: Angulo; porque: string; temGancho: boolean } {
+  const precisaSite = s.site.classe !== "bom";
+  const ganchoAtenda = s.fechaCedo || s.fechaNoFimDeSemana;
+  const motivosAtenda = [
+    ganchoAtenda ? "fecha cedo ou no fim de semana" : null,
+    vendePeloWhatsapp(s.site) ? "já vende pelo WhatsApp" : null,
+    s.avaliacoes !== null && s.avaliacoes >= 50 ? "tem muito movimento" : null,
+  ].filter((m): m is string => m !== null);
+  const vendeSite = ofertas.includes("site");
+  const vendeAtenda = ofertas.includes("atenda");
+  if (vendeSite && vendeAtenda && precisaSite && ganchoAtenda) {
+    return { angulo: "site_e_atenda", porque: `${resumoDoSite(s.site)}; ${listaEmTexto(motivosAtenda)}`, temGancho: true };
+  }
+  if (vendeSite && precisaSite) return { angulo: "site", porque: resumoDoSite(s.site), temGancho: true };
+  if (vendeAtenda && ganchoAtenda) {
+    return { angulo: "atenda", porque: `Site em ordem; ${listaEmTexto(motivosAtenda)}`, temGancho: true };
+  }
+  const primeira: Angulo = ofertas[0] ?? "atenda";
+  return { angulo: primeira, porque: resumoDoSite(s.site), temGancho: false };
 }
 
 /** Faixa da pontuação para o selo da tela (estado, não decoração). */
@@ -183,11 +328,26 @@ export function preencherTexto(modelo: string, campos: CamposDoTexto): { texto: 
 }
 
 /**
- * Os campos que os textos podem usar, a partir do lead. `horario_curto` sai do
- * horário da empresa ("fecha no fim de semana"); sem fato, fica sem valor e o
+ * "Voz e vocabulário": quem assina e o que diz de si, para os textos (e, na fase
+ * 2, para o rascunho da IA) soarem como o dono.
+ */
+export interface VozDaCampanha {
+  meuNome: string;
+  minhaEmpresa: string;
+  oQueFaco: string;
+  diferencial: string;
+}
+
+/**
+ * Os campos que os textos podem usar, a partir do lead e da voz. `horario_curto`
+ * sai do horário ("fecha no fim de semana") e `falta_no_site` do raio-X ("não tem
+ * o mapa nem o telefone clicável no site"); sem fato, o campo fica sem valor e o
  * texto que o usa não pode ser aprovado como está.
  */
-export function camposDoLead(l: { nome: string; cidade: string; segmento: string; sinais: SinaisDoLead }): CamposDoTexto {
+export function camposDoLead(
+  l: { nome: string; cidade: string; segmento: string; sinais: SinaisDoLead },
+  voz: VozDaCampanha,
+): CamposDoTexto {
   const { fechaCedo, fechaNoFimDeSemana } = l.sinais;
   const horario_curto =
     fechaCedo && fechaNoFimDeSemana
@@ -197,7 +357,29 @@ export function camposDoLead(l: { nome: string; cidade: string; segmento: string
         : fechaCedo
           ? "fecha cedo durante a semana"
           : null;
-  return { nome: l.nome, cidade: l.cidade, segmento: l.segmento.toLowerCase(), horario_curto };
+  return {
+    nome: l.nome,
+    cidade: l.cidade,
+    segmento: l.segmento.toLowerCase(),
+    horario_curto,
+    falta_no_site: faltaNoSite(l.sinais.site),
+    meu_nome: voz.meuNome,
+    minha_empresa: voz.minhaEmpresa,
+    o_que_faco: voz.oQueFaco,
+    diferencial: voz.diferencial,
+  };
+}
+
+/** Os textos da campanha: a primeira mensagem muda com o ângulo; os acompanhamentos são um só. */
+export interface TextosDaCampanha {
+  primeira: Record<Angulo, string>;
+  segundo: string;
+  terceiro: string;
+}
+
+/** O modelo de texto deste toque para este ângulo. */
+export function modeloDoToque(t: TextosDaCampanha, toque: number, angulo: Angulo): string {
+  return toque === 1 ? t.primeira[angulo] : toque === 2 ? t.segundo : t.terceiro;
 }
 
 /** O texto pronto de um toque: modelo preenchido e, no primeiro toque, a linha de saída (D8). */

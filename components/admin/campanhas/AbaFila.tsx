@@ -11,7 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { diaMesHoraSP } from "@/lib/fuso";
 import {
+  ROTULO_DO_ANGULO,
+  anguloDaAbordagem,
   camposDoLead,
+  modeloDoToque,
   encaixarNaJanela,
   sortearPausaMs,
   textoDaJanela,
@@ -50,11 +53,16 @@ function AbaFila({
     .filter((f) => !pulados.has(f.id))
     .map((f) => {
       const lead = leads.find((l) => l.id === f.id)!;
-      const pronto = textoDoToque(config.textos[f.toque - 1] ?? "", camposDoLead(lead), f.toque);
+      const angulo = anguloDaAbordagem(lead.sinais, config.ofertas);
+      const pronto = textoDoToque(
+        modeloDoToque(config.textos, f.toque, angulo.angulo),
+        camposDoLead(lead, config.voz),
+        f.toque,
+      );
       const texto = editados[f.id] ?? pronto.texto;
       // Campo que o dono já resolveu à mão deixa de faltar.
       const faltando = pronto.faltando.filter((c) => texto.includes(`{${c}}`));
-      return { ...f, lead, texto, faltando };
+      return { ...f, lead, texto, faltando, angulo };
     });
 
   const pausa: [number, number] = [config.pausaMinutos[0] * 60_000, config.pausaMinutos[1] * 60_000];
@@ -148,6 +156,12 @@ function AbaFila({
                           {i.lead.segmento}, {i.lead.bairro}
                         </span>
                       </div>
+                      <p className="mt-1 text-apoio text-ink-2" data-slot="fila-angulo">
+                        <span className="font-semibold text-ink">
+                          {i.angulo.temGancho ? `Oferta: ${ROTULO_DO_ANGULO[i.angulo.angulo]}.` : "Sem gancho claro."}
+                        </span>{" "}
+                        {i.angulo.porque}.
+                      </p>
                       <Textarea
                         className="mt-3 min-h-28"
                         aria-label={`Mensagem para ${i.lead.nome}`}

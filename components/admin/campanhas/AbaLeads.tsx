@@ -13,7 +13,14 @@ import { diaMesCurtoSP } from "@/lib/fuso";
 import { numeroBR } from "@/lib/format";
 import { useDebounce } from "@/lib/use-debounce";
 import { usePaginada } from "@/lib/use-paginada";
-import { pontuarLead, tipoDoTelefone } from "@/lib/prospeccao";
+import {
+  ROTULO_DO_ANGULO,
+  anguloDaAbordagem,
+  pontuarLead,
+  resumoDoSite,
+  tipoDoTelefone,
+  type Oferta,
+} from "@/lib/prospeccao";
 import { SeloDaPontuacao, SeloDaSituacao } from "./pecas";
 import type { EmpresaAchada, LeadDaCampanha } from "./tipos";
 
@@ -22,6 +29,11 @@ import type { EmpresaAchada, LeadDaCampanha } from "./tipos";
 // Só o que o dono escolhe é gravado (minimização, plano seção 7).
 
 type Modo = "buscar" | "escolhidos";
+
+function textoDoAngulo(sinais: EmpresaAchada["sinais"], ofertas: Oferta[]): string {
+  const a = anguloDaAbordagem(sinais, ofertas);
+  return a.temGancho ? `Oferta: ${ROTULO_DO_ANGULO[a.angulo]}.` : "Sem gancho claro.";
+}
 
 /** Lista vazia estável: um `[]` novo a cada render recomeçaria a paginação. */
 const NENHUMA: EmpresaAchada[] = [];
@@ -47,11 +59,13 @@ function usePaginaDeMemoria<T>(lista: T[], chave: (t: T) => string) {
 
 function AbaLeads({
   leads,
+  ofertas,
   buscar,
   aoEscolher,
   aoDescartar,
 }: {
   leads: LeadDaCampanha[];
+  ofertas: Oferta[];
   buscar: (segmento: string) => EmpresaAchada[];
   aoEscolher: (empresas: EmpresaAchada[]) => void;
   aoDescartar: (id: string) => void;
@@ -83,7 +97,7 @@ function AbaLeads({
         </Button>
       </div>
       {modo === "buscar" ? (
-        <Busca buscar={buscar} leads={leads} aoEscolher={aoEscolher} />
+        <Busca buscar={buscar} leads={leads} ofertas={ofertas} aoEscolher={aoEscolher} />
       ) : (
         <Escolhidos leads={escolhidos} aoDescartar={aoDescartar} />
       )}
@@ -94,10 +108,12 @@ function AbaLeads({
 function Busca({
   buscar,
   leads,
+  ofertas,
   aoEscolher,
 }: {
   buscar: (segmento: string) => EmpresaAchada[];
   leads: LeadDaCampanha[];
+  ofertas: Oferta[];
   aoEscolher: (empresas: EmpresaAchada[]) => void;
 }) {
   const [segmento, setSegmento] = useState("");
@@ -211,6 +227,10 @@ function Busca({
                         <span>{tipoDoTelefone(e.telefone) === "celular" ? "Celular" : "Fixo"}</span>
                       </span>
                       <span className="mt-0.5 block text-legenda text-ink-3">{e.horario}</span>
+                      <span className="mt-1 block text-apoio text-ink-2" data-slot="leads-raio-x">
+                        <span className="font-semibold text-ink">{textoDoAngulo(e.sinais, ofertas)}</span>{" "}
+                        {resumoDoSite(e.sinais.site)}.
+                      </span>
                     </span>
                   </label>
                 </li>
@@ -272,7 +292,7 @@ function Escolhidos({ leads, aoDescartar }: { leads: LeadDaCampanha[]; aoDescart
                     <SeloDaPontuacao sinais={l.sinais} />
                   </span>
                   <span className="mt-0.5 block text-apoio text-ink-2">
-                    {l.segmento}, {l.bairro}
+                    {l.segmento}, {l.bairro}, {resumoDoSite(l.sinais.site).toLowerCase()}
                     {l.abordadoEm !== null && ` · abordado em ${diaMesCurtoSP(new Date(l.abordadoEm).toISOString())}`}
                     {l.toque > 0 && `, ${l.toque} de 3 toques`}
                   </span>

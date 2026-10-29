@@ -12,7 +12,9 @@ create table if not exists public.prospeccao_campanhas (
   nome text not null check (btrim(nome) <> ''),
   segmento text not null default '',
   cidade text not null default '',
-  textos jsonb not null default '[]'::jsonb,
+  ofertas text[] not null default '{site,atenda}' check (ofertas <@ array['site', 'atenda'] and cardinality(ofertas) > 0),
+  voz jsonb not null default '{}'::jsonb,
+  textos jsonb not null default '{}'::jsonb,
   cadencia jsonb not null default '[0, 3, 7]'::jsonb,
   teto_diario int not null check (teto_diario between 1 and 10),
   intervalo_min_s int not null check (intervalo_min_s >= 60),
@@ -46,6 +48,9 @@ create table if not exists public.prospeccao_leads (
   nota numeric(2, 1),
   avaliacoes int,
   horario jsonb,
+  -- O raio-X do site: classe (sem_site, so_rede_social, fora_do_ar, com_falhas, bom) e o que falta.
+  raio_x jsonb,
+  angulo text check (angulo in ('site', 'atenda', 'site_e_atenda')),
   sinais jsonb not null default '{}'::jsonb,
   pontuacao int not null default 0 check (pontuacao between 0 and 100),
   status text not null default 'escolhido' check (status in (

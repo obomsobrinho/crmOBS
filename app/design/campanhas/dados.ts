@@ -1,4 +1,12 @@
-import { JANELA_PROVISORIA, PAUSA_PROVISORIA_MINUTOS, TETO_MAXIMO_DIARIO, type SituacaoDoLead } from "@/lib/prospeccao";
+import {
+  JANELA_PROVISORIA,
+  PAUSA_PROVISORIA_MINUTOS,
+  TETO_MAXIMO_DIARIO,
+  classeDaUrl,
+  type ItemDoSite,
+  type RaioXDoSite,
+  type SituacaoDoLead,
+} from "@/lib/prospeccao";
 import type {
   ConfigDaCampanha,
   EmpresaAchada,
@@ -48,8 +56,28 @@ const BASE: Base[] = [
   { fonteId: "f-22", nome: "Odonto Center Sorriso", segmento: "Odontologia", bairro: "Bela Vista", telefone: "11900000122", site: "odontocenter.exemplo", nota: 4.5, avaliacoes: 230, horario: "Seg a sex 8h às 20h, sáb 8h às 12h", whatsappNoSite: true },
 ];
 
+/** O que o raio-X "achou" em cada site de mentira (o que falta), e o que está fora do ar. */
+const FALTA_NO_SITE: Record<string, ItemDoSite[]> = {
+  "f-01": ["mapa"],
+  "f-04": ["telefone_clicavel", "mapa"],
+  "f-06": ["celular", "https"],
+  "f-11": ["telefone_clicavel", "mapa"],
+  "f-17": ["endereco", "mapa"],
+  "f-18": ["mapa"],
+};
+const FORA_DO_AR = new Set(["f-14"]);
+
+function raioX(b: Base): RaioXDoSite {
+  const pelaUrl = classeDaUrl(b.site);
+  if (pelaUrl) return { classe: pelaUrl, falta: [] };
+  if (FORA_DO_AR.has(b.fonteId)) return { classe: "fora_do_ar", falta: [] };
+  const falta = [...(FALTA_NO_SITE[b.fonteId] ?? []), ...(b.whatsappNoSite ? [] : (["whatsapp"] as ItemDoSite[]))];
+  return { classe: falta.length > 0 ? "com_falhas" : "bom", falta };
+}
+
 function empresa(b: Base): EmpresaAchada {
-  const { fechaCedo = false, fechaNoFimDeSemana = false, whatsappNoSite = false, bloqueado = null, ...resto } = b;
+  const { fechaCedo = false, fechaNoFimDeSemana = false, bloqueado = null, ...resto } = b;
+  delete resto.whatsappNoSite;
   return {
     ...resto,
     cidade: CIDADE,
@@ -60,7 +88,7 @@ function empresa(b: Base): EmpresaAchada {
       nota: b.nota,
       fechaCedo,
       fechaNoFimDeSemana,
-      whatsappNoSite,
+      site: raioX(b),
       bloqueado,
     },
   };
@@ -125,16 +153,27 @@ export function leadsDeMentira(agora: number): LeadDaCampanha[] {
   });
 }
 
-/** Textos de EXEMPLO (o dono escreve os de verdade, decisão D5). */
+/** Ofertas, voz e textos de EXEMPLO (o dono escreve os de verdade, decisão D5). */
 export const CONFIG_DE_MENTIRA: ConfigDaCampanha = {
   nome: "Clínicas e salões, Cidade Exemplo",
   segmento: "Clínicas, estética, salões e barbearias",
   cidade: CIDADE,
-  textos: [
-    "Oi, tudo bem? Sou o Franck, da OBS, aqui de {cidade}. Vi que a {nome} {horario_curto}. Quem chama no WhatsApp fora desse horário fica sem resposta hoje?",
-    "Oi de novo! Só para mostrar como seria: um atendente com IA responde quem chama a {nome} em segundos, até de noite, e passa para vocês quando precisa. Quer ver funcionando?",
-    "Vou parar por aqui para não incomodar. Se um dia fizer sentido ter o WhatsApp da {nome} respondendo sozinho fora do horário, é só me chamar.",
-  ],
+  ofertas: ["site", "atenda"],
+  voz: {
+    meuNome: "Franck",
+    minhaEmpresa: "OBS",
+    oQueFaco: "sites e atendimento com IA no WhatsApp para pequenos negócios",
+    diferencial: "",
+  },
+  textos: {
+    primeira: {
+      site: "Oi, tudo bem? Sou o {meu_nome}, da {minha_empresa}, aqui de {cidade}. Procurei {nome} no Google e vi que a empresa {falta_no_site}. Isso faz quem pesquisa ligar para outro lugar. Posso te mandar o que eu vi?",
+      atenda: "Oi, tudo bem? Sou o {meu_nome}, da {minha_empresa}, aqui de {cidade}. Vi que {nome} {horario_curto}. Quem chama no WhatsApp fora desse horário fica sem resposta hoje?",
+      site_e_atenda: "Oi, tudo bem? Sou o {meu_nome}, da {minha_empresa}, aqui de {cidade}. Procurei {nome} no Google e vi duas coisas: a empresa {falta_no_site} e {horario_curto}. Posso te mostrar como resolver as duas?",
+    },
+    segundo: "Oi de novo! Só para mostrar como seria: um atendente com IA responde quem chama vocês no WhatsApp em segundos, até de noite, e passa para vocês quando precisa. Quer ver funcionando?",
+    terceiro: "Vou parar por aqui para não incomodar. Se um dia fizer sentido melhorar o site ou o WhatsApp de vocês, é só me chamar.",
+  },
   tetoDiario: TETO_MAXIMO_DIARIO,
   pausaMinutos: PAUSA_PROVISORIA_MINUTOS,
   janela: JANELA_PROVISORIA,

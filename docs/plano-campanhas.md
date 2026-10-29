@@ -33,13 +33,18 @@ What exists today:
 ### 2.1 Video (Rafael Melgaço, "Prospecção com IA agora audita o site da empresa e aborda o lead", 23/10/2026, 18 min)
 
 The transcript could NOT be fetched (YouTube returns an empty caption body without a session token).
-What follows is from the video page: description written by the author and chapter list.
+What follows is from the video page (description written by the author and chapter list), confirmed
+on 29/10/2026 with the full description read in the owner's browser.
 - Flow: connect a WhatsApp by QR ("use a disposable or warmed number, never the company's official
   one, prospecting uses a non official API"); turn on business hours and human activity simulation;
   type segment and city (example: real estate agencies in Divinópolis, MG); paste an **Apify** key;
   set "voice and vocabulary" (your name, what you do, your edge); search; each company gets a **score
   ("how much information the AI found")** and a **site audit**; prepare the approach with a published
-  SDR agent, connection, funnel and entry/qualified stages; cap the sends.
+  SDR agent, connection, funnel and entry/qualified stages; cap the sends. The search also brings
+  **e-mails and social profiles**; "send protection" means business hours, human activity simulation
+  and an automatic **warm up counted from the number's registration date**.
+- The author's explicit warning: **never use the company's official number**, because prospecting runs
+  on a non official API. The owner decided to use OBS's own number anyway (section 10.1).
 - Numbers in the video: **5 sends per 24 h, 3 minutes apart**, "reply PARAR" exit. **50 companies in
   about 3 minutes for US$ 0.33 (about R$ 1.65)**, about 3 cents each; Apify gives US$ 5 credit per
   month; message generation also spends AI credit.
@@ -81,9 +86,14 @@ What follows is from the video page: description written by the author and chapt
 - Adopt: unique phone across all campaigns, required legal basis, deterministic exit footer, cold pace
   that fails closed, jitter that only delays, campaign versus candidate failure scope, metrics by
   timestamp, pause and resume, edit only the pace after start.
-- Do better: (1) their audit sells **websites**; ours should read what matters to Atenda: **how the
-  company attends on WhatsApp** (opening hours that end early or skip weekends, many reviews means
-  many conversations, reviews that complain about no answer, a site that already pushes wa.me). (2)
+- Do better: (1) **OBS sells both sites and Atenda**, so the site audit is our natural hook too, and it
+  is the PRIORITY of Phase 1 (section 7, step 2). We read two things per company and let them pick the
+  offer: the **site** (no site, only a social profile, offline, or missing clickable phone, WhatsApp
+  button, address, map, mobile version, https) and the **attendance** (hours that end early or skip
+  weekends, many reviews means many conversations, a site that already pushes wa.me). Each lead gets an
+  angle, "Site", "Atenda" or "Site e Atenda", and the first message has one version per angle, citing
+  the concrete gap. Their score measures how much information was found; ours measures fit and
+  opportunity, with the reasons on screen. (2)
   The owner **approves the day's batch** before anything leaves (they send fully automatic after
   setup). (3) The reply lands in a product that is itself the demo: the lead talks to an Atenda AI.
 
@@ -209,11 +219,13 @@ reply, any SAIR, a block or a failure stops the sequence. Never more than 3 touc
    (advanced mode) learns to handle a reply to a prospecting message: say who OBS is, qualify, offer
    the 7 day trial, and acknowledge SAIR in one line. This proves the text and the reply rate before
    any code, and the owner prospects tomorrow instead of in two weeks.
-2. **Phase 1, the Campanhas module** in the owner's central (sections 6 to 9): search, score, save the
-   chosen leads, daily queue that the owner approves, paced sender, 3 touch cadence, exit and
-   suppression, results.
-3. **Phase 2**: per-lead AI draft from the "attendance x-ray" (section 7), auto-pause rules, conversion
-   linking, the C lane as tasks (send an e-mail or Instagram DM with a wa.me link).
+2. **Phase 1, the Campanhas module** in the owner's central (sections 6 to 9), **site audit first**:
+   search, the site and attendance x-ray with the angle per lead, score, save the chosen leads, voice
+   and one first message per angle, daily queue that the owner approves, paced sender, 3 touch cadence,
+   exit and suppression, results.
+3. **Phase 2**: per-lead AI draft from the x-ray and the owner's voice (still approved one by one),
+   auto-pause rules, conversion linking, the C lane as tasks (send an e-mail or Instagram DM with a
+   wa.me link, using the e-mails and profiles the search found).
 
 Why not A: the cost of a wrong text is a burned number and an annoyed local business owner who may
 become a customer later; 10 per day does not need full automation, and the approval screen doubles as
@@ -241,21 +253,37 @@ quality control. Why not B: it costs money, needs Meta setup and is not more leg
    calls the provider (D3) and returns one page of up to 20 results. Nothing is stored yet. Each row
    shows name, segment, neighborhood, rating and reviews, hours, phone type, and the score with its
    reasons.
-2. **Score** (pure `lib/prospeccao.ts`, `pontuarLead(sinais)`, same function on screen and server,
-   0 to 100 with the list of reasons; weights are D17, the defaults are placeholders):
+2. **X-ray and angle (PRIORITY)**. For each result, the server classifies the site:
+   - from the URL alone, no request (`classeDaUrl`): no site, or only a social profile, link
+     aggregator or wa.me shortcut (Deskcomm measured 8 of 20 "websites" in this case);
+   - otherwise the server opens the page ONCE (short timeout, only public http/https, refusing internal
+     addresses and redirects to them, size limit), never the browser, and checks a closed list of
+     items (D19): clickable phone (`tel:`), WhatsApp button or link, address, map, mobile viewport,
+     https. Offline or invalid certificate is its own class. No AI in this step: the result is
+     reproducible and costs nothing per lead.
+   - `anguloDaAbordagem` picks the offer among those the campaign sells (D18): a site gap gives the
+     "Site" angle (`{falta_no_site}`: "não tem o mapa nem o telefone clicável no site"), short hours give
+     the "Atenda" angle (`{horario_curto}`), both give "Site e Atenda". Many reviews and selling on
+     WhatsApp reinforce Atenda in the reasons and the score but do not make a sentence alone. No
+     concrete fact means "Sem gancho claro": the queue asks the owner to write it by hand or skip.
+3. **Score** (pure `lib/prospeccao.ts`, `pontuarLead(sinais)`, same function on screen and server,
+   0 to 100 with the list of reasons; weights are D17, the defaults are placeholders; the site gap
+   weighs most because it is OBS's hook):
    - required: a **mobile** number (BR mobile = 11 digits with the 9 after the DDD) and not in the
      suppression list, not an existing Atenda customer, not already approached;
-   - signals: segment in the ICP list; many reviews (busy business, many conversations); hours that end
+   - signals: a site gap; segment in the ICP list; many reviews (busy business, many conversations); hours that end
      early, closed on Sunday or Saturday afternoon (the AI covers that); site or profile that pushes
      wa.me (they already sell on WhatsApp); reviews that mention slow answers (phase 2, needs review
      text).
-3. **Choose**: the owner ticks the best ones and saves them; only chosen leads are stored, with
-   minimal fields and the source id (data minimization, D3).
-4. **Daily queue**: every working day the system proposes up to the cap (D7): due follow-up touches
+4. **Choose**: the owner ticks the best ones and saves them; only chosen leads are stored, with
+   minimal fields, the x-ray and the source id (data minimization, D3).
+5. **Voice**: the campaign keeps the owner's "voice and vocabulary" (name, company, what he does, his
+   edge), used as fields in the texts now and as guidance for the AI draft in Phase 2.
+6. **Daily queue**: every working day the system proposes up to the cap (D7): due follow-up touches
    first, then new leads by score. Each item shows the final text (template with fields filled in phase
    1; AI draft in phase 2). The owner edits, skips or approves; **only approved items are sent**.
    Unapproved items do not roll over automatically into a burst the next day.
-5. **Send**: a scheduler tick (D15) inside the window (D7) sends **at most one** approved message when
+7. **Send**: a scheduler tick (D15) inside the window (D7) sends **at most one** approved message when
    `proximo_envio_em <= now`, then sets the next slot with a random pause (jitter only delays). Sending
    goes through `enviarMensagemAtiva` (`lib/envio-ativo.ts`) with a new `REGRAS_DA_PROSPECCAO`
    (cap and interval), on the OBS instance. Before each send it re-checks: not in
@@ -263,15 +291,15 @@ quality control. Why not B: it costs money, needs Meta setup and is not more leg
    contact in `dados_cliente` of the OBS tenant and records the outgoing text in
    `chat_messages` with `message_type = 'prospeccao'` through service role, the same way the agenda
    reminder does, so the conversation shows it and the AI reads it when the lead answers.
-6. **Reply**: nothing new in n8n. The OBS instance webhook already lands the inbound in the inbox and
+8. **Reply**: nothing new in n8n. The OBS instance webhook already lands the inbound in the inbox and
    calls `/api/agent`; the OBS agent prompt answers (it must know about the campaign, Phase 0). The campaign learns about the reply by
    reading `chat_messages` (indexed `(client_id, phone, created_at)`) for a `user_message` after the
    last touch, before each send and when the results screen loads. No change in `processTurn`, so the
    attendance path is untouched.
-7. **Exit**: an inbound whose whole text is SAIR (normalized, accents and case) puts the phone in the
+9. **Exit**: an inbound whose whole text is SAIR (normalized, accents and case) puts the phone in the
    suppression list forever and stops the sequence; the OBS agent acknowledges it in one line. A
    failed send (number without WhatsApp) marks the lead and never retries the same touch.
-8. **Funnel**: the OBS pipeline, shared with OBS's other conversations (stage names are the owner's;
+10. **Funnel**: the OBS pipeline, shared with OBS's other conversations (stage names are the owner's;
    whether prospects get their own stages is open). The AI qualification moves the card as today. "Converted" = the
    company signed up (D13).
 
@@ -281,7 +309,8 @@ All tables: RLS on, no grant to `anon` or `authenticated`, `service_role` only (
 `/api/admin/campanhas/*`). Names follow the central (Portuguese columns).
 
 - `prospeccao_campanhas`: `id`, `nome`, `client_id` (the OBS tenant, FK `clients`), `segmento`,
-  `cidade`, `textos` jsonb (one text per touch, with variants), `cadencia` jsonb (days between touches),
+  `cidade`, `ofertas` text[] (`site`, `atenda`), `voz` jsonb, `textos` jsonb (first message per angle,
+  then one text per follow-up), `cadencia` jsonb (days between touches),
   `teto_diario` int (1 to 10, the owner's ceiling), `intervalo_min_s` and `intervalo_max_s`, `janela` jsonb (weekdays, start
   and end hour in São Paulo), `base_legal_ref` text NOT NULL, `status` (`rascunho`, `ativa`, `pausada`,
   `encerrada`), `pausada_motivo`, `proximo_envio_em`, `criada_por`, `criada_em`, `atualizada_em`.
@@ -289,7 +318,8 @@ All tables: RLS on, no grant to `anon` or `authenticated`, `service_role` only (
   each send 10.
 - `prospeccao_leads`: `id`, `campanha_id`, `fonte` (`google_places`, `apify`, `cnpj`, `manual`),
   `fonte_id`, `nome`, `telefone` (digits), `segmento`, `cidade`, `bairro`, `site`, `nota`, `avaliacoes`,
-  `horario` jsonb, `sinais` jsonb, `pontuacao` int, `status` (`escolhido`, `na_fila`, `abordado`,
+  `horario` jsonb, `raio_x` jsonb (site class
+  and what is missing), `angulo`, `sinais` jsonb, `pontuacao` int, `status` (`escolhido`, `na_fila`, `abordado`,
   `respondeu`, `convertido`, `descartado`, `saiu`, `falhou`), `toque` int, `proximo_toque_em`,
   `contato_id` (bigint, `dados_cliente.id` after the first send), timestamps. **Unique `telefone`
   across all campaigns**: a number is approached once in its life.
@@ -325,12 +355,20 @@ SAIR or failures above a rate in the last N sends; reply rate zero after N touch
 4. **Brand** (medium): a pushy message to a local business that is a future customer. Approval of each
    text and the 3 touch ceiling are the mitigation.
 5. **Google terms** (medium if Places API is stored, D3).
-6. **Attendance regression** (low): the plan does not touch `processTurn` or n8n; the only shared
+6. **Opening third party sites from the server** (low, with guards): one request per lead, public
+   http/https only, internal addresses and redirects to them refused, short timeout and size limit
+   (Deskcomm keeps the same guard in a server only module).
+7. **A wrong audit claim** (medium for the brand): telling a business its site lacks a map when it has
+   one. The x-ray uses a closed list of checks, the owner reads every text before it leaves, and the
+   item names on screen are the ones the text cites.
+8. **Attendance regression** (low): the plan does not touch `processTurn` or n8n; the only shared
    piece is `lib/envio-ativo.ts`, which belongs to the agenda branch and must be merged first.
 
 ### 10.1 Accepted risk: OBS's main number
 
-The owner decided to prospect from OBS's own number instead of a dedicated chip. If WhatsApp bans it:
+The owner decided to prospect from OBS's own number instead of a dedicated chip, against the agent's
+recommendation and against the explicit advice of the Deskcomm author in the video ("never the
+company's official number", because prospecting runs on a non official API). If WhatsApp bans it:
 - OBS's own attendance stops on that number (the AI and the team stop receiving and answering there)
   until a new number is connected by QR; the history stays in the database, but contacts must learn
   the new number.
@@ -370,6 +408,10 @@ chip, and warming up a new number (OBS's number is not new; the warm up caps no 
 
 - `/design/campanhas` (dev only, `notFound()` in production), fake companies and phones (prefix 90000),
   no search API, no send, no database. `?aba=fila|leads|resultados|campanha`, `?cenario=vazia`.
+- X-ray and angle (added 29/10/2026 after the full video description): each fake company has a site
+  class and what is missing; Leads and Fila show "Oferta: Site / Atenda / Site e Atenda" (or "Sem gancho
+  claro") with the reason; Campanha has the offers (Sites, Atenda), "Sua voz" and one first message per
+  angle with a preview on a lead of that angle.
 - Tabs: **Fila do dia** (rhythm notice with OBS's number, the cap of 10 and today's sends, each proposed message editable,
   "Aprovar"/"Pular hoje"/"Aprovar todas", missing fields block approval, approved items show the
   drawn send time), **Leads** (search by segment and city sorted by score with the reasons in a
@@ -378,7 +420,8 @@ chip, and warming up a new number (OBS's number is not new; the warm up caps no 
   what happened, recent replies, number health with today's sends), **Campanha** (texts per touch
   with a live preview on a real lead of the list, the fixed exit line, limits, required legal basis
   that blocks activation).
-- Real rule behind it: `lib/prospeccao.ts` (pure: `tipoDoTelefone`, `pontuarLead`, `camposDoLead`,
+- Real rule behind it: `lib/prospeccao.ts` (pure: `classeDaUrl`, `resumoDoSite`, `faltaNoSite`,
+  `anguloDaAbordagem`, `modeloDoToque`, `tipoDoTelefone`, `pontuarLead`, `camposDoLead`,
   `textoDoToque`, `comSaida`, `ehPedidoDeSaida`, `filaDoDia`, `tetoDeHoje` (min of the campaign's cap and `TETO_MAXIMO_DIARIO` = 10), `encaixarNaJanela`, `proximoToqueEm`,
   `sortearPausaMs`, `resumoDaCampanha`). Weights, ICP segments, cadence, pause and window there are
   marked PROVISIONAL until D6, D7 (pace and window) and D17; the cap of 10 is the owner's decision.
@@ -407,3 +450,6 @@ chip, and warming up a new number (OBS's number is not new; the warm up caps no 
 | D15 | Scheduler | Vercel Cron every 10 minutes in the window if the Vercel plan allows it (to verify; the agenda uses one daily cron); otherwise the tick runs from an n8n schedule calling the route (needs his OK, n8n is production) |
 | D16 | Start this week with Phase 0, no code, from OBS's `/contatos` | Yes, after teaching the OBS prompt about prospect replies |
 | D17 | Score weights and ICP segment list | His list; the prototype uses placeholder weights, marked as such |
+| D18 | What each campaign offers (sites, Atenda, both) and how the angle is picked | Both, with the rule in section 7 step 2 (site gap gives "Site", short hours give "Atenda"); one first message per angle |
+| D19 | Site audit: which items count as a gap, and whether the server may open the lead's site | Yes, once per lead, on the server with the guards in section 7; items: clickable phone, WhatsApp button, address, map, mobile version, https; offline as its own class |
+| D20 | Use e-mails and social profiles the search finds | Only for the C lane in Phase 2 (a message where the lead starts the WhatsApp chat); needs Apify or reading the site, Places does not return e-mails |

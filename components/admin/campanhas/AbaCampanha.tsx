@@ -5,6 +5,7 @@ import { ShieldCheck } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Switch, SwitchThumb, SwitchTrack } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,32 +13,77 @@ import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem
 import {
   CADENCIA_PROVISORIA,
   LINHA_DE_SAIDA,
+  ROTULO_DO_ANGULO,
   TETO_MAXIMO_DIARIO,
+  anguloDaAbordagem,
   camposDoLead,
   textoDaJanela,
   textoDoToque,
+  type Angulo,
+  type Oferta,
+  type VozDaCampanha,
 } from "@/lib/prospeccao";
 import type { ConfigDaCampanha, LeadDaCampanha } from "./tipos";
 
-// CAMPANHA: os textos de cada toque (com campos entre chaves e a prévia com um
-// lead de verdade da lista), a cadência, os limites e a base legal. A linha de
+// CAMPANHA: o que a campanha oferece (site, Atenda ou os dois), a voz de quem
+// assina, os textos (a primeira mensagem muda com o ângulo de cada lead, com a
+// prévia num lead da lista), a cadência, os limites e a base legal. A linha de
 // saída entra sozinha na primeira mensagem e não se edita (D8).
 
-const TOQUES = ["Primeira mensagem", "Segundo toque, se não responder", "Terceiro toque, despedida"];
+const OFERTAS: { chave: Oferta; rotulo: string }[] = [
+  { chave: "site", rotulo: "Sites" },
+  { chave: "atenda", rotulo: "Atenda (atendimento com IA)" },
+];
+
+const CAMPOS_DA_VOZ: { chave: keyof VozDaCampanha; rotulo: string; dica: string }[] = [
+  { chave: "meuNome", rotulo: "Seu nome", dica: "Como você assina" },
+  { chave: "minhaEmpresa", rotulo: "Sua empresa", dica: "Por exemplo, OBS" },
+  { chave: "oQueFaco", rotulo: "O que você faz", dica: "Uma frase" },
+  { chave: "diferencial", rotulo: "Seu diferencial", dica: "O que só você oferece" },
+];
+
+/** Os ângulos que a campanha pode usar, pelas ofertas marcadas. */
+function angulosDas(ofertas: Oferta[]): Angulo[] {
+  const site = ofertas.includes("site");
+  const atenda = ofertas.includes("atenda");
+  const angulos: Angulo[] = [];
+  if (site) angulos.push("site");
+  if (atenda) angulos.push("atenda");
+  if (site && atenda) angulos.push("site_e_atenda");
+  return angulos;
+}
+
+function Previa({ texto, faltando, nome }: { texto: string; faltando: string[]; nome: string }) {
+  return (
+    <div className="mt-3">
+      <p className="text-rotulo uppercase text-ink-3">Como fica para {nome}</p>
+      <p className="mt-1 whitespace-pre-line rounded-lg border border-line-soft bg-raised px-3 py-2 text-apoio text-ink-2">
+        {texto}
+      </p>
+      {faltando.length > 0 && (
+        <p className="mt-1 text-legenda text-warn-ink">
+          Esta empresa não tem {faltando.map((c) => `{${c}}`).join(", ")}: a fila pede para completar à mão.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function AbaCampanha({
   config,
   aoSalvar,
-  exemplo,
+  leads,
 }: {
   config: ConfigDaCampanha;
   aoSalvar: (c: ConfigDaCampanha) => void;
-  exemplo: LeadDaCampanha | null;
+  leads: LeadDaCampanha[];
 }) {
   const [rascunho, setRascunho] = useState(config);
   const [recado, setRecado] = useState<string | null>(null);
   const semBaseLegal = rascunho.baseLegalRef.trim().length < 3;
-  const tetoValido = Number.isInteger(rascunho.tetoDiario) && rascunho.tetoDiario >= 1 && rascunho.tetoDiario <= TETO_MAXIMO_DIARIO;
+  const semOferta = rascunho.ofertas.length === 0;
+  const tetoValido =
+    Number.isInteger(rascunho.tetoDiario) && rascunho.tetoDiario >= 1 && rascunho.tetoDiario <= TETO_MAXIMO_DIARIO;
   const [pMin, pMax] = rascunho.pausaMinutos;
   const pausaValida = pMin >= 1 && pMax >= pMin;
 
@@ -46,10 +92,20 @@ function AbaCampanha({
     setRecado(null);
   }
 
-  function mudarTexto(i: number, t: string) {
-    const textos = [...rascunho.textos] as ConfigDaCampanha["textos"];
-    textos[i] = t;
-    mudar({ textos });
+  function alternarOferta(o: Oferta, marcada: boolean) {
+    const ofertas = marcada ? [...rascunho.ofertas, o] : rascunho.ofertas.filter((x) => x !== o);
+    mudar({ ofertas: OFERTAS.map((x) => x.chave).filter((x) => ofertas.includes(x)) });
+  }
+
+  /** A prévia do texto num lead da lista (para a primeira mensagem, um que cairia neste ângulo). */
+  function previaDe(modelo: string, toque: number, angulo: Angulo | null) {
+    const l =
+      angulo === null
+        ? leads[0]
+        : leads.find((x) => anguloDaAbordagem(x.sinais, rascunho.ofertas).angulo === angulo);
+    if (!l) return null;
+    const p = textoDoToque(modelo, camposDoLead(l, rascunho.voz), toque);
+    return <Previa texto={p.texto} faltando={p.faltando} nome={l.nome} />;
   }
 
   return (
@@ -70,7 +126,7 @@ function AbaCampanha({
             </label>
             <Switch
               checked={rascunho.ativa}
-              disabled={semBaseLegal && !rascunho.ativa}
+              disabled={(semBaseLegal || semOferta) && !rascunho.ativa}
               onCheckedChange={(v) => mudar({ ativa: v })}
               aria-label="Campanha ativa"
               className="flex items-center gap-2 self-end text-apoio"
@@ -98,44 +154,91 @@ function AbaCampanha({
           )}
         </Card>
 
-        {rascunho.textos.map((t, i) => {
-          const previa = exemplo ? textoDoToque(t, camposDoLead(exemplo), i + 1) : null;
-          return (
-            <Card variant="secao" key={i} data-slot="campanha-toque">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <h2 className="text-cartao">{TOQUES[i]}</h2>
-                <span className="text-legenda text-ink-3">
-                  {CADENCIA_PROVISORIA[i] === 0 ? "dia 0" : `dia ${CADENCIA_PROVISORIA[i]}`}
-                </span>
-              </div>
+        <Card variant="secao" data-slot="campanha-oferta">
+          <h2 className="text-cartao">O que esta campanha oferece</h2>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            O raio-X de cada empresa escolhe o ângulo: site com problema puxa a oferta de site; horário curto, muito
+            movimento ou venda pelo WhatsApp puxam o Atenda.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-4">
+            {OFERTAS.map((o) => (
+              <label key={o.chave} className="flex cursor-pointer items-center gap-2 text-apoio text-ink">
+                <Checkbox
+                  checked={rascunho.ofertas.includes(o.chave)}
+                  onCheckedChange={(v) => alternarOferta(o.chave, v === true)}
+                />
+                {o.rotulo}
+              </label>
+            ))}
+          </div>
+          {semOferta && (
+            <Aviso tom="warn" className="mt-2">
+              Marque pelo menos uma oferta.
+            </Aviso>
+          )}
+        </Card>
+
+        <Card variant="secao" data-slot="campanha-voz">
+          <h2 className="text-cartao">Sua voz</h2>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            Entra nos textos como {"{meu_nome}"}, {"{minha_empresa}"}, {"{o_que_faco}"} e {"{diferencial}"}, e guia o
+            rascunho da IA na fase 2.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            {CAMPOS_DA_VOZ.map((c) => (
+              <label key={c.chave}>
+                <span className="text-rotulo uppercase text-ink-3">{c.rotulo}</span>
+                <Input
+                  className="mt-1"
+                  placeholder={c.dica}
+                  value={rascunho.voz[c.chave]}
+                  onChange={(e) => mudar({ voz: { ...rascunho.voz, [c.chave]: e.target.value } })}
+                />
+              </label>
+            ))}
+          </div>
+        </Card>
+
+        <Card variant="secao" data-slot="campanha-toque">
+          <div className="flex flex-wrap items-baseline gap-2">
+            <h2 className="text-cartao">Primeira mensagem</h2>
+            <span className="text-legenda text-ink-3">dia 0, uma versão por ângulo</span>
+          </div>
+          <p className="mt-0.5 text-legenda text-ink-3">
+            Campos: {"{nome}"}, {"{cidade}"}, {"{falta_no_site}"} (o que o raio-X achou), {"{horario_curto}"} e os da
+            sua voz. No fim entra sempre, sem edição: “{LINHA_DE_SAIDA}”
+          </p>
+          {angulosDas(rascunho.ofertas).map((a) => (
+            <div key={a} className="mt-4">
+              <p className="text-rotulo uppercase text-ink-3">Ângulo {ROTULO_DO_ANGULO[a]}</p>
               <Textarea
-                className="mt-2 min-h-24"
-                aria-label={TOQUES[i]}
-                value={t}
-                onChange={(e) => mudarTexto(i, e.target.value)}
+                className="mt-1 min-h-24"
+                aria-label={`Primeira mensagem, ângulo ${ROTULO_DO_ANGULO[a]}`}
+                value={rascunho.textos.primeira[a]}
+                onChange={(e) =>
+                  mudar({ textos: { ...rascunho.textos, primeira: { ...rascunho.textos.primeira, [a]: e.target.value } } })
+                }
               />
-              {i === 0 && (
-                <p className="mt-1.5 text-legenda text-ink-3">
-                  No fim entra sempre, sem edição: “{LINHA_DE_SAIDA}”
-                </p>
-              )}
-              {previa && (
-                <div className="mt-3">
-                  <p className="text-rotulo uppercase text-ink-3">Como fica para {exemplo?.nome}</p>
-                  <p className="mt-1 whitespace-pre-line rounded-lg border border-line-soft bg-raised px-3 py-2 text-apoio text-ink-2">
-                    {previa.texto}
-                  </p>
-                  {previa.faltando.length > 0 && (
-                    <p className="mt-1 text-legenda text-warn-ink">
-                      Esta empresa não tem {previa.faltando.map((c) => `{${c}}`).join(", ")}: a fila pede para completar
-                      à mão.
-                    </p>
-                  )}
-                </div>
-              )}
-            </Card>
-          );
-        })}
+              {previaDe(rascunho.textos.primeira[a], 1, a)}
+            </div>
+          ))}
+        </Card>
+
+        {(["segundo", "terceiro"] as const).map((k, i) => (
+          <Card variant="secao" key={k} data-slot="campanha-toque">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h2 className="text-cartao">{i === 0 ? "Segundo toque, se não responder" : "Terceiro toque, despedida"}</h2>
+              <span className="text-legenda text-ink-3">dia {CADENCIA_PROVISORIA[i + 1]}</span>
+            </div>
+            <Textarea
+              className="mt-2 min-h-24"
+              aria-label={i === 0 ? "Segundo toque" : "Terceiro toque"}
+              value={rascunho.textos[k]}
+              onChange={(e) => mudar({ textos: { ...rascunho.textos, [k]: e.target.value } })}
+            />
+            {previaDe(rascunho.textos[k], i + 2, null)}
+          </Card>
+        ))}
 
         <Card variant="secao">
           <h2 className="text-cartao">Limites</h2>
@@ -177,17 +280,20 @@ function AbaCampanha({
             </label>
           </div>
           <p className="mt-3 text-apoio text-ink-2">
-            Envios de {textoDaJanela(rascunho.janela)}, horário de São Paulo. Até 3 mensagens por empresa; qualquer resposta, SAIR ou falha encerra a sequência.
+            Envios de {textoDaJanela(rascunho.janela)}, horário de São Paulo. Até 3 mensagens por empresa; qualquer
+            resposta, SAIR ou falha encerra a sequência.
           </p>
           {(!tetoValido || !pausaValida) && (
             <Aviso tom="warn" className="mt-2">
-              {!tetoValido ? `O máximo por dia vai de 1 a ${TETO_MAXIMO_DIARIO}.` : "A pausa máxima precisa ser maior ou igual à mínima."}
+              {!tetoValido
+                ? `O máximo por dia vai de 1 a ${TETO_MAXIMO_DIARIO}.`
+                : "A pausa máxima precisa ser maior ou igual à mínima."}
             </Aviso>
           )}
         </Card>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" variant="brand" size="control" disabled={!tetoValido || !pausaValida}>
+          <Button type="submit" variant="brand" size="control" disabled={!tetoValido || !pausaValida || semOferta}>
             Salvar campanha
           </Button>
           {recado && (

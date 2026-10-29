@@ -1,7 +1,7 @@
 # Owner prospecting (Campanhas): approved daily batch on OBS's own number, at most 10 a day
 - Date: 2026-10-29
 - Status: Proposed. Decided by the owner on 29/10/2026: go ahead despite the opt-in policy, OBS's own
-  number and account, cap of 10 per day. Still open: D3 to D6 and D8 to D17 in `docs/plano-campanhas.md`.
+  number and account, cap of 10 per day. Still open: D3 to D6 and D8 to D20 in `docs/plano-campanhas.md`.
 - Area: product, admin
 
 ## Context
@@ -36,6 +36,13 @@ OBS's own number and account.
   (`TETO_MAXIMO_DIARIO`) and by the table check. Up to 3 touches (days 0, 3, 7); any reply, SAIR, block
   or failure stops the sequence. Exit line in the first message, deterministic. Global suppression
   list; a phone is approached once in its life.
+- **Site audit is the hook and the priority of Phase 1** (OBS sells sites and Atenda): each lead gets a
+  deterministic x-ray of its site (no site, only a social profile, offline, or which of clickable phone,
+  WhatsApp button, address, map, mobile version and https are missing; the server opens the page once,
+  with guards) and of its attendance (short hours, reviews, selling on WhatsApp). `anguloDaAbordagem`
+  picks "Site", "Atenda" or "Site e Atenda" among the campaign's offers, and the first message has one
+  version per angle citing the concrete gap; no fact means the owner writes it by hand. The owner's
+  "voice" (name, company, what he does, edge) feeds the texts and, in Phase 2, the AI draft.
 - **Sent from OBS's own number; conversations live in the OBS tenant**, answered by the OBS agent
   prompt, which must learn to handle prospect replies before the first send.
 - Screen at `/campanhas`, admin only (same guard family as `/clientes`), API under
@@ -45,7 +52,9 @@ OBS's own number and account.
   conversa"), up to 10 a day.
 
 ## Accepted risk
-A ban of OBS's main number (owner's decision, 29/10/2026). It stops OBS's own attendance on that number
+A ban of OBS's main number (owner's decision, 29/10/2026), against the agent's recommendation and
+the explicit advice of the Deskcomm author in the video ("never the company's official number", since
+prospecting runs on a non official API). It stops OBS's own attendance on that number
 until a new one is connected, silences OBS's notices and breaks the suites that run on the OBS tenant
 (`test:e2e:n8n`, login suites) until then; no third party can unban. Remaining mitigations: the cap of
 10, one message at a time with a random pause, business hours only, every text approved, exit line and

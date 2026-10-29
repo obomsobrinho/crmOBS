@@ -1,4 +1,11 @@
-import type { JanelaDeEnvio, SinaisDoLead, SituacaoDoLead } from "@/lib/prospeccao";
+import type {
+  JanelaDeEnvio,
+  Oferta,
+  SinaisDoLead,
+  SituacaoDoLead,
+  TextosDaCampanha,
+  VozDaCampanha,
+} from "@/lib/prospeccao";
 
 // Os tipos que as telas de Campanhas recebem. Hoje só o preview (`/design/campanhas`)
 // os preenche, com dados de mentira; a tela de verdade vai ler das tabelas
@@ -38,8 +45,12 @@ export interface ConfigDaCampanha {
   nome: string;
   segmento: string;
   cidade: string;
-  /** Um modelo de texto por toque, com campos entre chaves. */
-  textos: [string, string, string];
+  /** O que a campanha oferece (a OBS vende sites e o Atenda); decide o ângulo de cada lead. */
+  ofertas: Oferta[];
+  /** Quem assina e o que diz de si (voz e vocabulário). */
+  voz: VozDaCampanha;
+  /** Os modelos de texto, com campos entre chaves; a primeira mensagem muda com o ângulo. */
+  textos: TextosDaCampanha;
   tetoDiario: number;
   pausaMinutos: [number, number];
   janela: JanelaDeEnvio;

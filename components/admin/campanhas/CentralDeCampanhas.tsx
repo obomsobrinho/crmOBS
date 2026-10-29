@@ -123,13 +123,19 @@ export default function CentralDeCampanhas({
             />
           </TabsContent>
           <TabsContent value="leads" className="min-h-0 flex-1">
-            <AbaLeads leads={leads} buscar={buscar} aoEscolher={escolher} aoDescartar={descartar} />
+            <AbaLeads
+              leads={leads}
+              ofertas={config.ofertas}
+              buscar={buscar}
+              aoEscolher={escolher}
+              aoDescartar={descartar}
+            />
           </TabsContent>
           <TabsContent value="resultados" className="min-h-0 flex-1">
             <AbaResultados leads={leads} numero={numero} teto={teto} config={config} />
           </TabsContent>
           <TabsContent value="campanha" className="min-h-0 flex-1">
-            <AbaCampanha config={config} aoSalvar={setConfig} exemplo={leads[0] ?? null} />
+            <AbaCampanha config={config} aoSalvar={setConfig} leads={leads} />
           </TabsContent>
         </Tabs>
       </section>
