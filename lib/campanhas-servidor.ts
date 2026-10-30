@@ -24,6 +24,7 @@ import {
   ehSituacaoDaBusca,
   ehSituacaoDaCampanha,
   ehSituacaoNaCampanha,
+  areaDe,
   filtroDe,
 } from "./campanhas-pedidos";
 import { filtrarPelasOpcoes, itemParaOBanco, type FonteDeLeads } from "./fonte-de-leads";
@@ -91,6 +92,7 @@ function opcoesDoJson(j: Json, termo: string, cidade: string, uf: string | null)
     notaMinima: nota,
     site: o.site === "sem_site" || o.site === "com_site" ? o.site : "todos",
     cidadeIbge: typeof o.cidadeIbge === "number" ? o.cidadeIbge : null,
+    area: areaDe(o.area) ?? null,
     minAvaliacoes: MINIMOS_DE_AVALIACOES.find((m) => m === o.minAvaliacoes) ?? null,
     categorias: Array.isArray(o.categorias) ? o.categorias.filter((c): c is string => typeof c === "string") : [],
     ignorarFechados: typeof o.ignorarFechados === "boolean" ? o.ignorarFechados : OPCOES_PADRAO.ignorarFechados,

@@ -28,7 +28,11 @@ export const NOME_AUSENTE = "Sem nome";
 export function entradaApify(o: OpcoesDaBusca): Record<string, unknown> {
   return {
     searchStringsArray: o.termos.map((t) => t.trim()).filter(Boolean),
-    locationQuery: localDaBusca(o),
+    // Com o centro ou o raio ajustados no mapa, o círculo e NÃO a cidade (formato conferido
+    // numa execução real em 30/10/2026, run Rfb0VfmDckdMIbiwT: LONGITUDE primeiro).
+    ...(o.area
+      ? { customGeolocation: { type: "Point", coordinates: [o.area.lng, o.area.lat], radiusKm: o.area.raioKm } }
+      : { locationQuery: localDaBusca(o) }),
     maxCrawledPlacesPerSearch: o.porTermo,
     language: "pt-BR",
     skipClosedPlaces: o.ignorarFechados,

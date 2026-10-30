@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   PESOS_PROVISORIOS,
   UFS,
+  proximoRaio,
+  textoDoLocal,
   categoriasSugeridas,
   estadoNoMapa,
   ganchosDoHorario,
@@ -46,9 +48,9 @@ import {
 import { entradaApify, itemDoApify, leituraDoStatus, webhooksDaExecucao } from "../lib/apify-campos";
 import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
-import { buscarCidades, cidadeDoCodigo, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
+import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
 import { normalizar } from "../lib/clientes";
-import { filtroDe, opcoesDe, paginaDe, rascunhoDe, textoDe } from "../lib/campanhas-pedidos";
+import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, textoDe } from "../lib/campanhas-pedidos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
 import { dadosDeMentira } from "../app/design/campanhas/dados";
 
@@ -629,5 +631,52 @@ test.describe("Horário, pontuação nova e o mapa (revisão de 30/10/2026)", ()
     expect(sugestoes).toContain("Esteticista");
     expect(new Set(sugestoes.map(normalizar)).size).toBe(sugestoes.length);
     expect(categoriasSugeridas(["padaria"])).toEqual(["Padaria"]);
+  });
+});
+
+test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmado no run Rfb0VfmDckdMIbiwT)", () => {
+  const base = { ...OPCOES_PADRAO, termos: ["padaria"], cidade: "Mutum", uf: "MG", cidadeIbge: 3144003 };
+
+  test("com área: customGeolocation com LONGITUDE primeiro e sem locationQuery; sem área: só a cidade", () => {
+    const comArea = entradaApify({ ...base, area: { lat: -19.8121, lng: -41.4407, raioKm: 2 } });
+    expect(comArea.customGeolocation).toEqual({ type: "Point", coordinates: [-41.4407, -19.8121], radiusKm: 2 });
+    expect(comArea).not.toHaveProperty("locationQuery");
+    const semArea = entradaApify({ ...base, area: null });
+    expect(semArea.locationQuery).toBe("Mutum, MG, Brasil");
+    expect(semArea).not.toHaveProperty("customGeolocation");
+  });
+
+  test("o raio anda pela lista e não sai dela; o texto do local mostra o raio", () => {
+    expect(proximoRaio(5, 1)).toBe(8);
+    expect(proximoRaio(5, -1)).toBe(3);
+    expect(proximoRaio(1, -1)).toBe(1);
+    expect(proximoRaio(50, 1)).toBe(50);
+    expect(proximoRaio(4, 1)).toBe(8);
+    expect(textoDoLocal({ cidade: "Mutum", uf: "MG", area: null })).toBe("Mutum, MG");
+    expect(textoDoLocal({ cidade: "Mutum", uf: "MG", area: { lat: 0, lng: 0, raioKm: 5 } })).toBe("Mutum, MG · raio de 5 km");
+  });
+
+  test("a cidade mais próxima pela sede: Mutum no centro dela, outra cidade longe, em qualquer UF", () => {
+    const porUf = municipiosDoArquivo(arquivoDeMunicipios);
+    const mutum = cidadeDoCodigo(porUf, "MG", 3144003);
+    if (!mutum?.lat || !mutum.lng) throw new Error("Mutum sem coordenadas");
+    expect(cidadeMaisProxima(porUf, { lat: mutum.lat, lng: mutum.lng })?.nome).toBe("Mutum");
+    // 25 km a leste de Mutum já é a sede de outra cidade.
+    const longe = cidadeMaisProxima(porUf, { lat: mutum.lat, lng: mutum.lng + 0.24 });
+    expect(longe?.ibge).not.toBe(3144003);
+    // Vitória (ES) no ponto dela, mesmo partindo de uma busca em MG.
+    expect(cidadeMaisProxima(porUf, { lat: -20.3155, lng: -40.3128 })?.uf).toBe("ES");
+    expect(Math.round(distanciaKm({ lat: -19.8121, lng: -41.4407 }, { lat: -19.8121, lng: -41.4407 }))).toBe(0);
+    expect(Math.round(distanciaKm({ lat: 0, lng: 0 }, { lat: 1, lng: 0 }))).toBe(111);
+  });
+
+  test("o servidor confere a área: raio da lista, centro no Brasil; sem área é a cidade inteira", () => {
+    expect(areaDe(null)).toBeNull();
+    expect(areaDe({ lat: -19.8, lng: -41.4, raioKm: 5 })).toEqual({ lat: -19.8, lng: -41.4, raioKm: 5 });
+    expect(areaDe({ lat: -19.8, lng: -41.4, raioKm: 7 })).toBeUndefined();
+    expect(areaDe({ lat: 40.7, lng: -74, raioKm: 5 })).toBeUndefined();
+    expect(areaDe("x")).toBeUndefined();
+    expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 2 } })?.area).toEqual({ lat: -19.8, lng: -41.4, raioKm: 2 });
+    expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 999 } })).toBeNull();
   });
 });

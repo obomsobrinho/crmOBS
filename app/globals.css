@@ -1381,3 +1381,18 @@ select:focus-visible,
 [data-theme="dark"] .mapa-da-busca .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6);
 }
+/* O centro arrastável e o raio da "Nova busca" (components/admin/campanhas/Mapa.tsx). */
+.mapa-da-busca .pino-central {
+  border-radius: 9999px;
+  background: var(--brand-fill);
+  border: 3px solid var(--raised);
+  box-shadow: 0 0 0 1px var(--brand-fill), var(--panel-shadow);
+  cursor: grab;
+}
+.mapa-da-busca .pino-central:active {
+  cursor: grabbing;
+}
+.mapa-da-busca .area-do-mapa {
+  stroke: var(--brand-fill);
+  fill: var(--brand-fill);
+}

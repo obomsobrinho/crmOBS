@@ -61,6 +61,11 @@ interface ItemDoMenu {
   adminOnly?: boolean;
   /** Só com a agenda ligada (revisão do dono, 28/10/2026). */
   soComAgenda?: boolean;
+  /**
+   * Ferramenta do DONO DO PRODUTO, não do CRM (revisão de 30/10/2026): vai no FIM do
+   * menu, numa seção com título próprio (`BRAND.secaoDoDono`), só para admin.
+   */
+  doDono?: boolean;
 }
 
 const NAV: ItemDoMenu[] = [
@@ -81,11 +86,6 @@ const NAV: ItemDoMenu[] = [
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
   { href: "/contatos", label: "Contatos", icon: BookUser },
-  // CAMPANHAS (30/10/2026, revisão do dono): a prospecção do DONO DO PRODUTO,
-  // logo abaixo de Contatos, só para `ADMIN_USER_IDS` (a mesma decisão do
-  // servidor que o item Clientes). Conta de cliente nunca vê; a trava de verdade
-  // é `adminDaPagina` na página e `rotaDoAdmin` nas rotas.
-  { href: "/campanhas", label: "Campanhas", icon: Megaphone, adminOnly: true },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
@@ -103,7 +103,13 @@ const NAV: ItemDoMenu[] = [
   // PRODUTO, com as empresas que usam o CRM. O item só existe para quem está em
   // `ADMIN_USER_IDS` (decidido no servidor, `app/(app)/layout.tsx`); esconder o
   // item não é a trava, a trava é a página e as rotas (`adminDaSessao`).
-  { href: "/clientes", label: "Clientes", icon: Building2, adminOnly: true },
+  // A SEÇÃO DO DONO DO PRODUTO (revisão de 30/10/2026): Campanhas (a prospecção
+  // dele) e Clientes (a central) não são do CRM. Ficam no FIM do menu, numa seção
+  // com título (`BRAND.secaoDoDono`), só para `ADMIN_USER_IDS` (decidido no
+  // servidor). Esconder o item não é a trava: a trava é `adminDaPagina` nas páginas
+  // e `rotaDoAdmin` nas rotas.
+  { href: "/campanhas", label: "Campanhas", icon: Megaphone, adminOnly: true, doDono: true },
+  { href: "/clientes", label: "Clientes", icon: Building2, adminOnly: true, doDono: true },
 ];
 
 // "Em breve" (26/08/2026). A Agenda saiu daqui em 28/10/2026 (agenda própria,
@@ -262,6 +268,74 @@ export default function NavRail({
   const initials = clientName.slice(0, 2).toUpperCase();
   const perfilActive = pathname.startsWith("/perfil");
 
+  // O CRM em cima; as ferramentas do dono do produto numa seção própria no fim.
+  const doCrm = visiveis.filter((n) => !n.doDono);
+  const doDono = visiveis.filter((n) => n.doDono);
+  // Um item do trilho (o mesmo desenho para o CRM e para a seção do dono).
+  const desenharItem = ({ href, label, icon: Icon }: ItemDoMenu) => {
+    const atual = activeHref ?? pathname;
+    const active = atual === href || atual.startsWith(href + "/");
+    const unread = href === "/inbox" && unreadConvos > 0;
+    const esperando = href === "/pedidos" && pedidosAbertos > 0;
+    const item = (
+      <Button
+        asChild
+        variant="rail"
+        size="none"
+        className={cn(
+          "relative h-10 gap-3 rounded-lg text-corpo font-normal",
+          collapsed ? "w-10 justify-center" : "px-3",
+          active &&
+            "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
+        )}
+      >
+        <Link href={href} aria-current={active ? "page" : undefined}>
+          <Icon size={18} strokeWidth={1.8} className="shrink-0" />
+          {!collapsed && (
+            <span className="min-w-0 flex-1 truncate">{label}</span>
+          )}
+          {/* Expandido, pílula com o número; recolhido, só o ponto. A
+              pílula encolhida virava um círculo escuro sem nada legível
+              dentro. */}
+          {unread && !collapsed && (
+            <Badge variant="nao-lidas" className="ml-auto">
+              {unreadConvos > 99 ? "99+" : unreadConvos}
+            </Badge>
+          )}
+          {unread && collapsed && (
+            <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
+          )}
+          {/* Âmbar, e não a cor da marca: aqui o número é ESTADO (tem gente
+              esperando), e âmbar é a cor de estado de espera do sistema. */}
+          {esperando && !collapsed && (
+            <Badge variant="pedidos" data-slot="rail-pedidos" className="ml-auto">
+              {pedidosAbertos > 99 ? "99+" : pedidosAbertos}
+            </Badge>
+          )}
+          {esperando && collapsed && (
+            <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
+          )}
+        </Link>
+      </Button>
+    );
+    // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
+    // ícone. Expandido, o rótulo está escrito ao lado e a dica seria eco.
+    return collapsed ? (
+      <Tooltip key={href}>
+        <TooltipTrigger asChild>{item}</TooltipTrigger>
+        <TooltipContent side="right">
+          {unread
+            ? `${label} (${unreadConvos} não lidas)`
+            : esperando
+              ? `${label} (${pedidosAbertos} esperando)`
+              : label}
+        </TooltipContent>
+      </Tooltip>
+    ) : (
+      <React.Fragment key={href}>{item}</React.Fragment>
+    );
+  };
+
   return (
     <>
     <Card asChild variant="menu">
@@ -306,69 +380,7 @@ export default function NavRail({
           canal) ficam fixos. */}
       <AreaRolavel tamanho={16} data-slot="rail-itens" className="min-h-0 w-full flex-1">
         <div className={cn("flex flex-col gap-1", collapsed && "items-center")}>
-          {visiveis.map(({ href, label, icon: Icon }) => {
-            const atual = activeHref ?? pathname;
-            const active = atual === href || atual.startsWith(href + "/");
-            const unread = href === "/inbox" && unreadConvos > 0;
-            const esperando = href === "/pedidos" && pedidosAbertos > 0;
-            const item = (
-              <Button
-                asChild
-                variant="rail"
-                size="none"
-                className={cn(
-                  "relative h-10 gap-3 rounded-lg text-corpo font-normal",
-                  collapsed ? "w-10 justify-center" : "px-3",
-                  active &&
-                    "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
-                )}
-              >
-                <Link href={href} aria-current={active ? "page" : undefined}>
-                  <Icon size={18} strokeWidth={1.8} className="shrink-0" />
-                  {!collapsed && (
-                    <span className="min-w-0 flex-1 truncate">{label}</span>
-                  )}
-                  {/* Expandido, pílula com o número; recolhido, só o ponto. A
-                      pílula encolhida virava um círculo escuro sem nada legível
-                      dentro. */}
-                  {unread && !collapsed && (
-                    <Badge variant="nao-lidas" className="ml-auto">
-                      {unreadConvos > 99 ? "99+" : unreadConvos}
-                    </Badge>
-                  )}
-                  {unread && collapsed && (
-                    <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-brand-ink" />
-                  )}
-                  {/* Âmbar, e não a cor da marca: aqui o número é ESTADO (tem gente
-                      esperando), e âmbar é a cor de estado de espera do sistema. */}
-                  {esperando && !collapsed && (
-                    <Badge variant="pedidos" data-slot="rail-pedidos" className="ml-auto">
-                      {pedidosAbertos > 99 ? "99+" : pedidosAbertos}
-                    </Badge>
-                  )}
-                  {esperando && collapsed && (
-                    <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
-                  )}
-                </Link>
-              </Button>
-            );
-            // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
-            // ícone. Expandido, o rótulo está escrito ao lado e a dica seria eco.
-            return collapsed ? (
-              <Tooltip key={href}>
-                <TooltipTrigger asChild>{item}</TooltipTrigger>
-                <TooltipContent side="right">
-                  {unread
-                    ? `${label} (${unreadConvos} não lidas)`
-                    : esperando
-                      ? `${label} (${pedidosAbertos} esperando)`
-                      : label}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <React.Fragment key={href}>{item}</React.Fragment>
-            );
-          })}
+          {doCrm.map(desenharItem)}
 
           {SOON.map(({ label, icon: Icon }) => (
             <Tooltip key={label}>
@@ -387,6 +399,13 @@ export default function NavRail({
               <TooltipContent side="right">{label} (em breve)</TooltipContent>
             </Tooltip>
           ))}
+
+          {doDono.length > 0 && (
+            <div role="group" aria-label={BRAND.secaoDoDono} data-slot="rail-secao-dono" className={cn("mt-3 flex flex-col gap-1 border-t border-line pt-3", collapsed && "items-center")}>
+              {!collapsed && <p className="px-3 pb-1 text-rotulo uppercase text-ink-3">{BRAND.secaoDoDono}</p>}
+              {doDono.map(desenharItem)}
+            </div>
+          )}
         </div>
       </AreaRolavel>
 
@@ -604,6 +623,19 @@ function BarraAbas({
   // Pedidos entrou na barra no lugar do Pipeline (29/09/2026, decisão do
   // dono), e o Pipeline foi para "Mais".
   const itensMais = itens.filter((n) => !["/painel", "/pedidos", "/inbox"].includes(n.href));
+  // Uma linha do "Mais" (o CRM e, num grupo próprio, a seção do dono do produto).
+  const linhaDoMais = (n: ItemDoMenu) => {
+    const Icone = n.icon;
+    return (
+      <Button key={n.href} asChild variant="linha" size="linha">
+        <Link href={n.href} onClick={() => setMaisAberto(false)}>
+          <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
+          <span className="flex-1">{n.label}</span>
+          <ChevronRight size={18} className="text-ink-3" />
+        </Link>
+      </Button>
+    );
+  };
   const emMais = pathname.startsWith("/perfil") || itensMais.some((n) => pathname.startsWith(n.href));
   const abas: {
     href?: string;
@@ -685,18 +717,13 @@ function BarraAbas({
             </div>
           </div>
           <div className="flex flex-col p-2">
-            {itensMais.map((n) => {
-              const Icone = n.icon;
-              return (
-                <Button key={n.href} asChild variant="linha" size="linha">
-                  <Link href={n.href} onClick={() => setMaisAberto(false)}>
-                    <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
-                    <span className="flex-1">{n.label}</span>
-                    <ChevronRight size={18} className="text-ink-3" />
-                  </Link>
-                </Button>
-              );
-            })}
+            {itensMais.filter((n) => !n.doDono).map(linhaDoMais)}
+            {itensMais.some((n) => n.doDono) && (
+              <div role="group" aria-label={BRAND.secaoDoDono} data-slot="mais-secao-dono" className="my-1 border-y border-line py-1">
+                <p className="px-3 pb-1 pt-2 text-rotulo uppercase text-ink-3">{BRAND.secaoDoDono}</p>
+                {itensMais.filter((n) => n.doDono).map(linhaDoMais)}
+              </div>
+            )}
             <Button asChild variant="linha" size="linha">
               <Link href="/perfil" onClick={() => setMaisAberto(false)}>
                 <User size={20} strokeWidth={1.8} className="text-ink-2" />

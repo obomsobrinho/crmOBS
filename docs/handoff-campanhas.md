@@ -1,5 +1,48 @@
 # Handoff: Campanhas v2
 
+## Rodada de 30/10/2026 (2a revisão): bug do refresh, centro e raio no mapa, menu (branch `claude/lucid-cerf-1wh6fc`)
+
+**Parado para a revisão do Franck.** Protótipo em `/design/campanhas`; a correção do bug já vale na página real.
+
+- **Bug do refresh ("Carregando…" eterno com "Nenhum resultado" embaixo), corrigido na página real.** Causa:
+  o HTML que o servidor entregava em `/campanhas` era a tela vazia, e todos os números vinham de leituras no
+  navegador, sem prazo; um refresh mostrava esse HTML até elas voltarem, ou para sempre se uma travasse (o
+  HTML do preview reproduzia exatamente o que você viu). Agora a primeira tela (totais, primeira página de
+  buscas e o painel da base) vem lida do servidor, como a lista de Clientes; toda leitura tem prazo de 20 s
+  e vira "Não deu para carregar agora" com "Tentar de novo"; a paginação só aparece com dados. Testes de
+  regressão: o HTML já traz as buscas, dois refresh seguidos, e uma leitura que nunca volta (`?cenario=travado`).
+- **Nova busca:** UF, cidade e, ao escolher a cidade, o mapa centraliza nela. "Raio: a cidade inteira" até
+  você mexer; o "+" cria o círculo de 5 km, o pino central arrasta, clicar no mapa move o centro, "−"/"+"
+  andam por 1, 2, 3, 5, 8, 10, 15, 20, 30 e 50 km, "Usar a cidade inteira" desfaz. Centro fora da cidade:
+  "O centro está em Lajinha" (pela sede mais próxima), sem bloquear. Com ajuste vai `customGeolocation`
+  (longitude primeiro, como no run `Rfb0VfmDckdMIbiwT`) e não vai `locationQuery`; sem ajuste, "Cidade, UF,
+  Brasil". O centro e o raio ficam no `opcoes` da busca (sem DDL) e o detalhe diz "Mutum, MG · raio de 5 km".
+  O mapa da Nova busca é o mesmo componente do detalhe (`components/admin/campanhas/Mapa.tsx`).
+- **Menu:** o CRM como antes (Painel, Pedidos, Conversas, Contatos, Pipeline, Agente, Equipe, Follow-up em
+  breve) e, no fim, a seção "Gestão da OBS" com Campanhas e Clientes, só admin; no celular o mesmo grupo
+  dentro de "Mais". O título é `BRAND.secaoDoDono` em `lib/brand.ts`: trocar é uma linha.
+
+### Para o Franck (esta rodada e o que segue pendente)
+1. **Revisar** o menu novo, o mapa da Nova busca e o título da seção ("Gestão da OBS" é proposta).
+2. **Liberar o DDL aditivo das 8 colunas** em `prospeccao_leads` (continua pendente): `lat numeric`, `lng
+   numeric`, `reivindicado boolean`, `horarios jsonb`, `distribuicao_notas jsonb`, `fotos int`, `categorias
+   text[]`, `instagram text`. Sem isto a página de verdade fica sem pinos no detalhe, sem a ficha completa e
+   sem o filtro "Perfil não reivindicado".
+3. **Gerar a lista de cidades pelo IBGE** numa máquina com acesso (`node scripts/gerar-municipios.mjs`) e ver
+   se o diff muda algum nome (esta sessão não alcança servicodados.ibge.gov.br).
+4. A pergunta do layout do detalhe da busca continua: o mapa empurra a tabela para baixo da primeira tela.
+5. Ainda a conferir com um item real do dataset: o formato do `openingHours` em português e os nomes das
+   categorias sugeridas.
+
+### Decisões que tomei
+- O centro e o raio só valem depois de você mexer no mapa (o "+" ou o pino); antes, a busca é a cidade
+  inteira, que é o que a busca de 30/10 fez.
+- O aviso de cidade vizinha usa a SEDE mais próxima (o arquivo tem a coordenada da sede, não o contorno do
+  município): perto da divisa ele pode errar para o lado da cidade vizinha. Serve para avisar, nunca decide.
+- O mapa do detalhe ainda não desenha o círculo da busca; se quiser, entra junto da parte real.
+
+---
+
 ## Rodada de 30/10/2026: busca de leads, mapa e menu (branch `claude/lucid-cerf-1wh6fc`)
 
 Revisão do Franck depois da primeira busca real. **Protótipo pronto em `/design/campanhas`, parado para a
