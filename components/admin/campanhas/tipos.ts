@@ -233,6 +233,17 @@ export interface Totais {
   campanhas: Record<SituacaoDaCampanha, number>;
 }
 
+/**
+ * O que a página de verdade já leu no servidor para a primeira tela (aba Leads): os
+ * totais, a primeira página de buscas e o painel da base. Um refresh já chega com
+ * os números no HTML; cada peça que falhou no servidor vem null e a tela lê de novo.
+ */
+export interface InicialDaCentral {
+  totais: Totais | null;
+  buscas: Pagina<BuscaDaTabela> | null;
+  painel: ResumoDobrado | null;
+}
+
 export type RespostaDeIniciar = { ok: true; situacao: SituacaoDaCampanha } | { ok: false; erro: string };
 
 /** De onde as telas de Campanhas leem e para onde escrevem. */

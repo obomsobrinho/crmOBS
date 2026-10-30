@@ -275,7 +275,7 @@ function AbaCampanhas({
             ))}
           </ul>
         </CorpoDaTabela>
-        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanhas" />
+        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanhas" lido={tabela.lido} />
       </Card>
     </div>
   );

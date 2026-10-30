@@ -227,3 +227,46 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     await expect(page.locator('[data-slot="ficha-nao-reivindicado"]')).toBeVisible();
   });
 });
+
+// Bug de 30/10/2026: um refresh deixava a aba Leads em "Carregando…" com "Nenhum
+// resultado" na paginação, para sempre. Causa: a tela dependia só das leituras do
+// navegador, sem prazo, e o HTML do servidor era a tela vazia. Agora a primeira tela
+// vem lida do servidor, a paginação só aparece com dados e uma leitura que não
+// volta vira "Tentar de novo".
+test.describe("Campanhas: refresh nunca fica em Carregando (regressão de 30/10/2026)", () => {
+  test("o HTML do servidor já traz a primeira tela: buscas, contagens e paginação, sem Carregando", async ({ request }) => {
+    const html = await (await request.get("/design/campanhas?tela=leads")).text();
+    expect(html).not.toContain("Carregando…");
+    expect(html).not.toContain("Nenhum resultado");
+    expect(html).toContain("Mostrando 1 a 10 de 14");
+    expect(html).toContain('data-slot="busca-linha"');
+  });
+
+  test("refresh: a tabela continua com as buscas, e a paginação nunca diz Nenhum resultado sob Carregando", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    const rodape = page.locator('[data-slot="buscas-rodape"] [data-slot="paginacao-texto"]');
+    await expect(rodape).toHaveText("Mostrando 1 a 10 de 14");
+    for (let i = 0; i < 2; i++) {
+      await page.reload();
+      await expect(page.locator('[data-slot="busca-linha"]')).toHaveCount(10);
+      await expect(rodape).toHaveText("Mostrando 1 a 10 de 14");
+      await expect(page.getByText("Carregando…")).toHaveCount(0);
+    }
+  });
+
+  test("uma leitura que nunca volta vira \"Tentar de novo\" no tempo limite, sem paginação embaixo", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("/design/campanhas?tela=leads&cenario=travado");
+    const tabela = page.locator('[data-bloco="leads-tabela"]');
+    await expect(tabela.getByText("Carregando…")).toBeVisible();
+    // Carregando: nada de "Nenhum resultado" embaixo.
+    await expect(page.locator('[data-slot="buscas-rodape"]')).toHaveCount(0);
+    // O HTML aparece antes de a tela hidratar e o prazo começar: o relógio anda até a falha aparecer.
+    await expect(async () => {
+      await page.clock.fastForward(5_000);
+      await expect(tabela.getByText("Não deu para carregar agora.")).toBeVisible({ timeout: 500 });
+    }).toPass({ timeout: 20_000 });
+    await expect(tabela.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
+    await expect(page.locator('[data-slot="buscas-rodape"]')).toHaveCount(0);
+  });
+});

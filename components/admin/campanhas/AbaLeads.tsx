@@ -43,8 +43,10 @@ import {
   type ContagemDaBusca,
   type FiltroDosLeads,
   type FonteDeCampanhas,
+  type InicialDaCentral,
   type Lead,
   type LeadDaTabela,
+  type Pagina,
   type Totais,
 } from "./tipos";
 
@@ -317,6 +319,7 @@ function TabelaDeBuscas({
   fonte,
   versao,
   contagens,
+  inicial,
   agora,
   abrir,
   aoTerminarBusca,
@@ -325,6 +328,8 @@ function TabelaDeBuscas({
   fonte: FonteDeCampanhas;
   versao: number;
   contagens: Record<SituacaoDaBusca, number> | null;
+  /** A primeira página que o servidor já leu (recorte padrão). */
+  inicial: Pagina<BuscaDaTabela> | null;
   agora: number;
   abrir: (id: string) => void;
   /** Uma busca da página saiu de "buscando": o painel e as contagens leem de novo. */
@@ -334,7 +339,7 @@ function TabelaDeBuscas({
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
   const ler = useCallback((pagina: number) => fonte.buscas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao, inicial);
   const { itens, recarregar } = tabela;
   const buscando = itens.filter((b) => b.situacao === "buscando").map((b) => b.id);
   const chaveBuscando = buscando.join(",");
@@ -406,7 +411,7 @@ function TabelaDeBuscas({
           ))}
         </ul>
       </CorpoDaTabela>
-      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" />
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" lido={tabela.lido} />
     </>
   );
 }
@@ -675,7 +680,7 @@ function TabelaDeLeads({
           ))}
         </ul>
       </CorpoDaTabela>
-      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" />
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" lido={tabela.lido} />
       <FichaDoLead lead={ficha} aoFechar={() => setFicha(null)} />
     </>
   );
@@ -688,6 +693,7 @@ function HomeDosLeads({
   fonte,
   versao,
   totais,
+  inicial,
   agora,
   rascunho,
   abrir,
@@ -699,6 +705,7 @@ function HomeDosLeads({
   fonte: FonteDeCampanhas;
   versao: number;
   totais: Totais | null;
+  inicial: InicialDaCentral | null;
   agora: number;
   rascunho: CampanhaEditavel | null;
   abrir: (id: string) => void;
@@ -707,18 +714,18 @@ function HomeDosLeads({
   aoTerminarBusca: () => void;
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
-  const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null));
+  const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null), inicial?.painel ?? null);
   const nBuscas = somaDe(totais?.buscas);
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
         <TabsTrigger value="buscas" variant="painel" data-slot="leads-ver-buscas">
           Buscas
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nBuscas)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nBuscas)}</span>}
         </TabsTrigger>
         <TabsTrigger value="leads" variant="painel" data-slot="leads-ver-todos">
           Todos os leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -767,6 +774,7 @@ function HomeDosLeads({
                 fonte={fonte}
                 versao={versao}
                 contagens={totais?.buscas ?? null}
+                inicial={inicial?.buscas ?? null}
                 agora={agora}
                 abrir={abrir}
                 aoTerminarBusca={aoTerminarBusca}
@@ -857,6 +865,7 @@ function AbaLeads({
   fonte,
   versao,
   totais,
+  inicial,
   agora,
   buscaAberta,
   rascunho,
@@ -871,6 +880,8 @@ function AbaLeads({
   /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
   versao: number;
   totais: Totais | null;
+  /** O que o servidor já leu (painel e primeira página de buscas). */
+  inicial: InicialDaCentral | null;
   agora: number;
   buscaAberta: string | null;
   rascunho: CampanhaEditavel | null;
@@ -918,6 +929,7 @@ function AbaLeads({
           fonte={fonte}
           versao={versao}
           totais={totais}
+          inicial={inicial}
           agora={agora}
           rascunho={rascunho}
           abrir={abrirBusca}
