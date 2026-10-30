@@ -31,7 +31,7 @@ import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
 import NovaBusca from "./NovaBusca";
 import { CabecalhoDoGrafico, GraficoDeContagem, Rosca } from "./graficos";
-import { FunilDaBase, RankingDaBase } from "./ranking";
+import { FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
 import type { Busca, Campanha, Lead } from "./tipos";
@@ -96,54 +96,62 @@ function PainelDaBase({ r, porSemana }: { r: ResumoDaBase; porSemana: { inicio: 
         ]}
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card variant="conteudo" className="p-6" data-bloco="leads-cidades">
-          <CabecalhoDoGrafico titulo="Por cidade" />
-          <RankingDaBase grupos={r.porCidade} total={r.total} unidade={["cidade", "cidades"]} slot="leads-ranking-cidades" />
-        </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="leads-segmentos">
-          <CabecalhoDoGrafico titulo="Por segmento" />
-          <RankingDaBase grupos={r.porSegmento} total={r.total} unidade={["segmento", "segmentos"]} slot="leads-ranking-segmentos" />
-        </Card>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
-        <Card variant="conteudo" className="flex flex-col p-6" data-bloco="leads-funil">
-          <CabecalhoDoGrafico titulo="Funil da base" />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <OndeEstao cidades={r.porCidade} segmentos={r.porSegmento} total={r.total} />
+        </div>
+        <Card variant="conteudo" className="p-5" data-bloco="leads-funil">
+          <div className="flex min-h-8 items-center">
+            <h3 className="text-rotulo uppercase text-ink-3">Funil da base</h3>
+          </div>
           <FunilDaBase passos={funil} />
         </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="leads-nota">
-          <CabecalhoDoGrafico titulo="Nota no Google" />
-          <GraficoDeContagem
-            nome="Leads por nota no Google"
-            colunas={FAIXAS_DE_NOTA.map((f) => ({ chave: f.chave, eixo: f.eixo, rotulo: f.rotulo, n: r.porNota[f.chave] }))}
-          />
-        </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="leads-site">
-          <CabecalhoDoGrafico titulo="Presença online" />
-          <Rosca
-            nome="Leads por presença online"
-            unidade={["lead", "leads"]}
-            fatias={[
-              { chave: "nao", rotulo: ROTULO_DO_SITE.nao, n: r.porSite.nao, fill: "var(--chart-rampa-4)" },
-              { chave: "so_rede_social", rotulo: ROTULO_DO_SITE.so_rede_social, n: r.porSite.so_rede_social, fill: "var(--chart-rampa-2)" },
-              { chave: "sim", rotulo: ROTULO_DO_SITE.sim, n: r.porSite.sim, fill: "var(--chart-barra-neutra)" },
-            ]}
-          />
-        </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="leads-pontuacao">
-          <CabecalhoDoGrafico titulo="Pontuação" />
-          <Rosca
-            nome="Leads por pontuação"
-            unidade={["lead", "leads"]}
-            fatias={[
-              { chave: "alta", rotulo: "Alta", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
-              { chave: "media", rotulo: "Média", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
-              { chave: "baixa", rotulo: "Baixa", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
-            ]}
-          />
-        </Card>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A qualidade de UMA busca: nota no Google, presença online e pontuação. Mora no detalhe da busca, não no
+ * resumo da base (dono, 29/10/2026: alguns gráficos só fazem sentido dentro da busca).
+ */
+function QualidadeDaBusca({ r }: { r: ResumoDaBase }) {
+  return (
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Card variant="conteudo" className="p-5" data-bloco="busca-nota">
+        <CabecalhoDoGrafico titulo="Nota no Google" />
+        <GraficoDeContagem
+          nome="Leads por nota no Google"
+          className="h-28"
+          colunas={FAIXAS_DE_NOTA.map((f) => ({ chave: f.chave, eixo: f.eixo, rotulo: f.rotulo, n: r.porNota[f.chave] }))}
+        />
+      </Card>
+      <Card variant="conteudo" className="p-5" data-bloco="busca-site">
+        <CabecalhoDoGrafico titulo="Presença online" />
+        <Rosca
+          compacta
+          nome="Leads por presença online"
+          unidade={["lead", "leads"]}
+          fatias={[
+            { chave: "nao", rotulo: ROTULO_DO_SITE.nao, n: r.porSite.nao, fill: "var(--chart-rampa-4)" },
+            { chave: "so_rede_social", rotulo: ROTULO_DO_SITE.so_rede_social, n: r.porSite.so_rede_social, fill: "var(--chart-rampa-2)" },
+            { chave: "sim", rotulo: ROTULO_DO_SITE.sim, n: r.porSite.sim, fill: "var(--chart-barra-neutra)" },
+          ]}
+        />
+      </Card>
+      <Card variant="conteudo" className="p-5" data-bloco="busca-pontuacao">
+        <CabecalhoDoGrafico titulo="Pontuação" />
+        <Rosca
+          compacta
+          nome="Leads por pontuação"
+          unidade={["lead", "leads"]}
+          fatias={[
+            { chave: "alta", rotulo: "Alta", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
+            { chave: "media", rotulo: "Média", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
+            { chave: "baixa", rotulo: "Baixa", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
+          ]}
+        />
+      </Card>
     </div>
   );
 }
@@ -606,7 +614,7 @@ function HomeDosLeads({
     </Tabs>
   );
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
         <Button className="ml-auto" onClick={novaBusca} data-slot="leads-nova-busca">
@@ -683,8 +691,9 @@ function DetalheDaBusca({
 }) {
   const daBusca = useMemo(() => leads.filter((l) => l.buscaId === busca.id), [leads, busca.id]);
   const c = contar(daBusca, responderam);
+  const resumoDaBusca = useMemo(() => resumir(daBusca, responderam), [daBusca, responderam]);
   return (
-    <div className="flex flex-col gap-6" data-slot="busca-detalhe">
+    <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
         <Button className="ml-auto" onClick={criarCampanha} data-slot="busca-criar-campanha">
@@ -723,6 +732,8 @@ function DetalheDaBusca({
           },
         ]}
       />
+
+      <QualidadeDaBusca r={resumoDaBusca} />
 
       <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
         <TabelaDeLeads

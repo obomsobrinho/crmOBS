@@ -87,7 +87,7 @@ function PainelDeResultados({
   const pouco = r.enviados > 0 && r.enviados < AMOSTRA_MINIMA_PROVISORIA;
 
   const cartaoDaVariante = (
-    <Card variant="conteudo" className="flex flex-col p-6 lg:col-span-2 xl:col-span-1" data-bloco="resultado-variantes">
+    <Card variant="conteudo" className="flex flex-col p-5 lg:col-span-2 xl:col-span-1" data-bloco="resultado-variantes">
       <CabecalhoDoGrafico
         titulo="Melhor mensagem"
         destaque={
@@ -160,45 +160,73 @@ function PainelDeResultados({
         </p>
       )}
 
-      {serie && (
-        <Card variant="conteudo" className="p-6" data-bloco="resultado-dias">
-          <GraficoDeEnviosPorDia serie={serie} />
-        </Card>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-        {cartaoDaVariante}
-        <Card variant="conteudo" className="p-6" data-bloco="resultado-semana">
-          <CabecalhoDoGrafico
-            titulo="Melhor dia da semana"
-            destaque={
-              melhorDia !== null && (
+      {serie ? (
+        // O RESUMO (todas as campanhas): só o que vale somado. Envios por dia e, ao lado, quando o lead
+        // responde mais, em colunas baixas. A melhor MENSAGEM fica no detalhe: cada campanha tem os seus textos.
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card variant="conteudo" className="p-5 lg:col-span-2" data-bloco="resultado-dias">
+            <GraficoDeEnviosPorDia serie={serie} className="h-44" />
+          </Card>
+          <Card variant="conteudo" className="flex flex-col gap-4 p-5" data-bloco="resultado-quando">
+            <div data-bloco="resultado-semana">
+              <CabecalhoDoGrafico
+                titulo="Melhor dia"
+                destaque={melhorDia !== null && (
                 <DestaqueDoGrafico
                   slot="resultado-melhor-dia"
                   valor={DIAS_DA_SEMANA[melhorDia].longo.replace(/^./, (c) => c.toUpperCase())}
                   frase={`${r.porDiaDaSemana[melhorDia].taxa}% responderam`}
                 />
-              )
-            }
-          />
-          <GraficoDeTaxaEmColunas nome="Taxa de resposta por dia da semana" barras={barrasDia} />
-        </Card>
-        <Card variant="conteudo" className="p-6" data-bloco="resultado-horas">
-          <CabecalhoDoGrafico
-            titulo="Melhor horário de envio"
-            destaque={
-              melhorHora !== null && (
+              )}
+              />
+              <GraficoDeTaxaEmColunas compacto nome="Taxa de resposta por dia da semana" barras={barrasDia} />
+            </div>
+            <div className="border-t border-line-soft pt-4" data-bloco="resultado-horas">
+              <CabecalhoDoGrafico
+                titulo="Melhor horário"
+                destaque={melhorHora !== null && (
                 <DestaqueDoGrafico
                   slot="resultado-melhor-hora"
                   valor={`${r.porHoraDoEnvio[melhorHora].hora}h às ${r.porHoraDoEnvio[melhorHora].hora + 1}h`}
                   frase={`${r.porHoraDoEnvio[melhorHora].taxa}% responderam`}
                 />
-              )
-            }
-          />
-          <GraficoDeTaxaEmColunas nome="Taxa de resposta por horário de envio" barras={barrasHora} />
-        </Card>
-      </div>
+              )}
+              />
+              <GraficoDeTaxaEmColunas compacto nome="Taxa de resposta por horário de envio" barras={barrasHora} />
+            </div>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+          {cartaoDaVariante}
+          <Card variant="conteudo" className="p-5" data-bloco="resultado-semana">
+            <CabecalhoDoGrafico
+              titulo="Melhor dia da semana"
+              destaque={melhorDia !== null && (
+                <DestaqueDoGrafico
+                  slot="resultado-melhor-dia"
+                  valor={DIAS_DA_SEMANA[melhorDia].longo.replace(/^./, (c) => c.toUpperCase())}
+                  frase={`${r.porDiaDaSemana[melhorDia].taxa}% responderam`}
+                />
+              )}
+            />
+            <GraficoDeTaxaEmColunas nome="Taxa de resposta por dia da semana" barras={barrasDia} />
+          </Card>
+          <Card variant="conteudo" className="p-5" data-bloco="resultado-horas">
+            <CabecalhoDoGrafico
+              titulo="Melhor horário de envio"
+              destaque={melhorHora !== null && (
+                <DestaqueDoGrafico
+                  slot="resultado-melhor-hora"
+                  valor={`${r.porHoraDoEnvio[melhorHora].hora}h às ${r.porHoraDoEnvio[melhorHora].hora + 1}h`}
+                  frase={`${r.porHoraDoEnvio[melhorHora].taxa}% responderam`}
+                />
+              )}
+            />
+            <GraficoDeTaxaEmColunas nome="Taxa de resposta por horário de envio" barras={barrasHora} />
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

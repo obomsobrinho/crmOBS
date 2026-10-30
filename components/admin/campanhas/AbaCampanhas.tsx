@@ -219,7 +219,7 @@ function AbaCampanhas({
 
   if (campanhas.length === 0) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {topo}
         <Card variant="conteudo" className="py-4">
           <EstadoVazio
@@ -238,7 +238,7 @@ function AbaCampanhas({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       {topo}
       <PainelDeResultados
         envios={painel.envios}

@@ -75,7 +75,7 @@ function DetalheDaCampanha({
   const { itens, pagina, setPagina, total } = usePaginaDaMemoria<EnvioDaCampanha, typeof params>({ params, filtrar });
 
   return (
-    <div className="flex flex-col gap-6" data-slot="campanha-detalhe">
+    <div className="flex flex-col gap-4" data-slot="campanha-detalhe">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
         <div className="ml-auto flex flex-wrap items-center gap-2">

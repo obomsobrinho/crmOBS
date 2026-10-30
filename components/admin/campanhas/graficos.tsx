@@ -13,6 +13,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
+import { cn } from "@/lib/utils";
 import { numeroBR, pct, plural } from "@/lib/format";
 import { diaMes } from "@/lib/fuso";
 import { textoDoDiaDeEnvio, type DiaDeEnvio, type Taxa } from "@/lib/prospeccao";
@@ -53,7 +54,7 @@ const CONFIG_DIAS: ChartConfig = {
   semResposta: { label: "Sem resposta", color: "var(--chart-barra-neutra)" },
 };
 
-export function GraficoDeEnviosPorDia({ serie }: { serie: DiaDeEnvio[] }) {
+export function GraficoDeEnviosPorDia({ serie, className = "h-56" }: { serie: DiaDeEnvio[]; /** A altura do desenho. */ className?: string }) {
   const animar = useAnimacaoDoGrafico();
   const barras = useMemo<BarraDoDia[]>(
     () => serie.map((d) => ({ ...d, eixo: diaMes(d.dia), rotulo: textoDoDiaDeEnvio(d.dia), semResposta: d.enviados - d.responderam })),
@@ -68,7 +69,7 @@ export function GraficoDeEnviosPorDia({ serie }: { serie: DiaDeEnvio[] }) {
         <EstadoVazio tamanho="compacto" texto="Nenhuma mensagem enviada no período." />
       ) : (
         <>
-          <ChartContainer config={CONFIG_DIAS} className="mt-4 h-56" role="img" aria-label="Envios por dia">
+          <ChartContainer config={CONFIG_DIAS} className={cn("mt-3", className)} role="img" aria-label="Envios por dia">
             <BarChart data={barras} margin={{ top: 8, right: 4, left: 0, bottom: 0 }} barCategoryGap="24%">
               <CartesianGrid vertical={false} stroke="var(--chart-grade)" />
               <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval={Math.max(0, Math.ceil(barras.length / 8) - 1)} />
@@ -182,25 +183,30 @@ function BalaoDeTaxa() {
 
 const CONFIG_TAXA: ChartConfig = { valor: { label: "Taxa de resposta", color: "var(--chart-1)" } };
 
-/** Colunas de taxa de resposta (dia da semana, horário). */
-export function GraficoDeTaxaEmColunas({ nome, barras }: { nome: string; barras: BarraDeTaxa[] }) {
+/**
+ * Colunas de taxa de resposta (dia da semana, horário). `compacto` é a versão do resumo: baixa, sem
+ * eixo de porcentagem nem grade (o número de cada coluna está no balão e na tabela em texto).
+ */
+export function GraficoDeTaxaEmColunas({ nome, barras, compacto = false }: { nome: string; barras: BarraDeTaxa[]; compacto?: boolean }) {
   const animar = useAnimacaoDoGrafico();
   return (
     <>
-      <ChartContainer config={CONFIG_TAXA} className="mt-4 h-48" role="img" aria-label={nome}>
-        <BarChart data={barras} margin={{ top: 20, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
-          <CartesianGrid vertical={false} stroke="var(--chart-grade)" />
-          <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval={0} />
-          <YAxis tickLine={false} axisLine={false} width={36} tickFormatter={(v: number) => `${v}%`} allowDecimals={false} />
+      <ChartContainer config={CONFIG_TAXA} className={compacto ? "mt-2 h-20" : "mt-4 h-48"} role="img" aria-label={nome}>
+        <BarChart data={barras} margin={{ top: compacto ? 4 : 20, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
+          {!compacto && <CartesianGrid vertical={false} stroke="var(--chart-grade)" />}
+          <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={6} interval={0} />
+          <YAxis hide={compacto} tickLine={false} axisLine={false} width={36} tickFormatter={(v: number) => `${v}%`} allowDecimals={false} />
           <ChartTooltip cursor={CURSOR} content={<BalaoDeTaxa />} />
           <Bar dataKey="valor" shape={FormaDaBarra} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={animar}>
-            <LabelList
-              dataKey="valor"
-              position="top"
-              className="fill-ink-3"
-              fontSize={11}
-              formatter={(v: unknown) => (Number(v) > 0 ? `${v}%` : "")}
-            />
+            {!compacto && (
+              <LabelList
+                dataKey="valor"
+                position="top"
+                className="fill-ink-3"
+                fontSize={11}
+                formatter={(v: unknown) => (Number(v) > 0 ? `${v}%` : "")}
+              />
+            )}
           </Bar>
         </BarChart>
       </ChartContainer>
@@ -268,12 +274,12 @@ export interface ColunaDeContagem {
 }
 
 /** Colunas de uma série só (quantos leads em cada faixa), com o número em cima e a parte do total no balão. */
-export function GraficoDeContagem({ nome, colunas }: { nome: string; colunas: ColunaDeContagem[] }) {
+export function GraficoDeContagem({ nome, colunas, className = "h-44" }: { nome: string; colunas: ColunaDeContagem[]; className?: string }) {
   const animar = useAnimacaoDoGrafico();
   const total = colunas.reduce((s, c) => s + c.n, 0);
   return (
     <>
-      <ChartContainer config={{ n: { label: "Leads", color: "var(--chart-1)" } }} className="mt-4 h-44" role="img" aria-label={nome}>
+      <ChartContainer config={{ n: { label: "Leads", color: "var(--chart-1)" } }} className={cn("mt-3", className)} role="img" aria-label={nome}>
         <BarChart data={colunas} margin={{ top: 20, right: 4, left: 0, bottom: 0 }} barCategoryGap="22%">
           <CartesianGrid vertical={false} stroke="var(--chart-grade)" />
           <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={8} interval={0} />
@@ -324,7 +330,7 @@ export interface FatiaDaRosca {
   fill: string;
 }
 
-export function Rosca({ nome, fatias, unidade }: { nome: string; fatias: FatiaDaRosca[]; unidade: [string, string] }) {
+export function Rosca({ nome, fatias, unidade, compacta = false }: { nome: string; fatias: FatiaDaRosca[]; unidade: [string, string]; compacta?: boolean }) {
   const animar = useAnimacaoDoGrafico();
   const total = fatias.reduce((s, f) => s + f.n, 0);
   const config = useMemo<ChartConfig>(
@@ -333,9 +339,9 @@ export function Rosca({ nome, fatias, unidade }: { nome: string; fatias: FatiaDa
   );
   if (total === 0) return <EstadoVazio tamanho="compacto" texto="Nada a mostrar ainda." />;
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
-      <div className="relative w-36 shrink-0">
-        <ChartContainer config={config} className="h-36" role="img" aria-label={nome}>
+    <div className={cn("flex flex-wrap items-center justify-center gap-y-3", compacta ? "mt-2 gap-x-5" : "mt-4 gap-x-8")}>
+      <div className={cn("relative shrink-0", compacta ? "w-28" : "w-36")}>
+        <ChartContainer config={config} className={compacta ? "h-28" : "h-36"} role="img" aria-label={nome}>
           <PieChart>
             <ChartTooltip
               content={

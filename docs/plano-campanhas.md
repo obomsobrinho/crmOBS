@@ -56,14 +56,16 @@ plan, not as captions.
 ### 3.1 Leads (the base)
 
 - **Dashboard of the base** (`resumoDaBase`, pure; the real one is one SQL aggregate, never rows in the
-  browser), fourth round: a band of four numbers (`FaixaDeNumeros`: Na base with cities, segments and a
-  sparkline of new leads per week, `leadsPorSemana`; Com celular, Contatados and Responderam each with its
-  share and a thin bar), then "Por cidade" and "Por segmento" as RANKINGS (`RankingDaBase`: the 6 largest,
-  each with count, share of the base as a bar, contacted and replied, and one "Outras N" line with the
-  rest, so the card keeps its size with 300 cities; the stacked bar chart per city grew without limit and
-  its "fora das campanhas" read as "no phone"), then "Funil da base" (a list of steps with bars and the
-  share of the previous step, `FunilDaBase`), "Nota no Google" (columns per band, `FAIXAS_DE_NOTA`) and
-  two donuts, "Presença online" (no site / social only / own site) and "Pontuação" (high / medium / low).
+  browser). Fifth round (owner: the dashboards made him scroll three times to reach the table; reference
+  Dribbble "CureDesk", numbers, one row of charts and the table on the first screen): ONE band of four
+  numbers (`FaixaDeNumeros`: Na base with cities, segments and a sparkline of new leads per week,
+  `leadsPorSemana`; Com celular, Contatados and Responderam each with its share and a thin bar) and ONE
+  row: "Onde estão" (`OndeEstao`, a Cidade | Segmento switch over a compact ranking, one line per group:
+  name, bar, count, share; the 5 largest and one "Outras N" line, so it keeps its size with 300 cities;
+  the per-city chart grew without limit, and two ranking cards side by side were too tall) and "Funil da
+  base" (`FunilDaBase`). Then the table, visible without scrolling at 1440x900. The quality charts of a
+  search ("Nota no Google" in columns per band, `FAIXAS_DE_NOTA`, "Presença online" and "Pontuação"
+  donuts) moved to the search detail, where they describe one search.
 - **Table**, two views in a `painel` tab pair: **Buscas** (term and city, status, found, with mobile,
   good, contacted of those with mobile as a `Medidor` plus replies, when; the filter button by status and
   search by segment or city) and **Todos os leads** (the lead table below, over the whole base).
@@ -138,7 +140,11 @@ bars of text); this one:
   zero).
 - **Envios por dia** (home only; inside a campaign it is always the daily quota, owner): stacked columns
   per São Paulo day (replied in brand, no reply neutral), legend with totals.
-- **Melhor mensagem**: horizontal bars of reply rate per variant, the texts behind "Ver os textos".
+- **Home vs detail** (fifth round, first screen must reach the table): the home shows the band, "Envios
+  por dia" and, beside it, one card with "Melhor dia" and "Melhor horário" as low columns without axis
+  (the value of each column in the tooltip and the text table). "Melhor mensagem" lives only in the
+  campaign detail, because variant 1 of one campaign is not the same text as variant 1 of another.
+- **Melhor mensagem** (detail): horizontal bars of reply rate per variant, the texts behind "Ver os textos".
 - **Melhor dia da semana** and **Melhor horário de envio** (8h to 17h): columns of reply rate with the
   value on top; the best one is the only column in brand color (`indiceDaMelhorTaxa`: only with two
   lines with sends and not all tied) and its name sits large in the card header ("Quarta, 28%
