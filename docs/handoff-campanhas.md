@@ -72,3 +72,28 @@ Cursor agent while the owner sleeps. Never merged, never pushed to `main`.
   expected. Security advisors: only the expected "RLS on, no policy" info for the new tables.
 - `lib/database.types.ts` regenerated (only additions); `prospeccao_campanhas` added to
   `TABELAS_DO_CLIENTE` (`lib/admin-purga.ts`).
+
+### Phase 2 (in progress, Cursor 30/10/2026 ~01h)
+- Added `lib/fonte-de-leads.ts`, `lib/fonte-apify.ts` (actor `compass/crawler-google-places`; star/website
+  enum mapping marked TODO until a real run).
+- Added `lib/campanhas-servidor.ts` (RPC helpers, row mappers, conexões do admin).
+- Routes: `GET/POST /api/admin/campanhas/buscas`, `POST /api/prospeccao/apify` (query `busca` + secret `s`),
+  `GET /api/prospeccao/cron` + `lib/prospeccao-cron.ts` (send claim, reply scan, Apify poll fallback).
+- `REGRAS_DA_PROSPECCAO` in `lib/envio-ativo.ts`.
+- Draft migration `20261030043000_prospeccao_cron_job.sql` (schedules only when Vault secrets exist).
+- **Not applied yet:** pg_cron migration (needs Vault secrets first).
+- **Still missing for phase 2 close:** env var names documented in `data.md`, real-run field check.
+
+### Phases 3–7 (not started)
+- Live `/campanhas` page, `lib/campanhas-fonte.ts`, remaining admin routes (leads, campaigns CRUD,
+  resultados/resumo), wire `CentralDeCampanhas` to API, unit + e2e tests, self-review.
+
+## Para o Franck amanhã
+1. **Vault (Supabase):** create `prospeccao_cron_url` and `prospeccao_cron_bearer`, then apply migration
+   `20261030043000_prospeccao_cron_job.sql` (or tell Cursor to apply).
+2. **Vercel env:** `APIFY_TOKEN`, `APIFY_WEBHOOK_SECRET`, `CRON_SECRET` (same as agenda lembretes if shared).
+3. **Apify account:** create, add token, run one search of 5 places and confirm star/website field values.
+4. **Local webhook:** Apify must reach your URL; overnight dev only works if tunnel/production URL is set.
+5. **UI:** backend for lists exists for buscas only; the screen still uses `/design/campanhas` fake data until
+   phase 3 lands.
+6. **Rehearsal:** your phone as sole lead, after UI + env are ready (not done tonight).
