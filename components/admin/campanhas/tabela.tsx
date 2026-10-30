@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Paginacao } from "@/components/ui/paginacao";
+import { LIMITE_DA_LEITURA_MS } from "@/lib/campanhas-fonte";
 import { POR_PAGINA_DE_CAMPANHAS } from "@/lib/prospeccao";
 import { cn } from "@/lib/utils";
 import type { Pagina } from "./tipos";
@@ -18,32 +19,46 @@ import type { Pagina } from "./tipos";
 /** A mesma página da rota (`lib/prospeccao.ts`), para o rodapé nunca discordar do servidor. */
 export const POR_PAGINA = POR_PAGINA_DE_CAMPANHAS;
 
+
 /**
  * UMA LEITURA da fonte, de novo a cada `chave` nova (os parâmetros dela em texto)
  * ou `recarregar`. Enquanto a próxima chega, a anterior continua na tela (a tabela
  * não pisca). Resposta de uma leitura já trocada é jogada fora. `mudar` corrige o
  * que está na tela sem ler de novo (marcar um lead muda só aquela linha).
  */
-export function useLeitura<T>(chave: string, ler: () => Promise<T>) {
+export function useLeitura<T>(chave: string, ler: () => Promise<T>, inicial: T | null = null) {
   const lerAtual = useRef(ler);
   useEffect(() => {
     lerAtual.current = ler;
   });
-  const [estado, setEstado] = useState<{ dados: T | null; erro: boolean; lida: string | null }>({ dados: null, erro: false, lida: null });
+  // `inicial` (o que o servidor já leu) vai direto para a tela, sem "Carregando":
+  // o HTML de um refresh já chega com os dados. A leitura do navegador roda mesmo
+  // assim, para a tela nunca ficar com um dado velho de outra montagem.
+  const [estado, setEstado] = useState<{ dados: T | null; erro: boolean; lida: string | null }>(() => ({
+    dados: inicial,
+    erro: false,
+    lida: inicial === null ? null : chave,
+  }));
   const [tentativa, setTentativa] = useState(0);
   useEffect(() => {
     let vivo = true;
-    lerAtual
-      .current()
+    // Uma leitura que não volta vira falha com "Tentar de novo", nunca um "Carregando" eterno.
+    let relogio: ReturnType<typeof setTimeout> | undefined;
+    const limite = new Promise<never>((_, rejeitar) => {
+      relogio = setTimeout(() => rejeitar(new Error(`leitura passou de ${LIMITE_DA_LEITURA_MS} ms`)), LIMITE_DA_LEITURA_MS);
+    });
+    Promise.race([lerAtual.current(), limite])
       .then((dados) => {
         if (vivo) setEstado({ dados, erro: false, lida: chave });
       })
       .catch((e) => {
         console.error("campanhas, leitura:", e);
         if (vivo) setEstado((cur) => ({ ...cur, erro: true, lida: chave }));
-      });
+      })
+      .finally(() => clearTimeout(relogio));
     return () => {
       vivo = false;
+      clearTimeout(relogio);
     };
   }, [chave, tentativa]);
   const recarregar = useCallback(() => setTentativa((n) => n + 1), []);
@@ -57,14 +72,20 @@ export function useLeitura<T>(chave: string, ler: () => Promise<T>) {
  * MESMA página; uma página que ficou além do fim (um filtro que encolheu a lista)
  * volta para a última.
  */
-export function usePaginaDaFonte<T>(chave: string, ler: (pagina: number) => Promise<Pagina<T>>, versao = 0) {
+export function usePaginaDaFonte<T>(
+  chave: string,
+  ler: (pagina: number) => Promise<Pagina<T>>,
+  versao = 0,
+  /** A primeira página que o servidor já leu (só para o recorte padrão). */
+  inicial: Pagina<T> | null = null,
+) {
   const [pagina, setPagina] = useState(1);
   const [chaveVista, setChaveVista] = useState(chave);
   if (chave !== chaveVista) {
     setChaveVista(chave);
     setPagina(1);
   }
-  const lida = useLeitura(`${chave}|${pagina}|${versao}`, () => ler(pagina));
+  const lida = useLeitura(`${chave}|${pagina}|${versao}`, () => ler(pagina), inicial);
   const total = lida.dados?.total ?? 0;
   const ultima = Math.max(1, Math.ceil(total / POR_PAGINA));
   if (lida.dados && !lida.carregando && pagina > ultima) setPagina(ultima);
@@ -138,12 +159,16 @@ export function RodapeDaTabela({
   total,
   aoMudar,
   slot,
+  lido,
 }: {
   pagina: number;
   total: number;
   aoMudar: (p: number) => void;
   slot: string;
+  /** Sem a primeira leitura não há o que paginar: nada de "Nenhum resultado" embaixo de "Carregando". */
+  lido: boolean;
 }) {
+  if (!lido) return null;
   return (
     <div className="border-t border-line-soft px-5 py-3" data-slot={`${slot}-rodape`}>
       <Paginacao pagina={pagina} porPagina={POR_PAGINA} total={total} aoMudar={aoMudar} />

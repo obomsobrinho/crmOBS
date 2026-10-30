@@ -216,7 +216,7 @@ function DetalheDaCampanha({
             })}
           </ul>
         </CorpoDaTabela>
-        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanha-leads" />
+        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanha-leads" lido={tabela.lido} />
       </Card>
     </div>
   );

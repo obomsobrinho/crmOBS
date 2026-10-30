@@ -9,7 +9,7 @@ import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
 import { useLeitura } from "./tabela";
-import { somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type Tela } from "./tipos";
+import { somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
 // par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
@@ -27,17 +27,20 @@ export default function CentralDeCampanhas({
   agora,
   fonte,
   variantesSugeridas,
+  inicial = null,
 }: {
   telaInicial: Tela;
   agora: number;
   fonte: FonteDeCampanhas;
+  /** O que o servidor já leu para a primeira tela (só a página de verdade). */
+  inicial?: InicialDaCentral | null;
   /** O texto pré-preenchido de uma campanha nova (o dono edita). */
   variantesSugeridas: string[];
 }) {
   const [tela, setTela] = useState<Tela>(telaInicial);
   const [versao, setVersao] = useState(0);
   const mudou = useCallback(() => setVersao((v) => v + 1), []);
-  const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais());
+  const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais(), inicial?.totais ?? null);
   const { dados: conexoes } = useLeitura("conexoes", () => fonte.conexoes());
 
   // ── O rascunho aberto no assistente ──
@@ -188,11 +191,11 @@ export default function CentralDeCampanhas({
       <TabsList variant="painel" aria-label="Seções">
         <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
           Leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
         </TabsTrigger>
         <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
           Campanhas
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -235,6 +238,7 @@ export default function CentralDeCampanhas({
                 fonte={fonte}
                 versao={versao}
                 totais={totais}
+                inicial={inicial}
                 agora={agora}
                 buscaAberta={tela.busca}
                 rascunho={rascunhoEsperando}

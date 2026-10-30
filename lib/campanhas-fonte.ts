@@ -22,6 +22,13 @@ import type { MarcacaoDoLead, ResumoDobrado, SituacaoDaCampanha } from "./prospe
 
 const BASE = "/api/admin/campanhas";
 
+/**
+ * Quanto uma leitura da tela espera antes de virar falha com "Tentar de novo" (bug do
+ * refresh de 30/10/2026: uma leitura sem prazo deixava a tela em "Carregando" para
+ * sempre). Vale para o pedido HTTP (aborta) e para a tela (`useLeitura`).
+ */
+export const LIMITE_DA_LEITURA_MS = 20_000;
+
 class FalhaDaRota extends Error {
   constructor(
     readonly status: number,
@@ -34,6 +41,7 @@ class FalhaDaRota extends Error {
 async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${caminho}`, {
     ...init,
+    signal: AbortSignal.timeout(LIMITE_DA_LEITURA_MS),
     headers: init?.body ? { "Content-Type": "application/json" } : undefined,
     cache: "no-store",
   });
