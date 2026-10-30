@@ -3,7 +3,8 @@
 Status: v2, written 29/10/2026 after the owner's review of the first prototype, which he rejected as a
 structure. The brief of that review is the source of truth and this plan follows it. ADR:
 `docs/adr/2026-10-29-owner-prospecting-campaigns.md` (Proposed). Prototype with fake data:
-`/design/campanhas`. Nothing applied to the database, nothing sent, n8n untouched.
+`/design/campanhas`. Backend built on 30/10/2026 (phases 1 to 7, `docs/handoff-campanhas.md`): tables APPLIED
+(`20261030034211`), the pg_cron job migration written but not applied, nothing sent, n8n untouched.
 
 Delivery flow (fixed by the owner): 1. plan; 2. prototype with fake data; 3. owner approves layout and
 rules; 4. backend; 5. tests; 6. `/simplify` and `/code-review`; 7. `main`. **DDL only after the owner

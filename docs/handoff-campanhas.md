@@ -1,99 +1,85 @@
-# Handoff: Campanhas v2 backend (overnight run, 29 to 30/10/2026)
+# Handoff: Campanhas v2 backend
 
-Branch `claude/campanhas-plano-1c34fe` (worktree `.claude/worktrees/campanhas-plano-1c34fe`). Written by the
-Cursor agent while the owner sleeps. Never merged, never pushed to `main`.
+Branch `claude/campanhas-plano-1c34fe`. Never merged, never pushed to `main`. Phases 0 and 1 by the Cursor
+agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 30/10/2026.
 
-## What I understood (read before phase 0)
+## Para o Franck (o que só você pode fazer, na ordem)
 
-- Campanhas is the product owner's own prospecting tool (only `ADMIN_USER_IDS`), never a tenant feature.
-  Two sections: Leads (a base built by searches at Apify, deduplicated by phone, marked good or
-  discarded) and Campanhas (a 4 step wizard: Campanha, Contatos, Mensagem, Confirmar; one fixed message
-  per lead with 1 to 3 rotating variants; at most 10 a day, 8h to 18h, random 4 to 12 min pause; detail
-  with Pausar/Retomar and "Nova campanha com quem não respondeu").
-- The layout is approved and lives in `components/admin/campanhas/*`, fed today by fake data in memory
-  (`/design/campanhas`). My job: make it real WITHOUT changing what it looks like. The rules already live
-  in `lib/prospeccao.ts` (pure); routes, cron and SQL must use or mirror them.
-- Data: six new tables (`prospeccao_*`), RLS on, service role only; every admin write is one SQL
-  function with its `admin_acoes` row; dashboards are SQL aggregates (never rows in the browser);
-  `prospeccao_campanhas` goes into `TABELAS_DO_CLIENTE`.
-- Sending: `GET /api/prospeccao/cron` every 5 min from Supabase `pg_cron` + `pg_net` (Vercel Hobby), with
-  the `CRON_SECRET` bearer read from Vault; one message per due campaign per run through
-  `enviarMensagemAtiva`; reply and opt-out detection by reading `chat_messages` (read only).
-- Source: Apify actor `compass/crawler-google-places`, async with a webhook to `/api/prospeccao/apify`
-  (`APIFY_WEBHOOK_SECRET`), polling fallback in the cron. No Apify account yet: build against the
-  documented schema and mark the mapping "to confirm with a real run".
-- Tonight: additive DDL is released (new tables, indexes, functions, the pg_cron job). Nothing existing is
-  altered. No real WhatsApp message, no n8n, no push to `main`.
+1. **Apify:** crie a conta e gere o token (Console, Settings, API and Integrations). Não cole o token no chat.
+2. **Vercel (Production):** crie as variáveis `APIFY_TOKEN` (o token do item 1) e `APIFY_WEBHOOK_SECRET` (um
+   texto longo e aleatório que você inventa, só a Vercel guarda). `CRON_SECRET` já existe (o da agenda); o
+   cron das Campanhas usa o MESMO valor. Faça um redeploy depois.
+3. **Supabase Vault** (Dashboard, Project Settings, Vault): crie `prospeccao_cron_url` = a URL de produção
+   terminando em `/api/prospeccao/cron`, e `prospeccao_cron_bearer` = o mesmo valor do `CRON_SECRET`.
+4. **Aplicar a migration** `supabase/migrations/20261030043000_prospeccao_cron_job.sql` (agenda o tick de 5 em
+   5 minutos; os segredos são lidos do Vault a cada execução, nunca copiados para o job). Sem o item 3 o job
+   roda e não chama nada. Para desligar: `select cron.unschedule('prospeccao_tick_5m');`.
+5. **Uma busca real de 5 lugares** em `/campanhas` (Leads, Nova busca; o menor teto da tela é 50, então use um
+   segmento raro numa cidade pequena). Confira: (a) a busca fica "Pronta" sozinha em poucos minutos (webhook)
+   ou em até ~13 min (o cron confere buscas paradas há 8 min); (b) no Apify Console, Input da execução, os
+   valores de `placeMinimumStars` (usamos `threeAndHalf`, `four`, `fourAndHalf`) e `website` (`allPlaces`,
+   `withoutWebsite`, `withWebsite`) foram aceitos; (c) os leads chegam com telefone, nota, site, bairro e
+   cidade. Se algum campo vier vazio, me mande o JSON de UM item do dataset (sem dados de terceiros, se
+   preferir) e eu ajusto `lib/apify-campos.ts`. Mesmo que o actor ignore um filtro, aplicamos nota, site e
+   fechadas do nosso lado (`filtrarPelasOpcoes`).
+6. **Ensaio com o seu celular como único lead**: hoje só um lead vindo de uma busca entra numa campanha. Faça
+   uma busca que ache a sua empresa (ou me peça um modo seguro de inserir só o seu número; NÃO fiz isso).
+   Crie a campanha com só esse lead (filtro "só os bons" e marque só você como bom), Iniciar, e espere o
+   tick (8h às 18h, segunda a sábado). Confira a mensagem com a linha "Se não quiser receber mais
+   mensagens, é só responder SAIR.", responda "oi" (vira "Respondeu" no próximo tick) e depois "SAIR"
+   (vira "Pediu para parar" e o lead nunca mais entra).
+7. **A pergunta do n8n (`fromMe`)**: no ensaio, veja se a mensagem enviada pela API pausou a IA da sua
+   conversa com a OBS ("Pausar IA (Franck digitou)" no `obs-atendimento`). Para um lead NOVO não há
+   `dados_cliente` ainda, então nada pausa; para um telefone que já conversa com a OBS, pode pausar. Eu não
+   toquei no n8n; me diga o que viu e decidimos.
+8. **Revisar e fazer o merge** quando estiver de acordo (o fluxo: você faz o merge).
 
-## Open questions (for the owner; none blocks tonight)
+## Estado
 
-1. **Which numbers can send.** The wizard lists "Número que envia". I restrict it to the companies the
-   admin user is a member of (`user_clients`) that have a WhatsApp instance, so a prospect message can
-   never leave a customer's number by mistake. OBS qualifies. Tell me if you want a wider list.
-2. **n8n and the first message.** In the n8n export in the repo (`n8n/obs-atendimento.json`), every
-   outgoing message (`fromMe`) goes to "Pausar IA (Franck digitou)" and to the AI history. For a NEW
-   lead there is no `dados_cliente` row yet, so nothing is paused and the AI gets the message as context.
-   For a phone that already talks to OBS (your own phone in the rehearsal!), the send would pause the AI
-   of that conversation. Whether Evolution emits `fromMe` for API sends depends on its webhook events,
-   which I did not touch. Check it in the rehearsal (section "Para o Franck amanhã").
-3. **Numbered pages.** The approved layout has numbered pages ("Mostrando 11 a 20 de 137"), which need
-   an offset. The SQL pages by offset over an index-ordered query (owner-only tables, a few thousand rows
-   at most); the    plan's "keyset" wording conflicts with jumping to page 7. Kept offset, on purpose.
+- Fase 0 e 1 (Cursor): decisões D1 a D9; DDL aditivo APLICADO em produção (`20261030034211_prospeccao_do_dono.sql`).
+- Fase 2: fonte Apify revisada e corrigida (ver "Revisão do trabalho da noite"); `data.md` com as envs.
+- Fase 3: `/campanhas` (só admin, `adminDaPagina`), link "Campanhas" no topo da central Clientes. As telas
+  aprovadas leem de `FonteDeCampanhas`: `lib/campanhas-fonte.ts` (rotas) na página de verdade, memória no
+  preview. Layout igual ao aprovado (conferido por captura de tela em 1440x900).
+- Fase 4: 13 rotas em `/api/admin/campanhas/*` (lista, totais, conexões, buscas, leads e marcação, painel da
+  base, resultados, prévia do recorte, rascunho, detalhe e leads, iniciar/pausar/retomar). O servidor confere
+  de novo `problemasParaIniciar` (com `problemasDaVariante`) e que o número é de uma empresa sua; a fila sai
+  de `prospeccao_leads_do_filtro` (`podeEntrarNaCampanha` no SQL).
+- Fase 5: cron revisado (uma mensagem por campanha por tick, linha de saída pelo código, respostas lidas de
+  `chat_messages` em lotes, D6).
+- Fase 6: painéis lendo os agregados SQL, dobrados pelos gêmeos puros.
+- Fase 7: `e2e/campanhas-lib.design.spec.ts` (24 testes puros) e `e2e/campanhas.design.spec.ts` (9 de tela e
+  das travas sem login), guard list atualizada. Suíte `sem-login`: 827 passaram; 6 de
+  `bancada-conversa.design.spec.ts` não abriram o navegador neste container (o spec usa um launch próprio que
+  procura um headless shell que a nuvem não tem), sem relação com Campanhas. Suítes com login e pagas: não
+  rodadas (regra: só o orquestrador local, e nada aqui envia mensagem).
 
-## Log
+## Revisão do trabalho da noite (o que estava errado)
 
-### Phase 0 (done)
-- Merged `origin/main` (47 commits: agenda, `lib/envio-ativo.ts`, central updates). Two conflicts, both
-  kept both sides: the lucide import of `components/admin/ListaCentral.tsx` and the ADR index rows.
-  Types, lint (10 old warnings, none in Campanhas) and `checar` green.
-- D1 to D9 recorded in plan section 12 and in `lib/prospeccao.ts`: `JANELA` Monday to Saturday,
-  `LINHA_DE_SAIDA` appended by `textoParaLead`, `AMOSTRA_MINIMA` 30, `PARADAS_PARA_PAUSAR` 2,
-  `MESES_DE_RETENCAO` 12.
+1. O webhook ad hoc do Apify ia no CORPO do POST, que o Apify trata como entrada do actor: o fim da busca nunca
+   chegaria. Agora vai na query `webhooks` (base64), com o segredo no header `x-apify-secret`
+   (`headersTemplate`) e o token como Bearer; nada secreto em URL.
+2. O fallback do cron concluía a busca pelo dataset sem olhar o status da execução: uma busca ainda rodando
+   seria gravada pela metade. Webhook e cron agora perguntam à fonte (`lerExecucao`).
+3. A migration do pg_cron copiava o bearer para o texto do job (visível em `cron.job`). Agora lê do Vault a cada
+   execução.
+4. Um envio "pulado" devolvia o lead à fila: o cron reivindicaria o mesmo lead para sempre. Agora vira
+   "falhou" com o motivo.
+5. Detalhes: `select("*")`, casts `as never`/`as unknown as`, Evolution chamado na renderização (agora o
+   navegador pede `/conexoes`), respostas lidas uma consulta por lead (agora lotes de 25 por empresa).
 
-### Phase 1 (done, APPLIED to production as additive DDL)
-- `supabase/migrations/20261030034211_prospeccao_do_dono.sql` (the applied version). Six tables, RLS on,
-  no policy, service role only. Admin writes, one SQL function each with its `admin_acoes` row:
-  `prospeccao_criar_busca`, `prospeccao_marcar_lead`, `prospeccao_salvar_campanha` (draft autosave),
-  `prospeccao_iniciar_campanha`, `prospeccao_pausar_campanha`, `prospeccao_retomar_campanha`. System
-  (webhook and cron): `prospeccao_concluir_busca`, `prospeccao_ativar_agendadas`,
-  `prospeccao_reivindicar_envio` (reserves the campaign turn and claims ONE lead), `prospeccao_registrar_envio`,
-  `prospeccao_em_observacao`, `prospeccao_registrar_respostas` (with the D6 pause),
-  `prospeccao_apagar_antigos` (D8). Reads: pages and counts for searches, leads and campaigns,
-  `prospeccao_resumo_da_base` and `prospeccao_resultados` (long format, folded in the app by the same
-  shapes as the pure twins), `prospeccao_leads_do_filtro` (the eligibility, shared by the wizard count and
-  the start).
-- Decisions I took: lead and campaign ids are generated in the app (the search id goes into the Apify
-  webhook before the row exists, so the route makes ONE write); a lead keeps the phone as the source gave
-  it (`telefone_original`, shown with the Fixo/Inválido badge) and the dedupe key only for a valid mobile
-  (`telefone`), plus a dedupe by place id for leads without mobile; `tentado_em` keeps a failed attempt in
-  the results window while `enviado_em` stays the twin of `enviadoEm`.
-- Tested inside a rolled back transaction with fake data (dedupe, idempotent completion, filters, start,
-  claim race, failure, auto conclusion, opt-out, results, pages, base summary, LGPD purge): all as
-  expected. Security advisors: only the expected "RLS on, no policy" info for the new tables.
-- `lib/database.types.ts` regenerated (only additions); `prospeccao_campanhas` added to
-  `TABELAS_DO_CLIENTE` (`lib/admin-purga.ts`).
+## Decisões que tomei (diga se quer outra)
 
-### Phase 2 (in progress, Cursor 30/10/2026 ~01h)
-- Added `lib/fonte-de-leads.ts`, `lib/fonte-apify.ts` (actor `compass/crawler-google-places`; star/website
-  enum mapping marked TODO until a real run).
-- Added `lib/campanhas-servidor.ts` (RPC helpers, row mappers, conexões do admin).
-- Routes: `GET/POST /api/admin/campanhas/buscas`, `POST /api/prospeccao/apify` (query `busca` + secret `s`),
-  `GET /api/prospeccao/cron` + `lib/prospeccao-cron.ts` (send claim, reply scan, Apify poll fallback).
-- `REGRAS_DA_PROSPECCAO` in `lib/envio-ativo.ts`.
-- Draft migration `20261030043000_prospeccao_cron_job.sql` (schedules only when Vault secrets exist).
-- **Not applied yet:** pg_cron migration (needs Vault secrets first).
-- **Still missing for phase 2 close:** env var names documented in `data.md`, real-run field check.
+- **Números que enviam:** só as empresas de que você é membro (`user_clients`) com instância. A OBS entra.
+- **Páginas numeradas por offset** (como o Cursor): a tela pede "página 7"; são tabelas suas, de milhares de linhas.
+- **Rascunho salva sozinho** 600 ms depois da última mudança; "Cancelar" salva antes de sair.
+- **Reserva da vez:** o lead é marcado "enviado" ANTES do envio (nunca manda duas vezes). Se o processo
+  morrer bem no meio, esse lead fica "enviado" sem ter recebido. Preferi o risco de perder um envio ao de
+  repetir mensagem para um desconhecido.
+- **Respostas:** 14 dias de observação depois do envio; uma resposta conta só até o próximo envio ao mesmo
+  lead (a "segunda chance" fica com a dela).
 
-### Phases 3–7 (not started)
-- Live `/campanhas` page, `lib/campanhas-fonte.ts`, remaining admin routes (leads, campaigns CRUD,
-  resultados/resumo), wire `CentralDeCampanhas` to API, unit + e2e tests, self-review.
+## O que ficou de fora
 
-## Para o Franck amanhã
-1. **Vault (Supabase):** create `prospeccao_cron_url` and `prospeccao_cron_bearer`, then apply migration
-   `20261030043000_prospeccao_cron_job.sql` (or tell Cursor to apply).
-2. **Vercel env:** `APIFY_TOKEN`, `APIFY_WEBHOOK_SECRET`, `CRON_SECRET` (same as agenda lembretes if shared).
-3. **Apify account:** create, add token, run one search of 5 places and confirm star/website field values.
-4. **Local webhook:** Apify must reach your URL; overnight dev only works if tunnel/production URL is set.
-5. **UI:** backend for lists exists for buscas only; the screen still uses `/design/campanhas` fake data until
-   phase 3 lands.
-6. **Rehearsal:** your phone as sole lead, after UI + env are ready (not done tonight).
+- Nenhuma mensagem real foi enviada; n8n intocado; nenhum DDL aplicado nesta sessão.
+- Não há tempo real nas telas (de propósito: a busca em andamento é relida a cada 10 s, só com a aba visível).
