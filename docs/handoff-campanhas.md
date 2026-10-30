@@ -38,4 +38,37 @@ Cursor agent while the owner sleeps. Never merged, never pushed to `main`.
    which I did not touch. Check it in the rehearsal (section "Para o Franck amanhã").
 3. **Numbered pages.** The approved layout has numbered pages ("Mostrando 11 a 20 de 137"), which need
    an offset. The SQL pages by offset over an index-ordered query (owner-only tables, a few thousand rows
-   at most); the plan's "keyset" wording conflicts with jumping to page 7. Kept offset, on purpose.
+   at most); the    plan's "keyset" wording conflicts with jumping to page 7. Kept offset, on purpose.
+
+## Log
+
+### Phase 0 (done)
+- Merged `origin/main` (47 commits: agenda, `lib/envio-ativo.ts`, central updates). Two conflicts, both
+  kept both sides: the lucide import of `components/admin/ListaCentral.tsx` and the ADR index rows.
+  Types, lint (10 old warnings, none in Campanhas) and `checar` green.
+- D1 to D9 recorded in plan section 12 and in `lib/prospeccao.ts`: `JANELA` Monday to Saturday,
+  `LINHA_DE_SAIDA` appended by `textoParaLead`, `AMOSTRA_MINIMA` 30, `PARADAS_PARA_PAUSAR` 2,
+  `MESES_DE_RETENCAO` 12.
+
+### Phase 1 (done, APPLIED to production as additive DDL)
+- `supabase/migrations/20261030034211_prospeccao_do_dono.sql` (the applied version). Six tables, RLS on,
+  no policy, service role only. Admin writes, one SQL function each with its `admin_acoes` row:
+  `prospeccao_criar_busca`, `prospeccao_marcar_lead`, `prospeccao_salvar_campanha` (draft autosave),
+  `prospeccao_iniciar_campanha`, `prospeccao_pausar_campanha`, `prospeccao_retomar_campanha`. System
+  (webhook and cron): `prospeccao_concluir_busca`, `prospeccao_ativar_agendadas`,
+  `prospeccao_reivindicar_envio` (reserves the campaign turn and claims ONE lead), `prospeccao_registrar_envio`,
+  `prospeccao_em_observacao`, `prospeccao_registrar_respostas` (with the D6 pause),
+  `prospeccao_apagar_antigos` (D8). Reads: pages and counts for searches, leads and campaigns,
+  `prospeccao_resumo_da_base` and `prospeccao_resultados` (long format, folded in the app by the same
+  shapes as the pure twins), `prospeccao_leads_do_filtro` (the eligibility, shared by the wizard count and
+  the start).
+- Decisions I took: lead and campaign ids are generated in the app (the search id goes into the Apify
+  webhook before the row exists, so the route makes ONE write); a lead keeps the phone as the source gave
+  it (`telefone_original`, shown with the Fixo/Inválido badge) and the dedupe key only for a valid mobile
+  (`telefone`), plus a dedupe by place id for leads without mobile; `tentado_em` keeps a failed attempt in
+  the results window while `enviado_em` stays the twin of `enviadoEm`.
+- Tested inside a rolled back transaction with fake data (dedupe, idempotent completion, filters, start,
+  claim race, failure, auto conclusion, opt-out, results, pages, base summary, LGPD purge): all as
+  expected. Security advisors: only the expected "RLS on, no policy" info for the new tables.
+- `lib/database.types.ts` regenerated (only additions); `prospeccao_campanhas` added to
+  `TABELAS_DO_CLIENTE` (`lib/admin-purga.ts`).

@@ -30,6 +30,9 @@ export const TABELAS_DO_CLIENTE = [
   "agendamentos",
   "agenda_bloqueios",
   "agenda_servicos",
+  // Campanhas do dono (30/10/2026): a campanha que enviou por esse número; a fila e as variantes saem
+  // em cascata, e a base de leads (sem client_id, do dono do produto) fica.
+  "prospeccao_campanhas",
   "chat_messages",
   "conversations",
   "tags",

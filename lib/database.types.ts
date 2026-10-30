@@ -1044,6 +1044,297 @@ export type Database = {
           },
         ]
       }
+      prospeccao_busca_leads: {
+        Row: {
+          busca_id: string
+          lead_id: string
+        }
+        Insert: {
+          busca_id: string
+          lead_id: string
+        }
+        Update: {
+          busca_id?: string
+          lead_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_busca_leads_busca_id_fkey"
+            columns: ["busca_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_buscas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospeccao_busca_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao_buscas: {
+        Row: {
+          cidade: string
+          concluida_em: string | null
+          criada_em: string
+          criada_por: string | null
+          erro: string | null
+          fonte: string
+          fonte_execucao_id: string | null
+          id: string
+          opcoes: Json
+          status: string
+          termo: string
+          total: number
+          uf: string | null
+        }
+        Insert: {
+          cidade: string
+          concluida_em?: string | null
+          criada_em?: string
+          criada_por?: string | null
+          erro?: string | null
+          fonte: string
+          fonte_execucao_id?: string | null
+          id: string
+          opcoes?: Json
+          status?: string
+          termo: string
+          total?: number
+          uf?: string | null
+        }
+        Update: {
+          cidade?: string
+          concluida_em?: string | null
+          criada_em?: string
+          criada_por?: string | null
+          erro?: string | null
+          fonte?: string
+          fonte_execucao_id?: string | null
+          id?: string
+          opcoes?: Json
+          status?: string
+          termo?: string
+          total?: number
+          uf?: string | null
+        }
+        Relationships: []
+      }
+      prospeccao_campanha_leads: {
+        Row: {
+          campanha_id: string
+          enviado_em: string | null
+          erro: string | null
+          lead_id: string
+          ordem: number
+          respondeu_em: string | null
+          status: string
+          tentado_em: string | null
+          variante: number | null
+        }
+        Insert: {
+          campanha_id: string
+          enviado_em?: string | null
+          erro?: string | null
+          lead_id: string
+          ordem: number
+          respondeu_em?: string | null
+          status?: string
+          tentado_em?: string | null
+          variante?: number | null
+        }
+        Update: {
+          campanha_id?: string
+          enviado_em?: string | null
+          erro?: string | null
+          lead_id?: string
+          ordem?: number
+          respondeu_em?: string | null
+          status?: string
+          tentado_em?: string | null
+          variante?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_campanha_leads_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prospeccao_campanha_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao_campanhas: {
+        Row: {
+          agendada_para: string | null
+          client_id: string | null
+          concluida_em: string | null
+          criada_em: string
+          criada_por: string | null
+          filtro: Json
+          id: string
+          iniciada_em: string | null
+          nome: string
+          passo: number
+          pausada_motivo: string | null
+          proximo_envio_em: string | null
+          salva_em: string
+          status: string
+          teto_diario: number
+        }
+        Insert: {
+          agendada_para?: string | null
+          client_id?: string | null
+          concluida_em?: string | null
+          criada_em?: string
+          criada_por?: string | null
+          filtro?: Json
+          id: string
+          iniciada_em?: string | null
+          nome?: string
+          passo?: number
+          pausada_motivo?: string | null
+          proximo_envio_em?: string | null
+          salva_em?: string
+          status?: string
+          teto_diario?: number
+        }
+        Update: {
+          agendada_para?: string | null
+          client_id?: string | null
+          concluida_em?: string | null
+          criada_em?: string
+          criada_por?: string | null
+          filtro?: Json
+          id?: string
+          iniciada_em?: string | null
+          nome?: string
+          passo?: number
+          pausada_motivo?: string | null
+          proximo_envio_em?: string | null
+          salva_em?: string
+          status?: string
+          teto_diario?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_campanhas_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao_leads: {
+        Row: {
+          avaliacoes: number | null
+          bairro: string | null
+          busca_id: string
+          cidade: string | null
+          criado_em: string
+          endereco: string | null
+          fonte_id: string | null
+          id: string
+          marcacao: string | null
+          nome: string
+          nota: number | null
+          parou_em: string | null
+          pontuacao: number
+          segmento: string | null
+          site: string | null
+          site_classe: string
+          telefone: string | null
+          telefone_original: string | null
+          tipo_telefone: string | null
+        }
+        Insert: {
+          avaliacoes?: number | null
+          bairro?: string | null
+          busca_id: string
+          cidade?: string | null
+          criado_em?: string
+          endereco?: string | null
+          fonte_id?: string | null
+          id?: string
+          marcacao?: string | null
+          nome: string
+          nota?: number | null
+          parou_em?: string | null
+          pontuacao?: number
+          segmento?: string | null
+          site?: string | null
+          site_classe?: string
+          telefone?: string | null
+          telefone_original?: string | null
+          tipo_telefone?: string | null
+        }
+        Update: {
+          avaliacoes?: number | null
+          bairro?: string | null
+          busca_id?: string
+          cidade?: string | null
+          criado_em?: string
+          endereco?: string | null
+          fonte_id?: string | null
+          id?: string
+          marcacao?: string | null
+          nome?: string
+          nota?: number | null
+          parou_em?: string | null
+          pontuacao?: number
+          segmento?: string | null
+          site?: string | null
+          site_classe?: string
+          telefone?: string | null
+          telefone_original?: string | null
+          tipo_telefone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_leads_busca_id_fkey"
+            columns: ["busca_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_buscas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prospeccao_variantes: {
+        Row: {
+          campanha_id: string
+          ordem: number
+          texto: string
+        }
+        Insert: {
+          campanha_id: string
+          ordem: number
+          texto: string
+        }
+        Update: {
+          campanha_id?: string
+          ordem?: number
+          texto?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prospeccao_variantes_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "prospeccao_campanhas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quick_replies: {
         Row: {
           body: string
@@ -1638,6 +1929,303 @@ export type Database = {
           esperando: number
           mais_antigo: string
           total: number
+        }[]
+      }
+      prospeccao_apagar_antigos: { Args: { p_antes: string }; Returns: number }
+      prospeccao_ativar_agendadas: {
+        Args: { p_agora: string }
+        Returns: number
+      }
+      prospeccao_buscas_contagens: {
+        Args: never
+        Returns: {
+          n: number
+          status: string
+        }[]
+      }
+      prospeccao_buscas_pagina: {
+        Args: {
+          p_limite?: number
+          p_offset?: number
+          p_status?: string
+          p_texto?: string
+        }
+        Returns: {
+          achadas: number
+          bons: number
+          cidade: string
+          com_celular: number
+          contatados: number
+          criada_em: string
+          erro: string
+          id: string
+          opcoes: Json
+          responderam: number
+          status: string
+          termo: string
+          total_geral: number
+          uf: string
+        }[]
+      }
+      prospeccao_campanhas_contagens: {
+        Args: never
+        Returns: {
+          n: number
+          status: string
+        }[]
+      }
+      prospeccao_campanhas_pagina: {
+        Args: {
+          p_dias?: number
+          p_hoje?: string
+          p_limite?: number
+          p_offset?: number
+          p_status?: string
+          p_texto?: string
+        }
+        Returns: {
+          agendada_para: string
+          client_id: string
+          criada_em: string
+          enviados: number
+          falharam: number
+          id: string
+          nome: string
+          passo: number
+          responderam: number
+          salva_em: string
+          serie: number[]
+          status: string
+          total: number
+          total_geral: number
+        }[]
+      }
+      prospeccao_cidades: {
+        Args: { p_busca?: string }
+        Returns: {
+          cidade: string
+        }[]
+      }
+      prospeccao_concluir_busca: {
+        Args: { p_busca: string; p_erro: string; p_itens: Json }
+        Returns: {
+          status: string
+          total: number
+        }[]
+      }
+      prospeccao_contagens_da_campanha: {
+        Args: { p_campanha: string }
+        Returns: {
+          n: number
+          status: string
+        }[]
+      }
+      prospeccao_criar_busca: {
+        Args: {
+          p_cidade: string
+          p_execucao: string
+          p_fonte: string
+          p_id: string
+          p_opcoes: Json
+          p_quem: string
+          p_termo: string
+          p_uf: string
+        }
+        Returns: undefined
+      }
+      prospeccao_em_observacao: {
+        Args: { p_desde: string }
+        Returns: {
+          campanha_id: string
+          client_id: string
+          enviado_em: string
+          lead_id: string
+          respondeu_em: string
+          status: string
+          telefone: string
+        }[]
+      }
+      prospeccao_iniciar_campanha: {
+        Args: {
+          p_agora: string
+          p_id: string
+          p_proximo: string
+          p_quem: string
+        }
+        Returns: string
+      }
+      prospeccao_leads_da_campanha: {
+        Args: {
+          p_campanha: string
+          p_limite?: number
+          p_offset?: number
+          p_status?: string
+          p_texto?: string
+        }
+        Returns: {
+          bairro: string
+          cidade: string
+          enviado_em: string
+          lead_id: string
+          nome: string
+          respondeu_em: string
+          status: string
+          total_geral: number
+          variante: number
+        }[]
+      }
+      prospeccao_leads_do_filtro: {
+        Args: {
+          p_busca?: string
+          p_limite?: number
+          p_origem?: string
+          p_so_bons?: boolean
+          p_so_sem_site?: boolean
+        }
+        Returns: {
+          id: string
+          nome: string
+          pontuacao: number
+          total: number
+        }[]
+      }
+      prospeccao_leads_pagina: {
+        Args: {
+          p_busca?: string
+          p_cidade?: string
+          p_digitos?: string
+          p_limite?: number
+          p_nao_contatados?: boolean
+          p_nota_minima?: number
+          p_offset?: number
+          p_so_bons?: boolean
+          p_so_sem_site?: boolean
+          p_texto?: string
+        }
+        Returns: {
+          avaliacoes: number
+          bairro: string
+          busca_id: string
+          campanha_ids: string[]
+          campanha_nomes: string[]
+          cidade: string
+          id: string
+          marcacao: string
+          nome: string
+          nota: number
+          parou_em: string
+          respondeu: boolean
+          segmento: string
+          site: string
+          telefone: string
+          total_geral: number
+        }[]
+      }
+      prospeccao_marcar_lead: {
+        Args: { p_lead: string; p_marcacao: string; p_quem: string }
+        Returns: {
+          marcacao: string
+        }[]
+      }
+      prospeccao_pausar_campanha: {
+        Args: { p_id: string; p_motivo: string; p_quem: string }
+        Returns: string
+      }
+      prospeccao_registrar_envio: {
+        Args: {
+          p_campanha: string
+          p_erro: string
+          p_lead: string
+          p_proximo: string
+          p_resultado: string
+          p_variante: number
+        }
+        Returns: undefined
+      }
+      prospeccao_registrar_respostas: {
+        Args: {
+          p_inicio_do_dia: string
+          p_itens: Json
+          p_motivo: string
+          p_paradas: number
+        }
+        Returns: number
+      }
+      prospeccao_reivindicar_envio: {
+        Args: {
+          p_agora: string
+          p_campanha: string
+          p_inicio_do_dia: string
+          p_reserva_ate: string
+        }
+        Returns: {
+          avisos: string
+          client_id: string
+          enviados_hoje: number
+          instancia: string
+          lead_id: string
+          nome: string
+          ordem: number
+          situacao: string
+          telefone: string
+          variantes: string[]
+        }[]
+      }
+      prospeccao_resultados: {
+        Args: {
+          p_ate?: string
+          p_campanha?: string
+          p_de?: string
+          p_serie_ate?: string
+          p_serie_de?: string
+        }
+        Returns: {
+          chave: number
+          dimensao: string
+          enviados: number
+          n: number
+          responderam: number
+        }[]
+      }
+      prospeccao_resumo_da_base: {
+        Args: {
+          p_busca?: string
+          p_dias?: number
+          p_hoje?: string
+          p_semanas?: number
+        }
+        Returns: {
+          a_contatar: number
+          chave: string
+          contatados: number
+          dimensao: string
+          n: number
+          responderam: number
+          soma: number
+        }[]
+      }
+      prospeccao_retomar_campanha: {
+        Args: {
+          p_agora: string
+          p_id: string
+          p_proximo: string
+          p_quem: string
+        }
+        Returns: string
+      }
+      prospeccao_salvar_campanha: {
+        Args: {
+          p_agendada_para: string
+          p_client: string
+          p_filtro: Json
+          p_id: string
+          p_nome: string
+          p_passo: number
+          p_quem: string
+          p_variantes: string[]
+        }
+        Returns: {
+          salva_em: string
         }[]
       }
       provision_tenant: {
