@@ -28,6 +28,7 @@ import {
   MessagesSquare,
   BookUser,
   Building2,
+  Megaphone,
   KanbanSquare,
   LayoutDashboard,
   Bot,
@@ -80,6 +81,11 @@ const NAV: ItemDoMenu[] = [
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
   { href: "/contatos", label: "Contatos", icon: BookUser },
+  // CAMPANHAS (30/10/2026, revisão do dono): a prospecção do DONO DO PRODUTO,
+  // logo abaixo de Contatos, só para `ADMIN_USER_IDS` (a mesma decisão do
+  // servidor que o item Clientes). Conta de cliente nunca vê; a trava de verdade
+  // é `adminDaPagina` na página e `rotaDoAdmin` nas rotas.
+  { href: "/campanhas", label: "Campanhas", icon: Megaphone, adminOnly: true },
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
   { href: "/agente", label: "Agente", icon: Bot, donoOnly: true },
   // "Conhecimento" saiu do menu em 26/08/2026, pelo mesmo motivo do Playground:
@@ -103,9 +109,9 @@ const NAV: ItemDoMenu[] = [
 // "Em breve" (26/08/2026). A Agenda saiu daqui em 28/10/2026 (agenda própria,
 // item do menu acima).
 //
-// **Campanhas SAIU.** Manter prometia disparo em massa sobre conexão QR, que é o
-// cenário de banimento que o projeto decidiu não correr, e atrai o cliente
-// errado logo de início. Se um dia vier por API Oficial, volta.
+// **Campanhas SAIU do "Em breve"** dos clientes. Manter prometia disparo em massa
+// sobre conexão QR, que é o cenário de banimento que o projeto decidiu não correr.
+// O item "Campanhas" acima é outra coisa: a prospecção do dono do produto, só admin.
 //
 // **Follow-up e não "Fluxos"**: o cliente final não pensa em fluxo, pensa em
 // "falar de novo com quem sumiu". ⚠️ O nome está amarrado a uma regra: o produto

@@ -1,4 +1,5 @@
-import type { OpcoesDaBusca } from "./prospeccao";
+import { normalizar } from "./clientes";
+import type { DetalhesDoLead, OpcoesDaBusca } from "./prospeccao";
 
 // A FONTE DE LEADS, trocável (docs/plano-campanhas.md, seção 6): começar uma
 // busca, ler o que ela achou e traduzir cada lugar num lead. Este módulo é o
@@ -25,6 +26,11 @@ export interface ItemDaFonteDeLeads {
   pontuacao: number;
   /** Fechado de vez na fonte (sai quando a busca pede "sem fechadas"). Não vai ao banco. */
   fechado: boolean;
+  /**
+   * Coordenadas, perfil reivindicado, horário, notas, fotos, categorias. ⚠️ Ainda não vão
+   * ao banco: as colunas pedem DDL aditivo, que espera o dono liberar.
+   */
+  detalhes: DetalhesDoLead;
 }
 
 export interface InicioDaBusca {
@@ -57,6 +63,8 @@ export function filtrarPelasOpcoes(itens: ItemDaFonteDeLeads[], o: OpcoesDaBusca
   return itens.filter((i) => {
     if (o.ignorarFechados && i.fechado) return false;
     if (o.notaMinima !== null && (i.nota === null || i.nota < o.notaMinima)) return false;
+    if (o.minAvaliacoes !== null && (i.avaliacoes ?? 0) < o.minAvaliacoes) return false;
+    if (!daCategoria(i, o.categorias)) return false;
     if (o.site === "sem_site" && i.site_classe === "sim") return false;
     if (o.site === "com_site" && i.site_classe !== "sim") return false;
     const chaves = [i.telefone && `t${i.telefone}`, i.fonte_id && `f${i.fonte_id}`].filter((c): c is string => !!c);
@@ -64,6 +72,16 @@ export function filtrarPelasOpcoes(itens: ItemDaFonteDeLeads[], o: OpcoesDaBusca
     for (const c of chaves) vistos.add(c);
     return true;
   });
+}
+
+/**
+ * "Só desta categoria": alguma categoria do lugar (a principal ou as outras) contém
+ * alguma das escolhidas, sem acento e sem caixa. Nenhuma escolhida = qualquer uma.
+ */
+export function daCategoria(i: Pick<ItemDaFonteDeLeads, "segmento" | "detalhes">, categorias: string[]): boolean {
+  if (categorias.length === 0) return true;
+  const doLugar = [i.segmento ?? "", ...i.detalhes.categorias].map(normalizar);
+  return categorias.map(normalizar).some((c) => doLugar.some((l) => l.includes(c)));
 }
 
 /** O item no formato do jsonb de `prospeccao_concluir_busca` (sem o que não vai ao banco). */

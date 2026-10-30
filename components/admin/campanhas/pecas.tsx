@@ -65,7 +65,7 @@ export function SeloNaCampanha({ situacao }: { situacao: SituacaoNaCampanha }) {
   );
 }
 
-const DA_FAIXA = { alta: "estado-bom", media: "estado-neutro", baixa: "contorno" } as const;
+export const DA_FAIXA = { alta: "estado-bom", media: "estado-neutro", baixa: "contorno" } as const;
 
 /** A pontuação com os motivos no balão. */
 export function SeloDaPontuacao({ sinais }: { sinais: SinaisDoLead }) {

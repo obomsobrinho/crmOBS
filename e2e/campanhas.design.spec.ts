@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // CAMPANHAS na tela (docs/plano-campanhas.md), no preview com dados de mentira
 // (`/design/campanhas`, a fonte em memória com a MESMA interface da página de
@@ -8,6 +8,19 @@ import { test, expect } from "@playwright/test";
 // página manda para o login. Prova layout e comportamento da tela, nunca o banco.
 
 const ID = "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b";
+
+/** UF primeiro, depois a cidade DA LISTA, digitando no combobox. */
+async function escolherCidade(page: Page, uf: string, digitado: string, nome: string) {
+  const dialogo = page.getByRole("dialog");
+  await dialogo.getByRole("combobox", { name: "Estado" }).click();
+  await page.getByRole("option", { name: uf, exact: true }).click();
+  const cidade = dialogo.getByRole("combobox", { name: "Cidade" });
+  await expect(cidade).toBeEnabled();
+  await cidade.click();
+  await page.getByRole("textbox", { name: "Cidade: buscar" }).fill(digitado);
+  await page.getByRole("option", { name: nome, exact: true }).click();
+  await expect(cidade).toHaveText(nome);
+}
 
 test.describe("Campanhas sem login", () => {
   test("as rotas /api/admin/campanhas respondem 404 a quem não é admin, sem revelar nada", async ({ request }) => {
@@ -83,9 +96,7 @@ test.describe("Campanhas no preview", () => {
     const dialogo = page.getByRole("dialog");
     await dialogo.getByRole("textbox", { name: "Segmento" }).fill("pet shop");
     await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
-    await dialogo.getByRole("textbox", { name: "Cidade" }).fill("Mutum");
-    await dialogo.getByRole("combobox", { name: "Estado" }).click();
-    await page.getByRole("option", { name: "MG" }).click();
+    await escolherCidade(page, "MG", "mutum", "Mutum");
     await dialogo.getByRole("button", { name: "Buscar", exact: true }).click();
     const nova = page.locator('[data-slot="busca-linha"]', { hasText: "pet shop" });
     await expect(nova).toContainText("Buscando");
@@ -125,5 +136,94 @@ test.describe("Campanhas no preview", () => {
     await expect(page.getByText("Nenhuma busca ainda")).toBeVisible();
     await page.locator('[data-slot="campanhas-aba-campanhas"]').click();
     await expect(page.getByText("Nenhuma campanha ainda")).toBeVisible();
+  });
+});
+
+test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
+  test("o menu do admin tem Campanhas logo abaixo de Contatos", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    const rotulos = await page.locator('[data-slot="rail-itens"] a').allInnerTexts();
+    const nomes = rotulos.map((t) => t.trim());
+    expect(nomes.indexOf("Campanhas")).toBe(nomes.indexOf("Contatos") + 1);
+    await expect(page.locator('[data-slot="rail-itens"] a', { hasText: "Campanhas" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("Nova busca: sem cidade da lista não busca; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    await page.locator('[data-slot="leads-nova-busca"]').click();
+    const dialogo = page.getByRole("dialog");
+    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("clínica de estética");
+    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    const buscar = dialogo.getByRole("button", { name: "Buscar", exact: true });
+    await expect(buscar).toBeDisabled();
+    // Sem UF a cidade nem abre.
+    await expect(dialogo.getByRole("combobox", { name: "Cidade" })).toBeDisabled();
+    // No ES não existe Mutum.
+    await dialogo.getByRole("combobox", { name: "Estado" }).click();
+    await page.getByRole("option", { name: "ES", exact: true }).click();
+    await dialogo.getByRole("combobox", { name: "Cidade" }).click();
+    await page.getByRole("textbox", { name: "Cidade: buscar" }).fill("Mutúm");
+    await expect(page.getByText("Nenhuma cidade com esse nome neste estado")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await escolherCidade(page, "MG", "MUTÚM", "Mutum");
+    await expect(buscar).toBeEnabled();
+    // As categorias sugeridas saem do segmento.
+    await expect(dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" })).toBeVisible();
+    await expect(dialogo.getByRole("group", { name: "Mínimo de avaliações no Google" }).first()).toBeVisible();
+  });
+
+  test("o mapa da busca: um pino por lead com coordenadas, a legenda conta os estados", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa).toBeVisible();
+    const n = Number(await mapa.getAttribute("data-pinos"));
+    expect(n).toBeGreaterThan(10);
+    await expect(mapa.locator("path.pino-do-mapa")).toHaveCount(n);
+    const legenda = await page.locator('[data-slot="busca-mapa-legenda"] li').allInnerTexts();
+    expect(legenda.map((t) => Number(t.match(/(\d+)$/)?.[1] ?? 0)).reduce((a, b) => a + b, 0)).toBe(n);
+    await expect(page.locator(".leaflet-control-attribution")).toContainText("OpenStreetMap");
+  });
+
+  test("clicar num pino destaca a linha na tabela; \"ver no mapa\" na linha destaca o pino", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const pinos = page.locator('[data-slot="busca-mapa"] path.pino-do-mapa');
+    await expect(pinos.first()).toBeVisible();
+    // O último pino da busca de estética é o dentista que veio no meio (fica na última página da tabela).
+    // O clique vai ao próprio pino (o Leaflet escuta o evento no SVG), sem depender de onde ele cai na tela.
+    await pinos.last().dispatchEvent("click");
+    await expect(page.locator('[data-slot="leads-rodape"] [data-slot="paginacao-texto"]')).toHaveText("Mostrando 11 a 17 de 17");
+    const destacada = page.locator('[data-slot="lead-linha"][data-destaque]');
+    await expect(destacada).toHaveCount(1);
+    await expect(destacada).toBeInViewport();
+    const linha = page.locator('[data-slot="lead-linha"]').first();
+    await linha.locator('[data-slot="lead-ver-no-mapa"]').click();
+    await expect(page.locator('[data-slot="lead-linha"][data-destaque]')).toHaveAttribute("data-lead", (await linha.getAttribute("data-lead")) ?? "");
+  });
+
+  test("a ficha do lead: pontos e motivos, perfil não reivindicado, horário da semana e avaliações por estrela", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await page.locator('[data-slot="lead-abrir-ficha"]').first().click();
+    const ficha = page.locator('[data-slot="lead-ficha"]');
+    await expect(ficha).toBeVisible();
+    await expect(ficha.locator('[data-slot="ficha-pontos"]')).toContainText("pontos");
+    await expect(ficha.locator('[data-slot="ficha-horario"] tr')).toHaveCount(7);
+    await expect(ficha.locator('[data-slot="ficha-avaliacoes"]')).toContainText("avaliações");
+    await expect(ficha.getByText("Perfil no Google")).toBeVisible();
+  });
+
+  test("o filtro Perfil não reivindicado mostra só quem a fonte diz que não reivindicou", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const rodape = page.locator('[data-slot="leads-rodape"] [data-slot="paginacao-texto"]');
+    await expect(rodape).toContainText("de 17");
+    // A tabela fica abaixo do mapa: traz o botão para a tela antes de abrir o menu (o menu segue o botão).
+    await page.locator('[data-slot="leads-filtro"]').scrollIntoViewIfNeeded();
+    await page.locator('[data-slot="leads-filtro"]').click();
+    const opcao = page.locator('[data-menu="leads-filtro"] [data-filtro]', { hasText: "Perfil não reivindicado" });
+    await expect(opcao).toBeVisible();
+    await opcao.dispatchEvent("click");
+    await page.keyboard.press("Escape");
+    await expect(rodape).not.toContainText("de 17");
+    await page.locator('[data-slot="lead-abrir-ficha"]').first().click();
+    await expect(page.locator('[data-slot="ficha-nao-reivindicado"]')).toBeVisible();
   });
 });

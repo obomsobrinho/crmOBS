@@ -1,5 +1,7 @@
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
-import { OPCOES_PADRAO, VARIANTES_SUGERIDAS, diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
+import arquivoDeMunicipios from "@/lib/dados/municipios.json";
+import { municipiosDoArquivo } from "@/lib/municipios";
+import { OPCOES_PADRAO, VARIANTES_SUGERIDAS, diaDaSemanaSP, varianteDaOrdem, type DetalhesDoLead } from "@/lib/prospeccao";
 import {
   leadsDoFiltro,
   type Busca,
@@ -34,7 +36,16 @@ function sorteador(semente: number) {
   };
 }
 
-type Base = [nome: string, bairro: string, telefone: "cel" | "fixo" | "sem", site: string | null, nota: number | null, avaliacoes: number | null];
+type Base = [
+  nome: string,
+  bairro: string,
+  telefone: "cel" | "fixo" | "sem",
+  site: string | null,
+  nota: number | null,
+  avaliacoes: number | null,
+  /** A categoria do Google, quando não é o segmento da busca (o dentista que veio na busca de estética). */
+  categoria?: string,
+];
 
 const ESTETICA: Base[] = [
   ["Espaço Bella Pele", "Centro", "cel", null, 4.9, 214],
@@ -53,6 +64,8 @@ const ESTETICA: Base[] = [
   ["Clínica Bem-Estar Mutum", "Boa Vista", "fixo", null, 4.1, 9],
   ["Studio Glow", "Centro", "cel", null, 4.8, 74],
   ["Harmonia Estética Integrada", "Santa Terezinha", "cel", "instagram.com/harmoniaest", 4.6, 52],
+  // A busca real de 30/10/2026 trouxe um dentista no meio, com telefone fixo e um "site" que era post do Instagram.
+  ["Sorriso Mutum Odontologia", "Centro", "fixo", "instagram.com/p/Cx9Exemplo", 4.7, 38, "Dentista"],
 ];
 
 const DENTISTA: Base[] = [
@@ -70,8 +83,43 @@ const DENTISTA: Base[] = [
   ["Odonto Excellence", "Engenho da Serra", "cel", "instagram.com/odontoexc", 4.8, 120],
 ];
 
+const MUNICIPIOS_MG = municipiosDoArquivo(arquivoDeMunicipios).MG ?? [];
+
+// Os horários de mentira: comercial com sábado de manhã; fecha no almoço e não abre sábado;
+// fecha 17h30; aberto até as 20h de segunda a sábado (este não tem gancho).
+const HORARIOS: [number, number][][][] = [
+  [[[480, 1080]], [[480, 1080]], [[480, 1080]], [[480, 1080]], [[480, 1080]], [[480, 720]], []],
+  [[[480, 720], [840, 1080]], [[480, 720], [840, 1080]], [[480, 720], [840, 1080]], [[480, 720], [840, 1080]], [[480, 720], [840, 1080]], [], []],
+  [[[540, 1050]], [[540, 1050]], [[540, 1050]], [[540, 1050]], [[540, 1050]], [], []],
+  [[[480, 1200]], [[480, 1200]], [[480, 1200]], [[480, 1200]], [[480, 1200]], [[480, 1200]], []],
+];
+
+/** Detalhes de mentira, repetíveis por lead: ponto perto do centro da cidade, horário, notas, fotos. */
+function detalhesDeMentira(id: string, cidade: string, bairro: string, segmento: string, site: string | null, nota: number | null, avaliacoes: number | null, categoria?: string): DetalhesDoLead {
+  const sorteio = sorteador([...id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) | 0);
+  const centro = MUNICIPIOS_MG.find((m) => m.nome === cidade);
+  const horario = HORARIOS[Math.floor(sorteio() * HORARIOS.length)];
+  const total = avaliacoes ?? 0;
+  const alta = nota === null ? 0.5 : Math.min(0.95, Math.max(0.3, (nota - 3.5) / 1.5));
+  const arroba = site?.match(/instagram\.com\/([a-z0-9_.]+)$/i)?.[1];
+  return {
+    lat: centro?.lat != null ? Math.round((centro.lat + (sorteio() - 0.5) * 0.024) * 1e5) / 1e5 : null,
+    lng: centro?.lng != null ? Math.round((centro.lng + (sorteio() - 0.5) * 0.024) * 1e5) / 1e5 : null,
+    reivindicado: sorteio() >= 0.35,
+    horarios: horario.map((faixas, i) => ({ dow: (i + 1) % 7, faixas })),
+    distribuicao:
+      total === 0
+        ? null
+        : { 5: Math.round(total * alta), 4: Math.round(total * (1 - alta) * 0.6), 3: Math.round(total * (1 - alta) * 0.25), 2: Math.round(total * (1 - alta) * 0.1), 1: Math.round(total * (1 - alta) * 0.05) },
+    fotos: Math.round(sorteio() * 80),
+    categorias: [categoria ?? segmento, ...(sorteio() < 0.4 ? ["Serviço de saúde e beleza"] : [])],
+    endereco: `Rua ${["das Flores", "São Paulo", "Sete de Setembro", "Minas Gerais"][Math.floor(sorteio() * 4)]}, ${10 + Math.floor(sorteio() * 900)}, ${bairro}, ${cidade} - MG`,
+    instagram: arroba ? `@${arroba}` : null,
+  };
+}
+
 function leadsDaBusca(buscaId: string, cidade: string, segmento: string, ddd: string, base: Base[], inicio: number): Lead[] {
-  return base.map(([nome, bairro, tel, site, nota, avaliacoes], i) => ({
+  return base.map(([nome, bairro, tel, site, nota, avaliacoes, categoria], i) => ({
     id: `${buscaId}-${i + 1}`,
     buscaId,
     nome,
@@ -85,6 +133,7 @@ function leadsDaBusca(buscaId: string, cidade: string, segmento: string, ddd: st
     marcacao: null,
     parouEm: null,
     campanhaIds: [],
+    detalhes: detalhesDeMentira(`${buscaId}-${i + 1}`, cidade, bairro, categoria ?? segmento, site, nota, avaliacoes, categoria),
   }));
 }
 

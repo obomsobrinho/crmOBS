@@ -29,8 +29,7 @@ export default async function DesignCampanhasPage({
 
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
-      {/* Sem item próprio no menu: a rota de verdade ainda não existe. */}
-      <NavRail clientName="O Bom Sobrinho" activeHref="/clientes" role="dono" ehAdmin />
+      <NavRail clientName="O Bom Sobrinho" activeHref="/campanhas" role="dono" ehAdmin />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <PreviaDeCampanhas tela={inicial} agora={agoraMs()} vazio={vazio} />
       </div>

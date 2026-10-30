@@ -32,6 +32,7 @@ import { paraJson } from "./json";
 import { PERIODOS, type PeriodoKey } from "./periodo";
 import {
   DIAS_DA_LINHA,
+  MINIMOS_DE_AVALIACOES,
   OPCOES_PADRAO,
   POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
@@ -89,6 +90,9 @@ function opcoesDoJson(j: Json, termo: string, cidade: string, uf: string | null)
     porTermo: typeof o.porTermo === "number" ? o.porTermo : OPCOES_PADRAO.porTermo,
     notaMinima: nota,
     site: o.site === "sem_site" || o.site === "com_site" ? o.site : "todos",
+    cidadeIbge: typeof o.cidadeIbge === "number" ? o.cidadeIbge : null,
+    minAvaliacoes: MINIMOS_DE_AVALIACOES.find((m) => m === o.minAvaliacoes) ?? null,
+    categorias: Array.isArray(o.categorias) ? o.categorias.filter((c): c is string => typeof c === "string") : [],
     ignorarFechados: typeof o.ignorarFechados === "boolean" ? o.ignorarFechados : OPCOES_PADRAO.ignorarFechados,
     buscarContatos: typeof o.buscarContatos === "boolean" ? o.buscarContatos : OPCOES_PADRAO.buscarContatos,
   };
@@ -254,6 +258,7 @@ export async function paginaDeLeads(
         marcacao: marcacaoDe(r.marcacao),
         parouEm: ms(r.parou_em),
         campanhaIds: ids,
+        detalhes: null,
         campanhas: ids.map((id, i) => ({ id, nome: nomes[i] ?? "" })),
         respondeu: r.respondeu,
       };

@@ -2,10 +2,13 @@ import type { PeriodoKey } from "@/lib/periodo";
 import {
   podeEntrarNaCampanha,
   siteDoLead,
+  type DetalhesDoLead,
   type DiaDeEnvio,
+  type EstadoNoMapa,
   type MarcacaoDoLead,
   type ResultadoDaCampanha,
   type ResultadoDobrado,
+  type SinaisDoLead,
   type ResumoDobrado,
   type OpcoesDaBusca,
   type SituacaoDaBusca,
@@ -51,6 +54,8 @@ export interface Lead {
   parouEm: number | null;
   /** As campanhas por onde passou (a marca fica para sempre). */
   campanhaIds: string[];
+  /** O que a fonte trouxe além do básico (a ficha e o mapa); null quando não há. */
+  detalhes: DetalhesDoLead | null;
 }
 
 /** O recorte de leads que a campanha usa (passo Contatos). */
@@ -154,7 +159,24 @@ export interface LeadDaTabela extends Lead {
 }
 
 /** Os recortes do botão de filtro da tabela de leads. */
-export type FiltroDosLeads = "nao_contatados" | "bons" | "sem_site" | "nota";
+export type FiltroDosLeads = "nao_contatados" | "bons" | "sem_site" | "nota" | "nao_reivindicado";
+
+/** Um pino no mapa da busca: o lead, onde está e a cor do estado. */
+export interface PontoNoMapa {
+  id: string;
+  nome: string;
+  lat: number;
+  lng: number;
+  estado: EstadoNoMapa;
+}
+
+/** O recorte da tabela de leads (o mesmo da leitura de uma página). */
+export interface RecorteDosLeads {
+  buscaId: string | null;
+  texto: string;
+  cidade: string | null;
+  filtros: FiltroDosLeads[];
+}
 
 /** A campanha sem os envios: o que o assistente edita e o topo do detalhe mostra. */
 export type CampanhaEditavel = Omit<Campanha, "envios">;
@@ -222,7 +244,11 @@ export interface FonteDeCampanhas {
   buscasParaEscolher(): Promise<Busca[]>;
   busca(id: string): Promise<Busca | null>;
   novaBusca(o: OpcoesDaBusca): Promise<{ ok: true } | { ok: false; erro: string }>;
-  leads(p: { buscaId: string | null; texto: string; cidade: string | null; filtros: FiltroDosLeads[]; pagina: number }): Promise<Pagina<LeadDaTabela>>;
+  leads(p: RecorteDosLeads & { pagina: number }): Promise<Pagina<LeadDaTabela>>;
+  /** Em que página do recorte o lead está (o pino clicado leva a tabela até ele); null = fora do recorte. */
+  paginaDoLead(p: RecorteDosLeads, leadId: string): Promise<number | null>;
+  /** Os pinos de uma busca (todos os leads dela que têm coordenadas). */
+  pontosDaBusca(buscaId: string): Promise<PontoNoMapa[]>;
   cidades(buscaId: string | null): Promise<string[]>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
@@ -244,4 +270,9 @@ export interface FonteDeCampanhas {
 /** O total de um registro de contagens por situação (as abas e o "Todas" dos filtros). */
 export function somaDe(contagens: Record<string, number> | null | undefined): number {
   return contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
+}
+
+/** Os sinais da pontuação de um lead, com os detalhes da fonte quando existem. */
+export function sinaisDoLead<L extends Lead>(l: L): L & SinaisDoLead {
+  return { ...l, reivindicado: l.detalhes?.reivindicado ?? null, horarios: l.detalhes?.horarios ?? null };
 }

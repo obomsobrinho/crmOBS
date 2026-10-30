@@ -6,6 +6,7 @@ import {
   POR_PAGINA_DE_CAMPANHAS,
   contagemPorSemana,
   enviosPorDia,
+  estadoNoMapa,
   pontuarLead,
   problemasParaIniciar,
   respostasPorEspera,
@@ -17,6 +18,7 @@ import {
 } from "@/lib/prospeccao";
 import {
   leadsDoFiltro,
+  sinaisDoLead,
   type Busca,
   type Campanha,
   type CampanhaDaTabela,
@@ -25,6 +27,7 @@ import {
   type Lead,
   type LeadDaTabela,
   type Pagina,
+  type RecorteDosLeads,
   type Resultados,
 } from "@/components/admin/campanhas/tipos";
 import { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA } from "@/lib/campanhas-pedidos";
@@ -35,6 +38,8 @@ import { CONEXOES_DE_MENTIRA, resultadoDaBuscaDeMentira, type DadosDeMentira } f
 // memória com as regras puras de `lib/prospeccao.ts` (o SQL de verdade tem os
 // gêmeos dessas contas). Buscar, marcar, salvar e iniciar mudam só a memória da
 // página; nada é gravado, nenhuma busca paga é chamada, nenhuma mensagem sai.
+
+const pontos = (l: Lead) => pontuarLead(sinaisDoLead(l)).pontos;
 
 const pagina = <T,>(lista: T[], n: number): Pagina<T> => ({
   itens: lista.slice((n - 1) * POR_PAGINA_DE_CAMPANHAS, n * POR_PAGINA_DE_CAMPANHAS),
@@ -61,6 +66,23 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
     salvaEm: c.salvaEm,
     passo: c.passo,
   });
+  /** Os leads do recorte da tabela, na ordem da pontuação (a mesma da tabela de verdade). */
+  const doRecorte = ({ buscaId, texto, cidade, filtros }: RecorteDosLeads): Lead[] => {
+    const q = normalizar(texto);
+    const digitos = texto.replace(/\D/g, "");
+    return daBusca(buscaId)
+      .filter(
+        (l) =>
+          (!q || normalizar(l.nome).includes(q) || (digitos.length >= 3 && (l.telefone ?? "").replace(/\D/g, "").includes(digitos))) &&
+          (cidade === null || l.cidade === cidade) &&
+          (!filtros.includes("nao_contatados") || l.campanhaIds.length === 0) &&
+          (!filtros.includes("bons") || l.marcacao === "bom") &&
+          (!filtros.includes("sem_site") || siteDoLead(l.site) !== "sim") &&
+          (!filtros.includes("nota") || (l.nota ?? 0) >= 4.5) &&
+          (!filtros.includes("nao_reivindicado") || l.detalhes?.reivindicado === false),
+      )
+      .sort((a, b) => pontos(b) - pontos(a) || a.nome.localeCompare(b.nome, "pt-BR"));
+  };
   const enviosDosLeads = (ids: Set<string>) => campanhas.flatMap((c) => c.envios.filter((e) => ids.has(e.leadId)));
 
   return {
@@ -121,24 +143,29 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       return { ok: true };
     },
 
-    async leads({ buscaId, texto, cidade, filtros, pagina: n }) {
-      const q = normalizar(texto);
-      const digitos = texto.replace(/\D/g, "");
+    async leads({ pagina: n, ...recorte }) {
       const r = responderam();
       const nomes = new Map(campanhas.map((c) => [c.id, c.nome]));
-      const lista: LeadDaTabela[] = daBusca(buscaId)
-        .filter(
-          (l) =>
-            (!q || normalizar(l.nome).includes(q) || (digitos.length >= 3 && (l.telefone ?? "").replace(/\D/g, "").includes(digitos))) &&
-            (cidade === null || l.cidade === cidade) &&
-            (!filtros.includes("nao_contatados") || l.campanhaIds.length === 0) &&
-            (!filtros.includes("bons") || l.marcacao === "bom") &&
-            (!filtros.includes("sem_site") || siteDoLead(l.site) !== "sim") &&
-            (!filtros.includes("nota") || (l.nota ?? 0) >= 4.5),
-        )
-        .sort((a, b) => pontuarLead(b).pontos - pontuarLead(a).pontos || a.nome.localeCompare(b.nome, "pt-BR"))
-        .map((l) => ({ ...l, campanhas: l.campanhaIds.map((id) => ({ id, nome: nomes.get(id) ?? "" })), respondeu: r.has(l.id) }));
+      const lista: LeadDaTabela[] = doRecorte(recorte).map((l) => ({
+        ...l,
+        campanhas: l.campanhaIds.map((id) => ({ id, nome: nomes.get(id) ?? "" })),
+        respondeu: r.has(l.id),
+      }));
       return pagina(lista, n);
+    },
+
+    async paginaDoLead(recorte, leadId) {
+      const i = doRecorte(recorte).findIndex((l) => l.id === leadId);
+      return i < 0 ? null : Math.floor(i / POR_PAGINA_DE_CAMPANHAS) + 1;
+    },
+
+    async pontosDaBusca(buscaId) {
+      const r = responderam();
+      return daBusca(buscaId).flatMap((l) =>
+        l.detalhes?.lat != null && l.detalhes.lng != null
+          ? [{ id: l.id, nome: l.nome, lat: l.detalhes.lat, lng: l.detalhes.lng, estado: estadoNoMapa({ respondeu: r.has(l.id), campanhas: l.campanhaIds.length, marcacao: l.marcacao }) }]
+          : [],
+      );
     },
 
     async cidades(buscaId) {
@@ -157,7 +184,7 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const ids = new Set(ls.map((l) => l.id));
       const envios = enviosDosLeads(ids);
       return {
-        resumo: resumoDaBase(ls.map((l) => ({ ...l, campanhas: l.campanhaIds.length, respondeu: r.has(l.id) }))),
+        resumo: resumoDaBase(ls.map((l) => ({ ...sinaisDoLead(l), campanhas: l.campanhaIds.length, respondeu: r.has(l.id) }))),
         novosPorSemana: contagemPorSemana(
           ls.map((l) => quando.get(l.buscaId) ?? agora),
           agora,
@@ -245,7 +272,7 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
     },
 
     async previaDoFiltro(filtro) {
-      const fila = leadsDoFiltro(leads, filtro, campanhas).sort((a, b) => pontuarLead(b).pontos - pontuarLead(a).pontos);
+      const fila = leadsDoFiltro(leads, filtro, campanhas).sort((a, b) => pontos(b) - pontos(a));
       const origem = filtro.quemNaoRespondeuDe ? (campanhas.find((c) => c.id === filtro.quemNaoRespondeuDe)?.nome ?? null) : null;
       return { total: fila.length, primeiros: fila.slice(0, 8).map((l) => l.nome), origem };
     },
@@ -265,7 +292,7 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const problemas = problemasParaIniciar({ ...c, agora: Date.now() });
       if (problemas.length > 0) return { ok: false, erro: problemas[0] };
       // A fila sai na ordem da pontuação: os melhores leads recebem primeiro.
-      const fila: Lead[] = leadsDoFiltro(leads, c.filtro, campanhas).sort((a, b) => pontuarLead(b).pontos - pontuarLead(a).pontos);
+      const fila: Lead[] = leadsDoFiltro(leads, c.filtro, campanhas).sort((a, b) => pontos(b) - pontos(a));
       if (fila.length === 0) return { ok: false, erro: "Ninguém nesse recorte." };
       const ids = new Set(fila.map((l) => l.id));
       leads = leads.map((l) => (ids.has(l.id) ? { ...l, campanhaIds: [...l.campanhaIds, id] } : l));

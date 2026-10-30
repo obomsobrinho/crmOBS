@@ -97,6 +97,110 @@ export interface SinaisDoLead {
   site: string | null;
   nota: number | null;
   avaliacoes: number | null;
+  /**
+   * O dono reivindicou o perfil no Google? `false` = a fonte mostra "Reivindicar esta
+   * empresa" (`claimThisBusiness`): presença digital fraca. Ausente ou null = não se sabe.
+   */
+  reivindicado?: boolean | null;
+  /** O horário de funcionamento lido da fonte (`lerHorarios`); ausente ou null = não se sabe. */
+  horarios?: HorarioDoDia[] | null;
+}
+
+// ── Horário de funcionamento (o gancho do atendimento fora do horário) ──
+
+/** Um dia da semana (`dow` 0 = domingo) com as faixas abertas em minutos do dia; vazio = fechado. */
+export interface HorarioDoDia {
+  dow: number;
+  faixas: [number, number][];
+}
+
+const DIA_PELO_NOME: Record<string, number> = {
+  domingo: 0, sunday: 0, segunda: 1, monday: 1, terca: 2, tuesday: 2, quarta: 3, wednesday: 3,
+  quinta: 4, thursday: 4, sexta: 5, friday: 5, sabado: 6, saturday: 6,
+};
+
+/** "8:30", "08h30", "8 AM", "6:30 PM" em minutos do dia; null quando não é hora. */
+function minutosDe(t: string): number | null {
+  const m = t.trim().match(/^(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm)?$/i);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2] ?? 0);
+  const ampm = m[3]?.toLowerCase();
+  if (ampm === "pm" && h < 12) h += 12;
+  if (ampm === "am" && h === 12) h = 0;
+  return h > 24 || min > 59 ? null : h * 60 + min;
+}
+
+/**
+ * O `openingHours` da fonte (`[{ day, hours }]`) em dias e faixas. Aceita português e
+ * inglês ("segunda-feira" / "Monday", "08:00–18:00", "8 AM to 6 PM", "Fechado", "Aberto
+ * 24 horas", várias faixas separadas por vírgula). ⚠️ A CONFIRMAR numa execução real com
+ * `language: pt-BR`. Um dia que não se entende fica de fora (nunca vira "fechado").
+ */
+export function lerHorarios(bruto: unknown): HorarioDoDia[] | null {
+  if (!Array.isArray(bruto)) return null;
+  const dias: HorarioDoDia[] = [];
+  for (const item of bruto) {
+    if (item === null || typeof item !== "object") continue;
+    const { day, hours } = item as { day?: unknown; hours?: unknown };
+    if (typeof day !== "string" || typeof hours !== "string") continue;
+    const dow = DIA_PELO_NOME[normalizar(day).replace(/-feira$/, "").trim()];
+    if (dow === undefined) continue;
+    const h = normalizar(hours);
+    if (/fechado|closed/.test(h)) {
+      dias.push({ dow, faixas: [] });
+      continue;
+    }
+    if (/24 ?h|24 horas|24 hours/.test(h)) {
+      dias.push({ dow, faixas: [[0, 24 * 60]] });
+      continue;
+    }
+    const faixas: [number, number][] = [];
+    for (const parte of h.split(/,|;/)) {
+      const [a, b] = parte.split(/\s*(?:–|-|to|as|a|ate)\s+|\s*[–-]\s*/).filter(Boolean);
+      const ini = a ? minutosDe(a) : null;
+      const fim = b ? minutosDe(b) : null;
+      if (ini !== null && fim !== null) faixas.push([ini, fim <= ini ? fim + 24 * 60 : fim]);
+    }
+    if (faixas.length > 0) dias.push({ dow, faixas });
+  }
+  return dias.length > 0 ? dias.sort((x, y) => ((x.dow + 6) % 7) - ((y.dow + 6) % 7)) : null;
+}
+
+/** O que o horário diz de quem perde cliente fora dele (o gancho do Atenda). */
+export interface GanchosDoHorario {
+  /** Em algum dia útil fecha antes das 18h. */
+  fechaCedo: boolean;
+  /** Sábado fechado (ou sábado não listado com os dias úteis listados). */
+  naoAbreSabado: boolean;
+  /** Em algum dia útil há um intervalo no meio do dia (fecha no almoço). */
+  fechaNoAlmoco: boolean;
+}
+
+export function ganchosDoHorario(dias: HorarioDoDia[] | null | undefined): GanchosDoHorario | null {
+  if (!dias || dias.length === 0) return null;
+  const uteis = dias.filter((d) => d.dow >= 1 && d.dow <= 5 && d.faixas.length > 0);
+  const sabado = dias.find((d) => d.dow === 6);
+  return {
+    fechaCedo: uteis.some((d) => Math.max(...d.faixas.map((f) => f[1])) < 18 * 60),
+    naoAbreSabado: sabado ? sabado.faixas.length === 0 : uteis.length >= 5,
+    fechaNoAlmoco: uteis.some((d) => d.faixas.length >= 2),
+  };
+}
+
+/** As frases dos ganchos, para a ficha e o balão da pontuação. */
+export function textosDosGanchos(g: GanchosDoHorario | null): string[] {
+  if (!g) return [];
+  return [g.fechaCedo && "Fecha antes das 18h", g.naoAbreSabado && "Não abre no sábado", g.fechaNoAlmoco && "Fecha no almoço"].filter(
+    (t): t is string => typeof t === "string",
+  );
+}
+
+/** "08:00 às 12:00, 14:00 às 18:00" ou "Fechado": o dia na ficha. */
+export function textoDoDia(d: HorarioDoDia): string {
+  if (d.faixas.length === 0) return "Fechado";
+  const hm = (m: number) => `${String(Math.floor((m % 1440) / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  return d.faixas.map(([a, b]) => (b - a >= 1440 ? "24 horas" : `${hm(a)} às ${hm(b)}`)).join(", ");
 }
 
 /** ⚠️ PROVISÓRIO: a lista de segmentos do ICP é do dono. */
@@ -113,12 +217,17 @@ export const SEGMENTOS_DO_ICP = [
   "academia",
 ] as const;
 
-/** ⚠️ PROVISÓRIO: pesos de exemplo, somam 100. */
+/**
+ * ⚠️ PROVISÓRIO (D9): pesos de exemplo, somam 100. Revisão do dono de 30/10/2026: entram o
+ * perfil não reivindicado e o horário que deixa cliente sem resposta (o gancho do Atenda).
+ */
 export const PESOS_PROVISORIOS = {
-  semSiteProprio: 30,
-  segmento: 25,
-  avaliacoes: 25,
-  nota: 20,
+  semSiteProprio: 25,
+  segmento: 20,
+  avaliacoes: 20,
+  nota: 10,
+  perfilNaoReivindicado: 15,
+  horario: 10,
 } as const;
 
 export interface Pontuacao {
@@ -149,6 +258,15 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
   if (s.nota !== null && s.nota >= 4.5) {
     pontos += PESOS_PROVISORIOS.nota;
     motivos.push(`Nota ${s.nota.toFixed(1).replace(".", ",")}: cuida da reputação`);
+  }
+  if (s.reivindicado === false) {
+    pontos += PESOS_PROVISORIOS.perfilNaoReivindicado;
+    motivos.push("Perfil do Google não reivindicado pelo dono");
+  }
+  const ganchos = textosDosGanchos(ganchosDoHorario(s.horarios));
+  if (ganchos.length > 0) {
+    pontos += PESOS_PROVISORIOS.horario;
+    motivos.push(`${ganchos.join(", ")}: perde cliente fora do horário`);
   }
   return { pontos, motivos };
 }
@@ -564,23 +682,82 @@ export type FiltroDeSiteDaBusca = "todos" | "sem_site" | "com_site";
 export interface OpcoesDaBusca {
   /** Um ou mais segmentos ("clínica de estética", "estética"). */
   termos: string[];
+  /** A cidade como o IBGE escreve, escolhida na lista da UF (nunca texto livre). */
   cidade: string;
   uf: string;
+  /** O código IBGE da cidade escolhida (`lib/dados/municipios.json`); null até escolher. */
+  cidadeIbge: number | null;
   porTermo: number;
+  /** Nota mínima, aplicada do NOSSO lado (o filtro da fonte custa por empresa). */
   notaMinima: NotaMinima;
+  /** Com ou sem site, também do nosso lado. */
   site: FiltroDeSiteDaBusca;
+  /** Mínimo de avaliações no Google, do nosso lado (pouca avaliação, pouco movimento). */
+  minAvaliacoes: MinimoDeAvaliacoes;
+  /**
+   * "Só desta categoria": palavras que a categoria do Google precisa ter (vazio = qualquer).
+   * Do nosso lado, sobre `categoryName` e `categories`, que já vêm em todo item.
+   */
+  categorias: string[];
   ignorarFechados: boolean;
   /** E-mail e redes sociais tirados do site da empresa (custa a mais por empresa na fonte). */
   buscarContatos: boolean;
+}
+
+/** Os mínimos de avaliações oferecidos na "Nova busca" (null = qualquer). */
+export const MINIMOS_DE_AVALIACOES = [null, 10, 30, 100] as const;
+export type MinimoDeAvaliacoes = (typeof MINIMOS_DE_AVALIACOES)[number];
+
+/**
+ * ⚠️ PROVISÓRIO: categorias do Google sugeridas por segmento do ICP para "Só desta
+ * categoria" (o dono escolhe; o termo digitado também vira sugestão). Os nomes são os
+ * que o Google Maps mostra em português; conferir numa execução real.
+ */
+export const CATEGORIAS_SUGERIDAS: Record<string, string[]> = {
+  estetica: ["Clínica de estética", "Esteticista", "Spa"],
+  dentista: ["Dentista", "Clínica odontológica", "Ortodontista"],
+  odontologia: ["Dentista", "Clínica odontológica", "Ortodontista"],
+  clinica: ["Clínica médica", "Clínica de estética", "Clínica odontológica"],
+  salao: ["Salão de beleza", "Cabeleireiro", "Manicure"],
+  barbearia: ["Barbearia", "Cabeleireiro"],
+  otica: ["Ótica", "Optometrista"],
+  advocacia: ["Advogado", "Escritório de advocacia"],
+  advogado: ["Advogado", "Escritório de advocacia"],
+  pet: ["Pet shop", "Veterinário", "Banho e tosa"],
+  academia: ["Academia", "Estúdio de pilates", "Personal trainer"],
+  contabilidade: ["Contador", "Escritório de contabilidade"],
+  restaurante: ["Restaurante", "Pizzaria", "Lanchonete"],
+};
+
+/** As sugestões de "Só desta categoria" para os segmentos digitados (sem repetir). */
+export function categoriasSugeridas(termos: string[]): string[] {
+  const vistas = new Set<string>();
+  const saida: string[] = [];
+  const incluir = (c: string) => {
+    const k = normalizar(c);
+    if (!vistas.has(k)) {
+      vistas.add(k);
+      saida.push(c);
+    }
+  };
+  for (const t of termos) {
+    const n = normalizar(t);
+    for (const [chave, cats] of Object.entries(CATEGORIAS_SUGERIDAS)) if (n.includes(chave)) cats.forEach(incluir);
+    if (t.trim()) incluir(t.trim().charAt(0).toUpperCase() + t.trim().slice(1));
+  }
+  return saida;
 }
 
 export const OPCOES_PADRAO: OpcoesDaBusca = {
   termos: [],
   cidade: "",
   uf: "",
+  cidadeIbge: null,
   porTermo: QUANTIDADES_POR_TERMO[0],
   notaMinima: null,
   site: "todos",
+  minAvaliacoes: null,
+  categorias: [],
   ignorarFechados: true,
   buscarContatos: false,
 };
@@ -589,8 +766,8 @@ export const OPCOES_PADRAO: OpcoesDaBusca = {
 export function problemasDaBusca(o: OpcoesDaBusca): string[] {
   const p: string[] = [];
   if (o.termos.filter((t) => t.trim().length >= 3).length === 0) p.push("Falta o segmento");
-  if (o.cidade.trim().length < 2) p.push("Falta a cidade");
   if (!UFS.includes(o.uf as (typeof UFS)[number])) p.push("Falta o estado");
+  else if (o.cidadeIbge === null || o.cidade.trim().length < 2) p.push("Escolha a cidade na lista");
   return p;
 }
 
@@ -610,6 +787,8 @@ export function resumoDasOpcoes(o: OpcoesDaBusca): string[] {
   if (o.notaMinima !== null) r.push(`Nota ${String(o.notaMinima).replace(".", ",")} ou mais`);
   if (o.site === "sem_site") r.push("Só sem site");
   if (o.site === "com_site") r.push("Só com site");
+  if (o.minAvaliacoes !== null) r.push(`${o.minAvaliacoes}+ avaliações`);
+  if (o.categorias.length > 0) r.push(`Categoria: ${o.categorias.join(", ")}`);
   if (o.ignorarFechados) r.push("Sem fechadas");
   if (o.buscarContatos) r.push("Com e-mail e redes");
   return r;
@@ -975,4 +1154,54 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
     if (r.respondeuEm !== undefined || r.parouEm !== undefined) achadas.push(r);
   }
   return achadas;
+}
+
+// ── O que a fonte traz além do básico (a ficha do lead e o mapa) ─────────
+
+/** Quantas avaliações de 1 a 5 estrelas (`reviewsDistribution`). */
+export interface DistribuicaoDasNotas {
+  1: number;
+  2: number;
+  3: number;
+  4: number;
+  5: number;
+}
+
+/**
+ * O que a fonte devolve de graça em todo lugar e a ficha mostra. Tudo opcional: um lead
+ * de antes destes campos (ou de outra fonte) só não tem a informação.
+ */
+export interface DetalhesDoLead {
+  lat: number | null;
+  lng: number | null;
+  /** O dono reivindicou o perfil no Google (o contrário de `claimThisBusiness`). */
+  reivindicado: boolean | null;
+  horarios: HorarioDoDia[] | null;
+  distribuicao: DistribuicaoDasNotas | null;
+  fotos: number | null;
+  /** A categoria principal e as outras (`categoryName`, `categories`). */
+  categorias: string[];
+  endereco: string | null;
+  /** O @ do Instagram, quando a busca pediu os contatos do site. */
+  instagram: string | null;
+}
+
+/** A cor do pino no mapa: o estado do lead, do mais forte para o mais fraco. */
+export type EstadoNoMapa = "respondeu" | "contatado" | "descartado" | "bom" | "nao_contatado";
+
+export const ROTULO_NO_MAPA: Record<EstadoNoMapa, string> = {
+  respondeu: "Respondeu",
+  contatado: "Contatado",
+  descartado: "Descartado",
+  bom: "Marcado como bom",
+  nao_contatado: "Não contatado",
+};
+
+/** Respondeu ganha de contatado, que ganha da marcação do dono. */
+export function estadoNoMapa(l: { respondeu: boolean; campanhas: number; marcacao: MarcacaoDoLead }): EstadoNoMapa {
+  if (l.respondeu) return "respondeu";
+  if (l.campanhas > 0) return "contatado";
+  if (l.marcacao === "descartado") return "descartado";
+  if (l.marcacao === "bom") return "bom";
+  return "nao_contatado";
 }

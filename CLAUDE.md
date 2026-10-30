@@ -36,7 +36,7 @@ Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack.
 
 ## Owner's working rules (universal)
 - The owner's personal working rules (survey vs fix, never invent, scratchpad, no AI footer) live in the global `~/.claude/CLAUDE.md`; `engineering.md` repeats the engineering ones.
-- Menu "Em breve" = Agenda and Follow-up; Campanhas is out.
+- Menu "Em breve" = Follow-up. Campanhas is NOT a tenant feature: the menu item exists only for the product owner (`adminOnly`, his own prospecting, `/campanhas`).
 - n8n is PRODUCTION: never modify or activate workflows live without explicit confirmation (`validateOnly` first). Never commit `x-lookup-secret` (skill `exportar-n8n`). Never paste secrets in chat.
 - Atendimento is the product: an attendance bug comes before any side finding. Before asking the owner to test an attendance change, run `npm run test:e2e:n8n` (see `testing.md`).
 - Never build mass sending over the QR (Baileys) connection, and never write marketing that promises mass sending, "não pague a API da Meta" or ban protection. Exception (decided 29/09/2026): the owner's OWN prospecting inside `/admin`, his user only, dedicated number, daily cap and interval (not built yet; never a tenant feature).
