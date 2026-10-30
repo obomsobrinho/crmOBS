@@ -372,10 +372,24 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
   });
 
   buscas.sort((a, b) => b.criadaEm - a.criadaEm);
-  const comOpcoes: Busca[] = buscas.map((b, i) => ({
-    ...b,
-    opcoes: { ...OPCOES_PADRAO, termos: [b.termo], cidade: b.cidade, uf: "MG", porTermo: b.total > 40 ? 100 : 50, notaMinima: i % 4 === 1 ? 4 : null },
-  }));
+  const comOpcoes: Busca[] = buscas.map((b, i) => {
+    const cidade = MUNICIPIOS_MG.find((m) => m.nome === b.cidade) ?? null;
+    // A busca de estética em Mutum foi feita com o centro e o raio ajustados no mapa (5 km).
+    const area = b.id === "b1" && cidade?.lat != null && cidade.lng != null ? { lat: cidade.lat, lng: cidade.lng, raioKm: 5 } : null;
+    return {
+      ...b,
+      opcoes: {
+        ...OPCOES_PADRAO,
+        termos: [b.termo],
+        cidade: b.cidade,
+        uf: "MG",
+        cidadeIbge: cidade?.ibge ?? null,
+        area,
+        porTermo: b.total > 40 ? 100 : 50,
+        notaMinima: i % 4 === 1 ? 4 : null,
+      },
+    };
+  });
   const campanhas = [c3, c1, c4, c2, ...geradas].sort((a, b) =>
     a.situacao === "rascunho" ? -1 : b.situacao === "rascunho" ? 1 : b.criadaEm - a.criadaEm,
   );

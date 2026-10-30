@@ -62,3 +62,34 @@ export function localDaBusca(c: { cidade: string; uf: string }): string {
 export function cidadeDoCodigo(porUf: MunicipiosPorUf, uf: string, ibge: number): Municipio | null {
   return porUf[uf]?.find((c) => c.ibge === ibge) ?? null;
 }
+
+/** A distância em km entre dois pontos (haversine, a Terra como esfera de 6.371 km). */
+export function distanciaKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const rad = (g: number) => (g * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/**
+ * A cidade cuja SEDE está mais perto do ponto, em todo o Brasil (o centro de uma
+ * busca pode cair do outro lado de uma divisa). É uma aproximação pela sede, não
+ * pelo limite do município: serve para avisar "o centro está em Lajinha", não para
+ * decidir nada.
+ */
+export function cidadeMaisProxima(porUf: MunicipiosPorUf, ponto: { lat: number; lng: number }): Municipio | null {
+  let melhor: Municipio | null = null;
+  let menor = Infinity;
+  for (const lista of Object.values(porUf)) {
+    for (const c of lista) {
+      if (c.lat === null || c.lng === null) continue;
+      const d = distanciaKm(ponto, { lat: c.lat, lng: c.lng });
+      if (d < menor) {
+        menor = d;
+        melhor = c;
+      }
+    }
+  }
+  return melhor;
+}

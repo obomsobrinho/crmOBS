@@ -140,12 +140,78 @@ test.describe("Campanhas no preview", () => {
 });
 
 test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
-  test("o menu do admin tem Campanhas logo abaixo de Contatos", async ({ page }) => {
+  test("o menu: o CRM como antes e, no fim, a seção do dono com Campanhas e Clientes", async ({ page }) => {
     await page.goto("/design/campanhas?tela=leads");
-    const rotulos = await page.locator('[data-slot="rail-itens"] a').allInnerTexts();
-    const nomes = rotulos.map((t) => t.trim());
-    expect(nomes.indexOf("Campanhas")).toBe(nomes.indexOf("Contatos") + 1);
-    await expect(page.locator('[data-slot="rail-itens"] a', { hasText: "Campanhas" })).toHaveAttribute("aria-current", "page");
+    const doCrm = (await page.locator('[data-slot="rail-itens"] a').allInnerTexts()).map((t) => t.trim());
+    const secao = page.locator('[data-slot="rail-secao-dono"]');
+    await expect(secao).toBeVisible();
+    await expect(secao.getByText("Gestão da OBS")).toBeVisible();
+    expect((await secao.locator("a").allInnerTexts()).map((t) => t.trim())).toEqual(["Campanhas", "Clientes"]);
+    // Os itens do CRM ficam como antes das Campanhas, e a seção vem depois de todos.
+    const crm = doCrm.filter((n) => n !== "Campanhas" && n !== "Clientes");
+    expect(crm.slice(0, 5)).toEqual(["Painel", "Pedidos", "Conversas", "Contatos", "Pipeline"]);
+    expect(doCrm.slice(-2)).toEqual(["Campanhas", "Clientes"]);
+    await expect(secao.locator("a", { hasText: "Campanhas" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("celular: a seção do dono aparece agrupada dentro de \"Mais\"", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/design/campanhas?tela=leads");
+    await page.getByRole("button", { name: "Mais" }).click();
+    const grupo = page.locator('[data-slot="mais-secao-dono"]');
+    await expect(grupo).toBeVisible();
+    await expect(grupo.getByText("Gestão da OBS")).toBeVisible();
+    expect((await grupo.locator("a").allInnerTexts()).map((t) => t.trim())).toEqual(["Campanhas", "Clientes"]);
+  });
+
+  test("Nova busca: a cidade escolhida abre o mapa; o raio aparece, muda e volta para a cidade inteira", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    await page.locator('[data-slot="leads-nova-busca"]').click();
+    const dialogo = page.getByRole("dialog");
+    await expect(dialogo.locator('[data-slot="nova-busca-mapa"]')).toHaveCount(0);
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    await expect(dialogo.locator('[data-slot="nova-busca-mapa"]')).toBeVisible();
+    const raio = dialogo.locator('[data-slot="nova-busca-raio"]');
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await dialogo.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 5 km");
+    await expect(dialogo.locator(".pino-central")).toHaveCount(1);
+    await expect(dialogo.locator("path.area-do-mapa")).toHaveCount(1);
+    await dialogo.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 8 km");
+    await dialogo.getByRole("button", { name: "Diminuir o raio" }).click();
+    await dialogo.getByRole("button", { name: "Diminuir o raio" }).click();
+    await expect(raio).toHaveText("Raio: 3 km");
+    await dialogo.locator('[data-slot="nova-busca-cidade-inteira"]').click();
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await expect(dialogo.locator(".pino-central")).toHaveCount(0);
+  });
+
+  test("Nova busca: clicar longe no mapa move o centro e avisa a cidade vizinha, sem bloquear", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    await page.locator('[data-slot="leads-nova-busca"]').click();
+    const dialogo = page.getByRole("dialog");
+    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("padaria");
+    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    // Da cidade inteira até o maior raio: 5, 8, 10, 15, 20, 30, 50 km (no fim o "+" desliga).
+    const mais = dialogo.getByRole("button", { name: "Aumentar o raio" });
+    for (let i = 0; i < 7; i++) await mais.click();
+    await expect(dialogo.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 50 km");
+    await expect(mais).toBeDisabled();
+    await expect(dialogo.locator('[data-bloco="nova-busca-centro-fora"]')).toHaveCount(0);
+    const mapa = dialogo.locator('[data-slot="nova-busca-mapa"]');
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem caixa");
+    await page.mouse.click(caixa.x + caixa.width - 40, caixa.y + caixa.height / 2);
+    await expect(dialogo.locator('[data-bloco="nova-busca-centro-fora"]')).toContainText("O centro está em");
+    await expect(dialogo.getByRole("button", { name: "Buscar", exact: true })).toBeEnabled();
+  });
+
+  test("o detalhe da busca diz onde ela procurou: a cidade e o raio usado", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await expect(page.getByText("Mutum, MG · raio de 5 km")).toBeVisible();
   });
 
   test("Nova busca: sem cidade da lista não busca; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {

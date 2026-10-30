@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { Minus, Plus, X } from "lucide-react";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
@@ -10,10 +12,13 @@ import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { numeroBR } from "@/lib/format";
-import { buscarCidades, carregarMunicipios, type MunicipiosPorUf } from "@/lib/municipios";
+import { buscarCidades, carregarMunicipios, cidadeMaisProxima, type MunicipiosPorUf } from "@/lib/municipios";
 import {
   MINIMOS_DE_AVALIACOES,
   OPCOES_PADRAO,
+  RAIOS_KM,
+  RAIO_PADRAO_KM,
+  proximoRaio,
   QUANTIDADES_POR_TERMO,
   UFS,
   categoriasSugeridas,
@@ -45,6 +50,9 @@ const SITES: { valor: FiltroDeSiteDaBusca; rotulo: string }[] = [
   { valor: "sem_site", rotulo: "Só sem site" },
   { valor: "com_site", rotulo: "Só com site" },
 ];
+
+// O mapa (Leaflet) só carrega no navegador, quando a cidade foi escolhida.
+const Mapa = dynamic(() => import("./Mapa"), { ssr: false });
 
 const MINIMOS: { valor: (typeof MINIMOS_DE_AVALIACOES)[number]; rotulo: string }[] = MINIMOS_DE_AVALIACOES.map((m) => ({
   valor: m,
@@ -100,6 +108,26 @@ export default function NovaBusca({
     };
   }, [aberto, municipios]);
   const cidadesDaUf = municipios?.[o.uf] ?? null;
+  const cidadeEscolhida = cidadesDaUf?.find((c) => c.ibge === o.cidadeIbge) ?? null;
+  const vista = useMemo(
+    () => (cidadeEscolhida?.lat != null && cidadeEscolhida.lng != null ? { lat: cidadeEscolhida.lat, lng: cidadeEscolhida.lng, zoom: 12 } : null),
+    [cidadeEscolhida],
+  );
+  // Fora da cidade escolhida: avisa (pela sede mais próxima), não bloqueia.
+  const vizinha = o.area && municipios ? cidadeMaisProxima(municipios, o.area) : null;
+  const centroFora = vizinha !== null && vizinha.ibge !== o.cidadeIbge;
+  const moverCentro = useCallback(
+    (lat: number, lng: number) =>
+      setO((atual) => ({ ...atual, area: { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5, raioKm: atual.area?.raioKm ?? RAIO_PADRAO_KM } })),
+    [],
+  );
+  const mudarRaio = (passo: 1 | -1) => {
+    if (!o.area) {
+      if (vista) mudar({ area: { lat: vista.lat, lng: vista.lng, raioKm: RAIO_PADRAO_KM } });
+      return;
+    }
+    mudar({ area: { ...o.area, raioKm: proximoRaio(o.area.raioKm, passo) } });
+  };
   const buscarCidade = useCallback(
     (texto: string) => buscarCidades(cidadesDaUf ?? [], texto).map((c) => ({ valor: String(c.ibge), rotulo: c.nome })),
     [cidadesDaUf],
@@ -182,7 +210,7 @@ export default function NovaBusca({
 
               <Campo titulo="Onde">
                 <div className="flex gap-2">
-                  <Select value={o.uf} onValueChange={(uf) => mudar({ uf, cidade: "", cidadeIbge: null })}>
+                  <Select value={o.uf} onValueChange={(uf) => mudar({ uf, cidade: "", cidadeIbge: null, area: null })}>
                     <SelectTrigger size="field" className="w-24" aria-label="Estado" data-slot="nova-busca-uf">
                       <SelectValue placeholder="UF" />
                     </SelectTrigger>
@@ -206,11 +234,59 @@ export default function NovaBusca({
                     buscar={buscarCidade}
                     aoEscolher={(v) => {
                       const c = cidadesDaUf?.find((x) => String(x.ibge) === v);
-                      if (c) mudar({ cidade: c.nome, cidadeIbge: c.ibge });
+                      if (c) mudar({ cidade: c.nome, cidadeIbge: c.ibge, area: null });
                     }}
                     data-campo="nova-busca-cidade"
                   />
                 </div>
+                {vista && (
+                  <div className="flex flex-col gap-2" data-bloco="nova-busca-area">
+                    <Mapa
+                      vista={vista}
+                      area={o.area}
+                      aoMoverCentro={moverCentro}
+                      rotulo={`Mapa de ${o.cidade}: arraste o centro ou clique para mover`}
+                      className="h-56"
+                      data-slot="nova-busca-mapa"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-chrome"
+                        aria-label="Diminuir o raio"
+                        disabled={!o.area || o.area.raioKm <= RAIOS_KM[0]}
+                        onClick={() => mudarRaio(-1)}
+                      >
+                        <Minus aria-hidden />
+                      </Button>
+                      <span className="min-w-36 text-center text-apoio tabular-nums text-ink" aria-live="polite" data-slot="nova-busca-raio">
+                        {o.area ? `Raio: ${o.area.raioKm} km` : "Raio: a cidade inteira"}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-chrome"
+                        aria-label="Aumentar o raio"
+                        disabled={o.area !== null && o.area.raioKm >= RAIOS_KM[RAIOS_KM.length - 1]}
+                        onClick={() => mudarRaio(1)}
+                      >
+                        <Plus aria-hidden />
+                      </Button>
+                      {o.area && (
+                        <Button type="button" variant="link" size="link" className="ml-auto" onClick={() => mudar({ area: null })} data-slot="nova-busca-cidade-inteira">
+                          Usar a cidade inteira
+                        </Button>
+                      )}
+                    </div>
+                    {centroFora && vizinha && (
+                      <Aviso tom="warn" data-bloco="nova-busca-centro-fora">
+                        O centro está em {vizinha.nome}
+                        {vizinha.uf !== o.uf ? `, ${vizinha.uf}` : ""}.
+                      </Aviso>
+                    )}
+                  </div>
+                )}
               </Campo>
 
               <Campo titulo="Quantas empresas por segmento">

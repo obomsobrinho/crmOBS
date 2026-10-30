@@ -687,6 +687,12 @@ export interface OpcoesDaBusca {
   uf: string;
   /** O código IBGE da cidade escolhida (`lib/dados/municipios.json`); null até escolher. */
   cidadeIbge: number | null;
+  /**
+   * O centro e o raio AJUSTADOS no mapa da "Nova busca" (revisão de 30/10/2026); null =
+   * a cidade inteira (vai como `locationQuery`). Com área, vai `customGeolocation` e não
+   * vai `locationQuery`. Fica gravado no jsonb `opcoes` da busca (sem DDL).
+   */
+  area: AreaDaBusca | null;
   porTermo: number;
   /** Nota mínima, aplicada do NOSSO lado (o filtro da fonte custa por empresa). */
   notaMinima: NotaMinima;
@@ -702,6 +708,32 @@ export interface OpcoesDaBusca {
   ignorarFechados: boolean;
   /** E-mail e redes sociais tirados do site da empresa (custa a mais por empresa na fonte). */
   buscarContatos: boolean;
+}
+
+/** Um círculo de busca: o centro e o raio em km. */
+export interface AreaDaBusca {
+  lat: number;
+  lng: number;
+  raioKm: number;
+}
+
+/** Os raios do controle "Raio: N km" (do menor ao maior). */
+export const RAIOS_KM = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50] as const;
+
+/** O raio com que uma área nasce quando o dono mexe no mapa pela primeira vez. */
+export const RAIO_PADRAO_KM = 5;
+
+/** O próximo raio da lista, para cima (+1) ou para baixo (-1), sem sair dela. */
+export function proximoRaio(atual: number, passo: 1 | -1): number {
+  const i = RAIOS_KM.findIndex((r) => r >= atual);
+  const j = Math.min(RAIOS_KM.length - 1, Math.max(0, (i < 0 ? RAIOS_KM.length - 1 : i) + passo));
+  return RAIOS_KM[j];
+}
+
+/** "Mutum, MG" ou "Mutum, MG · raio de 5 km": onde a busca procurou, para o detalhe. */
+export function textoDoLocal(o: Pick<OpcoesDaBusca, "cidade" | "uf" | "area">): string {
+  const cidade = [o.cidade, o.uf].filter(Boolean).join(", ");
+  return o.area ? `${cidade} · raio de ${String(o.area.raioKm).replace(".", ",")} km` : cidade;
 }
 
 /** Os mínimos de avaliações oferecidos na "Nova busca" (null = qualquer). */
@@ -753,6 +785,7 @@ export const OPCOES_PADRAO: OpcoesDaBusca = {
   cidade: "",
   uf: "",
   cidadeIbge: null,
+  area: null,
   porTermo: QUANTIDADES_POR_TERMO[0],
   notaMinima: null,
   site: "todos",

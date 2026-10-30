@@ -22,4 +22,10 @@ export const BRAND = {
   markDark: "/marca/obs-mark-dark.png",
   /** Assinatura de rodapé: o CRM é subproduto da OBS, não a OBS. */
   footer: "um produto OBS",
+  /**
+   * O título da seção do menu com as ferramentas do DONO DO PRODUTO (Campanhas e a
+   * central Clientes), só para admin, no fim do menu. ⚠️ Proposta de 30/10/2026: o
+   * Franck decide o nome na revisão; trocar é só esta linha.
+   */
+  secaoDoDono: "Gestão da OBS",
 } as const;

@@ -3,6 +3,8 @@ import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads } from "@/compo
 import {
   MINIMOS_DE_AVALIACOES,
   QUANTIDADES_POR_TERMO,
+  RAIOS_KM,
+  type AreaDaBusca,
   UFS,
   type FiltroDeSiteDaBusca,
   type NotaMinima,
@@ -46,6 +48,21 @@ export function paginaDe(v: string | null): number | null {
 /** O texto de busca, aparado e com teto (vai a um `like` no SQL, que escapa os curingas). */
 export const textoDe = (v: string | null) => (v ?? "").trim().slice(0, 100);
 
+/**
+ * A área ajustada no mapa: null (a cidade inteira), um círculo válido, ou undefined
+ * quando veio torta. Centro dentro de uma caixa larga em volta do Brasil; raio da lista.
+ */
+export function areaDe(v: unknown): AreaDaBusca | null | undefined {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "object") return undefined;
+  const o = v as Record<string, unknown>;
+  const { lat, lng, raioKm } = o;
+  if (typeof lat !== "number" || typeof lng !== "number" || typeof raioKm !== "number") return undefined;
+  if (lat < -34 || lat > 6 || lng < -74.5 || lng > -28.5) return undefined;
+  if (!(RAIOS_KM as readonly number[]).includes(raioKm)) return undefined;
+  return { lat, lng, raioKm };
+}
+
 /** As opções da "Nova busca" vindas do navegador, conferidas campo a campo; null quando algo está fora. */
 export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (v === null || typeof v !== "object") return null;
@@ -63,11 +80,14 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (minimo === undefined) return null;
   const categorias = Array.isArray(o.categorias) ? o.categorias.filter((c): c is string => typeof c === "string").map((c) => c.trim().slice(0, 60)) : null;
   if (!categorias || categorias.length > 10) return null;
+  const area = areaDe(o.area);
+  if (area === undefined) return null;
   return {
     termos,
     cidade: o.cidade.trim().slice(0, 80),
     uf: o.uf,
     cidadeIbge: o.cidadeIbge,
+    area,
     porTermo: o.porTermo as number,
     notaMinima: o.notaMinima as NotaMinima,
     site: o.site as FiltroDeSiteDaBusca,

@@ -19,6 +19,7 @@ import {
   ROTULO_DO_SITE,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
+  textoDoLocal,
   tipoDoTelefone,
   type DiaDeEnvio,
   type OpcoesDaBusca,
@@ -826,7 +827,7 @@ function DetalheDaBusca({
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}
-        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, `${busca.cidade}, ${busca.opcoes.uf}`, ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
+        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, textoDoLocal({ ...busca.opcoes, cidade: busca.cidade }), ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
       />
 
       {painel && <PainelDaBusca r={painel.resumo} respostasPorDia={painel.respostasPorDia} />}
