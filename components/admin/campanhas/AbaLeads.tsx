@@ -328,7 +328,7 @@ function TabelaDeBuscas({
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
   const ler = useCallback((pagina: number) => fonte.buscas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}|${versao}`, ler);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao);
   const { itens, recarregar } = tabela;
   const buscando = itens.filter((b) => b.situacao === "buscando").map((b) => b.id);
   const chaveBuscando = buscando.join(",");
@@ -536,7 +536,7 @@ function TabelaDeLeads({
     (pagina: number) => fonte.leads({ buscaId, texto: busca, cidade, filtros, pagina }),
     [fonte, buscaId, busca, cidade, filtros],
   );
-  const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}|${versao}`, ler);
+  const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}`, ler, versao);
   const { mudarItem } = tabela;
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
   const marcar = useCallback(

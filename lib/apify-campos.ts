@@ -12,6 +12,9 @@ import type { ItemDaFonteDeLeads, LeituraDaExecucao } from "./fonte-de-leads";
 
 export const ACTOR_APIFY = "compass/crawler-google-places";
 
+/** O nome de um lugar que veio sem nome (o mesmo do SQL): fica na base, nunca entra numa mensagem. */
+export const NOME_AUSENTE = "Sem nome";
+
 const ESTRELAS: Record<Exclude<NotaMinima, null>, string> = {
   3.5: "threeAndHalf",
   4: "four",
@@ -106,7 +109,7 @@ export function itemDoApify(bruto: unknown, termo: string): ItemDaFonteDeLeads {
     telefone_original: telefone,
     tipo_telefone: telefone ? tipoDoTelefone(telefone) : null,
     fonte_id: texto(o, ["placeId"]),
-    nome: texto(o, ["title"]) ?? "Sem nome",
+    nome: texto(o, ["title"]) ?? NOME_AUSENTE,
     segmento,
     endereco: texto(o, ["address"]),
     bairro: texto(o, ["neighborhood"]),

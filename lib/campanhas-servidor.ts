@@ -15,7 +15,7 @@ import type {
   Resultados,
   Totais,
 } from "@/components/admin/campanhas/tipos";
-import { estadoDoWhatsApp } from "./admin-alertas";
+import { estadoDoWhatsApp, type EstadoDoWhatsApp } from "./admin-alertas";
 import { estadoDaInstancia } from "./evolution";
 import {
   SITUACOES_DA_BUSCA,
@@ -94,12 +94,12 @@ function opcoesDoJson(j: Json, termo: string, cidade: string, uf: string | null)
   };
 }
 
-/** O número da instância está conectado agora (Evolution ao vivo; falha = não). */
-export async function whatsappConectado(instancia: string): Promise<boolean> {
+/** O estado do número agora (Evolution ao vivo); uma falha da Evolution é "desconhecido", nunca "desconectado". */
+export async function estadoDoNumero(instancia: string): Promise<EstadoDoWhatsApp> {
   try {
-    return estadoDoWhatsApp(await estadoDaInstancia(instancia)) === "conectado";
+    return estadoDoWhatsApp(await estadoDaInstancia(instancia));
   } catch {
-    return false;
+    return "desconhecido";
   }
 }
 
@@ -165,7 +165,7 @@ export async function conexoesDoAdmin(svc: Supa, admin: string): Promise<Conexao
       id: c.id,
       nome: c.name,
       numero: c.evolution_instance ?? "",
-      conectado: c.evolution_instance ? await whatsappConectado(c.evolution_instance) : false,
+      conectado: c.evolution_instance ? (await estadoDoNumero(c.evolution_instance)) === "conectado" : false,
     })),
   );
   return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -667,6 +667,11 @@ export async function fecharBusca(svc: Supa, fonte: FonteDeLeads, buscaId: strin
   );
   await concluir(svc, b.id, itens.map(itemParaOBanco), null);
   return "pronta";
+}
+
+/** Desiste de uma busca que a fonte não fechou a tempo (a linha sai de "buscando" com o motivo). */
+export function desistirDaBusca(svc: Supa, buscaId: string): Promise<void> {
+  return concluir(svc, buscaId, null, "A fonte não respondeu a tempo. Nada foi gravado; dá para buscar de novo.");
 }
 
 async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {

@@ -1,6 +1,7 @@
 import "server-only";
 import { grafiasDeDigitos } from "./avisos";
-import { fecharBusca, whatsappConectado } from "./campanhas-servidor";
+import { desistirDaBusca, estadoDoNumero, fecharBusca } from "./campanhas-servidor";
+import { NOME_AUSENTE } from "./apify-campos";
 import { enviarMensagemAtiva } from "./envio-ativo";
 import { fonteApify } from "./fonte-apify";
 import { diaIsoSP, inicioDoDiaSP } from "./fuso";
@@ -42,6 +43,10 @@ const FONES_POR_LEITURA = 25;
 /** Mensagens por página dessa leitura (o teto do PostgREST); a leitura segue de página em página até o fim. */
 const MENSAGENS_POR_PAGINA = 1000;
 const LEAD_NENHUM = "00000000-0000-0000-0000-000000000000";
+/** Depois disto o tick não começa outra campanha (a rota tem `maxDuration` de 120 s). */
+const ORCAMENTO_DE_ENVIO_MS = 60_000;
+/** Uma busca ainda "buscando" depois disto é dada como perdida (execução sumida na fonte). */
+const BUSCA_PERDIDA_MS = 2 * 60 * 60_000;
 
 export interface ResumoDoTick {
   campanhas: number;
@@ -51,6 +56,7 @@ export interface ResumoDoTick {
 }
 
 export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDoTick> {
+  const comeco = Date.now();
   const agoraIso = new Date(agora).toISOString();
   const inicioDoDia = new Date(inicioDoDiaSP(diaIsoSP(agora))).toISOString();
 
@@ -60,6 +66,10 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
     chamar(svc.rpc("prospeccao_ativar_agendadas", { p_agora: agoraIso })),
     chamar(svc.rpc("prospeccao_apagar_antigos", { p_antes: corte.toISOString() })),
   ]);
+
+  // As respostas e os pedidos para parar ANTES dos envios: um "SAIR" lido agora já
+  // tira o lead de toda fila neste tick. Se a leitura falhar, este tick não envia.
+  const respostas = await registrarRespostas(svc, agora, inicioDoDia);
 
   await fecharBuscasPresas(svc, agora);
 
@@ -74,20 +84,13 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
   let enviados = 0;
   let pausadas = 0;
   for (const c of devidas ?? []) {
+    // Folga para a rota terminar dentro do `maxDuration`: o resto fica para o próximo tick.
+    if (Date.now() - comeco > ORCAMENTO_DE_ENVIO_MS) break;
     try {
       // Fora da janela (uma agendada que ativou de noite ou no domingo): só empurra a vez
       // para a próxima abertura. A janela é conferida aqui, num lugar só, para todo envio.
       if (!dentroDaJanela(agora)) {
-        await chamar(
-          svc.rpc("prospeccao_registrar_envio", {
-            p_campanha: c.id,
-            p_lead: LEAD_NENHUM,
-            p_resultado: "adiar",
-            p_variante: 0,
-            p_erro: null,
-            p_proximo: new Date(proximoEnvioEm(agora, 0)).toISOString(),
-          }),
-        );
+        await adiar(svc, c.id, proximoEnvioEm(agora, 0));
         continue;
       }
       const r = await vezDaCampanha(svc, c.id, agora, inicioDoDia);
@@ -98,9 +101,21 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
       console.error("prospecção, vez da campanha:", c.id, e);
     }
   }
-
-  const respostas = await registrarRespostas(svc, agora, inicioDoDia);
   return { campanhas: devidas?.length ?? 0, enviados, pausadas, respostas };
+}
+
+/** Só muda a vez da campanha (`adiar` não toca em lead nenhum). */
+function adiar(svc: Supa, campanhaId: string, proximo: number) {
+  return chamar(
+    svc.rpc("prospeccao_registrar_envio", {
+      p_campanha: campanhaId,
+      p_lead: LEAD_NENHUM,
+      p_resultado: "adiar",
+      p_variante: 0,
+      p_erro: null,
+      p_proximo: new Date(proximo).toISOString(),
+    }),
+  );
 }
 
 async function chamar(p: PromiseLike<{ error: unknown }>) {
@@ -112,17 +127,22 @@ async function fecharBuscasPresas(svc: Supa, agora: number) {
   if (!process.env.APIFY_TOKEN) return;
   const { data, error } = await svc
     .from("prospeccao_buscas")
-    .select("id")
+    .select("id, criada_em")
     .eq("status", "buscando")
     .lt("criada_em", new Date(agora - BUSCA_PRESA_MS).toISOString())
     .order("criada_em")
     .limit(5);
   if (error) throw error;
   for (const b of data ?? []) {
+    // Passou do prazo e a fonte ainda não fechou (ou nem responde): desiste, e a fila
+    // de buscas paradas não fica presa nas mesmas cinco para sempre.
+    const perdida = Date.parse(b.criada_em) < agora - BUSCA_PERDIDA_MS;
     try {
-      await fecharBusca(svc, fonteApify, b.id);
+      const situacao = await fecharBusca(svc, fonteApify, b.id);
+      if (situacao === "buscando" && perdida) await desistirDaBusca(svc, b.id);
     } catch (e) {
       console.error("prospecção, busca presa:", b.id, e);
+      if (perdida) await desistirDaBusca(svc, b.id).catch(() => undefined);
     }
   }
 }
@@ -148,7 +168,13 @@ async function vezDaCampanha(
   if (error) throw error;
   const vez = data?.[0];
   if (!vez || vez.situacao === "concluida") return "nada";
-  const registrar = (lead: string, resultado: "enviado" | "falhou" | "devolver" | "adiar", variante: number, erro: string | null, proximo: number) =>
+  if (vez.situacao === "cota_cheia") {
+    await adiar(svc, campanhaId, proximoEnvioEm(agora, vez.enviados_hoje ?? 0));
+    return "nada";
+  }
+  if (vez.situacao !== "enviar" || !vez.lead_id || !vez.telefone || !vez.client_id) return "nada";
+  const lead = vez.lead_id;
+  const registrar = (resultado: "enviado" | "falhou" | "devolver", variante: number, erro: string | null, proximo: number) =>
     chamar(
       svc.rpc("prospeccao_registrar_envio", {
         p_campanha: campanhaId,
@@ -159,38 +185,54 @@ async function vezDaCampanha(
         p_proximo: new Date(proximo).toISOString(),
       }),
     );
-  if (vez.situacao === "cota_cheia") {
-    await registrar(LEAD_NENHUM, "adiar", 0, null, proximoEnvioEm(agora, vez.enviados_hoje ?? 0));
+
+  // O lead já está reivindicado ("enviado" no banco, para nunca sair duas vezes).
+  // Até a mensagem ser entregue à Evolution, qualquer falha o devolve à fila.
+  let entregueAEvolution = false;
+  try {
+    const hoje = vez.enviados_hoje ?? 0;
+    const pausar = async (motivo: string) => {
+      await chamar(svc.rpc("prospeccao_pausar_campanha", { p_quem: null, p_id: campanhaId, p_motivo: motivo }));
+      await registrar("devolver", 0, null, agora + RESERVA_MS);
+      return "pausada" as const;
+    };
+    if (!vez.instancia) return await pausar("A empresa do número não tem WhatsApp");
+    const estado = await estadoDoNumero(vez.instancia);
+    // Só "desconectado" pausa (D6); "reconectando" ou uma falha da Evolution tenta no próximo tick.
+    if (estado === "desconectado") return await pausar("WhatsApp desconectado");
+    if (estado !== "conectado") {
+      await registrar("devolver", 0, null, agora + RESERVA_MS);
+      return "nada";
+    }
+    // Um nome que a fonte não trouxe não vai para dentro da mensagem ("Achei a Sem nome...").
+    const empresa = (vez.nome ?? "").trim();
+    if (!empresa || empresa === NOME_AUSENTE) {
+      await registrar("falhou", 0, "Lead sem o nome da empresa", proximoEnvioEm(agora, hoje));
+      return "nada";
+    }
+    const variantes = vez.variantes ?? [];
+    const variante = varianteDaOrdem(vez.ordem ?? 0, variantes.length);
+    entregueAEvolution = true;
+    const resultado = await enviarMensagemAtiva({
+      instancia: vez.instancia,
+      telefone: vez.telefone,
+      texto: textoParaLead(variantes[variante] ?? "", empresa),
+      numeroDeAvisos: vez.avisos,
+    });
+    if (resultado === "enviado") {
+      await registrar("enviado", variante, null, proximoEnvioEm(agora, hoje + 1));
+      return "enviado";
+    }
+    // Sem confirmação da Evolution (recusa, erro ou tempo esgotado: a mensagem pode até
+    // ter saído) ou pulado (número de teste ou o de avisos): o lead sai da fila com o
+    // motivo e nunca é tentado de novo, para nunca receber duas vezes.
+    const erro = resultado === "recusado" ? "O WhatsApp não confirmou o envio" : "Número de teste ou de avisos";
+    await registrar("falhou", 0, erro, proximoEnvioEm(agora, hoje));
     return "nada";
+  } catch (e) {
+    if (!entregueAEvolution) await registrar("devolver", 0, null, agora + RESERVA_MS).catch(() => undefined);
+    throw e;
   }
-  if (vez.situacao !== "enviar" || !vez.lead_id || !vez.telefone || !vez.client_id) return "nada";
-
-  const pausar = async (motivo: string) => {
-    await chamar(svc.rpc("prospeccao_pausar_campanha", { p_quem: null, p_id: campanhaId, p_motivo: motivo }));
-    await registrar(vez.lead_id, "devolver", 0, null, agora + RESERVA_MS);
-    return "pausada" as const;
-  };
-  if (!vez.instancia) return pausar("A empresa do número não tem WhatsApp");
-  if (!(await whatsappConectado(vez.instancia))) return pausar("WhatsApp desconectado");
-
-  const variantes = vez.variantes ?? [];
-  const variante = varianteDaOrdem(vez.ordem ?? 0, variantes.length);
-  const resultado = await enviarMensagemAtiva({
-    instancia: vez.instancia,
-    telefone: vez.telefone,
-    texto: textoParaLead(variantes[variante] ?? "", vez.nome ?? ""),
-    numeroDeAvisos: vez.avisos,
-  });
-  const hoje = vez.enviados_hoje ?? 0;
-  if (resultado === "enviado") {
-    await registrar(vez.lead_id, "enviado", variante, null, proximoEnvioEm(agora, hoje + 1));
-    return "enviado";
-  }
-  // Recusado pela Evolution, ou pulado (número de teste ou o número de avisos da
-  // empresa): o lead sai da fila com o motivo e nunca é tentado de novo.
-  const erro = resultado === "recusado" ? "O WhatsApp recusou o envio" : "Número de teste ou de avisos";
-  await registrar(vez.lead_id, "falhou", 0, erro, proximoEnvioEm(agora, hoje));
-  return "nada";
 }
 
 /**
@@ -249,28 +291,30 @@ async function registrarRespostas(svc: Supa, agora: number, inicioDoDia: string)
 
 /**
  * As mensagens RECEBIDAS por uma empresa, de alguns celulares, depois de `desde`: de
- * página em página pela chave (`id`), até o fim, para um "SAIR" depois de uma conversa
- * longa com a IA nunca ficar de fora.
+ * página em página na ordem (`created_at`, `id`), a mesma do índice da tabela por
+ * empresa, telefone e data, até o fim, para um "SAIR" depois de uma conversa longa
+ * com a IA nunca ficar de fora.
  */
 async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], desde: number) {
   const recebidas: { telefone: string; texto: string; em: number }[] = [];
-  let depoisDe = 0;
+  let cursor: { em: string; id: number } | null = null;
   for (;;) {
-    const { data, error } = await svc
+    let q = svc
       .from("chat_messages")
       .select("id, phone, user_message, created_at")
       .eq("client_id", clientId)
       .in("phone", fones.flatMap(grafiasDeDigitos))
       .gt("created_at", new Date(desde).toISOString())
-      .gt("id", depoisDe)
-      .not("user_message", "is", null)
-      .order("id")
-      .limit(MENSAGENS_POR_PAGINA);
+      .not("user_message", "is", null);
+    // O instante vai entre aspas: tem ":" e "+", que o `or` do PostgREST leria como sintaxe.
+    if (cursor) q = q.or(`created_at.gt."${cursor.em}",and(created_at.eq."${cursor.em}",id.gt.${cursor.id})`);
+    const { data, error } = await q.order("created_at").order("id").limit(MENSAGENS_POR_PAGINA);
     if (error) throw error;
     for (const m of data ?? []) {
       if (m.user_message && m.created_at) recebidas.push({ telefone: m.phone, texto: m.user_message, em: Date.parse(m.created_at) });
     }
-    if (!data || data.length < MENSAGENS_POR_PAGINA) return recebidas;
-    depoisDe = data[data.length - 1].id;
+    const ultima = data?.[data.length - 1];
+    if (!data || data.length < MENSAGENS_POR_PAGINA || !ultima?.created_at) return recebidas;
+    cursor = { em: ultima.created_at, id: ultima.id };
   }
 }

@@ -3,6 +3,7 @@
 import { memo, useCallback, useState } from "react";
 import { Pause, Play, Repeat } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
+import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
@@ -48,13 +49,14 @@ function DetalheDaCampanha({
   const aberta = useLeitura(`campanha|${id}|${versao}`, () => fonte.campanha(id));
   const { dados: resultados } = useLeitura(`resultados|${id}|${versao}`, () => fonte.resultados({ campanhaId: id, periodo: null }));
   const [mudando, setMudando] = useState(false);
+  const [falhaAoMudar, setFalhaAoMudar] = useState(false);
 
   // ── A tabela ──
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoNaCampanha | null>(null);
   const ler = useCallback((pagina: number) => fonte.leadsDaCampanha(id, { texto: busca, situacao, pagina }), [fonte, id, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${id}|${busca}|${situacao ?? ""}|${versao}`, ler);
+  const tabela = usePaginaDaFonte(`${id}|${busca}|${situacao ?? ""}`, ler, versao);
 
   if (!aberta.dados) {
     return (
@@ -84,11 +86,13 @@ function DetalheDaCampanha({
 
   const pausarOuRetomar = async () => {
     setMudando(true);
+    setFalhaAoMudar(false);
     try {
       await (campanha.situacao === "pausada" ? fonte.retomar(campanha.id) : fonte.pausar(campanha.id));
       aoMudar();
     } catch (e) {
       console.error("campanha, pausar ou retomar:", e);
+      setFalhaAoMudar(true);
     } finally {
       setMudando(false);
     }
@@ -127,6 +131,14 @@ function DetalheDaCampanha({
           )}
         </div>
       </div>
+
+      {falhaAoMudar && (
+        <Aviso tom="danger" forma="faixa" data-bloco="campanha-falha">
+          {campanha.situacao === "pausada"
+            ? "Não deu para retomar agora. A campanha segue pausada; tente de novo."
+            : "Não deu para pausar agora. A campanha segue ativa; tente de novo."}
+        </Aviso>
+      )}
 
       <TopoDeDetalhe
         voltar={voltar}

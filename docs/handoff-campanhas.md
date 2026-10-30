@@ -48,6 +48,7 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
 - Fase 5: cron revisado (uma mensagem por campanha por tick, linha de saída pelo código, respostas lidas de
   `chat_messages` em lotes, D6).
 - Fase 6: painéis lendo os agregados SQL, dobrados pelos gêmeos puros.
+- /simplify e /code-review rodados (achados aplicados; os pulados estão no fim deste arquivo).
 - Fase 7: `e2e/campanhas-lib.design.spec.ts` (24 testes puros) e `e2e/campanhas.design.spec.ts` (9 de tela e
   das travas sem login), guard list atualizada. Suíte `sem-login`: 827 passaram; 6 de
   `bancada-conversa.design.spec.ts` não abriram o navegador neste container (o spec usa um launch próprio que
@@ -77,9 +78,27 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
   morrer bem no meio, esse lead fica "enviado" sem ter recebido. Preferi o risco de perder um envio ao de
   repetir mensagem para um desconhecido.
 - **Respostas:** 14 dias de observação depois do envio; uma resposta conta só até o próximo envio ao mesmo
-  lead (a "segunda chance" fica com a dela).
+  lead (a "segunda chance" fica com a dela). O cron lê as respostas ANTES de enviar: um "SAIR" lido no tick
+  já tira o lead de toda fila; se a leitura falhar, o tick não envia nada.
+- **Falhas de envio:** se a Evolution não confirmar (recusa, erro ou tempo esgotado; a mensagem pode até ter
+  saído), o lead vira "Falhou" e não é tentado de novo, para nunca receber duas vezes. Uma falha ANTES de
+  entregar à Evolution devolve o lead à fila. Só "desconectado" pausa a campanha; estado desconhecido tenta
+  no próximo tick.
+- **Lead sem nome** (a fonte não trouxe o nome): fica na base, mas na vez dele vira "Falhou" em vez de mandar
+  "Achei a Sem nome...".
+- **Busca perdida:** uma busca ainda "Buscando" depois de 2 horas vira "Falhou" ("A fonte não respondeu a
+  tempo").
 
 ## O que ficou de fora
 
 - Nenhuma mensagem real foi enviada; n8n intocado; nenhum DDL aplicado nesta sessão.
 - Não há tempo real nas telas (de propósito: a busca em andamento é relida a cada 10 s, só com a aba visível).
+
+## Achados das revisões que ficaram de fora (de propósito)
+
+- Unificar `useLeitura` (Campanhas) com `useCarga` (central): mexeria nas abas da central já aprovadas.
+- Trocar o "Tentar de novo" das tabelas por `FalhaAoLer`: muda o visual dentro da tabela aprovada.
+- Dia da semana, plural e taxa repetidos em `lib/prospeccao.ts` (vêm do protótipo aprovado): limpeza para
+  depois, sem mudança de comportamento.
+- Provar os agregados SQL contra o banco de verdade: o teste puro prova a dobra; uma prova contra
+  `prospeccao_resultados` real cabe na suíte com login (não rodada aqui).

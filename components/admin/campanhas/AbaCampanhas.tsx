@@ -160,7 +160,7 @@ function AbaCampanhas({
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaCampanha | null>(null);
   const ler = useCallback((pagina: number) => fonte.campanhas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}|${versao}`, ler);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao);
   const contagens = totais?.campanhas;
   const todas = somaDe(contagens);
 

@@ -53,17 +53,18 @@ export function useLeitura<T>(chave: string, ler: () => Promise<T>) {
 
 /**
  * Uma PÁGINA da fonte (10 por página, total contado no servidor). Trocar o recorte
- * (`chave`) volta para a página 1; uma página que ficou além do fim (um filtro que
- * encolheu a lista) volta para a última.
+ * (`chave`) volta para a página 1; uma `versao` nova (depois de uma escrita) relê a
+ * MESMA página; uma página que ficou além do fim (um filtro que encolheu a lista)
+ * volta para a última.
  */
-export function usePaginaDaFonte<T>(chave: string, ler: (pagina: number) => Promise<Pagina<T>>) {
+export function usePaginaDaFonte<T>(chave: string, ler: (pagina: number) => Promise<Pagina<T>>, versao = 0) {
   const [pagina, setPagina] = useState(1);
   const [chaveVista, setChaveVista] = useState(chave);
   if (chave !== chaveVista) {
     setChaveVista(chave);
     setPagina(1);
   }
-  const lida = useLeitura(`${chave}|${pagina}`, () => ler(pagina));
+  const lida = useLeitura(`${chave}|${pagina}|${versao}`, () => ler(pagina));
   const total = lida.dados?.total ?? 0;
   const ultima = Math.max(1, Math.ceil(total / POR_PAGINA));
   if (lida.dados && !lida.carregando && pagina > ultima) setPagina(ultima);

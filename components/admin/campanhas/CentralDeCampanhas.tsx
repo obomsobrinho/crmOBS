@@ -48,17 +48,24 @@ export default function CentralDeCampanhas({
   /** O rascunho que mandou para Leads ("Falta lead? Fazer uma nova busca"). */
   const [rascunhoEsperando, setRascunhoEsperando] = useState<CampanhaEditavel | null>(null);
   const pendente = useRef<CampanhaEditavel | null>(null);
+  /** O salvamento que está indo agora: quem precisa do rascunho gravado (Iniciar, Cancelar) espera por ele. */
+  const salvando = useRef<Promise<void>>(Promise.resolve());
 
-  const salvarAgora = useCallback(async () => {
-    const c = pendente.current;
-    if (!c) return;
-    pendente.current = null;
-    try {
-      const salvaEm = await fonte.salvar(c);
-      setRascunho((atual) => (atual && atual.id === c.id ? { ...atual, salvaEm } : atual));
-    } catch (e) {
-      console.error("campanha, salvar rascunho:", e);
-    }
+  // Os salvamentos andam em fila: o próximo só sai depois do anterior, e esperar a fila
+  // é esperar o último. Assim "Iniciar" nunca chega ao servidor antes do rascunho.
+  const salvarAgora = useCallback(() => {
+    salvando.current = salvando.current.then(async () => {
+      const c = pendente.current;
+      if (!c) return;
+      pendente.current = null;
+      try {
+        const salvaEm = await fonte.salvar(c);
+        setRascunho((atual) => (atual && atual.id === c.id ? { ...atual, salvaEm } : atual));
+      } catch (e) {
+        console.error("campanha, salvar rascunho:", e);
+      }
+    });
+    return salvando.current;
   }, [fonte]);
 
   useEffect(() => {
