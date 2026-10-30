@@ -1,3 +1,4 @@
+import { chaveTelefone } from "./avisos";
 import { normalizar } from "./clientes";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
@@ -240,6 +241,13 @@ export function problemasDaVariante(modelo: string): string[] {
   if (outras.length > 0) p.push(`Campo desconhecido: {${outras[0]}}`);
   return p;
 }
+
+/** As três variantes sugeridas (plano, seção 9; aprovadas pelo dono em 29/10/2026): o texto pré-preenchido de uma campanha nova. */
+export const VARIANTES_SUGERIDAS = [
+  "Oi, tudo bem? Sou o Franck, da OBS. Achei a {empresa} numa busca no Google. A gente monta sistemas sob medida que deixam o WhatsApp respondendo sozinho e tiram o trabalho repetido da rotina. Posso te mostrar em 2 minutos como ficaria aí?",
+  "Oi! Aqui é o Franck, da OBS. Vi a {empresa} no Google e fiquei curioso: quando um cliente chama no WhatsApp fora do horário, alguém responde? A gente monta um sistema que atende, organiza e agenda sozinho. Se fizer sentido, te mostro rapidinho.",
+  "Oi, tudo bem? Sou o Franck, da OBS. A gente cria sistemas sob medida pra tirar tarefa chata da rotina: atendimento no WhatsApp que responde sozinho, agenda, lembrete, controle. Vale uma conversa rápida pra eu entender como funciona aí na {empresa} hoje?",
+];
 
 /** Qual variante (0, 1, 2) vai para o lead na posição `ordem` da fila: revezamento simples. */
 export function varianteDaOrdem(ordem: number, quantas: number): number {
@@ -739,4 +747,216 @@ export function contagemPorSemana(datas: number[], agora: number, semanas: numbe
     if (i >= 0 && i < semanas) serie[i].n++;
   }
   return serie;
+}
+
+// ── Os gêmeos do SQL: o formato longo dobrado nas mesmas formas ─────────
+//
+// `prospeccao_resultados` e `prospeccao_resumo_da_base` devolvem uma linha por
+// grupo (dimensão, chave, contagens). Estas funções dobram essas linhas nas MESMAS
+// formas de `resultadoDaCampanha`, `respostasPorEspera`, `enviosPorDia`,
+// `resumoDaBase` e `contagemPorSemana`, que o preview e os testes usam em memória.
+
+export interface LinhaDoResultado {
+  dimensao: string;
+  chave: number;
+  n: number | null;
+  enviados: number | null;
+  responderam: number | null;
+}
+
+export interface ResultadoDobrado {
+  resultado: ResultadoDaCampanha;
+  espera: { chave: string; rotulo: string; n: number }[];
+}
+
+/** As linhas de `prospeccao_resultados` (sem a dimensão `dia`) na forma de `resultadoDaCampanha`. */
+export function resultadoDasLinhas(
+  linhas: LinhaDoResultado[],
+  quantasVariantes: number,
+  janela: JanelaDeEnvio = JANELA,
+): ResultadoDobrado {
+  const de = (d: string) => linhas.filter((l) => l.dimensao === d);
+  const n = (d: string) => de(d)[0]?.n ?? 0;
+  const taxaDe = (d: string, chave: number) => {
+    const l = de(d).find((x) => x.chave === chave);
+    return taxa(l?.enviados ?? 0, l?.responderam ?? 0);
+  };
+  const env = de("enviados")[0];
+  const mediana = de("mediana")[0];
+  const porHoraDoEnvio = [];
+  for (let h = janela.inicioHora; h < janela.fimHora; h++) porHoraDoEnvio.push({ hora: h, ...taxaDe("hora_envio", h) });
+  return {
+    resultado: {
+      total: n("total"),
+      naFila: n("na_fila"),
+      falharam: n("falharam"),
+      pararam: n("pararam"),
+      ...taxa(env?.enviados ?? 0, env?.responderam ?? 0),
+      porVariante: Array.from({ length: Math.max(1, quantasVariantes) }, (_, v) => taxaDe("variante", v)),
+      porHoraDoEnvio,
+      porDiaDaSemana: DIAS_DA_SEMANA.map(({ dow }) => ({ dow, ...taxaDe("dia_semana", dow) })),
+      porHoraDaResposta: de("hora_resposta")
+        .map((l) => ({ hora: l.chave, respostas: l.n ?? 0 }))
+        .sort((a, b) => a.hora - b.hora),
+      minutosAteResponder: mediana?.n ?? null,
+    },
+    espera: FAIXAS_DE_ESPERA.map((f, i) => ({
+      chave: f.chave,
+      rotulo: f.rotulo,
+      n: de("espera").find((l) => l.chave === i)?.n ?? 0,
+    })),
+  };
+}
+
+/** A dimensão `dia` de `prospeccao_resultados` (chave = dias desde `de`) na forma de `enviosPorDia`. */
+export function serieDasLinhas(linhas: LinhaDoResultado[], de: string, dias: number): DiaDeEnvio[] {
+  return Array.from({ length: dias }, (_, i) => {
+    const l = linhas.find((x) => x.dimensao === "dia" && x.chave === i);
+    return { dia: somarDias(de, i), enviados: l?.enviados ?? 0, responderam: l?.responderam ?? 0 };
+  });
+}
+
+export interface LinhaDoResumo {
+  dimensao: string;
+  chave: string;
+  n: number;
+  aContatar: number | null;
+  contatados: number | null;
+  responderam: number | null;
+  soma: number | null;
+}
+
+export interface SemanaContada {
+  inicio: string;
+  n: number;
+}
+
+export interface ResumoDobrado {
+  resumo: ResumoDaBase;
+  novosPorSemana: SemanaContada[];
+  enviosPorSemana: SemanaContada[];
+  respostasPorDia: DiaDeEnvio[];
+}
+
+/** As linhas de `prospeccao_resumo_da_base` na forma de `resumoDaBase` e das séries de `contagemPorSemana`/`enviosPorDia`. */
+export function resumoDasLinhas(linhas: LinhaDoResumo[], hoje: string, semanas: number, dias: number): ResumoDobrado {
+  const de = (d: string) => linhas.filter((l) => l.dimensao === d);
+  const n = (d: string, chave = "") => de(d).find((l) => l.chave === chave)?.n ?? 0;
+  const grupos = (d: string) =>
+    de(d)
+      .map((l) => ({ nome: l.chave, total: l.n, aContatar: l.aContatar ?? 0, contatados: l.contatados ?? 0, responderam: l.responderam ?? 0 }))
+      .sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
+  const total = de("total")[0];
+  const media = de("nota_media")[0];
+  const semana = (d: string) =>
+    Array.from({ length: semanas }, (_, i) => ({ inicio: somarDias(hoje, -7 * (semanas - i) + 1), n: n(d, String(i)) }));
+  return {
+    resumo: {
+      total: total?.n ?? 0,
+      comCelular: n("com_celular"),
+      bons: n("bons"),
+      contatados: total?.contatados ?? 0,
+      responderam: total?.responderam ?? 0,
+      aContatar: total?.aContatar ?? 0,
+      porCidade: grupos("cidade"),
+      porSegmento: grupos("segmento"),
+      porBairro: grupos("bairro"),
+      porTelefone: { celular: n("telefone", "celular"), fixo: n("telefone", "fixo"), sem: n("telefone", "sem") },
+      notaMedia: media && media.n > 0 && media.soma !== null ? Math.round((media.soma / media.n) * 10) / 10 : null,
+      porSite: { sim: n("site", "sim"), so_rede_social: n("site", "so_rede_social"), nao: n("site", "nao") },
+      porFaixa: { alta: n("faixa", "alta"), media: n("faixa", "media"), baixa: n("faixa", "baixa") },
+      porNota: { sem: n("nota", "sem"), ate4: n("nota", "ate4"), "4": n("nota", "4"), "45": n("nota", "45"), "48": n("nota", "48") },
+    },
+    novosPorSemana: semana("novos_semana"),
+    enviosPorSemana: semana("envios_semana"),
+    respostasPorDia: Array.from({ length: dias }, (_, i) => {
+      const dia = somarDias(hoje, i - dias + 1);
+      const l = de("respostas_dia").find((x) => x.chave === dia);
+      return { dia, enviados: l?.n ?? 0, responderam: l?.responderam ?? 0 };
+    }),
+  };
+}
+
+// ── O que o servidor confere antes de iniciar ───────────────────────────
+
+/** O que impede de iniciar (vazio = pode). As mesmas regras que travam o assistente, de novo no servidor. */
+export function problemasParaIniciar(c: {
+  nome: string;
+  conexaoId: string | null;
+  agendadaPara: number | null;
+  variantes: string[];
+  agora: number;
+}): string[] {
+  const p: string[] = [];
+  if (c.nome.trim() === "") p.push("Falta o nome da campanha");
+  if (!c.conexaoId) p.push("Falta o número que envia");
+  if (c.agendadaPara !== null && c.agendadaPara <= c.agora) p.push("A data agendada já passou");
+  if (c.variantes.length === 0) p.push("Falta a mensagem");
+  if (c.variantes.length > MAXIMO_DE_VARIANTES) p.push(`No máximo ${MAXIMO_DE_VARIANTES} variantes`);
+  c.variantes.forEach((v, i) => {
+    const pv = problemasDaVariante(v);
+    if (pv.length > 0) p.push(`Variante ${i + 1}: ${pv[0]}`);
+  });
+  return p;
+}
+
+// ── Respostas e pedidos para parar (o cron lê `chat_messages`, nunca escreve) ──
+
+/** Um lead enviado que o cron ainda observa: a primeira resposta, ou um pedido para parar depois. */
+export interface EnvioObservado {
+  campanhaId: string;
+  leadId: string;
+  /** A chave do celular do lead (55 + DDD + número). */
+  telefone: string;
+  situacao: "enviado" | "respondeu";
+  enviadoEm: number;
+}
+
+/** Uma mensagem RECEBIDA (`user_message`) na empresa que enviou. */
+export interface MensagemRecebida {
+  telefone: string;
+  texto: string;
+  em: number;
+}
+
+export interface RespostaAchada {
+  campanhaId: string;
+  leadId: string;
+  /** A primeira mensagem depois do envio (só para quem ainda estava "enviado"). */
+  respondeuEm?: number;
+  /** A primeira mensagem que pede para parar (`ehPedidoParaParar`). */
+  parouEm?: number;
+}
+
+/**
+ * O que as mensagens recebidas dizem sobre cada envio observado. Uma mensagem
+ * conta para o envio do mesmo celular (com e sem o nono dígito, `chaveTelefone`)
+ * que veio ANTES dela, e só até o próximo envio ao mesmo lead (uma "segunda
+ * chance" não faz a primeira campanha ganhar a resposta da segunda).
+ */
+export function respostasDosEnvios(envios: EnvioObservado[], mensagens: MensagemRecebida[]): RespostaAchada[] {
+  const porLead = new Map<string, EnvioObservado[]>();
+  for (const e of envios) porLead.set(e.leadId, [...(porLead.get(e.leadId) ?? []), e]);
+  const porFone = new Map<string, MensagemRecebida[]>();
+  for (const m of mensagens) {
+    const k = chaveTelefone(m.telefone);
+    porFone.set(k, [...(porFone.get(k) ?? []), m]);
+  }
+  const achadas: RespostaAchada[] = [];
+  for (const e of envios) {
+    const proximo = (porLead.get(e.leadId) ?? [])
+      .map((x) => x.enviadoEm)
+      .filter((t) => t > e.enviadoEm)
+      .reduce((a, b) => Math.min(a, b), Infinity);
+    const delas = (porFone.get(chaveTelefone(e.telefone)) ?? [])
+      .filter((m) => m.em > e.enviadoEm && m.em < proximo && m.texto.trim() !== "")
+      .sort((a, b) => a.em - b.em);
+    if (delas.length === 0) continue;
+    const parada = delas.find((m) => ehPedidoParaParar(m.texto));
+    const r: RespostaAchada = { campanhaId: e.campanhaId, leadId: e.leadId };
+    if (e.situacao === "enviado") r.respondeuEm = delas[0].em;
+    if (parada) r.parouEm = parada.em;
+    if (r.respondeuEm !== undefined || r.parouEm !== undefined) achadas.push(r);
+  }
+  return achadas;
 }

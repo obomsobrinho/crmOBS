@@ -10,24 +10,24 @@ import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Medidor } from "@/components/ui/medidor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
-import { normalizar } from "@/lib/clientes";
 import { numeroBR, pct } from "@/lib/format";
-import { diaIsoSP, diaMesHoraSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
+import { diaMesHoraSP } from "@/lib/fuso";
 import { PERIODOS, type PeriodoKey } from "@/lib/periodo";
-import { enviosPorDia, textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/prospeccao";
+import { textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, haQuanto, textoDaTaxa } from "./pecas";
-import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
-import type { Campanha, ConexaoDisponivel, EnvioDaCampanha } from "./tipos";
+import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
+import type { CampanhaDaTabela, ConexaoDisponivel, FonteDeCampanhas, Totais } from "./tipos";
 
 // CAMPANHAS: o painel de resultados no topo (todas as campanhas ou uma, no
 // período) e embaixo a tabela de campanhas, 10 por página, com busca pelo nome
-// e o filtro por situação. Clicar numa linha abre o detalhe (ou o assistente,
-// no rascunho).
+// e o filtro por situação, tudo lido da fonte (contas no servidor). Clicar numa
+// linha abre o detalhe (ou o assistente, no rascunho).
 
 const PASSOS = ["Campanha", "Contatos", "Mensagem", "Confirmar"];
-const DIAS_DA_LINHA = 14;
+/** Os dias do mini gráfico de cada linha (a série vem da fonte com este tamanho). */
+export const DIAS_DA_LINHA = 14;
 const GRADE = "xl:grid xl:grid-cols-[minmax(0,2.4fr)_120px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_20px] xl:items-center xl:gap-5";
 
 const SITUACOES: { chave: SituacaoDaCampanha; rotulo: string }[] = [
@@ -38,38 +38,25 @@ const SITUACOES: { chave: SituacaoDaCampanha; rotulo: string }[] = [
   { chave: "concluida", rotulo: "Concluídas" },
 ];
 
-interface ParamsDaTabela {
-  busca: string;
-  situacao: SituacaoDaCampanha | null;
-}
-
 function LinhaDaCampanha({
   campanha,
   conexoes,
   agora,
   abrir,
 }: {
-  campanha: Campanha;
+  campanha: CampanhaDaTabela;
   conexoes: ConexaoDisponivel[];
   agora: number;
   abrir: () => void;
 }) {
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
   const rascunho = campanha.situacao === "rascunho";
-  const enviados = campanha.envios.filter((e) => e.enviadoEm !== null).length;
-  const saidos = enviados + campanha.envios.filter((e) => e.situacao === "falhou").length;
-  const responderam = campanha.envios.filter((e) => e.respondeuEm !== null).length;
-  const total = campanha.envios.length;
+  const { enviados, responderam, total } = campanha;
+  const saidos = enviados + campanha.falharam;
   const taxa = enviados === 0 ? null : Math.round((responderam / enviados) * 100);
-  const hoje = diaIsoSP(agora);
   const pontos = useMemo(
-    () =>
-      enviosPorDia(campanha.envios, hoje, DIAS_DA_LINHA).map((d) => ({
-        chave: d.dia,
-        rotulo: textoDoDiaDeEnvio(d.dia),
-        valor: d.enviados,
-      })),
-    [campanha.envios, hoje],
+    () => campanha.serie.map((d) => ({ chave: d.dia, rotulo: textoDoDiaDeEnvio(d.dia), valor: d.enviados })),
+    [campanha.serie],
   );
 
   return (
@@ -140,7 +127,9 @@ function LinhaDaCampanha({
 
 function AbaCampanhas({
   abas,
-  campanhas,
+  fonte,
+  versao,
+  totais,
   conexoes,
   agora,
   abrir,
@@ -149,7 +138,10 @@ function AbaCampanhas({
 }: {
   /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
   abas: React.ReactNode;
-  campanhas: Campanha[];
+  fonte: FonteDeCampanhas;
+  /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
+  versao: number;
+  totais: Totais | null;
   conexoes: ConexaoDisponivel[];
   agora: number;
   abrir: (id: string) => void;
@@ -159,39 +151,26 @@ function AbaCampanhas({
   // ── O painel: período e campanha ──
   const [periodo, setPeriodo] = useState<PeriodoKey>("mes");
   const [escolhida, setEscolhida] = useState<string>("todas");
-  const comEnvio = campanhas.filter((c) => c.envios.some((e) => e.enviadoEm !== null));
   const dias = PERIODOS[periodo].dias;
-  const hoje = diaIsoSP(agora);
-  const painel = useMemo(() => {
-    const de = inicioDoDiaSP(somarDias(hoje, -dias + 1));
-    const deAntes = inicioDoDiaSP(somarDias(hoje, -2 * dias + 1));
-    const das = escolhida === "todas" ? campanhas : campanhas.filter((c) => c.id === escolhida);
-    const todos: EnvioDaCampanha[] = das.flatMap((c) => c.envios);
-    return {
-      envios: todos.filter((e) => e.enviadoEm !== null && e.enviadoEm >= de),
-      anteriores: todos.filter((e) => e.enviadoEm !== null && e.enviadoEm >= deAntes && e.enviadoEm < de),
-      serie: enviosPorDia(todos, hoje, Math.max(7, dias)),
-      variantes: das.length === 1 ? das[0].variantes : [],
-    };
-  }, [campanhas, escolhida, hoje, dias]);
+  const { dados: comEnvio } = useLeitura(`com-envio|${versao}`, () => fonte.campanhasComEnvio());
+  const { dados: painel } = useLeitura(`resultados|${escolhida}|${periodo}|${versao}`, () =>
+    fonte.resultados({ campanhaId: escolhida === "todas" ? null : escolhida, periodo }),
+  );
 
   // ── A tabela ──
   const [q, setQ] = useState("");
-  const busca = useDebounce(normalizar(q.trim()), 300);
+  const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaCampanha | null>(null);
-  const params = useMemo<ParamsDaTabela>(() => ({ busca, situacao }), [busca, situacao]);
-  const filtrar = useCallback(
-    (p: ParamsDaTabela) =>
-      campanhas.filter((c) => (p.situacao === null || c.situacao === p.situacao) && (!p.busca || normalizar(c.nome).includes(p.busca))),
-    [campanhas],
-  );
-  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
+  const ler = useCallback((pagina: number) => fonte.campanhas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}|${versao}`, ler);
+  const contagens = totais?.campanhas;
+  const todas = contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
 
   const topo = (
     <div className="flex flex-wrap items-center gap-2">
       {abas}
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        {comEnvio.length > 0 && (
+        {comEnvio && comEnvio.length > 0 && (
           <>
             <Select value={escolhida} onValueChange={setEscolhida}>
               <SelectTrigger className="w-56" aria-label="Campanha do painel" data-slot="resultados-filtro">
@@ -217,7 +196,7 @@ function AbaCampanhas({
     </div>
   );
 
-  if (campanhas.length === 0) {
+  if (totais && todas === 0) {
     return (
       <div className="flex flex-col gap-4">
         {topo}
@@ -240,16 +219,9 @@ function AbaCampanhas({
   return (
     <div className="flex flex-col gap-4">
       {topo}
-      <PainelDeResultados
-        modo="resumo"
-        envios={painel.envios}
-        anteriores={painel.anteriores}
-        contra={`os ${dias} dias anteriores`}
-        serie={painel.serie}
-        quantasVariantes={3}
-        variantes={painel.variantes}
-        legenda={PERIODOS[periodo].legenda}
-      />
+      {painel && (
+        <PainelDeResultados modo="resumo" dados={painel} contra={`os ${dias} dias anteriores`} variantes={[]} legenda={PERIODOS[periodo].legenda} />
+      )}
 
       <Card variant="conteudo" className="overflow-hidden" data-bloco="campanhas-tabela">
         <BarraDaTabela
@@ -266,11 +238,11 @@ function AbaCampanhas({
                 {
                   titulo: "Situação",
                   opcoes: [
-                    { chave: "todas", rotulo: "Todas", contagem: campanhas.length, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                    { chave: "todas", rotulo: "Todas", contagem: todas, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
                     ...SITUACOES.map((s) => ({
                       chave: s.chave,
                       rotulo: s.rotulo,
-                      contagem: campanhas.filter((c) => c.situacao === s.chave).length,
+                      contagem: contagens?.[s.chave] ?? 0,
                       marcado: situacao === s.chave,
                       aoEscolher: () => setSituacao(s.chave),
                     })),
@@ -286,11 +258,15 @@ function AbaCampanhas({
           grade={GRADE}
           colunas={["Campanha", "Situação", "Progresso", "Respostas", `${DIAS_DA_LINHA} dias`, "Quando", ""]}
         />
-        {itens.length === 0 ? (
-          <EstadoVazio tamanho="compacto" texto={busca ? `Nenhuma campanha com "${q.trim()}".` : "Nenhuma campanha nesta situação."} />
-        ) : (
+        <CorpoDaTabela
+          lido={tabela.lido}
+          erro={tabela.erro}
+          recarregar={tabela.recarregar}
+          quantas={tabela.itens.length}
+          vazio={busca ? `Nenhuma campanha com "${q.trim()}".` : "Nenhuma campanha nesta situação."}
+        >
           <ul className="divide-y divide-line-soft" data-slot="campanhas-lista">
-            {itens.map((c) => (
+            {tabela.itens.map((c) => (
               <LinhaDaCampanha
                 key={c.id}
                 campanha={c}
@@ -300,8 +276,8 @@ function AbaCampanhas({
               />
             ))}
           </ul>
-        )}
-        <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="campanhas" />
+        </CorpoDaTabela>
+        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanhas" />
       </Card>
     </div>
   );

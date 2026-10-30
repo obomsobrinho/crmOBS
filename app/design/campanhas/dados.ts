@@ -1,5 +1,5 @@
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
-import { OPCOES_PADRAO, diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
+import { OPCOES_PADRAO, VARIANTES_SUGERIDAS, diaDaSemanaSP, varianteDaOrdem } from "@/lib/prospeccao";
 import {
   leadsDoFiltro,
   type Busca,
@@ -17,12 +17,7 @@ import {
 const MIN = 60_000;
 const H = 60 * MIN;
 
-/** As três variantes sugeridas no brief (o dono aprova antes de usar). */
-export const VARIANTES_SUGERIDAS = [
-  "Oi, tudo bem? Sou o Franck, da OBS. Achei a {empresa} numa busca no Google. A gente monta sistemas sob medida que deixam o WhatsApp respondendo sozinho e tiram o trabalho repetido da rotina. Posso te mostrar em 2 minutos como ficaria aí?",
-  "Oi! Aqui é o Franck, da OBS. Vi a {empresa} no Google e fiquei curioso: quando um cliente chama no WhatsApp fora do horário, alguém responde? A gente monta um sistema que atende, organiza e agenda sozinho. Se fizer sentido, te mostro rapidinho.",
-  "Oi, tudo bem? Sou o Franck, da OBS. A gente cria sistemas sob medida pra tirar tarefa chata da rotina: atendimento no WhatsApp que responde sozinho, agenda, lembrete, controle. Vale uma conversa rápida pra eu entender como funciona aí na {empresa} hoje?",
-];
+export { VARIANTES_SUGERIDAS } from "@/lib/prospeccao";
 
 export const CONEXOES_DE_MENTIRA: ConexaoDisponivel[] = [
   { id: "obs", nome: "OBS", numero: "(33) 90000-0001", conectado: true },

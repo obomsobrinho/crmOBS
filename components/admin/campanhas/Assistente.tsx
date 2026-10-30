@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { Check, ChevronDown, CircleCheck, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -20,13 +20,18 @@ import {
   problemasDaVariante,
   textoParaLead,
 } from "@/lib/prospeccao";
+import { useDebounce } from "@/lib/use-debounce";
+import { Aviso } from "@/components/ui/aviso";
 import { haQuanto } from "./pecas";
-import { leadsDoFiltro, type Busca, type Campanha, type ConexaoDisponivel, type Lead } from "./tipos";
+import { useLeitura } from "./tabela";
+import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./tipos";
 
 // O ASSISTENTE de criação (referência: "Asset Group Setup", Dribbble 21751329):
 // passos no topo; cada seção é uma linha com o check e, à direita, o resumo do
 // que foi escolhido, e abre para editar; rodapé com "Salvo agora" e Cancelar /
-// Continuar. Todo campo salva o rascunho na hora: dá para sair no meio.
+// Continuar. Todo campo salva o rascunho (quem salva é a central, com uma pausa
+// curta para juntar a digitação): dá para sair no meio. A contagem de quem entra
+// vem da fonte, pela mesma regra do servidor que monta a fila ao iniciar.
 
 const PASSOS = ["Campanha", "Contatos", "Mensagem", "Confirmar"] as const;
 const HORA = 3_600_000;
@@ -150,26 +155,28 @@ function Rotulo({ children }: { children: React.ReactNode }) {
 
 function Assistente({
   campanha,
-  buscas,
-  leads,
-  campanhas,
+  fonte,
   conexoes,
   agora,
   montadoEm,
+  iniciando,
+  erro,
   aoMudar,
   aoSair,
   aoIniciar,
   irParaLeads,
 }: {
-  campanha: Campanha;
-  buscas: Busca[];
-  leads: Lead[];
-  campanhas: Campanha[];
+  campanha: CampanhaEditavel;
+  fonte: FonteDeCampanhas;
   conexoes: ConexaoDisponivel[];
   agora: number;
   /** Quando a tela abriu: salvo depois disso = "Salvo agora". */
   montadoEm: number;
-  aoMudar: (patch: Partial<Campanha>) => void;
+  /** Iniciar foi pedido e o servidor ainda não respondeu. */
+  iniciando: boolean;
+  /** Por que o servidor recusou iniciar, em uma frase. */
+  erro: string | null;
+  aoMudar: (patch: Partial<CampanhaEditavel>) => void;
   aoSair: () => void;
   aoIniciar: () => void;
   irParaLeads: () => void;
@@ -182,12 +189,15 @@ function Assistente({
     setAberta(p === 1 ? "nome" : p === 2 ? "lista" : p === 3 ? "v0" : null);
   };
 
-  const entram = useMemo(() => leadsDoFiltro(leads, campanha.filtro, campanhas), [leads, campanha.filtro, campanhas]);
-  const origem = campanha.filtro.quemNaoRespondeuDe ? campanhas.find((c) => c.id === campanha.filtro.quemNaoRespondeuDe) : null;
-  const buscaEscolhida = buscas.find((b) => b.id === campanha.filtro.buscaId);
+  const { dados: buscas } = useLeitura("buscas-do-assistente", () => fonte.buscasParaEscolher());
+  const filtro = useDebounce(campanha.filtro, 300);
+  const { dados: previa } = useLeitura(`previa|${JSON.stringify(filtro)}`, () => fonte.previaDoFiltro(filtro));
+  const quantos = previa?.total ?? 0;
+  const origem = campanha.filtro.quemNaoRespondeuDe ? { nome: previa?.origem ?? "a campanha de origem" } : null;
+  const buscaEscolhida = buscas?.find((b) => b.id === campanha.filtro.buscaId);
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
-  const dias = diasParaEnviar(entram.length);
-  const exemplo = entram[0]?.nome ?? "Clínica Exemplo";
+  const dias = diasParaEnviar(quantos);
+  const exemplo = previa?.primeiros[0] ?? "Clínica Exemplo";
 
   const inicio = campanha.agendadaPara ?? agora;
   const ultimoDia = dias > 0 ? somarDias(diaIsoSP(inicio), dias - 1) : null;
@@ -195,7 +205,7 @@ function Assistente({
 
   const completos = [
     campanha.nome.trim() !== "" && numero !== undefined && (campanha.agendadaPara === null || campanha.agendadaPara > agora),
-    entram.length > 0,
+    quantos > 0,
     campanha.variantes.length > 0 && problemas.every((p) => p.length === 0),
     true,
   ];
@@ -323,7 +333,7 @@ function Assistente({
                   id="lista"
                   titulo="Lista"
                   resumo={`${resumoDaLista}${origem ? "" : `, ${recortes.join(", ")}`}`}
-                  completa={entram.length > 0}
+                  completa={quantos > 0}
                   aberta={aberta === "lista"}
                   alternar={alternar("lista")}
                 >
@@ -355,7 +365,7 @@ function Assistente({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="todas">Todas as buscas</SelectItem>
-                            {buscas.map((b) => (
+                            {(buscas ?? []).map((b) => (
                               <SelectItem key={b.id} value={b.id} disabled={b.situacao !== "pronta"}>
                                 {b.termo} · {b.cidade}
                                 {b.situacao === "buscando" ? " (buscando)" : b.situacao === "falhou" ? " (falhou)" : ""}
@@ -392,15 +402,15 @@ function Assistente({
                   id="quem"
                   titulo="Quem entra"
                   resumo={
-                    entram.length === 0
+                    quantos === 0
                       ? "Ninguém ainda"
-                      : `${numeroBR(entram.length)} ${plural(entram.length, "lead", "leads")}, ${dias} ${plural(dias, "dia", "dias")}`
+                      : `${numeroBR(quantos)} ${plural(quantos, "lead", "leads")}, ${dias} ${plural(dias, "dia", "dias")}`
                   }
-                  completa={entram.length > 0}
+                  completa={quantos > 0}
                   aberta={aberta === "quem"}
                   alternar={alternar("quem")}
                 >
-                  {entram.length === 0 ? (
+                  {quantos === 0 ? (
                     <EstadoVazio
                       tamanho="compacto"
                       className="items-start p-0 text-left"
@@ -413,21 +423,21 @@ function Assistente({
                   ) : (
                     <div className="flex flex-col gap-4" data-slot="assistente-quem">
                       <p className="text-apoio text-ink-2">
-                        <span className="text-numero tabular-nums text-ink">{numeroBR(entram.length)}</span>{" "}
-                        {plural(entram.length, "lead", "leads")}. A {TETO_DIARIO} por dia, leva{" "}
+                        <span className="text-numero tabular-nums text-ink">{numeroBR(quantos)}</span>{" "}
+                        {plural(quantos, "lead", "leads")}. A {TETO_DIARIO} por dia, leva{" "}
                         <span className="font-semibold text-ink">
                           {dias} {plural(dias, "dia", "dias")}
                         </span>
                         .
                       </p>
                       <ul className="flex flex-wrap gap-1.5">
-                        {entram.slice(0, 8).map((l) => (
-                          <li key={l.id} className="rounded-full bg-bloco px-2.5 py-1 text-legenda text-ink-2">
-                            {l.nome}
+                        {(previa?.primeiros ?? []).slice(0, 8).map((nome, i) => (
+                          <li key={`${i}-${nome}`} className="rounded-full bg-bloco px-2.5 py-1 text-legenda text-ink-2">
+                            {nome}
                           </li>
                         ))}
-                        {entram.length > 8 && (
-                          <li className="px-1 py-1 text-legenda text-ink-3">e mais {numeroBR(entram.length - 8)}</li>
+                        {quantos > 8 && (
+                          <li className="px-1 py-1 text-legenda text-ink-3">e mais {numeroBR(quantos - 8)}</li>
                         )}
                       </ul>
                     </div>
@@ -518,7 +528,7 @@ function Assistente({
                 <Secao
                   id="r-contatos"
                   titulo="Contatos"
-                  resumo={`${numeroBR(entram.length)} ${plural(entram.length, "lead", "leads")}`}
+                  resumo={`${numeroBR(quantos)} ${plural(quantos, "lead", "leads")}`}
                   completa={completos[1]}
                   aberta={false}
                   alternar={() => irPara(2)}
@@ -539,6 +549,11 @@ function Assistente({
                   aberta={false}
                 />
               </ListaDeSecoes>
+              {erro && (
+                <Aviso tom="danger" data-bloco="assistente-erro">
+                  {erro}
+                </Aviso>
+              )}
             </>
           )}
         </div>
@@ -564,7 +579,7 @@ function Assistente({
                 Continuar
               </Button>
             ) : (
-              <Button onClick={aoIniciar} disabled={!tudoPronto} data-slot="assistente-iniciar">
+              <Button onClick={aoIniciar} disabled={!tudoPronto} carregando={iniciando} data-slot="assistente-iniciar">
                 {campanha.agendadaPara ? "Agendar" : "Iniciar"}
               </Button>
             )}

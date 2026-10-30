@@ -1,131 +1,180 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
-import { pontuarLead, telefoneDoLead, type OpcoesDaBusca } from "@/lib/prospeccao";
 import AbaLeads from "./AbaLeads";
 import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
-import { leadsDoFiltro, type Busca, type Campanha, type ConexaoDisponivel, type Lead, type Tela } from "./tipos";
+import { useLeitura } from "./tabela";
+import type { Busca, CampanhaEditavel, FonteDeCampanhas, Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
 // par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
 // buscas e de leads) e Campanhas (o painel de resultados, a tabela de
-// campanhas, o assistente e o detalhe). Hoje só o preview `/design/campanhas`
-// monta esta tela, com dados de mentira: buscar, marcar, salvar e iniciar mudam
-// só o estado da página.
+// campanhas, o assistente e o detalhe). Cada tela lê da `fonte` (as rotas
+// `/api/admin/campanhas/*` na página de verdade, a memória no preview); depois de
+// uma escrita a `versao` muda e as leituras voltam ao servidor. O rascunho do
+// assistente é salvo sozinho, uma pausa curta depois da última mudança.
+
+/** A pausa entre a última mudança no assistente e o salvamento do rascunho. */
+const PAUSA_DO_SALVAMENTO_MS = 600;
+
+function novoId(): string {
+  return crypto.randomUUID();
+}
 
 export default function CentralDeCampanhas({
   telaInicial,
   agora,
-  buscasIniciais,
-  leadsIniciais,
-  campanhasIniciais,
-  conexoes,
+  fonte,
   variantesSugeridas,
-  simularBusca,
 }: {
   telaInicial: Tela;
   agora: number;
-  buscasIniciais: Busca[];
-  leadsIniciais: Lead[];
-  campanhasIniciais: Campanha[];
-  conexoes: ConexaoDisponivel[];
+  fonte: FonteDeCampanhas;
   /** O texto pré-preenchido de uma campanha nova (o dono edita). */
   variantesSugeridas: string[];
-  /** A busca de mentira do preview; de verdade, a rota que dispara a fonte de leads. */
-  simularBusca: (buscaId: string, termo: string, cidade: string, inicio: number) => Lead[];
 }) {
   const [tela, setTela] = useState<Tela>(telaInicial);
-  const [buscas, setBuscas] = useState(buscasIniciais);
-  const [leads, setLeads] = useState(leadsIniciais);
-  const [campanhas, setCampanhas] = useState(campanhasIniciais);
-  /** O rascunho que mandou para Leads ("Falta lead? Fazer uma nova busca"). */
-  const [rascunhoEsperando, setRascunhoEsperando] = useState<string | null>(null);
+  const [versao, setVersao] = useState(0);
+  const mudou = useCallback(() => setVersao((v) => v + 1), []);
+  const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais());
+  const { dados: conexoes } = useLeitura("conexoes", () => fonte.conexoes());
 
-  const mudarCampanha = useCallback(
-    (id: string, patch: Partial<Campanha>) =>
-      setCampanhas((atual) => atual.map((c) => (c.id === id ? { ...c, ...patch, salvaEm: Date.now() } : c))),
+  // ── O rascunho aberto no assistente ──
+  const [rascunho, setRascunho] = useState<CampanhaEditavel | null>(null);
+  const [montadoEm, setMontadoEm] = useState(agora);
+  const [iniciando, setIniciando] = useState(false);
+  const [erroAoIniciar, setErroAoIniciar] = useState<string | null>(null);
+  /** O rascunho que mandou para Leads ("Falta lead? Fazer uma nova busca"). */
+  const [rascunhoEsperando, setRascunhoEsperando] = useState<CampanhaEditavel | null>(null);
+  const pendente = useRef<CampanhaEditavel | null>(null);
+
+  const salvarAgora = useCallback(async () => {
+    const c = pendente.current;
+    if (!c) return;
+    pendente.current = null;
+    try {
+      const salvaEm = await fonte.salvar(c);
+      setRascunho((atual) => (atual && atual.id === c.id ? { ...atual, salvaEm } : atual));
+    } catch (e) {
+      console.error("campanha, salvar rascunho:", e);
+    }
+  }, [fonte]);
+
+  useEffect(() => {
+    if (!rascunho || pendente.current === null) return;
+    const t = window.setTimeout(() => void salvarAgora(), PAUSA_DO_SALVAMENTO_MS);
+    return () => window.clearTimeout(t);
+  }, [rascunho, salvarAgora]);
+
+  const abrirRascunho = useCallback(
+    (c: CampanhaEditavel, salvar: boolean) => {
+      setMontadoEm(Date.now());
+      setErroAoIniciar(null);
+      setRascunho(c);
+      if (salvar) pendente.current = c;
+      setTela({ aba: "campanhas", vista: "editar", id: c.id });
+    },
     [],
   );
 
   const novoRascunho = useCallback(
-    (extra: Partial<Campanha>) => {
-      const id = `c${Date.now()}`;
-      const conectada = conexoes.find((c) => c.conectado) ?? null;
+    (extra: Partial<CampanhaEditavel>) => {
+      const conectada = conexoes?.find((c) => c.conectado) ?? conexoes?.[0] ?? null;
       const agoraMs = Date.now();
-      const rascunho: Campanha = {
-        id,
-        nome: "",
-        situacao: "rascunho",
-        agendadaPara: null,
-        conexaoId: conectada?.id ?? null,
-        filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
-        variantes: [...variantesSugeridas],
-        envios: [],
-        criadaEm: agoraMs,
-        salvaEm: agoraMs,
-        passo: 1,
-        ...extra,
-      };
-      setCampanhas((atual) => [rascunho, ...atual]);
-      setTela({ aba: "campanhas", vista: "editar", id });
+      abrirRascunho(
+        {
+          id: novoId(),
+          nome: "",
+          situacao: "rascunho",
+          agendadaPara: null,
+          conexaoId: conectada?.id ?? null,
+          filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+          variantes: [...variantesSugeridas],
+          criadaEm: agoraMs,
+          salvaEm: agoraMs,
+          passo: 1,
+          ...extra,
+        },
+        true,
+      );
     },
-    [conexoes, variantesSugeridas],
+    [abrirRascunho, conexoes, variantesSugeridas],
   );
 
-  const aoBuscar = useCallback(
-    (opcoes: OpcoesDaBusca) => {
-      const id = `b${Date.now()}`;
-      const termo = opcoes.termos.join(", ");
-      const cidade = opcoes.cidade;
-      setBuscas((atual) => [{ id, termo, cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null, opcoes }, ...atual]);
-      // A fonte de verdade avisa por webhook; aqui, alguns segundos de espera.
-      window.setTimeout(() => {
-        setLeads((atual) => {
-          const ja = new Set(atual.map((l) => telefoneDoLead(l.telefone)).filter(Boolean));
-          const achados = simularBusca(id, opcoes.termos[0], cidade, 3000 + atual.length);
-          const novos = achados.filter((l) => !ja.has(telefoneDoLead(l.telefone)));
-          setBuscas((b) => b.map((x) => (x.id === id ? { ...x, situacao: "pronta", total: achados.length } : x)));
-          return [...atual, ...novos];
-        });
-      }, 4000);
+  const editar = useCallback(
+    async (id: string) => {
+      try {
+        const aberta = await fonte.campanha(id);
+        if (aberta && aberta.campanha.situacao === "rascunho") abrirRascunho(aberta.campanha, false);
+        else if (aberta) setTela({ aba: "campanhas", vista: "detalhe", id });
+      } catch (e) {
+        console.error("campanha, abrir rascunho:", e);
+      }
     },
-    [simularBusca],
+    [abrirRascunho, fonte],
   );
 
-  const marcar = useCallback(
-    (id: string, marcacao: Lead["marcacao"]) => setLeads((atual) => atual.map((l) => (l.id === id ? { ...l, marcacao } : l))),
-    [],
-  );
+  // Aberta direto num rascunho (o link do preview `?tela=rascunho`): lê a campanha uma vez.
+  useEffect(() => {
+    if (telaInicial.aba !== "campanhas" || telaInicial.vista !== "editar") return;
+    let vivo = true;
+    fonte
+      .campanha(telaInicial.id)
+      .then((a) => {
+        if (vivo && a?.campanha.situacao === "rascunho") setRascunho(a.campanha);
+      })
+      .catch((e) => console.error("campanha, abrir rascunho:", e));
+    return () => {
+      vivo = false;
+    };
+  }, [fonte, telaInicial]);
 
-  const iniciar = useCallback(
-    (id: string) => {
-      const c = campanhas.find((x) => x.id === id);
-      if (!c) return;
-      // A fila sai na ordem da pontuação: os melhores leads recebem primeiro.
-      const fila = leadsDoFiltro(leads, c.filtro, campanhas).sort((a, b) => pontuarLead(b).pontos - pontuarLead(a).pontos);
-      const ids = new Set(fila.map((l) => l.id));
-      setLeads((atual) => atual.map((l) => (ids.has(l.id) ? { ...l, campanhaIds: [...l.campanhaIds, id] } : l)));
-      mudarCampanha(id, {
-        situacao: c.agendadaPara ? "agendada" : "rodando",
-        envios: fila.map((l) => ({ leadId: l.id, situacao: "na_fila", variante: null, enviadoEm: null, respondeuEm: null })),
-      });
-      setTela({ aba: "campanhas", vista: "detalhe", id });
-    },
-    [campanhas, leads, mudarCampanha],
-  );
+  const mudarRascunho = useCallback((patch: Partial<CampanhaEditavel>) => {
+    setRascunho((atual) => {
+      if (!atual) return atual;
+      const novo = { ...atual, ...patch };
+      pendente.current = novo;
+      return novo;
+    });
+  }, []);
 
-  const rascunho = useMemo(
-    () => (rascunhoEsperando ? (campanhas.find((c) => c.id === rascunhoEsperando) ?? null) : null),
-    [campanhas, rascunhoEsperando],
-  );
-  const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" ? campanhas.find((c) => c.id === tela.id) : undefined;
-  const emDetalhe = tela.aba === "campanhas" && tela.vista === "detalhe" ? campanhas.find((c) => c.id === tela.id) : undefined;
+  const sairDoAssistente = useCallback(async () => {
+    await salvarAgora();
+    setRascunho(null);
+    setTela({ aba: "campanhas", vista: "lista" });
+    mudou();
+  }, [mudou, salvarAgora]);
+
+  const iniciar = useCallback(async () => {
+    if (!rascunho) return;
+    setIniciando(true);
+    setErroAoIniciar(null);
+    try {
+      await salvarAgora();
+      const r = await fonte.iniciar(rascunho.id);
+      if (!r.ok) {
+        setErroAoIniciar(r.erro);
+        return;
+      }
+      setRascunho(null);
+      setTela({ aba: "campanhas", vista: "detalhe", id: rascunho.id });
+      mudou();
+    } catch (e) {
+      console.error("campanha, iniciar:", e);
+      setErroAoIniciar("Não deu para iniciar agora. O rascunho está salvo; tente de novo em instantes.");
+    } finally {
+      setIniciando(false);
+    }
+  }, [fonte, mudou, rascunho, salvarAgora]);
+
   const irParaCampanhas = () => setTela({ aba: "campanhas", vista: "lista" });
+  const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" && rascunho?.id === tela.id ? rascunho : null;
+  const nCampanhas = totais ? Object.values(totais.campanhas).reduce((a, b) => a + b, 0) : 0;
 
   // Leads | Campanhas: o par de abas no canto esquerdo da linha de cima de cada tela (dono, 29/10/2026).
   const abas = (
@@ -136,11 +185,11 @@ export default function CentralDeCampanhas({
       <TabsList variant="painel" aria-label="Seções">
         <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
           Leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(leads.length)}</span>
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
         </TabsTrigger>
         <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
           Campanhas
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(campanhas.length)}</span>
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -153,17 +202,18 @@ export default function CentralDeCampanhas({
         <section aria-label="Nova campanha" className="flex min-h-0 min-w-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line">
           <Assistente
             campanha={emEdicao}
-            buscas={buscas}
-            leads={leads}
-            campanhas={campanhas}
-            conexoes={conexoes}
+            fonte={fonte}
+            conexoes={conexoes ?? []}
             agora={agora}
-            montadoEm={agora}
-            aoMudar={(patch) => mudarCampanha(emEdicao.id, patch)}
-            aoSair={irParaCampanhas}
-            aoIniciar={() => iniciar(emEdicao.id)}
+            montadoEm={montadoEm}
+            iniciando={iniciando}
+            erro={erroAoIniciar}
+            aoMudar={mudarRascunho}
+            aoSair={sairDoAssistente}
+            aoIniciar={iniciar}
             irParaLeads={() => {
-              setRascunhoEsperando(emEdicao.id);
+              void salvarAgora();
+              setRascunhoEsperando(emEdicao);
               setTela({ aba: "leads", busca: null });
             }}
           />
@@ -179,43 +229,40 @@ export default function CentralDeCampanhas({
             {tela.aba === "leads" ? (
               <AbaLeads
                 abas={abas}
-                buscas={buscas}
-                leads={leads}
-                campanhas={campanhas}
+                fonte={fonte}
+                versao={versao}
+                totais={totais}
                 agora={agora}
                 buscaAberta={tela.busca}
-                rascunho={rascunho}
+                rascunho={rascunhoEsperando}
                 abrirBusca={(id) => setTela({ aba: "leads", busca: id })}
-                aoBuscar={aoBuscar}
-                marcar={marcar}
-                criarCampanhaDaBusca={(buscaId) => {
-                  const b = buscas.find((x) => x.id === buscaId);
-                  const nome = b ? `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}` : "";
-                  novoRascunho({ nome, filtro: { buscaId, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
+                aoMudar={mudou}
+                criarCampanhaDaBusca={(b: Busca) => {
+                  const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
+                  novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
                 }}
                 voltarAoRascunho={() => {
                   if (!rascunhoEsperando) return;
-                  setTela({ aba: "campanhas", vista: "editar", id: rascunhoEsperando });
+                  const id = rascunhoEsperando.id;
                   setRascunhoEsperando(null);
+                  void editar(id);
                 }}
               />
-            ) : emDetalhe ? (
+            ) : tela.vista === "detalhe" ? (
               <DetalheDaCampanha
                 abas={abas}
-                agora={agora}
-                campanha={emDetalhe}
-                leads={leads}
-                conexoes={conexoes}
+                fonte={fonte}
+                id={tela.id}
+                versao={versao}
+                conexoes={conexoes ?? []}
                 voltar={irParaCampanhas}
-                pausarOuRetomar={() =>
-                  mudarCampanha(emDetalhe.id, { situacao: emDetalhe.situacao === "pausada" ? "rodando" : "pausada" })
-                }
-                reenviarParaQuemNaoRespondeu={() =>
+                aoMudar={mudou}
+                reenviarParaQuemNaoRespondeu={(origem) =>
                   novoRascunho({
-                    nome: `${emDetalhe.nome}, segunda chance`,
-                    conexaoId: emDetalhe.conexaoId,
-                    variantes: [...emDetalhe.variantes],
-                    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: emDetalhe.id },
+                    nome: `${origem.nome}, segunda chance`,
+                    conexaoId: origem.conexaoId,
+                    variantes: [...origem.variantes],
+                    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: origem.id },
                     passo: 2,
                   })
                 }
@@ -223,11 +270,13 @@ export default function CentralDeCampanhas({
             ) : (
               <AbaCampanhas
                 abas={abas}
-                campanhas={campanhas}
-                conexoes={conexoes}
+                fonte={fonte}
+                versao={versao}
+                totais={totais}
+                conexoes={conexoes ?? []}
                 agora={agora}
                 abrir={(id) => setTela({ aba: "campanhas", vista: "detalhe", id })}
-                editar={(id) => setTela({ aba: "campanhas", vista: "editar", id })}
+                editar={(id) => void editar(id)}
                 nova={() => novoRascunho({})}
               />
             )}

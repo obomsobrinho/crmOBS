@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Selo } from "@/components/painel/pecas";
 import { calcularDelta } from "@/lib/delta";
@@ -9,12 +9,8 @@ import {
   AMOSTRA_MINIMA,
   DIAS_DA_SEMANA,
   indiceDaMelhorTaxa,
-  respostasPorEspera,
-  resultadoDaCampanha,
   textoDoDiaDeEnvio,
   textoDoTempo,
-  type DiaDeEnvio,
-  type EnvioParaResultado,
 } from "@/lib/prospeccao";
 import { FaixaDeNumeros, type CelulaDaFaixa } from "./faixa";
 import {
@@ -25,6 +21,7 @@ import {
   GraficoDeTaxaEmColunas,
   barrasDeTaxa,
 } from "./graficos";
+import type { Resultados } from "./tipos";
 
 // O PAINEL DE RESULTADOS, em dois modos, os dois cabendo acima da tabela numa
 // tela de 1440x900 (dono, 29/10/2026):
@@ -33,36 +30,27 @@ import {
 // - `campanha` (o detalhe, desde o início): a faixa com o progresso e o desfecho
 //   e as três comparações (mensagem, dia, horário) numa linha baixa. "Envios por
 //   dia" não entra aqui: dentro de uma campanha todo dia sai a mesma cota.
-// Tudo sai de `resultadoDaCampanha` (lib/prospeccao.ts).
+// Tudo chega dobrado na forma de `resultadoDaCampanha` (lib/prospeccao.ts): da
+// função SQL pelo gêmeo `resultadoDasLinhas`, ou da memória no preview.
 
 function PainelDeResultados({
   modo,
-  envios,
-  anteriores,
+  dados,
   contra,
-  serie,
-  quantasVariantes,
   variantes,
   legenda,
 }: {
   modo: "resumo" | "campanha";
-  /** Os envios da janela (ou da campanha inteira, na fila também). */
-  envios: EnvioParaResultado[];
-  /** Os da janela anterior igual, para os selos; null no detalhe de uma campanha. */
-  anteriores: EnvioParaResultado[] | null;
+  /** A janela (ou a campanha inteira, na fila também), a anterior para os selos e a série por dia. */
+  dados: Resultados;
   /** Contra o que se compara ("os 30 dias anteriores"). */
   contra: string;
-  /** Os envios por dia (o gráfico do resumo e os mini gráficos da faixa). */
-  serie: DiaDeEnvio[];
-  quantasVariantes: number;
   /** Os textos, quando é UMA campanha (no geral, "Variante 1" é a posição em cada campanha). */
   variantes: string[];
   /** "últimos 30 dias" ou "desde o início". */
   legenda: string;
 }) {
-  const r = useMemo(() => resultadoDaCampanha(envios, quantasVariantes), [envios, quantasVariantes]);
-  const antes = useMemo(() => (anteriores ? resultadoDaCampanha(anteriores, quantasVariantes) : null), [anteriores, quantasVariantes]);
-  const espera = useMemo(() => respostasPorEspera(envios), [envios]);
+  const { atual: r, anterior: antes, espera, serie } = dados;
 
   const melhorVariante = indiceDaMelhorTaxa(r.porVariante);
   const melhorDia = indiceDaMelhorTaxa(r.porDiaDaSemana);

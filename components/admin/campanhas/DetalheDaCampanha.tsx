@@ -1,20 +1,19 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Pause, Play, Repeat } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
-import { normalizar } from "@/lib/clientes";
 import { numeroBR } from "@/lib/format";
-import { diaIsoSP, diaMesHoraSP } from "@/lib/fuso";
-import { ROTULO_NA_CAMPANHA, diasParaEnviar, enviosPorDia, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
+import { diaMesHoraSP } from "@/lib/fuso";
+import { ROTULO_NA_CAMPANHA, diasParaEnviar, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, SeloNaCampanha, TopoDeDetalhe } from "./pecas";
-import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
-import type { Campanha, ConexaoDisponivel, EnvioDaCampanha, Lead } from "./tipos";
+import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
+import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./tipos";
 
 // O DETALHE de uma campanha: o mesmo painel de resultados da aba (desde o
 // início da campanha, sem "Envios por dia": todo dia sai a mesma cota) e a
@@ -27,36 +26,73 @@ const SITUACOES: SituacaoNaCampanha[] = ["respondeu", "enviado", "na_fila", "par
 
 function DetalheDaCampanha({
   abas,
-  agora,
-  campanha,
-  leads,
+  fonte,
+  id,
+  versao,
   conexoes,
   voltar,
-  pausarOuRetomar,
+  aoMudar,
   reenviarParaQuemNaoRespondeu,
 }: {
   abas: React.ReactNode;
-  agora: number;
-  campanha: Campanha;
-  leads: Lead[];
+  fonte: FonteDeCampanhas;
+  id: string;
+  /** Muda depois de cada escrita: o detalhe lê de novo. */
+  versao: number;
   conexoes: ConexaoDisponivel[];
   voltar: () => void;
-  pausarOuRetomar: () => void;
-  reenviarParaQuemNaoRespondeu: () => void;
+  /** Depois de pausar ou retomar (as outras telas leem de novo). */
+  aoMudar: () => void;
+  reenviarParaQuemNaoRespondeu: (origem: CampanhaEditavel) => void;
 }) {
+  const aberta = useLeitura(`campanha|${id}|${versao}`, () => fonte.campanha(id));
+  const { dados: resultados } = useLeitura(`resultados|${id}|${versao}`, () => fonte.resultados({ campanhaId: id, periodo: null }));
+  const [mudando, setMudando] = useState(false);
+
+  // ── A tabela ──
+  const [q, setQ] = useState("");
+  const busca = useDebounce(q.trim(), 300);
+  const [situacao, setSituacao] = useState<SituacaoNaCampanha | null>(null);
+  const ler = useCallback((pagina: number) => fonte.leadsDaCampanha(id, { texto: busca, situacao, pagina }), [fonte, id, busca, situacao]);
+  const tabela = usePaginaDaFonte(`${id}|${busca}|${situacao ?? ""}|${versao}`, ler);
+
+  if (!aberta.dados) {
+    return (
+      <div className="flex flex-col gap-4" data-slot="campanha-detalhe">
+        <div className="flex flex-wrap items-center gap-2">{abas}</div>
+        <Card variant="conteudo" className="py-4">
+          <EstadoVazio
+            tamanho="compacto"
+            texto={aberta.carregando ? "Carregando…" : aberta.erro ? "Não deu para abrir a campanha agora." : "Esta campanha não existe mais."}
+          >
+            <Button variant="outline" size="control" className="mt-2" onClick={aberta.erro ? aberta.recarregar : voltar}>
+              {aberta.erro ? "Tentar de novo" : "Voltar para Campanhas"}
+            </Button>
+          </EstadoVazio>
+        </Card>
+      </div>
+    );
+  }
+
+  const { campanha, contagens } = aberta.dados;
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
-  // Os dias da campanha (do primeiro envio até hoje, no máximo 30): os mini gráficos da faixa.
-  const hoje = diaIsoSP(agora);
-  const serie = useMemo(() => {
-    const primeiro = Math.min(...campanha.envios.map((e) => e.enviadoEm ?? Infinity));
-    const dias = Number.isFinite(primeiro) ? Math.min(30, Math.max(7, Math.round((agora - primeiro) / 86_400_000) + 1)) : 7;
-    return enviosPorDia(campanha.envios, hoje, dias);
-  }, [campanha.envios, hoje, agora]);
-  const porLead = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
-  const contagem = (s: SituacaoNaCampanha) => campanha.envios.filter((e) => e.situacao === s).length;
+  const contagem = (s: SituacaoNaCampanha) => contagens[s];
+  const totalDaCampanha = Object.values(contagens).reduce((x, y) => x + y, 0);
   const naFila = contagem("na_fila");
   const semResposta = contagem("enviado");
   const pode = campanha.situacao === "rodando" || campanha.situacao === "pausada" || campanha.situacao === "agendada";
+
+  const pausarOuRetomar = async () => {
+    setMudando(true);
+    try {
+      await (campanha.situacao === "pausada" ? fonte.retomar(campanha.id) : fonte.pausar(campanha.id));
+      aoMudar();
+    } catch (e) {
+      console.error("campanha, pausar ou retomar:", e);
+    } finally {
+      setMudando(false);
+    }
+  };
 
   const apoio = [
     numero ? `Pelo WhatsApp de ${numero.nome}` : "Sem número escolhido",
@@ -67,29 +103,13 @@ function DetalheDaCampanha({
         : "todos os leads já receberam",
   ].join(", ");
 
-  // ── A tabela ──
-  const [q, setQ] = useState("");
-  const busca = useDebounce(normalizar(q.trim()), 300);
-  const [situacao, setSituacao] = useState<SituacaoNaCampanha | null>(null);
-  const params = useMemo(() => ({ busca, situacao }), [busca, situacao]);
-  const filtrar = useCallback(
-    (p: { busca: string; situacao: SituacaoNaCampanha | null }) =>
-      campanha.envios.filter(
-        (e) =>
-          (p.situacao === null || e.situacao === p.situacao) &&
-          (!p.busca || normalizar(porLead.get(e.leadId)?.nome ?? "").includes(p.busca)),
-      ),
-    [campanha.envios, porLead],
-  );
-  const { itens, pagina, setPagina, total } = usePaginaDaMemoria<EnvioDaCampanha, typeof params>({ params, filtrar });
-
   return (
     <div className="flex flex-col gap-4" data-slot="campanha-detalhe">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {semResposta > 0 && (
-            <Button variant="outline" onClick={reenviarParaQuemNaoRespondeu} data-slot="campanha-reenviar">
+            <Button variant="outline" onClick={() => reenviarParaQuemNaoRespondeu(campanha)} data-slot="campanha-reenviar">
               <Repeat aria-hidden />
               Nova campanha com quem não respondeu
             </Button>
@@ -98,6 +118,7 @@ function DetalheDaCampanha({
             <Button
               variant={campanha.situacao === "pausada" ? "brand" : "outline"}
               onClick={pausarOuRetomar}
+              carregando={mudando}
               data-slot="campanha-pausar"
             >
               {campanha.situacao === "pausada" ? <Play aria-hidden /> : <Pause aria-hidden />}
@@ -115,16 +136,7 @@ function DetalheDaCampanha({
         apoio={`${apoio}.`}
       />
 
-      <PainelDeResultados
-        modo="campanha"
-        envios={campanha.envios}
-        anteriores={null}
-        contra=""
-        serie={serie}
-        quantasVariantes={campanha.variantes.length}
-        variantes={campanha.variantes}
-        legenda="desde o início"
-      />
+      {resultados && <PainelDeResultados modo="campanha" dados={resultados} contra="" variantes={campanha.variantes} legenda="desde o início" />}
 
       <Card variant="conteudo" className="overflow-hidden" data-bloco="campanha-leads">
         <BarraDaTabela
@@ -141,7 +153,7 @@ function DetalheDaCampanha({
                 {
                   titulo: "Situação",
                   opcoes: [
-                    { chave: "todos", rotulo: "Todos", contagem: campanha.envios.length, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                    { chave: "todos", rotulo: "Todos", contagem: totalDaCampanha, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
                     ...SITUACOES.filter((s) => contagem(s) > 0 || s === situacao).map((s) => ({
                       chave: s,
                       rotulo: ROTULO_NA_CAMPANHA[s],
@@ -158,12 +170,15 @@ function DetalheDaCampanha({
           <h3 className="text-cartao text-ink">Leads da campanha</h3>
         </BarraDaTabela>
         <CabecalhoDaTabela grade={GRADE} colunas={["Empresa", "Mensagem", "Enviada", "Respondeu", "Em", "Situação"]} />
-        {itens.length === 0 ? (
-          <EstadoVazio tamanho="compacto" texto="Nenhum lead com esse filtro." />
-        ) : (
+        <CorpoDaTabela
+          lido={tabela.lido}
+          erro={tabela.erro}
+          recarregar={tabela.recarregar}
+          quantas={tabela.itens.length}
+          vazio={busca ? `Nenhum lead com "${q.trim()}".` : "Nenhum lead com esse filtro."}
+        >
           <ul className="divide-y divide-line-soft" data-slot="campanha-leads">
-            {itens.map((e) => {
-              const l = porLead.get(e.leadId);
+            {tabela.itens.map((e) => {
               const espera =
                 e.enviadoEm !== null && e.respondeuEm !== null ? Math.round((e.respondeuEm - e.enviadoEm) / 60_000) : null;
               return (
@@ -174,8 +189,8 @@ function DetalheDaCampanha({
                   data-situacao={e.situacao}
                 >
                   <span className="min-w-0 basis-full xl:basis-auto">
-                    <span className="block truncate text-corpo font-semibold text-ink">{l?.nome ?? "Lead"}</span>
-                    <span className="block truncate text-legenda text-ink-3">{l ? `${l.bairro}, ${l.cidade}` : ""}</span>
+                    <span className="block truncate text-corpo font-semibold text-ink">{e.nome}</span>
+                    <span className="block truncate text-legenda text-ink-3">{[e.bairro, e.cidade].filter(Boolean).join(", ")}</span>
                   </span>
                   <span className="text-ink-2">{e.variante === null ? "" : `Variante ${e.variante + 1}`}</span>
                   <span className="tabular-nums text-ink-2">{e.enviadoEm ? diaMesHoraSP(e.enviadoEm) : ""}</span>
@@ -188,8 +203,8 @@ function DetalheDaCampanha({
               );
             })}
           </ul>
-        )}
-        <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="campanha-leads" />
+        </CorpoDaTabela>
+        <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanha-leads" />
       </Card>
     </div>
   );

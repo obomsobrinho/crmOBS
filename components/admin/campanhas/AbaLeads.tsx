@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
@@ -10,24 +10,19 @@ import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Aviso } from "@/components/ui/aviso";
 import { Medidor } from "@/components/ui/medidor";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { normalizar } from "@/lib/clientes";
 import { mascaraTelefoneBR, numeroBR, pct, plural } from "@/lib/format";
-import { diaIsoSP, diaMesHoraSP } from "@/lib/fuso";
+import { diaMesHoraSP } from "@/lib/fuso";
 import {
   FAIXAS_DE_NOTA,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
-  contagemPorSemana,
-  enviosPorDia,
-  resumoDaBase,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
-  siteDoLead,
-  telefoneDoLead,
   tipoDoTelefone,
   type DiaDeEnvio,
   type OpcoesDaBusca,
   type ResumoDaBase,
+  type SemanaContada,
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
@@ -36,21 +31,20 @@ import NovaBusca from "./NovaBusca";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
-import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
-import type { Busca, Campanha, Lead } from "./tipos";
+import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
+import type { Busca, BuscaDaTabela, CampanhaEditavel, ContagemDaBusca, FiltroDosLeads, FonteDeCampanhas, Lead, LeadDaTabela, Totais } from "./tipos";
 
 // LEADS, a base: o painel no topo (quantos, onde, quantos já contatados e quem
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,
 // com busca digitando e o botão de filtro. A busca abre o detalhe com os leads dela.
+// Tudo lido da fonte: páginas e contas no servidor, nunca a base no navegador.
 
-/** O resumo pela regra pura; quem respondeu sai das campanhas. */
-function resumir(leads: Lead[], responderam: Set<string>): ResumoDaBase {
-  return resumoDaBase(leads.map((l) => ({ ...l, campanhas: l.campanhaIds.length, respondeu: responderam.has(l.id) })));
-}
+/** De quanto em quanto tempo a tabela relê uma busca que ainda está rodando na fonte. */
+const RELER_BUSCA_MS = 10_000;
 
 // ── O painel da base ────────────────────────────────────────────────────
 
-type Semana = { inicio: string; n: number };
+type Semana = SemanaContada;
 
 const pontosDaSemana = (semanas: Semana[]) =>
   semanas.map((s) => ({ chave: s.inicio, rotulo: `Semana de ${s.inicio.slice(8, 10)}/${s.inicio.slice(5, 7)}`, valor: s.n }));
@@ -221,31 +215,13 @@ function PainelDaBusca({ r, respostasPorDia }: { r: ResumoDaBase; respostasPorDi
 const GRADE_BUSCAS =
   "xl:grid xl:grid-cols-[minmax(0,2.2fr)_110px_repeat(3,minmax(0,0.8fr))_minmax(0,1.4fr)_minmax(0,0.9fr)_20px] xl:items-center xl:gap-5";
 
-interface ContagemDaBusca {
-  total: number;
-  comCelular: number;
-  bons: number;
-  contatados: number;
-  responderam: number;
-}
-
-function contar(leads: Lead[], responderam: Set<string>): ContagemDaBusca {
-  return {
-    total: leads.length,
-    comCelular: leads.filter((l) => telefoneDoLead(l.telefone) !== null).length,
-    bons: leads.filter((l) => l.marcacao === "bom").length,
-    contatados: leads.filter((l) => l.campanhaIds.length > 0).length,
-    responderam: leads.filter((l) => responderam.has(l.id)).length,
-  };
-}
-
 function LinhaDaBusca({
   busca,
   contagem,
   agora,
   abrir,
 }: {
-  busca: Busca;
+  busca: BuscaDaTabela;
   contagem: ContagemDaBusca;
   agora: number;
   abrir: () => void;
@@ -321,36 +297,46 @@ const SITUACOES_DA_BUSCA: SituacaoDaBusca[] = ["pronta", "buscando", "falhou"];
 
 function TabelaDeBuscas({
   esquerda,
-  buscas,
-  leads,
-  responderam,
+  fonte,
+  versao,
+  contagens,
   agora,
   abrir,
+  aoTerminarBusca,
 }: {
   esquerda: React.ReactNode;
-  buscas: Busca[];
-  leads: Lead[];
-  responderam: Set<string>;
+  fonte: FonteDeCampanhas;
+  versao: number;
+  contagens: Record<SituacaoDaBusca, number> | null;
   agora: number;
   abrir: (id: string) => void;
+  /** Uma busca da página saiu de "buscando": o painel e as contagens leem de novo. */
+  aoTerminarBusca: () => void;
 }) {
   const [q, setQ] = useState("");
-  const busca = useDebounce(normalizar(q.trim()), 300);
+  const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
-  const params = useMemo(() => ({ busca, situacao }), [busca, situacao]);
-  const filtrar = useCallback(
-    (p: { busca: string; situacao: SituacaoDaBusca | null }) =>
-      buscas.filter(
-        (b) => (p.situacao === null || b.situacao === p.situacao) && (!p.busca || normalizar(`${b.termo} ${b.cidade}`).includes(p.busca)),
-      ),
-    [buscas],
-  );
-  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
-  const porBusca = useMemo(() => {
-    const m = new Map<string, Lead[]>();
-    for (const l of leads) m.set(l.buscaId, [...(m.get(l.buscaId) ?? []), l]);
-    return m;
-  }, [leads]);
+  const ler = useCallback((pagina: number) => fonte.buscas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}|${versao}`, ler);
+  const { itens, recarregar } = tabela;
+  const buscando = itens.filter((b) => b.situacao === "buscando").map((b) => b.id);
+  const chaveBuscando = buscando.join(",");
+
+  // Uma busca rodando na fonte: relê a página de tempos em tempos (aba visível), sem tempo real.
+  useEffect(() => {
+    if (!chaveBuscando) return;
+    const t = window.setInterval(() => {
+      if (document.visibilityState === "visible") recarregar();
+    }, RELER_BUSCA_MS);
+    return () => window.clearInterval(t);
+  }, [chaveBuscando, recarregar]);
+  const antes = useRef<string[]>([]);
+  useEffect(() => {
+    const terminou = antes.current.some((id) => !buscando.includes(id));
+    antes.current = buscando;
+    if (terminou) aoTerminarBusca();
+  });
+  const todas = contagens ? Object.values(contagens).reduce((x, y) => x + y, 0) : 0;
 
   return (
     <>
@@ -368,11 +354,11 @@ function TabelaDeBuscas({
               {
                 titulo: "Situação",
                 opcoes: [
-                  { chave: "todas", rotulo: "Todas", contagem: buscas.length, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
+                  { chave: "todas", rotulo: "Todas", contagem: todas, marcado: situacao === null, aoEscolher: () => setSituacao(null) },
                   ...SITUACOES_DA_BUSCA.map((s) => ({
                     chave: s,
                     rotulo: ROTULO_DA_BUSCA[s],
-                    contagem: buscas.filter((b) => b.situacao === s).length,
+                    contagem: contagens?.[s] ?? 0,
                     marcado: situacao === s,
                     aoEscolher: () => setSituacao(s),
                   })),
@@ -385,23 +371,27 @@ function TabelaDeBuscas({
         {esquerda}
       </BarraDaTabela>
       <CabecalhoDaTabela grade={GRADE_BUSCAS} colunas={["Busca", "Situação", "Achadas", "Com celular", "Bons", "Contatados", "Quando", ""]} />
-      {itens.length === 0 ? (
-        <EstadoVazio tamanho="compacto" texto={busca ? `Nenhuma busca com "${q.trim()}".` : "Nenhuma busca nesta situação."} />
-      ) : (
+      <CorpoDaTabela
+        lido={tabela.lido}
+        erro={tabela.erro}
+        recarregar={recarregar}
+        quantas={itens.length}
+        vazio={busca ? `Nenhuma busca com "${q.trim()}".` : "Nenhuma busca nesta situação."}
+      >
         <ul className="divide-y divide-line-soft" data-slot="leads-buscas">
           {itens.map((b) => (
-            <LinhaDaBusca key={b.id} busca={b} contagem={contar(porBusca.get(b.id) ?? [], responderam)} agora={agora} abrir={() => abrir(b.id)} />
+            <LinhaDaBusca key={b.id} busca={b} contagem={b.contagem} agora={agora} abrir={() => abrir(b.id)} />
           ))}
         </ul>
-      )}
-      <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="buscas" />
+      </CorpoDaTabela>
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" />
     </>
   );
 }
 
 // ── A tabela de leads (todos, ou os de uma busca) ──────────────────────
 
-type Filtro = "nao_contatados" | "bons" | "sem_site" | "nota";
+type Filtro = FiltroDosLeads;
 
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "nao_contatados", rotulo: "Não contatados" },
@@ -412,12 +402,6 @@ const FILTROS: { chave: Filtro; rotulo: string }[] = [
 
 const GRADE_LEADS =
   "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_112px] xl:items-center xl:gap-4";
-
-interface ParamsDosLeads {
-  busca: string;
-  cidade: string | null;
-  filtros: Filtro[];
-}
 
 function Telefone({ telefone }: { telefone: string | null }) {
   const tipo = tipoDoTelefone(telefone);
@@ -434,17 +418,8 @@ function Telefone({ telefone }: { telefone: string | null }) {
   );
 }
 
-function LinhaDoLead({
-  lead,
-  campanhas,
-  respondeu,
-  marcar,
-}: {
-  lead: Lead;
-  campanhas: Map<string, Campanha>;
-  respondeu: boolean;
-  marcar: (m: Lead["marcacao"]) => void;
-}) {
+function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["marcacao"]) => void }) {
+  const { respondeu } = lead;
   const descartado = lead.marcacao === "descartado";
   return (
     <li
@@ -485,14 +460,14 @@ function LinhaDoLead({
       <div className="flex min-w-0 flex-wrap gap-1.5">
         {lead.parouEm !== null ? (
           <Badge variant="estado-aviso">Pediu para parar</Badge>
-        ) : lead.campanhaIds.length === 0 ? (
+        ) : lead.campanhas.length === 0 ? (
           <span className="text-apoio text-ink-3">Nenhuma</span>
         ) : (
           <>
             {respondeu && <Badge variant="estado-bom">Respondeu</Badge>}
-            {lead.campanhaIds.map((id) => (
-              <Badge key={id} variant="contorno" data-slot="lead-campanha" className="max-w-full truncate">
-                {campanhas.get(id)?.nome ?? "Campanha"}
+            {lead.campanhas.map((c) => (
+              <Badge key={c.id} variant="contorno" data-slot="lead-campanha" className="max-w-full truncate">
+                {c.nome || "Campanha sem nome"}
               </Badge>
             ))}
           </>
@@ -526,42 +501,47 @@ function LinhaDoLead({
 
 function TabelaDeLeads({
   esquerda,
-  leads,
-  campanhas,
-  responderam,
-  marcar,
+  fonte,
+  versao,
+  buscaId,
 }: {
   esquerda: React.ReactNode;
-  /** O escopo: todos os leads, ou os de uma busca. */
-  leads: Lead[];
-  campanhas: Campanha[];
-  responderam: Set<string>;
-  marcar: (id: string, m: Lead["marcacao"]) => void;
+  fonte: FonteDeCampanhas;
+  versao: number;
+  /** O escopo: todos os leads (null), ou os de uma busca. */
+  buscaId: string | null;
 }) {
   const [q, setQ] = useState("");
-  const busca = useDebounce(normalizar(q.trim()), 300);
+  const busca = useDebounce(q.trim(), 300);
   const [cidade, setCidade] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<Filtro[]>([]);
-  const cidades = useMemo(() => [...new Set(leads.map((l) => l.cidade))].sort((a, b) => a.localeCompare(b, "pt-BR")), [leads]);
-  const params = useMemo<ParamsDosLeads>(() => ({ busca, cidade, filtros }), [busca, cidade, filtros]);
-  const filtrar = useCallback(
-    (p: ParamsDosLeads) => {
-      const digitos = p.busca.replace(/\D/g, "");
-      return leads.filter(
-        (l) =>
-          (!p.busca || normalizar(l.nome).includes(p.busca) || (digitos.length >= 3 && (l.telefone ?? "").includes(digitos))) &&
-          (p.cidade === null || l.cidade === p.cidade) &&
-          (!p.filtros.includes("nao_contatados") || l.campanhaIds.length === 0) &&
-          (!p.filtros.includes("bons") || l.marcacao === "bom") &&
-          (!p.filtros.includes("sem_site") || siteDoLead(l.site) !== "sim") &&
-          (!p.filtros.includes("nota") || (l.nota ?? 0) >= 4.5),
-      );
-    },
-    [leads],
+  const { dados: cidades } = useLeitura(`cidades|${buscaId ?? ""}|${versao}`, () => fonte.cidades(buscaId));
+  const ler = useCallback(
+    (pagina: number) => fonte.leads({ buscaId, texto: busca, cidade, filtros, pagina }),
+    [fonte, buscaId, busca, cidade, filtros],
   );
-  const { itens, pagina, setPagina, total } = usePaginaDaMemoria({ params, filtrar });
-  const porCampanha = useMemo(() => new Map(campanhas.map((c) => [c.id, c])), [campanhas]);
+  const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}|${versao}`, ler);
+  const { mudarItem } = tabela;
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
+  const marcar = useCallback(
+    async (id: string, m: Lead["marcacao"]) => {
+      // A linha muda na hora; se o servidor recusar, volta ao que era.
+      let antes: Lead["marcacao"] = null;
+      mudarItem((l) => {
+        if (l.id !== id) return l;
+        antes = l.marcacao;
+        return { ...l, marcacao: m };
+      });
+      try {
+        const salva = await fonte.marcar(id, m);
+        mudarItem((l) => (l.id === id ? { ...l, marcacao: salva } : l));
+      } catch (e) {
+        console.error("lead, marcar:", e);
+        mudarItem((l) => (l.id === id ? { ...l, marcacao: antes } : l));
+      }
+    },
+    [fonte, mudarItem],
+  );
 
   const grupos = [
     {
@@ -569,7 +549,7 @@ function TabelaDeLeads({
       multiplo: true,
       opcoes: FILTROS.map((f) => ({ chave: f.chave, rotulo: f.rotulo, marcado: filtros.includes(f.chave), aoEscolher: () => alternar(f.chave) })),
     },
-    ...(cidades.length > 1
+    ...(cidades && cidades.length > 1
       ? [
           {
             titulo: "Cidade",
@@ -602,22 +582,20 @@ function TabelaDeLeads({
         {esquerda}
       </BarraDaTabela>
       <CabecalhoDaTabela grade={GRADE_LEADS} colunas={["Empresa", "Google", "Site", "Telefone", "Pontos", "Campanhas", ""]} />
-      {itens.length === 0 ? (
-        <EstadoVazio tamanho="compacto" texto="Nenhum lead com esses filtros." />
-      ) : (
+      <CorpoDaTabela
+        lido={tabela.lido}
+        erro={tabela.erro}
+        recarregar={tabela.recarregar}
+        quantas={tabela.itens.length}
+        vazio={busca ? `Nenhum lead com "${q.trim()}".` : "Nenhum lead com esses filtros."}
+      >
         <ul className="divide-y divide-line-soft" data-slot="leads-tabela">
-          {itens.map((l) => (
-            <LinhaDoLead
-              key={l.id}
-              lead={l}
-              campanhas={porCampanha}
-              respondeu={responderam.has(l.id)}
-              marcar={(m) => marcar(l.id, m)}
-            />
+          {tabela.itens.map((l) => (
+            <LinhaDoLead key={l.id} lead={l} marcar={(m) => marcar(l.id, m)} />
           ))}
         </ul>
-      )}
-      <RodapeDaTabela pagina={pagina} total={total} aoMudar={setPagina} slot="leads" />
+      </CorpoDaTabela>
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" />
     </>
   );
 }
@@ -626,53 +604,40 @@ function TabelaDeLeads({
 
 function HomeDosLeads({
   abas,
-  buscas,
-  leads,
-  campanhas,
-  responderam,
+  fonte,
+  versao,
+  totais,
   agora,
   rascunho,
   abrir,
   novaBusca,
-  marcar,
   voltarAoRascunho,
+  aoTerminarBusca,
 }: {
   abas: React.ReactNode;
-  buscas: Busca[];
-  leads: Lead[];
-  campanhas: Campanha[];
-  responderam: Set<string>;
+  fonte: FonteDeCampanhas;
+  versao: number;
+  totais: Totais | null;
   agora: number;
-  rascunho: Campanha | null;
+  rascunho: CampanhaEditavel | null;
   abrir: (id: string) => void;
   novaBusca: () => void;
-  marcar: (id: string, m: Lead["marcacao"]) => void;
   voltarAoRascunho: () => void;
+  aoTerminarBusca: () => void;
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
-  const r = useMemo(() => resumir(leads, responderam), [leads, responderam]);
-  const novosPorSemana = useMemo(() => {
-    const quando = new Map(buscas.map((b) => [b.id, b.criadaEm]));
-    return contagemPorSemana(
-      leads.map((l) => quando.get(l.buscaId) ?? agora),
-      agora,
-      8,
-    );
-  }, [buscas, leads, agora]);
-  const enviosPorSemana = useMemo(
-    () => contagemPorSemana(campanhas.flatMap((c) => c.envios.map((e) => e.enviadoEm).filter((t): t is number => t !== null)), agora, 8),
-    [campanhas, agora],
-  );
+  const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null));
+  const nBuscas = totais ? Object.values(totais.buscas).reduce((x, y) => x + y, 0) : 0;
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
         <TabsTrigger value="buscas" variant="painel" data-slot="leads-ver-buscas">
           Buscas
-          <span className="ml-1.5 tabular-nums text-ink-3">{buscas.length}</span>
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nBuscas)}</span>
         </TabsTrigger>
         <TabsTrigger value="leads" variant="painel" data-slot="leads-ver-todos">
           Todos os leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(leads.length)}</span>
+          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -698,7 +663,7 @@ function HomeDosLeads({
         </Aviso>
       )}
 
-      {buscas.length === 0 ? (
+      {totais && nBuscas === 0 ? (
         <Card variant="conteudo" className="py-4">
           <EstadoVazio
             icone={Search}
@@ -713,19 +678,20 @@ function HomeDosLeads({
         </Card>
       ) : (
         <>
-          <PainelDaBase r={r} novosPorSemana={novosPorSemana} enviosPorSemana={enviosPorSemana} />
+          {painel && <PainelDaBase r={painel.resumo} novosPorSemana={painel.novosPorSemana} enviosPorSemana={painel.enviosPorSemana} />}
           <Card variant="conteudo" className="overflow-hidden" data-bloco="leads-tabela">
             {vista === "buscas" ? (
               <TabelaDeBuscas
                 esquerda={seletorDaVista}
-                buscas={buscas}
-                leads={leads}
-                responderam={responderam}
+                fonte={fonte}
+                versao={versao}
+                contagens={totais?.buscas ?? null}
                 agora={agora}
                 abrir={abrir}
+                aoTerminarBusca={aoTerminarBusca}
               />
             ) : (
-              <TabelaDeLeads esquerda={seletorDaVista} leads={leads} campanhas={campanhas} responderam={responderam} marcar={marcar} />
+              <TabelaDeLeads esquerda={seletorDaVista} fonte={fonte} versao={versao} buscaId={null} />
             )}
           </Card>
         </>
@@ -736,36 +702,20 @@ function HomeDosLeads({
 
 function DetalheDaBusca({
   abas,
-  agora,
+  fonte,
+  versao,
   busca,
-  leads,
-  campanhas,
-  responderam,
   voltar,
-  marcar,
   criarCampanha,
 }: {
   abas: React.ReactNode;
-  agora: number;
+  fonte: FonteDeCampanhas;
+  versao: number;
   busca: Busca;
-  leads: Lead[];
-  campanhas: Campanha[];
-  responderam: Set<string>;
   voltar: () => void;
-  marcar: (id: string, m: Lead["marcacao"]) => void;
   criarCampanha: () => void;
 }) {
-  const daBusca = useMemo(() => leads.filter((l) => l.buscaId === busca.id), [leads, busca.id]);
-  const resumoDaBusca = useMemo(() => resumir(daBusca, responderam), [daBusca, responderam]);
-  // As respostas dos leads desta busca por dia (os últimos 14), no dia do envio.
-  const respostasPorDia = useMemo(() => {
-    const ids = new Set(daBusca.map((l) => l.id));
-    return enviosPorDia(
-      campanhas.flatMap((cp) => cp.envios.filter((e) => ids.has(e.leadId))),
-      diaIsoSP(agora),
-      14,
-    );
-  }, [daBusca, campanhas, agora]);
+  const { dados: painel } = useLeitura(`painel-busca|${busca.id}|${versao}`, () => fonte.painelDaBase(busca.id));
   return (
     <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
@@ -786,16 +736,10 @@ function DetalheDaBusca({
         apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, `${busca.cidade}, ${busca.opcoes.uf}`, ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
       />
 
-      <PainelDaBusca r={resumoDaBusca} respostasPorDia={respostasPorDia} />
+      {painel && <PainelDaBusca r={painel.resumo} respostasPorDia={painel.respostasPorDia} />}
 
       <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
-        <TabelaDeLeads
-          esquerda={<h3 className="text-cartao text-ink">Leads</h3>}
-          leads={daBusca}
-          campanhas={campanhas}
-          responderam={responderam}
-          marcar={marcar}
-        />
+        <TabelaDeLeads esquerda={<h3 className="text-cartao text-ink">Leads</h3>} fonte={fonte} versao={versao} buscaId={busca.id} />
       </Card>
     </div>
   );
@@ -805,75 +749,79 @@ function DetalheDaBusca({
 
 function AbaLeads({
   abas,
-  buscas,
-  leads,
-  campanhas,
+  fonte,
+  versao,
+  totais,
   agora,
   buscaAberta,
   rascunho,
   abrirBusca,
-  aoBuscar,
-  marcar,
+  aoMudar,
   criarCampanhaDaBusca,
   voltarAoRascunho,
 }: {
   /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
   abas: React.ReactNode;
-  buscas: Busca[];
-  leads: Lead[];
-  campanhas: Campanha[];
+  fonte: FonteDeCampanhas;
+  /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
+  versao: number;
+  totais: Totais | null;
   agora: number;
   buscaAberta: string | null;
-  rascunho: Campanha | null;
+  rascunho: CampanhaEditavel | null;
   abrirBusca: (id: string | null) => void;
-  aoBuscar: (o: OpcoesDaBusca) => void;
-  marcar: (id: string, m: Lead["marcacao"]) => void;
-  criarCampanhaDaBusca: (buscaId: string) => void;
+  /** Depois de uma escrita que muda números de outras telas (nova busca, busca que terminou). */
+  aoMudar: () => void;
+  criarCampanhaDaBusca: (busca: Busca) => void;
   voltarAoRascunho: () => void;
 }) {
   const [dialogo, setDialogo] = useState(false);
-  const busca = buscas.find((b) => b.id === buscaAberta) ?? null;
-  const responderam = useMemo(
-    () => new Set(campanhas.flatMap((c) => c.envios.filter((e) => e.respondeuEm !== null).map((e) => e.leadId))),
-    [campanhas],
-  );
+  const [falha, setFalha] = useState<string | null>(null);
+  const aberta = useLeitura(`busca|${buscaAberta ?? ""}`, () => (buscaAberta ? fonte.busca(buscaAberta) : Promise.resolve(null)));
+  const busca = buscaAberta && aberta.dados?.id === buscaAberta ? aberta.dados : null;
+  const buscar = async (o: OpcoesDaBusca) => {
+    setDialogo(false);
+    setFalha(null);
+    try {
+      const r = await fonte.novaBusca(o);
+      if (!r.ok) setFalha(r.erro);
+    } catch (e) {
+      console.error("nova busca:", e);
+      setFalha("Não deu para começar a busca agora. Tente de novo em instantes.");
+    }
+    aoMudar();
+  };
   return (
     <>
+      {falha && (
+        <Aviso tom="danger" forma="faixa" className="mb-4" data-bloco="leads-falha">
+          {falha}
+        </Aviso>
+      )}
       {busca ? (
         <DetalheDaBusca
           abas={abas}
-          agora={agora}
+          fonte={fonte}
+          versao={versao}
           busca={busca}
-          leads={leads}
-          campanhas={campanhas}
-          responderam={responderam}
           voltar={() => abrirBusca(null)}
-          marcar={marcar}
-          criarCampanha={() => criarCampanhaDaBusca(busca.id)}
+          criarCampanha={() => criarCampanhaDaBusca(busca)}
         />
       ) : (
         <HomeDosLeads
           abas={abas}
-          buscas={buscas}
-          leads={leads}
-          campanhas={campanhas}
-          responderam={responderam}
+          fonte={fonte}
+          versao={versao}
+          totais={totais}
           agora={agora}
           rascunho={rascunho}
           abrir={abrirBusca}
           novaBusca={() => setDialogo(true)}
-          marcar={marcar}
           voltarAoRascunho={voltarAoRascunho}
+          aoTerminarBusca={aoMudar}
         />
       )}
-      <NovaBusca
-        aberto={dialogo}
-        aoMudar={setDialogo}
-        aoBuscar={(o) => {
-          setDialogo(false);
-          aoBuscar(o);
-        }}
-      />
+      <NovaBusca aberto={dialogo} aoMudar={setDialogo} aoBuscar={buscar} />
     </>
   );
 }

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, CalendarX2, MessageCircleWarning, RefreshCw } from "lucide-react";
+import { Building2, CalendarX2, Megaphone, MessageCircleWarning, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { agoraMs } from "@/lib/periodo";
 import { Button } from "@/components/ui/button";
@@ -101,11 +101,16 @@ export default function ListaCentral({
         <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
           <div className="flex items-center gap-2">
             <h1 className="text-titulo">Clientes</h1>
+            <Button asChild variant="outline" size="control" className="ml-auto" data-slot="central-campanhas">
+              <Link href="/campanhas">
+                <Megaphone size={14} />
+                Campanhas
+              </Link>
+            </Button>
             <Button
               variant="outline"
               size="control"
               data-slot="central-atualizar"
-              className="ml-auto"
               carregando={carregando}
               onClick={() => void revalidar()}
             >

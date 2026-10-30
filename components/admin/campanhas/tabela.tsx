@@ -1,37 +1,85 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { CampoBusca } from "@/components/ui/campo-busca";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Paginacao } from "@/components/ui/paginacao";
 import { cn } from "@/lib/utils";
+import type { Pagina } from "./tipos";
 
 // AS TABELAS de Campanhas (campanhas, buscas, leads): a barra de cima (busca
 // digitando e o botão de filtro, igual a Clientes), o cabeçalho de colunas e a
 // paginação numerada embaixo (29/10/2026, dono: páginas de 10, "Mostrando 11 a
-// 20 de 137"). De verdade cada página é uma rota (página e total por contagem
-// no servidor); no preview a página sai da memória pela mesma forma.
+// 20 de 137"). Cada página é uma leitura da fonte (página e total por contagem no
+// servidor; no preview, a fonte de mentira em memória responde igual).
 
 export const POR_PAGINA = 10;
 
 /**
- * Uma página do recorte da memória. Trocar o recorte (`params`) volta para a
- * página 1; a página nunca passa da última (um filtro que encolhe a lista).
+ * UMA LEITURA da fonte, de novo a cada `chave` nova (os parâmetros dela em texto)
+ * ou `recarregar`. Enquanto a próxima chega, a anterior continua na tela (a tabela
+ * não pisca). Resposta de uma leitura já trocada é jogada fora. `mudar` corrige o
+ * que está na tela sem ler de novo (marcar um lead muda só aquela linha).
  */
-export function usePaginaDaMemoria<T, P>({ params, filtrar }: { params: P; filtrar: (p: P) => T[] }) {
+export function useLeitura<T>(chave: string, ler: () => Promise<T>) {
+  const lerAtual = useRef(ler);
+  useEffect(() => {
+    lerAtual.current = ler;
+  });
+  const [estado, setEstado] = useState<{ dados: T | null; erro: boolean; lida: string | null }>({ dados: null, erro: false, lida: null });
+  const [tentativa, setTentativa] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    lerAtual
+      .current()
+      .then((dados) => {
+        if (vivo) setEstado({ dados, erro: false, lida: chave });
+      })
+      .catch((e) => {
+        console.error("campanhas, leitura:", e);
+        if (vivo) setEstado((cur) => ({ ...cur, erro: true, lida: chave }));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [chave, tentativa]);
+  const recarregar = useCallback(() => setTentativa((n) => n + 1), []);
+  const mudar = useCallback((f: (d: T) => T) => setEstado((cur) => (cur.dados === null ? cur : { ...cur, dados: f(cur.dados) })), []);
+  return { dados: estado.dados, erro: estado.erro, carregando: estado.lida !== chave, recarregar, mudar };
+}
+
+/**
+ * Uma PÁGINA da fonte (10 por página, total contado no servidor). Trocar o recorte
+ * (`chave`) volta para a página 1; uma página que ficou além do fim (um filtro que
+ * encolheu a lista) volta para a última.
+ */
+export function usePaginaDaFonte<T>(chave: string, ler: (pagina: number) => Promise<Pagina<T>>) {
   const [pagina, setPagina] = useState(1);
-  const [paramsVistos, setParamsVistos] = useState(params);
-  if (params !== paramsVistos) {
-    setParamsVistos(params);
+  const [chaveVista, setChaveVista] = useState(chave);
+  if (chave !== chaveVista) {
+    setChaveVista(chave);
     setPagina(1);
   }
-  const lista = filtrar(params);
-  const ultima = Math.max(1, Math.ceil(lista.length / POR_PAGINA));
-  const atual = Math.min(pagina, ultima);
+  const lida = useLeitura(`${chave}|${pagina}`, () => ler(pagina));
+  const total = lida.dados?.total ?? 0;
+  const ultima = Math.max(1, Math.ceil(total / POR_PAGINA));
+  if (lida.dados && !lida.carregando && pagina > ultima) setPagina(ultima);
+  const { mudar } = lida;
+  const mudarItem = useCallback(
+    (f: (item: T) => T) => mudar((d) => ({ ...d, itens: d.itens.map(f) })),
+    [mudar],
+  );
   return {
-    itens: lista.slice((atual - 1) * POR_PAGINA, atual * POR_PAGINA),
-    pagina: atual,
+    itens: lida.dados?.itens ?? [],
+    pagina,
     setPagina,
-    total: lista.length,
+    total,
+    carregando: lida.carregando,
+    lido: lida.dados !== null,
+    erro: lida.erro,
+    recarregar: lida.recarregar,
+    mudarItem,
   };
 }
 
@@ -99,4 +147,36 @@ export function RodapeDaTabela({
       <Paginacao pagina={pagina} porPagina={POR_PAGINA} total={total} aoMudar={aoMudar} />
     </div>
   );
+}
+
+/**
+ * O meio da tabela: a primeira leitura ("Carregando"), a falha com "Tentar de novo",
+ * o vazio do recorte, ou as linhas.
+ */
+export function CorpoDaTabela({
+  lido,
+  erro,
+  recarregar,
+  vazio,
+  quantas,
+  children,
+}: {
+  lido: boolean;
+  erro: boolean;
+  recarregar: () => void;
+  vazio: string;
+  quantas: number;
+  children: React.ReactNode;
+}) {
+  if (erro && !lido)
+    return (
+      <EstadoVazio tamanho="compacto" texto="Não deu para carregar agora.">
+        <Button variant="outline" size="control" className="mt-2" onClick={recarregar}>
+          Tentar de novo
+        </Button>
+      </EstadoVazio>
+    );
+  if (!lido) return <EstadoVazio tamanho="compacto" texto="Carregando…" />;
+  if (quantas === 0) return <EstadoVazio tamanho="compacto" texto={vazio} />;
+  return children;
 }
