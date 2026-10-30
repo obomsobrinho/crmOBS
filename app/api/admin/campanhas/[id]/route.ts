@@ -1,5 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campanhaAberta, falhou, rascunhoDe, salvarRascunho, torto } from "@/lib/campanhas-servidor";
+import { rascunhoDe } from "@/lib/campanhas-pedidos";
+import { campanhaAberta, falhou, salvarRascunho, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // GET: a campanha (o topo do detalhe e o assistente) com quantos leads em cada situação.

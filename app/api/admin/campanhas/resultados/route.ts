@@ -1,5 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehId, falhou, resultados, torto } from "@/lib/campanhas-servidor";
+import { ehId } from "@/lib/campanhas-pedidos";
+import { falhou, resultados, torto } from "@/lib/campanhas-servidor";
 import { agoraMs, ehPeriodo } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 

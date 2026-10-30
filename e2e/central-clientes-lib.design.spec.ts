@@ -685,8 +685,23 @@ test.describe("Lógica dos gráficos da central (lib, fora dos componentes)", ()
 
 test.describe("Trava por rota da central", () => {
   const PAGINAS_DA_CENTRAL = ["app/(app)/clientes/[id]/page.tsx", "app/(app)/clientes/page.tsx"];
+  // Campanhas, a prospecção do dono (docs/plano-campanhas.md, D1): a mesma guarda de página.
+  const PAGINAS_DE_CAMPANHAS = ["app/(app)/campanhas/page.tsx"];
   const PAGINA_ADMIN = "app/admin/page.tsx";
   const ROTAS = [
+    "app/api/admin/campanhas/[id]/acao/route.ts",
+    "app/api/admin/campanhas/[id]/leads/route.ts",
+    "app/api/admin/campanhas/[id]/route.ts",
+    "app/api/admin/campanhas/buscas/[id]/route.ts",
+    "app/api/admin/campanhas/buscas/route.ts",
+    "app/api/admin/campanhas/conexoes/route.ts",
+    "app/api/admin/campanhas/leads/[id]/route.ts",
+    "app/api/admin/campanhas/leads/route.ts",
+    "app/api/admin/campanhas/previa/route.ts",
+    "app/api/admin/campanhas/resultados/route.ts",
+    "app/api/admin/campanhas/resumo/route.ts",
+    "app/api/admin/campanhas/route.ts",
+    "app/api/admin/campanhas/totais/route.ts",
     "app/api/admin/empresas/[id]/apagar/route.ts",
     "app/api/admin/empresas/[id]/atendimento/route.ts",
     "app/api/admin/empresas/[id]/cobrancas/route.ts",
@@ -701,13 +716,15 @@ test.describe("Trava por rota da central", () => {
 
   test("as páginas e rotas da central são exatamente as listadas", () => {
     expect(achar("app/(app)/clientes", /^page\.tsx$/)).toEqual(PAGINAS_DA_CENTRAL);
+    expect(achar("app/(app)/campanhas", /^page\.tsx$/)).toEqual(PAGINAS_DE_CAMPANHAS);
+    expect(achar("app/(app)/campanhas", /^layout\.tsx$/)).toEqual([]);
     expect(achar("app/admin", /^page\.tsx$/)).toEqual([PAGINA_ADMIN]);
     expect(achar("app/api/admin", /^route\.ts$/)).toEqual(ROTAS);
     // Nada de layout herdando em silêncio: a central não tem layout próprio.
     expect(achar("app/(app)/clientes", /^layout\.tsx$/)).toEqual([]);
   });
 
-  for (const arq of PAGINAS_DA_CENTRAL) {
+  for (const arq of [...PAGINAS_DA_CENTRAL, ...PAGINAS_DE_CAMPANHAS]) {
     test(`${arq} chama a guarda de página (adminDaPagina), que redireciona e nunca dá 404`, () => {
       const fonte = ler(arq);
       expect(fonte).toMatch(/await adminDaPagina\(/);
@@ -746,6 +763,14 @@ test.describe("Trava por rota da central", () => {
 
   test("nenhuma rota da central usa sessaoDaRota (o admin não age como membro de um tenant)", () => {
     for (const arq of ROTAS) expect(ler(arq)).not.toMatch(/import[^;]*sessaoDaRota/);
+  });
+
+  test("as rotas de Campanhas fora de /api/admin (webhook da fonte e cron) conferem um segredo em tempo constante", () => {
+    const webhook = ler("app/api/prospeccao/apify/route.ts");
+    expect(webhook).toContain('segredoConfere(req.headers.get("x-apify-secret"), process.env.APIFY_WEBHOOK_SECRET)');
+    const cron = ler("app/api/prospeccao/cron/route.ts");
+    expect(cron).toContain("segredoConfere(recebido, process.env.CRON_SECRET)");
+    expect(achar("app/api/prospeccao", /^route\.ts$/)).toEqual(["app/api/prospeccao/apify/route.ts", "app/api/prospeccao/cron/route.ts"]);
   });
 
   test("a central nunca importa o service_role em componente", () => {

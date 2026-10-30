@@ -1,5 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { falhou, filtroDe, previaDoFiltro, torto } from "@/lib/campanhas-servidor";
+import { filtroDe } from "@/lib/campanhas-pedidos";
+import { falhou, previaDoFiltro, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Quem entra pelo recorte do passo Contatos (a mesma regra que monta a fila ao

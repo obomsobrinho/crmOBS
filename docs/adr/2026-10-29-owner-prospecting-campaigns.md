@@ -96,3 +96,21 @@ line (risk 4 and D4 in the plan).
   contacts.
 - Google Places API as the source: 1,000 free Enterprise calls a month, but its terms forbid storing
   anything other than the place id; kept as a swap behind the source module.
+
+## Implementation notes (backend, 30/10/2026)
+- The screens read from ONE interface, `FonteDeCampanhas` (`components/admin/campanhas/tipos.ts`): the
+  real page through `/api/admin/campanhas/*` (`lib/campanhas-fonte.ts`), the preview from memory
+  (`app/design/campanhas/fonte-de-mentira.ts`). Pages of 10 with a count and the search run on the
+  server; no list of leads or campaigns ever reaches the browser whole.
+- The dashboards come from SQL in long format, folded by pure twins (`resultadoDasLinhas`,
+  `serieDasLinhas`, `resumoDasLinhas` in `lib/prospeccao.ts`); `e2e/campanhas-lib.design.spec.ts` proves
+  the fold equals the in-memory math for every fake campaign.
+- Evidence of the review of the overnight phase 2: (1) the Apify ad hoc webhook was sent inside the POST
+  body, which Apify treats as the actor input, so the run's end would never reach the CRM; it goes in
+  the `webhooks` query parameter (base64), with the secret in a `headersTemplate` header, never in the
+  URL. (2) The cron's fallback concluded a search from the dataset without checking the run status, so a
+  run still in progress would be saved half done; both paths now ask the source (`lerExecucao`). (3) The
+  pg_cron migration copied the bearer into `cron.job`; the job now reads Vault on every run. (4) A send
+  "pulado" returned the lead to the queue, so the cron would claim the same lead forever.
+- The actor's accepted values for `placeMinimumStars` and `website` are still unconfirmed; the same
+  filters run on our side (`filtrarPelasOpcoes`), so the base never gets what the owner left out.

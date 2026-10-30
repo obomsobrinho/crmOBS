@@ -1,17 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import {
-  buscasParaEscolher,
-  criarBusca,
-  ehSituacaoDaBusca,
-  falhou,
-  opcoesDe,
-  paginaDe,
-  paginaDeBuscas,
-  textoDe,
-  torto,
-} from "@/lib/campanhas-servidor";
+import { ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
+import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas, torto } from "@/lib/campanhas-servidor";
 import { fonteApify } from "@/lib/fonte-apify";
 import { problemasDaBusca } from "@/lib/prospeccao";
 import { createServiceClient } from "@/lib/supabase/service";

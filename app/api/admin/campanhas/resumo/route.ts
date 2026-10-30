@@ -1,5 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehId, falhou, painelDaBase, torto } from "@/lib/campanhas-servidor";
+import { ehId } from "@/lib/campanhas-pedidos";
+import { falhou, painelDaBase, torto } from "@/lib/campanhas-servidor";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 

@@ -1,5 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehSituacaoNaCampanha, falhou, leadsDaCampanha, paginaDe, textoDe, torto } from "@/lib/campanhas-servidor";
+import { ehSituacaoNaCampanha, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
+import { falhou, leadsDaCampanha, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Os leads de uma campanha (o detalhe): 10 por página, na ordem da fila, busca pelo nome e `?situacao=`.

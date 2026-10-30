@@ -330,12 +330,17 @@ function TabelaDeBuscas({
     }, RELER_BUSCA_MS);
     return () => window.clearInterval(t);
   }, [chaveBuscando, recarregar]);
-  const antes = useRef<string[]>([]);
+  // Terminou = uma busca que estava "buscando" voltou numa leitura com outra situação
+  // (sumir da página, por trocar de página ou de filtro, não é terminar).
+  const rodando = useRef(new Set<string>());
   useEffect(() => {
-    const terminou = antes.current.some((id) => !buscando.includes(id));
-    antes.current = buscando;
+    const terminou = itens.some((b) => b.situacao !== "buscando" && rodando.current.has(b.id));
+    for (const b of itens) {
+      if (b.situacao === "buscando") rodando.current.add(b.id);
+      else rodando.current.delete(b.id);
+    }
     if (terminou) aoTerminarBusca();
-  });
+  }, [itens, aoTerminarBusca]);
   const todas = contagens ? Object.values(contagens).reduce((x, y) => x + y, 0) : 0;
 
   return (
