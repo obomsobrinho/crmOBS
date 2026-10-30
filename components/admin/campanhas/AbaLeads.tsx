@@ -12,17 +12,20 @@ import { Medidor } from "@/components/ui/medidor";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { normalizar } from "@/lib/clientes";
 import { mascaraTelefoneBR, numeroBR, pct, plural } from "@/lib/format";
-import { diaMesHoraSP } from "@/lib/fuso";
+import { diaIsoSP, diaMesHoraSP } from "@/lib/fuso";
 import {
   FAIXAS_DE_NOTA,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
-  leadsPorSemana,
+  contagemPorSemana,
+  enviosPorDia,
   resumoDaBase,
   resumoDasOpcoes,
+  textoDoDiaDeEnvio,
   siteDoLead,
   telefoneDoLead,
   tipoDoTelefone,
+  type DiaDeEnvio,
   type OpcoesDaBusca,
   type ResumoDaBase,
   type SituacaoDaBusca,
@@ -30,8 +33,8 @@ import {
 import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
 import NovaBusca from "./NovaBusca";
-import { CabecalhoDoGrafico, GraficoDeContagem, Rosca } from "./graficos";
-import { FunilDaBase, OndeEstao } from "./ranking";
+import { CabecalhoDoGrafico, Rosca } from "./graficos";
+import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, RodapeDaTabela, usePaginaDaMemoria } from "./tabela";
 import type { Busca, Campanha, Lead } from "./tipos";
@@ -47,7 +50,32 @@ function resumir(leads: Lead[], responderam: Set<string>): ResumoDaBase {
 
 // ── O painel da base ────────────────────────────────────────────────────
 
-function PainelDaBase({ r, porSemana }: { r: ResumoDaBase; porSemana: { inicio: string; n: number }[] }) {
+type Semana = { inicio: string; n: number };
+
+const pontosDaSemana = (semanas: Semana[]) =>
+  semanas.map((s) => ({ chave: s.inicio, rotulo: `Semana de ${s.inicio.slice(8, 10)}/${s.inicio.slice(5, 7)}`, valor: s.n }));
+
+/** O tipo de telefone em pedaços (celular, fixo, sem): quem pode e quem não pode receber WhatsApp. */
+const partesDoTelefone = (r: ResumoDaBase) => [
+  { chave: "celular", rotulo: "Celular", n: r.porTelefone.celular, cor: "var(--chart-1)" },
+  { chave: "fixo", rotulo: "Fixo", n: r.porTelefone.fixo, cor: "var(--chart-rampa-2)" },
+  { chave: "sem", rotulo: "Sem", n: r.porTelefone.sem, cor: "var(--chart-barra-neutra)" },
+];
+
+/**
+ * O painel da base. Cada número com o desenho que combina com ele (dono, 29/10/2026: "tem tantos
+ * gráficos bacanas, vamos ser criativos"): leads novos por semana em área, o tipo de telefone em pedaços,
+ * os envios por semana em colunas e a taxa de resposta num anel.
+ */
+function PainelDaBase({
+  r,
+  novosPorSemana,
+  enviosPorSemana,
+}: {
+  r: ResumoDaBase;
+  novosPorSemana: Semana[];
+  enviosPorSemana: Semana[];
+}) {
   const funil = [
     { chave: "base", rotulo: "Na base", n: r.total },
     { chave: "celular", rotulo: "Com celular", n: r.comCelular },
@@ -62,36 +90,31 @@ function PainelDaBase({ r, porSemana }: { r: ResumoDaBase; porSemana: { inicio: 
             chave: "base",
             rotulo: "Na base",
             valor: numeroBR(r.total),
-            frase: `${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}, ${numeroBR(r.porSegmento.length)} ${plural(r.porSegmento.length, "segmento", "segmentos")}`,
-            serie: {
-              pontos: porSemana.map((s) => ({ chave: s.inicio, rotulo: `Semana de ${s.inicio.slice(8, 10)}/${s.inicio.slice(5, 7)}`, valor: s.n })),
-              nome: "Leads novos",
-              formatar: numeroBR,
-            },
+            frase: `em ${numeroBR(r.porCidade.length)} ${plural(r.porCidade.length, "cidade", "cidades")}`,
+            desenho: { tipo: "area", nome: "Leads novos", pontos: pontosDaSemana(novosPorSemana) },
           },
           {
             chave: "celular",
             rotulo: "Com celular",
             valor: numeroBR(r.comCelular),
             complemento: `${pct(r.comCelular, r.total)}%`,
-            frase: "da base pode receber WhatsApp",
-            barra: pct(r.comCelular, r.total),
+            frase: "",
+            desenho: { tipo: "partes", partes: partesDoTelefone(r) },
           },
           {
             chave: "contatados",
             rotulo: "Contatados",
             valor: numeroBR(r.contatados),
             complemento: `${pct(r.contatados, r.comCelular)}%`,
-            frase: `dos com celular, ${numeroBR(r.aContatar)} ainda a contatar`,
-            barra: pct(r.contatados, r.comCelular),
+            frase: `${numeroBR(r.aContatar)} ainda a contatar`,
+            desenho: { tipo: "colunas", nome: "Envios", pontos: pontosDaSemana(enviosPorSemana), destaque: "ultima" },
           },
           {
             chave: "responderam",
             rotulo: "Responderam",
             valor: numeroBR(r.responderam),
-            complemento: r.contatados > 0 ? `${pct(r.responderam, r.contatados)}%` : undefined,
-            frase: `dos contatados, ${numeroBR(r.bons)} marcados como bons`,
-            barra: pct(r.responderam, r.contatados),
+            frase: "dos contatados",
+            desenho: { tipo: "anel", valor: pct(r.responderam, r.contatados) },
           },
         ]}
       />
@@ -112,46 +135,83 @@ function PainelDaBase({ r, porSemana }: { r: ResumoDaBase; porSemana: { inicio: 
 }
 
 /**
- * A qualidade de UMA busca: nota no Google, presença online e pontuação. Mora no detalhe da busca, não no
- * resumo da base (dono, 29/10/2026: alguns gráficos só fazem sentido dentro da busca).
+ * O painel de UMA busca: a faixa (o que veio, a nota média, quanto já foi contatado, as respostas por
+ * dia) e uma linha com os bairros, a presença online e a pontuação. Cabe acima da tabela.
  */
-function QualidadeDaBusca({ r }: { r: ResumoDaBase }) {
+function PainelDaBusca({ r, respostasPorDia }: { r: ResumoDaBase; respostasPorDia: DiaDeEnvio[] }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      <Card variant="conteudo" className="p-5" data-bloco="busca-nota">
-        <CabecalhoDoGrafico titulo="Nota no Google" />
-        <GraficoDeContagem
-          nome="Leads por nota no Google"
-          className="h-28"
-          colunas={FAIXAS_DE_NOTA.map((f) => ({ chave: f.chave, eixo: f.eixo, rotulo: f.rotulo, n: r.porNota[f.chave] }))}
-        />
-      </Card>
-      <Card variant="conteudo" className="p-5" data-bloco="busca-site">
-        <CabecalhoDoGrafico titulo="Presença online" />
-        <Rosca
-          compacta
-          nome="Leads por presença online"
-          unidade={["lead", "leads"]}
-          fatias={[
-            { chave: "nao", rotulo: ROTULO_DO_SITE.nao, n: r.porSite.nao, fill: "var(--chart-rampa-4)" },
-            { chave: "so_rede_social", rotulo: ROTULO_DO_SITE.so_rede_social, n: r.porSite.so_rede_social, fill: "var(--chart-rampa-2)" },
-            { chave: "sim", rotulo: ROTULO_DO_SITE.sim, n: r.porSite.sim, fill: "var(--chart-barra-neutra)" },
-          ]}
-        />
-      </Card>
-      <Card variant="conteudo" className="p-5" data-bloco="busca-pontuacao">
-        <CabecalhoDoGrafico titulo="Pontuação" />
-        <Rosca
-          compacta
-          nome="Leads por pontuação"
-          unidade={["lead", "leads"]}
-          fatias={[
-            { chave: "alta", rotulo: "Alta", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
-            { chave: "media", rotulo: "Média", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
-            { chave: "baixa", rotulo: "Baixa", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
-          ]}
-        />
-      </Card>
+    <div className="flex flex-col gap-4" data-slot="busca-painel">
+      <FaixaDeNumeros
+        celulas={[
+          {
+            chave: "achadas",
+            rotulo: "Achadas",
+            valor: numeroBR(r.total),
+            complemento: `${numeroBR(r.comCelular)} com celular`,
+            frase: "",
+            desenho: { tipo: "partes", partes: partesDoTelefone(r) },
+          },
+          {
+            chave: "nota",
+            rotulo: "Nota no Google",
+            valor: r.notaMedia === null ? "Sem nota" : r.notaMedia.toFixed(1).replace(".", ","),
+            frase: "a média das notas",
+            desenho: {
+              tipo: "colunas",
+              nome: "Leads",
+              pontos: FAIXAS_DE_NOTA.map((f) => ({ chave: f.chave, rotulo: f.rotulo, valor: r.porNota[f.chave] })),
+            },
+          },
+          {
+            chave: "contatados",
+            rotulo: "Contatados",
+            valor: numeroBR(r.contatados),
+            frase: `${numeroBR(r.aContatar)} ainda a contatar`,
+            desenho: { tipo: "anel", valor: pct(r.contatados, r.comCelular) },
+          },
+          {
+            chave: "responderam",
+            rotulo: "Responderam",
+            valor: numeroBR(r.responderam),
+            complemento: r.contatados > 0 ? `${pct(r.responderam, r.contatados)}%` : undefined,
+            frase: "dos contatados",
+            desenho: {
+              tipo: "area",
+              nome: "Respostas",
+              pontos: respostasPorDia.map((d) => ({ chave: d.dia, rotulo: textoDoDiaDeEnvio(d.dia), valor: d.responderam })),
+            },
+          },
+        ]}
+      />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <CartaoDeRanking titulo="Por bairro" grupos={r.porBairro} total={r.total} unidade={["bairro", "bairros"]} bloco="busca-bairros" />
+        <Card variant="conteudo" className="p-5" data-bloco="busca-site">
+          <CabecalhoDoGrafico titulo="Presença online" />
+          <Rosca
+            compacta
+            nome="Leads por presença online"
+            unidade={["lead", "leads"]}
+            fatias={[
+              { chave: "nao", rotulo: ROTULO_DO_SITE.nao, n: r.porSite.nao, fill: "var(--chart-rampa-4)" },
+              { chave: "so_rede_social", rotulo: ROTULO_DO_SITE.so_rede_social, n: r.porSite.so_rede_social, fill: "var(--chart-rampa-2)" },
+              { chave: "sim", rotulo: ROTULO_DO_SITE.sim, n: r.porSite.sim, fill: "var(--chart-barra-neutra)" },
+            ]}
+          />
+        </Card>
+        <Card variant="conteudo" className="p-5" data-bloco="busca-pontuacao">
+          <CabecalhoDoGrafico titulo="Pontuação" />
+          <Rosca
+            compacta
+            nome="Leads por pontuação"
+            unidade={["lead", "leads"]}
+            fatias={[
+              { chave: "alta", rotulo: "Alta", n: r.porFaixa.alta, fill: "var(--chart-rampa-4)" },
+              { chave: "media", rotulo: "Média", n: r.porFaixa.media, fill: "var(--chart-rampa-2)" },
+              { chave: "baixa", rotulo: "Baixa", n: r.porFaixa.baixa, fill: "var(--chart-barra-neutra)" },
+            ]}
+          />
+        </Card>
+      </div>
     </div>
   );
 }
@@ -591,14 +651,18 @@ function HomeDosLeads({
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
   const r = useMemo(() => resumir(leads, responderam), [leads, responderam]);
-  const porSemana = useMemo(() => {
+  const novosPorSemana = useMemo(() => {
     const quando = new Map(buscas.map((b) => [b.id, b.criadaEm]));
-    return leadsPorSemana(
+    return contagemPorSemana(
       leads.map((l) => quando.get(l.buscaId) ?? agora),
       agora,
       8,
     );
   }, [buscas, leads, agora]);
+  const enviosPorSemana = useMemo(
+    () => contagemPorSemana(campanhas.flatMap((c) => c.envios.map((e) => e.enviadoEm).filter((t): t is number => t !== null)), agora, 8),
+    [campanhas, agora],
+  );
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
@@ -649,7 +713,7 @@ function HomeDosLeads({
         </Card>
       ) : (
         <>
-          <PainelDaBase r={r} porSemana={porSemana} />
+          <PainelDaBase r={r} novosPorSemana={novosPorSemana} enviosPorSemana={enviosPorSemana} />
           <Card variant="conteudo" className="overflow-hidden" data-bloco="leads-tabela">
             {vista === "buscas" ? (
               <TabelaDeBuscas
@@ -672,6 +736,7 @@ function HomeDosLeads({
 
 function DetalheDaBusca({
   abas,
+  agora,
   busca,
   leads,
   campanhas,
@@ -681,6 +746,7 @@ function DetalheDaBusca({
   criarCampanha,
 }: {
   abas: React.ReactNode;
+  agora: number;
   busca: Busca;
   leads: Lead[];
   campanhas: Campanha[];
@@ -690,8 +756,16 @@ function DetalheDaBusca({
   criarCampanha: () => void;
 }) {
   const daBusca = useMemo(() => leads.filter((l) => l.buscaId === busca.id), [leads, busca.id]);
-  const c = contar(daBusca, responderam);
   const resumoDaBusca = useMemo(() => resumir(daBusca, responderam), [daBusca, responderam]);
+  // As respostas dos leads desta busca por dia (os últimos 14), no dia do envio.
+  const respostasPorDia = useMemo(() => {
+    const ids = new Set(daBusca.map((l) => l.id));
+    return enviosPorDia(
+      campanhas.flatMap((cp) => cp.envios.filter((e) => ids.has(e.leadId))),
+      diaIsoSP(agora),
+      14,
+    );
+  }, [daBusca, campanhas, agora]);
   return (
     <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
@@ -712,28 +786,7 @@ function DetalheDaBusca({
         apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, `${busca.cidade}, ${busca.opcoes.uf}`, ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
       />
 
-      <FaixaDeNumeros
-        celulas={[
-          { chave: "achadas", rotulo: "Achadas", valor: numeroBR(c.total), frase: `${numeroBR(c.bons)} marcadas como boas` },
-          { chave: "celular", rotulo: "Com celular", valor: numeroBR(c.comCelular), complemento: `${pct(c.comCelular, c.total)}%`, frase: "das achadas" },
-          {
-            chave: "contatados",
-            rotulo: "Contatados",
-            valor: numeroBR(c.contatados),
-            complemento: `${pct(c.contatados, Math.max(1, c.comCelular))}%`,
-            frase: "dos com celular",
-          },
-          {
-            chave: "responderam",
-            rotulo: "Responderam",
-            valor: numeroBR(c.responderam),
-            complemento: c.contatados > 0 ? `${pct(c.responderam, c.contatados)}%` : undefined,
-            frase: "dos contatados",
-          },
-        ]}
-      />
-
-      <QualidadeDaBusca r={resumoDaBusca} />
+      <PainelDaBusca r={resumoDaBusca} respostasPorDia={respostasPorDia} />
 
       <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
         <TabelaDeLeads
@@ -789,6 +842,7 @@ function AbaLeads({
       {busca ? (
         <DetalheDaBusca
           abas={abas}
+          agora={agora}
           busca={busca}
           leads={leads}
           campanhas={campanhas}

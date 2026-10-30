@@ -454,6 +454,25 @@ export function textoDoTempo(minutos: number): string {
   return d === 1 ? "1 dia" : `${d} dias`;
 }
 
+/** As faixas do tempo até responder, da mais rápida para a mais lenta (minutos, fim exclusivo). */
+export const FAIXAS_DE_ESPERA = [
+  { chave: "15", rotulo: "Até 15 min", eixo: "15m", ate: 15 },
+  { chave: "60", rotulo: "De 15 a 60 min", eixo: "1h", ate: 60 },
+  { chave: "180", rotulo: "De 1 a 3 h", eixo: "3h", ate: 180 },
+  { chave: "mais", rotulo: "Mais de 3 h", eixo: "3h+", ate: Infinity },
+] as const;
+
+/** Quantas respostas caíram em cada faixa de tempo até responder (o mini gráfico do cartão). */
+export function respostasPorEspera(envios: EnvioParaResultado[]): { chave: string; rotulo: string; n: number }[] {
+  const contas = FAIXAS_DE_ESPERA.map((f) => ({ chave: f.chave, rotulo: f.rotulo, n: 0 }));
+  for (const e of envios) {
+    if (e.enviadoEm === null || e.respondeuEm === null) continue;
+    const min = (e.respondeuEm - e.enviadoEm) / 60_000;
+    contas[FAIXAS_DE_ESPERA.findIndex((f) => min < f.ate)].n++;
+  }
+  return contas;
+}
+
 export interface DiaDeEnvio {
   /** AAAA-MM-DD em São Paulo. */
   dia: string;
@@ -564,6 +583,7 @@ export function resumoDasOpcoes(o: OpcoesDaBusca): string[] {
 
 export interface LeadParaResumo extends SinaisDoLead {
   cidade: string;
+  bairro?: string;
   marcacao: MarcacaoDoLead;
   parouEm: number | null;
   /** Por quantas campanhas passou. */
@@ -609,6 +629,11 @@ export interface ResumoDaBase {
   aContatar: number;
   porCidade: GrupoDaBase[];
   porSegmento: GrupoDaBase[];
+  porBairro: GrupoDaBase[];
+  /** Celular válido, fixo, ou sem telefone (inclui inválido). */
+  porTelefone: { celular: number; fixo: number; sem: number };
+  /** A média das notas no Google de quem tem nota; null sem nenhuma. */
+  notaMedia: number | null;
   porSite: Record<SiteDoLead, number>;
   porFaixa: Record<FaixaDaPontuacao, number>;
   porNota: Record<FaixaDeNota, number>;
@@ -634,6 +659,10 @@ const porTamanho = (m: Map<string, GrupoDaBase>) =>
 export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
   const cidades = new Map<string, GrupoDaBase>();
   const segmentos = new Map<string, GrupoDaBase>();
+  const bairros = new Map<string, GrupoDaBase>();
+  const porTelefone = { celular: 0, fixo: 0, sem: 0 };
+  let somaDasNotas = 0;
+  let comNota = 0;
   const porSite: Record<SiteDoLead, number> = { sim: 0, so_rede_social: 0, nao: 0 };
   const porFaixa: Record<FaixaDaPontuacao, number> = { alta: 0, media: 0, baixa: 0 };
   const porNota: Record<FaixaDeNota, number> = { sem: 0, ate4: 0, "4": 0, "45": 0, "48": 0 };
@@ -646,6 +675,13 @@ export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
     const pode = podeEntrarNaCampanha(l);
     somarNoGrupo(cidades, l.cidade, l, pode);
     somarNoGrupo(segmentos, l.segmento || "Sem segmento", l, pode);
+    somarNoGrupo(bairros, l.bairro || "Sem bairro", l, pode);
+    const tipo = tipoDoTelefone(l.telefone);
+    porTelefone[l.telefone && tipo !== "invalido" ? tipo : "sem"]++;
+    if (l.nota !== null) {
+      somaDasNotas += l.nota;
+      comNota++;
+    }
     if (pode) aContatar++;
     if (l.campanhas > 0) contatados++;
     if (telefoneDoLead(l.telefone)) comCelular++;
@@ -664,6 +700,9 @@ export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
     aContatar,
     porCidade: porTamanho(cidades),
     porSegmento: porTamanho(segmentos),
+    porBairro: porTamanho(bairros),
+    porTelefone,
+    notaMedia: comNota === 0 ? null : Math.round((somaDasNotas / comNota) * 10) / 10,
     porSite,
     porFaixa,
     porNota,
@@ -671,10 +710,10 @@ export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
 }
 
 /**
- * Leads que entraram na base por semana (a data da busca que os trouxe), nas
- * `semanas` semanas que terminam hoje: a tendência do número "Na base".
+ * Quantos instantes caem em cada semana (as `semanas` semanas que terminam hoje,
+ * em São Paulo): leads novos na base, envios, respostas. As tendências da faixa.
  */
-export function leadsPorSemana(datas: number[], agora: number, semanas: number): { inicio: string; n: number }[] {
+export function contagemPorSemana(datas: number[], agora: number, semanas: number): { inicio: string; n: number }[] {
   const hoje = diaIsoSP(agora);
   const serie = Array.from({ length: semanas }, (_, i) => ({ inicio: somarDias(hoje, -7 * (semanas - i) + 1), n: 0 }));
   for (const t of datas) {

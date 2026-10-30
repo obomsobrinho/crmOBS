@@ -241,6 +241,7 @@ function AbaCampanhas({
     <div className="flex flex-col gap-4">
       {topo}
       <PainelDeResultados
+        modo="resumo"
         envios={painel.envios}
         anteriores={painel.anteriores}
         contra={`os ${dias} dias anteriores`}

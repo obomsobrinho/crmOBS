@@ -70,6 +70,30 @@ function LinhasDoRanking({ grupos, total, unidade }: { grupos: GrupoDaBase[]; to
   );
 }
 
+/** Um ranking num cartão, sem alternador (os bairros de uma busca). */
+export function CartaoDeRanking({
+  titulo,
+  grupos,
+  total,
+  unidade,
+  bloco,
+}: {
+  titulo: string;
+  grupos: GrupoDaBase[];
+  total: number;
+  unidade: [string, string];
+  bloco: string;
+}) {
+  return (
+    <Card variant="conteudo" className="p-5" data-bloco={bloco}>
+      <div className="flex min-h-8 items-center">
+        <h3 className="text-rotulo uppercase text-ink-3">{titulo}</h3>
+      </div>
+      <LinhasDoRanking grupos={grupos} total={total} unidade={unidade} />
+    </Card>
+  );
+}
+
 /** "Onde estão": o ranking por cidade ou por segmento, com o alternador no canto. */
 export function OndeEstao({
   cidades,

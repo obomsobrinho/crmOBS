@@ -80,7 +80,7 @@ plan, not as captions.
   `placeMinimumStars` and `website` are not listed there, confirm on a real run before mapping). The
   search detail shows the chosen options. It runs in the background (section 6); the owner can leave and come
   back. A row in "buscando" says so; "falhou" says why in one sentence and nothing is saved.
-- **Search detail**: the same band of four numbers for that search and the lead table filtered to it.
+- **Search detail**: its own band of four numbers, a row with bairros, presença online and pontuação, and the lead table filtered to it (section 4).
 - **Lead table** (both places): name with neighborhood and city, Google rating and review count, site
   (yes / social only / no, `siteDoLead` over `classeDaUrl`), phone (flagged "Fixo", "Inválido" or "Sem
   telefone" when it is not a valid BR mobile, `tipoDoTelefone`), score (`pontuarLead`, reasons in the
@@ -134,10 +134,19 @@ the previous equal window for the badges) and of the campaign detail (since the 
 from `resultadoDaCampanha` and `enviosPorDia` (pure; counts what happened, so a lead who asked to stop
 also counts as replied and sent). The owner found the first version weak (no best day, hours shown as
 bars of text); this one:
-- **Band of four numbers** (third round: smaller, no empty space under a card, reply rate merged into
-  Responderam): Enviadas and Responderam with its % (sparkline per day and badge against the previous
-  window), Tempo até responder (median), Pediram para parar with its share of the replies (amber above
-  zero).
+- **Band of four numbers** (sixth round, owner: "some are too poor, others are all progress bars, let's be
+  creative"): every cell of `FaixaDeNumeros` picks the drawing that fits its number, `area` (a trend,
+  `ChartSparkline`), `colunas` (a count per day or per band, `ChartMiniColunas`, new in `chart.tsx`, the
+  "CureDesk" reference), `anel` (a share of a whole) or `partes` (a composition with every piece named).
+  Home: Enviadas (columns per day, badge), Responderam with its % (area per day, badge), Tempo até
+  responder (median, columns per wait band, `respostasPorEspera`) and Pediram para parar (ring, share of the
+  replies). Campaign detail: Progresso (ring, sent of total), Responderam (columns per day), Tempo até
+  responder, Desfecho (pieces: replied, stopped, no reply, failed). Leads home: Na base (area of new leads
+  per week, `contagemPorSemana`), Com celular (pieces: mobile, landline, none), Contatados (columns of sends
+  per week), Responderam (ring). Search detail: Achadas (pieces by phone type), Nota no Google (average,
+  columns per band), Contatados (ring), Responderam (area per day); then "Por bairro" (ranking),
+  "Presença online" and "Pontuação". Every detail fits above its table at 1440x900; the detail header is
+  one line (back icon, title, badge).
 - **Envios por dia** (home only; inside a campaign it is always the daily quota, owner): stacked columns
   per São Paulo day (replied in brand, no reply neutral), legend with totals.
 - **Home vs detail** (fifth round, first screen must reach the table): the home shows the band, "Envios

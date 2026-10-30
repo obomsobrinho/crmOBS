@@ -102,7 +102,7 @@ export function TextoDoSite({ url }: { url: string | null }) {
   );
 }
 
-/** O topo de uma tela de detalhe: voltar, título, apoio e as ações à direita. */
+/** O topo de uma tela de detalhe, numa linha só (dono, 29/10/2026: tudo acima da tabela): voltar, título, selo e o apoio embaixo. */
 export function TopoDeDetalhe({
   voltar,
   rotuloDoVoltar,
@@ -119,21 +119,20 @@ export function TopoDeDetalhe({
   children?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <Button variant="link-discreto" size="link" className="self-start" onClick={voltar}>
-        <ArrowLeft aria-hidden />
-        {rotuloDoVoltar}
-      </Button>
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2">
+        <Button variant="outline" size="icon-control" onClick={voltar} aria-label={`Voltar para ${rotuloDoVoltar}`} data-slot="detalhe-voltar">
+          <ArrowLeft aria-hidden />
+        </Button>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-titulo text-ink">{titulo}</h2>
             {selo}
           </div>
-          {apoio && <p className="mt-1 text-apoio text-ink-2">{apoio}</p>}
+          {apoio && <p className="text-legenda text-ink-3">{apoio}</p>}
         </div>
-        {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
       </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
   );
 }

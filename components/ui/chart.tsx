@@ -306,6 +306,60 @@ function ChartSparkline({
   );
 }
 
+/**
+ * As MINI COLUNAS de um cartão de indicador (29/10/2026, referência "CureDesk" do dono): colunas finas sem
+ * eixo, todas na cor da marca em tom claro e a de `destaque` (a maior, ou a última) cheia, com o balão do
+ * ponto. Mesma regra do `ChartSparkline`: o número do cartão já está em texto, então o desenho é
+ * `aria-hidden` e não tem camada de foco. Serve para contagens por dia ou por faixa (envios por dia,
+ * respostas por tempo de espera, leads por nota).
+ */
+function ChartMiniColunas({
+  dados,
+  nome,
+  formatar,
+  destaque = "maior",
+  className,
+}: {
+  dados: PontoDeTendencia[];
+  nome: string;
+  formatar: (valor: number) => React.ReactNode;
+  /** Qual coluna vai cheia: a maior (uma distribuição) ou a última (uma série no tempo). */
+  destaque?: "maior" | "ultima";
+  className?: string;
+}) {
+  const animar = useAnimacaoDoGrafico();
+  const maior = dados.reduce((m, p, i) => (p.valor > dados[m].valor ? i : m), 0);
+  const alvo = destaque === "ultima" ? dados.length - 1 : maior;
+  const comCor = dados.map((p, i) => ({ ...p, fill: i === alvo ? "var(--chart-1)" : "var(--chart-rampa-2)" }));
+  return (
+    <div data-slot="mini-colunas" aria-hidden className={cn("w-full", className)}>
+      <ChartContainer config={{ valor: { label: nome, color: "var(--chart-1)" } }} className="h-12">
+        <RechartsPrimitive.BarChart data={comCor} margin={{ top: 2, right: 0, left: 0, bottom: 0 }} barCategoryGap="18%" accessibilityLayer={false}>
+          <ChartTooltip
+            cursor={{ fill: "var(--chart-cursor)", fillOpacity: 0.4 }}
+            content={
+              <ChartTooltipContent<PontoDeTendencia>
+                semSeries
+                titulo={(p) => p.rotulo}
+                rodape={(p) => <ChartTooltipLinha rotulo={nome}>{formatar(p.valor)}</ChartTooltipLinha>}
+              />
+            }
+          />
+          <RechartsPrimitive.Bar
+            dataKey="valor"
+            radius={[2, 2, 0, 0]}
+            minPointSize={2}
+            isAnimationActive={animar}
+            shape={(p: RechartsPrimitive.BarShapeProps) => (
+              <RechartsPrimitive.Rectangle {...p} fill={(p.payload as { fill: string }).fill} />
+            )}
+          />
+        </RechartsPrimitive.BarChart>
+      </ChartContainer>
+    </div>
+  );
+}
+
 type ItemDaLegenda = {
   chave: string;
   rotulo: React.ReactNode;
@@ -366,5 +420,6 @@ export {
   ChartLegenda,
   ChartTabela,
   ChartSparkline,
+  ChartMiniColunas,
   useAnimacaoDoGrafico,
 };

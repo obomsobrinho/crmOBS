@@ -8,8 +8,8 @@ import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { normalizar } from "@/lib/clientes";
 import { numeroBR } from "@/lib/format";
-import { diaMesHoraSP } from "@/lib/fuso";
-import { ROTULO_NA_CAMPANHA, diasParaEnviar, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
+import { diaIsoSP, diaMesHoraSP } from "@/lib/fuso";
+import { ROTULO_NA_CAMPANHA, diasParaEnviar, enviosPorDia, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, SeloNaCampanha, TopoDeDetalhe } from "./pecas";
@@ -27,6 +27,7 @@ const SITUACOES: SituacaoNaCampanha[] = ["respondeu", "enviado", "na_fila", "par
 
 function DetalheDaCampanha({
   abas,
+  agora,
   campanha,
   leads,
   conexoes,
@@ -35,6 +36,7 @@ function DetalheDaCampanha({
   reenviarParaQuemNaoRespondeu,
 }: {
   abas: React.ReactNode;
+  agora: number;
   campanha: Campanha;
   leads: Lead[];
   conexoes: ConexaoDisponivel[];
@@ -43,6 +45,13 @@ function DetalheDaCampanha({
   reenviarParaQuemNaoRespondeu: () => void;
 }) {
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
+  // Os dias da campanha (do primeiro envio até hoje, no máximo 30): os mini gráficos da faixa.
+  const hoje = diaIsoSP(agora);
+  const serie = useMemo(() => {
+    const primeiro = Math.min(...campanha.envios.map((e) => e.enviadoEm ?? Infinity));
+    const dias = Number.isFinite(primeiro) ? Math.min(30, Math.max(7, Math.round((agora - primeiro) / 86_400_000) + 1)) : 7;
+    return enviosPorDia(campanha.envios, hoje, dias);
+  }, [campanha.envios, hoje, agora]);
   const porLead = useMemo(() => new Map(leads.map((l) => [l.id, l])), [leads]);
   const contagem = (s: SituacaoNaCampanha) => campanha.envios.filter((e) => e.situacao === s).length;
   const naFila = contagem("na_fila");
@@ -107,10 +116,11 @@ function DetalheDaCampanha({
       />
 
       <PainelDeResultados
+        modo="campanha"
         envios={campanha.envios}
         anteriores={null}
         contra=""
-        serie={null}
+        serie={serie}
         quantasVariantes={campanha.variantes.length}
         variantes={campanha.variantes}
         legenda="desde o início"

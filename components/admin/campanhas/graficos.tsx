@@ -187,11 +187,22 @@ const CONFIG_TAXA: ChartConfig = { valor: { label: "Taxa de resposta", color: "v
  * Colunas de taxa de resposta (dia da semana, horário). `compacto` é a versão do resumo: baixa, sem
  * eixo de porcentagem nem grade (o número de cada coluna está no balão e na tabela em texto).
  */
-export function GraficoDeTaxaEmColunas({ nome, barras, compacto = false }: { nome: string; barras: BarraDeTaxa[]; compacto?: boolean }) {
+export function GraficoDeTaxaEmColunas({
+  nome,
+  barras,
+  compacto = false,
+  className,
+}: {
+  nome: string;
+  barras: BarraDeTaxa[];
+  compacto?: boolean;
+  /** A altura do desenho (o padrão depende de `compacto`). */
+  className?: string;
+}) {
   const animar = useAnimacaoDoGrafico();
   return (
     <>
-      <ChartContainer config={CONFIG_TAXA} className={compacto ? "mt-2 h-20" : "mt-4 h-48"} role="img" aria-label={nome}>
+      <ChartContainer config={CONFIG_TAXA} className={cn(compacto ? "mt-2 h-20" : "mt-3 h-48", className)} role="img" aria-label={nome}>
         <BarChart data={barras} margin={{ top: compacto ? 4 : 20, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
           {!compacto && <CartesianGrid vertical={false} stroke="var(--chart-grade)" />}
           <XAxis dataKey="eixo" tickLine={false} axisLine={false} tickMargin={6} interval={0} />
@@ -216,14 +227,13 @@ export function GraficoDeTaxaEmColunas({ nome, barras, compacto = false }: { nom
 }
 
 /** Barras deitadas de taxa (as variantes da mensagem: nomes longos e ordem). */
-export function GraficoDeTaxaDeitado({ nome, barras }: { nome: string; barras: BarraDeTaxa[] }) {
+export function GraficoDeTaxaDeitado({ nome, barras, className = "h-48" }: { nome: string; barras: BarraDeTaxa[]; className?: string }) {
   const animar = useAnimacaoDoGrafico();
   return (
     <>
       <ChartContainer
         config={CONFIG_TAXA}
-        className="mt-4"
-        style={{ height: 192 }}
+        className={cn("mt-3", className)}
         role="img"
         aria-label={nome}
       >

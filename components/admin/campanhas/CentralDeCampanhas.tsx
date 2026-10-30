@@ -202,6 +202,7 @@ export default function CentralDeCampanhas({
             ) : emDetalhe ? (
               <DetalheDaCampanha
                 abas={abas}
+                agora={agora}
                 campanha={emDetalhe}
                 leads={leads}
                 conexoes={conexoes}
