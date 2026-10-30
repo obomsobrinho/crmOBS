@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -43,6 +43,170 @@ export type Database = {
           quem?: string
         }
         Relationships: []
+      }
+      agenda_bloqueios: {
+        Row: {
+          client_id: string
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: number
+          inicio: string
+          motivo: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: never
+          inicio: string
+          motivo?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: never
+          inicio?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_bloqueios_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_servicos: {
+        Row: {
+          ativo: boolean
+          client_id: string
+          created_at: string
+          duracao_min: number
+          id: number
+          nome: string
+          ordem: number
+        }
+        Insert: {
+          ativo?: boolean
+          client_id: string
+          created_at?: string
+          duracao_min: number
+          id?: never
+          nome: string
+          ordem?: number
+        }
+        Update: {
+          ativo?: boolean
+          client_id?: string
+          created_at?: string
+          duracao_min?: number
+          id?: never
+          nome?: string
+          ordem?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_servicos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agendamentos: {
+        Row: {
+          cancelado_em: string | null
+          cancelado_por: string | null
+          client_id: string
+          confirmado_em: string | null
+          created_at: string
+          criado_por: string | null
+          fim: string
+          id: number
+          inicio: string
+          lembrete_enviado_em: string | null
+          lembrete_falhou_em: string | null
+          nome: string | null
+          origem: string
+          phone: string
+          remarcado_de: number | null
+          resumo: string | null
+          servico_id: number | null
+          servico_nome: string
+          status: string
+        }
+        Insert: {
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          client_id: string
+          confirmado_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          fim: string
+          id?: never
+          inicio: string
+          lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
+          nome?: string | null
+          origem: string
+          phone: string
+          remarcado_de?: number | null
+          resumo?: string | null
+          servico_id?: number | null
+          servico_nome: string
+          status?: string
+        }
+        Update: {
+          cancelado_em?: string | null
+          cancelado_por?: string | null
+          client_id?: string
+          confirmado_em?: string | null
+          created_at?: string
+          criado_por?: string | null
+          fim?: string
+          id?: never
+          inicio?: string
+          lembrete_enviado_em?: string | null
+          lembrete_falhou_em?: string | null
+          nome?: string | null
+          origem?: string
+          phone?: string
+          remarcado_de?: number | null
+          resumo?: string | null
+          servico_id?: number | null
+          servico_nome?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_remarcado_de_fkey"
+            columns: ["remarcado_de"]
+            isOneToOne: false
+            referencedRelation: "agendamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "agenda_servicos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agent_publications: {
         Row: {
@@ -255,6 +419,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          agenda_config: Json | null
           agent_config: Json | null
           agent_config_updated_at: string | null
           agent_enabled: boolean
@@ -284,6 +449,7 @@ export type Database = {
           vitalicio_desde: string | null
         }
         Insert: {
+          agenda_config?: Json | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
           agent_enabled?: boolean
@@ -313,6 +479,7 @@ export type Database = {
           vitalicio_desde?: string | null
         }
         Update: {
+          agenda_config?: Json | null
           agent_config?: Json | null
           agent_config_updated_at?: string | null
           agent_enabled?: boolean
@@ -1014,6 +1181,10 @@ export type Database = {
           nome: string
         }[]
       }
+      admin_cliente_picos: {
+        Args: { p_ate: string[]; p_client: string; p_de: string[] }
+        Returns: Json
+      }
       admin_cliente_solucoes: {
         Args: {
           p_ate?: string[]
@@ -1027,10 +1198,6 @@ export type Database = {
           n: number
           solucao: string
         }[]
-      }
-      admin_cliente_picos: {
-        Args: { p_ate: string[]; p_client: string; p_de: string[] }
-        Returns: Json
       }
       admin_cliente_uso: {
         Args: {
@@ -1094,6 +1261,14 @@ export type Database = {
           linha: Json
         }[]
       }
+      admin_lembretes_com_falha: {
+        Args: { p_clients: string[] }
+        Returns: {
+          client_id: string
+          falhas: number
+          mais_antiga: string
+        }[]
+      }
       admin_mudar_conta: {
         Args: {
           p_acao: string
@@ -1103,6 +1278,20 @@ export type Database = {
           p_quem: string
         }
         Returns: string
+      }
+      admin_mudar_limite_ia: {
+        Args: {
+          p_client: string
+          p_limiar_aviso: number
+          p_limiar_parado: number
+          p_limite: number
+          p_mes: string
+          p_quem: string
+        }
+        Returns: {
+          antes: number
+          depois: number
+        }[]
       }
       admin_pedidos_abertos: {
         Args: { p_clients: string[] }
@@ -1138,30 +1327,23 @@ export type Database = {
           motivo: string
         }[]
       }
-      admin_mudar_limite_ia: {
-        Args: {
-          p_client: string
-          p_limiar_aviso: number
-          p_limiar_parado: number
-          p_limite: number
-          p_mes: string
-          p_quem: string
-        }
-        Returns: {
-          antes: number
-          depois: number
-        }[]
-      }
       admin_registrar_exportacao: {
         Args: { p_client: string; p_quem: string }
         Returns: boolean
       }
-      admin_tabelas_fora_da_purga: { Args: { p_tabelas: string[] }; Returns: string[] }
+      admin_tabelas_fora_da_purga: {
+        Args: { p_tabelas: string[] }
+        Returns: string[]
+      }
       admin_usuarios_so_do_cliente: {
         Args: { p_client: string }
         Returns: {
           user_id: string
         }[]
+      }
+      agenda_etapa_do_funil: {
+        Args: { p_ativa: boolean; p_client: string }
+        Returns: undefined
       }
       chat_resumo_conversa: {
         Args: { p_phone: string }

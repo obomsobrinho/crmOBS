@@ -37,6 +37,36 @@ import {
   type ConsumoDoMes,
 } from "@/lib/consumo-ia";
 import { semLoteAtual } from "@/lib/mensagem";
+import {
+  SAIDA_DA_AGENDA_VAZIA,
+  TEXTO_PEDE_DIA_E_PERIODO,
+  textoPedeDia,
+  textoPedePeriodo,
+  travaSemAgenda,
+  blocoDaAgenda,
+  consultaDeSeguranca,
+  saidaComODiaDaPessoa,
+  decidirAgenda,
+  horarioDaAgenda,
+  diaDaSaida,
+  diaFalado,
+  periodoDe,
+  preferenciaDoHorario,
+  quandoFalado,
+  textoDaConsulta,
+  textoDoAvisoDaAgenda,
+  textosDaEscalada,
+  type AgendaConfig,
+  type AgendamentoDaPessoa,
+  type ServicoDaAgenda,
+} from "@/lib/agenda";
+import {
+  agendaDoTurno,
+  cancelarAgendamento,
+  marcarAgendamento,
+  ocupadosDoDia,
+  remarcarAgendamento,
+} from "@/lib/agenda-servidor";
 import type {
   TurnDiagnostics,
   RagMatchDiag,
@@ -112,6 +142,12 @@ export interface ProcessTurnParams {
    */
   horarioOverride?: BusinessHours | null;
   /**
+   * Agenda ligada de teste (config e serviços), SÓ em `dryRun` (29/10/2026):
+   * a suíte paga conversa com a agenda sem ligar a de um tenant real. Lê os
+   * ocupados do tenant de verdade e não grava nada (dryRun).
+   */
+  agendaOverride?: { config: AgendaConfig; servicos: ServicoDaAgenda[] };
+  /**
    * TURNO DE RETOMADA (27/09/2026, pedido do dono): o time orientou um pedido
    * de ajuda e a IA responde NA HORA, sem esperar o cliente escrever de novo.
    * `message` é ignorada (não existe mensagem nova) e a orientação vem daqui,
@@ -159,7 +195,7 @@ function personaDoTenant(client: {
   prompt_mode?: unknown;
   regras_salvas?: unknown;
   name?: unknown;
-}): { persona: string; origem: PersonaOrigem } {
+}, agendaAtiva = false): { persona: string; origem: PersonaOrigem } {
   const salva = texto(client.persona);
   // Sem normalizar para "a empresa" aqui: `buildFallbackPersona` já faz esse
   // default. Duas cópias do mesmo literal é uma para esquecer de mudar.
@@ -172,7 +208,7 @@ function personaDoTenant(client: {
       agent_config: client.agent_config,
       prompt_mode: client.prompt_mode,
       regras_salvas: client.regras_salvas,
-    });
+    }, undefined, agendaAtiva);
     if (r.ok) return { persona: r.persona, origem: "montada" };
     // ⚠️ "longo" NÃO cai para a salva: quem salva recusa acima do limite, mas no
     // atendimento trocar o prompt de hoje por um de meses atrás é pior que servir
@@ -209,7 +245,7 @@ export async function processTurn(
     svc
       .from("clients")
       .select(
-        "persona, agent_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, billing_plan, vitalicio_desde, bloqueado_em, desativada_em"
+        "persona, agent_config, agenda_config, prompt_mode, regras_salvas, name, subscription_status, trial_ends_at, grace_until, agent_published_at, agent_enabled, notify_group_jid, evolution_instance, ia_limite_tokens, billing_plan, vitalicio_desde, bloqueado_em, desativada_em"
       )
       .eq("id", clientId)
       .maybeSingle(),
@@ -363,6 +399,39 @@ export async function processTurn(
     return t;
   }
 
+  // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
+  // com datas (`horarioCadastrado`). O avançado também tem horário salvo
+  // (`agent_config.hours`, gravado à parte do prompt).
+  const horasDoTurno =
+    dryRun && params.horarioOverride !== undefined
+      ? params.horarioOverride
+      : horarioCadastrado(client.agent_config);
+  const agoraDoTurno =
+    dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
+      ? new Date(params.agoraTeste)
+      : undefined;
+
+  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): com a agenda ligada, o turno
+  // leva o contrato `### AGENDA` (serviços e agendamentos da pessoa, sem
+  // horários: quem oferece, no máximo 3, é o código depois do dia e período).
+  // Sem migration, sem horário ou desligada: `null`, e o turno segue como antes.
+  const agoraMsAgenda = (agoraDoTurno ?? new Date()).getTime();
+  // A suíte paga (`e2e/agenda.ia.spec.ts`) manda a agenda no corpo, SÓ em
+  // dryRun, para conversar com a agenda ligada sem mexer na de um tenant real.
+  const agendaTeste = dryRun ? params.agendaOverride : undefined;
+  const horasDaAgendaTeste = agendaTeste ? horarioDaAgenda(agendaTeste.config, horasDoTurno) : null;
+  const agenda =
+    agendaTeste && horasDaAgendaTeste && agendaTeste.servicos.length > 0
+      ? { ...agendaTeste, daPessoa: [], hours: horasDaAgendaTeste, atendimento: horasDoTurno }
+      : await agendaDoTurno({
+          svc,
+          clientId,
+          phone,
+          agora: agoraMsAgenda,
+          hours: horasDoTurno,
+          configGravada: client.agenda_config,
+        });
+
   // Persona em edição (bancada dentro do /agente) tem precedência, mas SÓ no
   // dryRun: fora dele a única fonte é o banco.
   const emEdicao = dryRun ? texto(params.personaOverride) : null;
@@ -370,7 +439,9 @@ export async function processTurn(
   // `personaDoTenant` são silenciosas por construção (servir o prompt antigo é
   // melhor que emudecer), e sem registrar isso uma regressão em que TODO tenant
   // volta para a persona salva seria invisível. "salva" em produção é ALARME.
-  const doTenant = emEdicao ? null : personaDoTenant(client);
+  // A agenda ligada (e valendo para este turno) muda o prompt: o objetivo
+  // "Agendar" antigo saiu (decisão do dono, 28/10/2026).
+  const doTenant = emEdicao ? null : personaDoTenant(client, agenda !== null);
   const persona = emEdicao ?? doTenant!.persona;
   const personaOrigem: PersonaOrigem = emEdicao ? "override" : doTenant!.origem;
 
@@ -485,6 +556,7 @@ export async function processTurn(
   // decisão de atualizar usa a mesma (`atualizacaoDoPedido`).
   const listaDoModelo = abertos.filter((p) => (p.summary ?? "").trim() !== "");
 
+
   // Modelo. Lança AgentError em falha (a rota mapeia para 502).
   const run = await runAgent({
     persona,
@@ -495,16 +567,11 @@ export async function processTurn(
     operatorInstruction: instruction,
     pedidosResolvidos: resolvidos,
     pedidosAbertos: listaDoModelo.map((p) => (p.summary ?? "").trim()),
-    now: dryRun && params.agoraTeste && Number.isFinite(Date.parse(params.agoraTeste))
-      ? new Date(params.agoraTeste)
-      : undefined,
-    // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
-    // com datas (`horarioCadastrado`). O avançado também tem horário salvo
-    // (`agent_config.hours`, gravado à parte do prompt).
-    hours:
-      dryRun && params.horarioOverride !== undefined
-        ? params.horarioOverride
-        : horarioCadastrado(client.agent_config),
+    now: agoraDoTurno,
+    hours: horasDoTurno,
+    agenda: agenda
+      ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config, hours: agenda.hours })
+      : null,
   });
   const raw = run.output;
 
@@ -535,7 +602,51 @@ export async function processTurn(
   //
   // O guardrail continua protegido: quando ele reprova, ele mesmo já troca as
   // mensagens pela frase neutra antes de chegar aqui, então nada inventado sai.
-  const output = guarded.output;
+  // Sem agenda ligada ninguém marca: `agendar` que escapar vira pedido de ajuda.
+  let output = travaSemAgenda(guarded.output, agenda !== null);
+
+  // AGENDA PRÓPRIA: o código marca, remarca ou cancela ANTES de responder,
+  // então a resposta nunca afirma um horário que não ficou gravado. A regra é
+  // `decidirAgenda` (lib/agenda.ts); aqui só banco e aviso.
+  let diagAgenda: TurnDiagnostics["agenda"];
+  let agendou = false;
+  // A pessoa disse o dia e o modelo não consultou (perguntou o período ou
+  // passou para o time "para ver horário"): o código consulta no lugar dele
+  // (`consultaDeSeguranca`, lib/agenda.ts). Nunca com o guardrail barrando.
+  if (agenda && !guardrail.blocked) {
+    const rede = consultaDeSeguranca({
+      mensagem: message || null,
+      resposta: output.messages.join(" "),
+      action: output.action,
+      motivo: output.motivo,
+      acao: output.agenda.acao,
+      dia: output.agenda.dia,
+      periodo: output.agenda.periodo,
+      agora: agoraMsAgenda,
+    });
+    if (rede) {
+      output = { ...output, action: "none", summary: "", agenda: { ...output.agenda, acao: "consultar", dia: rede.dia, periodo: rede.periodo } };
+    }
+    output = { ...output, agenda: saidaComODiaDaPessoa(output.agenda, message || null, agoraMsAgenda) };
+  }
+  // Pedido de ajuda (do modelo ou do guardrail que barrou) ganha da agenda: o
+  // turno segue como pausar, sem marcar nem oferecer, e o time assume.
+  if (agenda && output.action !== "pausar" && !guardrail.blocked) {
+    const r = await aplicarAgenda({
+      svc,
+      clientId,
+      phone,
+      dryRun,
+      agora: agoraMsAgenda,
+      output,
+      agenda,
+      instancia: (client.evolution_instance as string | null) ?? null,
+      destino: avisos,
+    });
+    output = r.output;
+    diagAgenda = r.diag;
+    agendou = r.agendou;
+  }
 
   // Consumo único: em produção, limpa a orientação depois de usada (best-effort;
   // um erro aqui não pode derrubar a resposta).
@@ -629,6 +740,7 @@ export async function processTurn(
         currentStage: params.currentStage ?? null,
         stageSource: params.stageSource ?? null,
         canonical,
+        agendou,
       });
     } else {
       // Persiste a qualificação (alimenta a lista "Precisa de você" e o resumo
@@ -660,7 +772,7 @@ export async function processTurn(
       ]);
       if (qErr) console.error("falha ao gravar qualificação:", qErr.message);
       if (uErr) console.error("falha ao atualizar o pedido aberto:", uErr.message);
-      stageWouldMove = await advanceStage(svc, clientId, phone, output.action);
+      stageWouldMove = await advanceStage(svc, clientId, phone, output.action, agendou);
 
       // A fila (`entraNaFila`, calculada acima). Best-effort: um erro aqui não
       // pode derrubar a resposta ao cliente.
@@ -715,6 +827,7 @@ export async function processTurn(
     pedidoNaFila: naFila,
     ...(atualizacao.tipo === "atualizar" ? { pedidoAtualizado: true } : {}),
     ...(avisoAgendado ? { avisoAgendado: true } : {}),
+    ...(diagAgenda ? { agenda: diagAgenda } : {}),
   };
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado
@@ -930,6 +1043,7 @@ function silentTurn(
       motivo: "",
       pedido_aberto: 0,
       informacao_nova: false,
+      agenda: SAIDA_DA_AGENDA_VAZIA,
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
@@ -1037,7 +1151,8 @@ async function advanceStage(
   svc: ReturnType<typeof createServiceClient>,
   clientId: string,
   phone: string,
-  action: string
+  action: string,
+  agendou = false
 ): Promise<string | null> {
   try {
     const canonical = await loadCanonical(svc, clientId);
@@ -1056,6 +1171,7 @@ async function advanceStage(
       currentStage: (conv.stage as string | null) ?? null,
       stageSource: (conv.stage_source as string | null) ?? null,
       canonical,
+      agendou,
     });
     if (!target) return null;
 
@@ -1073,4 +1189,261 @@ async function advanceStage(
     console.error("falha ao mover o card no pipeline:", e);
     return null;
   }
+}
+
+/**
+ * AGENDA PRÓPRIA (28/10/2026): aplica a decisão do turno (`decidirAgenda`,
+ * lib/agenda.ts). Consultar: o CÓDIGO escreve a resposta com até 3 horários do
+ * dia e período pedidos. Marcar e remarcar: gravados ANTES de a resposta sair;
+ * se o horário não vale mais, o código oferece outros do mesmo período. Dentro
+ * da antecedência mínima: pedido de ajuda ao time (action pausar), nunca
+ * marcado. O aviso de marcar e remarcar continua sendo o "Notifica grupo" do
+ * n8n (action agendar); só o cancelamento avisa daqui. No dryRun nada é
+ * gravado nem avisado: o diagnóstico diz o que aconteceria. NUNCA lança.
+ */
+async function aplicarAgenda(a: {
+  svc: ReturnType<typeof createServiceClient>;
+  clientId: string;
+  phone: string;
+  dryRun: boolean;
+  agora: number;
+  output: AgentOutput;
+  agenda: {
+    config: AgendaConfig;
+    servicos: ServicoDaAgenda[];
+    daPessoa: AgendamentoDaPessoa[];
+    hours: BusinessHours;
+    atendimento: BusinessHours | null;
+  };
+  instancia: string | null;
+  destino: string | null;
+}): Promise<{ output: AgentOutput; diag: NonNullable<TurnDiagnostics["agenda"]>; agendou: boolean }> {
+  const { config, servicos, daPessoa, hours } = a.agenda;
+  const saida = a.output.agenda;
+  const responder = (texto: string, extra: Partial<AgentOutput> = {}): AgentOutput => ({
+    ...a.output,
+    messages: [texto],
+    action: "none",
+    summary: "",
+    preferencia_horario: "",
+    ...extra,
+  });
+  const diag: NonNullable<TurnDiagnostics["agenda"]> = { decisao: "nada" };
+
+  try {
+    // Só lê a agenda do dia em jogo (sem limite de dias à frente).
+    const diaEmJogo = diaDaSaida(saida.dia, a.agora);
+    const ocupados = diaEmJogo ? await ocupadosDoDia(a.svc, a.clientId, diaEmJogo) : [];
+    if (ocupados === null) {
+      diag.falhou = "erro";
+      return { output: a.output, diag, agendou: false };
+    }
+    const decisao = decidirAgenda({ action: a.output.action, saida, agora: a.agora, hours, ocupados, config, servicos, daPessoa });
+    diag.decisao = decisao.tipo;
+
+    switch (decisao.tipo) {
+      case "nada":
+        return { output: a.output, diag, agendou: false };
+      case "invalido":
+        return { output: responder(TEXTO_PEDE_DIA_E_PERIODO), diag, agendou: false };
+      case "pedeDia":
+        return { output: responder(textoPedeDia(hours)), diag, agendou: false };
+      case "pedePeriodo":
+        return { output: responder(textoPedePeriodo(decisao.dia, decisao.periodos, a.agora)), diag, agendou: false };
+      case "consultar":
+      case "indisponivel": {
+        const texto = textoDaConsulta({
+          dia: decisao.dia,
+          periodo: decisao.periodo,
+          resultado: decisao.resultado,
+          agora: a.agora,
+          antecedenciaMin: config.antecedenciaMin,
+          indisponivel: decisao.tipo === "indisponivel",
+        });
+        if (decisao.resultado.tipo === "antecedencia") {
+          // Livre só em cima da hora: o time decide (pedido de ajuda).
+          const e = textosDaEscalada({
+            servico: decisao.servico.nome,
+            inicio: decisao.resultado.inicios[0],
+            agora: a.agora,
+            antecedenciaMin: config.antecedenciaMin,
+          });
+          return {
+            output: responder(texto, { action: "pausar", summary: e.resumo, motivo: "fechar", pedido_novo: true }),
+            diag,
+            agendou: false,
+          };
+        }
+        diag.ofertas = decisao.resultado.tipo === "ofertas" ? decisao.resultado.inicios.length : 0;
+        return { output: responder(texto), diag, agendou: false };
+      }
+      case "escalar": {
+        const e = textosDaEscalada({
+          servico: decisao.servico.nome,
+          inicio: decisao.inicio,
+          agora: a.agora,
+          antecedenciaMin: config.antecedenciaMin,
+        });
+        diag.marcado = `${quandoFalado(decisao.inicio, a.agora)} (${decisao.servico.nome})`;
+        return {
+          output: responder(e.mensagem, { action: "pausar", summary: e.resumo, motivo: "fechar", pedido_novo: true }),
+          diag,
+          agendou: false,
+        };
+      }
+      case "confirmar": {
+        const g = decisao.agendamento;
+        diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;
+        if (a.dryRun) return { output: a.output, diag, agendou: false };
+        // Só grava; a resposta curta ("Perfeito, te espero...") é da IA.
+        const { error } = await a.svc
+          .from("agendamentos")
+          .update({ confirmado_em: new Date().toISOString() })
+          .eq("id", g.id)
+          .eq("client_id", a.clientId)
+          .eq("status", "confirmado")
+          .is("confirmado_em", null);
+        if (error) diag.falhou = "erro";
+        return { output: a.output, diag, agendou: false };
+      }
+      case "cancelar": {
+        const g = decisao.agendamento;
+        diag.marcado = `${quandoFalado(g.inicio, a.agora)} (${g.servicoNome})`;
+        if (a.dryRun) return { output: a.output, diag, agendou: false };
+        const ok = await cancelarAgendamento(a.svc, a.clientId, g.id, "cliente");
+        if (!ok) {
+          diag.falhou = "erro";
+          return {
+            output: responder("Não consegui cancelar agora. Vou pedir para alguém do time confirmar com você."),
+            diag,
+            agendou: false,
+          };
+        }
+        avisarAgenda({
+          ...a,
+          texto: (nome) => textoDoAvisoDaAgenda({ nome, servico: g.servicoNome, antes: g.inicio, agora: a.agora }),
+        });
+        return { output: a.output, diag, agendou: false };
+      }
+      case "marcar":
+      case "remarcar": {
+        const { servico, inicio, fim } = decisao;
+        diag.marcado = `${quandoFalado(inicio, a.agora)} (${servico.nome})`;
+        const remarcando = decisao.tipo === "remarcar" ? decisao.agendamento : null;
+        const resumo = remarcando
+          ? `Remarcou ${remarcando.servicoNome} de ${quandoFalado(remarcando.inicio, a.agora)} para ${quandoFalado(inicio, a.agora)}. ${a.output.summary}`.trim()
+          : a.output.summary;
+        const certo: AgentOutput = {
+          ...a.output,
+          action: "agendar",
+          preferencia_horario: preferenciaDoHorario(servico.nome, inicio, a.agora),
+          summary: resumo,
+        };
+        if (a.dryRun) return { output: certo, diag, agendou: true };
+        const res = remarcando
+          ? await remarcarAgendamento(a.svc, {
+              clientId: a.clientId,
+              id: remarcando.id,
+              inicio,
+              fim,
+              servicoId: servico.id,
+              servicoNome: servico.nome,
+              origem: "ia",
+              por: "cliente",
+              resumo,
+            })
+          : await marcarAgendamento(a.svc, {
+              clientId: a.clientId,
+              phone: a.phone,
+              // O nome só serve à marcação nova (remarcar copia o da linha antiga).
+              nome: await nomeDoTelefone(a.svc, a.clientId, a.phone),
+              servicoId: servico.id,
+              servicoNome: servico.nome,
+              inicio,
+              fim,
+              origem: "ia",
+              resumo,
+            });
+        if (res.ok) return { output: certo, diag, agendou: true };
+        diag.falhou = res.motivo;
+        // Outra conversa levou o horário no mesmo instante: oferece outros do período.
+        const outros = (diaEmJogo && (await ocupadosDoDia(a.svc, a.clientId, diaEmJogo))) || ocupados;
+        const nova = decidirAgenda({
+          action: "none",
+          saida: { ...saida, acao: "consultar", periodo: saida.periodo || periodoDe(inicio) },
+          agora: a.agora,
+          hours,
+          ocupados: outros,
+          config,
+          servicos,
+          daPessoa,
+        });
+        const texto =
+          nova.tipo === "consultar"
+            ? textoDaConsulta({
+                dia: nova.dia,
+                periodo: nova.periodo,
+                resultado: nova.resultado,
+                agora: a.agora,
+                antecedenciaMin: config.antecedenciaMin,
+                indisponivel: true,
+              })
+            : `Esse horário acabou de ser preenchido. Quer que eu veja outro horário para ${diaFalado(inicio, a.agora)}?`;
+        return { output: responder(texto), diag, agendou: false };
+      }
+    }
+  } catch (e) {
+    console.error("falha na agenda do turno:", e);
+    diag.falhou = "erro";
+    const queriaMarcar = saida.acao === "marcar" || saida.acao === "remarcar" || a.output.action === "agendar";
+    return queriaMarcar
+      ? {
+          output: responder("Não consegui confirmar o horário agora. Vou pedir para alguém do time falar com você."),
+          diag,
+          agendou: false,
+        }
+      : { output: a.output, diag, agendou: false };
+  }
+}
+
+/** Aviso ao time de um cancelamento feito na conversa. Mesmo cano do pedido de ajuda. */
+function avisarAgenda(a: {
+  clientId: string;
+  phone: string;
+  instancia: string | null;
+  destino: string | null;
+  texto: (nome: string) => string;
+}): void {
+  if (!a.instancia || !a.destino) return;
+  // A conversa de teste (DDD 00) nunca avisa ninguém.
+  if (telefoneImpossivel(a.phone)) return;
+  const { instancia, destino } = a;
+  try {
+    after(async () => {
+      try {
+        const nome = await nomeDoTelefone(createServiceClient(), a.clientId, a.phone);
+        const ok = await sendText(instancia, destino, a.texto(nome ?? ""));
+        if (!ok) console.error("aviso da agenda recusado pela Evolution");
+      } catch (e) {
+        console.error("falha ao mandar o aviso da agenda:", e);
+      }
+    });
+  } catch (e) {
+    console.error("falha ao agendar o aviso da agenda:", e);
+  }
+}
+
+/** O nome do contato (`nomeDoContato`) pelo telefone, para a agenda; null sem nome. */
+async function nomeDoTelefone(
+  svc: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  phone: string
+): Promise<string | null> {
+  const { data } = await svc
+    .from("dados_cliente")
+    .select("display_name, nomewpp")
+    .eq("client_id", clientId)
+    .eq("telefone", phone)
+    .maybeSingle();
+  return nomeDoContato(data);
 }

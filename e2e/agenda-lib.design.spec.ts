@@ -1,0 +1,410 @@
+import fs from "node:fs";
+import { test, expect } from "@playwright/test";
+import {
+  AGENDA_PADRAO,
+  acoesDoTurno,
+  diaDaSaida,
+  pedidoDeHorario,
+  consultaDeSeguranca,
+  saidaComODiaDaPessoa,
+  textoPedeDia,
+  travaSemAgenda,
+  blocoDaAgenda,
+  consultarPeriodo,
+  decidirAgenda,
+  hhmm,
+  horariosDoTime,
+  iniciosDoDia,
+  diaDoLembrete,
+  execucaoDoDia,
+  janelaDoLembrete,
+  lembreteDoHorario,
+  normalizarConfigDaAgenda,
+  feriadoQueFecha,
+  horarioDaAgenda,
+  periodosDoDia,
+  resumoDosPeriodos,
+  quandoFalado,
+  textoDaConsulta,
+  textoDoLembrete,
+  validarHorario,
+  type AgendaConfig,
+  type SaidaDaAgenda,
+} from "../lib/agenda";
+import { EMPTY_CONFIG, GOALS, compilePersona, validateConfig, type BusinessHours } from "../lib/agent-prompt";
+import { inicioDoDiaSP } from "../lib/fuso";
+import { feriadoDoDia, feriadosDoAno, pascoa } from "../lib/feriados";
+import { ehLembrete, respostaDaIa, respostaHumana } from "../lib/mensagem";
+import { rowsToBubbles } from "../components/thread/bolhas";
+
+// AGENDA PRÓPRIA (docs/plano-agenda.md): as regras do dono de 28/10/2026, puras
+// e com relógio FIXO. Quarta, 28/10/2026, 08:00 em São Paulo.
+
+const MIN = 60_000;
+const em = (dia: string, hm: string) => {
+  const [h, m] = hm.split(":").map(Number);
+  return inicioDoDiaSP(dia) + (h * 60 + m) * MIN;
+};
+const AGORA = em("2026-10-28", "08:00");
+const aberto = { open: true, from: "08:00", to: "18:00" };
+const HORAS: BusinessHours = {
+  seg: aberto, ter: aberto, qua: aberto, qui: aberto, sex: aberto,
+  sab: { open: true, from: "08:00", to: "12:00" },
+  dom: { open: false, from: "08:00", to: "12:00" },
+};
+const CFG: AgendaConfig = { ...AGENDA_PADRAO, ativa: true, antecedenciaMin: 120, intervaloMin: 0, inicio: "meia" };
+const lista = (ts: number[]) => ts.map(hhmm);
+const VAZIA: SaidaDaAgenda = { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" };
+
+test.describe("lib/agenda: como os horários começam", () => {
+  const base = { dia: "2026-10-29", hours: HORAS, duracaoMin: 30 };
+  test("na hora cheia ou na meia hora (padrão)", () => {
+    expect(lista(iniciosDoDia({ ...base, ocupados: [], config: CFG })).slice(0, 4)).toEqual(["08:00", "08:30", "09:00", "09:30"]);
+  });
+  test("na hora cheia", () => {
+    expect(lista(iniciosDoDia({ ...base, ocupados: [], config: { ...CFG, inicio: "hora" } })).slice(0, 3)).toEqual(["08:00", "09:00", "10:00"]);
+  });
+  test("logo após o anterior, com intervalo de 10 min: 8h, 8h40, 9h20", () => {
+    expect(lista(iniciosDoDia({ ...base, ocupados: [], config: { ...CFG, inicio: "seguido", intervaloMin: 10 } })).slice(0, 3)).toEqual(["08:00", "08:40", "09:20"]);
+  });
+  test("o intervalo entra na conta: fim + intervalo, arredondado para a próxima marca", () => {
+    const ocupado = [{ inicio: em("2026-10-29", "08:00"), fim: em("2026-10-29", "08:40") }];
+    expect(lista(iniciosDoDia({ ...base, ocupados: ocupado, config: { ...CFG, intervaloMin: 10 } }))[0]).toBe("09:00");
+    expect(lista(iniciosDoDia({ ...base, ocupados: ocupado, config: { ...CFG, inicio: "seguido", intervaloMin: 10 } }))[0]).toBe("08:50");
+  });
+});
+
+test.describe("lib/agenda: oferta por dia e período", () => {
+  const base = { agora: AGORA, hours: HORAS, ocupados: [], config: CFG, duracaoMin: 30 };
+  test("no máximo 3, os mais próximos do período", () => {
+    const r = consultarPeriodo({ ...base, dia: "2026-10-29", periodo: "tarde" });
+    expect(r.tipo === "ofertas" && lista(r.inicios)).toEqual(["12:00", "12:30", "13:00"]);
+  });
+  test("sem limite de dias à frente", () => {
+    const r = consultarPeriodo({ ...base, dia: "2027-03-10", periodo: "manha" });
+    expect(r.tipo).toBe("ofertas");
+  });
+  test("só livre dentro da antecedência: escala, não esconde", () => {
+    const r = consultarPeriodo({ ...base, agora: em("2026-10-28", "16:30"), dia: "2026-10-28", periodo: "tarde" });
+    expect(r.tipo).toBe("antecedencia");
+  });
+  test("dia fechado: diz que não tem horário naquele dia e pergunta outro dia", () => {
+    const r = consultarPeriodo({ ...base, dia: "2026-11-01", periodo: "manha" });
+    expect(r.tipo).toBe("fechado");
+    expect(textoDaConsulta({ dia: "2026-11-01", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toContain("não temos horário. Prefere outro dia?");
+  });
+  test("o texto da oferta diz o dia, o período e até 3 horas", () => {
+    const r = consultarPeriodo({ ...base, dia: "2026-10-29", periodo: "tarde" });
+    expect(textoDaConsulta({ dia: "2026-10-29", periodo: "tarde", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toBe(
+      "Amanhã, quinta, 29/10, à tarde, tenho 12h, 12h30 ou 13h. Qual fica melhor?"
+    );
+  });
+});
+
+test.describe("lib/agenda: validar e decidir", () => {
+  const ctx = { agora: AGORA, hours: HORAS, ocupados: [{ inicio: em("2026-10-29", "10:00"), fim: em("2026-10-29", "10:30") }], config: CFG };
+  const servicos = [{ id: 7, nome: "Avaliação", duracaoMin: 30 }];
+  test("validarHorario", () => {
+    expect(validarHorario({ ...ctx, inicio: em("2026-10-29", "11:00"), duracaoMin: 30 })).toBe("ok");
+    expect(validarHorario({ ...ctx, inicio: em("2026-10-29", "10:00"), duracaoMin: 30 })).toBe("ocupado");
+    expect(validarHorario({ ...ctx, inicio: em("2026-10-29", "11:10"), duracaoMin: 30 })).toBe("fora");
+    expect(validarHorario({ ...ctx, inicio: em("2026-10-28", "09:00"), duracaoMin: 30 })).toBe("antecedencia");
+    expect(validarHorario({ ...ctx, inicio: em("2026-10-28", "07:00"), duracaoMin: 30 })).toBe("passou");
+  });
+  test("decidirAgenda: consultar, marcar, escalar, indisponível, inválido, cancelar", () => {
+    const d = (action: string, saida: Partial<SaidaDaAgenda>, daPessoa = [] as never[]) =>
+      decidirAgenda({ ...ctx, action, saida: { ...VAZIA, ...saida }, servicos, daPessoa });
+    expect(d("none", {}).tipo).toBe("nada");
+    expect(d("none", { acao: "consultar", dia: "2026-10-29", periodo: "manha" }).tipo).toBe("consultar");
+    // Sem período e o dia tem manhã e tarde: pergunta entre os dois (nunca "inválido").
+    expect(d("none", { acao: "consultar", dia: "2026-10-29" })).toEqual({ tipo: "pedePeriodo", dia: "2026-10-29", periodos: ["manha", "tarde"] });
+    expect(d("none", { acao: "consultar" }).tipo).toBe("pedeDia");
+    expect(d("agendar", { acao: "marcar", dia: "2026-10-29", hora: "11:00" }).tipo).toBe("marcar");
+    expect(d("agendar", { acao: "marcar", dia: "2026-10-28", hora: "09:00" }).tipo).toBe("escalar");
+    expect(d("agendar", { acao: "marcar", dia: "2026-10-29", hora: "10:00" }).tipo).toBe("indisponivel");
+    expect(d("agendar", {}).tipo).toBe("pedeDia");
+    // Quis marcar com o dia e sem hora: vira consulta do dia.
+    expect(d("agendar", { acao: "marcar", dia: "2026-10-29", periodo: "tarde" }).tipo).toBe("consultar");
+    const g = { codigo: "A1", id: 9, servicoId: 7, servicoNome: "Avaliação", inicio: em("2026-10-30", "09:00"), fim: em("2026-10-30", "09:30") };
+    expect(decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "cancelar", agendamento: "A1" }, servicos, daPessoa: [g] }).tipo).toBe("cancelar");
+    const rem = decidirAgenda({ ...ctx, action: "agendar", saida: { ...VAZIA, acao: "remarcar", dia: "2026-10-30", hora: "14:00", agendamento: "a1" }, servicos, daPessoa: [g] });
+    expect(rem.tipo === "remarcar" && rem.agendamento.id).toBe(9);
+  });
+  test("o caso da OBS (29/10): agenda só à tarde, \"amanhã\" sem período já oferece a tarde", () => {
+    const tarde = { open: true, from: "13:00", to: "18:00" };
+    const obs: BusinessHours = { seg: tarde, ter: tarde, qua: tarde, qui: tarde, sex: tarde, sab: { ...tarde, open: false }, dom: { ...tarde, open: false } };
+    const agora = em("2026-10-29", "11:15");
+    const cfg = { ...CFG, inicio: "hora" as const, intervaloMin: 15 };
+    const r = decidirAgenda({ agora, hours: obs, ocupados: [], config: cfg, action: "none", saida: { ...VAZIA, acao: "consultar", dia: "amanhã" }, servicos, daPessoa: [] });
+    expect(r.tipo).toBe("consultar");
+    if (r.tipo !== "consultar") return;
+    expect(r.dia).toBe("2026-10-30");
+    expect(r.periodo).toBe("tarde");
+    expect(textoDaConsulta({ dia: r.dia, periodo: r.periodo, resultado: r.resultado, agora, antecedenciaMin: 120 })).toBe(
+      "Amanhã, sexta, 30/10, à tarde, tenho 13h, 14h ou 15h. Qual fica melhor?"
+    );
+    // A lista do prompt traz a data completa e o período do dia; nada de "manhã".
+    const b = blocoDaAgenda({ agora, daPessoa: [], servicos, config: cfg, hours: obs });
+    expect(b).toContain("- amanhã, sexta, 30/10 = 2026-10-30: tarde (13h às 18h)");
+    expect(b).toContain("- sábado, 31/10 = 2026-10-31: sem horário");
+    expect(b).toContain("Períodos em que a agenda atende: segunda a sexta: tarde");
+    // Falta o dia: pergunta só o dia, dizendo o período que existe.
+    expect(textoPedeDia(obs)).toBe("Qual dia fica melhor pra você? A agenda atende segunda a sexta: tarde.");
+  });
+  test("o dia como a pessoa fala: amanhã, segunda, dia 05, 5 de novembro, 30/10", () => {
+    const agora = em("2026-10-29", "11:15"); // quinta
+    const casos: [string, string | null][] = [
+      ["2026-11-03", "2026-11-03"],
+      ["hoje", "2026-10-29"],
+      ["amanhã", "2026-10-30"],
+      ["Amanha", "2026-10-30"],
+      ["depois de amanhã", "2026-10-31"],
+      ["segunda", "2026-11-02"],
+      ["segunda-feira", "2026-11-02"],
+      ["terça", "2026-11-03"],
+      ["quinta", "2026-11-05"],
+      ["sábado", "2026-10-31"],
+      ["dia 05", "2026-11-05"],
+      ["05", "2026-11-05"],
+      ["30", "2026-10-30"],
+      ["5 de novembro", "2026-11-05"],
+      ["05 de outubro", "2027-10-05"],
+      ["30/10", "2026-10-30"],
+      ["5/11", "2026-11-05"],
+      ["10/01", "2027-01-10"],
+      ["30/10/2026", "2026-10-30"],
+      ["semana que vem", null],
+      ["", null],
+      ["32", null],
+    ];
+    for (const [dito, esperado] of casos) expect(diaDaSaida(dito, agora), dito).toBe(esperado);
+  });
+  test("a rede do código: a pessoa disse o dia e o modelo não consultou", () => {
+    const agora = em("2026-10-29", "11:15"); // quinta
+    expect(pedidoDeHorario("sim, vamos marcar para amanhã", agora)).toEqual({ dia: "2026-10-30", periodo: "" });
+    expect(pedidoDeHorario("pode marcar 30/10 de manhã", agora)).toEqual({ dia: "2026-10-30", periodo: "manha" });
+    expect(pedidoDeHorario("terça que vem, à tarde", agora)).toEqual({ dia: "2026-11-03", periodo: "tarde" });
+    expect(pedidoDeHorario("dia 05 de manhã", agora)).toEqual({ dia: "2026-11-05", periodo: "manha" });
+    expect(pedidoDeHorario("5 de novembro à noite", agora)).toEqual({ dia: "2026-11-05", periodo: "noite" });
+    expect(pedidoDeHorario("Boa tarde, pode ser segunda-feira?", agora)).toEqual({ dia: "2026-11-02", periodo: "" });
+    expect(pedidoDeHorario("amanhã", agora)?.periodo).toBe("");
+    expect(pedidoDeHorario("quero melhorar meu atendimento", agora)).toBeNull();
+    const base = { agora, motivo: "", acao: "" };
+    // Perguntou "manhã ou tarde?" sem consultar: o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "sim, vamos marcar para amanhã", resposta: "Prefere manhã ou tarde?", action: "none" })).toEqual({ dia: "2026-10-30", periodo: "" });
+    // Passou para o time "para ver os horários": o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "terça que vem, à tarde", resposta: "Vou ver os horários disponíveis e já te confirmo.", action: "pausar", motivo: "fechar" })).toEqual({ dia: "2026-11-03", periodo: "tarde" });
+    // Pedido de ajuda de outro motivo, ou o modelo já consultou: não mexe.
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero falar com alguém amanhã sobre o horário", resposta: "Vou chamar alguém.", action: "pausar", motivo: "pessoa" })).toBeNull();
+    expect(consultaDeSeguranca({ ...base, mensagem: "amanhã à tarde", resposta: "", action: "none", acao: "consultar" })).toBeNull();
+    // Dia sem conversa de horário: não mexe ("chego amanhã na loja").
+    expect(consultaDeSeguranca({ ...base, mensagem: "chego amanhã na loja", resposta: "Combinado, te espero!", action: "none" })).toBeNull();
+    // Retomada (sem mensagem nova): não mexe.
+    expect(consultaDeSeguranca({ ...base, mensagem: null, resposta: "horário", action: "none" })).toBeNull();
+    // Passou para o time marcando "falta de informação" para ver horário: o código consulta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "dia 05 de manhã", resposta: "Vou ver os horários e te passo.", action: "pausar", motivo: "falta_info" })).toEqual({ dia: "2026-11-05", periodo: "manha" });
+    // Consultou E pediu ajuda junto: a consulta vale (com o dia da conversa, se a mensagem não traz).
+    expect(consultaDeSeguranca({ ...base, mensagem: "pode ser à tarde", resposta: "Vou verificar os horários.", action: "pausar", motivo: "falta_info", acao: "consultar", dia: "2026-11-04", periodo: "tarde" })).toEqual({ dia: "2026-11-04", periodo: "tarde" });
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero cancelar amanhã", resposta: "Vou ver o horário.", action: "pausar", motivo: "fechar", acao: "cancelar" })).toBeNull();
+    // Dois dias na mesma frase: ambíguo, o código não escolhe.
+    expect(pedidoDeHorario("não posso amanhã, pode ser segunda?", agora)).toBeNull();
+    expect(pedidoDeHorario("depois de amanhã à tarde", agora)).toEqual({ dia: "2026-10-31", periodo: "tarde" });
+    // O dia dito pela pessoa vale mais que a conta do modelo ("segunda" é Finados; o modelo pôs terça).
+    const s = saidaComODiaDaPessoa({ ...VAZIA, acao: "consultar", dia: "2026-11-03", periodo: "tarde" }, "pode ser segunda-feira à tarde", agora);
+    expect(s.dia).toBe("2026-11-02");
+    expect(saidaComODiaDaPessoa({ ...VAZIA, acao: "marcar", dia: "2026-11-03", hora: "14:00" }, "pode ser às 14h", agora).dia).toBe("2026-11-03");
+  });
+  test("com mais de um serviço, sem código válido é inválido", () => {
+    const dois = [...servicos, { id: 8, nome: "Retorno", duracaoMin: 15 }];
+    expect(decidirAgenda({ ...ctx, action: "agendar", saida: { ...VAZIA, acao: "marcar", dia: "2026-10-29", hora: "11:00" }, servicos: dois, daPessoa: [] }).tipo).toBe("invalido");
+    expect(decidirAgenda({ ...ctx, action: "agendar", saida: { ...VAZIA, acao: "marcar", servico: "V2", dia: "2026-10-29", hora: "11:00" }, servicos: dois, daPessoa: [] }).tipo).toBe("marcar");
+  });
+  test("o time marca fora do expediente", () => {
+    const dentro = horariosDoTime({ ...ctx, dia: "2026-11-01", duracaoMin: 30 });
+    const fora = horariosDoTime({ ...ctx, dia: "2026-11-01", duracaoMin: 30, foraDoExpediente: true });
+    expect(dentro).toEqual([]);
+    expect(fora.length).toBeGreaterThan(40);
+  });
+  test("bloco do prompt: sem horários, com o contrato e sem travessão", () => {
+    const b = blocoDaAgenda({ agora: AGORA, daPessoa: [], servicos, config: CFG, hours: HORAS });
+    expect(b).toContain("### AGENDA");
+    expect(b).toContain("Só há um serviço");
+    expect(b).not.toMatch(/\d{1,2}h\d{0,2}, /);
+    expect(b).not.toMatch(/[–—]/);
+  });
+});
+
+test.describe("lib/agenda: config", () => {
+  test("valores fora da lista viram o padrão; antecedência é livre", () => {
+    expect(normalizarConfigDaAgenda(null)).toEqual(AGENDA_PADRAO);
+    expect(normalizarConfigDaAgenda({ ativa: true, antecedenciaMin: 45, intervaloMin: 7, inicio: "seguido" })).toEqual({
+      ...AGENDA_PADRAO, ativa: true, antecedenciaMin: 45, inicio: "seguido",
+    });
+    expect(quandoFalado(em("2026-10-29", "10:30"), AGORA)).toBe("amanhã, quinta, 29/10, às 10h30");
+  });
+});
+
+test.describe("lib/agenda: horário próprio", () => {
+  test("o próprio vale; sem ele, a cópia do de atendimento; o banco guarda normalizado", () => {
+    const proprio: BusinessHours = { ...HORAS, sab: { open: false, from: "08:00", to: "12:00" } };
+    expect(horarioDaAgenda({ ...CFG, horario: proprio }, HORAS)).toBe(proprio);
+    expect(horarioDaAgenda({ ...CFG, horario: null }, HORAS)).toBe(HORAS);
+    expect(horarioDaAgenda({ ...CFG, horario: null }, null)).toBeNull();
+    expect(normalizarConfigDaAgenda({ horario: { seg: { open: true, from: "10:00", to: "12:00" } } }).horario?.seg).toEqual({
+      open: true, from: "10:00", to: "12:00",
+    });
+  });
+});
+
+test.describe("lib/agenda: lembrete às 9h do dia anterior aberto", () => {
+  // HORAS: segunda a sexta abertas, sábado só manhã, domingo fechado.
+  const semSabado: BusinessHours = { ...HORAS, sab: { open: false, from: "08:00", to: "12:00" } };
+  test("dia comum: a execução cobre só amanhã", () => {
+    expect(janelaDoLembrete("2026-10-28", HORAS)).toEqual({ de: "2026-10-29", ate: "2026-10-29" });
+  });
+  test("sexta com sábado e domingo fechados: saem os de sábado, domingo e segunda", () => {
+    expect(janelaDoLembrete("2026-10-30", semSabado)).toEqual({ de: "2026-10-31", ate: "2026-11-02" });
+  });
+  test("empresa fechada no dia: não roda", () => {
+    expect(janelaDoLembrete("2026-11-01", HORAS)).toBeNull();
+    expect(janelaDoLembrete("2026-10-31", semSabado)).toBeNull();
+  });
+  test("feriado não entra: vale só o horário semanal", () => {
+    // 02/11 (Finados) é segunda: para o produto, um dia aberto como outro qualquer.
+    expect(janelaDoLembrete("2026-11-02", HORAS)).toEqual({ de: "2026-11-03", ate: "2026-11-03" });
+    expect(diaDoLembrete("2026-11-03", HORAS)).toBe("2026-11-02");
+  });
+  test("o dia do lembrete de um horário e quem fica sem", () => {
+    expect(diaDoLembrete("2026-11-02", semSabado)).toBe("2026-10-30");
+    const inicio = em("2026-11-02", "10:00");
+    expect(lembreteDoHorario({ inicio, marcadoEm: em("2026-10-30", "08:59"), hours: semSabado, ligado: true })).toEqual({ dia: "2026-10-30" });
+    // Marcado depois da execução que o cobriria: sem lembrete.
+    expect(lembreteDoHorario({ inicio, marcadoEm: em("2026-10-30", "09:00"), hours: semSabado, ligado: true })).toBeNull();
+    expect(lembreteDoHorario({ inicio, marcadoEm: AGORA, hours: semSabado, ligado: false })).toBeNull();
+    expect(execucaoDoDia("2026-10-30")).toBe(em("2026-10-30", "09:00"));
+  });
+});
+
+test.describe("lib/feriados e lib/agenda: feriados nacionais", () => {
+  test("Páscoa e móveis calculados; fixos do ano", () => {
+    expect(pascoa(2026)).toBe("2026-04-05");
+    expect(pascoa(2027)).toBe("2027-03-28");
+    expect(feriadoDoDia("2026-04-03")).toEqual({ dia: "2026-04-03", nome: "Sexta-feira Santa", tipo: "nacional" });
+    expect(feriadoDoDia("2026-02-17")?.tipo).toBe("facultativo"); // Carnaval
+    expect(feriadoDoDia("2026-11-20")?.nome).toBe("Dia da Consciência Negra");
+    expect(feriadoDoDia("2026-10-28")).toBeNull();
+    expect(feriadosDoAno(2026).filter((x) => x.tipo === "nacional")).toHaveLength(10);
+  });
+  test("feriado nacional vem bloqueado para a IA; o dono libera um específico", () => {
+    const base = { agora: AGORA, hours: HORAS, ocupados: [], duracaoMin: 30, periodo: "manha" as const };
+    // 02/11/2026 é segunda (Finados).
+    const r = consultarPeriodo({ ...base, config: CFG, dia: "2026-11-02" });
+    expect(r).toEqual({ tipo: "fechado", feriado: "Finados" });
+    expect(textoDaConsulta({ dia: "2026-11-02", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toContain("é feriado (Finados)");
+    expect(consultarPeriodo({ ...base, config: { ...CFG, feriadosLiberados: ["2026-11-02"] }, dia: "2026-11-02" }).tipo).toBe("ofertas");
+    expect(validarHorario({ ...base, config: CFG, inicio: em("2026-11-02", "09:00") })).toBe("fora");
+    // Ponto facultativo só aparece marcado: não bloqueia.
+    expect(feriadoQueFecha("2027-02-08", CFG)).toBeNull();
+  });
+});
+
+test.describe("lib/agenda: períodos pelo horário da agenda", () => {
+  const tarde: BusinessHours = { ...HORAS, qui: { open: true, from: "13:00", to: "17:00" } };
+  test("das 13h às 17h é só à tarde; pedir manhã diz o que existe", () => {
+    expect(periodosDoDia("2026-10-29", tarde)).toEqual(["tarde"]);
+    expect(periodosDoDia("2026-10-28", HORAS)).toEqual(["manha", "tarde"]);
+    const r = consultarPeriodo({ agora: AGORA, hours: tarde, ocupados: [], config: CFG, duracaoMin: 30, dia: "2026-10-29", periodo: "manha" });
+    expect(r).toEqual({ tipo: "semPeriodo", periodos: ["tarde"] });
+    expect(textoDaConsulta({ dia: "2026-10-29", periodo: "manha", resultado: r, agora: AGORA, antecedenciaMin: 120 })).toBe(
+      "Amanhã, quinta, 29/10 só temos horário à tarde. Pode ser?"
+    );
+  });
+  test("o bloco do prompt resume os períodos da semana", () => {
+    expect(resumoDosPeriodos(HORAS)).toBe("segunda a sexta: manhã e tarde; sábado: manhã");
+  });
+});
+
+test.describe("Prompt do agente: a agenda ligada substitui o objetivo Agendar", () => {
+  const cfg = { ...EMPTY_CONFIG, companyName: "Loja", companyWhat: "vende coisas.", agentName: "Ana", goals: ["duvidas", "agendar"] };
+  test("sem agenda ninguém marca, nem o avançado", () => {
+    const g = compilePersona({ mode: "guiado", config: cfg });
+    expect(g.ok && g.persona).toContain('NUNCA use "agendar"');
+    expect(g.ok && g.persona).toContain("Você não marca horários nem conversas");
+    const a = compilePersona({ mode: "avancado", persona: "### IDENTIDADE\nVocê é a Ana. Confirmou dia e período: use agendar." });
+    expect(a.ok && a.persona).toContain('NUNCA use "agendar"');
+    // A IA dizia "deixei reservado pra amanhã às 18h" sem agenda (bateria ia, 29/10).
+    for (const r of [g, a]) expect(r.ok && r.persona).toContain("Nunca diga que um horário ficou reservado, marcado, combinado ou confirmado");
+    // ... e na PRECEDÊNCIA, acima do texto do cliente (o avançado da OBS manda confirmar).
+    for (const r of [g, a]) expect(r.ok && r.persona).toContain("Esta conta não tem agenda ligada: você NUNCA confirma, reserva nem marca horário");
+    const comAgenda = compilePersona({ mode: "guiado", config: cfg, agendaAtiva: true });
+    expect(comAgenda.ok && comAgenda.persona).not.toContain("Esta conta não tem agenda ligada");
+  });
+  test("o prompt real da OBS continua cabendo no limite com a base nova", () => {
+    const obs = compilePersona({ mode: "avancado", persona: fs.readFileSync("e2e/fixtures/persona-obs.txt", "utf8") });
+    expect(obs.ok, obs.ok ? "" : obs.motivo).toBe(true);
+  });
+  test("sem agenda o esquema não tem agendar, e a trava converte o que escapar em pedido de ajuda", () => {
+    expect(acoesDoTurno(false)).toEqual(["none", "pausar"]);
+    expect(acoesDoTurno(true)).toEqual(["none", "agendar", "pausar"]);
+    const escapou = { action: "agendar", pedido_novo: false, summary: "quer amanhã às 18h" };
+    expect(travaSemAgenda(escapou, false)).toEqual({ action: "pausar", pedido_novo: true, summary: "quer amanhã às 18h" });
+    // Com a agenda ligada a trava não mexe (quem decide é decidirAgenda).
+    expect(travaSemAgenda(escapou, true)).toBe(escapou);
+    const nada = { action: "none", pedido_novo: false };
+    expect(travaSemAgenda(nada, false)).toBe(nada);
+  });
+  test("com agenda, o prompt manda seguir a seção AGENDA e o sistema oferece os horários", () => {
+    const g = compilePersona({ mode: "guiado", config: cfg, agendaAtiva: true });
+    expect(g.ok && g.persona).toContain("siga a seção AGENDA");
+    expect(g.ok && g.persona).toContain("um dos horários que o sistema ofereceu");
+    expect(g.ok && g.persona).not.toMatch(/[\u2013\u2014]/);
+  });
+  test("o objetivo Agendar sumiu da lista e da config", () => {
+    expect(GOALS.map((g) => g.value)).toEqual(["duvidas", "qualificar"]);
+    const v = validateConfig(cfg);
+    expect(v.ok && v.value.goals).toEqual(["duvidas"]);
+  });
+});
+
+test.describe("lib/agenda: confirmação de presença depois do lembrete", () => {
+  const servicos = [{ id: 7, nome: "Avaliação", duracaoMin: 30 }];
+  const base = { codigo: "A1", id: 9, servicoId: 7, servicoNome: "Avaliação", inicio: em("2026-10-29", "10:30"), fim: em("2026-10-29", "11:00") };
+  test("o bloco diz o estado de cada horário e só pede confirmação quando há lembrete aguardando", () => {
+    const aguardando = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [{ ...base, lembreteEnviadoEm: AGORA - 1, confirmadoEm: null }] });
+    expect(aguardando).toContain("[A1] Avaliação, amanhã, quinta, 29/10, às 10h30 (lembrete enviado, aguardando confirmação)");
+    expect(aguardando).toContain('agenda.acao "confirmar"');
+    const confirmado = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [{ ...base, lembreteEnviadoEm: AGORA - 2, confirmadoEm: AGORA - 1 }] });
+    expect(confirmado).toContain("(confirmado pelo contato)");
+    expect(confirmado).not.toContain('agenda.acao "confirmar"');
+    const semLembrete = blocoDaAgenda({ agora: AGORA, servicos, config: CFG, hours: HORAS, daPessoa: [base] });
+    expect(semLembrete).not.toContain("aguardando confirmação");
+  });
+  test("decidirAgenda: confirmar com código válido grava; sem código, nada", () => {
+    const ctx = { agora: AGORA, hours: HORAS, ocupados: [], config: CFG, servicos, daPessoa: [base] };
+    const ok = decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "confirmar", agendamento: "a1" } });
+    expect(ok.tipo === "confirmar" && ok.agendamento.id).toBe(9);
+    expect(decidirAgenda({ ...ctx, action: "none", saida: { ...VAZIA, acao: "confirmar", agendamento: "A7" } }).tipo).toBe("nada");
+  });
+});
+
+test("texto do lembrete (versão 1 do dono): primeiro nome, serviço, empresa, quando, pede o SIM e oferece remarcar", () => {
+  const t = textoDoLembrete({ nome: "Ana Paula", empresa: "Ótica Vision", servico: "Exame de vista", inicio: em("2026-10-29", "10:30"), agora: AGORA });
+  expect(t).toBe(
+    "Oi, Ana! Seu horário de Exame de vista na Ótica Vision está reservado para você amanhã, quinta, 29/10, às 10h30. Pode confirmar respondendo SIM? Se precisar mudar, é só me dizer um novo dia que eu remarco por aqui."
+  );
+  expect(textoDoLembrete({ nome: null, empresa: "Loja", servico: "Corte", inicio: em("2026-10-29", "10:30"), agora: AGORA })).toMatch(/^Oi! Seu horário de Corte/);
+  expect(t).not.toMatch(/[\u2013\u2014]|SAIR/);
+});
+
+test("o lembrete gravado na conversa não é resposta da IA nem do time, e vira balão com rótulo próprio", () => {
+  const lembrete = { bot_message: "Oi, Ana! Seu horário...", message_type: "lembrete" };
+  expect(ehLembrete("lembrete")).toBe(true);
+  expect(respostaDaIa(lembrete)).toBe(false);
+  expect(respostaHumana(lembrete)).toBe(false);
+  expect(respostaDaIa({ bot_message: "oi", message_type: null })).toBe(true);
+  const bolhas = rowsToBubbles([
+    { id: 1, phone: "5511900000000", nomewpp: null, user_message: null, active: null, created_at: "2026-10-28T12:00:00Z", ...lembrete },
+  ]);
+  expect(bolhas).toHaveLength(1);
+  expect(bolhas[0]).toMatchObject({ side: "out", lembrete: true, content: "Oi, Ana! Seu horário..." });
+});

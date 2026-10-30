@@ -58,6 +58,8 @@ interface ItemDoMenu {
   donoOnly?: boolean;
   /** Só o dono do PRODUTO (`ADMIN_USER_IDS`): a central "Clientes". */
   adminOnly?: boolean;
+  /** Só com a agenda ligada (revisão do dono, 28/10/2026). */
+  soComAgenda?: boolean;
 }
 
 const NAV: ItemDoMenu[] = [
@@ -71,6 +73,9 @@ const NAV: ItemDoMenu[] = [
   // para não deixar esquecer, e é para onde o aviso no WhatsApp leva.
   { href: "/pedidos", label: "Pedidos", icon: HandHelping },
   { href: "/inbox", label: "Conversas", icon: MessagesSquare },
+  // AGENDA PRÓPRIA (28/10/2026, docs/plano-agenda.md): saiu do "Em breve".
+  // Entre Conversas e Contatos, para dono e atendente, SÓ com a agenda ligada.
+  { href: "/agenda", label: "Agenda", icon: Calendar, soComAgenda: true },
   // CLIENTES (30/09/2026, decisão do dono D4 = A): entre Conversas e Pipeline.
   // No celular fica em "Mais", porque a barra de baixo já tem Painel, Pedidos
   // e Conversas.
@@ -95,8 +100,8 @@ const NAV: ItemDoMenu[] = [
   { href: "/clientes", label: "Clientes", icon: Building2, adminOnly: true },
 ];
 
-// "Em breve" (26/08/2026). Agenda porque ela saiu do "não construir" e agora vai
-// mesmo ser feita (integrando Google Calendar), então a promessa virou verdade.
+// "Em breve" (26/08/2026). A Agenda saiu daqui em 28/10/2026 (agenda própria,
+// item do menu acima).
 //
 // **Campanhas SAIU.** Manter prometia disparo em massa sobre conexão QR, que é o
 // cenário de banimento que o projeto decidiu não correr, e atrai o cliente
@@ -107,7 +112,6 @@ const NAV: ItemDoMenu[] = [
 // por trás dele nasce restrito a quem JÁ conversou, nunca lista importada nem
 // número frio.
 const SOON = [
-  { label: "Agenda", icon: Calendar },
   { label: "Follow-up", icon: Repeat2 },
 ];
 
@@ -119,6 +123,7 @@ export default function NavRail({
   ehAdmin = false,
   whatsappConnected = true,
   numeroAvisos = null,
+  agendaAtiva = false,
 }: {
   clientName: string;
   /**
@@ -139,6 +144,8 @@ export default function NavRail({
   whatsappConnected?: boolean;
   /** Destino dos avisos: não conta como conversa não lida (lib/avisos.ts). */
   numeroAvisos?: string | null;
+  /** Agenda ligada (`clients.agenda_config.ativa`, decidido no servidor): mostra "Agenda". */
+  agendaAtiva?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -147,7 +154,8 @@ export default function NavRail({
   // renderização, real ou de /design, passa o papel), e "Clientes" só existe para
   // o dono do produto.
   const visiveis = NAV.filter(
-    (n) => !(n.donoOnly && role !== "dono") && !(n.adminOnly && !ehAdmin),
+    (n) =>
+      !(n.donoOnly && role !== "dono") && !(n.adminOnly && !ehAdmin) && !(n.soComAgenda && !agendaAtiva),
   );
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);

@@ -43,7 +43,7 @@ const CONFIG: AgentConfig = {
   agentName: "Bia",
   agentRole: "",
   tone: "profissional",
-  goals: ["duvidas", "qualificar", "agendar"],
+  goals: ["duvidas", "qualificar"],
   neverAdmitAi: true,
   dontDo: [],
   escalateWhen: [],
@@ -123,7 +123,12 @@ for (const modo of MODOS) {
       expect(t, t).not.toMatch(MANHA_ERRADA);
     });
 
-    test("\"amanhã na\" completa o 18h combinado, nunca vira manhã", async ({ request }) => {
+    // ⚠️ CONTRATO NOVO (28/10/2026, decisão do dono): o objetivo "Agendar" saiu.
+    // Sem a agenda ligada (o tenant de teste fica com ela DESLIGADA), quem quer
+    // marcar vira pedido de ajuda ao time (`pausar`), nunca `agendar`, e a IA não
+    // confirma horário sozinha. Com a agenda ligada, quem oferece e marca é o
+    // código (lib/agenda.ts, provado em e2e/agenda-lib.design.spec.ts).
+    test("\"amanhã na\" sem agenda: passa para o time, nunca vira manhã", async ({ request }) => {
       const r = await turno(request, {
         ...modo.corpo,
         history: [
@@ -136,11 +141,11 @@ for (const modo of MODOS) {
         agoraTeste: NOITE,
       });
       const t = texto(r);
-      expect(t, t).toMatch(/18/);
+      expect(r.output.action, t).toBe("pausar");
       expect(t, t).not.toMatch(MANHA_ERRADA);
     });
 
-    test("conversa marcada é agendar e NÃO entra na fila de pedidos", async ({ request }) => {
+    test("pedido para marcar sem agenda é pedido de ajuda, nunca agendar", async ({ request }) => {
       const r = await turno(request, {
         ...modo.corpo,
         history: [
@@ -150,8 +155,8 @@ for (const modo of MODOS) {
         message: "Isso, amanhã às 18h pode marcar",
         agoraTeste: NOITE,
       });
-      expect(r.output.action, texto(r)).toBe("agendar");
-      expect(r.diagnostics.pedidoNaFila).toBe(false);
+      expect(r.output.action, texto(r)).toBe("pausar");
+      expect(r.diagnostics.pedidoNaFila).toBe(true);
     });
   });
 }

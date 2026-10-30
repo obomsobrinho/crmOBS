@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { agendaDoTenant } from "@/lib/agenda-servidor";
 import { requireActiveTenant } from "@/lib/auth";
 import MontagemWizard from "@/components/MontagemCliente";
 import { validateConfig, type AgentConfig } from "@/lib/agent-prompt";
@@ -31,7 +33,7 @@ export default async function MontagemPage() {
   if (client.agentPublishedAt) redirect("/agente");
 
   const supabase = await createClient();
-  const [{ data }, { data: stages }, { data: docsRows }] = await Promise.all([
+  const [{ data }, { data: stages }, { data: docsRows }, agenda] = await Promise.all([
     supabase
       .from("clients")
       .select(
@@ -48,6 +50,8 @@ export default async function MontagemPage() {
       .select("id, title, status, chunk_count, byte_size, error, created_at")
       .eq("client_id", client.id)
       .order("created_at", { ascending: false }),
+    // O item "Agenda" do passo 2 (null = agenda indisponível: o item some).
+    agendaDoTenant(createServiceClient(), client.id),
   ]);
 
   if ((data?.prompt_mode as string | null) === "avancado") redirect("/agente");
@@ -91,6 +95,7 @@ export default async function MontagemPage() {
       knowledgeKeyConfigured={!!process.env.OPENAI_API_KEY}
       stageNames={stageNames}
       passoDoServidor={client.montagem.passo}
+      agendaInicial={agenda}
     />
   );
 }

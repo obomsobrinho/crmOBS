@@ -19,6 +19,7 @@ import {
   estadoDoWhatsApp,
   type EstadoDoWhatsApp,
   type FiltroDeSituacao,
+  type LembretesComFalha,
   type PedidosEmAberto,
 } from "@/lib/admin-alertas";
 import {
@@ -183,8 +184,9 @@ export async function paginaDeClientes(
   });
   if (error) throw error;
   const linhas = data ?? [];
-  const pedidos = await pedidosAbertosDaPagina(svc, linhas.map((l) => l.id));
-  return linhas.map((l) => paraEmpresa(l, a.modelo, a.agora, pedidos.get(l.id)));
+  const ids = linhas.map((l) => l.id);
+  const [pedidos, lembretes] = await Promise.all([pedidosAbertosDaPagina(svc, ids), lembretesComFalhaDaPagina(svc, ids)]);
+  return linhas.map((l) => paraEmpresa(l, a.modelo, a.agora, pedidos.get(l.id), lembretes.get(l.id)));
 }
 
 /**
@@ -205,6 +207,25 @@ async function pedidosAbertosDaPagina(
   }
   for (const l of data ?? []) {
     mapa.set(l.client_id, { abertos: Number(l.abertos) || 0, maisAntigo: l.mais_antigo ?? null });
+  }
+  return mapa;
+}
+
+/**
+ * Os lembretes da agenda que não saíram, dos clientes de UMA página
+ * (`admin_lembretes_com_falha`, uma chamada por página). Falha (inclusive a
+ * função ainda não existir, antes da migration) não derruba a lista: o ícone some.
+ */
+async function lembretesComFalhaDaPagina(svc: Supa, ids: string[]): Promise<Map<string, LembretesComFalha>> {
+  const mapa = new Map<string, LembretesComFalha>();
+  if (ids.length === 0) return mapa;
+  const { data, error } = await svc.rpc("admin_lembretes_com_falha", { p_clients: ids });
+  if (error) {
+    console.error("central: falha ao contar os lembretes que não saíram:", error.message);
+    return mapa;
+  }
+  for (const l of data ?? []) {
+    mapa.set(l.client_id, { falhas: Number(l.falhas) || 0, maisAntiga: l.mais_antiga ?? null });
   }
   return mapa;
 }

@@ -145,6 +145,7 @@ test.describe("Guardrail e regras salvas (lib/guardrail.ts)", () => {
     motivo: "",
     pedido_aberto: 0,
     informacao_nova: false,
+    agenda: { acao: "", servico: "", dia: "", periodo: "", hora: "", agendamento: "" },
   };
 
   test("o valor da regra salva é fonte: a IA pode usar o 200 do dono", () => {

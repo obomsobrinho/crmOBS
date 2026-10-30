@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -24,11 +25,15 @@ const EM_DEV = process.env.NODE_ENV !== "production";
 export default function NovidadesModal({
   nota,
   simular = false,
+  dono = true,
 }: {
   nota: Novidade | null;
   /** Preview `/design/novidades`: fecha sem gravar nada. */
   simular?: boolean;
+  /** O usuário é dono: só ele vê o botão de uma ação `soDono`. */
+  dono?: boolean;
 }) {
+  const router = useRouter();
   const [forcada, setForcada] = useState<Novidade | null>(null);
   const [fechada, setFechada] = useState<string | null>(null);
 
@@ -69,6 +74,7 @@ export default function NovidadesModal({
   }
 
   if (!mostrar) return null;
+  const acao = mostrar.acao && (dono || !mostrar.acao.soDono) ? mostrar.acao : null;
 
   // Desenho pelas referências do dono (27/10/2026): topo colorido com o foguete
   // subindo entre nuvens, corpo claro com título centralizado, cada novidade
@@ -84,14 +90,18 @@ export default function NovidadesModal({
           <DialogTitle className="mt-3 font-bold" style={{ textWrap: "balance" }}>
             {mostrar.titulo}
           </DialogTitle>
-          <DialogDescription className="mt-1">{mostrar.resumo}</DialogDescription>
+          {mostrar.resumo ? (
+            <DialogDescription className="mt-1">{mostrar.resumo}</DialogDescription>
+          ) : (
+            <DialogDescription className="sr-only">{mostrar.titulo}</DialogDescription>
+          )}
           <ul className="mt-5 flex w-full flex-col gap-3 text-left">
             {mostrar.itens.map((i) => (
-              <li key={i.titulo} data-slot="novidades-item" className="flex gap-3">
+              <li key={i.titulo ?? i.texto} data-slot="novidades-item" className="flex gap-3">
                 <span aria-hidden className="mt-[7px] h-2 w-2 shrink-0 rounded-full bg-[var(--brand-fill)]" />
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-apoio font-semibold text-ink">{i.titulo}</span>
-                  <span className="text-apoio text-ink-2" style={{ textWrap: "pretty" }}>
+                  {i.titulo && <span className="text-apoio font-semibold text-ink">{i.titulo}</span>}
+                  <span className={i.titulo ? "text-apoio text-ink-2" : "text-apoio text-ink"} style={{ textWrap: "pretty" }}>
                     {i.texto}
                   </span>
                 </span>
@@ -100,6 +110,20 @@ export default function NovidadesModal({
           </ul>
         </div>
         <div className="border-t border-line-soft">
+          {acao && (
+            <Button
+              data-slot="novidades-acao"
+              variant="brand-ghost"
+              size="linha"
+              onClick={() => {
+                fechar();
+                if (!simular) router.push(acao.href);
+              }}
+              className="w-full justify-center rounded-none border-b border-line-soft font-semibold"
+            >
+              {acao.rotulo}
+            </Button>
+          )}
           <Button
             data-slot="novidades-fechar"
             variant="brand-ghost"

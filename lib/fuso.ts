@@ -122,3 +122,13 @@ export function mesmoDiaSP(a: string, b: string): boolean {
 export function horaNoDiaDe(iso: string, refIso: string): string {
   return mesmoDiaSP(iso, refIso) ? formatTime(iso) : diaMesCurtoHoraSP(iso);
 }
+
+/** "outubro de 2026": mês e ano de um dia civil `AAAA-MM-DD` (título da agenda). */
+export function mesAnoDoDia(dia: string): string {
+  const [a, m] = dia.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, 15, 12)).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: FUSO,
+  });
+}

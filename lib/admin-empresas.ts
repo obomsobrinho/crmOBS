@@ -7,6 +7,8 @@ import {
   situacaoDaConta,
   situacaoNoFiltro,
   SEM_PEDIDOS,
+  SEM_FALHAS_DE_LEMBRETE,
+  type LembretesComFalha,
   type Alerta,
   type PedidosEmAberto,
   type EstadoDoWhatsApp,
@@ -72,6 +74,8 @@ export interface EmpresaItem {
   criadaEm: string;
   /** Pedidos de ajuda ainda abertos (`admin_pedidos_abertos`); o ícone da lista sai daqui. */
   pedidos: PedidosEmAberto;
+  /** Lembretes da agenda que não saíram (`admin_lembretes_com_falha`); outro ícone da lista. */
+  lembretes: LembretesComFalha;
 }
 
 /** O item sem os alertas (os alertas dependem do resto dele). */
@@ -99,7 +103,8 @@ export function paraEmpresa(
   l: LinhaEmpresa,
   modelo: string | null,
   agora: number,
-  pedidos: PedidosEmAberto = SEM_PEDIDOS
+  pedidos: PedidosEmAberto = SEM_PEDIDOS,
+  lembretes: LembretesComFalha = SEM_FALHAS_DE_LEMBRETE
 ): EmpresaItem {
   const tokens: TokensDoMes = {
     entrada: Number(l.tokens_entrada) || 0,
@@ -143,6 +148,7 @@ export function paraEmpresa(
     temInstancia,
     criadaEm: l.created_at,
     pedidos,
+    lembretes,
   };
   return { ...base, alertas: alertasDaEmpresa(base, agora) };
 }

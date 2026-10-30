@@ -245,7 +245,8 @@ export function massaDeTeste(
       : i % 47 === 0
         ? NUMERO_AVISOS_SEM_NONO
         : `${prefixo}${pad(i % 23, 2)}@s.whatsapp.net`;
-  const tipos = [null, "text", "manual", "imported", "audio"];
+  // "lembrete" (28/10/2026): o lembrete automático da agenda não é resposta de ninguém.
+  const tipos = [null, "text", "manual", "imported", "audio", "lembrete"];
   const usDe = (i: number) =>
     agoraUs - (i * 61 + 5) * 60e6 - ((i * 7919) % 1000000) - (i % 11) * 13e6;
 
@@ -254,7 +255,7 @@ export function massaDeTeste(
     const k = i % 7;
     msgs.push({
       phone: fone(i),
-      message_type: tipos[i % 5],
+      message_type: tipos[i % tipos.length],
       user_message: k === 0 || k === 3 ? `pergunta ${i}` : k === 5 ? "" : null,
       bot_message:
         k === 1

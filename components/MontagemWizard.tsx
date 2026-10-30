@@ -51,6 +51,10 @@ import {
 } from "@/lib/onboarding";
 import type { AgentConfig } from "@/lib/agent-prompt";
 import type { KnowledgeDoc } from "@/lib/crm";
+import { problemaDosServicos, type AgendaConfig, type ServicoDaAgenda } from "@/lib/agenda";
+import { fonteDoBancoAgenda } from "@/lib/agenda-fonte";
+import { createClient } from "@/lib/supabase/client";
+import { ItemAgenda, ListaDeServicos, paraEditar, paraSalvar, type ServicoEditavel } from "./agenda/CamposDaAgenda";
 
 // O assistente de montagem (`/montagem`). Roda UMA vez na vida da conta e some
 // para sempre depois da primeira ativação.
@@ -83,6 +87,7 @@ export default function MontagemWizard({
   knowledgeKeyConfigured,
   stageNames,
   passoDoServidor,
+  agendaInicial,
   passoInicial,
   aberturaInicial,
   conectadoInicial,
@@ -101,6 +106,11 @@ export default function MontagemWizard({
   stageNames: Record<string, string>;
   /** Onde `montagemState` diz para retomar, olhando só o banco. */
   passoDoServidor: PassoMontagem;
+  /**
+   * A agenda gravada (config e serviços ativos). null = agenda indisponível
+   * (sem a tabela, por exemplo): o item não aparece.
+   */
+  agendaInicial: { config: AgendaConfig; servicos: ServicoDaAgenda[] } | null;
   /**
    * Força o passo de abertura, ignorando servidor e rascunho. Existe para o
    * `/design` e para o e2e conseguirem abrir um passo direto; em produção
@@ -167,9 +177,6 @@ export default function MontagemWizard({
   const [painel, setPainel] = useState<PainelDaRevisao | null>(null);
 
   const [ativando, setAtivando] = useState(false);
-  // Gravando o passo ou ativando: o botão principal gira e "Terminar depois"
-  // espera (sair no meio da gravação perderia o passo).
-  const ocupado = form.saving || ativando;
   const [erroAtivar, setErroAtivar] = useState<string | null>(null);
   // Conectado NESTA tela, visto pelo polling do `ConnectWhatsApp`. É estado de
   // tela, e não de banco: `evolution_instance` preenchida só diz que a
@@ -184,6 +191,41 @@ export default function MontagemWizard({
     initialNotifyJid
   );
   const podeAtivar = conectado && !!destinoAvisos;
+
+  // O ITEM "AGENDA" NO PASSO 2 (decisão do dono, 28/10/2026): o mesmo item das
+  // Configurações da agenda, sem perguntar "trabalha com horário marcado?".
+  // Marcado, pede só os serviços; o resto vem com os padrões (`AGENDA_PADRAO`)
+  // e os dias e horários com a cópia do horário de atendimento (a rota copia).
+  // Grava no Continuar do passo 2, logo depois do agente, que é quando o
+  // horário de atendimento já está no banco para a cópia.
+  const [agendaBase, setAgendaBase] = useState(agendaInicial?.config ?? null);
+  const [agendaAtiva, setAgendaAtiva] = useState(!!agendaInicial?.config.ativa);
+  const [servicosAgenda, setServicosAgenda] = useState<ServicoEditavel[]>(
+    () => agendaInicial?.servicos.map(paraEditar) ?? []
+  );
+  const [erroAgenda, setErroAgenda] = useState<string | null>(null);
+  const [gravandoAgenda, setGravandoAgenda] = useState(false);
+  // Gravando o passo (agente e agenda) ou ativando: o botão principal gira e
+  // "Terminar depois" espera (sair no meio da gravação perderia o passo).
+  const ocupado = form.saving || gravandoAgenda || ativando;
+
+  /** Grava a agenda quando há o que gravar. false = recusou (o erro fica no item). */
+  async function gravarAgenda(): Promise<boolean> {
+    // A lista já foi conferida no Continuar, antes de gravar o agente.
+    if (!agendaBase || (!agendaAtiva && !agendaBase.ativa) || preview) return true;
+    const lista = paraSalvar(servicosAgenda);
+    setGravandoAgenda(true);
+    const r = await fonteDoBancoAgenda(createClient(), clientId).salvarConfig({ ...agendaBase, ativa: agendaAtiva }, lista);
+    setGravandoAgenda(false);
+    if (!r.ok) {
+      setErroAgenda(r.erro);
+      return false;
+    }
+    // Com os ids devolvidos: voltar e continuar de novo não duplica serviço.
+    setAgendaBase(r.config);
+    setServicosAgenda(r.servicos.map(paraEditar));
+    return true;
+  }
 
   // Recomeçar a conversa de teste = remontar a bancada (a `key` muda), o mesmo
   // truque do "Resetar" do `AgentTestDrawer`.
@@ -252,6 +294,12 @@ export default function MontagemWizard({
     if (passo === "testar") return irPara("conectar");
     if (passo === "conectar") return conectado ? irPara("avisos") : undefined;
     if (passo === "sabe") {
+      // A lista de serviços é conferida antes de gravar o agente: recusada, a
+      // pessoa corrige aqui mesmo, sem nada pela metade.
+      setErroAgenda(null);
+      const lista = paraSalvar(servicosAgenda);
+      const problema = agendaBase ? problemaDosServicos(agendaAtiva, lista) : null;
+      if (problema) return setErroAgenda(problema);
       const { ok, campos } = await form.save();
       if (!ok) {
         // companyName, companyWhat e agentName moram no passo "quem"; goals nem
@@ -264,6 +312,7 @@ export default function MontagemWizard({
       }
       // Gravou de verdade: o rascunho perdeu a razão de existir.
       if (!preview) limparRascunho(clientId);
+      if (!(await gravarAgenda())) return;
       setPasso("testar");
     }
   }
@@ -500,6 +549,34 @@ export default function MontagemWizard({
                     titulo="Mande o que você já tem pronto"
                     porque={docRevisao.porque}
                   />
+                  {agendaBase && (
+                    <ItemAgenda
+                      ativa={agendaAtiva}
+                      onAtivar={(v) => {
+                        setAgendaAtiva(v);
+                        setErroAgenda(null);
+                      }}
+                    >
+                      <div className="mt-4 border-t border-line pt-4" data-agenda="montagem-servicos">
+                        <p className="mb-2 text-apoio text-ink-2">
+                          Os serviços, cada um com quanto tempo ocupa. O resto vem pronto e muda depois, nas configurações da agenda.
+                        </p>
+                        <ListaDeServicos
+                          servicos={servicosAgenda}
+                          comErro={!!erroAgenda}
+                          onChange={(l) => {
+                            setServicosAgenda(l);
+                            setErroAgenda(null);
+                          }}
+                        />
+                      </div>
+                    </ItemAgenda>
+                  )}
+                  {erroAgenda && (
+                    <p className="text-apoio text-danger-ink" role="alert" data-agenda="montagem-erro">
+                      {erroAgenda}
+                    </p>
+                  )}
                   <p className="text-legenda text-ink-3">
                     Nada aqui é obrigatório: dá para completar depois, na tela do
                     agente.

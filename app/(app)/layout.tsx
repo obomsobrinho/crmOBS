@@ -12,6 +12,7 @@ import { agoraMs } from "@/lib/periodo";
 import NovidadesModal from "@/components/NovidadesModal";
 import { notaAtual, novidadeParaMostrar } from "@/lib/novidades";
 import { inicioDoDiaSP } from "@/lib/fuso";
+import { agendaAtivaDoTenant } from "@/lib/agenda-servidor";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export default async function AppLayout({
         // aqui, no servidor; a trava de verdade é a página e as rotas.
         ehAdmin={ehAdminPeloAmbiente(client.userId)}
         numeroAvisos={client.avisos}
+        agendaAtiva={await agendaAtivaDoTenant(client.id)}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col md:gap-3">
         {/* Estado da conta: bloqueio (leitura só) ou aviso (trial acabando,
@@ -99,7 +101,7 @@ export default async function AppLayout({
       </div>
       {/* Novidades: decidido AQUI, no servidor, pela regra pura; o diálogo só
           mostra e grava o "já vi". Conta criada depois da nota não vê. */}
-      <NovidadesModal nota={novidadeDoUsuario(client.criadaEm, client.novidadesVista)} />
+      <NovidadesModal nota={novidadeDoUsuario(client.criadaEm, client.novidadesVista)} dono={client.role === "dono"} />
     </div>
   );
 }

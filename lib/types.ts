@@ -65,4 +65,6 @@ export interface Bubble {
   status?: "pending" | "failed";
   mediaUrl?: string | null;
   mediaType?: string | null; // image | audio | video | document
+  /** Lembrete automático da agenda (nem IA nem time): rótulo próprio no balão. */
+  lembrete?: boolean;
 }

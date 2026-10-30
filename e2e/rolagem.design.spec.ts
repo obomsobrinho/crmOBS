@@ -14,6 +14,8 @@ const TELAS = [
   { rota: "/design/pipeline", nome: "pipeline" },
   { rota: "/design/conhecimento", nome: "base de conhecimento" },
   { rota: "/design/equipe", nome: "equipe" },
+  { rota: "/design/agenda", nome: "agenda" },
+  { rota: "/design/agenda/configuracoes", nome: "configurações da agenda" },
   { rota: "/design/playground", nome: "bancada de teste" },
   { rota: "/design/contatos?sel=2", nome: "contatos" },
   { rota: "/design/clientes", nome: "central, lista de clientes" },

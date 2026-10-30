@@ -139,15 +139,15 @@ export default defineConfig({
     // `IA_PEDIDO` (ver o topo): fora de `logado` porque paga 12 chamadas ao
     // modelo, e fora da lista padrão para ninguém pagar sem querer.
     //
-    // `retries: 1` de propósito e só aqui: o modelo não é determinístico, e uma
-    // repetição separa "a base regrediu" de "o modelo variou uma vez". Duas
-    // falhas seguidas do mesmo caso é sinal de verdade.
+    // `retries: 0` (29/10/2026, pedido do dono): a repetição automática pagava
+    // cada falha em dobro sem ninguém pedir. Repetir um caso que falhou é decisão
+    // de quem roda (`--retries=1`), sabendo que custa.
     ...(IA_PEDIDO
       ? [
           {
             name: "ia",
             testMatch: /.*\.ia\.spec\.ts/,
-            retries: 1,
+            retries: 0,
             workers: 3,
             use: {
               ...devices["Desktop Chrome"],

@@ -72,4 +72,16 @@ export interface TurnDiagnostics {
   // true = o turno abriu pedido de ajuda e o aviso ao time foi AGENDADO (sai
   // depois da resposta, por `after`). Se a mensagem saiu mesmo, só o log diz.
   avisoAgendado?: boolean;
+  // AGENDA PRÓPRIA (28/10/2026, lib/agenda.ts): quantos horários o turno
+  // ofereceu, o que o código decidiu com a saída do modelo e o resultado. No
+  // dryRun só diz o que marcaria. Ausente = agenda desligada nesta conversa.
+  agenda?: {
+    /** Quantos horários o código ofereceu neste turno (consulta). */
+    ofertas?: number;
+    decisao: "nada" | "consultar" | "marcar" | "remarcar" | "cancelar" | "confirmar" | "escalar" | "indisponivel" | "pedeDia" | "pedePeriodo" | "invalido";
+    /** "quinta, 30/10, às 10h30 (Avaliação)" quando marcou (ou marcaria). */
+    marcado?: string;
+    /** O horário não valia mais (conflito) ou o banco falhou: a resposta foi trocada. */
+    falhou?: "conflito" | "erro";
+  };
 }
