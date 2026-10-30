@@ -7,8 +7,15 @@ import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 // agenda de envio (10 por dia, das 8h às 18h, espalhados na janela), o pedido
 // para parar e os números do resultado. Tela, rota e cron usam as MESMAS funções.
 //
-// ⚠️ Os pesos da pontuação e a amostra mínima são PROVISÓRIOS, marcados como
-// tal, até o dono decidir (plano, seção 12). Nada aqui é número medido.
+// Decisões do dono de 29/10/2026 (plano, seção 12): dias de envio de segunda a
+// sábado (D2), a linha de saída no fim de toda mensagem (D4), amostra mínima de
+// 30 (D5), pausa sozinha com mais de 2 pedidos para parar no dia (D6) e 12 meses
+// de guarda de quem nunca respondeu (D8). ⚠️ Os pesos da pontuação e os
+// segmentos do ICP seguem PROVISÓRIOS (D9). Nada aqui é número medido.
+//
+// O SQL de prospeccao_* repete algumas regras daqui (faixa da pontuação, faixa
+// da nota, quem pode entrar numa campanha, as contas do resultado): quem mudar
+// uma muda a outra (supabase/migrations/*_prospeccao_do_dono.sql).
 
 // ── Telefone ─────────────────────────────────────────────────────────────
 
@@ -208,9 +215,16 @@ export const CAMPO_EMPRESA = "{empresa}";
 /** Até 3 variantes, que se revezam. */
 export const MAXIMO_DE_VARIANTES = 3;
 
-/** O texto pronto para um lead: `{empresa}` vira o nome da empresa. */
+/**
+ * A linha de saída (D4, dono, 29/10/2026): vai no fim de TODA mensagem, posta
+ * pelo código, e o dono não tira editando a variante. "sair" está em
+ * `FRASES_DE_PARADA`, então responder SAIR sempre tira o lead da lista.
+ */
+export const LINHA_DE_SAIDA = "Se não quiser receber mais mensagens, é só responder SAIR.";
+
+/** O texto pronto para um lead: `{empresa}` vira o nome da empresa e a linha de saída vai no fim. */
 export function textoParaLead(modelo: string, empresa: string): string {
-  return modelo.replaceAll(CAMPO_EMPRESA, empresa.trim());
+  return `${modelo.replaceAll(CAMPO_EMPRESA, empresa.trim()).trimEnd()}\n\n${LINHA_DE_SAIDA}`;
 }
 
 /**
@@ -234,7 +248,7 @@ export function varianteDaOrdem(ordem: number, quantas: number): number {
 
 // ── Pedido para parar ────────────────────────────────────────────────────
 
-/** ⚠️ PROVISÓRIO: as frases que contam como "pare" (o dono revisa a lista). */
+/** As frases que contam como "pare" (D4, dono, 29/10/2026). */
 export const FRASES_DE_PARADA = ["nao quero", "pare", "parar", "para de mandar", "sair", "remover", "nao tenho interesse"] as const;
 
 /** A resposta pede para parar? Sem acento e sem caixa, por palavra inteira. */
@@ -258,11 +272,14 @@ export interface JanelaDeEnvio {
   fimHora: number;
 }
 
-/**
- * Das 8h às 18h (brief do dono, 29/10/2026). Os dias da semana ainda são
- * decisão dele (plano, D4): até lá, todos.
- */
-export const JANELA: JanelaDeEnvio = { dias: [0, 1, 2, 3, 4, 5, 6], inicioHora: 8, fimHora: 18 };
+/** Das 8h às 18h, de segunda a sábado (dono, 29/10/2026, D2). */
+export const JANELA: JanelaDeEnvio = { dias: [1, 2, 3, 4, 5, 6], inicioHora: 8, fimHora: 18 };
+
+/** D6: com MAIS do que isto de pedidos para parar no mesmo dia, a campanha pausa sozinha. */
+export const PARADAS_PARA_PAUSAR = 2;
+
+/** D8 (LGPD): quem nunca respondeu sai da base depois disto, contado da entrada; quem pediu para parar fica. */
+export const MESES_DE_RETENCAO = 12;
 
 const HORA_MS = 3_600_000;
 const MINUTO_MS = 60_000;
@@ -319,8 +336,8 @@ export function proximoEnvioEm(
 
 // ── Resultado ────────────────────────────────────────────────────────────
 
-/** ⚠️ PROVISÓRIO: abaixo disto a tela avisa "ainda pouco para comparar". */
-export const AMOSTRA_MINIMA_PROVISORIA = 30;
+/** Abaixo disto a tela avisa "ainda pouco para comparar" (D5, dono, 29/10/2026). */
+export const AMOSTRA_MINIMA = 30;
 
 export interface EnvioParaResultado {
   situacao: SituacaoNaCampanha;

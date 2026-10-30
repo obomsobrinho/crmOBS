@@ -177,10 +177,10 @@ bars of text); this one:
 
 ### 5.2 Scheduler
 
-- A Vercel cron calls `GET /api/prospeccao/cron` every few minutes (D3: the plan the project is on must
-  allow it; Vercel Hobby only runs a cron once a day). It is authenticated by the `CRON_SECRET` bearer
-  Vercel sends (checked with `segredoConfere`); it lives outside `/api/admin/*` because `proxy.ts`
-  answers 404 there to anyone without an admin session.
+- Supabase `pg_cron` + `pg_net` call `GET /api/prospeccao/cron` every 5 minutes (D3: Vercel Hobby only
+  runs a cron once a day). It is authenticated by the `CRON_SECRET` bearer the job reads from Vault
+  (checked with `segredoConfere`); it lives outside `/api/admin/*` because `proxy.ts` answers 404 there to
+  anyone without an admin session.
 - Each run: picks running campaigns whose `proximo_envio_em <= now()` (partial index), and per campaign
   sends ONE message to the next `na_fila` lead (`ordem`), through `enviarMensagemAtiva`
   (`lib/envio-ativo.ts`, from the agenda branch, merged first), then stores `enviado_em`, `variante` and
@@ -308,9 +308,8 @@ pagination have something to show. "Nova busca" finishes after 4 seconds with fa
 3. **LGPD** (medium): legitimate interest needs a written balancing test, minimal data, the exit honored
    forever and a retention limit for leads that never answered (D8). The v1 plan had a required legal
    basis field; v2 has none on screen, so the LIA lives in the owner's records (D8).
-4. **No exit line in the text** (medium): the suggested variants have no "responda SAIR"; the exit is
-   detected from natural replies ("não quero", "pare"). Without an explicit line, people who want out
-   tend to block or report instead, the trigger that weighs most for a ban (D4).
+4. **Exit line** (resolved by D4): every message ends with "Se não quiser receber mais mensagens, é só
+   responder SAIR.", appended by the code; natural replies ("não quero", "pare") are detected too.
 5. **Bot talking to bot** (medium, seen in the v1 video): a lead's own AI answers and the two agents keep
    talking. Handled by the OBS agent prompt and the help request flow; watch the first campaigns.
 6. **Attendance regression** (low): nothing touches `processTurn` or n8n; the only shared piece is
@@ -318,32 +317,32 @@ pagination have something to show. "Nova busca" finishes after 4 seconds with fa
 7. **Google terms** (medium): scraping Google Maps through Apify is outside Google's terms (appendix
    A.2.1); the source module keeps a switch to Places API possible.
 
-## 12. Owner decisions (open, each with a recommendation)
-
-- **D1 Route.** Recommendation: `/campanhas`, admin only (`adminDaPagina`), reached by a "Campanhas"
-  link in the central header, not in the tenants' menu. Alternative: a tab inside `/clientes`.
-- **D2 Days of the week.** The brief fixes 8h to 18h but not the days. Recommendation: Monday to
-  Saturday (small businesses work Saturday; Sunday reads as intrusive). The prototype uses every day
-  until he decides.
-- **D3 Cron cadence and Vercel plan.** Recommendation: every 5 minutes, which needs Vercel Pro; if the
-  project is on Hobby, decide between upgrading or an external scheduler (never n8n for this, by the
-  owner's rule).
-- **D4 Stop phrases and exit line.** Recommendation: keep the list "não quero", "pare", "parar", "para de
-  mandar", "sair", "remover", "não tenho interesse"; and consider a short exit sentence at the end of the
-  variants (risk 4).
-- **D5 Minimum sample** for "ainda pouco para comparar". Recommendation: 30 sends per line.
-- **D6 Auto-pause.** Recommendation: pause when the number disconnects, and when more than 2 leads ask to
-  stop in the same day.
-- **D7 Places per search.** Recommendation: 50 per search (about US$ 0.08 to 0.25 at the listed price;
-  confirm on the first real run).
-- **D8 LGPD.** Recommendation: write the legitimate interest balancing test once before the first send,
-  and delete leads that never answered after 12 months (the opt-out mark stays).
-- **D9 Score weights and ICP segments** (`PESOS_PROVISORIOS`, `SEGMENTOS_DO_ICP`, marked provisional).
-  Recommendation: keep them until the first 100 sends, then compare the reply rate by score band.
+## 12. Owner decisions
 
 Decided on 29/10/2026: go ahead despite the opt-in policy; the sending number is a simple campaign field
 (OBS's own today, ban risk accepted); at most 10 per day; one message only; Apify as the source; the v2
 structure of this plan.
+
+Decided on 29/10/2026 (the owner's answers in the Cursor brief, before the backend):
+- **D1 Route.** `/campanhas`, admin only (`adminDaPagina`), reached by a "Campanhas" link in the central
+  header, not in the tenants' menu.
+- **D2 Days of the week.** Monday to Saturday, 8h to 18h America/Sao_Paulo (`JANELA`).
+- **D3 Scheduler.** The Vercel project is on the Hobby plan (a Vercel cron runs at most once a day), so the
+  5 minute tick comes from Supabase `pg_cron` + `pg_net` calling `GET /api/prospeccao/cron` with the
+  `CRON_SECRET` bearer, the secret read from Supabase Vault (never written in a migration). The route is
+  not in `vercel.json`. Never n8n.
+- **D4 Stop phrases and exit line.** The list stays ("não quero", "pare", "parar", "para de mandar",
+  "sair", "remover", "não tenho interesse"). Every message ends with the exit line "Se não quiser receber
+  mais mensagens, é só responder SAIR.", appended by the code (`LINHA_DE_SAIDA`), never editable away.
+- **D5 Minimum sample.** 30 sends per line (`AMOSTRA_MINIMA`).
+- **D6 Auto-pause.** When the sending number disconnects, and when more than 2 leads of the campaign ask to
+  stop on the same day (`PARADAS_PARA_PAUSAR`).
+- **D7 Places per search.** 50 by default; 50, 100 and 200 stay in "Nova busca".
+- **D8 LGPD.** Leads that never answered are deleted 12 months after they entered the base
+  (`MESES_DE_RETENCAO`); the opt-out mark stays. The owner writes the balancing test himself.
+- **D9 Score weights and ICP segments.** Keep the provisional ones in `lib/prospeccao.ts`.
+- The Apify webhook secret env var is `APIFY_WEBHOOK_SECRET`.
+- The three variants of section 9 are approved.
 
 ## Appendix A: sources and research (v1, 29/10/2026)
 

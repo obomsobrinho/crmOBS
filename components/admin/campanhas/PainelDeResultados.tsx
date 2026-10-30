@@ -6,7 +6,7 @@ import { Selo } from "@/components/painel/pecas";
 import { calcularDelta } from "@/lib/delta";
 import { numeroBR, pct } from "@/lib/format";
 import {
-  AMOSTRA_MINIMA_PROVISORIA,
+  AMOSTRA_MINIMA,
   DIAS_DA_SEMANA,
   indiceDaMelhorTaxa,
   respostasPorEspera,
@@ -87,7 +87,7 @@ function PainelDeResultados({
   const pontos = (k: "enviados" | "responderam") => serie.map((d) => ({ chave: d.dia, rotulo: textoDoDiaDeEnvio(d.dia), valor: d[k] }));
   const selo = (atual: number, anterior: number | undefined, direcao: "neutra" | "maior-melhor") =>
     antes ? <Selo delta={calcularDelta({ atual, anterior: anterior ?? null, direcao, semBase: "sem base" })} contra={contra} /> : undefined;
-  const pouco = r.enviados > 0 && r.enviados < AMOSTRA_MINIMA_PROVISORIA;
+  const pouco = r.enviados > 0 && r.enviados < AMOSTRA_MINIMA;
 
   const tempo: CelulaDaFaixa = {
     chave: "tempo",
@@ -185,7 +185,7 @@ function PainelDeResultados({
 
       {pouco && (
         <p className="-my-1 text-legenda text-ink-3" data-slot="resultado-amostra">
-          Amostra pequena para comparar: {numeroBR(r.enviados)} de {AMOSTRA_MINIMA_PROVISORIA} envios.
+          Amostra pequena para comparar: {numeroBR(r.enviados)} de {AMOSTRA_MINIMA} envios.
         </p>
       )}
 
