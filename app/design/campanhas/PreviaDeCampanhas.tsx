@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import CentralDeCampanhas from "@/components/admin/campanhas/CentralDeCampanhas";
 import type { Tela } from "@/components/admin/campanhas/tipos";
-import { VARIANTES_SUGERIDAS, dadosDeMentira } from "./dados";
+import { VARIANTES_SUGERIDAS } from "@/lib/prospeccao";
+import { dadosDeMentira } from "./dados";
 import { fonteDeMentira } from "./fonte-de-mentira";
 
 // A ponte do preview: a fonte de mentira guarda funções e estado, e isso não

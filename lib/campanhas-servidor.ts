@@ -15,7 +15,8 @@ import type {
   Resultados,
   Totais,
 } from "@/components/admin/campanhas/tipos";
-import { whatsappDoCliente } from "./admin";
+import { estadoDoWhatsApp } from "./admin-alertas";
+import { estadoDaInstancia } from "./evolution";
 import {
   SITUACOES_DA_BUSCA,
   SITUACOES_DA_CAMPANHA,
@@ -24,19 +25,21 @@ import {
   ehSituacaoDaCampanha,
   ehSituacaoNaCampanha,
   filtroDe,
-  opcoesDe,
 } from "./campanhas-pedidos";
 import { filtrarPelasOpcoes, itemParaOBanco, type FonteDeLeads } from "./fonte-de-leads";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 import { paraJson } from "./json";
 import { PERIODOS, type PeriodoKey } from "./periodo";
 import {
+  DIAS_DA_LINHA,
   OPCOES_PADRAO,
+  POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
   resultadoDasLinhas,
   resumoDasLinhas,
   serieDasLinhas,
   type MarcacaoDoLead,
+  type NotaMinima,
   type OpcoesDaBusca,
   type ResumoDobrado,
   type SituacaoDaBusca,
@@ -52,11 +55,8 @@ import type { Supa } from "./supabase/tipos";
 // UMA função SQL com a linha em `admin_acoes`; toda conta dos painéis é agregada
 // no SQL e dobrada aqui pelos gêmeos puros de `lib/prospeccao.ts`.
 
-export const POR_PAGINA = 10;
-
 const SEMANAS_DO_PAINEL = 8;
 const DIAS_DO_PAINEL = 14;
-const DIAS_DA_LINHA = 14;
 
 // ── Mapas de linha ─────────────────────────────────────────────────────
 
@@ -64,11 +64,43 @@ const ms = (d: string | null | undefined): number | null => (d ? Date.parse(d) :
 const situacaoDaBusca = (s: string): SituacaoDaBusca => (ehSituacaoDaBusca(s) ? s : "buscando");
 const situacaoDaCampanha = (s: string): SituacaoDaCampanha => (ehSituacaoDaCampanha(s) ? s : "rascunho");
 const situacaoNaCampanha = (s: string): SituacaoNaCampanha => (ehSituacaoNaCampanha(s) ? s : "na_fila");
+const marcacaoDe = (s: string | null): MarcacaoDoLead => (s === "bom" || s === "descartado" ? s : null);
 
-/** O jsonb `opcoes` de uma busca como OpcoesDaBusca (campos faltando caem no padrão). */
+/** Quantas linhas em cada situação, com zero nas que não vieram. */
+function contarPorSituacao<K extends string>(chaves: K[], linhas: { status: string; n: number }[]): Record<K, number> {
+  return Object.fromEntries(chaves.map((k) => [k, linhas.find((l) => l.status === k)?.n ?? 0])) as Record<K, number>;
+}
+
+const NOTAS: NotaMinima[] = [3.5, 4, 4.5];
+
+/**
+ * O jsonb `opcoes` GRAVADO de uma busca, lido com folga: cada campo legível fica como
+ * foi pedido e só o que falta cai no padrão (a conferência estrita de um pedido novo é
+ * `opcoesDe`; apertá-la depois não pode mudar as opções de uma busca antiga).
+ */
 function opcoesDoJson(j: Json, termo: string, cidade: string, uf: string | null): OpcoesDaBusca {
-  const lidas = opcoesDe(j);
-  return lidas ?? { ...OPCOES_PADRAO, termos: termo.split(",").map((t) => t.trim()), cidade, uf: uf ?? "" };
+  const o = j !== null && typeof j === "object" && !Array.isArray(j) ? j : {};
+  const termos = Array.isArray(o.termos) ? o.termos.filter((t): t is string => typeof t === "string") : [];
+  const nota = NOTAS.find((n) => n === o.notaMinima) ?? null;
+  return {
+    termos: termos.length > 0 ? termos : termo.split(",").map((t) => t.trim()),
+    cidade: typeof o.cidade === "string" ? o.cidade : cidade,
+    uf: typeof o.uf === "string" ? o.uf : (uf ?? ""),
+    porTermo: typeof o.porTermo === "number" ? o.porTermo : OPCOES_PADRAO.porTermo,
+    notaMinima: nota,
+    site: o.site === "sem_site" || o.site === "com_site" ? o.site : "todos",
+    ignorarFechados: typeof o.ignorarFechados === "boolean" ? o.ignorarFechados : OPCOES_PADRAO.ignorarFechados,
+    buscarContatos: typeof o.buscarContatos === "boolean" ? o.buscarContatos : OPCOES_PADRAO.buscarContatos,
+  };
+}
+
+/** O número da instância está conectado agora (Evolution ao vivo; falha = não). */
+export async function whatsappConectado(instancia: string): Promise<boolean> {
+  try {
+    return estadoDoWhatsApp(await estadoDaInstancia(instancia)) === "conectado";
+  } catch {
+    return false;
+  }
 }
 
 interface LinhaDeBusca {
@@ -110,12 +142,10 @@ export async function totais(svc: Supa): Promise<Totais> {
   if (leads.error) throw leads.error;
   if (buscas.error) throw buscas.error;
   if (campanhas.error) throw campanhas.error;
-  const contar = <K extends string>(chaves: K[], linhas: { status: string; n: number }[]) =>
-    Object.fromEntries(chaves.map((k) => [k, linhas.find((l) => l.status === k)?.n ?? 0])) as Record<K, number>;
   return {
     leads: leads.count ?? 0,
-    buscas: contar(SITUACOES_DA_BUSCA, buscas.data ?? []),
-    campanhas: contar(SITUACOES_DA_CAMPANHA, campanhas.data ?? []),
+    buscas: contarPorSituacao(SITUACOES_DA_BUSCA, buscas.data ?? []),
+    campanhas: contarPorSituacao(SITUACOES_DA_CAMPANHA, campanhas.data ?? []),
   };
 }
 
@@ -135,7 +165,7 @@ export async function conexoesDoAdmin(svc: Supa, admin: string): Promise<Conexao
       id: c.id,
       nome: c.name,
       numero: c.evolution_instance ?? "",
-      conectado: (await whatsappDoCliente(svc, c.id).catch(() => null)) === "conectado",
+      conectado: c.evolution_instance ? await whatsappConectado(c.evolution_instance) : false,
     })),
   );
   return lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
@@ -221,7 +251,7 @@ export async function paginaDeLeads(
         site: r.site,
         nota: r.nota === null ? null : Number(r.nota),
         avaliacoes: r.avaliacoes,
-        marcacao: r.marcacao === "bom" || r.marcacao === "descartado" ? r.marcacao : null,
+        marcacao: marcacaoDe(r.marcacao),
         parouEm: ms(r.parou_em),
         campanhaIds: ids,
         campanhas: ids.map((id, i) => ({ id, nome: nomes[i] ?? "" })),
@@ -243,7 +273,7 @@ export async function marcarLead(svc: Supa, admin: string, id: string, marcacao:
   if (error) throw error;
   const r = data?.[0];
   if (!r) return null;
-  return { marcacao: r.marcacao === "bom" || r.marcacao === "descartado" ? r.marcacao : null };
+  return { marcacao: marcacaoDe(r.marcacao) };
 }
 
 export async function painelDaBase(svc: Supa, buscaId: string | null, agora: number): Promise<ResumoDobrado> {
@@ -323,6 +353,19 @@ async function quantasVariantes(svc: Supa, campanhaId: string): Promise<number> 
   return count ?? 0;
 }
 
+/** O primeiro envio da campanha (o começo da série do detalhe); null sem envio. */
+async function primeiroEnvio(svc: Supa, campanhaId: string): Promise<number | null> {
+  const { data, error } = await svc
+    .from("prospeccao_campanha_leads")
+    .select("enviado_em")
+    .eq("campanha_id", campanhaId)
+    .not("enviado_em", "is", null)
+    .order("enviado_em")
+    .limit(1);
+  if (error) throw error;
+  return ms(data?.[0]?.enviado_em);
+}
+
 async function linhasDoResultado(
   svc: Supa,
   a: { campanhaId: string | null; de: number | null; ate: number | null; serieDe: string | null; serieAte: string | null },
@@ -355,21 +398,11 @@ export async function resultados(
   agora: number,
 ): Promise<Resultados> {
   const hoje = diaIsoSP(agora);
-  const variantes = p.campanhaId ? Math.max(1, await quantasVariantes(svc, p.campanhaId)) : 3;
+  // A contagem das variantes corre junto com as outras leituras.
+  const quantas = p.campanhaId ? quantasVariantes(svc, p.campanhaId).then((n) => Math.max(1, n)) : Promise.resolve(3);
   if (p.periodo === null) {
-    let dias = 7;
-    if (p.campanhaId) {
-      const { data, error } = await svc
-        .from("prospeccao_campanha_leads")
-        .select("enviado_em")
-        .eq("campanha_id", p.campanhaId)
-        .not("enviado_em", "is", null)
-        .order("enviado_em")
-        .limit(1);
-      if (error) throw error;
-      const primeiro = ms(data?.[0]?.enviado_em);
-      if (primeiro !== null) dias = Math.min(30, Math.max(7, Math.round((agora - primeiro) / 86_400_000) + 1));
-    }
+    const [variantes, primeiro] = await Promise.all([quantas, p.campanhaId ? primeiroEnvio(svc, p.campanhaId) : null]);
+    const dias = primeiro === null ? 7 : Math.min(30, Math.max(7, Math.round((agora - primeiro) / 86_400_000) + 1));
     const serieDe = somarDias(hoje, -dias + 1);
     const linhas = await linhasDoResultado(svc, { campanhaId: p.campanhaId, de: null, ate: null, serieDe, serieAte: hoje });
     const { resultado, espera } = resultadoDasLinhas(linhas, variantes);
@@ -381,9 +414,10 @@ export async function resultados(
   const ate = inicioDoDiaSP(somarDias(hoje, 1));
   const diasDaSerie = Math.max(7, dias);
   const serieDe = somarDias(hoje, -diasDaSerie + 1);
-  const [atual, antes] = await Promise.all([
+  const [atual, antes, variantes] = await Promise.all([
     linhasDoResultado(svc, { campanhaId: p.campanhaId, de, ate, serieDe, serieAte: hoje }),
     linhasDoResultado(svc, { campanhaId: p.campanhaId, de: deAntes, ate: de, serieDe: null, serieAte: null }),
+    quantas,
   ]);
   const a = resultadoDasLinhas(atual, variantes);
   return {
@@ -424,10 +458,7 @@ export async function campanhaAberta(svc: Supa, id: string): Promise<CampanhaAbe
   const linhas = contagens.data ?? [];
   return {
     campanha,
-    contagens: Object.fromEntries(SITUACOES_NA_CAMPANHA.map((s) => [s, linhas.find((l) => l.status === s)?.n ?? 0])) as Record<
-      SituacaoNaCampanha,
-      number
-    >,
+    contagens: contarPorSituacao(SITUACOES_NA_CAMPANHA, linhas),
   };
 }
 
@@ -545,12 +576,12 @@ export async function iniciarCampanha(
   agora: number,
   problemas: (c: CampanhaEditavel) => string[],
 ): Promise<RespostaDaAcao> {
-  const c = await campanhaEditavel(svc, id);
+  const [c, empresas] = await Promise.all([campanhaEditavel(svc, id), empresasDoAdmin(svc, admin)]);
   if (!c) return { ok: false, ...RECUSAS_DO_INICIO.nao_encontrada };
   if (c.situacao !== "rascunho") return { ok: false, ...RECUSAS_DO_INICIO.nao_e_rascunho };
   const p = problemas(c);
   if (p.length > 0) return { ok: false, status: 422, erro: p[0] };
-  if (!c.conexaoId || !(await empresasDoAdmin(svc, admin)).includes(c.conexaoId)) {
+  if (!c.conexaoId || !empresas.includes(c.conexaoId)) {
     return { ok: false, status: 422, erro: "Escolha um número das suas empresas" };
   }
   const { data, error } = await svc.rpc("prospeccao_iniciar_campanha", {

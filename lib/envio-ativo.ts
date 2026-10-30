@@ -29,11 +29,6 @@ export const REGRAS_DO_LEMBRETE: RegrasDoEnvioAtivo = {
   intervaloMs: [20_000, 60_000],
 };
 
-/** Owner prospecting (Campanhas v2): 10/day enforced in SQL; pause 4–12 min in `proximoEnvioEm`. */
-export const REGRAS_DA_PROSPECCAO: RegrasDoEnvioAtivo = {
-  tetoDiario: 10,
-  intervaloMs: [4 * 60_000, 12 * 60_000],
-};
 
 export type ResultadoDoEnvio = "enviado" | "recusado" | "pulado";
 

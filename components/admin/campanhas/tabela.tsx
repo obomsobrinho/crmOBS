@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Paginacao } from "@/components/ui/paginacao";
+import { POR_PAGINA_DE_CAMPANHAS } from "@/lib/prospeccao";
 import { cn } from "@/lib/utils";
 import type { Pagina } from "./tipos";
 
@@ -14,7 +15,8 @@ import type { Pagina } from "./tipos";
 // 20 de 137"). Cada página é uma leitura da fonte (página e total por contagem no
 // servidor; no preview, a fonte de mentira em memória responde igual).
 
-export const POR_PAGINA = 10;
+/** A mesma página da rota (`lib/prospeccao.ts`), para o rodapé nunca discordar do servidor. */
+export const POR_PAGINA = POR_PAGINA_DE_CAMPANHAS;
 
 /**
  * UMA LEITURA da fonte, de novo a cada `chave` nova (os parâmetros dela em texto)
@@ -75,7 +77,6 @@ export function usePaginaDaFonte<T>(chave: string, ler: (pagina: number) => Prom
     pagina,
     setPagina,
     total,
-    carregando: lida.carregando,
     lido: lida.dados !== null,
     erro: lida.erro,
     recarregar: lida.recarregar,

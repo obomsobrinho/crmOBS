@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
+import { campoDe, ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
 import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas, torto } from "@/lib/campanhas-servidor";
 import { fonteApify } from "@/lib/fonte-apify";
 import { problemasDaBusca } from "@/lib/prospeccao";
@@ -32,7 +32,7 @@ export const GET = rotaDoAdmin(
 export const POST = rotaDoAdmin(
   async ({ req, admin }: { req: NextRequest; admin: string }) => {
     const corpo: unknown = await req.json().catch(() => null);
-    const opcoes = opcoesDe(corpo !== null && typeof corpo === "object" ? (corpo as { opcoes?: unknown }).opcoes : null);
+    const opcoes = opcoesDe(campoDe(corpo, "opcoes"));
     if (!opcoes) return torto("opções da busca inválidas");
     const problemas = problemasDaBusca(opcoes);
     if (problemas.length > 0) return torto(problemas[0]);

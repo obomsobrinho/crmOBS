@@ -17,8 +17,6 @@ import {
 const MIN = 60_000;
 const H = 60 * MIN;
 
-export { VARIANTES_SUGERIDAS } from "@/lib/prospeccao";
-
 export const CONEXOES_DE_MENTIRA: ConexaoDisponivel[] = [
   { id: "obs", nome: "OBS", numero: "(33) 90000-0001", conectado: true },
   { id: "chip", nome: "OBS Prospecção", numero: "(33) 90000-0002", conectado: false },

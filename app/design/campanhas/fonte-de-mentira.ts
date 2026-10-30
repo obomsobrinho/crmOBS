@@ -2,6 +2,8 @@ import { normalizar } from "@/lib/clientes";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 import { PERIODOS } from "@/lib/periodo";
 import {
+  DIAS_DA_LINHA,
+  POR_PAGINA_DE_CAMPANHAS,
   contagemPorSemana,
   enviosPorDia,
   pontuarLead,
@@ -25,7 +27,7 @@ import {
   type Pagina,
   type Resultados,
 } from "@/components/admin/campanhas/tipos";
-import { POR_PAGINA } from "@/components/admin/campanhas/tabela";
+import { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA } from "@/lib/campanhas-pedidos";
 import { CONEXOES_DE_MENTIRA, resultadoDaBuscaDeMentira, type DadosDeMentira } from "./dados";
 
 // A FONTE DE MENTIRA do preview (`/design/campanhas`): a MESMA interface da
@@ -35,11 +37,10 @@ import { CONEXOES_DE_MENTIRA, resultadoDaBuscaDeMentira, type DadosDeMentira } f
 // página; nada é gravado, nenhuma busca paga é chamada, nenhuma mensagem sai.
 
 const pagina = <T,>(lista: T[], n: number): Pagina<T> => ({
-  itens: lista.slice((n - 1) * POR_PAGINA, n * POR_PAGINA),
+  itens: lista.slice((n - 1) * POR_PAGINA_DE_CAMPANHAS, n * POR_PAGINA_DE_CAMPANHAS),
   total: lista.length,
 });
 
-const DIAS_DA_LINHA = 14;
 
 export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCampanhas {
   const buscas = [...dados.buscas];
@@ -68,8 +69,8 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
         Object.fromEntries(chaves.map((k) => [k, de.filter((x) => x.situacao === k).length])) as Record<K, number>;
       return {
         leads: leads.length,
-        buscas: contar(["buscando", "pronta", "falhou"], buscas),
-        campanhas: contar(["rascunho", "agendada", "rodando", "pausada", "concluida"], campanhas),
+        buscas: contar(SITUACOES_DA_BUSCA, buscas),
+        campanhas: contar(SITUACOES_DA_CAMPANHA, campanhas),
       };
     },
 

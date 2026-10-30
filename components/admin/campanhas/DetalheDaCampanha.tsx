@@ -13,7 +13,7 @@ import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, SeloNaCampanha, TopoDeDetalhe } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
-import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./tipos";
+import { somaDe, type CampanhaEditavel, type ConexaoDisponivel, type FonteDeCampanhas } from "./tipos";
 
 // O DETALHE de uma campanha: o mesmo painel de resultados da aba (desde o
 // início da campanha, sem "Envios por dia": todo dia sai a mesma cota) e a
@@ -77,7 +77,7 @@ function DetalheDaCampanha({
   const { campanha, contagens } = aberta.dados;
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
   const contagem = (s: SituacaoNaCampanha) => contagens[s];
-  const totalDaCampanha = Object.values(contagens).reduce((x, y) => x + y, 0);
+  const totalDaCampanha = somaDe(contagens);
   const naFila = contagem("na_fila");
   const semResposta = contagem("enviado");
   const pode = campanha.situacao === "rodando" || campanha.situacao === "pausada" || campanha.situacao === "agendada";

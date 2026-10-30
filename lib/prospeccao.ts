@@ -292,6 +292,17 @@ export const MESES_DE_RETENCAO = 12;
 const HORA_MS = 3_600_000;
 const MINUTO_MS = 60_000;
 
+/** As tabelas de Campanhas: páginas de 10 (a rota e a paginação da tela usam o MESMO número). */
+export const POR_PAGINA_DE_CAMPANHAS = 10;
+/** Os dias do mini gráfico de cada linha da tabela de campanhas. */
+export const DIAS_DA_LINHA = 14;
+
+/** O instante está dentro da janela de envio (dia de envio, das 8h às 18h em São Paulo)? */
+export function dentroDaJanela(t: number, janela: JanelaDeEnvio = JANELA): boolean {
+  const h = horaSP(t);
+  return janela.dias.includes(diaDaSemanaSP(t)) && h >= janela.inicioHora && h < janela.fimHora;
+}
+
 /** Quantos dias uma lista leva a 10 por dia. */
 export function diasParaEnviar(leads: number, teto = TETO_DIARIO): number {
   return leads <= 0 ? 0 : Math.ceil(leads / Math.max(1, teto));
@@ -935,13 +946,18 @@ export interface RespostaAchada {
  * chance" não faz a primeira campanha ganhar a resposta da segunda).
  */
 export function respostasDosEnvios(envios: EnvioObservado[], mensagens: MensagemRecebida[]): RespostaAchada[] {
-  const porLead = new Map<string, EnvioObservado[]>();
-  for (const e of envios) porLead.set(e.leadId, [...(porLead.get(e.leadId) ?? []), e]);
-  const porFone = new Map<string, MensagemRecebida[]>();
-  for (const m of mensagens) {
-    const k = chaveTelefone(m.telefone);
-    porFone.set(k, [...(porFone.get(k) ?? []), m]);
-  }
+  const agrupar = <T,>(lista: T[], chave: (x: T) => string) => {
+    const m = new Map<string, T[]>();
+    for (const x of lista) {
+      const k = chave(x);
+      const g = m.get(k);
+      if (g) g.push(x);
+      else m.set(k, [x]);
+    }
+    return m;
+  };
+  const porLead = agrupar(envios, (e) => e.leadId);
+  const porFone = agrupar(mensagens, (m) => chaveTelefone(m.telefone));
   const achadas: RespostaAchada[] = [];
   for (const e of envios) {
     const proximo = (porLead.get(e.leadId) ?? [])

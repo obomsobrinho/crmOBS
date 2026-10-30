@@ -1,13 +1,13 @@
 import "server-only";
 import { grafiasDeDigitos } from "./avisos";
-import { whatsappDoCliente } from "./admin";
-import { fecharBusca } from "./campanhas-servidor";
+import { fecharBusca, whatsappConectado } from "./campanhas-servidor";
 import { enviarMensagemAtiva } from "./envio-ativo";
 import { fonteApify } from "./fonte-apify";
 import { diaIsoSP, inicioDoDiaSP } from "./fuso";
 import {
   MESES_DE_RETENCAO,
   PARADAS_PARA_PAUSAR,
+  dentroDaJanela,
   proximoEnvioEm,
   respostasDosEnvios,
   textoParaLead,
@@ -39,6 +39,8 @@ const BUSCA_PRESA_MS = 8 * 60_000;
 const CAMPANHAS_POR_EXECUCAO = 20;
 /** Celulares por leitura de `chat_messages` (as grafias com e sem o nono dígito vão juntas). */
 const FONES_POR_LEITURA = 25;
+/** Mensagens por página dessa leitura (o teto do PostgREST); a leitura segue de página em página até o fim. */
+const MENSAGENS_POR_PAGINA = 1000;
 const LEAD_NENHUM = "00000000-0000-0000-0000-000000000000";
 
 export interface ResumoDoTick {
@@ -52,10 +54,12 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
   const agoraIso = new Date(agora).toISOString();
   const inicioDoDia = new Date(inicioDoDiaSP(diaIsoSP(agora))).toISOString();
 
-  await chamar(svc.rpc("prospeccao_ativar_agendadas", { p_agora: agoraIso }));
   const corte = new Date(agora);
   corte.setUTCMonth(corte.getUTCMonth() - MESES_DE_RETENCAO);
-  await chamar(svc.rpc("prospeccao_apagar_antigos", { p_antes: corte.toISOString() }));
+  await Promise.all([
+    chamar(svc.rpc("prospeccao_ativar_agendadas", { p_agora: agoraIso })),
+    chamar(svc.rpc("prospeccao_apagar_antigos", { p_antes: corte.toISOString() })),
+  ]);
 
   await fecharBuscasPresas(svc, agora);
 
@@ -71,6 +75,21 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
   let pausadas = 0;
   for (const c of devidas ?? []) {
     try {
+      // Fora da janela (uma agendada que ativou de noite ou no domingo): só empurra a vez
+      // para a próxima abertura. A janela é conferida aqui, num lugar só, para todo envio.
+      if (!dentroDaJanela(agora)) {
+        await chamar(
+          svc.rpc("prospeccao_registrar_envio", {
+            p_campanha: c.id,
+            p_lead: LEAD_NENHUM,
+            p_resultado: "adiar",
+            p_variante: 0,
+            p_erro: null,
+            p_proximo: new Date(proximoEnvioEm(agora, 0)).toISOString(),
+          }),
+        );
+        continue;
+      }
       const r = await vezDaCampanha(svc, c.id, agora, inicioDoDia);
       if (r === "enviado") enviados++;
       if (r === "pausada") pausadas++;
@@ -152,7 +171,7 @@ async function vezDaCampanha(
     return "pausada" as const;
   };
   if (!vez.instancia) return pausar("A empresa do número não tem WhatsApp");
-  if ((await whatsappDoCliente(svc, vez.client_id)) !== "conectado") return pausar("WhatsApp desconectado");
+  if (!(await whatsappConectado(vez.instancia))) return pausar("WhatsApp desconectado");
 
   const variantes = vez.variantes ?? [];
   const variante = varianteDaOrdem(vez.ordem ?? 0, variantes.length);
@@ -195,25 +214,17 @@ async function registrarRespostas(svc: Supa, agora: number, inicioDoDia: string)
 
   const itens: { campanha_id: string; lead_id: string; respondeu_em?: string; parou_em?: string }[] = [];
   for (const [clientId, envios] of porEmpresa) {
-    const fones = [...new Set(envios.map((e) => e.telefone))];
+    const porFone = new Map<string, EnvioObservado[]>();
+    for (const e of envios) {
+      const g = porFone.get(e.telefone);
+      if (g) g.push(e);
+      else porFone.set(e.telefone, [e]);
+    }
+    const fones = [...porFone.keys()];
     for (let i = 0; i < fones.length; i += FONES_POR_LEITURA) {
       const lote = fones.slice(i, i + FONES_POR_LEITURA);
-      const doLote = envios.filter((e) => lote.includes(e.telefone));
-      const desde = Math.min(...doLote.map((e) => e.enviadoEm));
-      const { data: msgs, error: erroMsgs } = await svc
-        .from("chat_messages")
-        .select("phone, user_message, created_at")
-        .eq("client_id", clientId)
-        .in("phone", lote.flatMap(grafiasDeDigitos))
-        .gt("created_at", new Date(desde).toISOString())
-        .not("user_message", "is", null)
-        .order("created_at")
-        // eslint-disable-next-line no-restricted-syntax -- the cron's read of replies for 25 phones over 14 days (PostgREST cap), matched in memory by respostasDosEnvios; no screen
-        .limit(1000);
-      if (erroMsgs) throw erroMsgs;
-      const recebidas = (msgs ?? []).flatMap((m) =>
-        m.user_message && m.created_at ? [{ telefone: m.phone, texto: m.user_message, em: Date.parse(m.created_at) }] : [],
-      );
+      const doLote = lote.flatMap((f) => porFone.get(f) ?? []);
+      const recebidas = await mensagensRecebidas(svc, clientId, lote, Math.min(...doLote.map((e) => e.enviadoEm)));
       for (const r of respostasDosEnvios(doLote, recebidas)) {
         itens.push({
           campanha_id: r.campanhaId,
@@ -234,4 +245,32 @@ async function registrarRespostas(svc: Supa, agora: number, inicioDoDia: string)
     }),
   );
   return itens.length;
+}
+
+/**
+ * As mensagens RECEBIDAS por uma empresa, de alguns celulares, depois de `desde`: de
+ * página em página pela chave (`id`), até o fim, para um "SAIR" depois de uma conversa
+ * longa com a IA nunca ficar de fora.
+ */
+async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], desde: number) {
+  const recebidas: { telefone: string; texto: string; em: number }[] = [];
+  let depoisDe = 0;
+  for (;;) {
+    const { data, error } = await svc
+      .from("chat_messages")
+      .select("id, phone, user_message, created_at")
+      .eq("client_id", clientId)
+      .in("phone", fones.flatMap(grafiasDeDigitos))
+      .gt("created_at", new Date(desde).toISOString())
+      .gt("id", depoisDe)
+      .not("user_message", "is", null)
+      .order("id")
+      .limit(MENSAGENS_POR_PAGINA);
+    if (error) throw error;
+    for (const m of data ?? []) {
+      if (m.user_message && m.created_at) recebidas.push({ telefone: m.phone, texto: m.user_message, em: Date.parse(m.created_at) });
+    }
+    if (!data || data.length < MENSAGENS_POR_PAGINA) return recebidas;
+    depoisDe = data[data.length - 1].id;
+  }
 }

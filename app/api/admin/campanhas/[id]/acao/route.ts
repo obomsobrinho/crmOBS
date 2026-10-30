@@ -1,4 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
+import { campoDe } from "@/lib/campanhas-pedidos";
 import { falhou, iniciarCampanha, pausarCampanha, retomarCampanha, torto } from "@/lib/campanhas-servidor";
 import { agoraMs } from "@/lib/periodo";
 import { problemasParaIniciar } from "@/lib/prospeccao";
@@ -10,7 +11,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 export const PUT = rotaDoAdmin(
   async ({ req, admin, id }) => {
     const corpo: unknown = await req.json().catch(() => null);
-    const acao = corpo !== null && typeof corpo === "object" ? (corpo as { acao?: unknown }).acao : undefined;
+    const acao = campoDe(corpo, "acao");
     if (acao !== "iniciar" && acao !== "pausar" && acao !== "retomar") return torto("ação inválida");
     const svc = createServiceClient();
     const agora = agoraMs();

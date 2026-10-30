@@ -13,12 +13,12 @@ import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
 import { numeroBR, pct } from "@/lib/format";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { PERIODOS, type PeriodoKey } from "@/lib/periodo";
-import { textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/prospeccao";
+import { DIAS_DA_LINHA, textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, haQuanto, textoDaTaxa } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
-import type { CampanhaDaTabela, ConexaoDisponivel, FonteDeCampanhas, Totais } from "./tipos";
+import { somaDe, type CampanhaDaTabela, type ConexaoDisponivel, type FonteDeCampanhas, type Totais } from "./tipos";
 
 // CAMPANHAS: o painel de resultados no topo (todas as campanhas ou uma, no
 // período) e embaixo a tabela de campanhas, 10 por página, com busca pelo nome
@@ -26,8 +26,6 @@ import type { CampanhaDaTabela, ConexaoDisponivel, FonteDeCampanhas, Totais } fr
 // linha abre o detalhe (ou o assistente, no rascunho).
 
 const PASSOS = ["Campanha", "Contatos", "Mensagem", "Confirmar"];
-/** Os dias do mini gráfico de cada linha (a série vem da fonte com este tamanho). */
-export const DIAS_DA_LINHA = 14;
 const GRADE = "xl:grid xl:grid-cols-[minmax(0,2.4fr)_120px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_20px] xl:items-center xl:gap-5";
 
 const SITUACOES: { chave: SituacaoDaCampanha; rotulo: string }[] = [
@@ -164,7 +162,7 @@ function AbaCampanhas({
   const ler = useCallback((pagina: number) => fonte.campanhas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
   const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}|${versao}`, ler);
   const contagens = totais?.campanhas;
-  const todas = contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
+  const todas = somaDe(contagens);
 
   const topo = (
     <div className="flex flex-wrap items-center gap-2">

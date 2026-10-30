@@ -40,7 +40,8 @@ export function entradaApify(o: OpcoesDaBusca): Record<string, unknown> {
 
 /**
  * Os webhooks ad hoc de uma execução: vão na QUERY `webhooks` em base64 (o corpo
- * do POST é a entrada do actor). O segredo vai num header, nunca na URL.
+ * do POST é a entrada do actor). O segredo vai num header, nunca na URL. Sem
+ * `payloadTemplate`: a rota não lê o corpo, pergunta à fonte como a execução terminou.
  */
 export function webhooksDaExecucao(url: string, segredo: string): string {
   const def = [
@@ -48,7 +49,6 @@ export function webhooksDaExecucao(url: string, segredo: string): string {
       eventTypes: ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED", "ACTOR.RUN.TIMED_OUT", "ACTOR.RUN.ABORTED"],
       requestUrl: url,
       headersTemplate: JSON.stringify({ "x-apify-secret": segredo }),
-      payloadTemplate: '{"runId":{{resource.id}},"status":{{resource.status}}}',
     },
   ];
   return Buffer.from(JSON.stringify(def), "utf8").toString("base64");
@@ -62,7 +62,7 @@ export function leituraDoStatus(status: string | null | undefined): LeituraDaExe
 }
 
 /** A frase da falha, para a linha da busca. */
-export function textoDaFalha(status: string | null | undefined): string {
+function textoDaFalha(status: string | null | undefined): string {
   if (status === "TIMED-OUT") return "A fonte passou do tempo. Nada foi gravado; dá para buscar de novo.";
   if (status === "ABORTED") return "A busca foi interrompida na fonte. Nada foi gravado.";
   return "A fonte não terminou a busca. Nada foi gravado; dá para buscar de novo.";
@@ -88,7 +88,7 @@ function numero(o: Record<string, unknown>, chaves: string[]): number | null {
  * Um lugar do dataset virando lead. Campos de saída do actor (página do Apify Store,
  * 29/10/2026): `title`, `categoryName`, `address`, `neighborhood`, `city`,
  * `phone`/`phoneUnformatted`, `website`, `totalScore`, `reviewsCount`, `placeId`,
- * `permanentlyClosed`. `termo` é o segmento quando o lugar não traz categoria.
+ * `permanentlyClosed`, `searchString`. `termo` é o segmento quando o lugar não traz nenhum dos dois.
  */
 export function itemDoApify(bruto: unknown, termo: string): ItemDaFonteDeLeads {
   const o = bruto !== null && typeof bruto === "object" ? (bruto as Record<string, unknown>) : {};
@@ -98,7 +98,8 @@ export function itemDoApify(bruto: unknown, termo: string): ItemDaFonteDeLeads {
   const nota = notaBruta !== null && notaBruta > 0 && notaBruta <= 5 ? Math.round(notaBruta * 10) / 10 : null;
   const reviews = numero(o, ["reviewsCount"]);
   const avaliacoes = reviews !== null && reviews >= 0 ? Math.round(reviews) : null;
-  const segmento = texto(o, ["categoryName"]) ?? termo;
+  // Sem categoria, o segmento é o termo que achou o lugar (`searchString`), ou o primeiro pedido.
+  const segmento = texto(o, ["categoryName", "searchString"]) ?? termo;
   const { pontos } = pontuarLead({ telefone, segmento, site, nota, avaliacoes });
   return {
     telefone: telefoneDoLead(telefone),

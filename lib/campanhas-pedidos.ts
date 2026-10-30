@@ -1,3 +1,4 @@
+import { ehUuid } from "./admin-acesso";
 import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads } from "@/components/admin/campanhas/tipos";
 import {
   QUANTIDADES_POR_TERMO,
@@ -20,8 +21,13 @@ export const SITUACOES_NA_CAMPANHA: SituacaoNaCampanha[] = ["na_fila", "enviado"
 const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota"];
 export { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const ehId = (v: unknown): v is string => typeof v === "string" && UUID.test(v);
+/** Um id (uuid) bem formado: a mesma regra das rotas da central (`ehUuid`). */
+export const ehId = (v: unknown): v is string => typeof v === "string" && ehUuid(v);
+
+/** Um campo do corpo JSON de um pedido (undefined quando o corpo não é um objeto). */
+export function campoDe(corpo: unknown, campo: string): unknown {
+  return corpo !== null && typeof corpo === "object" ? (corpo as Record<string, unknown>)[campo] : undefined;
+}
 
 const de = <T extends string>(lista: readonly T[], v: unknown): v is T => typeof v === "string" && (lista as readonly string[]).includes(v);
 export const ehSituacaoDaBusca = (v: unknown): v is SituacaoDaBusca => de(SITUACOES_DA_BUSCA, v);

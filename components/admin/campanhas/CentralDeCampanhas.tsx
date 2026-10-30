@@ -9,7 +9,7 @@ import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
 import { useLeitura } from "./tabela";
-import type { Busca, CampanhaEditavel, FonteDeCampanhas, Tela } from "./tipos";
+import { somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
 // par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
@@ -21,10 +21,6 @@ import type { Busca, CampanhaEditavel, FonteDeCampanhas, Tela } from "./tipos";
 
 /** A pausa entre a última mudança no assistente e o salvamento do rascunho. */
 const PAUSA_DO_SALVAMENTO_MS = 600;
-
-function novoId(): string {
-  return crypto.randomUUID();
-}
 
 export default function CentralDeCampanhas({
   telaInicial,
@@ -88,7 +84,7 @@ export default function CentralDeCampanhas({
       const agoraMs = Date.now();
       abrirRascunho(
         {
-          id: novoId(),
+          id: crypto.randomUUID(),
           nome: "",
           situacao: "rascunho",
           agendadaPara: null,
@@ -174,7 +170,7 @@ export default function CentralDeCampanhas({
 
   const irParaCampanhas = () => setTela({ aba: "campanhas", vista: "lista" });
   const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" && rascunho?.id === tela.id ? rascunho : null;
-  const nCampanhas = totais ? Object.values(totais.campanhas).reduce((a, b) => a + b, 0) : 0;
+  const nCampanhas = somaDe(totais?.campanhas);
 
   // Leads | Campanhas: o par de abas no canto esquerdo da linha de cima de cada tela (dono, 29/10/2026).
   const abas = (

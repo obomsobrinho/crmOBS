@@ -52,6 +52,26 @@ const q = (p: Record<string, string | number | null | undefined>) => {
   return t ? `?${t}` : "";
 };
 
+/** Um 404 vira null (a campanha ou a busca não existe mais). */
+async function nuloSe404<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof FalhaDaRota && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/** Uma recusa com motivo (4xx) vira `{ ok: false, erro }`, para a tela mostrar a frase; o resto lança. */
+async function recusaSe4xx<T>(p: Promise<T>): Promise<{ ok: true; valor: T } | { ok: false; erro: string }> {
+  try {
+    return { ok: true, valor: await p };
+  } catch (e) {
+    if (e instanceof FalhaDaRota && e.status < 500 && e.motivo) return { ok: false, erro: e.motivo };
+    throw e;
+  }
+}
+
 const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
 
 /** A fonte de verdade: uma instância por página (sem estado; cada leitura é uma rota). */
@@ -63,22 +83,10 @@ export function fonteDasRotas(): FonteDeCampanhas {
     conexoes: () => pedir<ConexaoDisponivel[]>("/conexoes"),
     buscas: (p) => pedir<Pagina<BuscaDaTabela>>(`/buscas${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     buscasParaEscolher: () => pedir<Busca[]>("/buscas?escolher=1"),
-    busca: async (id) => {
-      try {
-        return await pedir<Busca>(`/buscas/${id}`);
-      } catch (e) {
-        if (e instanceof FalhaDaRota && e.status === 404) return null;
-        throw e;
-      }
-    },
+    busca: (id) => nuloSe404(pedir<Busca>(`/buscas/${id}`)),
     novaBusca: async (opcoes) => {
-      try {
-        await pedir<{ id: string }>("/buscas", enviar({ opcoes }, "POST"));
-        return { ok: true };
-      } catch (e) {
-        if (e instanceof FalhaDaRota && e.status < 500 && e.motivo) return { ok: false, erro: e.motivo };
-        throw e;
-      }
+      const r = await recusaSe4xx(pedir<{ id: string }>("/buscas", enviar({ opcoes }, "POST")));
+      return r.ok ? { ok: true } : r;
     },
     leads: (p) =>
       pedir<Pagina<LeadDaTabela>>(
@@ -90,14 +98,7 @@ export function fonteDasRotas(): FonteDeCampanhas {
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     campanhasComEnvio: () => pedir<{ id: string; nome: string }[]>("?com_envio=1"),
     resultados: (p) => pedir<Resultados>(`/resultados${q({ campanha: p.campanhaId, periodo: p.periodo })}`),
-    campanha: async (id) => {
-      try {
-        return await pedir<CampanhaAberta>(`/${id}`);
-      } catch (e) {
-        if (e instanceof FalhaDaRota && e.status === 404) return null;
-        throw e;
-      }
-    },
+    campanha: (id) => nuloSe404(pedir<CampanhaAberta>(`/${id}`)),
     leadsDaCampanha: (id, p) => pedir<Pagina<LeadNaCampanha>>(`/${id}/leads${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     previaDoFiltro: (f) =>
       pedir<PreviaDoFiltro>(
@@ -119,12 +120,8 @@ export function fonteDasRotas(): FonteDeCampanhas {
       }
     },
     iniciar: async (id): Promise<RespostaDeIniciar> => {
-      try {
-        return { ok: true, situacao: await acao(id, "iniciar") };
-      } catch (e) {
-        if (e instanceof FalhaDaRota && e.status < 500 && e.motivo) return { ok: false, erro: e.motivo };
-        throw e;
-      }
+      const r = await recusaSe4xx(acao(id, "iniciar"));
+      return r.ok ? { ok: true, situacao: r.valor } : r;
     },
     pausar: (id) => acao(id, "pausar"),
     retomar: (id) => acao(id, "retomar"),

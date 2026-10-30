@@ -5,6 +5,7 @@ import {
   type DiaDeEnvio,
   type MarcacaoDoLead,
   type ResultadoDaCampanha,
+  type ResultadoDobrado,
   type ResumoDobrado,
   type OpcoesDaBusca,
   type SituacaoDaBusca,
@@ -190,7 +191,7 @@ export interface Resultados {
   atual: ResultadoDaCampanha;
   /** A janela anterior igual (os selos); null no detalhe de uma campanha. */
   anterior: ResultadoDaCampanha | null;
-  espera: { chave: string; rotulo: string; n: number }[];
+  espera: ResultadoDobrado["espera"];
   /** Os envios por dia (o gráfico do resumo e os mini gráficos da faixa). */
   serie: DiaDeEnvio[];
 }
@@ -238,4 +239,9 @@ export interface FonteDeCampanhas {
   iniciar(id: string): Promise<RespostaDeIniciar>;
   pausar(id: string): Promise<SituacaoDaCampanha>;
   retomar(id: string): Promise<SituacaoDaCampanha>;
+}
+
+/** O total de um registro de contagens por situação (as abas e o "Todas" dos filtros). */
+export function somaDe(contagens: Record<string, number> | null | undefined): number {
+  return contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
 }

@@ -32,7 +32,18 @@ import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
-import type { Busca, BuscaDaTabela, CampanhaEditavel, ContagemDaBusca, FiltroDosLeads, FonteDeCampanhas, Lead, LeadDaTabela, Totais } from "./tipos";
+import {
+  somaDe,
+  type Busca,
+  type BuscaDaTabela,
+  type CampanhaEditavel,
+  type ContagemDaBusca,
+  type FiltroDosLeads,
+  type FonteDeCampanhas,
+  type Lead,
+  type LeadDaTabela,
+  type Totais,
+} from "./tipos";
 
 // LEADS, a base: o painel no topo (quantos, onde, quantos já contatados e quem
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,
@@ -341,7 +352,7 @@ function TabelaDeBuscas({
     }
     if (terminou) aoTerminarBusca();
   }, [itens, aoTerminarBusca]);
-  const todas = contagens ? Object.values(contagens).reduce((x, y) => x + y, 0) : 0;
+  const todas = somaDe(contagens);
 
   return (
     <>
@@ -632,7 +643,7 @@ function HomeDosLeads({
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
   const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null));
-  const nBuscas = totais ? Object.values(totais.buscas).reduce((x, y) => x + y, 0) : 0;
+  const nBuscas = somaDe(totais?.buscas);
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
