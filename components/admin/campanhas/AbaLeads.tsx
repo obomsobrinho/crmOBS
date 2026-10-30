@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
@@ -28,11 +29,13 @@ import {
 import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
 import NovaBusca from "./NovaBusca";
+import FichaDoLead from "./FichaDoLead";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
 import {
+  sinaisDoLead,
   somaDe,
   type Busca,
   type BuscaDaTabela,
@@ -49,6 +52,9 @@ import {
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,
 // com busca digitando e o botão de filtro. A busca abre o detalhe com os leads dela.
 // Tudo lido da fonte: páginas e contas no servidor, nunca a base no navegador.
+
+// O mapa (Leaflet) só carrega no navegador e só no detalhe de uma busca.
+const MapaDaBusca = dynamic(() => import("./MapaDaBusca"), { ssr: false });
 
 /** De quanto em quanto tempo a tabela relê uma busca que ainda está rodando na fonte. */
 const RELER_BUSCA_MS = 10_000;
@@ -414,10 +420,11 @@ const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "bons", rotulo: "Marcados como bons" },
   { chave: "sem_site", rotulo: "Sem site próprio" },
   { chave: "nota", rotulo: "Nota 4,5 ou mais" },
+  { chave: "nao_reivindicado", rotulo: "Perfil não reivindicado" },
 ];
 
 const GRADE_LEADS =
-  "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_112px] xl:items-center xl:gap-4";
+  "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_148px] xl:items-center xl:gap-4";
 
 function Telefone({ telefone }: { telefone: string | null }) {
   const tipo = tipoDoTelefone(telefone);
@@ -434,7 +441,21 @@ function Telefone({ telefone }: { telefone: string | null }) {
   );
 }
 
-function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["marcacao"]) => void }) {
+function LinhaDoLead({
+  lead,
+  marcar,
+  abrirFicha,
+  destacada,
+  verNoMapa,
+}: {
+  lead: LeadDaTabela;
+  marcar: (m: Lead["marcacao"]) => void;
+  abrirFicha: () => void;
+  /** O pino deste lead foi clicado no mapa. */
+  destacada: boolean;
+  /** Só no detalhe de uma busca, e só para lead com coordenadas. */
+  verNoMapa: (() => void) | null;
+}) {
   const { respondeu } = lead;
   const descartado = lead.marcacao === "descartado";
   return (
@@ -442,10 +463,16 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
       data-slot="lead-linha"
       data-lead={lead.id}
       data-marcacao={lead.marcacao ?? "nenhuma"}
-      className={`flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 ${GRADE_LEADS} ${descartado ? "opacity-55" : ""}`}
+      data-destaque={destacada || undefined}
+      ref={(el) => {
+        if (el && destacada) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }}
+      className={`flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 data-[destaque]:bg-[var(--active-bg)] ${GRADE_LEADS} ${descartado ? "opacity-55" : ""}`}
     >
       <div className="min-w-0 basis-full xl:basis-auto">
-        <p className="truncate text-corpo font-semibold text-ink">{lead.nome}</p>
+        <Button variant="nu" size="none" onClick={abrirFicha} className="block max-w-full truncate text-left text-corpo font-semibold text-ink hover:underline" data-slot="lead-abrir-ficha">
+          {lead.nome}
+        </Button>
         <p className="truncate text-legenda text-ink-3">
           {lead.bairro}, {lead.cidade}
         </p>
@@ -471,7 +498,7 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
         <Telefone telefone={lead.telefone} />
       </div>
       <div>
-        <SeloDaPontuacao sinais={lead} />
+        <SeloDaPontuacao sinais={sinaisDoLead(lead)} />
       </div>
       <div className="flex min-w-0 flex-wrap gap-1.5">
         {lead.parouEm !== null ? (
@@ -490,6 +517,11 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
         )}
       </div>
       <div className="ml-auto flex items-center gap-1 xl:ml-0">
+        {verNoMapa && (
+          <Button variant="ghost" size="icon-chrome" aria-label={`Ver ${lead.nome} no mapa`} onClick={verNoMapa} data-slot="lead-ver-no-mapa">
+            <MapPin aria-hidden />
+          </Button>
+        )}
         <Button
           variant="alternavel"
           size="chip"
@@ -520,13 +552,22 @@ function TabelaDeLeads({
   fonte,
   versao,
   buscaId,
+  destaque = null,
+  focoDoMapa = null,
+  verNoMapa = null,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
   versao: number;
   /** O escopo: todos os leads (null), ou os de uma busca. */
   buscaId: string | null;
+  /** O lead destacado (pino ou linha). */
+  destaque?: string | null;
+  /** Um pino clicado: a tabela vai até a página dele (a chave muda a cada clique). */
+  focoDoMapa?: { id: string; vez: number } | null;
+  verNoMapa?: ((id: string) => void) | null;
 }) {
+  const [ficha, setFicha] = useState<LeadDaTabela | null>(null);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [cidade, setCidade] = useState<string | null>(null);
@@ -537,7 +578,23 @@ function TabelaDeLeads({
     [fonte, buscaId, busca, cidade, filtros],
   );
   const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}`, ler, versao);
-  const { mudarItem } = tabela;
+  const { mudarItem, setPagina } = tabela;
+  // Um pino clicado leva a tabela até a página do lead, no recorte que está na tela.
+  useEffect(() => {
+    if (!focoDoMapa) return;
+    let vivo = true;
+    fonte
+      .paginaDoLead({ buscaId, texto: busca, cidade, filtros }, focoDoMapa.id)
+      .then((p) => {
+        if (vivo && p !== null) setPagina(p);
+      })
+      .catch((e) => console.error("leads, página do lead:", e));
+    return () => {
+      vivo = false;
+    };
+    // Só um clique novo (a `vez`) move a tabela; mudar o recorte depois não volta ao lead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the jump answers the click, not later filter changes
+  }, [focoDoMapa]);
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
   const marcar = useCallback(
     async (id: string, m: Lead["marcacao"]) => {
@@ -607,11 +664,19 @@ function TabelaDeLeads({
       >
         <ul className="divide-y divide-line-soft" data-slot="leads-tabela">
           {tabela.itens.map((l) => (
-            <LinhaDoLead key={l.id} lead={l} marcar={(m) => marcar(l.id, m)} />
+            <LinhaDoLead
+              key={l.id}
+              lead={l}
+              marcar={(m) => marcar(l.id, m)}
+              abrirFicha={() => setFicha(l)}
+              destacada={destaque === l.id}
+              verNoMapa={verNoMapa && l.detalhes?.lat != null ? () => verNoMapa(l.id) : null}
+            />
           ))}
         </ul>
       </CorpoDaTabela>
       <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" />
+      <FichaDoLead lead={ficha} aoFechar={() => setFicha(null)} />
     </>
   );
 }
@@ -732,6 +797,10 @@ function DetalheDaBusca({
   criarCampanha: () => void;
 }) {
   const { dados: painel } = useLeitura(`painel-busca|${busca.id}|${versao}`, () => fonte.painelDaBase(busca.id));
+  const { dados: pontos } = useLeitura(`pontos|${busca.id}|${versao}`, () => fonte.pontosDaBusca(busca.id));
+  // O destaque e de onde ele veio: do mapa (a tabela vai até a linha) ou da tabela (o mapa vai até o pino).
+  const [destaque, setDestaque] = useState<{ id: string; origem: "mapa" | "tabela"; vez: number } | null>(null);
+  const destacar = useCallback((id: string, origem: "mapa" | "tabela") => setDestaque((d) => ({ id, origem, vez: (d?.vez ?? 0) + 1 })), []);
   return (
     <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
@@ -754,8 +823,28 @@ function DetalheDaBusca({
 
       {painel && <PainelDaBusca r={painel.resumo} respostasPorDia={painel.respostasPorDia} />}
 
+      {pontos && pontos.length > 0 && (
+        <Card variant="conteudo" className="p-5" data-bloco="busca-mapa">
+          <CabecalhoDoGrafico titulo="No mapa" />
+          <MapaDaBusca
+            pontos={pontos}
+            destaque={destaque?.id ?? null}
+            centralizar={destaque?.origem === "tabela"}
+            aoEscolher={(id) => destacar(id, "mapa")}
+          />
+        </Card>
+      )}
+
       <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
-        <TabelaDeLeads esquerda={<h3 className="text-cartao text-ink">Leads</h3>} fonte={fonte} versao={versao} buscaId={busca.id} />
+        <TabelaDeLeads
+          esquerda={<h3 className="text-cartao text-ink">Leads</h3>}
+          fonte={fonte}
+          versao={versao}
+          buscaId={busca.id}
+          destaque={destaque?.id ?? null}
+          focoDoMapa={destaque?.origem === "mapa" ? destaque : null}
+          verNoMapa={pontos && pontos.length > 0 ? (id) => destacar(id, "tabela") : null}
+        />
       </Card>
     </div>
   );

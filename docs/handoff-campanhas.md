@@ -1,4 +1,61 @@
-# Handoff: Campanhas v2 backend
+# Handoff: Campanhas v2
+
+## Rodada de 30/10/2026: busca de leads, mapa e menu (branch `claude/lucid-cerf-1wh6fc`)
+
+Revisão do Franck depois da primeira busca real. **Protótipo pronto em `/design/campanhas`, parado para a
+revisão do layout.** A página de verdade ainda não ganhou nada disso (a não ser o item do menu e a lista
+de cidades), de propósito: fluxo fixo, protótipo primeiro.
+
+O que dá para ver no protótipo:
+- **Menu:** "Campanhas" logo abaixo de Contatos, só para admin (no celular, dentro de "Mais").
+- **Nova busca:** UF primeiro; a cidade num campo que busca digitando (sem acento e sem diferença de
+  maiúscula: "mutum", "Mutúm") e só aceita cidade da lista daquela UF. Filtros novos: "Mínimo de
+  avaliações" e "Só desta categoria" (sugestões a partir do segmento). Nota, site, categoria e avaliações
+  são filtrados do nosso lado, de graça; o actor só recebe "sem fechadas" e o enriquecimento de contatos.
+- **Detalhe da busca:** um mapa com um pino por lead, na cor do estado (não contatado, bom, contatado,
+  respondeu; descartado é um anel vazado), com a legenda e as contagens. Clicar num pino leva a tabela até
+  a página do lead e destaca a linha; o ícone de pino na linha destaca o pino no mapa.
+- **Ficha do lead** (clique no nome): pontos e motivos, "Perfil não reivindicado", ganchos do horário
+  (fecha antes das 18h, não abre sábado, fecha no almoço), o horário da semana, as avaliações por
+  estrela, fotos, categorias, endereço e o @ do Instagram.
+- **Tabela:** filtro novo "Perfil não reivindicado". A pontuação ganhou perfil não reivindicado (15) e
+  horário (10); os pesos continuam provisórios (D9): sem site 25, segmento 20, avaliações 20, nota 10.
+
+### Para o Franck (esta rodada)
+1. **Revisar o layout** em `/design/campanhas?tela=busca` (mapa e ficha) e na "Nova busca". Uma pergunta: o
+   mapa empurra a tabela para baixo da primeira tela (a regra de 29/10 era tudo acima da tabela em
+   1440x900). Prefere assim, o mapa mais baixo, ou o mapa ao lado dos cartões de bairro e presença?
+2. **Liberar o DDL aditivo** para a parte real (só colunas novas em `prospeccao_leads`, nada existente muda):
+   `lat numeric`, `lng numeric`, `reivindicado boolean`, `horarios jsonb`, `distribuicao_notas jsonb`,
+   `fotos int`, `categorias text[]`, `instagram text`. Sem isto a página de verdade não tem pinos, ficha
+   completa nem o filtro de perfil. A pontuação dos leads já gravados continua a antiga até uma nova busca.
+3. **Lista de cidades:** gerei `lib/dados/municipios.json` a partir do espelho `kelvins/municipios-brasileiros`
+   (os mesmos códigos do IBGE; 5.571 cidades), porque a rede desta sessão bloqueia
+   servicodados.ibge.gov.br. O script versionado (`scripts/gerar-municipios.mjs`) usa a API do IBGE por
+   padrão; rode uma vez numa máquina com acesso (`node scripts/gerar-municipios.mjs`) e veja se o diff
+   muda algum nome.
+4. **"Incluir cidades vizinhas" (raio em km): NÃO fiz.** O README do actor estava bloqueado aqui (apify.com),
+   então não deu para confirmar o formato do `customGeolocation`. Se você colar o trecho do README (ou
+   liberar o domínio), entra na parte real.
+5. **Conferir com a busca de 30/10** (o JSON de um item do dataset ajuda): o nome dos dias e o formato das
+   horas em `openingHours` com `language: pt-BR` (o leitor aceita português e inglês, "08:00–18:00", "8 AM
+   to 6 PM", "Fechado", "Aberto 24 horas"), e os nomes das categorias sugeridas (lista provisória em
+   `CATEGORIAS_SUGERIDAS`, `lib/prospeccao.ts`).
+
+### Decisões que tomei nesta rodada
+- **Filtrar do nosso lado** nota, site, categoria e avaliações (pediu para preferir isso quando o dado já
+  vem). Consequência: o teto de 50 por segmento conta ANTES do filtro, então uma busca filtrada pode voltar
+  com menos empresas. O `categoryFilterWords` pago fica disponível se preferir gastar para não trazer o
+  dentista.
+- **Mapa:** Leaflet 1.9.4 (versão fixa), tiles do OpenStreetMap com a atribuição, escuro por filtro nos
+  tiles; o mapa só carrega no navegador e só no detalhe da busca. Neste container os tiles não carregam
+  (rede), então as capturas mostram só os pinos; no seu navegador o mapa aparece.
+- **Combobox de cidade** é uma peça nova da camada base (`components/ui/combobox.tsx`), com o desenho do
+  `Select`.
+
+---
+
+# Handoff: Campanhas v2 backend (rodada de 29 e 30/10/2026, já na main)
 
 Branch `claude/campanhas-plano-1c34fe`. Never merged, never pushed to `main`. Phases 0 and 1 by the Cursor
 agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 30/10/2026.

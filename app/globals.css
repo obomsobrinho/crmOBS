@@ -502,6 +502,14 @@
   --chart-area: color-mix(in srgb, var(--brand-fill) 16%, transparent);
   /* Coluna ACIMA de uma referência (o ritmo do limite): é ESTADO (âmbar), nunca uma segunda série. */
   --chart-acima: var(--warn-fill);
+  /* ── Os pinos do mapa de uma busca (Campanhas, 30/10/2026): o ESTADO do lead.
+     Respondeu é verde (estado bom); contatado é a marca; bom é a marca clara;
+     não contatado é neutro; descartado some no fundo. A legenda escreve o nome. */
+  --mapa-respondeu: var(--human-fill);
+  --mapa-contatado: var(--brand-fill);
+  --mapa-bom: var(--chart-rampa-2);
+  --mapa-nao-contatado: var(--chart-barra-neutra);
+  --mapa-borda: var(--raised);
 
   /* ── Chip de filtro ATIVO (lista de conversas) ──
      O desenho de 18/09/2026 marca o recorte ativo por INVERSÃO de tinta, e não
@@ -1310,4 +1318,66 @@ select:focus-visible,
   .painel-corpo {
     transition: none;
   }
+}
+
+/* ── O mapa de uma busca de leads (Leaflet, components/admin/campanhas/MapaDaBusca.tsx).
+   O pino é um SVG do Leaflet: a cor vem por classe, porque atributo SVG não lê var().
+   No escuro os tiles do OpenStreetMap passam por um filtro (inverte e devolve o
+   matiz), para o mapa não acender um retângulo branco no meio da tela. */
+.pino-do-mapa {
+  stroke: var(--mapa-borda);
+}
+.pino-do-mapa.pino-nao_contatado {
+  fill: var(--mapa-nao-contatado);
+}
+.pino-do-mapa.pino-bom {
+  fill: var(--mapa-bom);
+}
+.pino-do-mapa.pino-contatado {
+  fill: var(--mapa-contatado);
+}
+.pino-do-mapa.pino-respondeu {
+  fill: var(--mapa-respondeu);
+}
+/* Descartado é um anel vazado: some no fundo e não se confunde com o neutro. */
+.pino-do-mapa.pino-descartado {
+  fill: transparent;
+  stroke: var(--ink-3);
+}
+.legenda-do-mapa.pino-nao_contatado {
+  background: var(--mapa-nao-contatado);
+}
+.legenda-do-mapa.pino-bom {
+  background: var(--mapa-bom);
+}
+.legenda-do-mapa.pino-contatado {
+  background: var(--mapa-contatado);
+}
+.legenda-do-mapa.pino-respondeu {
+  background: var(--mapa-respondeu);
+}
+.legenda-do-mapa.pino-descartado {
+  border: 1.5px solid var(--ink-3);
+}
+.mapa-da-busca {
+  background: var(--s-bloco);
+  font: inherit;
+}
+.mapa-da-busca .leaflet-control-attribution,
+.mapa-da-busca .leaflet-bar a {
+  background: var(--raised);
+  color: var(--ink-2);
+  border-color: var(--line);
+}
+.mapa-da-busca .leaflet-control-attribution a {
+  color: var(--brand-ink);
+}
+.mapa-da-busca .leaflet-tooltip {
+  background: var(--raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: var(--panel-shadow);
+}
+[data-theme="dark"] .mapa-da-busca .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6);
 }

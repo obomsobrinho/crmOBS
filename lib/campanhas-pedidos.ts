@@ -1,6 +1,7 @@
 import { ehUuid } from "./admin-acesso";
 import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads } from "@/components/admin/campanhas/tipos";
 import {
+  MINIMOS_DE_AVALIACOES,
   QUANTIDADES_POR_TERMO,
   UFS,
   type FiltroDeSiteDaBusca,
@@ -57,13 +58,21 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (!(QUANTIDADES_POR_TERMO as readonly unknown[]).includes(o.porTermo)) return null;
   if (!notas.includes(o.notaMinima as NotaMinima) || !sites.includes(o.site as FiltroDeSiteDaBusca)) return null;
   if (typeof o.ignorarFechados !== "boolean" || typeof o.buscarContatos !== "boolean") return null;
+  if (o.cidadeIbge !== null && (typeof o.cidadeIbge !== "number" || !Number.isInteger(o.cidadeIbge))) return null;
+  const minimo = MINIMOS_DE_AVALIACOES.find((m) => m === o.minAvaliacoes);
+  if (minimo === undefined) return null;
+  const categorias = Array.isArray(o.categorias) ? o.categorias.filter((c): c is string => typeof c === "string").map((c) => c.trim().slice(0, 60)) : null;
+  if (!categorias || categorias.length > 10) return null;
   return {
     termos,
     cidade: o.cidade.trim().slice(0, 80),
     uf: o.uf,
+    cidadeIbge: o.cidadeIbge,
     porTermo: o.porTermo as number,
     notaMinima: o.notaMinima as NotaMinima,
     site: o.site as FiltroDeSiteDaBusca,
+    minAvaliacoes: minimo,
+    categorias: categorias.filter(Boolean),
     ignorarFechados: o.ignorarFechados,
     buscarContatos: o.buscarContatos,
   };
