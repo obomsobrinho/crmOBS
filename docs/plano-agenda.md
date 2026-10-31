@@ -249,6 +249,16 @@ sends by itself once the env var exists.
   `painel_verbatim`, not applied), `docs/instrumentacao-uso.md` and the mass of
   `e2e/painel-agregado.serial.spec.ts` (which proves TS and SQL agree once the migration is applied).
 
+## 7.1 Week grid redrawn (owner's review of 31/10/2026; branch `claude/agenda-grade-semana`)
+
+The grid showed only the agenda's hours (OBS: 13h to 18h), so it ended mid-screen and the "now" line
+(about 20h) sat loose under it. Now: the 24 hours, always at the same height; out-of-hours with the SAME
+look as closed days (Friday after 18h at OBS looks like the weekend); the "now" line always inside the
+grid; it opens scrolled to the middle of the agenda's hours, or to now when now is inside them. Works with
+one or two hours a day and a closed weekday. Booking rules unchanged. Preview:
+`/design/agenda?horario=obs&agora=2026-10-30T23:05:00Z` and `?horario=curto`. Waiting for the owner's
+review before `main`.
+
 ## 8. Tests
 
 Final test plan for the deploy approval (in this order):
