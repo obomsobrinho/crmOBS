@@ -10,7 +10,7 @@ import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
 import { useLeitura } from "./tabela";
-import { somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
+import { localDaUltimaBusca, somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
 // par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
@@ -29,12 +29,24 @@ export default function CentralDeCampanhas({
   fonte,
   variantesSugeridas,
   inicial = null,
+  abrirNovaBusca,
+  rascunhoEsperandoId = null,
 }: {
   telaInicial: Tela;
   agora: number;
   fonte: FonteDeCampanhas;
   /** O que o servidor já leu para a primeira tela (só a página de verdade). */
   inicial?: InicialDaCentral | null;
+  /**
+   * Abre a Nova busca na página própria (`/campanhas/buscas/nova`, a página de verdade);
+   * sem ela (o preview), a Nova busca é uma tela desta central.
+   */
+  abrirNovaBusca?: (rascunhoEsperandoId: string | null) => void;
+  /**
+   * A campanha que mandou buscar contatos ("Falta lead? Fazer uma nova busca") e volta com a
+   * página de verdade depois da Nova busca (`?rascunho=`): a faixa "esperando os contatos" reaparece.
+   */
+  rascunhoEsperandoId?: string | null;
   /** O texto pré-preenchido de uma campanha nova (o dono edita). */
   variantesSugeridas: string[];
 }) {
@@ -89,17 +101,24 @@ export default function CentralDeCampanhas({
     [],
   );
 
+  /** O número que uma campanha nova já traz: o primeiro conectado, senão o primeiro. */
+  const conexaoPadrao = useMemo(() => conexoes?.find((c) => c.conectado) ?? conexoes?.[0] ?? null, [conexoes]);
+
+  /** A campanha NOVA que nasceu antes de as conexões chegarem: só ela recebe o número padrão depois. */
+  const esperandoNumero = useRef<string | null>(null);
+
   const novoRascunho = useCallback(
     (extra: Partial<CampanhaEditavel>) => {
-      const conectada = conexoes?.find((c) => c.conectado) ?? conexoes?.[0] ?? null;
       const agoraMs = Date.now();
+      const id = crypto.randomUUID();
+      esperandoNumero.current = conexaoPadrao || extra.conexaoId ? null : id;
       abrirRascunho(
         {
-          id: crypto.randomUUID(),
+          id,
           nome: "",
           situacao: "rascunho",
           agendadaPara: null,
-          conexaoId: conectada?.id ?? null,
+          conexaoId: conexaoPadrao?.id ?? null,
           filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
           variantes: [...variantesSugeridas],
           criadaEm: agoraMs,
@@ -110,7 +129,7 @@ export default function CentralDeCampanhas({
         true,
       );
     },
-    [abrirRascunho, conexoes, variantesSugeridas],
+    [abrirRascunho, conexaoPadrao, variantesSugeridas],
   );
 
   const editar = useCallback(
@@ -125,6 +144,21 @@ export default function CentralDeCampanhas({
     },
     [abrirRascunho, fonte],
   );
+
+  // Voltando da Nova busca com a campanha que esperava contatos: lê ela uma vez para a faixa.
+  useEffect(() => {
+    if (!rascunhoEsperandoId) return;
+    let vivo = true;
+    fonte
+      .campanha(rascunhoEsperandoId)
+      .then((a) => {
+        if (vivo && a?.campanha.situacao === "rascunho") setRascunhoEsperando(a.campanha);
+      })
+      .catch((e) => console.error("campanha, rascunho esperando:", e));
+    return () => {
+      vivo = false;
+    };
+  }, [fonte, rascunhoEsperandoId]);
 
   // Aberta direto num rascunho (o link do preview `?tela=rascunho`): lê a campanha uma vez.
   useEffect(() => {
@@ -149,6 +183,15 @@ export default function CentralDeCampanhas({
       return novo;
     });
   }, []);
+
+  // Uma campanha NOVA criada antes de as conexões chegarem nasceu sem número (o "Continuar"
+  // ficava travado sem motivo à vista): o número padrão entra assim que elas chegam. Um rascunho
+  // salvo que foi só aberto nunca muda sozinho.
+  useEffect(() => {
+    if (!conexaoPadrao || !rascunho || rascunho.id !== esperandoNumero.current) return;
+    esperandoNumero.current = null;
+    if (rascunho.conexaoId === null) mudarRascunho({ conexaoId: conexaoPadrao.id });
+  }, [conexaoPadrao, mudarRascunho, rascunho]);
 
   const sairDoAssistente = useCallback(async () => {
     await salvarAgora();
@@ -254,7 +297,7 @@ export default function CentralDeCampanhas({
                 rascunho={rascunhoEsperando}
                 abrirBusca={(id) => setTela({ aba: "leads", busca: id })}
                 aoMudar={mudou}
-                novaBusca={() => setTela({ aba: "leads", nova: true })}
+                novaBusca={abrirNovaBusca ? () => abrirNovaBusca(rascunhoEsperando?.id ?? null) : () => setTela({ aba: "leads", nova: true })}
                 criarCampanhaDaBusca={(b: Busca) => {
                   const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
                   novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
@@ -311,10 +354,7 @@ export default function CentralDeCampanhas({
  */
 function PaginaDaNovaBusca({ fonte, voltar, aoComecar }: { fonte: FonteDeCampanhas; voltar: () => void; aoComecar: () => void }) {
   const ultima = useLeitura("ultima-busca", () => fonte.buscasParaEscolher());
-  const localInicial = useMemo(() => {
-    const opcoes = ultima.dados?.find((b) => b.opcoes.cidadeIbge !== null)?.opcoes ?? null;
-    return opcoes?.cidadeIbge != null ? { uf: opcoes.uf, ibge: opcoes.cidadeIbge } : null;
-  }, [ultima.dados]);
+  const localInicial = useMemo(() => localDaUltimaBusca(ultima.dados ?? []), [ultima.dados]);
   if (!ultima.dados && !ultima.erro) return null;
   return (
     <NovaBusca

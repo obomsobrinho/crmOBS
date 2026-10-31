@@ -158,6 +158,11 @@ export interface BuscaDaTabela extends Busca {
 export interface LeadDaTabela extends Lead {
   campanhas: { id: string; nome: string }[];
   respondeu: boolean;
+  /**
+   * A pontuação GRAVADA (a que ordena a tabela): um lead de antes dos pesos de hoje fica com a
+   * dele até uma busca nova achá-lo. Ausente (o preview) = calculada na hora.
+   */
+  pontuacao?: number;
 }
 
 /** Os recortes do botão de filtro da tabela de leads. */
@@ -278,6 +283,21 @@ export interface FonteDeCampanhas {
   iniciar(id: string): Promise<RespostaDeIniciar>;
   pausar(id: string): Promise<SituacaoDaCampanha>;
   retomar(id: string): Promise<SituacaoDaCampanha>;
+}
+
+/** Uma cidade da lista do IBGE pela UF e o código: onde o mapa da Nova busca abre. */
+export interface LocalInicial {
+  uf: string;
+  ibge: number;
+}
+
+/**
+ * Onde o mapa da Nova busca abre: a cidade da busca mais recente que tem cidade da lista
+ * (as buscas vêm da mais nova para a mais velha); null = nenhuma, e a página abre na cidade da OBS.
+ */
+export function localDaUltimaBusca(buscas: Busca[]): LocalInicial | null {
+  const opcoes = buscas.find((b) => b.opcoes.cidadeIbge !== null)?.opcoes;
+  return opcoes?.cidadeIbge != null ? { uf: opcoes.uf, ibge: opcoes.cidadeIbge } : null;
 }
 
 /** O total de um registro de contagens por situação (as abas e o "Todas" dos filtros). */

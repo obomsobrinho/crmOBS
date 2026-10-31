@@ -17,7 +17,10 @@ import type { ItemDaFonteDeLeads, LeituraDaExecucao } from "./fonte-de-leads";
 //
 // Os filtros pagos do actor (US$ 0,001 por empresa cada: nota mínima, site,
 // categoria) NÃO vão na entrada (revisão do dono, 30/10/2026): o dado já vem em
-// todo item, então `filtrarPelasOpcoes` filtra do nosso lado, de graça.
+// todo item, então `filtrarPelasOpcoes` filtra do nosso lado, de graça. A exceção
+// é a categoria quando o dono marca "Só desta categoria" (31/10/2026): vai como
+// `categoryFilterWords`, para a fonte não trazer (e cobrar) o lugar de outra
+// categoria, e é conferida do nosso lado também.
 
 export const ACTOR_APIFY = "compass/crawler-google-places";
 
@@ -33,6 +36,7 @@ export function entradaApify(o: OpcoesDaBusca): Record<string, unknown> {
     ...(o.area
       ? { customGeolocation: { type: "Point", coordinates: [o.area.lng, o.area.lat], radiusKm: o.area.raioKm } }
       : { locationQuery: localDaBusca(o) }),
+    ...(o.categorias.length > 0 ? { categoryFilterWords: o.categorias } : {}),
     maxCrawledPlacesPerSearch: o.porTermo,
     language: "pt-BR",
     skipClosedPlaces: o.ignorarFechados,

@@ -297,6 +297,18 @@ a "site" that was an Instagram post. Changes, prototype first (`/design/campanha
   reply, for a window and the previous one). Score and site class are stored on the lead row so SQL can
   group by them. To be written with the backend, after the owner approves this layout.
 
+### 7.1 Lead details (real phase, 31/10/2026)
+
+`supabase/migrations/20261031021139_prospeccao_leads_detalhes.sql`, additive, waiting for the owner's
+"pode aplicar": eight nullable columns on `prospeccao_leads` (`lat`, `lng`, `reivindicado`, `horarios`,
+`distribuicao_notas`, `fotos`, `categorias`, `instagram`); `prospeccao_concluir_busca` writes them (and
+refreshes the score and the source fields of a lead found again); `prospeccao_leads_pagina` returns them
+plus `endereco` and the stored `pontuacao`, with the new filter `p_nao_reivindicado`; two new functions,
+`prospeccao_pagina_do_lead` (the page of a lead in the table's cut, for the pin click; same filter as the
+page, change both) and `prospeccao_pontos_da_busca` (the pins, at most 2000). Routes: `GET
+/api/admin/campanhas/leads/[id]` (page of the lead) and `GET /api/admin/campanhas/buscas/[id]/pontos`.
+The real Nova busca page is `/campanhas/buscas/nova`.
+
 ## 8. Code map (backend phase)
 
 - Pure: `lib/prospeccao.ts` (done: phone, site class, score, statuses, eligibility, message variants,

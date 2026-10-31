@@ -10,7 +10,7 @@ import {
   DIAS_DA_SEMANA,
   faixaDaPontuacao,
   ganchosDoHorario,
-  pontuarLead,
+  pontuacaoExibida,
   textoDoDia,
   textosDosGanchos,
   tipoDoTelefone,
@@ -39,7 +39,7 @@ function Linha({ icone: Icone, rotulo, children }: { icone: typeof Phone; rotulo
 export default function FichaDoLead({ lead, aoFechar }: { lead: LeadDaTabela | null; aoFechar: () => void }) {
   const d = lead?.detalhes ?? null;
   const ganchos = textosDosGanchos(ganchosDoHorario(d?.horarios));
-  const pontos = lead ? pontuarLead(sinaisDoLead(lead)) : null;
+  const pontos = lead ? pontuacaoExibida(sinaisDoLead(lead), lead.pontuacao) : null;
   const totalDasNotas = d?.distribuicao ? Object.values(d.distribuicao).reduce((a, b) => a + b, 0) : 0;
   return (
     <Sheet open={lead !== null} onOpenChange={(v) => !v && aoFechar()}>

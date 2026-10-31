@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Circle, CircleMarker, Map as MapaLeaflet, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
@@ -14,11 +14,14 @@ import type { PontoNoMapa } from "./tipos";
 // Os pinos são SVG do Leaflet, coloridos por classe (`pino-{estado}`); o centro é um
 // marcador HTML (`.pino-central`) que dá para arrastar.
 
+/** Sem pinos (a Nova busca): uma lista só, para o efeito dos pinos não rodar a cada render. */
+const SEM_PONTOS: PontoNoMapa[] = [];
+
 const RAIO = 7;
 const RAIO_DESTACADO = 11;
 
 export default function Mapa({
-  pontos = [],
+  pontos = SEM_PONTOS,
   destaque = null,
   centralizar = false,
   aoEscolher,
@@ -62,7 +65,12 @@ export default function Mapa({
     mover.current = aoMoverCentro;
   });
 
-  // Monta o mapa e os pinos (Leaflet mexe no DOM e em `window`: só no navegador).
+  // Monta o mapa UMA vez (Leaflet mexe no DOM e em `window`: só no navegador). Os pinos têm o
+  // efeito deles: uma releitura (a cor de um lead marcado) redesenha só os pinos, sem perder o
+  // zoom nem o arrasto do dono.
+  const [pronto, setPronto] = useState(false);
+  /** A vista já se ajustou aos pinos (depois disso, o zoom e o arrasto são do dono). */
+  const enquadrado = useRef(false);
   useEffect(() => {
     let vivo = true;
     const marcados = pinos.current;
@@ -76,22 +84,9 @@ export default function Mapa({
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
       }).addTo(m);
       m.on("click", (e) => mover.current?.(e.latlng.lat, e.latlng.lng));
-      for (const p of pontos) {
-        const pino = L.circleMarker([p.lat, p.lng], { radius: RAIO, weight: 2, fillOpacity: 0.9, className: `pino-do-mapa pino-${p.estado}` })
-          .bindTooltip(`${p.nome} · ${ROTULO_NO_MAPA[p.estado]}`, { direction: "top", offset: [0, -6] })
-          .on("click", (e) => {
-            L.DomEvent.stopPropagation(e);
-            escolher.current?.(p.id);
-          })
-          .addTo(m);
-        marcados.set(p.id, pino);
-      }
-      if (pontos.length > 0) m.fitBounds(L.latLngBounds(pontos.map((p) => [p.lat, p.lng])), { padding: [24, 24], maxZoom: 15 });
-      else m.setView([-15.8, -47.9], 4);
+      m.setView([-15.8, -47.9], 4);
       mapa.current = m;
-      // A primeira vista e a área (os efeitos de baixo rodaram antes do Leaflet chegar).
-      desenharArea();
-      olharPara();
+      setPronto(true);
     });
     return () => {
       vivo = false;
@@ -99,10 +94,38 @@ export default function Mapa({
       mapa.current = null;
       centro.current = null;
       circulo.current = null;
+      enquadrado.current = false;
       marcados.clear();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the map mounts once per set of pins; area and view have their own effects
-  }, [pontos]);
+  }, []);
+
+  // Os pinos: trocados inteiros a cada lista nova; a vista só se ajusta a eles na primeira vez.
+  useEffect(() => {
+    const L = leaflet.current;
+    const m = mapa.current;
+    if (!pronto || !L || !m) return;
+    for (const pino of pinos.current.values()) pino.remove();
+    pinos.current.clear();
+    for (const p of pontos) {
+      const pino = L.circleMarker([p.lat, p.lng], { radius: RAIO, weight: 2, fillOpacity: 0.9, className: `pino-do-mapa pino-${p.estado}` })
+        .bindTooltip(`${p.nome} · ${ROTULO_NO_MAPA[p.estado]}`, { direction: "top", offset: [0, -6] })
+        .on("click", (e) => {
+          L.DomEvent.stopPropagation(e);
+          escolher.current?.(p.id);
+        })
+        .addTo(m);
+      pinos.current.set(p.id, pino);
+    }
+    if (enquadrado.current) return;
+    if (pontos.length > 0) {
+      m.fitBounds(L.latLngBounds(pontos.map((p) => [p.lat, p.lng])), { padding: [24, 24], maxZoom: 15 });
+      enquadrado.current = true;
+    }
+    // A primeira vista com a área (o efeito da área rodou antes do Leaflet chegar).
+    desenharArea();
+    olharPara();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pins follow the list; area and view have their own effects
+  }, [pontos, pronto]);
 
   /** O centro arrastável e o círculo, criados na primeira vez e depois só movidos. */
   function desenharArea() {
@@ -137,9 +160,12 @@ export default function Mapa({
       return;
     }
     if (!circulo.current) {
-      circulo.current = L.circle(ponto, { radius: area.raioKm * 1000, className: "area-do-mapa", weight: 2, fillOpacity: 0.12 }).addTo(m);
+      circulo.current = L.circle(ponto, { radius: area.raioKm * 1000, className: "area-do-mapa", weight: 2, fillOpacity: 0.12, interactive: false }).addTo(m);
     } else circulo.current.setLatLng(ponto).setRadius(area.raioKm * 1000);
-    m.fitBounds(circulo.current.getBounds(), { padding: [16, 16], animate: false });
+    // O círculo inteiro à vista, e os pinos também (no detalhe, um lead pode ficar fora do raio).
+    const caixa = circulo.current.getBounds();
+    for (const pino of pinos.current.values()) caixa.extend(pino.getLatLng());
+    m.fitBounds(caixa, { padding: [16, 16], animate: false });
   }
 
   function olharPara() {

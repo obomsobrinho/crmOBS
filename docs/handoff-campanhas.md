@@ -1,5 +1,76 @@
 # Handoff: Campanhas v2
 
+## Rodada de 31/10/2026 (Parte A, a parte real): detalhes do lead no banco, Nova busca de verdade (branch `claude/lucid-cerf-1wh6fc`)
+
+**Parado para o "pode aplicar" do Franck.** O código da parte real está pronto e testado; ele depende da
+migration abaixo, que NÃO foi aplicada (regra do repo: agente não aplica DDL, e esta sessão não tem o MCP
+do Supabase).
+
+- **Migration** `supabase/migrations/20261031021139_prospeccao_leads_detalhes.sql` (aditiva):
+  - as 8 colunas em `prospeccao_leads`, todas anuláveis e sem default: `lat numeric`, `lng numeric`,
+    `reivindicado boolean`, `horarios jsonb`, `distribuicao_notas jsonb`, `fotos int`, `categorias
+    text[]`, `instagram text`. Nada existente é apagado ou reescrito;
+  - para as colunas servirem, três funções mudam e duas nascem (todas só service_role):
+    `prospeccao_concluir_busca` grava os campos novos; num lead que já estava na base, a busca nova traz
+    juntos a pontuação e o que entra nela (nota, avaliações, site, perfil, horário) e o resto só completa
+    (vazio não apaga; marcação e "parou" nunca mudam; sem mudança, a linha não é reescrita).
+    `prospeccao_leads_pagina` devolve as colunas novas, o endereço e a pontuação gravada, e ganha o filtro
+    "Perfil não reivindicado" (muda o retorno, por isso `drop` e `create`; chamadas antigas continuam
+    valendo). Novas: `prospeccao_pagina_do_lead` (o pino clicado leva a tabela até o lead) e
+    `prospeccao_pontos_da_busca` (os pinos, até 2000).
+  - **Testada num Postgres 16 local** com as migrations reais: lead novo, lead achado de novo (pontuação e
+    dados juntos, categoria vazia não apaga, linha sem mudança fica intocada), o filtro, a página de cada
+    um de 25 leads, os pinos, e a migration rodando duas vezes.
+- **Fonte:** `categoryFilterWords` (pago) só quando "Só desta categoria" está marcada; o custo do rodapé
+  soma US$ 0,001 por empresa e a página avisa. Nota, site e avaliações seguem do nosso lado (a categoria
+  também é conferida do nosso lado). O formato real do `openingHours` (`"07:30 to 12:30, 13:30 to 19:00"`,
+  `"Fechado"`) tem teste com o texto exato. Os campos da fonte vão ao banco nas 8 colunas e voltam iguais.
+- **Telas reais:** a página `/campanhas/buscas/nova` (`adminDaPagina`; o mapa abre na cidade da última
+  busca, lida no servidor numa linha só; voltar e "Buscar" levam a Leads sem empilhar o formulário no
+  histórico); o detalhe da busca com os pinos de verdade e o círculo quando houve raio; a ficha com os
+  dados reais; o filtro "Perfil não reivindicado"; o selo mostra a pontuação GRAVADA (um lead antigo
+  fica com a dele até uma busca nova achá-lo). Marcar um lead na tabela recolore o pino na hora, e o mapa
+  não perde o zoom quando a tela relê. A campanha que mandou buscar contatos volta com você da Nova busca
+  (`?rascunho=`). Rotas novas: `GET /api/admin/campanhas/leads/[id]` e `GET
+  /api/admin/campanhas/buscas/[id]/pontos`, ambas no `rotaDoAdmin` e na lista de guarda do teste.
+  Nenhuma escrita nova do admin (as que existem já gravam `admin_acoes`).
+- **Bug achado de passagem e corrigido:** "Nova campanha" criada antes de as conexões chegarem nascia sem
+  número e o "Continuar" ficava travado sem motivo à vista (o teste do assistente falhava 3 em 6 já antes
+  desta rodada). Agora a campanha nova recebe o número padrão quando as conexões chegam; um rascunho salvo
+  que só foi aberto nunca muda sozinho.
+- **Menu "Gestão da OBS"** já estava na página real desde a rodada anterior (desktop e "Mais" no celular).
+- **Lista de cidades:** como combinado, fica a do espelho; você roda `node scripts/gerar-municipios.mjs`.
+
+### O que testei
+- Testes de lib (`campanhas-lib`): mapeamento com dados inventados (nenhum telefone real), o formato real
+  do horário, a pontuação com os sinais novos, `customGeolocation` e `categoryFilterWords`, o custo, o
+  banco ida e volta, jsonb torto, o recorte da query, a cidade de partida. Guarda das rotas
+  (`central-clientes-lib`) com a página e as rotas novas. Telas no preview (`campanhas.design`): círculo
+  no detalhe, pino recolorido ao marcar, aviso e custo da categoria, 404 das rotas novas e login das
+  duas páginas.
+- Suítes gratuitas sem login inteiras; `/simplify` e `/code-review` com as correções (lista no fim).
+
+### O que falta / o que precisa de você
+1. **"Pode aplicar"** para a migration. Depois, numa sessão com o MCP do Supabase: `apply_migration`
+   com a versão e o nome do arquivo, `generate_typescript_types` por cima de `lib/database.types.ts` (eu
+   editei os tipos à mão no formato do gerador; o diff deve sair vazio) e `npm run typecheck`. A página
+   real só funciona DEPOIS da migration (a leitura de leads pede o filtro novo): aplicar antes do deploy.
+2. **O ensaio** (você mesmo como único lead): uma busca real em `/campanhas/buscas/nova` com raio pequeno
+   em volta do seu endereço, de preferência com "Só desta categoria" marcada uma vez (os nomes sugeridos
+   em `CATEGORIAS_SUGERIDAS` ainda são provisórios; se a fonte devolver vazio com a categoria, me diga).
+   Conferir: o pino no mapa dentro do círculo, a ficha com horário, perfil e avaliações, o filtro "Perfil
+   não reivindicado", e a pontuação do selo.
+3. A lista de cidades pelo IBGE (`node scripts/gerar-municipios.mjs`).
+
+### Achados das revisões que deixei de lado (com o motivo)
+- Juntar o filtro de `prospeccao_leads_pagina` e `prospeccao_pagina_do_lead` numa função só: uma função
+  SQL com `set search_path` não é "inlinada" e pesaria na leitura da tabela; ficou o comentário "mudar um
+  muda o outro" e o teste local das 25 páginas.
+- `lat`/`lng` como `double precision`: você pediu `numeric`; a leitura converte.
+- Preview da Nova busca numa rota própria: a tela do preview segue dentro de `/design/campanhas`.
+
+---
+
 ## Rodada de 31/10/2026 (Parte A): Nova busca vira página, mapa e campos ligados (branch `claude/lucid-cerf-1wh6fc`)
 
 **Parado para a revisão do Franck.** Protótipo em `/design/campanhas?tela=nova-busca` (ou "Nova busca" na aba Leads).

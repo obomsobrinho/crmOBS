@@ -1,5 +1,5 @@
 import { ehUuid } from "./admin-acesso";
-import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads } from "@/components/admin/campanhas/tipos";
+import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads, RecorteDosLeads } from "@/components/admin/campanhas/tipos";
 import {
   MINIMOS_DE_AVALIACOES,
   QUANTIDADES_POR_TERMO,
@@ -21,7 +21,7 @@ import {
 const SITUACOES_DA_BUSCA: SituacaoDaBusca[] = ["buscando", "pronta", "falhou"];
 const SITUACOES_DA_CAMPANHA: SituacaoDaCampanha[] = ["rascunho", "agendada", "rodando", "pausada", "concluida"];
 export const SITUACOES_NA_CAMPANHA: SituacaoNaCampanha[] = ["na_fila", "enviado", "respondeu", "falhou", "parou"];
-const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota"];
+const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota", "nao_reivindicado"];
 export { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA };
 
 /** Um id (uuid) bem formado: a mesma regra das rotas da central (`ehUuid`). */
@@ -47,6 +47,19 @@ export function paginaDe(v: string | null): number | null {
 
 /** O texto de busca, aparado e com teto (vai a um `like` no SQL, que escapa os curingas). */
 export const textoDe = (v: string | null) => (v ?? "").trim().slice(0, 100);
+
+/**
+ * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b`), o mesmo
+ * da página e da "página do lead"; o motivo (string) quando algo veio torto.
+ */
+export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
+  const busca = q.get("busca");
+  if (busca !== null && !ehId(busca)) return "busca inválida";
+  const filtros = (q.get("filtros") ?? "").split(",").filter(Boolean);
+  if (!filtros.every(ehFiltroDosLeads)) return "filtro inválido";
+  const cidade = q.get("cidade");
+  return { buscaId: busca, texto: textoDe(q.get("texto")), cidade: cidade ? cidade.slice(0, 120) : null, filtros };
+}
 
 /**
  * A área ajustada no mapa: null (a cidade inteira), um círculo válido, ou undefined

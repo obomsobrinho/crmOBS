@@ -686,12 +686,13 @@ test.describe("Lógica dos gráficos da central (lib, fora dos componentes)", ()
 test.describe("Trava por rota da central", () => {
   const PAGINAS_DA_CENTRAL = ["app/(app)/clientes/[id]/page.tsx", "app/(app)/clientes/page.tsx"];
   // Campanhas, a prospecção do dono (docs/plano-campanhas.md, D1): a mesma guarda de página.
-  const PAGINAS_DE_CAMPANHAS = ["app/(app)/campanhas/page.tsx"];
+  const PAGINAS_DE_CAMPANHAS = ["app/(app)/campanhas/buscas/nova/page.tsx", "app/(app)/campanhas/page.tsx"];
   const PAGINA_ADMIN = "app/admin/page.tsx";
   const ROTAS = [
     "app/api/admin/campanhas/[id]/acao/route.ts",
     "app/api/admin/campanhas/[id]/leads/route.ts",
     "app/api/admin/campanhas/[id]/route.ts",
+    "app/api/admin/campanhas/buscas/[id]/pontos/route.ts",
     "app/api/admin/campanhas/buscas/[id]/route.ts",
     "app/api/admin/campanhas/buscas/route.ts",
     "app/api/admin/campanhas/conexoes/route.ts",

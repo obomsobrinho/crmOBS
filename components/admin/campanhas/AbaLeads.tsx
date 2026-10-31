@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
@@ -17,6 +17,7 @@ import {
   FAIXAS_DE_NOTA,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
+  estadoNoMapa,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
   textoDoLocal,
@@ -502,7 +503,7 @@ function LinhaDoLead({
         <Telefone telefone={lead.telefone} />
       </div>
       <div>
-        <SeloDaPontuacao sinais={sinaisDoLead(lead)} />
+        <SeloDaPontuacao sinais={sinaisDoLead(lead)} pontos={lead.pontuacao} />
       </div>
       <div className="flex min-w-0 flex-wrap gap-1.5">
         {lead.parouEm !== null ? (
@@ -559,6 +560,7 @@ function TabelaDeLeads({
   destaque = null,
   focoDoMapa = null,
   verNoMapa = null,
+  aoMarcar,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -570,6 +572,8 @@ function TabelaDeLeads({
   /** Um pino clicado: a tabela vai até a página dele (a chave muda a cada clique). */
   focoDoMapa?: { id: string; vez: number } | null;
   verNoMapa?: ((id: string) => void) | null;
+  /** Uma marcação que valeu (o mapa da busca recolore o pino sem reler). */
+  aoMarcar?: (id: string, m: Lead["marcacao"]) => void;
 }) {
   const [ficha, setFicha] = useState<LeadDaTabela | null>(null);
   const [q, setQ] = useState("");
@@ -612,12 +616,13 @@ function TabelaDeLeads({
       try {
         const salva = await fonte.marcar(id, m);
         mudarItem((l) => (l.id === id ? { ...l, marcacao: salva } : l));
+        aoMarcar?.(id, salva);
       } catch (e) {
         console.error("lead, marcar:", e);
         mudarItem((l) => (l.id === id ? { ...l, marcacao: antes } : l));
       }
     },
-    [fonte, mudarItem],
+    [aoMarcar, fonte, mudarItem],
   );
 
   const grupos = [
@@ -804,7 +809,19 @@ function DetalheDaBusca({
   criarCampanha: () => void;
 }) {
   const { dados: painel } = useLeitura(`painel-busca|${busca.id}|${versao}`, () => fonte.painelDaBase(busca.id));
-  const { dados: pontos } = useLeitura(`pontos|${busca.id}|${versao}`, () => fonte.pontosDaBusca(busca.id));
+  const { dados: lidos } = useLeitura(`pontos|${busca.id}|${versao}`, () => fonte.pontosDaBusca(busca.id));
+  // A marcação feita na tabela recolore o pino na hora (respondeu e contatado ganham da marcação).
+  const [marcas, setMarcas] = useState<Record<string, Lead["marcacao"]>>({});
+  const aoMarcar = useCallback((id: string, m: Lead["marcacao"]) => setMarcas((atual) => ({ ...atual, [id]: m })), []);
+  const pontos = useMemo(
+    () =>
+      lidos?.map((p) =>
+        p.id in marcas && (p.estado === "nao_contatado" || p.estado === "bom" || p.estado === "descartado")
+          ? { ...p, estado: estadoNoMapa({ respondeu: false, campanhas: 0, marcacao: marcas[p.id] }) }
+          : p,
+      ) ?? null,
+    [lidos, marcas],
+  );
   // O destaque e de onde ele veio: do mapa (a tabela vai até a linha) ou da tabela (o mapa vai até o pino).
   const [destaque, setDestaque] = useState<{ id: string; origem: "mapa" | "tabela"; vez: number } | null>(null);
   const destacar = useCallback((id: string, origem: "mapa" | "tabela") => setDestaque((d) => ({ id, origem, vez: (d?.vez ?? 0) + 1 })), []);
@@ -838,6 +855,7 @@ function DetalheDaBusca({
             destaque={destaque?.id ?? null}
             centralizar={destaque?.origem === "tabela"}
             aoEscolher={(id) => destacar(id, "mapa")}
+            area={busca.opcoes.area}
           />
         </Card>
       )}
@@ -851,6 +869,7 @@ function DetalheDaBusca({
           destaque={destaque?.id ?? null}
           focoDoMapa={destaque?.origem === "mapa" ? destaque : null}
           verNoMapa={pontos && pontos.length > 0 ? (id) => destacar(id, "tabela") : null}
+          aoMarcar={aoMarcar}
         />
       </Card>
     </div>

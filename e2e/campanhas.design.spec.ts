@@ -30,7 +30,9 @@ test.describe("Campanhas sem login", () => {
       "/api/admin/campanhas/conexoes",
       "/api/admin/campanhas/buscas",
       `/api/admin/campanhas/buscas/${ID}`,
+      `/api/admin/campanhas/buscas/${ID}/pontos`,
       "/api/admin/campanhas/leads",
+      `/api/admin/campanhas/leads/${ID}`,
       "/api/admin/campanhas/resumo",
       "/api/admin/campanhas/resultados",
       "/api/admin/campanhas/previa",
@@ -53,10 +55,12 @@ test.describe("Campanhas sem login", () => {
     expect((await request.get("/api/prospeccao/cron", { headers: { authorization: "Bearer chute" } })).status()).toBe(401);
   });
 
-  test("a página /campanhas sem sessão vai para o login", async ({ request }) => {
-    const r = await request.get("/campanhas", { maxRedirects: 0 });
-    expect(r.status()).toBe(307);
-    expect(r.headers().location).toContain("/login");
+  test("as páginas /campanhas e /campanhas/buscas/nova sem sessão vão para o login", async ({ request }) => {
+    for (const caminho of ["/campanhas", "/campanhas/buscas/nova"]) {
+      const r = await request.get(caminho, { maxRedirects: 0 });
+      expect(r.status(), caminho).toBe(307);
+      expect(r.headers().location, caminho).toContain("/login");
+    }
   });
 });
 
@@ -251,9 +255,13 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     await expect.poll(() => coluna.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
   });
 
-  test("o detalhe da busca diz onde ela procurou: a cidade e o raio usado", async ({ page }) => {
+  test("o detalhe da busca diz onde ela procurou: a cidade e o raio usado, e o mapa desenha o círculo", async ({ page }) => {
     await page.goto("/design/campanhas?tela=busca");
     await expect(page.getByText("Mutum, MG · raio de 5 km")).toBeVisible();
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa.locator("path.area-do-mapa")).toHaveCount(1);
+    // O círculo não pega o clique: os pinos de dentro dele continuam clicáveis.
+    await expect(mapa.locator("path.area-do-mapa")).not.toHaveClass(/leaflet-interactive/);
   });
 
   test("Nova busca: trocar a UF limpa a cidade e trava o Buscar; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
@@ -273,8 +281,13 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     await page.keyboard.press("Escape");
     await escolherCidade(page, "MG", "MUTÚM", "Mutum");
     await expect(buscar).toBeEnabled();
-    // As categorias sugeridas saem do segmento.
+    // As categorias sugeridas saem do segmento; marcar uma é o filtro pago da fonte, e o custo sobe.
+    const custo = dialogo.locator('[data-slot="nova-busca-custo"]');
+    const antes = await custo.innerText();
     await expect(dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" })).toBeVisible();
+    await dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" }).click();
+    await expect(dialogo.getByText("Marcada, a fonte só traz essa categoria e cobra a mais por empresa.")).toBeVisible();
+    await expect(custo).not.toHaveText(antes);
     await expect(dialogo.getByRole("group", { name: "Mínimo de avaliações no Google" }).first()).toBeVisible();
   });
 
@@ -288,6 +301,21 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     const legenda = await page.locator('[data-slot="busca-mapa-legenda"] li').allInnerTexts();
     expect(legenda.map((t) => Number(t.match(/(\d+)$/)?.[1] ?? 0)).reduce((a, b) => a + b, 0)).toBe(n);
     await expect(page.locator(".leaflet-control-attribution")).toContainText("OpenStreetMap");
+  });
+
+  test("marcar um lead não contatado como bom recolore o pino na hora, sem reler o mapa (revisão de 31/10/2026)", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa.locator("path.pino-do-mapa").first()).toBeVisible();
+    const bons = mapa.locator("path.pino-bom");
+    const antes = await bons.count();
+    // Uma linha sem campanha ("Nenhuma") e sem marcação: o pino dela é "não contatado".
+    const id = await page.locator('[data-slot="lead-linha"][data-marcacao="nenhuma"]').filter({ hasText: "Nenhuma" }).first().getAttribute("data-lead");
+    const linha = page.locator(`[data-slot="lead-linha"][data-lead="${id}"]`);
+    await linha.locator('[data-slot="lead-marcar-bom"]').click();
+    await expect(linha).toHaveAttribute("data-marcacao", "bom");
+    await expect(bons).toHaveCount(antes + 1);
+    await expect(mapa).toHaveAttribute("data-pinos", String(await mapa.locator("path.pino-do-mapa").count()));
   });
 
   test("clicar num pino destaca a linha na tabela; \"ver no mapa\" na linha destaca o pino", async ({ page }) => {

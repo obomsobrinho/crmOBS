@@ -26,10 +26,7 @@ export interface ItemDaFonteDeLeads {
   pontuacao: number;
   /** Fechado de vez na fonte (sai quando a busca pede "sem fechadas"). Não vai ao banco. */
   fechado: boolean;
-  /**
-   * Coordenadas, perfil reivindicado, horário, notas, fotos, categorias. ⚠️ Ainda não vão
-   * ao banco: as colunas pedem DDL aditivo, que espera o dono liberar.
-   */
+  /** Coordenadas, perfil reivindicado, horário, notas, fotos, categorias e o @ do Instagram. */
   detalhes: DetalhesDoLead;
 }
 
@@ -101,5 +98,13 @@ export function itemParaOBanco(i: ItemDaFonteDeLeads) {
     nota: i.nota,
     avaliacoes: i.avaliacoes,
     pontuacao: i.pontuacao,
+    lat: i.detalhes.lat,
+    lng: i.detalhes.lng,
+    reivindicado: i.detalhes.reivindicado,
+    horarios: i.detalhes.horarios,
+    distribuicao_notas: i.detalhes.distribuicao,
+    fotos: i.detalhes.fotos,
+    categorias: i.detalhes.categorias,
+    instagram: i.detalhes.instagram,
   };
 }

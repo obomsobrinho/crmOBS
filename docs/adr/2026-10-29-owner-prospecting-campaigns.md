@@ -119,3 +119,17 @@ line (risk 4 and D4 in the plan).
   the form looked frozen under the mouse. Measured in Playwright: over the fields the modal scrolled 300 px,
   over the map 0; the same map outside a dialog let the page scroll. Nova busca became a page and the wheel
   over the map zooms it (`ui.md`).
+- Real phase of the lead details (31/10/2026, owner's approval of the prototype): eight additive nullable
+  columns on `prospeccao_leads` (`lat`, `lng`, `reivindicado`, `horarios`, `distribuicao_notas`, `fotos`,
+  `categorias`, `instagram`; migration `20261031021139_prospeccao_leads_detalhes.sql`). null means "not
+  known", never "no": a lead from before stays null. A new search that finds a lead already in the base
+  takes the new score TOGETHER with its inputs (rating, reviews, site, claimed profile, hours), so the
+  number never belongs to one day and the data to another (found by /code-review: score 75 next to the
+  old 3.9 rating); the other source fields only fill in (an empty value never erases one) and an
+  unchanged row is not rewritten; the owner's mark and the opt-out never change there, so an old lead keeps its old score until a search finds it again, and the
+  table badge shows the STORED score (the one that orders the table). The real `openingHours` with
+  `language: pt-BR` is `{ day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" }` and
+  "Fechado" (search of 30/10/2026). "Só desta categoria" goes to the actor as `categoryFilterWords` (paid,
+  US$ 0.001 per place, counted in the cost line) only when the owner marks it, and is checked on our side
+  too; rating, site and reviews stay free, on our side. The SQL was run on a local Postgres 16 with the
+  real migrations before review (new lead, existing lead, filter, page of a lead, pins).

@@ -1,7 +1,7 @@
 "use client";
 
 import { numeroBR } from "@/lib/format";
-import { ROTULO_NO_MAPA, type EstadoNoMapa } from "@/lib/prospeccao";
+import { ROTULO_NO_MAPA, type AreaDaBusca, type EstadoNoMapa } from "@/lib/prospeccao";
 import Mapa from "./Mapa";
 import type { PontoNoMapa } from "./tipos";
 
@@ -10,7 +10,7 @@ import type { PontoNoMapa } from "./tipos";
 // cores são os tokens `--mapa-*` de app/globals.css), e a legenda com as contagens.
 // Clicar num pino leva a tabela até o lead; "ver no mapa" na tabela destaca o pino.
 // O texto de tudo isto é a tabela; o mapa é a vista. O mapa em si é `Mapa`, o mesmo
-// da "Nova busca".
+// da "Nova busca"; quando a busca foi por raio, o círculo dela aparece também.
 
 export const ESTADOS_NO_MAPA: EstadoNoMapa[] = ["nao_contatado", "bom", "contatado", "respondeu", "descartado"];
 
@@ -19,8 +19,11 @@ export default function MapaDaBusca({
   destaque,
   centralizar,
   aoEscolher,
+  area,
 }: {
   pontos: PontoNoMapa[];
+  /** O círculo da busca (centro e raio), quando ela foi por raio; null = a cidade inteira. */
+  area: AreaDaBusca | null;
   destaque: string | null;
   centralizar: boolean;
   aoEscolher: (id: string) => void;
@@ -33,6 +36,7 @@ export default function MapaDaBusca({
         destaque={destaque}
         centralizar={centralizar}
         aoEscolher={aoEscolher}
+        area={area}
         rotulo={`Mapa com ${numeroBR(pontos.length)} leads desta busca`}
         className="h-80"
         data-slot="busca-mapa"

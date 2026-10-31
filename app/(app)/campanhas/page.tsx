@@ -1,6 +1,7 @@
 import CampanhasAoVivo from "@/components/admin/campanhas/CampanhasAoVivo";
 import type { InicialDaCentral } from "@/components/admin/campanhas/tipos";
 import { adminDaPagina } from "@/lib/admin";
+import { ehUuid } from "@/lib/admin-acesso";
 import { painelDaBase, paginaDeBuscas, totais } from "@/lib/campanhas-servidor";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -17,8 +18,9 @@ export const metadata = { title: "Campanhas", robots: { index: false } };
 // leituras do navegador, e um refresh mostrava o HTML vazio ("Carregando" e
 // "Nenhum resultado") até elas voltarem, ou para sempre se uma travasse (bug de
 // 30/10/2026). Cada peça que falhar aqui vem null e a tela lê de novo.
-export default async function CampanhasPage() {
+export default async function CampanhasPage({ searchParams }: { searchParams: Promise<{ rascunho?: string }> }) {
   await adminDaPagina();
+  const { rascunho } = await searchParams;
   const svc = createServiceClient();
   const agora = agoraMs();
   const ou = <T,>(onde: string, p: Promise<T>) =>
@@ -34,7 +36,7 @@ export default async function CampanhasPage() {
   const inicial: InicialDaCentral = { totais: t, buscas, painel };
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <CampanhasAoVivo agora={agora} inicial={inicial} />
+      <CampanhasAoVivo agora={agora} inicial={inicial} rascunhoEsperandoId={ehUuid(rascunho) ? rascunho : null} />
     </div>
   );
 }
