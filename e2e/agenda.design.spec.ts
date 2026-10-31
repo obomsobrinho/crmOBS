@@ -143,10 +143,13 @@ test.describe("Agenda: marcar com contato novo e campos", () => {
     await abrir(page);
     await page.getByRole("button", { name: "Marcar horário" }).click();
     const d = page.locator('[data-agenda="marcar"]');
-    const s = (await d.getByLabel("Serviço").boundingBox())!;
-    const t = (await d.getByLabel("Dia").boundingBox())!;
-    expect(Math.abs(s.height - t.height)).toBeLessThanOrEqual(1);
-    expect(Math.abs(s.width - t.width)).toBeLessThanOrEqual(1);
+    // Mede depois da animação de abertura (sob carga, a medida no meio dela saía torta).
+    const diferenca = async () => {
+      const s = (await d.getByLabel("Serviço").boundingBox())!;
+      const t = (await d.getByLabel("Dia").boundingBox())!;
+      return Math.max(Math.abs(s.height - t.height), Math.abs(s.width - t.width));
+    };
+    await expect.poll(diferenca).toBeLessThanOrEqual(1);
   });
 });
 
