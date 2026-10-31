@@ -28,13 +28,15 @@ import {
   type NotaMinima,
   type OpcoesDaBusca,
 } from "@/lib/prospeccao";
+import type { LocalInicial } from "./tipos";
 
 // NOVA BUSCA (dono, 29/10/2026: "essa criação da busca não está muito pobre?").
 // O que buscar (um ou mais segmentos), onde (o estado primeiro e a cidade DA LISTA
 // do IBGE, digitando, revisão de 30/10/2026: nunca um nome errado), quantas
 // empresas por segmento (o teto de custo) e os filtros. Nota, site, categoria e
 // mínimo de avaliações são aplicados do NOSSO lado (o dado já vem em todo item; o
-// filtro da fonte custa por empresa); só "fechadas" e os contatos vão para a fonte.
+// filtro da fonte custa por empresa); "fechadas", os contatos e, quando marcada, a
+// categoria (o filtro pago) vão para a fonte.
 // O rodapé mostra o máximo de empresas e o custo mínimo pelo preço de tabela.
 //
 // É uma PÁGINA (revisão de 30/10/2026, segunda rodada; antes era um modal pequeno
@@ -89,7 +91,7 @@ export default function NovaBusca({
   /** Começa a busca; devolve a recusa em uma frase (a página fica aberta para corrigir). */
   aoBuscar: (o: OpcoesDaBusca) => Promise<{ ok: true } | { ok: false; erro: string }>;
   /** A cidade da última busca (UF e código IBGE); null = Mutum, a cidade da OBS. */
-  localInicial: { uf: string; ibge: number } | null;
+  localInicial: LocalInicial | null;
 }) {
   const [o, setO] = useState<OpcoesDaBusca>(OPCOES_PADRAO);
   const [termo, setTermo] = useState("");
@@ -376,6 +378,7 @@ export default function NovaBusca({
                       );
                     })}
                   </div>
+                  <p className="text-legenda text-ink-3">Marcada, a fonte só traz essa categoria e cobra a mais por empresa.</p>
                 </Campo>
               )}
 

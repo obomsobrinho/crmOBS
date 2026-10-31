@@ -8,7 +8,9 @@ import type {
   LeadDaTabela,
   LeadNaCampanha,
   Pagina,
+  PontoNoMapa,
   PreviaDoFiltro,
+  RecorteDosLeads,
   Resultados,
   RespostaDeIniciar,
   Totais,
@@ -80,6 +82,9 @@ async function recusaSe4xx<T>(p: Promise<T>): Promise<{ ok: true; valor: T } | {
   }
 }
 
+/** O recorte da tabela de leads na query (o mesmo que `recorteDe` confere na rota). */
+const recorteNaQuery = (p: RecorteDosLeads) => ({ busca: p.buscaId, texto: p.texto, cidade: p.cidade, filtros: p.filtros.join(",") });
+
 const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
 
 /** A fonte de verdade: uma instância por página (sem estado; cada leitura é uma rota). */
@@ -96,14 +101,9 @@ export function fonteDasRotas(): FonteDeCampanhas {
       const r = await recusaSe4xx(pedir<{ id: string }>("/buscas", enviar({ opcoes }, "POST")));
       return r.ok ? { ok: true } : r;
     },
-    leads: (p) =>
-      pedir<Pagina<LeadDaTabela>>(
-        `/leads${q({ busca: p.buscaId, texto: p.texto, cidade: p.cidade, filtros: p.filtros.join(","), pagina: p.pagina })}`,
-      ),
-    // ⚠️ Protótipo (30/10/2026): o mapa e a página de um lead esperam as colunas de coordenadas
-    // (DDL aditivo ainda não liberado pelo dono); até lá a página de verdade não tem pinos.
-    paginaDoLead: async () => null,
-    pontosDaBusca: async () => [],
+    leads: (p) => pedir<Pagina<LeadDaTabela>>(`/leads${q({ ...recorteNaQuery(p), pagina: p.pagina })}`),
+    paginaDoLead: async (p, leadId) => (await pedir<{ pagina: number | null }>(`/leads/${leadId}${q(recorteNaQuery(p))}`)).pagina,
+    pontosDaBusca: (buscaId) => pedir<PontoNoMapa[]>(`/buscas/${buscaId}/pontos`),
     cidades: (buscaId) => pedir<string[]>(`/leads${q({ cidades: 1, busca: buscaId })}`),
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),

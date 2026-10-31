@@ -1240,16 +1240,24 @@ export type Database = {
           avaliacoes: number | null
           bairro: string | null
           busca_id: string
+          categorias: string[] | null
           cidade: string | null
           criado_em: string
+          distribuicao_notas: Json | null
           endereco: string | null
           fonte_id: string | null
+          fotos: number | null
+          horarios: Json | null
           id: string
+          instagram: string | null
+          lat: number | null
+          lng: number | null
           marcacao: string | null
           nome: string
           nota: number | null
           parou_em: string | null
           pontuacao: number
+          reivindicado: boolean | null
           segmento: string | null
           site: string | null
           site_classe: string
@@ -1261,16 +1269,24 @@ export type Database = {
           avaliacoes?: number | null
           bairro?: string | null
           busca_id: string
+          categorias?: string[] | null
           cidade?: string | null
           criado_em?: string
+          distribuicao_notas?: Json | null
           endereco?: string | null
           fonte_id?: string | null
+          fotos?: number | null
+          horarios?: Json | null
           id?: string
+          instagram?: string | null
+          lat?: number | null
+          lng?: number | null
           marcacao?: string | null
           nome: string
           nota?: number | null
           parou_em?: string | null
           pontuacao?: number
+          reivindicado?: boolean | null
           segmento?: string | null
           site?: string | null
           site_classe?: string
@@ -1282,16 +1298,24 @@ export type Database = {
           avaliacoes?: number | null
           bairro?: string | null
           busca_id?: string
+          categorias?: string[] | null
           cidade?: string | null
           criado_em?: string
+          distribuicao_notas?: Json | null
           endereco?: string | null
           fonte_id?: string | null
+          fotos?: number | null
+          horarios?: Json | null
           id?: string
+          instagram?: string | null
+          lat?: number | null
+          lng?: number | null
           marcacao?: string | null
           nome?: string
           nota?: number | null
           parou_em?: string | null
           pontuacao?: number
+          reivindicado?: boolean | null
           segmento?: string | null
           site?: string | null
           site_classe?: string
@@ -2096,6 +2120,7 @@ export type Database = {
           p_digitos?: string
           p_limite?: number
           p_nao_contatados?: boolean
+          p_nao_reivindicado?: boolean
           p_nota_minima?: number
           p_offset?: number
           p_so_bons?: boolean
@@ -2108,18 +2133,44 @@ export type Database = {
           busca_id: string
           campanha_ids: string[]
           campanha_nomes: string[]
+          categorias: string[]
           cidade: string
+          distribuicao_notas: Json
+          endereco: string
+          fotos: number
+          horarios: Json
           id: string
+          instagram: string
+          lat: number
+          lng: number
           marcacao: string
           nome: string
           nota: number
           parou_em: string
+          pontuacao: number
+          reivindicado: boolean
           respondeu: boolean
           segmento: string
           site: string
           telefone: string
           total_geral: number
         }[]
+      }
+      prospeccao_pagina_do_lead: {
+        Args: {
+          p_busca?: string
+          p_cidade?: string
+          p_digitos?: string
+          p_lead: string
+          p_nao_contatados?: boolean
+          p_nao_reivindicado?: boolean
+          p_nota_minima?: number
+          p_por_pagina?: number
+          p_so_bons?: boolean
+          p_so_sem_site?: boolean
+          p_texto?: string
+        }
+        Returns: number
       }
       prospeccao_marcar_lead: {
         Args: { p_lead: string; p_marcacao: string; p_quem: string }
@@ -2130,6 +2181,18 @@ export type Database = {
       prospeccao_pausar_campanha: {
         Args: { p_id: string; p_motivo: string; p_quem: string }
         Returns: string
+      }
+      prospeccao_pontos_da_busca: {
+        Args: { p_busca: string }
+        Returns: {
+          campanhas: number
+          id: string
+          lat: number
+          lng: number
+          marcacao: string
+          nome: string
+          respondeu: boolean
+        }[]
       }
       prospeccao_registrar_envio: {
         Args: {

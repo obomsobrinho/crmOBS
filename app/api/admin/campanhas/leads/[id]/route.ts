@@ -1,7 +1,19 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe } from "@/lib/campanhas-pedidos";
-import { falhou, marcarLead, torto } from "@/lib/campanhas-servidor";
+import { campoDe, recorteDe } from "@/lib/campanhas-pedidos";
+import { falhou, marcarLead, paginaDoLead, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
+
+// Em que página do recorte (`?busca=&texto=&cidade=&filtros=`) o lead está: o pino
+// clicado no mapa leva a tabela até ele. `{ pagina: null }` = fora do recorte.
+export const GET = rotaDoAdmin(async ({ req, id }) => {
+  const recorte = recorteDe(req.nextUrl.searchParams);
+  if (typeof recorte === "string") return torto(recorte);
+  try {
+    return Response.json({ pagina: await paginaDoLead(createServiceClient(), recorte, id) });
+  } catch (e) {
+    return falhou("achar a página do lead", e);
+  }
+});
 
 // Marca o lead: `{ marcacao: "bom" | "descartado" | null }` (uma função SQL, com a linha em admin_acoes).
 export const PUT = rotaDoAdmin(

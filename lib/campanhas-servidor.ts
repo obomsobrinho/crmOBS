@@ -7,11 +7,13 @@ import type {
   CampanhaEditavel,
   ConexaoDisponivel,
   FiltroDeContatos,
-  FiltroDosLeads,
   LeadDaTabela,
   LeadNaCampanha,
+  LocalInicial,
   Pagina,
+  PontoNoMapa,
   PreviaDoFiltro,
+  RecorteDosLeads,
   Resultados,
   Totais,
 } from "@/components/admin/campanhas/tipos";
@@ -34,6 +36,9 @@ import { PERIODOS, type PeriodoKey } from "./periodo";
 import {
   DIAS_DA_LINHA,
   MINIMOS_DE_AVALIACOES,
+  detalhesDaLinha,
+  estadoNoMapa,
+  numeroOuNull,
   OPCOES_PADRAO,
   POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
@@ -216,26 +221,47 @@ export async function buscasParaEscolher(svc: Supa): Promise<Busca[]> {
   return (data ?? []).map(paraBusca);
 }
 
+/** Onde o mapa da Nova busca abre: a cidade da busca mais recente que tem cidade da lista (uma linha). */
+export async function cidadeDaUltimaBusca(svc: Supa): Promise<LocalInicial | null> {
+  const { data, error } = await svc
+    .from("prospeccao_buscas")
+    .select("termo, cidade, uf, opcoes")
+    // `->>`: o JSON null vira NULL (com `->`, `cidadeIbge: null` passaria no filtro).
+    .not("opcoes->>cidadeIbge", "is", null)
+    .order("criada_em", { ascending: false })
+    .order("id")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  const o = data ? opcoesDoJson(data.opcoes, data.termo, data.cidade, data.uf) : null;
+  return o?.cidadeIbge != null ? { uf: o.uf, ibge: o.cidadeIbge } : null;
+}
+
 export async function buscaPorId(svc: Supa, id: string): Promise<Busca | null> {
   const { data, error } = await svc.from("prospeccao_buscas").select(COLUNAS_DA_BUSCA).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? paraBusca(data) : null;
 }
 
-export async function paginaDeLeads(
-  svc: Supa,
-  p: { buscaId: string | null; texto: string; cidade: string | null; filtros: FiltroDosLeads[]; pagina: number },
-): Promise<Pagina<LeadDaTabela>> {
+/** O recorte da tabela de leads nos parâmetros das funções SQL (a página e a página de um lead usam o mesmo). */
+function parametrosDoRecorte(p: RecorteDosLeads) {
   const digitos = p.texto.replace(/\D/g, "");
-  const { data, error } = await svc.rpc("prospeccao_leads_pagina", {
-    p_busca: p.buscaId,
-    p_texto: p.texto || null,
-    p_digitos: digitos.length >= 3 ? digitos : null,
-    p_cidade: p.cidade,
+  return {
+    p_busca: p.buscaId ?? undefined,
+    p_texto: p.texto || undefined,
+    p_digitos: digitos.length >= 3 ? digitos : undefined,
+    p_cidade: p.cidade ?? undefined,
     p_nao_contatados: p.filtros.includes("nao_contatados"),
     p_so_bons: p.filtros.includes("bons"),
     p_so_sem_site: p.filtros.includes("sem_site"),
-    p_nota_minima: p.filtros.includes("nota") ? 4.5 : null,
+    p_nota_minima: p.filtros.includes("nota") ? 4.5 : undefined,
+    p_nao_reivindicado: p.filtros.includes("nao_reivindicado"),
+  };
+}
+
+export async function paginaDeLeads(svc: Supa, p: RecorteDosLeads & { pagina: number }): Promise<Pagina<LeadDaTabela>> {
+  const { data, error } = await svc.rpc("prospeccao_leads_pagina", {
+    ...parametrosDoRecorte(p),
     p_offset: (p.pagina - 1) * POR_PAGINA,
     p_limite: POR_PAGINA,
   });
@@ -260,12 +286,37 @@ export async function paginaDeLeads(
         marcacao: marcacaoDe(r.marcacao),
         parouEm: ms(r.parou_em),
         campanhaIds: ids,
-        detalhes: null,
+        detalhes: detalhesDaLinha(r),
         campanhas: ids.map((id, i) => ({ id, nome: nomes[i] ?? "" })),
         respondeu: r.respondeu,
+        pontuacao: r.pontuacao,
       };
     }),
   };
+}
+
+/** Em que página do recorte o lead está (o pino clicado leva a tabela até ele); null = fora do recorte. */
+export async function paginaDoLead(svc: Supa, recorte: RecorteDosLeads, leadId: string): Promise<number | null> {
+  const { data, error } = await svc.rpc("prospeccao_pagina_do_lead", {
+    ...parametrosDoRecorte(recorte),
+    p_lead: leadId,
+    p_por_pagina: POR_PAGINA,
+  });
+  if (error) throw error;
+  // O gerador tipa o retorno como number; sem o lead no recorte, o SQL devolve null.
+  return data ?? null;
+}
+
+/** Os pinos de uma busca (os leads dela com coordenadas), com a cor do estado. */
+export async function pontosDaBusca(svc: Supa, buscaId: string): Promise<PontoNoMapa[]> {
+  const { data, error } = await svc.rpc("prospeccao_pontos_da_busca", { p_busca: buscaId });
+  if (error) throw error;
+  return (data ?? []).flatMap((r) => {
+    const lat = numeroOuNull(r.lat);
+    const lng = numeroOuNull(r.lng);
+    if (lat === null || lng === null) return [];
+    return [{ id: r.id, nome: r.nome, lat, lng, estado: estadoNoMapa({ respondeu: r.respondeu, campanhas: r.campanhas, marcacao: marcacaoDe(r.marcacao) }) }];
+  });
 }
 
 export async function cidadesDosLeads(svc: Supa, buscaId: string | null): Promise<string[]> {
@@ -682,7 +733,7 @@ export function desistirDaBusca(svc: Supa, buscaId: string): Promise<void> {
 }
 
 async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {
-  const { error } = await svc.rpc("prospeccao_concluir_busca", { p_busca: buscaId, p_itens: itens ?? [], p_erro: erro });
+  const { error } = await svc.rpc("prospeccao_concluir_busca", { p_busca: buscaId, p_itens: paraJson(itens ?? []), p_erro: erro });
   if (error) throw error;
 }
 

@@ -10,7 +10,7 @@ import {
   ROTULO_DO_SITE,
   ROTULO_NA_CAMPANHA,
   faixaDaPontuacao,
-  pontuarLead,
+  pontuacaoExibida,
   siteDoLead,
   type SinaisDoLead,
   type SituacaoDaBusca,
@@ -67,9 +67,9 @@ export function SeloNaCampanha({ situacao }: { situacao: SituacaoNaCampanha }) {
 
 export const DA_FAIXA = { alta: "estado-bom", media: "estado-neutro", baixa: "contorno" } as const;
 
-/** A pontuação com os motivos no balão. */
-export function SeloDaPontuacao({ sinais }: { sinais: SinaisDoLead }) {
-  const p = pontuarLead(sinais);
+/** A pontuação com os motivos no balão; `pontos` = a gravada (senão, calculada dos sinais). */
+export function SeloDaPontuacao({ sinais, pontos }: { sinais: SinaisDoLead; pontos?: number }) {
+  const p = pontuacaoExibida(sinais, pontos);
   const texto = p.motivos.length > 0 ? p.motivos.join(". ") : "Nenhum sinal forte achado";
   return (
     <Tooltip>

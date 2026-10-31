@@ -134,8 +134,9 @@ function minutosDe(t: string): number | null {
 /**
  * O `openingHours` da fonte (`[{ day, hours }]`) em dias e faixas. Aceita português e
  * inglês ("segunda-feira" / "Monday", "08:00–18:00", "8 AM to 6 PM", "Fechado", "Aberto
- * 24 horas", várias faixas separadas por vírgula). ⚠️ A CONFIRMAR numa execução real com
- * `language: pt-BR`. Um dia que não se entende fica de fora (nunca vira "fechado").
+ * 24 horas", várias faixas separadas por vírgula). O formato real com `language: pt-BR`
+ * (busca de 30/10/2026): `{ day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" }`
+ * e `"Fechado"`. Um dia que não se entende fica de fora (nunca vira "fechado").
  */
 export function lerHorarios(bruto: unknown): HorarioDoDia[] | null {
   if (!Array.isArray(bruto)) return null;
@@ -269,6 +270,15 @@ export function pontuarLead(s: SinaisDoLead): Pontuacao {
     motivos.push(`${ganchos.join(", ")}: perde cliente fora do horário`);
   }
   return { pontos, motivos };
+}
+
+/**
+ * A pontuação que a tela mostra: a GRAVADA quando há (a que ordena a tabela; um lead antigo
+ * fica com a dele até uma busca nova), com os motivos calculados dos sinais de hoje.
+ */
+export function pontuacaoExibida(s: SinaisDoLead, gravada?: number): Pontuacao {
+  const calculada = pontuarLead(s);
+  return gravada === undefined ? calculada : { ...calculada, pontos: gravada };
 }
 
 /** Faixa da pontuação para o selo da tela (estado, não decoração). */
@@ -676,6 +686,9 @@ export const QUANTIDADES_POR_TERMO = [50, 100, 200] as const;
 /** Preço de tabela do actor no Apify Store em 29/10/2026: "from $1.50 / 1,000 scraped places". */
 export const PRECO_POR_MIL_LUGARES_USD = 1.5;
 
+/** Cada filtro pago do actor (a categoria, `categoryFilterWords`), por lugar, no preço de tabela do Store. */
+export const PRECO_DO_FILTRO_POR_LUGAR_USD = 0.001;
+
 export type NotaMinima = null | 3.5 | 4 | 4.5;
 export type FiltroDeSiteDaBusca = "todos" | "sem_site" | "com_site";
 
@@ -702,7 +715,9 @@ export interface OpcoesDaBusca {
   minAvaliacoes: MinimoDeAvaliacoes;
   /**
    * "Só desta categoria": palavras que a categoria do Google precisa ter (vazio = qualquer).
-   * Do nosso lado, sobre `categoryName` e `categories`, que já vêm em todo item.
+   * Marcada, vai para a fonte como `categoryFilterWords` (o filtro pago, para não pagar pelo
+   * lugar de outra categoria; decisão do dono de 31/10/2026) e é conferida do nosso lado
+   * também, sobre `categoryName` e `categories`.
    */
   categorias: string[];
   ignorarFechados: boolean;
@@ -809,9 +824,10 @@ export function maximoDaBusca(o: OpcoesDaBusca): number {
   return o.termos.length * o.porTermo;
 }
 
-/** O custo mínimo em dólar pelo preço de tabela (contatos e detalhes custam a mais). */
+/** O custo mínimo em dólar pelo preço de tabela, com o filtro pago da categoria (os contatos custam a mais). */
 export function custoMinimoDaBuscaUsd(o: OpcoesDaBusca): number {
-  return (maximoDaBusca(o) * PRECO_POR_MIL_LUGARES_USD) / 1000;
+  const porLugar = PRECO_POR_MIL_LUGARES_USD / 1000 + (o.categorias.length > 0 ? PRECO_DO_FILTRO_POR_LUGAR_USD : 0);
+  return maximoDaBusca(o) * porLugar;
 }
 
 /** As opções em pílulas curtas, para a tela da busca ("50 por termo", "Nota 4 ou mais"). */
@@ -1217,6 +1233,64 @@ export interface DetalhesDoLead {
   endereco: string | null;
   /** O @ do Instagram, quando a busca pediu os contatos do site. */
   instagram: string | null;
+}
+
+/** As colunas do lead no banco que viram `DetalhesDoLead` (o jsonb chega como veio). */
+export interface DetalhesNaLinha {
+  lat: number | string | null;
+  lng: number | string | null;
+  reivindicado: boolean | null;
+  horarios: unknown;
+  distribuicao_notas: unknown;
+  fotos: number | null;
+  categorias: string[] | null;
+  instagram: string | null;
+  endereco: string | null;
+}
+
+/** Um número finito (também o numeric que o banco devolve como texto), ou null. */
+export const numeroOuNull = (v: unknown): number | null => {
+  const n = typeof v === "string" && v.trim() !== "" ? Number(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+};
+
+/** O horário como `concluir` gravou (`HorarioDoDia[]`), conferido; um dia torto fica de fora. */
+function horariosDoBanco(v: unknown): HorarioDoDia[] | null {
+  if (!Array.isArray(v)) return null;
+  const dias = v.flatMap((d): HorarioDoDia[] => {
+    if (d === null || typeof d !== "object") return [];
+    const { dow, faixas } = d as { dow?: unknown; faixas?: unknown };
+    if (typeof dow !== "number" || !Number.isInteger(dow) || dow < 0 || dow > 6 || !Array.isArray(faixas)) return [];
+    const boas = faixas.filter(
+      (f): f is [number, number] => Array.isArray(f) && f.length === 2 && f.every((x) => typeof x === "number" && Number.isFinite(x)),
+    );
+    return [{ dow, faixas: boas }];
+  });
+  return dias.length > 0 ? dias : null;
+}
+
+/** As avaliações por estrela como gravadas (`{"1": n, ..., "5": n}`). */
+function distribuicaoDoBanco(v: unknown): DistribuicaoDasNotas | null {
+  if (v === null || typeof v !== "object" || Array.isArray(v)) return null;
+  const o = v as Record<string, unknown>;
+  const n = (k: string) => Math.max(0, numeroOuNull(o[k]) ?? 0);
+  const d = { 1: n("1"), 2: n("2"), 3: n("3"), 4: n("4"), 5: n("5") };
+  return Object.values(d).some((x) => x > 0) ? d : null;
+}
+
+/** As colunas do lead no banco em `DetalhesDoLead` (a ficha, o filtro e a pontuação da tela). Puro. */
+export function detalhesDaLinha(r: DetalhesNaLinha): DetalhesDoLead {
+  return {
+    lat: numeroOuNull(r.lat),
+    lng: numeroOuNull(r.lng),
+    reivindicado: r.reivindicado,
+    horarios: horariosDoBanco(r.horarios),
+    distribuicao: distribuicaoDoBanco(r.distribuicao_notas),
+    fotos: r.fotos,
+    categorias: r.categorias ?? [],
+    endereco: r.endereco,
+    instagram: r.instagram,
+  };
 }
 
 /** A cor do pino no mapa: o estado do lead, do mais forte para o mais fraco. */

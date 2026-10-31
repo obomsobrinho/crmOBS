@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   PESOS_PROVISORIOS,
   UFS,
+  custoMinimoDaBuscaUsd,
+  detalhesDaLinha,
   proximoRaio,
   textoDoLocal,
   categoriasSugeridas,
@@ -50,7 +52,8 @@ import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
 import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
 import { normalizar } from "../lib/clientes";
-import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, textoDe } from "../lib/campanhas-pedidos";
+import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, textoDe } from "../lib/campanhas-pedidos";
+import { localDaUltimaBusca } from "../components/admin/campanhas/tipos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
 import { dadosDeMentira } from "../app/design/campanhas/dados";
 
@@ -373,7 +376,7 @@ test.describe("Gêmeos do SQL (resultadoDasLinhas, serieDasLinhas, resumoDasLinh
 test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () => {
   const opcoes: OpcoesDaBusca = { ...OPCOES_PADRAO, termos: ["clínica de estética", " estética "], cidade: "Mutum", uf: "MG", notaMinima: 4.5, site: "sem_site" };
 
-  test("a entrada do actor: termos aparados, \"Cidade, UF, Brasil\", teto por termo; os filtros pagos ficam de fora", () => {
+  test("a entrada do actor: termos aparados, \"Cidade, UF, Brasil\", teto por termo; nota, site e avaliações ficam de fora", () => {
     expect(entradaApify(opcoes)).toEqual({
       searchStringsArray: ["clínica de estética", "estética"],
       locationQuery: "Mutum, MG, Brasil",
@@ -382,9 +385,17 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
       skipClosedPlaces: true,
       scrapeContacts: false,
     });
-    // Nota, site e categoria custam US$ 0,001 por empresa na fonte: são filtrados do nosso lado.
-    const entrada = entradaApify({ ...opcoes, minAvaliacoes: 30, categorias: ["Dentista"] });
+    // Nota, site e avaliações custam US$ 0,001 por empresa na fonte: são filtrados do nosso lado.
+    const entrada = entradaApify({ ...opcoes, minAvaliacoes: 30 });
     for (const pago of ["placeMinimumStars", "website", "categoryFilterWords"]) expect(entrada).not.toHaveProperty(pago);
+  });
+
+  test("\"Só desta categoria\" marcada vai à fonte como categoryFilterWords (pago) e entra no custo; sem ela, nada", () => {
+    expect(entradaApify({ ...opcoes, categorias: ["Clínica de estética", "Spa"] }).categoryFilterWords).toEqual(["Clínica de estética", "Spa"]);
+    expect(entradaApify({ ...opcoes, categorias: [] })).not.toHaveProperty("categoryFilterWords");
+    // 2 termos x 50 = 100 lugares: US$ 0,15 pela tabela, mais US$ 0,001 por lugar com o filtro.
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: [] })).toBeCloseTo(0.15, 6);
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: ["Spa"] })).toBeCloseTo(0.25, 6);
   });
 
   test("o webhook da execução: vai em base64 na query, com o segredo num header e nunca na URL", () => {
@@ -437,6 +448,47 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
     expect(itemDoApify({ title: "X", totalScore: 0, phone: "(33) 3333-0001" }, "x")).toMatchObject({ nota: null, telefone: null, tipo_telefone: "fixo" });
     // O que vai ao banco não leva o campo "fechado".
     expect(itemParaOBanco(item)).not.toHaveProperty("fechado");
+  });
+
+  test("os detalhes vão ao banco nas 8 colunas novas e voltam iguais (o jsonb ida e volta)", () => {
+    const item = itemDoApify(
+      {
+        title: "Padaria Teste",
+        categoryName: "Padaria",
+        categories: ["Padaria", "Confeitaria"],
+        address: "Rua Exemplo, 1, Centro",
+        phone: "+5533999990021",
+        location: { lat: -19.8121, lng: -41.4407 },
+        claimThisBusiness: true,
+        openingHours: [{ day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" }],
+        reviewsDistribution: { oneStar: 0, twoStar: 1, threeStar: 0, fourStar: 3, fiveStar: 20 },
+        imagesCount: 7,
+        instagrams: ["https://instagram.com/padariateste"],
+      },
+      "padaria",
+    );
+    const banco = itemParaOBanco(item);
+    expect(banco).toMatchObject({
+      lat: -19.8121,
+      lng: -41.4407,
+      reivindicado: false,
+      distribuicao_notas: { 1: 0, 2: 1, 3: 0, 4: 3, 5: 20 },
+      fotos: 7,
+      categorias: ["Padaria", "Confeitaria"],
+      instagram: "@padariateste",
+    });
+    // O que o SQL devolve: jsonb como veio, numeric às vezes como texto.
+    const linha = JSON.parse(JSON.stringify(banco));
+    expect(detalhesDaLinha({ ...linha, lat: String(linha.lat), endereco: "Rua Exemplo, 1, Centro" })).toEqual(item.detalhes);
+  });
+
+  test("detalhesDaLinha: um lead de antes (tudo null) e jsonb torto não quebram", () => {
+    const vazio = { lat: null, lng: null, reivindicado: null, horarios: null, distribuicao_notas: null, fotos: null, categorias: null, instagram: null, endereco: null };
+    expect(detalhesDaLinha(vazio)).toEqual({ lat: null, lng: null, reivindicado: null, horarios: null, distribuicao: null, fotos: null, categorias: [], endereco: null, instagram: null });
+    const torto = detalhesDaLinha({ ...vazio, lat: "x", horarios: [{ dow: 9, faixas: [] }, { dow: 1, faixas: [[480, "y"], [600, 720]] }, "z"], distribuicao_notas: [1, 2] });
+    expect(torto.lat).toBeNull();
+    expect(torto.horarios).toEqual([{ dow: 1, faixas: [[600, 720]] }]);
+    expect(torto.distribuicao).toBeNull();
   });
 
   test("filtrarPelasOpcoes aplica nota, site e fechadas do nosso lado e tira os repetidos", () => {
@@ -549,6 +601,25 @@ test.describe("Pedidos das rotas (lib/campanhas-pedidos.ts): o que não confere 
 });
 
 test.describe("Horário, pontuação nova e o mapa (revisão de 30/10/2026)", () => {
+  test("o formato real da fonte com language pt-BR (busca de 30/10/2026): \"07:30 to 12:30, 13:30 to 19:00\" e \"Fechado\"", () => {
+    const dias = lerHorarios([
+      { day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "terça-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "quarta-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "quinta-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "sexta-feira", hours: "07:30 to 12:30, 13:30 to 17:00" },
+      { day: "sábado", hours: "Fechado" },
+      { day: "domingo", hours: "Fechado" },
+    ]);
+    expect(dias).toHaveLength(7);
+    expect(dias?.[0]).toEqual({ dow: 1, faixas: [[450, 750], [810, 1140]] });
+    expect(dias?.find((d) => d.dow === 6)?.faixas).toEqual([]);
+    expect(ganchosDoHorario(dias)).toEqual({ fechaCedo: true, naoAbreSabado: true, fechaNoAlmoco: true });
+    // Com o horário real, o gancho do Atenda pontua.
+    const p = pontuarLead({ telefone: null, segmento: "padaria", site: "https://padaria.exemplo", nota: null, avaliacoes: null, horarios: dias });
+    expect(p.pontos).toBe(PESOS_PROVISORIOS.horario);
+  });
+
   test("lerHorarios entende português e inglês, fechado e 24 horas; dia que não entende fica de fora", () => {
     const h = lerHorarios([
       { day: "Monday", hours: "8 AM to 6 PM" },
@@ -678,5 +749,34 @@ test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmad
     expect(areaDe("x")).toBeUndefined();
     expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 2 } })?.area).toEqual({ lat: -19.8, lng: -41.4, raioKm: 2 });
     expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 999 } })).toBeNull();
+  });
+
+  test("o recorte da tabela na query: busca uuid, filtros da lista (com \"Perfil não reivindicado\"), cidade e texto com teto", () => {
+    const id = "6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
+    expect(recorteDe(new URLSearchParams({ busca: id, filtros: "nao_reivindicado,bons", cidade: "Mutum", texto: "  bela " }))).toEqual({
+      buscaId: id,
+      texto: "bela",
+      cidade: "Mutum",
+      filtros: ["nao_reivindicado", "bons"],
+    });
+    expect(recorteDe(new URLSearchParams())).toEqual({ buscaId: null, texto: "", cidade: null, filtros: [] });
+    expect(recorteDe(new URLSearchParams({ busca: "x" }))).toBe("busca inválida");
+    expect(recorteDe(new URLSearchParams({ filtros: "nao_reivindicado,todos" }))).toBe("filtro inválido");
+  });
+
+  test("a Nova busca abre na cidade da última busca com cidade da lista; sem nenhuma, null (a cidade da OBS)", () => {
+    const busca = (cidadeIbge: number | null, uf: string) => ({
+      id: "b",
+      termo: "x",
+      cidade: "c",
+      criadaEm: 0,
+      situacao: "pronta" as const,
+      total: 0,
+      erro: null,
+      opcoes: { ...base, uf, cidadeIbge },
+    });
+    expect(localDaUltimaBusca([busca(null, "MG"), busca(3112406, "MG"), busca(3144003, "MG")])).toEqual({ uf: "MG", ibge: 3112406 });
+    expect(localDaUltimaBusca([busca(null, "MG")])).toBeNull();
+    expect(localDaUltimaBusca([])).toBeNull();
   });
 });
