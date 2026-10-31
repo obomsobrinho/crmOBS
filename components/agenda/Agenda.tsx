@@ -255,10 +255,10 @@ export default function Agenda(p: PropsAgenda) {
                 data-hoje={d === hoje ? "sim" : undefined}
                 className={cn("flex min-w-0 items-center justify-center gap-1.5 border-l border-line px-1 py-2", d === hoje && "bg-brand-surface")}
               >
-                <span className={cn("text-legenda uppercase", d === hoje ? "text-brand-ink" : "text-ink-3")}>
+                <span className={cn("text-legenda uppercase", d === hoje ? "text-ink" : "text-ink-3")}>
                   {CHAVES_DA_SEMANA[i]}
                 </span>
-                <span className={cn("text-apoio font-semibold tabular-nums", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
+                <span className="text-apoio font-semibold tabular-nums">{d.slice(8)}</span>
                 {feriadoDoDia(d) && (
                   <span className="min-w-0 truncate text-legenda text-ink-3" title={feriadoDoDia(d)!.nome} data-agenda="feriado">
                     {feriadoDoDia(d)!.nome}
