@@ -212,6 +212,93 @@ export function expedienteDoDia(dia: string, hours: BusinessHours): Intervalo | 
   return { inicio: base + de * MIN, fim: base + ate * MIN };
 }
 
+/** Os minutos de um dia: o fim da grade semanal. */
+const MINUTOS_DO_DIA = DIA_MS / MIN;
+
+/**
+ * Onde a grade semanal centraliza quando a semana não tem horário nenhum: 13h, o meio
+ * do dia comercial (8h às 18h), para a grade não abrir na madrugada.
+ */
+const MEIO_DO_DIA_COMERCIAL = 13 * 60;
+
+/** Os feriados que a agenda guarda fechados (`feriadoQueFecha`); ausente = sem feriado. */
+type FeriadosDaAgenda = Pick<AgendaConfig, "feriadosLiberados"> | null | undefined;
+
+/** Um trecho do dia em minutos, de 0 a 1440 (fim exclusivo). */
+export type TrechoDoDia = [inicioMin: number, fimMin: number];
+
+/**
+ * Os trechos do dia em que a agenda ATENDE, em minutos de 0 a 1440: o expediente do
+ * próprio dia (cortado à meia-noite) e a sobra do expediente da véspera que vira a
+ * noite (18:00 às 02:00 deixa 00:00 às 02:00 no dia seguinte). Sem horário, vazio;
+ * um feriado que a agenda guarda fechado (`feriadoQueFecha`, com `config`) não atende.
+ * É o desenho da grade semanal (redesenho de 31/10/2026); a regra de horário livre
+ * continua em `expedienteDoDia`.
+ */
+export function trechosAbertosDoDia(dia: string, hours: BusinessHours | null, config?: FeriadosDaAgenda): TrechoDoDia[] {
+  if (!hours) return [];
+  const base = inicioDoDiaSP(dia);
+  const ontem = somarDias(dia, -1);
+  const vespera = atendeNoDia(ontem, config) ? expedienteDoDia(ontem, hours) : null;
+  const trechos: TrechoDoDia[] = [];
+  if (vespera && vespera.fim > base) trechos.push([0, Math.round((Math.min(vespera.fim, base + DIA_MS) - base) / MIN)]);
+  const proprio = trechoProprioDoDia(dia, hours, config);
+  if (proprio) trechos.push(proprio);
+  // A sobra da véspera começa às 00:00 e vem antes: a lista já sai em ordem.
+  return trechos.filter(([a, b]) => b > a);
+}
+
+/** O feriado do dia não fecha a agenda (sem `config`, o feriado não conta). */
+function atendeNoDia(dia: string, config: FeriadosDaAgenda): boolean {
+  return !config || !feriadoQueFecha(dia, config);
+}
+
+/** O expediente que COMEÇA no dia, cortado à meia-noite (sem a sobra da véspera); null fechado. */
+function trechoProprioDoDia(dia: string, hours: BusinessHours, config: FeriadosDaAgenda): TrechoDoDia | null {
+  const e = atendeNoDia(dia, config) ? expedienteDoDia(dia, hours) : null;
+  if (!e) return null;
+  const base = inicioDoDiaSP(dia);
+  return [Math.round((e.inicio - base) / MIN), Math.round((Math.min(e.fim, base + DIA_MS) - base) / MIN)];
+}
+
+/** O complemento: os trechos do dia em que a agenda NÃO atende (o dia inteiro, se fechado). */
+export function trechosFechadosDoDia(dia: string, hours: BusinessHours | null, config?: FeriadosDaAgenda): TrechoDoDia[] {
+  const fechados: TrechoDoDia[] = [];
+  let cursor = 0;
+  for (const [a, b] of trechosAbertosDoDia(dia, hours, config)) {
+    if (a > cursor) fechados.push([cursor, a]);
+    cursor = Math.max(cursor, b);
+  }
+  if (cursor < MINUTOS_DO_DIA) fechados.push([cursor, MINUTOS_DO_DIA]);
+  return fechados;
+}
+
+/**
+ * O minuto do dia que a grade semanal centraliza ao abrir: a hora de agora, quando
+ * ela cai no horário de atendimento de hoje; senão o meio do horário da semana (do
+ * começo mais cedo ao fim mais tarde); sem horário nenhum, o meio do dia comercial.
+ * Com `config`, o feriado que a agenda guarda fechado conta como fechado (o mesmo
+ * desenho da grade).
+ */
+export function minutoParaCentralizar(dias: string[], hours: BusinessHours | null, agora: number, config?: FeriadosDaAgenda): number {
+  const hoje = diaIsoSP(agora);
+  if (dias.includes(hoje)) {
+    const min = minutosNoDia(agora);
+    if (trechosAbertosDoDia(hoje, hours, config).some(([a, b]) => min >= a && min < b)) return min;
+  }
+  // O expediente que começa em cada dia, sem a sobra da véspera: um horário que vira a noite
+  // (18h às 02h) centraliza nas 21h, não no meio-dia fechado entre a madrugada e a noite.
+  let de = Infinity;
+  let ate = -Infinity;
+  for (const d of dias) {
+    const t = hours ? trechoProprioDoDia(d, hours, config) : null;
+    if (!t) continue;
+    de = Math.min(de, t[0]);
+    ate = Math.max(ate, t[1]);
+  }
+  return Number.isFinite(de) ? Math.round((de + ate) / 2) : MEIO_DO_DIA_COMERCIAL;
+}
+
 /** O trecho bate em algum ocupado, contando o intervalo depois de cada um? */
 export function conflita(inicio: number, fim: number, ocupados: Intervalo[], intervaloMin = 0): boolean {
   const folga = intervaloMin * MIN;

@@ -21,6 +21,32 @@ export const EXPEDIENTE: BusinessHours = {
   dom: { open: false, from: "09:00", to: "13:00" },
 };
 
+/**
+ * Horários de teste da grade semanal (redesenho de 31/10/2026), `?horario=` no preview:
+ * `obs` = das 13h às 18h de segunda a sexta (o da OBS); `curto` = UMA hora por dia, com
+ * a quarta fechada no meio da semana.
+ */
+export const HORARIOS_DE_TESTE: Record<string, BusinessHours> = {
+  obs: {
+    seg: { open: true, from: "13:00", to: "18:00" },
+    ter: { open: true, from: "13:00", to: "18:00" },
+    qua: { open: true, from: "13:00", to: "18:00" },
+    qui: { open: true, from: "13:00", to: "18:00" },
+    sex: { open: true, from: "13:00", to: "18:00" },
+    sab: { open: false, from: "09:00", to: "13:00" },
+    dom: { open: false, from: "09:00", to: "13:00" },
+  },
+  curto: {
+    seg: { open: true, from: "13:00", to: "14:00" },
+    ter: { open: true, from: "13:00", to: "14:00" },
+    qua: { open: false, from: "13:00", to: "14:00" },
+    qui: { open: true, from: "13:00", to: "14:00" },
+    sex: { open: true, from: "13:00", to: "14:00" },
+    sab: { open: false, from: "09:00", to: "13:00" },
+    dom: { open: false, from: "09:00", to: "13:00" },
+  },
+};
+
 export const SERVICOS: ServicoDaAgenda[] = [
   { id: 1, nome: "Exame de vista", duracaoMin: 30 },
   { id: 2, nome: "Ajuste de armação", duracaoMin: 15 },

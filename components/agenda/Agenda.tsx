@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Ban,
@@ -36,6 +36,9 @@ import { DAY_LABEL, type BusinessHours } from "@/lib/agent-prompt";
 import {
   diaFalado,
   expedienteDoDia,
+  minutoParaCentralizar,
+  trechosFechadosDoDia,
+  type TrechoDoDia,
   faixaHoraria,
   hhmm,
   quandoFalado,
@@ -53,7 +56,6 @@ import { useDebounce } from "@/lib/use-debounce";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { diaIsoSP, mesAnoDoDia, somarDias, somarMes } from "@/lib/fuso";
 import { prettyPhone } from "@/lib/format";
-import { minutosAgoraSP } from "@/lib/horarios";
 import { ROTULO_CHAVES, fillDoRotulo } from "@/lib/rotulos";
 import { feriadoDoDia } from "@/lib/feriados";
 import { cn } from "@/lib/utils";
@@ -66,8 +68,14 @@ import { cn } from "@/lib/utils";
 // abre o detalhe com remarcar e cancelar. No celular, um dia por vez.
 // Os dados vêm SÓ da `fonte` (banco em `/agenda`, memória em `/design/agenda`).
 
-/** Altura mínima de uma hora na grade (30 min = nome e horário legíveis). */
-const HORA_PX_MIN = 72;
+/**
+ * A altura de uma hora na grade, SEMPRE a mesma (30 min = nome e horário legíveis).
+ * A grade tem as 24 horas do dia (redesenho de 31/10/2026): antes ela só desenhava
+ * o horário da agenda e, com poucas horas (a OBS atende das 13h às 18h), acabava no
+ * meio da tela com a linha do "agora" solta embaixo, fora da grade.
+ */
+const HORA_PX = 72;
+const HORAS = 24;
 const DIA_MS = 86_400_000;
 const CHAVES_DA_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
 
@@ -93,29 +101,6 @@ export interface PropsAgenda {
 
 function corDoServico(servicoId: number | null): string {
   return fillDoRotulo(ROTULO_CHAVES[Math.abs(servicoId ?? 0) % ROTULO_CHAVES.length]);
-}
-
-function minutos(ms: number): number {
-  return minutosAgoraSP(new Date(ms));
-}
-
-/** As horas que a grade mostra: o expediente da semana, esticado para caber o que está marcado. */
-function faixaDaGrade(dias: string[], hours: BusinessHours | null, itens: { inicio: number; fim: number }[]): [number, number] {
-  let de = 24;
-  let ate = 0;
-  for (const d of dias) {
-    const exp = hours ? expedienteDoDia(d, hours) : null;
-    if (!exp) continue;
-    de = Math.min(de, Math.floor(minutos(exp.inicio) / 60));
-    const fim = exp.fim - exp.inicio >= DIA_MS ? 24 : Math.ceil((minutos(exp.fim) || 1440) / 60);
-    ate = Math.max(ate, fim <= de ? 24 : fim);
-  }
-  for (const x of itens) {
-    de = Math.min(de, Math.floor(minutos(x.inicio) / 60));
-    ate = Math.max(ate, Math.ceil((minutos(x.fim) || 1440) / 60));
-  }
-  if (de >= ate) return [8, 18];
-  return [de, Math.min(24, ate)];
 }
 
 export default function Agenda(p: PropsAgenda) {
@@ -161,15 +146,28 @@ export default function Agenda(p: PropsAgenda) {
     return () => document.removeEventListener("visibilitychange", aoVoltar);
   }, [recarregar]);
 
-  // A grade ocupa a altura toda: a hora cresce até a área encher (nunca menor
-  // que `HORA_PX_MIN`, que é o mínimo para nome e horário caberem no cartão).
-  const [alturaDaArea, setAlturaDaArea] = useState(0);
-  const medirArea = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    const obs = new ResizeObserver(([e]) => setAlturaDaArea(e.contentRect.height));
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
+  // Ao abrir (e a cada semana), a rolagem fica mais ou menos no meio do horário de
+  // atendimento, ou na hora de agora quando ela está dentro dele.
+  // Antes da pintura (sem a grade piscar em 0h e pular), e só quando a SEMANA muda: um
+  // render que refaz as props não devolve a rolagem do dono ao centro.
+  /** O que fica fora do horário em cada dia da semana: uma conta por semana, não por tecla. */
+  const fechadosPorDia = useMemo(
+    () => Object.fromEntries(dias.map((d) => [d, trechosFechadosDoDia(d, p.hours, p.config)])),
+    [dias, p.hours, p.config],
+  );
+  const grade = useRef<HTMLDivElement>(null);
+  const centralizadaEm = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const el = grade.current;
+    const semanaAberta = dias.join();
+    if (!el || centralizadaEm.current === semanaAberta) return;
+    centralizadaEm.current = semanaAberta;
+    const minuto = minutoParaCentralizar(dias, p.hours, p.agora, p.config);
+    el.scrollTop = Math.max(0, (minuto / 60) * HORA_PX - el.clientHeight / 2);
+    // Marca (no DOM, sem estado) que a rolagem inicial já aconteceu: quem clica num cartão
+    // logo ao abrir (os testes) espera por ela, para o clique não mudar de lugar.
+    el.dataset.centralizada = "sim";
+  }, [dias, p.hours, p.agora, p.config]);
 
   const irPara = (dia: string) => {
     setSemana(segundaDaSemana(dia));
@@ -188,11 +186,6 @@ export default function Agenda(p: PropsAgenda) {
       </Card>
     );
   }
-
-  const [horaDe, horaAte] = faixaDaGrade(dias, p.hours, [...itens, ...bloqueios]);
-  // Sem arredondar: a faixa (início mais cedo ao fim mais tarde da semana, mais
-  // o que o time marcou fora dela) enche a altura exata, sem sobra embaixo.
-  const horaPx = Math.max(HORA_PX_MIN, alturaDaArea / (horaAte - horaDe));
 
   return (
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
@@ -261,7 +254,9 @@ export default function Agenda(p: PropsAgenda) {
             ))}
           </div>
 
-          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] border-b border-line max-md:hidden" data-agenda="cabecalho-dias">
+          {/* ⚠️ O mesmo `scrollbar-gutter: stable` no cabeçalho e na grade (31/10/2026): a barra de rolagem
+              só existe na grade, e sem a reserva as colunas de cima saíam mais largas que as de baixo. */}
+          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] overflow-hidden border-b border-line [scrollbar-gutter:stable] max-md:hidden" data-agenda="cabecalho-dias">
             <span />
             {dias.map((d, i) => (
               <div
@@ -270,10 +265,10 @@ export default function Agenda(p: PropsAgenda) {
                 data-hoje={d === hoje ? "sim" : undefined}
                 className={cn("flex min-w-0 items-center justify-center gap-1.5 border-l border-line px-1 py-2", d === hoje && "bg-brand-surface")}
               >
-                <span className={cn("text-legenda uppercase", d === hoje ? "text-brand-ink" : "text-ink-3")}>
+                <span className={cn("text-legenda uppercase", d === hoje ? "text-ink" : "text-ink-3")}>
                   {CHAVES_DA_SEMANA[i]}
                 </span>
-                <span className={cn("text-apoio font-semibold tabular-nums", d === hoje && "text-brand-ink")}>{d.slice(8)}</span>
+                <span className="text-apoio font-semibold tabular-nums">{d.slice(8)}</span>
                 {feriadoDoDia(d) && (
                   <span className="min-w-0 truncate text-legenda text-ink-3" title={feriadoDoDia(d)!.nome} data-agenda="feriado">
                     {feriadoDoDia(d)!.nome}
@@ -283,24 +278,24 @@ export default function Agenda(p: PropsAgenda) {
             ))}
           </div>
 
-          <div ref={medirArea} className="flex min-h-0 flex-1 flex-col">
-          <AreaRolavel className="min-h-0 flex-1" data-agenda="grade">
+          <AreaRolavel ref={grade} className="min-h-0 flex-1 [scrollbar-gutter:stable]" data-agenda="grade">
             <div
               className="relative grid grid-cols-[52px_repeat(7,minmax(0,1fr))] max-md:grid-cols-[44px_minmax(0,1fr)]"
-              style={{ height: (horaAte - horaDe) * horaPx }}
+              style={{ height: HORAS * HORA_PX }}
             >
               <div className="relative">
-                {/* Início e fim da faixa aparecem dentro da grade (sem cortar). */}
-                {Array.from({ length: horaAte - horaDe + 1 }, (_, i) => (
+                {/* 0h e 24h aparecem dentro da grade (sem cortar). */}
+                {Array.from({ length: HORAS + 1 }, (_, i) => (
                   <span
                     key={i}
+                    data-agenda="hora"
                     className={cn(
                       "absolute right-2 text-legenda tabular-nums text-ink-3",
-                      i === 0 ? "translate-y-0.5" : i === horaAte - horaDe ? "-translate-y-full" : "-translate-y-1/2"
+                      i === 0 ? "translate-y-0.5" : i === HORAS ? "-translate-y-full" : "-translate-y-1/2"
                     )}
-                    style={{ top: i * horaPx }}
+                    style={{ top: i * HORA_PX }}
                   >
-                    {`${horaDe + i}h`}
+                    {`${i}h`}
                   </span>
                 ))}
               </div>
@@ -310,14 +305,11 @@ export default function Agenda(p: PropsAgenda) {
                   dia={d}
                   hoje={hoje}
                   agora={p.agora}
-                  horaDe={horaDe}
-                  hours={p.hours}
+                  fechados={fechadosPorDia[d] ?? []}
                   itens={itens.filter((l) => diaIsoSP(l.inicio) === d)}
-                  bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + 86_400_000 && b.fim > inicioDoDia(d))}
+                  bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + DIA_MS && b.fim > inicioDoDia(d))}
                   escondidaNoCelular={d !== diaCelular}
                   onAbrir={setDetalhe}
-                  horaPx={horaPx}
-                  nHoras={horaAte - horaDe}
                   feriado={!!feriadoQueFecha(d, p.config)}
                   onVazio={(dia, inicio) => {
                     if (p.readOnly || p.servicos.length === 0) return;
@@ -328,7 +320,6 @@ export default function Agenda(p: PropsAgenda) {
               ))}
             </div>
           </AreaRolavel>
-          </div>
         </div>
       </div>
 
@@ -389,38 +380,34 @@ function ColunaDoDia({
   dia,
   hoje,
   agora,
-  horaDe,
-  hours,
+  fechados,
   itens,
   bloqueios,
   escondidaNoCelular,
   onAbrir,
-  horaPx,
-  nHoras,
   feriado,
   onVazio,
 }: {
   dia: string;
   hoje: string;
   agora: number;
-  horaDe: number;
-  hours: BusinessHours | null;
+  /**
+   * Fora do horário da agenda (antes, depois, o dia fechado, o feriado que a agenda não
+   * atende): UM visual só, o dos dias fechados; o time ainda marca ali, a IA não.
+   */
+  fechados: TrechoDoDia[];
   itens: LinhaAgenda[];
   bloqueios: BloqueioAgenda[];
   escondidaNoCelular: boolean;
   onAbrir: (l: LinhaAgenda) => void;
-  horaPx: number;
-  nHoras: number;
   /** Feriado nacional que a agenda não atende neste dia. */
   feriado: boolean;
   onVazio: (dia: string, inicio: number) => void;
 }) {
-  const base = inicioDoDia(dia) + horaDe * 3_600_000;
-  const topo = (t: number) => ((t - base) / 60_000 / 60) * horaPx;
-  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * horaPx - 2);
-  // Feriado que a agenda não atende conta como dia fechado (apagado).
-  const exp = hours && !feriado ? expedienteDoDia(dia, hours) : null;
-  const alturaTotal = nHoras * horaPx;
+  const base = inicioDoDia(dia);
+  const topo = (t: number) => ((t - base) / 60_000 / 60) * HORA_PX;
+  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * HORA_PX - 2);
+  const alturaTotal = HORAS * HORA_PX;
   return (
     <div
       data-agenda="coluna"
@@ -442,23 +429,24 @@ function ColunaDoDia({
         className="absolute inset-0 z-0 rounded-none"
         onClick={(e) => {
           const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-          const min = Math.floor(((y / horaPx) * 60) / 30) * 30;
+          const min = Math.floor(((y / HORA_PX) * 60) / 30) * 30;
           onVazio(dia, base + min * 60_000);
         }}
       />
       {/* Linhas só ENTRE as horas: no topo vale a borda do cabeçalho e no fim a
           borda do cartão (ajuste do dono: eram duas linhas coladas). */}
-      {Array.from({ length: Math.max(0, nHoras - 1) }, (_, i) => (
-        <div key={`h${i}`} className="pointer-events-none absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * horaPx }} aria-hidden />
+      {Array.from({ length: Math.max(0, HORAS - 1) }, (_, i) => (
+        <div key={`h${i}`} className="pointer-events-none absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * HORA_PX }} aria-hidden />
       ))}
-      {/* Fora do expediente fica apagado: o time ainda marca ali, a IA não. */}
-      {!exp && <div className="pointer-events-none absolute inset-0 bg-[var(--chip-bg)] opacity-60" aria-hidden />}
-      {exp && topo(exp.inicio) > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 bg-[var(--chip-bg)] opacity-60" style={{ height: topo(exp.inicio) }} aria-hidden />
-      )}
-      {exp && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[var(--chip-bg)] opacity-60" style={{ top: topo(exp.fim) }} aria-hidden />
-      )}
+      {fechados.map(([de, ate]) => (
+        <div
+          key={`f${de}`}
+          data-agenda="fechado"
+          className="pointer-events-none absolute inset-x-0 bg-[var(--chip-bg)] opacity-60"
+          style={{ top: (de / 60) * HORA_PX, height: ((ate - de) / 60) * HORA_PX }}
+          aria-hidden
+        />
+      ))}
 
       {/* Bloqueio de vários dias aparece em cada dia que cobre, recortado à grade. */}
       {bloqueios.map((b) => {
@@ -494,7 +482,8 @@ function ColunaDoDia({
               "absolute inset-x-1 z-10 flex-col items-start justify-center overflow-hidden rounded-md border border-line bg-raised pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
               passou && "opacity-60"
             )}
-            style={{ top: topo(l.inicio), height: altura(l.inicio, l.fim) }}
+            // Um horário que passa da meia-noite para no fim da grade (24h), como os bloqueios.
+            style={{ top: topo(l.inicio), height: Math.min(altura(l.inicio, l.fim), Math.max(20, alturaTotal - topo(l.inicio))) }}
           >
             <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
             <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">

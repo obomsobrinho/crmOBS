@@ -70,3 +70,22 @@ one strict-JSON call that n8n reads; the persona is the cached prefix.
   never to an expired or late account; a refused send is recorded and retried, with an icon in the
   owner's central.
 - The contact card shows the contact's bookings ("Horários marcados").
+
+## Week grid redrawn (31/10/2026, owner's review)
+
+The week grid drew only the agenda's hours (the earliest start to the latest end of the week) and
+stretched the hour to fill the area. With OBS's short hours (13h to 18h) the grid ended in the middle of
+the screen with an empty strip below, and at about 20h the "now" line sat loose at the bottom, outside
+the grid. Decision: the grid always has the 24 hours at one fixed hour height (`HORA_PX`); everything
+outside the agenda's hours, closed days and holidays the agenda does not serve share ONE look, drawn from
+`trechosFechadosDoDia` (`lib/agenda.ts`, pure, which also carries the overnight remainder of the day
+before); the grid opens scrolled to `minutoParaCentralizar` (now, when it is inside today's hours, else
+the middle of the week's hours). The booking rules did not change. Tests: `e2e/agenda-lib.design.spec.ts`
+(open and closed stretches, overnight, one-hour days, a closed weekday, where it opens) and
+`e2e/agenda.design.spec.ts` (`?horario=obs|curto&agora=` in `/design/agenda`).
+- Review of the redraw (/simplify and /code-review, 31/10/2026): a holiday the agenda keeps closed is
+  decided inside `trechosAbertosDoDia`/`minutoParaCentralizar` (they take the config), so the shading and
+  the opening scroll never disagree; an agenda whose hours cross midnight centres on the stretch that
+  STARTS each day (18h to 02h opens at 21h, not at the closed noon between the two pieces); the centring
+  runs before paint (`useLayoutEffect`) and only when the week changes, so a re-render never pulls the
+  owner's scroll back; a booking that crosses midnight stops at the end of the grid like a block.

@@ -28,6 +28,9 @@ import {
   textoDaConsulta,
   textoDoLembrete,
   validarHorario,
+  minutoParaCentralizar,
+  trechosAbertosDoDia,
+  trechosFechadosDoDia,
   type AgendaConfig,
   type SaidaDaAgenda,
 } from "../lib/agenda";
@@ -407,4 +410,71 @@ test("o lembrete gravado na conversa não é resposta da IA nem do time, e vira 
   ]);
   expect(bolhas).toHaveLength(1);
   expect(bolhas[0]).toMatchObject({ side: "out", lembrete: true, content: "Oi, Ana! Seu horário..." });
+});
+
+test.describe("Grade semanal: trechos abertos e fechados do dia (redesenho de 31/10/2026)", () => {
+  const h = (dias: Partial<Record<string, [string, string] | null>>): BusinessHours => {
+    const base = { open: false, from: "09:00", to: "18:00" };
+    const chaves = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const;
+    return Object.fromEntries(
+      chaves.map((k) => [k, dias[k] ? { open: true, from: dias[k]![0], to: dias[k]![1] } : base]),
+    ) as BusinessHours;
+  };
+  const obs = h({ seg: ["13:00", "18:00"], ter: ["13:00", "18:00"], qua: ["13:00", "18:00"], qui: ["13:00", "18:00"], sex: ["13:00", "18:00"] });
+  // 26/10/2026 é segunda; 30/10 sexta; 31/10 sábado.
+
+  test("dia aberto: um trecho aberto e o resto fechado; dia fechado: o dia inteiro", () => {
+    expect(trechosAbertosDoDia("2026-10-30", obs)).toEqual([[780, 1080]]);
+    expect(trechosFechadosDoDia("2026-10-30", obs)).toEqual([
+      [0, 780],
+      [1080, 1440],
+    ]);
+    expect(trechosAbertosDoDia("2026-10-31", obs)).toEqual([]);
+    expect(trechosFechadosDoDia("2026-10-31", obs)).toEqual([[0, 1440]]);
+    expect(trechosFechadosDoDia("2026-10-30", null)).toEqual([[0, 1440]]);
+  });
+
+  test("expediente que vira a noite: o resto vai para a madrugada do dia seguinte", () => {
+    const noite = h({ sex: ["18:00", "02:00"] });
+    expect(trechosAbertosDoDia("2026-10-30", noite)).toEqual([[1080, 1440]]);
+    expect(trechosAbertosDoDia("2026-10-31", noite)).toEqual([[0, 120]]);
+    expect(trechosFechadosDoDia("2026-10-31", noite)).toEqual([[120, 1440]]);
+    // A grade abre no meio do expediente da noite (21h), não ao meio-dia entre a madrugada e a noite.
+    const semana = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"];
+    expect(minutoParaCentralizar(semana, noite, inicioDoDiaSP("2026-11-05"))).toBe(21 * 60);
+  });
+
+  test("horário de uma hora: dois trechos fechados em volta; um dia fechado no meio da semana", () => {
+    const curto = h({ seg: ["13:00", "14:00"], ter: ["13:00", "14:00"], qui: ["13:00", "14:00"], sex: ["13:00", "14:00"] });
+    expect(trechosFechadosDoDia("2026-10-26", curto)).toEqual([
+      [0, 780],
+      [840, 1440],
+    ]);
+    expect(trechosFechadosDoDia("2026-10-28", curto)).toEqual([[0, 1440]]);
+  });
+
+  test("onde a grade abre: o agora dentro do horário; senão o meio do horário da semana", () => {
+    const semana = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"];
+    // Quinta 16h10 (dentro): o próprio agora.
+    expect(minutoParaCentralizar(semana, obs, inicioDoDiaSP("2026-10-29") + (16 * 60 + 10) * 60_000)).toBe(16 * 60 + 10);
+    // Sexta 20h05 (fora): o meio de 13h às 18h.
+    expect(minutoParaCentralizar(semana, obs, inicioDoDiaSP("2026-10-30") + (20 * 60 + 5) * 60_000)).toBe(15 * 60 + 30);
+    // Outra semana (o agora não está nela): o meio do horário.
+    expect(minutoParaCentralizar(semana, obs, inicioDoDiaSP("2026-11-05") + 15 * 60 * 60_000)).toBe(15 * 60 + 30);
+    // Sem horário nenhum: o meio do dia comercial.
+    expect(minutoParaCentralizar(semana, null, inicioDoDiaSP("2026-10-29"))).toBe(13 * 60);
+  });
+
+  test("feriado que a agenda guarda fechado: o dia todo fechado, e a grade não centraliza no agora dele", () => {
+    // 02/11/2026 (segunda) é Finados, nacional.
+    expect(trechosAbertosDoDia("2026-11-02", obs, CFG)).toEqual([]);
+    expect(trechosFechadosDoDia("2026-11-02", obs, CFG)).toEqual([[0, 1440]]);
+    // Liberado pelo dono, volta a atender; sem a config, o feriado não conta.
+    expect(trechosAbertosDoDia("2026-11-02", obs, { ...CFG, feriadosLiberados: ["2026-11-02"] })).toEqual([[780, 1080]]);
+    expect(trechosAbertosDoDia("2026-11-02", obs)).toEqual([[780, 1080]]);
+    const semana = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"];
+    const quatorzeDoFeriado = inicioDoDiaSP("2026-11-02") + 14 * 60 * 60_000;
+    expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado, CFG)).toBe(15 * 60 + 30);
+    expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado)).toBe(14 * 60);
+  });
 });

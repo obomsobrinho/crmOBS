@@ -6,23 +6,25 @@ import ConfiguracaoDaAgenda from "@/components/agenda/ConfiguracaoDaAgenda";
 import { fonteDaMemoriaAgenda } from "@/lib/agenda-fonte";
 import { segundaDaSemana } from "@/lib/agenda";
 import { diaIsoSP } from "@/lib/fuso";
-import { CONFIG, CONTATOS, EMPRESA, EXPEDIENTE, SERVICOS, bloqueios, linhas } from "./dados";
+import { CONFIG, CONTATOS, EMPRESA, EXPEDIENTE, HORARIOS_DE_TESTE, SERVICOS, bloqueios, linhas } from "./dados";
 
 // A tela de verdade (agenda e configurações) com a fonte em MEMÓRIA: as ações
 // só mudam esta aba, com a mesma regra de horário livre do produto.
-function useFonte(agora: number, vazio: boolean, semHorario: boolean) {
+function useFonte(agora: number, vazio: boolean, semHorario: boolean, horario?: string) {
   return useMemo(() => {
+    // Só as chaves do próprio objeto (`?horario=toString` não vira uma função).
+    const expediente = (horario && Object.hasOwn(HORARIOS_DE_TESTE, horario) && HORARIOS_DE_TESTE[horario]) || EXPEDIENTE;
     const dados = {
       linhas: vazio ? [] : linhas(agora),
       bloqueios: vazio ? [] : bloqueios(agora),
       servicos: SERVICOS,
-      hours: EXPEDIENTE,
+      hours: expediente,
       config: CONFIG,
       contatos: CONTATOS,
       agora,
     };
-    return { fonte: fonteDaMemoriaAgenda(dados), dados, hours: semHorario ? null : EXPEDIENTE };
-  }, [agora, vazio, semHorario]);
+    return { fonte: fonteDaMemoriaAgenda(dados), dados, hours: semHorario ? null : expediente };
+  }, [agora, vazio, semHorario, horario]);
 }
 
 export function AgendaDeMemoria(props: {
@@ -31,8 +33,10 @@ export function AgendaDeMemoria(props: {
   disponivel: boolean;
   semHorario: boolean;
   vazio: boolean;
+  /** `obs` ou `curto` (`HORARIOS_DE_TESTE`); sem, o expediente da ótica de mentira. */
+  horario?: string;
 }) {
-  const { fonte, dados, hours } = useFonte(props.agora, props.vazio, props.semHorario);
+  const { fonte, dados, hours } = useFonte(props.agora, props.vazio, props.semHorario, props.horario);
   const semana = segundaDaSemana(diaIsoSP(props.agora));
   return (
     <Agenda
