@@ -83,3 +83,9 @@ before); the grid opens scrolled to `minutoParaCentralizar` (now, when it is ins
 the middle of the week's hours). The booking rules did not change. Tests: `e2e/agenda-lib.design.spec.ts`
 (open and closed stretches, overnight, one-hour days, a closed weekday, where it opens) and
 `e2e/agenda.design.spec.ts` (`?horario=obs|curto&agora=` in `/design/agenda`).
+- Review of the redraw (/simplify and /code-review, 31/10/2026): a holiday the agenda keeps closed is
+  decided inside `trechosAbertosDoDia`/`minutoParaCentralizar` (they take the config), so the shading and
+  the opening scroll never disagree; an agenda whose hours cross midnight centres on the stretch that
+  STARTS each day (18h to 02h opens at 21h, not at the closed noon between the two pieces); the centring
+  runs before paint (`useLayoutEffect`) and only when the week changes, so a re-render never pulls the
+  owner's scroll back; a booking that crosses midnight stops at the end of the grid like a block.

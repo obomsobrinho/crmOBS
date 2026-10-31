@@ -12,7 +12,8 @@ import { CONFIG, CONTATOS, EMPRESA, EXPEDIENTE, HORARIOS_DE_TESTE, SERVICOS, blo
 // só mudam esta aba, com a mesma regra de horário livre do produto.
 function useFonte(agora: number, vazio: boolean, semHorario: boolean, horario?: string) {
   return useMemo(() => {
-    const expediente = (horario && HORARIOS_DE_TESTE[horario]) || EXPEDIENTE;
+    // Só as chaves do próprio objeto (`?horario=toString` não vira uma função).
+    const expediente = (horario && Object.hasOwn(HORARIOS_DE_TESTE, horario) && HORARIOS_DE_TESTE[horario]) || EXPEDIENTE;
     const dados = {
       linhas: vazio ? [] : linhas(agora),
       bloqueios: vazio ? [] : bloqueios(agora),
