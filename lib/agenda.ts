@@ -212,6 +212,62 @@ export function expedienteDoDia(dia: string, hours: BusinessHours): Intervalo | 
   return { inicio: base + de * MIN, fim: base + ate * MIN };
 }
 
+/** Um trecho do dia em minutos, de 0 a 1440 (fim exclusivo). */
+export type TrechoDoDia = [inicioMin: number, fimMin: number];
+
+/**
+ * Os trechos do dia em que a agenda ATENDE, em minutos de 0 a 1440: o expediente do
+ * próprio dia (cortado à meia-noite) e a sobra do expediente da véspera que vira a
+ * noite (18:00 às 02:00 deixa 00:00 às 02:00 no dia seguinte). Sem horário, vazio.
+ * É o desenho da grade semanal (redesenho de 31/10/2026); a regra de horário livre
+ * continua em `expedienteDoDia`.
+ */
+export function trechosAbertosDoDia(dia: string, hours: BusinessHours | null): TrechoDoDia[] {
+  if (!hours) return [];
+  const base = inicioDoDiaSP(dia);
+  const fimDoDia = base + 24 * 60 * MIN;
+  const trechos: TrechoDoDia[] = [];
+  const vespera = expedienteDoDia(somarDias(dia, -1), hours);
+  if (vespera && vespera.fim > base) trechos.push([0, Math.round((Math.min(vespera.fim, fimDoDia) - base) / MIN)]);
+  const hoje = expedienteDoDia(dia, hours);
+  if (hoje) trechos.push([Math.round((hoje.inicio - base) / MIN), Math.round((Math.min(hoje.fim, fimDoDia) - base) / MIN)]);
+  return trechos.filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+}
+
+/** O complemento: os trechos do dia em que a agenda NÃO atende (o dia inteiro, se fechado). */
+export function trechosFechadosDoDia(dia: string, hours: BusinessHours | null): TrechoDoDia[] {
+  const fechados: TrechoDoDia[] = [];
+  let cursor = 0;
+  for (const [a, b] of trechosAbertosDoDia(dia, hours)) {
+    if (a > cursor) fechados.push([cursor, a]);
+    cursor = Math.max(cursor, b);
+  }
+  if (cursor < 24 * 60) fechados.push([cursor, 24 * 60]);
+  return fechados;
+}
+
+/**
+ * O minuto do dia que a grade semanal centraliza ao abrir: a hora de agora, quando
+ * ela cai no horário de atendimento de hoje; senão o meio do horário da semana (do
+ * começo mais cedo ao fim mais tarde); sem horário nenhum, o meio do dia comercial.
+ */
+export function minutoParaCentralizar(dias: string[], hours: BusinessHours | null, agora: number): number {
+  const hoje = diaIsoSP(agora);
+  if (dias.includes(hoje)) {
+    const min = Math.round((agora - inicioDoDiaSP(hoje)) / MIN);
+    if (trechosAbertosDoDia(hoje, hours).some(([a, b]) => min >= a && min < b)) return min;
+  }
+  let de = Infinity;
+  let ate = -Infinity;
+  for (const d of dias) {
+    for (const [a, b] of trechosAbertosDoDia(d, hours)) {
+      de = Math.min(de, a);
+      ate = Math.max(ate, b);
+    }
+  }
+  return Number.isFinite(de) ? Math.round((de + ate) / 2) : 13 * 60;
+}
+
 /** O trecho bate em algum ocupado, contando o intervalo depois de cada um? */
 export function conflita(inicio: number, fim: number, ocupados: Intervalo[], intervaloMin = 0): boolean {
   const folga = intervaloMin * MIN;
