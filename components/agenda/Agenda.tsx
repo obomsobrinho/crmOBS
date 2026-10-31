@@ -244,7 +244,9 @@ export default function Agenda(p: PropsAgenda) {
             ))}
           </div>
 
-          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] border-b border-line max-md:hidden" data-agenda="cabecalho-dias">
+          {/* ⚠️ O mesmo `scrollbar-gutter: stable` no cabeçalho e na grade (31/10/2026): a barra de rolagem
+              só existe na grade, e sem a reserva as colunas de cima saíam mais largas que as de baixo. */}
+          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] overflow-y-hidden border-b border-line [scrollbar-gutter:stable] max-md:hidden" data-agenda="cabecalho-dias">
             <span />
             {dias.map((d, i) => (
               <div
@@ -267,7 +269,7 @@ export default function Agenda(p: PropsAgenda) {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col">
-          <AreaRolavel ref={grade} className="min-h-0 flex-1" data-agenda="grade">
+          <AreaRolavel ref={grade} className="min-h-0 flex-1 [scrollbar-gutter:stable]" data-agenda="grade">
             <div
               className="relative grid grid-cols-[52px_repeat(7,minmax(0,1fr))] max-md:grid-cols-[44px_minmax(0,1fr)]"
               style={{ height: HORAS * HORA_PX }}
