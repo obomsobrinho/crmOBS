@@ -1,15 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
 import AbaLeads from "./AbaLeads";
+import NovaBusca from "./NovaBusca";
 import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
 import { useLeitura } from "./tabela";
-import { somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type Tela } from "./tipos";
+import { localDaUltimaBusca, somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
 // par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
@@ -27,17 +28,32 @@ export default function CentralDeCampanhas({
   agora,
   fonte,
   variantesSugeridas,
+  inicial = null,
+  abrirNovaBusca,
+  rascunhoEsperandoId = null,
 }: {
   telaInicial: Tela;
   agora: number;
   fonte: FonteDeCampanhas;
+  /** O que o servidor já leu para a primeira tela (só a página de verdade). */
+  inicial?: InicialDaCentral | null;
+  /**
+   * Abre a Nova busca na página própria (`/campanhas/buscas/nova`, a página de verdade);
+   * sem ela (o preview), a Nova busca é uma tela desta central.
+   */
+  abrirNovaBusca?: (rascunhoEsperandoId: string | null) => void;
+  /**
+   * A campanha que mandou buscar contatos ("Falta lead? Fazer uma nova busca") e volta com a
+   * página de verdade depois da Nova busca (`?rascunho=`): a faixa "esperando os contatos" reaparece.
+   */
+  rascunhoEsperandoId?: string | null;
   /** O texto pré-preenchido de uma campanha nova (o dono edita). */
   variantesSugeridas: string[];
 }) {
   const [tela, setTela] = useState<Tela>(telaInicial);
   const [versao, setVersao] = useState(0);
   const mudou = useCallback(() => setVersao((v) => v + 1), []);
-  const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais());
+  const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais(), inicial?.totais ?? null);
   const { dados: conexoes } = useLeitura("conexoes", () => fonte.conexoes());
 
   // ── O rascunho aberto no assistente ──
@@ -85,17 +101,24 @@ export default function CentralDeCampanhas({
     [],
   );
 
+  /** O número que uma campanha nova já traz: o primeiro conectado, senão o primeiro. */
+  const conexaoPadrao = useMemo(() => conexoes?.find((c) => c.conectado) ?? conexoes?.[0] ?? null, [conexoes]);
+
+  /** A campanha NOVA que nasceu antes de as conexões chegarem: só ela recebe o número padrão depois. */
+  const esperandoNumero = useRef<string | null>(null);
+
   const novoRascunho = useCallback(
     (extra: Partial<CampanhaEditavel>) => {
-      const conectada = conexoes?.find((c) => c.conectado) ?? conexoes?.[0] ?? null;
       const agoraMs = Date.now();
+      const id = crypto.randomUUID();
+      esperandoNumero.current = conexaoPadrao || extra.conexaoId ? null : id;
       abrirRascunho(
         {
-          id: crypto.randomUUID(),
+          id,
           nome: "",
           situacao: "rascunho",
           agendadaPara: null,
-          conexaoId: conectada?.id ?? null,
+          conexaoId: conexaoPadrao?.id ?? null,
           filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
           variantes: [...variantesSugeridas],
           criadaEm: agoraMs,
@@ -106,7 +129,7 @@ export default function CentralDeCampanhas({
         true,
       );
     },
-    [abrirRascunho, conexoes, variantesSugeridas],
+    [abrirRascunho, conexaoPadrao, variantesSugeridas],
   );
 
   const editar = useCallback(
@@ -121,6 +144,21 @@ export default function CentralDeCampanhas({
     },
     [abrirRascunho, fonte],
   );
+
+  // Voltando da Nova busca com a campanha que esperava contatos: lê ela uma vez para a faixa.
+  useEffect(() => {
+    if (!rascunhoEsperandoId) return;
+    let vivo = true;
+    fonte
+      .campanha(rascunhoEsperandoId)
+      .then((a) => {
+        if (vivo && a?.campanha.situacao === "rascunho") setRascunhoEsperando(a.campanha);
+      })
+      .catch((e) => console.error("campanha, rascunho esperando:", e));
+    return () => {
+      vivo = false;
+    };
+  }, [fonte, rascunhoEsperandoId]);
 
   // Aberta direto num rascunho (o link do preview `?tela=rascunho`): lê a campanha uma vez.
   useEffect(() => {
@@ -145,6 +183,15 @@ export default function CentralDeCampanhas({
       return novo;
     });
   }, []);
+
+  // Uma campanha NOVA criada antes de as conexões chegarem nasceu sem número (o "Continuar"
+  // ficava travado sem motivo à vista): o número padrão entra assim que elas chegam. Um rascunho
+  // salvo que foi só aberto nunca muda sozinho.
+  useEffect(() => {
+    if (!conexaoPadrao || !rascunho || rascunho.id !== esperandoNumero.current) return;
+    esperandoNumero.current = null;
+    if (rascunho.conexaoId === null) mudarRascunho({ conexaoId: conexaoPadrao.id });
+  }, [conexaoPadrao, mudarRascunho, rascunho]);
 
   const sairDoAssistente = useCallback(async () => {
     await salvarAgora();
@@ -188,11 +235,11 @@ export default function CentralDeCampanhas({
       <TabsList variant="painel" aria-label="Seções">
         <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
           Leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
         </TabsTrigger>
         <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
           Campanhas
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -221,25 +268,36 @@ export default function CentralDeCampanhas({
             }}
           />
         </section>
+      ) : tela.aba === "leads" && "nova" in tela ? (
+        <PaginaDaNovaBusca
+          fonte={fonte}
+          voltar={() => setTela({ aba: "leads", busca: null })}
+          aoComecar={() => {
+            setTela({ aba: "leads", busca: null });
+            mudou();
+          }}
+        />
       ) : (
         // A chave troca a cada tela: abrir outra tela começa do topo, não de onde a anterior parou.
         <AreaRolavel
-          key={tela.aba === "leads" ? `leads-${tela.busca ?? ""}` : `campanhas-${"id" in tela ? tela.id : ""}`}
+          key={tela.aba === "leads" ? `leads-${"busca" in tela ? (tela.busca ?? "") : ""}` : `campanhas-${"id" in tela ? tela.id : ""}`}
           tamanho={DISSOLVER_PADRAO}
           className="min-h-0 min-w-0 flex-1"
         >
           <div className="px-4 py-4 md:px-1 md:py-1">
-            {tela.aba === "leads" ? (
+            {tela.aba === "leads" && "busca" in tela ? (
               <AbaLeads
                 abas={abas}
                 fonte={fonte}
                 versao={versao}
                 totais={totais}
+                inicial={inicial}
                 agora={agora}
                 buscaAberta={tela.busca}
                 rascunho={rascunhoEsperando}
                 abrirBusca={(id) => setTela({ aba: "leads", busca: id })}
                 aoMudar={mudou}
+                novaBusca={abrirNovaBusca ? () => abrirNovaBusca(rascunhoEsperando?.id ?? null) : () => setTela({ aba: "leads", nova: true })}
                 criarCampanhaDaBusca={(b: Busca) => {
                   const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
                   novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
@@ -287,5 +345,26 @@ export default function CentralDeCampanhas({
         </AreaRolavel>
       )}
     </section>
+  );
+}
+
+/**
+ * A página da Nova busca: lê a cidade da última busca (onde o mapa abre; sem busca, a
+ * cidade da OBS) e só então monta a página, para os campos nascerem nela.
+ */
+function PaginaDaNovaBusca({ fonte, voltar, aoComecar }: { fonte: FonteDeCampanhas; voltar: () => void; aoComecar: () => void }) {
+  const ultima = useLeitura("ultima-busca", () => fonte.buscasParaEscolher());
+  const localInicial = useMemo(() => localDaUltimaBusca(ultima.dados ?? []), [ultima.dados]);
+  if (!ultima.dados && !ultima.erro) return null;
+  return (
+    <NovaBusca
+      voltar={voltar}
+      localInicial={localInicial}
+      aoBuscar={async (o) => {
+        const r = await fonte.novaBusca(o);
+        if (r.ok) aoComecar();
+        return r;
+      }}
+    />
   );
 }

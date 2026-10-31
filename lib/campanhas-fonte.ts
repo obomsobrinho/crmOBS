@@ -8,7 +8,9 @@ import type {
   LeadDaTabela,
   LeadNaCampanha,
   Pagina,
+  PontoNoMapa,
   PreviaDoFiltro,
+  RecorteDosLeads,
   Resultados,
   RespostaDeIniciar,
   Totais,
@@ -22,6 +24,13 @@ import type { MarcacaoDoLead, ResumoDobrado, SituacaoDaCampanha } from "./prospe
 
 const BASE = "/api/admin/campanhas";
 
+/**
+ * Quanto uma leitura da tela espera antes de virar falha com "Tentar de novo" (bug do
+ * refresh de 30/10/2026: uma leitura sem prazo deixava a tela em "Carregando" para
+ * sempre). Vale para o pedido HTTP (aborta) e para a tela (`useLeitura`).
+ */
+export const LIMITE_DA_LEITURA_MS = 20_000;
+
 class FalhaDaRota extends Error {
   constructor(
     readonly status: number,
@@ -34,6 +43,7 @@ class FalhaDaRota extends Error {
 async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${caminho}`, {
     ...init,
+    signal: AbortSignal.timeout(LIMITE_DA_LEITURA_MS),
     headers: init?.body ? { "Content-Type": "application/json" } : undefined,
     cache: "no-store",
   });
@@ -72,6 +82,9 @@ async function recusaSe4xx<T>(p: Promise<T>): Promise<{ ok: true; valor: T } | {
   }
 }
 
+/** O recorte da tabela de leads na query (o mesmo que `recorteDe` confere na rota). */
+const recorteNaQuery = (p: RecorteDosLeads) => ({ busca: p.buscaId, texto: p.texto, cidade: p.cidade, filtros: p.filtros.join(",") });
+
 const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
 
 /** A fonte de verdade: uma instância por página (sem estado; cada leitura é uma rota). */
@@ -88,10 +101,9 @@ export function fonteDasRotas(): FonteDeCampanhas {
       const r = await recusaSe4xx(pedir<{ id: string }>("/buscas", enviar({ opcoes }, "POST")));
       return r.ok ? { ok: true } : r;
     },
-    leads: (p) =>
-      pedir<Pagina<LeadDaTabela>>(
-        `/leads${q({ busca: p.buscaId, texto: p.texto, cidade: p.cidade, filtros: p.filtros.join(","), pagina: p.pagina })}`,
-      ),
+    leads: (p) => pedir<Pagina<LeadDaTabela>>(`/leads${q({ ...recorteNaQuery(p), pagina: p.pagina })}`),
+    paginaDoLead: async (p, leadId) => (await pedir<{ pagina: number | null }>(`/leads/${leadId}${q(recorteNaQuery(p))}`)).pagina,
+    pontosDaBusca: (buscaId) => pedir<PontoNoMapa[]>(`/buscas/${buscaId}/pontos`),
     cidades: (buscaId) => pedir<string[]>(`/leads${q({ cidades: 1, busca: buscaId })}`),
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),

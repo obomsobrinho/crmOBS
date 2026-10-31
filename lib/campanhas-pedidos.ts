@@ -1,7 +1,10 @@
 import { ehUuid } from "./admin-acesso";
-import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads } from "@/components/admin/campanhas/tipos";
+import type { CampanhaEditavel, FiltroDeContatos, FiltroDosLeads, RecorteDosLeads } from "@/components/admin/campanhas/tipos";
 import {
+  MINIMOS_DE_AVALIACOES,
   QUANTIDADES_POR_TERMO,
+  RAIOS_KM,
+  type AreaDaBusca,
   UFS,
   type FiltroDeSiteDaBusca,
   type NotaMinima,
@@ -18,7 +21,7 @@ import {
 const SITUACOES_DA_BUSCA: SituacaoDaBusca[] = ["buscando", "pronta", "falhou"];
 const SITUACOES_DA_CAMPANHA: SituacaoDaCampanha[] = ["rascunho", "agendada", "rodando", "pausada", "concluida"];
 export const SITUACOES_NA_CAMPANHA: SituacaoNaCampanha[] = ["na_fila", "enviado", "respondeu", "falhou", "parou"];
-const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota"];
+const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota", "nao_reivindicado"];
 export { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA };
 
 /** Um id (uuid) bem formado: a mesma regra das rotas da central (`ehUuid`). */
@@ -45,6 +48,34 @@ export function paginaDe(v: string | null): number | null {
 /** O texto de busca, aparado e com teto (vai a um `like` no SQL, que escapa os curingas). */
 export const textoDe = (v: string | null) => (v ?? "").trim().slice(0, 100);
 
+/**
+ * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b`), o mesmo
+ * da página e da "página do lead"; o motivo (string) quando algo veio torto.
+ */
+export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
+  const busca = q.get("busca");
+  if (busca !== null && !ehId(busca)) return "busca inválida";
+  const filtros = (q.get("filtros") ?? "").split(",").filter(Boolean);
+  if (!filtros.every(ehFiltroDosLeads)) return "filtro inválido";
+  const cidade = q.get("cidade");
+  return { buscaId: busca, texto: textoDe(q.get("texto")), cidade: cidade ? cidade.slice(0, 120) : null, filtros };
+}
+
+/**
+ * A área ajustada no mapa: null (a cidade inteira), um círculo válido, ou undefined
+ * quando veio torta. Centro dentro de uma caixa larga em volta do Brasil; raio da lista.
+ */
+export function areaDe(v: unknown): AreaDaBusca | null | undefined {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "object") return undefined;
+  const o = v as Record<string, unknown>;
+  const { lat, lng, raioKm } = o;
+  if (typeof lat !== "number" || typeof lng !== "number" || typeof raioKm !== "number") return undefined;
+  if (lat < -34 || lat > 6 || lng < -74.5 || lng > -28.5) return undefined;
+  if (!(RAIOS_KM as readonly number[]).includes(raioKm)) return undefined;
+  return { lat, lng, raioKm };
+}
+
 /** As opções da "Nova busca" vindas do navegador, conferidas campo a campo; null quando algo está fora. */
 export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (v === null || typeof v !== "object") return null;
@@ -57,13 +88,24 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (!(QUANTIDADES_POR_TERMO as readonly unknown[]).includes(o.porTermo)) return null;
   if (!notas.includes(o.notaMinima as NotaMinima) || !sites.includes(o.site as FiltroDeSiteDaBusca)) return null;
   if (typeof o.ignorarFechados !== "boolean" || typeof o.buscarContatos !== "boolean") return null;
+  if (o.cidadeIbge !== null && (typeof o.cidadeIbge !== "number" || !Number.isInteger(o.cidadeIbge))) return null;
+  const minimo = MINIMOS_DE_AVALIACOES.find((m) => m === o.minAvaliacoes);
+  if (minimo === undefined) return null;
+  const categorias = Array.isArray(o.categorias) ? o.categorias.filter((c): c is string => typeof c === "string").map((c) => c.trim().slice(0, 60)) : null;
+  if (!categorias || categorias.length > 10) return null;
+  const area = areaDe(o.area);
+  if (area === undefined) return null;
   return {
     termos,
     cidade: o.cidade.trim().slice(0, 80),
     uf: o.uf,
+    cidadeIbge: o.cidadeIbge,
+    area,
     porTermo: o.porTermo as number,
     notaMinima: o.notaMinima as NotaMinima,
     site: o.site as FiltroDeSiteDaBusca,
+    minAvaliacoes: minimo,
+    categorias: categorias.filter(Boolean),
     ignorarFechados: o.ignorarFechados,
     buscarContatos: o.buscarContatos,
   };

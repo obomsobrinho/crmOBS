@@ -1,5 +1,17 @@
 import { test, expect } from "@playwright/test";
 import {
+  PESOS_PROVISORIOS,
+  UFS,
+  custoMinimoDaBuscaUsd,
+  detalhesDaLinha,
+  proximoRaio,
+  textoDoLocal,
+  categoriasSugeridas,
+  estadoNoMapa,
+  ganchosDoHorario,
+  lerHorarios,
+  problemasDaBusca,
+  textosDosGanchos,
   JANELA,
   LINHA_DE_SAIDA,
   OPCOES_PADRAO,
@@ -37,7 +49,11 @@ import {
 } from "../lib/prospeccao";
 import { entradaApify, itemDoApify, leituraDoStatus, webhooksDaExecucao } from "../lib/apify-campos";
 import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
-import { filtroDe, opcoesDe, paginaDe, rascunhoDe, textoDe } from "../lib/campanhas-pedidos";
+import arquivoDeMunicipios from "../lib/dados/municipios.json";
+import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
+import { normalizar } from "../lib/clientes";
+import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, textoDe } from "../lib/campanhas-pedidos";
+import { localDaUltimaBusca } from "../components/admin/campanhas/tipos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
 import { dadosDeMentira } from "../app/design/campanhas/dados";
 
@@ -360,7 +376,7 @@ test.describe("Gêmeos do SQL (resultadoDasLinhas, serieDasLinhas, resumoDasLinh
 test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () => {
   const opcoes: OpcoesDaBusca = { ...OPCOES_PADRAO, termos: ["clínica de estética", " estética "], cidade: "Mutum", uf: "MG", notaMinima: 4.5, site: "sem_site" };
 
-  test("a entrada do actor: termos aparados, cidade com o estado, teto por termo e os filtros", () => {
+  test("a entrada do actor: termos aparados, \"Cidade, UF, Brasil\", teto por termo; nota, site e avaliações ficam de fora", () => {
     expect(entradaApify(opcoes)).toEqual({
       searchStringsArray: ["clínica de estética", "estética"],
       locationQuery: "Mutum, MG, Brasil",
@@ -368,10 +384,18 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
       language: "pt-BR",
       skipClosedPlaces: true,
       scrapeContacts: false,
-      website: "withoutWebsite",
-      placeMinimumStars: "fourAndHalf",
     });
-    expect(entradaApify({ ...opcoes, notaMinima: null, site: "todos" })).not.toHaveProperty("placeMinimumStars");
+    // Nota, site e avaliações custam US$ 0,001 por empresa na fonte: são filtrados do nosso lado.
+    const entrada = entradaApify({ ...opcoes, minAvaliacoes: 30 });
+    for (const pago of ["placeMinimumStars", "website", "categoryFilterWords"]) expect(entrada).not.toHaveProperty(pago);
+  });
+
+  test("\"Só desta categoria\" marcada vai à fonte como categoryFilterWords (pago) e entra no custo; sem ela, nada", () => {
+    expect(entradaApify({ ...opcoes, categorias: ["Clínica de estética", "Spa"] }).categoryFilterWords).toEqual(["Clínica de estética", "Spa"]);
+    expect(entradaApify({ ...opcoes, categorias: [] })).not.toHaveProperty("categoryFilterWords");
+    // 2 termos x 50 = 100 lugares: US$ 0,15 pela tabela, mais US$ 0,001 por lugar com o filtro.
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: [] })).toBeCloseTo(0.15, 6);
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: ["Spa"] })).toBeCloseTo(0.25, 6);
   });
 
   test("o webhook da execução: vai em base64 na query, com o segredo num header e nunca na URL", () => {
@@ -417,12 +441,54 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
       avaliacoes: 212,
       fechado: false,
     });
-    expect(item.pontuacao).toBe(100);
+    // Sem site próprio, segmento, avaliações e nota: tudo menos perfil e horário (que este lugar não trouxe).
+    expect(item.pontuacao).toBe(100 - PESOS_PROVISORIOS.perfilNaoReivindicado - PESOS_PROVISORIOS.horario);
     // Lixo não quebra: vira um lead sem nada, que nunca entra em campanha.
     expect(itemDoApify(null, "barbearia")).toMatchObject({ nome: "Sem nome", segmento: "barbearia", telefone: null, nota: null });
     expect(itemDoApify({ title: "X", totalScore: 0, phone: "(33) 3333-0001" }, "x")).toMatchObject({ nota: null, telefone: null, tipo_telefone: "fixo" });
     // O que vai ao banco não leva o campo "fechado".
     expect(itemParaOBanco(item)).not.toHaveProperty("fechado");
+  });
+
+  test("os detalhes vão ao banco nas 8 colunas novas e voltam iguais (o jsonb ida e volta)", () => {
+    const item = itemDoApify(
+      {
+        title: "Padaria Teste",
+        categoryName: "Padaria",
+        categories: ["Padaria", "Confeitaria"],
+        address: "Rua Exemplo, 1, Centro",
+        phone: "+5533999990021",
+        location: { lat: -19.8121, lng: -41.4407 },
+        claimThisBusiness: true,
+        openingHours: [{ day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" }],
+        reviewsDistribution: { oneStar: 0, twoStar: 1, threeStar: 0, fourStar: 3, fiveStar: 20 },
+        imagesCount: 7,
+        instagrams: ["https://instagram.com/padariateste"],
+      },
+      "padaria",
+    );
+    const banco = itemParaOBanco(item);
+    expect(banco).toMatchObject({
+      lat: -19.8121,
+      lng: -41.4407,
+      reivindicado: false,
+      distribuicao_notas: { 1: 0, 2: 1, 3: 0, 4: 3, 5: 20 },
+      fotos: 7,
+      categorias: ["Padaria", "Confeitaria"],
+      instagram: "@padariateste",
+    });
+    // O que o SQL devolve: jsonb como veio, numeric às vezes como texto.
+    const linha = JSON.parse(JSON.stringify(banco));
+    expect(detalhesDaLinha({ ...linha, lat: String(linha.lat), endereco: "Rua Exemplo, 1, Centro" })).toEqual(item.detalhes);
+  });
+
+  test("detalhesDaLinha: um lead de antes (tudo null) e jsonb torto não quebram", () => {
+    const vazio = { lat: null, lng: null, reivindicado: null, horarios: null, distribuicao_notas: null, fotos: null, categorias: null, instagram: null, endereco: null };
+    expect(detalhesDaLinha(vazio)).toEqual({ lat: null, lng: null, reivindicado: null, horarios: null, distribuicao: null, fotos: null, categorias: [], endereco: null, instagram: null });
+    const torto = detalhesDaLinha({ ...vazio, lat: "x", horarios: [{ dow: 9, faixas: [] }, { dow: 1, faixas: [[480, "y"], [600, 720]] }, "z"], distribuicao_notas: [1, 2] });
+    expect(torto.lat).toBeNull();
+    expect(torto.horarios).toEqual([{ dow: 1, faixas: [[600, 720]] }]);
+    expect(torto.distribuicao).toBeNull();
   });
 
   test("filtrarPelasOpcoes aplica nota, site e fechadas do nosso lado e tira os repetidos", () => {
@@ -441,6 +507,55 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
       "C",
       "D",
     ]);
+  });
+
+  test("mínimo de avaliações e \"Só desta categoria\" do nosso lado (o dentista da busca de estética sai)", () => {
+    const livre = { ...opcoes, notaMinima: null, site: "todos" as const };
+    const itens = [
+      itemDoApify({ title: "Estética A", categoryName: "Clínica de estética", reviewsCount: 50, phone: "+5533999990011", placeId: "q1" }, "estética"),
+      itemDoApify({ title: "Odonto B", categoryName: "Dentista", reviewsCount: 80, phone: "+5533999990012", placeId: "q2" }, "estética"),
+      itemDoApify({ title: "Spa C", categoryName: "Spa", categories: ["Spa", "Clínica de Estética"], reviewsCount: 5, phone: "+5533999990013", placeId: "q3" }, "estética"),
+    ];
+    expect(filtrarPelasOpcoes(itens, { ...livre, categorias: ["clinica de estetica"] }).map((i) => i.nome)).toEqual(["Estética A", "Spa C"]);
+    expect(filtrarPelasOpcoes(itens, { ...livre, minAvaliacoes: 30 }).map((i) => i.nome)).toEqual(["Estética A", "Odonto B"]);
+    expect(filtrarPelasOpcoes(itens, livre)).toHaveLength(3);
+  });
+
+  test("os detalhes grátis da fonte: coordenadas, perfil não reivindicado, horário, notas, fotos, categorias e o @", () => {
+    const item = itemDoApify(
+      {
+        title: "Clínica Bela",
+        categoryName: "Clínica de estética",
+        categories: ["Clínica de estética", "Spa"],
+        phone: "+5533999990001",
+        location: { lat: -19.81, lng: -41.44 },
+        claimThisBusiness: true,
+        openingHours: [
+          { day: "segunda-feira", hours: "08:00–12:00, 14:00–18:00" },
+          { day: "terça-feira", hours: "08:00–12:00, 14:00–18:00" },
+          { day: "sábado", hours: "Fechado" },
+        ],
+        reviewsDistribution: { oneStar: 1, twoStar: 0, threeStar: 2, fourStar: 10, fiveStar: 60 },
+        imagesCount: 42,
+        instagrams: ["https://www.instagram.com/p/Cx9abc/", "https://instagram.com/clinicabela"],
+      },
+      "estética",
+    );
+    expect(item.detalhes).toMatchObject({
+      lat: -19.81,
+      lng: -41.44,
+      reivindicado: false,
+      distribuicao: { 1: 1, 2: 0, 3: 2, 4: 10, 5: 60 },
+      fotos: 42,
+      categorias: ["Clínica de estética", "Spa"],
+      instagram: "@clinicabela",
+    });
+    expect(item.detalhes.horarios?.find((h) => h.dow === 1)?.faixas).toEqual([
+      [480, 720],
+      [840, 1080],
+    ]);
+    // Sem nada disso, os detalhes ficam vazios e nada quebra.
+    expect(itemDoApify({ title: "X" }, "x").detalhes).toMatchObject({ lat: null, reivindicado: null, horarios: null, distribuicao: null, categorias: [] });
   });
 
   test("leituraDoStatus: rodando espera, terminado bem lê o dataset, o resto falha com uma frase", () => {
@@ -482,5 +597,186 @@ test.describe("Pedidos das rotas (lib/campanhas-pedidos.ts): o que não confere 
     expect(rascunhoDe(id, { ...r, variantes: ["a", "b", "c", "d"] })).toBeNull();
     expect(rascunhoDe(id, { ...r, conexaoId: "obs" })).toBeNull();
     expect(rascunhoDe(id, { ...r, agendadaPara: "amanhã" })).toBeNull();
+  });
+});
+
+test.describe("Horário, pontuação nova e o mapa (revisão de 30/10/2026)", () => {
+  test("o formato real da fonte com language pt-BR (busca de 30/10/2026): \"07:30 to 12:30, 13:30 to 19:00\" e \"Fechado\"", () => {
+    const dias = lerHorarios([
+      { day: "segunda-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "terça-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "quarta-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "quinta-feira", hours: "07:30 to 12:30, 13:30 to 19:00" },
+      { day: "sexta-feira", hours: "07:30 to 12:30, 13:30 to 17:00" },
+      { day: "sábado", hours: "Fechado" },
+      { day: "domingo", hours: "Fechado" },
+    ]);
+    expect(dias).toHaveLength(7);
+    expect(dias?.[0]).toEqual({ dow: 1, faixas: [[450, 750], [810, 1140]] });
+    expect(dias?.find((d) => d.dow === 6)?.faixas).toEqual([]);
+    expect(ganchosDoHorario(dias)).toEqual({ fechaCedo: true, naoAbreSabado: true, fechaNoAlmoco: true });
+    // Com o horário real, o gancho do Atenda pontua.
+    const p = pontuarLead({ telefone: null, segmento: "padaria", site: "https://padaria.exemplo", nota: null, avaliacoes: null, horarios: dias });
+    expect(p.pontos).toBe(PESOS_PROVISORIOS.horario);
+  });
+
+  test("lerHorarios entende português e inglês, fechado e 24 horas; dia que não entende fica de fora", () => {
+    const h = lerHorarios([
+      { day: "Monday", hours: "8 AM to 6 PM" },
+      { day: "terça-feira", hours: "08:30–17:30" },
+      { day: "quarta-feira", hours: "08:00 às 12:00, 14:00 às 18:00" },
+      { day: "domingo", hours: "Fechado" },
+      { day: "sábado", hours: "Aberto 24 horas" },
+      { day: "feriado", hours: "08:00–12:00" },
+      { day: "quinta-feira", hours: "consulte" },
+    ]);
+    expect(h).toEqual([
+      { dow: 1, faixas: [[480, 1080]] },
+      { dow: 2, faixas: [[510, 1050]] },
+      { dow: 3, faixas: [[480, 720], [840, 1080]] },
+      { dow: 6, faixas: [[0, 1440]] },
+      { dow: 0, faixas: [] },
+    ]);
+    expect(lerHorarios(null)).toBeNull();
+    expect(lerHorarios([{ day: "x", hours: "y" }])).toBeNull();
+  });
+
+  test("os ganchos do horário: fecha cedo, não abre sábado, fecha no almoço", () => {
+    const uteis = (faixas: [number, number][]) => [1, 2, 3, 4, 5].map((dow) => ({ dow, faixas }));
+    expect(ganchosDoHorario([...uteis([[480, 1080]]), { dow: 6, faixas: [[480, 720]] }])).toEqual({
+      fechaCedo: false,
+      naoAbreSabado: false,
+      fechaNoAlmoco: false,
+    });
+    expect(ganchosDoHorario([...uteis([[540, 1050]]), { dow: 6, faixas: [] }])).toEqual({ fechaCedo: true, naoAbreSabado: true, fechaNoAlmoco: false });
+    expect(ganchosDoHorario(uteis([[480, 720], [840, 1080]]))).toEqual({ fechaCedo: false, naoAbreSabado: true, fechaNoAlmoco: true });
+    expect(ganchosDoHorario(null)).toBeNull();
+    expect(textosDosGanchos({ fechaCedo: true, naoAbreSabado: true, fechaNoAlmoco: false })).toEqual(["Fecha antes das 18h", "Não abre no sábado"]);
+  });
+
+  test("pontuarLead: perfil não reivindicado e horário curto entram, com o motivo; os pesos somam 100", () => {
+    expect(Object.values(PESOS_PROVISORIOS).reduce((a, b) => a + b, 0)).toBe(100);
+    const base = { telefone: "(33) 99999-0001", segmento: "padaria", site: "padaria.com.br", nota: 4, avaliacoes: 10 };
+    expect(pontuarLead(base)).toEqual({ pontos: 0, motivos: [] });
+    const p = pontuarLead({ ...base, reivindicado: false, horarios: [1, 2, 3, 4, 5].map((dow) => ({ dow, faixas: [[480, 1020]] as [number, number][] })) });
+    expect(p.pontos).toBe(PESOS_PROVISORIOS.perfilNaoReivindicado + PESOS_PROVISORIOS.horario);
+    expect(p.motivos).toEqual(["Perfil do Google não reivindicado pelo dono", "Fecha antes das 18h, Não abre no sábado: perde cliente fora do horário"]);
+    // Não saber (null) não pontua.
+    expect(pontuarLead({ ...base, reivindicado: null, horarios: null }).pontos).toBe(0);
+  });
+
+  test("estadoNoMapa: respondeu ganha de contatado, que ganha da marcação do dono", () => {
+    expect(estadoNoMapa({ respondeu: true, campanhas: 1, marcacao: "descartado" })).toBe("respondeu");
+    expect(estadoNoMapa({ respondeu: false, campanhas: 2, marcacao: "bom" })).toBe("contatado");
+    expect(estadoNoMapa({ respondeu: false, campanhas: 0, marcacao: "descartado" })).toBe("descartado");
+    expect(estadoNoMapa({ respondeu: false, campanhas: 0, marcacao: "bom" })).toBe("bom");
+    expect(estadoNoMapa({ respondeu: false, campanhas: 0, marcacao: null })).toBe("nao_contatado");
+  });
+
+  test("as cidades: a lista do IBGE, busca sem acento e sem caixa, só da UF, \"Cidade, UF, Brasil\"", () => {
+    const porUf = municipiosDoArquivo(arquivoDeMunicipios);
+    expect(Object.keys(porUf).sort()).toEqual([...UFS].sort());
+    const total = Object.values(porUf).reduce((a, l) => a + l.length, 0);
+    expect(total).toBeGreaterThanOrEqual(5570);
+    const mg = porUf.MG;
+    for (const digitado of ["mutum", "Mutúm", "MUTUM", " mutu"]) expect(buscarCidades(mg, digitado)[0]?.nome, digitado).toBe("Mutum");
+    // Só as da UF: "Mutum" não existe no ES.
+    expect(buscarCidades(porUf.ES, "mutum")).toEqual([]);
+    // Quem começa com o texto vem antes de quem só o contém.
+    const sao = buscarCidades(mg, "sao j").map((c) => c.nome);
+    expect(sao.every((n) => normalizar(n).includes("sao j"))).toBe(true);
+    expect(normalizar(sao[0]).startsWith("sao j")).toBe(true);
+    const mutum = cidadeDoCodigo(porUf, "MG", 3144003);
+    expect(mutum?.nome).toBe("Mutum");
+    expect(cidadeDoCodigo(porUf, "ES", 3144003)).toBeNull();
+    expect(localDaBusca({ cidade: "Mutum", uf: "MG" })).toBe("Mutum, MG, Brasil");
+  });
+
+  test("a busca exige a cidade DA LISTA; as categorias sugeridas saem do segmento", () => {
+    const o = { ...OPCOES_PADRAO, termos: ["clínica de estética"], cidade: "Mutum", uf: "MG" };
+    expect(problemasDaBusca({ ...o, cidadeIbge: null })).toEqual(["Escolha a cidade na lista"]);
+    expect(problemasDaBusca({ ...o, cidadeIbge: 3144003 })).toEqual([]);
+    expect(problemasDaBusca({ ...o, uf: "", cidadeIbge: null })).toEqual(["Falta o estado"]);
+    const sugestoes = categoriasSugeridas(["clínica de estética"]);
+    expect(sugestoes).toContain("Clínica de estética");
+    expect(sugestoes).toContain("Esteticista");
+    expect(new Set(sugestoes.map(normalizar)).size).toBe(sugestoes.length);
+    expect(categoriasSugeridas(["padaria"])).toEqual(["Padaria"]);
+  });
+});
+
+test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmado no run Rfb0VfmDckdMIbiwT)", () => {
+  const base = { ...OPCOES_PADRAO, termos: ["padaria"], cidade: "Mutum", uf: "MG", cidadeIbge: 3144003 };
+
+  test("com área: customGeolocation com LONGITUDE primeiro e sem locationQuery; sem área: só a cidade", () => {
+    const comArea = entradaApify({ ...base, area: { lat: -19.8121, lng: -41.4407, raioKm: 2 } });
+    expect(comArea.customGeolocation).toEqual({ type: "Point", coordinates: [-41.4407, -19.8121], radiusKm: 2 });
+    expect(comArea).not.toHaveProperty("locationQuery");
+    const semArea = entradaApify({ ...base, area: null });
+    expect(semArea.locationQuery).toBe("Mutum, MG, Brasil");
+    expect(semArea).not.toHaveProperty("customGeolocation");
+  });
+
+  test("o raio anda pela lista e não sai dela; o texto do local mostra o raio", () => {
+    expect(proximoRaio(5, 1)).toBe(8);
+    expect(proximoRaio(5, -1)).toBe(3);
+    expect(proximoRaio(1, -1)).toBe(1);
+    expect(proximoRaio(50, 1)).toBe(50);
+    expect(proximoRaio(4, 1)).toBe(8);
+    expect(textoDoLocal({ cidade: "Mutum", uf: "MG", area: null })).toBe("Mutum, MG");
+    expect(textoDoLocal({ cidade: "Mutum", uf: "MG", area: { lat: 0, lng: 0, raioKm: 5 } })).toBe("Mutum, MG · raio de 5 km");
+  });
+
+  test("a cidade mais próxima pela sede: Mutum no centro dela, outra cidade longe, em qualquer UF", () => {
+    const porUf = municipiosDoArquivo(arquivoDeMunicipios);
+    const mutum = cidadeDoCodigo(porUf, "MG", 3144003);
+    if (!mutum?.lat || !mutum.lng) throw new Error("Mutum sem coordenadas");
+    expect(cidadeMaisProxima(porUf, { lat: mutum.lat, lng: mutum.lng })?.nome).toBe("Mutum");
+    // 25 km a leste de Mutum já é a sede de outra cidade.
+    const longe = cidadeMaisProxima(porUf, { lat: mutum.lat, lng: mutum.lng + 0.24 });
+    expect(longe?.ibge).not.toBe(3144003);
+    // Vitória (ES) no ponto dela, mesmo partindo de uma busca em MG.
+    expect(cidadeMaisProxima(porUf, { lat: -20.3155, lng: -40.3128 })?.uf).toBe("ES");
+    expect(Math.round(distanciaKm({ lat: -19.8121, lng: -41.4407 }, { lat: -19.8121, lng: -41.4407 }))).toBe(0);
+    expect(Math.round(distanciaKm({ lat: 0, lng: 0 }, { lat: 1, lng: 0 }))).toBe(111);
+  });
+
+  test("o servidor confere a área: raio da lista, centro no Brasil; sem área é a cidade inteira", () => {
+    expect(areaDe(null)).toBeNull();
+    expect(areaDe({ lat: -19.8, lng: -41.4, raioKm: 5 })).toEqual({ lat: -19.8, lng: -41.4, raioKm: 5 });
+    expect(areaDe({ lat: -19.8, lng: -41.4, raioKm: 7 })).toBeUndefined();
+    expect(areaDe({ lat: 40.7, lng: -74, raioKm: 5 })).toBeUndefined();
+    expect(areaDe("x")).toBeUndefined();
+    expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 2 } })?.area).toEqual({ lat: -19.8, lng: -41.4, raioKm: 2 });
+    expect(opcoesDe({ ...base, area: { lat: -19.8, lng: -41.4, raioKm: 999 } })).toBeNull();
+  });
+
+  test("o recorte da tabela na query: busca uuid, filtros da lista (com \"Perfil não reivindicado\"), cidade e texto com teto", () => {
+    const id = "6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
+    expect(recorteDe(new URLSearchParams({ busca: id, filtros: "nao_reivindicado,bons", cidade: "Mutum", texto: "  bela " }))).toEqual({
+      buscaId: id,
+      texto: "bela",
+      cidade: "Mutum",
+      filtros: ["nao_reivindicado", "bons"],
+    });
+    expect(recorteDe(new URLSearchParams())).toEqual({ buscaId: null, texto: "", cidade: null, filtros: [] });
+    expect(recorteDe(new URLSearchParams({ busca: "x" }))).toBe("busca inválida");
+    expect(recorteDe(new URLSearchParams({ filtros: "nao_reivindicado,todos" }))).toBe("filtro inválido");
+  });
+
+  test("a Nova busca abre na cidade da última busca com cidade da lista; sem nenhuma, null (a cidade da OBS)", () => {
+    const busca = (cidadeIbge: number | null, uf: string) => ({
+      id: "b",
+      termo: "x",
+      cidade: "c",
+      criadaEm: 0,
+      situacao: "pronta" as const,
+      total: 0,
+      erro: null,
+      opcoes: { ...base, uf, cidadeIbge },
+    });
+    expect(localDaUltimaBusca([busca(null, "MG"), busca(3112406, "MG"), busca(3144003, "MG")])).toEqual({ uf: "MG", ibge: 3112406 });
+    expect(localDaUltimaBusca([busca(null, "MG")])).toBeNull();
+    expect(localDaUltimaBusca([])).toBeNull();
   });
 });

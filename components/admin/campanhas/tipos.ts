@@ -2,10 +2,13 @@ import type { PeriodoKey } from "@/lib/periodo";
 import {
   podeEntrarNaCampanha,
   siteDoLead,
+  type DetalhesDoLead,
   type DiaDeEnvio,
+  type EstadoNoMapa,
   type MarcacaoDoLead,
   type ResultadoDaCampanha,
   type ResultadoDobrado,
+  type SinaisDoLead,
   type ResumoDobrado,
   type OpcoesDaBusca,
   type SituacaoDaBusca,
@@ -51,6 +54,8 @@ export interface Lead {
   parouEm: number | null;
   /** As campanhas por onde passou (a marca fica para sempre). */
   campanhaIds: string[];
+  /** O que a fonte trouxe além do básico (a ficha e o mapa); null quando não há. */
+  detalhes: DetalhesDoLead | null;
 }
 
 /** O recorte de leads que a campanha usa (passo Contatos). */
@@ -103,6 +108,8 @@ export interface ConexaoDisponivel {
 /** Onde a central está (as duas abas e as telas de cada uma). */
 export type Tela =
   | { aba: "leads"; busca: string | null }
+  /** A página da Nova busca (o mapa grande e os campos ao lado), com voltar para Leads. */
+  | { aba: "leads"; nova: true }
   | { aba: "campanhas"; vista: "lista" }
   | { aba: "campanhas"; vista: "detalhe" | "editar"; id: string };
 
@@ -151,10 +158,32 @@ export interface BuscaDaTabela extends Busca {
 export interface LeadDaTabela extends Lead {
   campanhas: { id: string; nome: string }[];
   respondeu: boolean;
+  /**
+   * A pontuação GRAVADA (a que ordena a tabela): um lead de antes dos pesos de hoje fica com a
+   * dele até uma busca nova achá-lo. Ausente (o preview) = calculada na hora.
+   */
+  pontuacao?: number;
 }
 
 /** Os recortes do botão de filtro da tabela de leads. */
-export type FiltroDosLeads = "nao_contatados" | "bons" | "sem_site" | "nota";
+export type FiltroDosLeads = "nao_contatados" | "bons" | "sem_site" | "nota" | "nao_reivindicado";
+
+/** Um pino no mapa da busca: o lead, onde está e a cor do estado. */
+export interface PontoNoMapa {
+  id: string;
+  nome: string;
+  lat: number;
+  lng: number;
+  estado: EstadoNoMapa;
+}
+
+/** O recorte da tabela de leads (o mesmo da leitura de uma página). */
+export interface RecorteDosLeads {
+  buscaId: string | null;
+  texto: string;
+  cidade: string | null;
+  filtros: FiltroDosLeads[];
+}
 
 /** A campanha sem os envios: o que o assistente edita e o topo do detalhe mostra. */
 export type CampanhaEditavel = Omit<Campanha, "envios">;
@@ -211,6 +240,17 @@ export interface Totais {
   campanhas: Record<SituacaoDaCampanha, number>;
 }
 
+/**
+ * O que a página de verdade já leu no servidor para a primeira tela (aba Leads): os
+ * totais, a primeira página de buscas e o painel da base. Um refresh já chega com
+ * os números no HTML; cada peça que falhou no servidor vem null e a tela lê de novo.
+ */
+export interface InicialDaCentral {
+  totais: Totais | null;
+  buscas: Pagina<BuscaDaTabela> | null;
+  painel: ResumoDobrado | null;
+}
+
 export type RespostaDeIniciar = { ok: true; situacao: SituacaoDaCampanha } | { ok: false; erro: string };
 
 /** De onde as telas de Campanhas leem e para onde escrevem. */
@@ -222,7 +262,11 @@ export interface FonteDeCampanhas {
   buscasParaEscolher(): Promise<Busca[]>;
   busca(id: string): Promise<Busca | null>;
   novaBusca(o: OpcoesDaBusca): Promise<{ ok: true } | { ok: false; erro: string }>;
-  leads(p: { buscaId: string | null; texto: string; cidade: string | null; filtros: FiltroDosLeads[]; pagina: number }): Promise<Pagina<LeadDaTabela>>;
+  leads(p: RecorteDosLeads & { pagina: number }): Promise<Pagina<LeadDaTabela>>;
+  /** Em que página do recorte o lead está (o pino clicado leva a tabela até ele); null = fora do recorte. */
+  paginaDoLead(p: RecorteDosLeads, leadId: string): Promise<number | null>;
+  /** Os pinos de uma busca (todos os leads dela que têm coordenadas). */
+  pontosDaBusca(buscaId: string): Promise<PontoNoMapa[]>;
   cidades(buscaId: string | null): Promise<string[]>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
@@ -241,7 +285,27 @@ export interface FonteDeCampanhas {
   retomar(id: string): Promise<SituacaoDaCampanha>;
 }
 
+/** Uma cidade da lista do IBGE pela UF e o código: onde o mapa da Nova busca abre. */
+export interface LocalInicial {
+  uf: string;
+  ibge: number;
+}
+
+/**
+ * Onde o mapa da Nova busca abre: a cidade da busca mais recente que tem cidade da lista
+ * (as buscas vêm da mais nova para a mais velha); null = nenhuma, e a página abre na cidade da OBS.
+ */
+export function localDaUltimaBusca(buscas: Busca[]): LocalInicial | null {
+  const opcoes = buscas.find((b) => b.opcoes.cidadeIbge !== null)?.opcoes;
+  return opcoes?.cidadeIbge != null ? { uf: opcoes.uf, ibge: opcoes.cidadeIbge } : null;
+}
+
 /** O total de um registro de contagens por situação (as abas e o "Todas" dos filtros). */
 export function somaDe(contagens: Record<string, number> | null | undefined): number {
   return contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
+}
+
+/** Os sinais da pontuação de um lead, com os detalhes da fonte quando existem. */
+export function sinaisDoLead<L extends Lead>(l: L): L & SinaisDoLead {
+  return { ...l, reivindicado: l.detalhes?.reivindicado ?? null, horarios: l.detalhes?.horarios ?? null };
 }

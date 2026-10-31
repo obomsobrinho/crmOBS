@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
@@ -16,23 +17,25 @@ import {
   FAIXAS_DE_NOTA,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
+  estadoNoMapa,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
+  textoDoLocal,
   tipoDoTelefone,
   type DiaDeEnvio,
-  type OpcoesDaBusca,
   type ResumoDaBase,
   type SemanaContada,
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
-import NovaBusca from "./NovaBusca";
+import FichaDoLead from "./FichaDoLead";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
 import {
+  sinaisDoLead,
   somaDe,
   type Busca,
   type BuscaDaTabela,
@@ -40,8 +43,10 @@ import {
   type ContagemDaBusca,
   type FiltroDosLeads,
   type FonteDeCampanhas,
+  type InicialDaCentral,
   type Lead,
   type LeadDaTabela,
+  type Pagina,
   type Totais,
 } from "./tipos";
 
@@ -49,6 +54,9 @@ import {
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,
 // com busca digitando e o botão de filtro. A busca abre o detalhe com os leads dela.
 // Tudo lido da fonte: páginas e contas no servidor, nunca a base no navegador.
+
+// O mapa (Leaflet) só carrega no navegador e só no detalhe de uma busca.
+const MapaDaBusca = dynamic(() => import("./MapaDaBusca"), { ssr: false });
 
 /** De quanto em quanto tempo a tabela relê uma busca que ainda está rodando na fonte. */
 const RELER_BUSCA_MS = 10_000;
@@ -311,6 +319,7 @@ function TabelaDeBuscas({
   fonte,
   versao,
   contagens,
+  inicial,
   agora,
   abrir,
   aoTerminarBusca,
@@ -319,6 +328,8 @@ function TabelaDeBuscas({
   fonte: FonteDeCampanhas;
   versao: number;
   contagens: Record<SituacaoDaBusca, number> | null;
+  /** A primeira página que o servidor já leu (recorte padrão). */
+  inicial: Pagina<BuscaDaTabela> | null;
   agora: number;
   abrir: (id: string) => void;
   /** Uma busca da página saiu de "buscando": o painel e as contagens leem de novo. */
@@ -328,7 +339,7 @@ function TabelaDeBuscas({
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
   const ler = useCallback((pagina: number) => fonte.buscas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao, inicial);
   const { itens, recarregar } = tabela;
   const buscando = itens.filter((b) => b.situacao === "buscando").map((b) => b.id);
   const chaveBuscando = buscando.join(",");
@@ -400,7 +411,7 @@ function TabelaDeBuscas({
           ))}
         </ul>
       </CorpoDaTabela>
-      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" />
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" lido={tabela.lido} />
     </>
   );
 }
@@ -414,10 +425,11 @@ const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "bons", rotulo: "Marcados como bons" },
   { chave: "sem_site", rotulo: "Sem site próprio" },
   { chave: "nota", rotulo: "Nota 4,5 ou mais" },
+  { chave: "nao_reivindicado", rotulo: "Perfil não reivindicado" },
 ];
 
 const GRADE_LEADS =
-  "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_112px] xl:items-center xl:gap-4";
+  "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_148px] xl:items-center xl:gap-4";
 
 function Telefone({ telefone }: { telefone: string | null }) {
   const tipo = tipoDoTelefone(telefone);
@@ -434,7 +446,21 @@ function Telefone({ telefone }: { telefone: string | null }) {
   );
 }
 
-function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["marcacao"]) => void }) {
+function LinhaDoLead({
+  lead,
+  marcar,
+  abrirFicha,
+  destacada,
+  verNoMapa,
+}: {
+  lead: LeadDaTabela;
+  marcar: (m: Lead["marcacao"]) => void;
+  abrirFicha: () => void;
+  /** O pino deste lead foi clicado no mapa. */
+  destacada: boolean;
+  /** Só no detalhe de uma busca, e só para lead com coordenadas. */
+  verNoMapa: (() => void) | null;
+}) {
   const { respondeu } = lead;
   const descartado = lead.marcacao === "descartado";
   return (
@@ -442,10 +468,16 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
       data-slot="lead-linha"
       data-lead={lead.id}
       data-marcacao={lead.marcacao ?? "nenhuma"}
-      className={`flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 ${GRADE_LEADS} ${descartado ? "opacity-55" : ""}`}
+      data-destaque={destacada || undefined}
+      ref={(el) => {
+        if (el && destacada) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }}
+      className={`flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3.5 data-[destaque]:bg-[var(--active-bg)] ${GRADE_LEADS} ${descartado ? "opacity-55" : ""}`}
     >
       <div className="min-w-0 basis-full xl:basis-auto">
-        <p className="truncate text-corpo font-semibold text-ink">{lead.nome}</p>
+        <Button variant="nu" size="none" onClick={abrirFicha} className="block max-w-full truncate text-left text-corpo font-semibold text-ink hover:underline" data-slot="lead-abrir-ficha">
+          {lead.nome}
+        </Button>
         <p className="truncate text-legenda text-ink-3">
           {lead.bairro}, {lead.cidade}
         </p>
@@ -471,7 +503,7 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
         <Telefone telefone={lead.telefone} />
       </div>
       <div>
-        <SeloDaPontuacao sinais={lead} />
+        <SeloDaPontuacao sinais={sinaisDoLead(lead)} pontos={lead.pontuacao} />
       </div>
       <div className="flex min-w-0 flex-wrap gap-1.5">
         {lead.parouEm !== null ? (
@@ -490,6 +522,11 @@ function LinhaDoLead({ lead, marcar }: { lead: LeadDaTabela; marcar: (m: Lead["m
         )}
       </div>
       <div className="ml-auto flex items-center gap-1 xl:ml-0">
+        {verNoMapa && (
+          <Button variant="ghost" size="icon-chrome" aria-label={`Ver ${lead.nome} no mapa`} onClick={verNoMapa} data-slot="lead-ver-no-mapa">
+            <MapPin aria-hidden />
+          </Button>
+        )}
         <Button
           variant="alternavel"
           size="chip"
@@ -520,13 +557,25 @@ function TabelaDeLeads({
   fonte,
   versao,
   buscaId,
+  destaque = null,
+  focoDoMapa = null,
+  verNoMapa = null,
+  aoMarcar,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
   versao: number;
   /** O escopo: todos os leads (null), ou os de uma busca. */
   buscaId: string | null;
+  /** O lead destacado (pino ou linha). */
+  destaque?: string | null;
+  /** Um pino clicado: a tabela vai até a página dele (a chave muda a cada clique). */
+  focoDoMapa?: { id: string; vez: number } | null;
+  verNoMapa?: ((id: string) => void) | null;
+  /** Uma marcação que valeu (o mapa da busca recolore o pino sem reler). */
+  aoMarcar?: (id: string, m: Lead["marcacao"]) => void;
 }) {
+  const [ficha, setFicha] = useState<LeadDaTabela | null>(null);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [cidade, setCidade] = useState<string | null>(null);
@@ -537,7 +586,23 @@ function TabelaDeLeads({
     [fonte, buscaId, busca, cidade, filtros],
   );
   const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}`, ler, versao);
-  const { mudarItem } = tabela;
+  const { mudarItem, setPagina } = tabela;
+  // Um pino clicado leva a tabela até a página do lead, no recorte que está na tela.
+  useEffect(() => {
+    if (!focoDoMapa) return;
+    let vivo = true;
+    fonte
+      .paginaDoLead({ buscaId, texto: busca, cidade, filtros }, focoDoMapa.id)
+      .then((p) => {
+        if (vivo && p !== null) setPagina(p);
+      })
+      .catch((e) => console.error("leads, página do lead:", e));
+    return () => {
+      vivo = false;
+    };
+    // Só um clique novo (a `vez`) move a tabela; mudar o recorte depois não volta ao lead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the jump answers the click, not later filter changes
+  }, [focoDoMapa]);
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
   const marcar = useCallback(
     async (id: string, m: Lead["marcacao"]) => {
@@ -551,12 +616,13 @@ function TabelaDeLeads({
       try {
         const salva = await fonte.marcar(id, m);
         mudarItem((l) => (l.id === id ? { ...l, marcacao: salva } : l));
+        aoMarcar?.(id, salva);
       } catch (e) {
         console.error("lead, marcar:", e);
         mudarItem((l) => (l.id === id ? { ...l, marcacao: antes } : l));
       }
     },
-    [fonte, mudarItem],
+    [aoMarcar, fonte, mudarItem],
   );
 
   const grupos = [
@@ -607,11 +673,19 @@ function TabelaDeLeads({
       >
         <ul className="divide-y divide-line-soft" data-slot="leads-tabela">
           {tabela.itens.map((l) => (
-            <LinhaDoLead key={l.id} lead={l} marcar={(m) => marcar(l.id, m)} />
+            <LinhaDoLead
+              key={l.id}
+              lead={l}
+              marcar={(m) => marcar(l.id, m)}
+              abrirFicha={() => setFicha(l)}
+              destacada={destaque === l.id}
+              verNoMapa={verNoMapa && l.detalhes?.lat != null ? () => verNoMapa(l.id) : null}
+            />
           ))}
         </ul>
       </CorpoDaTabela>
-      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" />
+      <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" lido={tabela.lido} />
+      <FichaDoLead lead={ficha} aoFechar={() => setFicha(null)} />
     </>
   );
 }
@@ -623,6 +697,7 @@ function HomeDosLeads({
   fonte,
   versao,
   totais,
+  inicial,
   agora,
   rascunho,
   abrir,
@@ -634,6 +709,7 @@ function HomeDosLeads({
   fonte: FonteDeCampanhas;
   versao: number;
   totais: Totais | null;
+  inicial: InicialDaCentral | null;
   agora: number;
   rascunho: CampanhaEditavel | null;
   abrir: (id: string) => void;
@@ -642,18 +718,18 @@ function HomeDosLeads({
   aoTerminarBusca: () => void;
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
-  const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null));
+  const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null), inicial?.painel ?? null);
   const nBuscas = somaDe(totais?.buscas);
   const seletorDaVista = (
     <Tabs value={vista} onValueChange={(v) => setVista(v === "leads" ? "leads" : "buscas")}>
       <TabsList variant="painel" aria-label="Ver por" className="bg-canvas">
         <TabsTrigger value="buscas" variant="painel" data-slot="leads-ver-buscas">
           Buscas
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nBuscas)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nBuscas)}</span>}
         </TabsTrigger>
         <TabsTrigger value="leads" variant="painel" data-slot="leads-ver-todos">
           Todos os leads
-          <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais?.leads ?? 0)}</span>
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -702,6 +778,7 @@ function HomeDosLeads({
                 fonte={fonte}
                 versao={versao}
                 contagens={totais?.buscas ?? null}
+                inicial={inicial?.buscas ?? null}
                 agora={agora}
                 abrir={abrir}
                 aoTerminarBusca={aoTerminarBusca}
@@ -732,6 +809,22 @@ function DetalheDaBusca({
   criarCampanha: () => void;
 }) {
   const { dados: painel } = useLeitura(`painel-busca|${busca.id}|${versao}`, () => fonte.painelDaBase(busca.id));
+  const { dados: lidos } = useLeitura(`pontos|${busca.id}|${versao}`, () => fonte.pontosDaBusca(busca.id));
+  // A marcação feita na tabela recolore o pino na hora (respondeu e contatado ganham da marcação).
+  const [marcas, setMarcas] = useState<Record<string, Lead["marcacao"]>>({});
+  const aoMarcar = useCallback((id: string, m: Lead["marcacao"]) => setMarcas((atual) => ({ ...atual, [id]: m })), []);
+  const pontos = useMemo(
+    () =>
+      lidos?.map((p) =>
+        p.id in marcas && (p.estado === "nao_contatado" || p.estado === "bom" || p.estado === "descartado")
+          ? { ...p, estado: estadoNoMapa({ respondeu: false, campanhas: 0, marcacao: marcas[p.id] }) }
+          : p,
+      ) ?? null,
+    [lidos, marcas],
+  );
+  // O destaque e de onde ele veio: do mapa (a tabela vai até a linha) ou da tabela (o mapa vai até o pino).
+  const [destaque, setDestaque] = useState<{ id: string; origem: "mapa" | "tabela"; vez: number } | null>(null);
+  const destacar = useCallback((id: string, origem: "mapa" | "tabela") => setDestaque((d) => ({ id, origem, vez: (d?.vez ?? 0) + 1 })), []);
   return (
     <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
@@ -749,13 +842,35 @@ function DetalheDaBusca({
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}
-        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, `${busca.cidade}, ${busca.opcoes.uf}`, ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
+        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, textoDoLocal({ ...busca.opcoes, cidade: busca.cidade }), ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
       />
 
       {painel && <PainelDaBusca r={painel.resumo} respostasPorDia={painel.respostasPorDia} />}
 
+      {pontos && pontos.length > 0 && (
+        <Card variant="conteudo" className="p-5" data-bloco="busca-mapa">
+          <CabecalhoDoGrafico titulo="No mapa" />
+          <MapaDaBusca
+            pontos={pontos}
+            destaque={destaque?.id ?? null}
+            centralizar={destaque?.origem === "tabela"}
+            aoEscolher={(id) => destacar(id, "mapa")}
+            area={busca.opcoes.area}
+          />
+        </Card>
+      )}
+
       <Card variant="conteudo" className="overflow-hidden" data-bloco="busca-tabela">
-        <TabelaDeLeads esquerda={<h3 className="text-cartao text-ink">Leads</h3>} fonte={fonte} versao={versao} buscaId={busca.id} />
+        <TabelaDeLeads
+          esquerda={<h3 className="text-cartao text-ink">Leads</h3>}
+          fonte={fonte}
+          versao={versao}
+          buscaId={busca.id}
+          destaque={destaque?.id ?? null}
+          focoDoMapa={destaque?.origem === "mapa" ? destaque : null}
+          verNoMapa={pontos && pontos.length > 0 ? (id) => destacar(id, "tabela") : null}
+          aoMarcar={aoMarcar}
+        />
       </Card>
     </div>
   );
@@ -768,11 +883,13 @@ function AbaLeads({
   fonte,
   versao,
   totais,
+  inicial,
   agora,
   buscaAberta,
   rascunho,
   abrirBusca,
   aoMudar,
+  novaBusca,
   criarCampanhaDaBusca,
   voltarAoRascunho,
 }: {
@@ -782,38 +899,23 @@ function AbaLeads({
   /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
   versao: number;
   totais: Totais | null;
+  /** O que o servidor já leu (painel e primeira página de buscas). */
+  inicial: InicialDaCentral | null;
   agora: number;
   buscaAberta: string | null;
   rascunho: CampanhaEditavel | null;
   abrirBusca: (id: string | null) => void;
-  /** Depois de uma escrita que muda números de outras telas (nova busca, busca que terminou). */
+  /** Depois de uma escrita que muda números de outras telas (uma busca que terminou). */
   aoMudar: () => void;
+  /** Abre a página da Nova busca. */
+  novaBusca: () => void;
   criarCampanhaDaBusca: (busca: Busca) => void;
   voltarAoRascunho: () => void;
 }) {
-  const [dialogo, setDialogo] = useState(false);
-  const [falha, setFalha] = useState<string | null>(null);
   const aberta = useLeitura(`busca|${buscaAberta ?? ""}`, () => (buscaAberta ? fonte.busca(buscaAberta) : Promise.resolve(null)));
   const busca = buscaAberta && aberta.dados?.id === buscaAberta ? aberta.dados : null;
-  const buscar = async (o: OpcoesDaBusca) => {
-    setDialogo(false);
-    setFalha(null);
-    try {
-      const r = await fonte.novaBusca(o);
-      if (!r.ok) setFalha(r.erro);
-    } catch (e) {
-      console.error("nova busca:", e);
-      setFalha("Não deu para começar a busca agora. Tente de novo em instantes.");
-    }
-    aoMudar();
-  };
   return (
     <>
-      {falha && (
-        <Aviso tom="danger" forma="faixa" className="mb-4" data-bloco="leads-falha">
-          {falha}
-        </Aviso>
-      )}
       {busca ? (
         <DetalheDaBusca
           abas={abas}
@@ -829,15 +931,15 @@ function AbaLeads({
           fonte={fonte}
           versao={versao}
           totais={totais}
+          inicial={inicial}
           agora={agora}
           rascunho={rascunho}
           abrir={abrirBusca}
-          novaBusca={() => setDialogo(true)}
+          novaBusca={novaBusca}
           voltarAoRascunho={voltarAoRascunho}
           aoTerminarBusca={aoMudar}
         />
       )}
-      <NovaBusca aberto={dialogo} aoMudar={setDialogo} aoBuscar={buscar} />
     </>
   );
 }

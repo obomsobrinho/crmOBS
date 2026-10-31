@@ -22,6 +22,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
+    "leaflet": "1.9.4",
     "lucide-react": "^0.460.0",
     "mammoth": "^1.12.0",
     "next": "16.2.11",
@@ -36,6 +37,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "1.9.12",
     "@types/node": "^20.19.43",
     "@types/react": "^19",
     "@types/react-dom": "^19",

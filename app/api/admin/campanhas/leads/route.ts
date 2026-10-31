@@ -1,5 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehFiltroDosLeads, ehId, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
+import { paginaDe, recorteDe } from "@/lib/campanhas-pedidos";
 import { cidadesDosLeads, falhou, paginaDeLeads, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -9,19 +9,14 @@ import { createServiceClient } from "@/lib/supabase/service";
 export const GET = rotaDoAdmin(
   async ({ req }) => {
     const q = req.nextUrl.searchParams;
-    const busca = q.get("busca");
-    if (busca !== null && !ehId(busca)) return torto("busca inválida");
     const svc = createServiceClient();
     try {
-      if (q.get("cidades") === "1") return Response.json(await cidadesDosLeads(svc, busca));
+      const recorte = recorteDe(q);
+      if (typeof recorte === "string") return torto(recorte);
+      if (q.get("cidades") === "1") return Response.json(await cidadesDosLeads(svc, recorte.buscaId));
       const pagina = paginaDe(q.get("pagina"));
-      const filtros = (q.get("filtros") ?? "").split(",").filter(Boolean);
       if (pagina === null) return torto("página inválida");
-      if (!filtros.every(ehFiltroDosLeads)) return torto("filtro inválido");
-      const cidade = q.get("cidade");
-      return Response.json(
-        await paginaDeLeads(svc, { buscaId: busca, texto: textoDe(q.get("texto")), cidade: cidade ? cidade.slice(0, 120) : null, filtros, pagina }),
-      );
+      return Response.json(await paginaDeLeads(svc, { ...recorte, pagina }));
     } catch (e) {
       return falhou("listar os leads", e);
     }

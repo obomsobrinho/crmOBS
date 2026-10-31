@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // CAMPANHAS na tela (docs/plano-campanhas.md), no preview com dados de mentira
 // (`/design/campanhas`, a fonte em memória com a MESMA interface da página de
@@ -9,6 +9,19 @@ import { test, expect } from "@playwright/test";
 
 const ID = "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b";
 
+/** UF primeiro, depois a cidade DA LISTA, digitando no combobox. */
+async function escolherCidade(page: Page, uf: string, digitado: string, nome: string) {
+  const dialogo = page.locator('[data-slot="nova-busca"]');
+  await dialogo.getByRole("combobox", { name: "Estado" }).click();
+  await page.getByRole("option", { name: uf, exact: true }).click();
+  const cidade = dialogo.getByRole("combobox", { name: "Cidade" });
+  await expect(cidade).toBeEnabled();
+  await cidade.click();
+  await page.getByRole("textbox", { name: "Cidade: buscar" }).fill(digitado);
+  await page.getByRole("option", { name: nome, exact: true }).click();
+  await expect(cidade).toHaveText(nome);
+}
+
 test.describe("Campanhas sem login", () => {
   test("as rotas /api/admin/campanhas respondem 404 a quem não é admin, sem revelar nada", async ({ request }) => {
     for (const r of [
@@ -17,7 +30,9 @@ test.describe("Campanhas sem login", () => {
       "/api/admin/campanhas/conexoes",
       "/api/admin/campanhas/buscas",
       `/api/admin/campanhas/buscas/${ID}`,
+      `/api/admin/campanhas/buscas/${ID}/pontos`,
       "/api/admin/campanhas/leads",
+      `/api/admin/campanhas/leads/${ID}`,
       "/api/admin/campanhas/resumo",
       "/api/admin/campanhas/resultados",
       "/api/admin/campanhas/previa",
@@ -40,10 +55,12 @@ test.describe("Campanhas sem login", () => {
     expect((await request.get("/api/prospeccao/cron", { headers: { authorization: "Bearer chute" } })).status()).toBe(401);
   });
 
-  test("a página /campanhas sem sessão vai para o login", async ({ request }) => {
-    const r = await request.get("/campanhas", { maxRedirects: 0 });
-    expect(r.status()).toBe(307);
-    expect(r.headers().location).toContain("/login");
+  test("as páginas /campanhas e /campanhas/buscas/nova sem sessão vão para o login", async ({ request }) => {
+    for (const caminho of ["/campanhas", "/campanhas/buscas/nova"]) {
+      const r = await request.get(caminho, { maxRedirects: 0 });
+      expect(r.status(), caminho).toBe(307);
+      expect(r.headers().location, caminho).toContain("/login");
+    }
   });
 });
 
@@ -80,12 +97,10 @@ test.describe("Campanhas no preview", () => {
     test.setTimeout(60_000);
     await page.goto("/design/campanhas?tela=leads");
     await page.locator('[data-slot="leads-nova-busca"]').click();
-    const dialogo = page.getByRole("dialog");
+    const dialogo = page.locator('[data-slot="nova-busca"]');
     await dialogo.getByRole("textbox", { name: "Segmento" }).fill("pet shop");
     await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
-    await dialogo.getByRole("textbox", { name: "Cidade" }).fill("Mutum");
-    await dialogo.getByRole("combobox", { name: "Estado" }).click();
-    await page.getByRole("option", { name: "MG" }).click();
+    await escolherCidade(page, "MG", "mutum", "Mutum");
     await dialogo.getByRole("button", { name: "Buscar", exact: true }).click();
     const nova = page.locator('[data-slot="busca-linha"]', { hasText: "pet shop" });
     await expect(nova).toContainText("Buscando");
@@ -125,5 +140,267 @@ test.describe("Campanhas no preview", () => {
     await expect(page.getByText("Nenhuma busca ainda")).toBeVisible();
     await page.locator('[data-slot="campanhas-aba-campanhas"]').click();
     await expect(page.getByText("Nenhuma campanha ainda")).toBeVisible();
+  });
+});
+
+test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
+  test("o menu: o CRM como antes e, no fim, a seção do dono com Campanhas e Clientes", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    const doCrm = (await page.locator('[data-slot="rail-itens"] a').allInnerTexts()).map((t) => t.trim());
+    const secao = page.locator('[data-slot="rail-secao-dono"]');
+    await expect(secao).toBeVisible();
+    await expect(secao.getByText("Gestão da OBS")).toBeVisible();
+    expect((await secao.locator("a").allInnerTexts()).map((t) => t.trim())).toEqual(["Campanhas", "Clientes"]);
+    // Os itens do CRM ficam como antes das Campanhas, e a seção vem depois de todos.
+    const crm = doCrm.filter((n) => n !== "Campanhas" && n !== "Clientes");
+    expect(crm.slice(0, 5)).toEqual(["Painel", "Pedidos", "Conversas", "Contatos", "Pipeline"]);
+    expect(doCrm.slice(-2)).toEqual(["Campanhas", "Clientes"]);
+    await expect(secao.locator("a", { hasText: "Campanhas" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("celular: a seção do dono aparece agrupada dentro de \"Mais\"", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/design/campanhas?tela=leads");
+    await page.getByRole("button", { name: "Mais" }).click();
+    const grupo = page.locator('[data-slot="mais-secao-dono"]');
+    await expect(grupo).toBeVisible();
+    await expect(grupo.getByText("Gestão da OBS")).toBeVisible();
+    expect((await grupo.locator("a").allInnerTexts()).map((t) => t.trim())).toEqual(["Campanhas", "Clientes"]);
+  });
+
+  test("Nova busca é uma página: o mapa já aparece aberto na cidade da última busca, e voltar leva a Leads", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    await page.locator('[data-slot="leads-nova-busca"]').click();
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(pagina.locator('[data-slot="nova-busca-mapa"]')).toBeVisible();
+    // A última busca do preview é a de barbearias em Caratinga.
+    await expect(pagina.getByRole("combobox", { name: "Estado" })).toHaveText(/MG/);
+    await expect(pagina.getByRole("combobox", { name: "Cidade" })).toHaveText("Caratinga");
+    await expect(pagina.locator(".pino-central")).toHaveCount(1);
+    // "Buscar" à vista sem rolar, em 1280x720.
+    await expect(pagina.locator('[data-slot="nova-busca-buscar"]')).toBeInViewport();
+    await pagina.locator('[data-slot="nova-busca-voltar"]').click();
+    await expect(page.locator('[data-slot="leads-buscas"]')).toBeVisible();
+  });
+
+  test("Nova busca: o raio aparece, muda e volta para a cidade inteira", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    const raio = pagina.locator('[data-slot="nova-busca-raio"]');
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(0);
+    await pagina.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 5 km");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(1);
+    await pagina.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 8 km");
+    await pagina.getByRole("button", { name: "Diminuir o raio" }).click();
+    await pagina.getByRole("button", { name: "Diminuir o raio" }).click();
+    await expect(raio).toHaveText("Raio: 3 km");
+    await pagina.locator('[data-slot="nova-busca-cidade-inteira"]').click();
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(0);
+    // O pino continua, na sede da cidade.
+    await expect(pagina.locator(".pino-central")).toHaveCount(1);
+  });
+
+  test("Nova busca: mover o centro para dentro de outra cidade troca UF e cidade nos campos", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await pagina.getByRole("textbox", { name: "Segmento" }).fill("padaria");
+    await pagina.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    const cidade = pagina.getByRole("combobox", { name: "Cidade" });
+    // Um clique perto do centro fica em Mutum e já cria a área.
+    const mapa = pagina.locator('[data-slot="nova-busca-mapa"]');
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem caixa");
+    await page.mouse.click(caixa.x + caixa.width / 2 + 15, caixa.y + caixa.height / 2 + 15);
+    await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 5 km");
+    await expect(cidade).toHaveText("Mutum");
+    // Com o raio de 50 km o mapa mostra a região; um clique perto da borda cai noutra cidade.
+    const mais = pagina.getByRole("button", { name: "Aumentar o raio" });
+    for (let i = 0; i < 6; i++) await mais.click();
+    await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 50 km");
+    await page.mouse.click(caixa.x + caixa.width - 30, caixa.y + caixa.height / 2);
+    await expect(cidade).not.toHaveText("Mutum");
+    await expect(pagina.getByRole("combobox", { name: "Estado" })).toHaveText(/MG|ES/);
+    await expect(pagina.getByRole("button", { name: "Buscar", exact: true })).toBeEnabled();
+    // O aviso antigo saiu: a referência agora são os próprios campos.
+    await expect(pagina.locator('[data-bloco="nova-busca-centro-fora"]')).toHaveCount(0);
+  });
+
+  test("rolagem: a roda sobre o mapa dá zoom no mapa; sobre os campos, a coluna rola (bug de 30/10/2026)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    const mapa = pagina.locator('[data-slot="nova-busca-mapa"]');
+    const zoom = () => mapa.locator(".leaflet-proxy").evaluate((e) => (e as HTMLElement).style.transform);
+    const coluna = pagina.locator('[data-slot="area-rolavel"]');
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem caixa");
+    const antes = await zoom();
+    await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+    await page.mouse.wheel(0, -500);
+    await expect.poll(zoom).not.toBe(antes);
+    expect(await coluna.evaluate((e) => e.scrollTop)).toBe(0);
+    // Fora do mapa a página (a coluna dos campos) rola normalmente, depois de escolher a cidade.
+    const campos = await coluna.boundingBox();
+    if (!campos) throw new Error("coluna sem caixa");
+    await page.mouse.move(campos.x + 100, campos.y + campos.height / 2);
+    await page.mouse.wheel(0, 400);
+    await expect.poll(() => coluna.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+  });
+
+  test("o detalhe da busca diz onde ela procurou: a cidade e o raio usado, e o mapa desenha o círculo", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await expect(page.getByText("Mutum, MG · raio de 5 km")).toBeVisible();
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa.locator("path.area-do-mapa")).toHaveCount(1);
+    // O círculo não pega o clique: os pinos de dentro dele continuam clicáveis.
+    await expect(mapa.locator("path.area-do-mapa")).not.toHaveClass(/leaflet-interactive/);
+  });
+
+  test("Nova busca: trocar a UF limpa a cidade e trava o Buscar; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const dialogo = page.locator('[data-slot="nova-busca"]');
+    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("clínica de estética");
+    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    const buscar = dialogo.getByRole("button", { name: "Buscar", exact: true });
+    await expect(buscar).toBeEnabled();
+    // No ES não existe Mutum, e trocar a UF limpa a cidade (sem cidade da lista, não busca).
+    await dialogo.getByRole("combobox", { name: "Estado" }).click();
+    await page.getByRole("option", { name: "ES", exact: true }).click();
+    await expect(buscar).toBeDisabled();
+    await dialogo.getByRole("combobox", { name: "Cidade" }).click();
+    await page.getByRole("textbox", { name: "Cidade: buscar" }).fill("Mutúm");
+    await expect(page.getByText("Nenhuma cidade com esse nome neste estado")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await escolherCidade(page, "MG", "MUTÚM", "Mutum");
+    await expect(buscar).toBeEnabled();
+    // As categorias sugeridas saem do segmento; marcar uma é o filtro pago da fonte, e o custo sobe.
+    const custo = dialogo.locator('[data-slot="nova-busca-custo"]');
+    const antes = await custo.innerText();
+    await expect(dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" })).toBeVisible();
+    await dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" }).click();
+    await expect(dialogo.getByText("Marcada, a fonte só traz essa categoria e cobra a mais por empresa.")).toBeVisible();
+    await expect(custo).not.toHaveText(antes);
+    await expect(dialogo.getByRole("group", { name: "Mínimo de avaliações no Google" }).first()).toBeVisible();
+  });
+
+  test("o mapa da busca: um pino por lead com coordenadas, a legenda conta os estados", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa).toBeVisible();
+    const n = Number(await mapa.getAttribute("data-pinos"));
+    expect(n).toBeGreaterThan(10);
+    await expect(mapa.locator("path.pino-do-mapa")).toHaveCount(n);
+    const legenda = await page.locator('[data-slot="busca-mapa-legenda"] li').allInnerTexts();
+    expect(legenda.map((t) => Number(t.match(/(\d+)$/)?.[1] ?? 0)).reduce((a, b) => a + b, 0)).toBe(n);
+    await expect(page.locator(".leaflet-control-attribution")).toContainText("OpenStreetMap");
+  });
+
+  test("marcar um lead não contatado como bom recolore o pino na hora, sem reler o mapa (revisão de 31/10/2026)", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa.locator("path.pino-do-mapa").first()).toBeVisible();
+    const bons = mapa.locator("path.pino-bom");
+    const antes = await bons.count();
+    // Uma linha sem campanha ("Nenhuma") e sem marcação: o pino dela é "não contatado".
+    const id = await page.locator('[data-slot="lead-linha"][data-marcacao="nenhuma"]').filter({ hasText: "Nenhuma" }).first().getAttribute("data-lead");
+    const linha = page.locator(`[data-slot="lead-linha"][data-lead="${id}"]`);
+    await linha.locator('[data-slot="lead-marcar-bom"]').click();
+    await expect(linha).toHaveAttribute("data-marcacao", "bom");
+    await expect(bons).toHaveCount(antes + 1);
+    await expect(mapa).toHaveAttribute("data-pinos", String(await mapa.locator("path.pino-do-mapa").count()));
+  });
+
+  test("clicar num pino destaca a linha na tabela; \"ver no mapa\" na linha destaca o pino", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const pinos = page.locator('[data-slot="busca-mapa"] path.pino-do-mapa');
+    await expect(pinos.first()).toBeVisible();
+    // O último pino da busca de estética é o dentista que veio no meio (fica na última página da tabela).
+    // O clique vai ao próprio pino (o Leaflet escuta o evento no SVG), sem depender de onde ele cai na tela.
+    await pinos.last().dispatchEvent("click");
+    await expect(page.locator('[data-slot="leads-rodape"] [data-slot="paginacao-texto"]')).toHaveText("Mostrando 11 a 17 de 17");
+    const destacada = page.locator('[data-slot="lead-linha"][data-destaque]');
+    await expect(destacada).toHaveCount(1);
+    await expect(destacada).toBeInViewport();
+    const linha = page.locator('[data-slot="lead-linha"]').first();
+    await linha.locator('[data-slot="lead-ver-no-mapa"]').click();
+    await expect(page.locator('[data-slot="lead-linha"][data-destaque]')).toHaveAttribute("data-lead", (await linha.getAttribute("data-lead")) ?? "");
+  });
+
+  test("a ficha do lead: pontos e motivos, perfil não reivindicado, horário da semana e avaliações por estrela", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await page.locator('[data-slot="lead-abrir-ficha"]').first().click();
+    const ficha = page.locator('[data-slot="lead-ficha"]');
+    await expect(ficha).toBeVisible();
+    await expect(ficha.locator('[data-slot="ficha-pontos"]')).toContainText("pontos");
+    await expect(ficha.locator('[data-slot="ficha-horario"] tr')).toHaveCount(7);
+    await expect(ficha.locator('[data-slot="ficha-avaliacoes"]')).toContainText("avaliações");
+    await expect(ficha.getByText("Perfil no Google")).toBeVisible();
+  });
+
+  test("o filtro Perfil não reivindicado mostra só quem a fonte diz que não reivindicou", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const rodape = page.locator('[data-slot="leads-rodape"] [data-slot="paginacao-texto"]');
+    await expect(rodape).toContainText("de 17");
+    // A tabela fica abaixo do mapa: traz o botão para a tela antes de abrir o menu (o menu segue o botão).
+    await page.locator('[data-slot="leads-filtro"]').scrollIntoViewIfNeeded();
+    await page.locator('[data-slot="leads-filtro"]').click();
+    const opcao = page.locator('[data-menu="leads-filtro"] [data-filtro]', { hasText: "Perfil não reivindicado" });
+    await expect(opcao).toBeVisible();
+    await opcao.dispatchEvent("click");
+    await page.keyboard.press("Escape");
+    await expect(rodape).not.toContainText("de 17");
+    await page.locator('[data-slot="lead-abrir-ficha"]').first().click();
+    await expect(page.locator('[data-slot="ficha-nao-reivindicado"]')).toBeVisible();
+  });
+});
+
+// Bug de 30/10/2026: um refresh deixava a aba Leads em "Carregando…" com "Nenhum
+// resultado" na paginação, para sempre. Causa: a tela dependia só das leituras do
+// navegador, sem prazo, e o HTML do servidor era a tela vazia. Agora a primeira tela
+// vem lida do servidor, a paginação só aparece com dados e uma leitura que não
+// volta vira "Tentar de novo".
+test.describe("Campanhas: refresh nunca fica em Carregando (regressão de 30/10/2026)", () => {
+  test("o HTML do servidor já traz a primeira tela: buscas, contagens e paginação, sem Carregando", async ({ request }) => {
+    const html = await (await request.get("/design/campanhas?tela=leads")).text();
+    expect(html).not.toContain("Carregando…");
+    expect(html).not.toContain("Nenhum resultado");
+    expect(html).toContain("Mostrando 1 a 10 de 14");
+    expect(html).toContain('data-slot="busca-linha"');
+  });
+
+  test("refresh: a tabela continua com as buscas, e a paginação nunca diz Nenhum resultado sob Carregando", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    const rodape = page.locator('[data-slot="buscas-rodape"] [data-slot="paginacao-texto"]');
+    await expect(rodape).toHaveText("Mostrando 1 a 10 de 14");
+    for (let i = 0; i < 2; i++) {
+      await page.reload();
+      await expect(page.locator('[data-slot="busca-linha"]')).toHaveCount(10);
+      await expect(rodape).toHaveText("Mostrando 1 a 10 de 14");
+      await expect(page.getByText("Carregando…")).toHaveCount(0);
+    }
+  });
+
+  test("uma leitura que nunca volta vira \"Tentar de novo\" no tempo limite, sem paginação embaixo", async ({ page }) => {
+    await page.clock.install();
+    await page.goto("/design/campanhas?tela=leads&cenario=travado");
+    const tabela = page.locator('[data-bloco="leads-tabela"]');
+    await expect(tabela.getByText("Carregando…")).toBeVisible();
+    // Carregando: nada de "Nenhum resultado" embaixo.
+    await expect(page.locator('[data-slot="buscas-rodape"]')).toHaveCount(0);
+    // O HTML aparece antes de a tela hidratar e o prazo começar: o relógio anda até a falha aparecer.
+    await expect(async () => {
+      await page.clock.fastForward(5_000);
+      await expect(tabela.getByText("Não deu para carregar agora.")).toBeVisible({ timeout: 500 });
+    }).toPass({ timeout: 20_000 });
+    await expect(tabela.getByRole("button", { name: "Tentar de novo" })).toBeVisible();
+    await expect(page.locator('[data-slot="buscas-rodape"]')).toHaveCount(0);
   });
 });
