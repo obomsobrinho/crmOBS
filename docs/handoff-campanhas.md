@@ -1,5 +1,38 @@
 # Handoff: Campanhas v2
 
+## Rodada de 31/10/2026 (Parte A): Nova busca vira página, mapa e campos ligados (branch `claude/lucid-cerf-1wh6fc`)
+
+**Parado para a revisão do Franck.** Protótipo em `/design/campanhas?tela=nova-busca` (ou "Nova busca" na aba Leads).
+
+- **Página própria**, com voltar para Leads: o mapa grande é a peça principal (à direita no desktop, em cima
+  no celular) e os campos ficam numa coluna ao lado, rolando por dentro; o rodapé com o custo e "Buscar"
+  fica sempre à vista. Todos os campos de antes continuam (segmento, UF, cidade, raio, quantidade, nota,
+  avaliações, categoria, site, fechadas, contatos). Uma recusa do servidor aparece no rodapé e a página
+  fica aberta para corrigir; dando certo, volta para Leads com a busca "Buscando".
+- **Mapa e campos ligados:** o mapa abre já na cidade da última busca (sem busca, em Mutum, MG), com os
+  campos preenchidos. Escolher UF e cidade move o mapa. Mover o centro (arrastar o pino ou clicar) cria a
+  área e, se o ponto cai noutra cidade, troca UF e cidade nos campos (pela sede mais próxima da lista). O
+  aviso "O centro está em ..." saiu: os próprios campos mostram a cidade.
+- **Bug da rolagem, causa:** no modal, a trava de rolagem do diálogo (Radix) cancelava a roda do mouse
+  quando ela caía sobre o mapa, e o mapa não usava a roda para zoom; como o mapa aparecia grande no meio do
+  formulário depois da cidade, a página "parava" de rolar. Fora do modal (o mapa do detalhe) a página
+  rolava. Correção: a Nova busca não é mais modal, e a roda sobre o mapa dá zoom NO MAPA (nos dois mapas);
+  fora dele a página rola. Teste de regressão das duas coisas.
+
+### Para o Franck
+1. **Revisar** a página da Nova busca (desktop e celular).
+2. **A página de verdade** ganha o endereço `/campanhas/buscas/nova` junto com a parte real, depois da
+   aprovação (hoje, no protótipo, é uma tela dentro de `/design/campanhas`).
+3. **Continua pendente:** liberar o DDL aditivo das 8 colunas em `prospeccao_leads` (`lat`, `lng`,
+   `reivindicado`, `horarios`, `distribuicao_notas`, `fotos`, `categorias`, `instagram`); gerar a lista de
+   cidades pelo IBGE numa máquina com acesso; o título "Gestão da OBS"; o layout do mapa no detalhe da busca.
+
+### Decisões que tomei
+- Antes de mexer no mapa, a busca continua sendo a cidade inteira (o pino fica na sede, sem círculo).
+- A cidade de partida é a da busca mais recente com cidade escolhida da lista.
+
+---
+
 ## Rodada de 30/10/2026 (2a revisão): bug do refresh, centro e raio no mapa, menu (branch `claude/lucid-cerf-1wh6fc`)
 
 **Parado para a revisão do Franck.** Protótipo em `/design/campanhas`; a correção do bug já vale na página real.

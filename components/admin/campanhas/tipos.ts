@@ -108,6 +108,8 @@ export interface ConexaoDisponivel {
 /** Onde a central está (as duas abas e as telas de cada uma). */
 export type Tela =
   | { aba: "leads"; busca: string | null }
+  /** A página da Nova busca (o mapa grande e os campos ao lado), com voltar para Leads. */
+  | { aba: "leads"; nova: true }
   | { aba: "campanhas"; vista: "lista" }
   | { aba: "campanhas"; vista: "detalhe" | "editar"; id: string };
 

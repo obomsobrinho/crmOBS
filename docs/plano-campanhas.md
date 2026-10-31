@@ -263,6 +263,12 @@ a "site" that was an Instagram post. Changes, prototype first (`/design/campanha
   `Rfb0VfmDckdMIbiwT`, "padaria" in Mutum, 2 km, 5 results within about 1.5 km) and no `locationQuery`;
   without adjustment, `locationQuery` "Cidade, UF, Brasil". The area is stored in the search's `opcoes`
   jsonb (no DDL) and the search detail says "Mutum, MG · raio de 5 km".
+- **Nova busca is a page** (third review, 31/10/2026; the modal was too small for the map): the big map is
+  the main piece, the fields a column beside it (map on top on mobile), "Buscar" always visible. Map and
+  fields are one thing: it opens on the last search's city (else Mutum, MG), picking UF and city moves
+  the map, and moving the center into another city changes UF and city in the fields (nearest seat). The
+  wheel over the map zooms the map; elsewhere the page scrolls (inside a modal the dialog's scroll lock
+  swallowed the wheel over the map).
 - **Later, not now**: drawing an area (polygon) on the map to search.
 - **Data**: coordinates and the new signals need additive columns on `prospeccao_leads` (owner's
   release first; see the handoff).

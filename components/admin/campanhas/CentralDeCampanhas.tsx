@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
 import AbaLeads from "./AbaLeads";
+import NovaBusca from "./NovaBusca";
 import AbaCampanhas from "./AbaCampanhas";
 import Assistente from "./Assistente";
 import DetalheDaCampanha from "./DetalheDaCampanha";
@@ -224,15 +225,24 @@ export default function CentralDeCampanhas({
             }}
           />
         </section>
+      ) : tela.aba === "leads" && "nova" in tela ? (
+        <PaginaDaNovaBusca
+          fonte={fonte}
+          voltar={() => setTela({ aba: "leads", busca: null })}
+          aoComecar={() => {
+            setTela({ aba: "leads", busca: null });
+            mudou();
+          }}
+        />
       ) : (
         // A chave troca a cada tela: abrir outra tela começa do topo, não de onde a anterior parou.
         <AreaRolavel
-          key={tela.aba === "leads" ? `leads-${tela.busca ?? ""}` : `campanhas-${"id" in tela ? tela.id : ""}`}
+          key={tela.aba === "leads" ? `leads-${"busca" in tela ? (tela.busca ?? "") : ""}` : `campanhas-${"id" in tela ? tela.id : ""}`}
           tamanho={DISSOLVER_PADRAO}
           className="min-h-0 min-w-0 flex-1"
         >
           <div className="px-4 py-4 md:px-1 md:py-1">
-            {tela.aba === "leads" ? (
+            {tela.aba === "leads" && "busca" in tela ? (
               <AbaLeads
                 abas={abas}
                 fonte={fonte}
@@ -244,6 +254,7 @@ export default function CentralDeCampanhas({
                 rascunho={rascunhoEsperando}
                 abrirBusca={(id) => setTela({ aba: "leads", busca: id })}
                 aoMudar={mudou}
+                novaBusca={() => setTela({ aba: "leads", nova: true })}
                 criarCampanhaDaBusca={(b: Busca) => {
                   const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
                   novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
@@ -291,5 +302,29 @@ export default function CentralDeCampanhas({
         </AreaRolavel>
       )}
     </section>
+  );
+}
+
+/**
+ * A página da Nova busca: lê a cidade da última busca (onde o mapa abre; sem busca, a
+ * cidade da OBS) e só então monta a página, para os campos nascerem nela.
+ */
+function PaginaDaNovaBusca({ fonte, voltar, aoComecar }: { fonte: FonteDeCampanhas; voltar: () => void; aoComecar: () => void }) {
+  const ultima = useLeitura("ultima-busca", () => fonte.buscasParaEscolher());
+  const localInicial = useMemo(() => {
+    const opcoes = ultima.dados?.find((b) => b.opcoes.cidadeIbge !== null)?.opcoes ?? null;
+    return opcoes?.cidadeIbge != null ? { uf: opcoes.uf, ibge: opcoes.cidadeIbge } : null;
+  }, [ultima.dados]);
+  if (!ultima.dados && !ultima.erro) return null;
+  return (
+    <NovaBusca
+      voltar={voltar}
+      localInicial={localInicial}
+      aoBuscar={async (o) => {
+        const r = await fonte.novaBusca(o);
+        if (r.ok) aoComecar();
+        return r;
+      }}
+    />
   );
 }

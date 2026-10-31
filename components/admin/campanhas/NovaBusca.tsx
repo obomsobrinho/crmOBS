@@ -2,17 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Minus, Plus, X } from "lucide-react";
+import { ArrowLeft, Minus, Plus, X } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Combobox } from "@/components/ui/combobox";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { numeroBR } from "@/lib/format";
-import { buscarCidades, carregarMunicipios, cidadeMaisProxima, type MunicipiosPorUf } from "@/lib/municipios";
+import { buscarCidades, carregarMunicipios, cidadeDoCodigo, cidadeMaisProxima, type MunicipiosPorUf } from "@/lib/municipios";
 import {
   MINIMOS_DE_AVALIACOES,
   OPCOES_PADRAO,
@@ -37,6 +36,14 @@ import {
 // mínimo de avaliações são aplicados do NOSSO lado (o dado já vem em todo item; o
 // filtro da fonte custa por empresa); só "fechadas" e os contatos vão para a fonte.
 // O rodapé mostra o máximo de empresas e o custo mínimo pelo preço de tabela.
+//
+// É uma PÁGINA (revisão de 30/10/2026, segunda rodada; antes era um modal pequeno
+// para o mapa): o mapa grande é a peça principal e os campos ficam numa coluna ao
+// lado (no celular, o mapa em cima). O rodapé com "Buscar" fica sempre à vista.
+// Mapa e campos são uma coisa só: escolher UF e cidade move o mapa; mover o centro
+// (arrastar o pino ou clicar) para dentro de outra cidade troca UF e cidade nos
+// campos, pela sede mais próxima. O mapa abre na cidade da última busca, ou em
+// Mutum (MG), a cidade da OBS, quando ainda não houve busca.
 
 const NOTAS: { valor: NotaMinima; rotulo: string }[] = [
   { valor: null, rotulo: "Qualquer" },
@@ -51,7 +58,10 @@ const SITES: { valor: FiltroDeSiteDaBusca; rotulo: string }[] = [
   { valor: "com_site", rotulo: "Só com site" },
 ];
 
-// O mapa (Leaflet) só carrega no navegador, quando a cidade foi escolhida.
+/** Onde o mapa abre sem busca anterior: Mutum (MG), a cidade da OBS (código IBGE). */
+const CIDADE_DA_OBS = { uf: "MG", ibge: 3144003 };
+
+// O mapa (Leaflet) só carrega no navegador.
 const Mapa = dynamic(() => import("./Mapa"), { ssr: false });
 
 const MINIMOS: { valor: (typeof MINIMOS_DE_AVALIACOES)[number]; rotulo: string }[] = MINIMOS_DE_AVALIACOES.map((m) => ({
@@ -71,16 +81,20 @@ function Campo({ titulo, children }: { titulo: string; children: React.ReactNode
 }
 
 export default function NovaBusca({
-  aberto,
-  aoMudar,
+  voltar,
   aoBuscar,
+  localInicial,
 }: {
-  aberto: boolean;
-  aoMudar: (v: boolean) => void;
-  aoBuscar: (o: OpcoesDaBusca) => void;
+  voltar: () => void;
+  /** Começa a busca; devolve a recusa em uma frase (a página fica aberta para corrigir). */
+  aoBuscar: (o: OpcoesDaBusca) => Promise<{ ok: true } | { ok: false; erro: string }>;
+  /** A cidade da última busca (UF e código IBGE); null = Mutum, a cidade da OBS. */
+  localInicial: { uf: string; ibge: number } | null;
 }) {
   const [o, setO] = useState<OpcoesDaBusca>(OPCOES_PADRAO);
   const [termo, setTermo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [falha, setFalha] = useState<string | null>(null);
   const campoDoTermo = useRef<HTMLInputElement>(null);
   const mudar = (patch: Partial<OpcoesDaBusca>) => setO((atual) => ({ ...atual, ...patch }));
   const adicionar = () => {
@@ -93,33 +107,45 @@ export default function NovaBusca({
   const problemas = problemasDaBusca(comDigitado);
   const sugestoes = categoriasSugeridas(comDigitado.termos);
 
-  // A lista de cidades (um pedaço à parte, ~100 KB) só baixa quando o diálogo abre.
+  // A lista de cidades (um pedaço à parte, ~100 KB) baixa quando a página abre; com ela,
+  // os campos já nascem na cidade da última busca (ou em Mutum) e o mapa vai até lá.
   const [municipios, setMunicipios] = useState<MunicipiosPorUf | null>(null);
   useEffect(() => {
-    if (!aberto || municipios) return;
     let vivo = true;
     carregarMunicipios()
       .then((m) => {
-        if (vivo) setMunicipios(m);
+        if (!vivo) return;
+        setMunicipios(m);
+        const inicio = (localInicial && cidadeDoCodigo(m, localInicial.uf, localInicial.ibge)) || cidadeDoCodigo(m, CIDADE_DA_OBS.uf, CIDADE_DA_OBS.ibge);
+        if (inicio) setO((atual) => (atual.cidadeIbge === null ? { ...atual, uf: inicio.uf, cidade: inicio.nome, cidadeIbge: inicio.ibge } : atual));
       })
       .catch((e) => console.error("nova busca, cidades:", e));
     return () => {
       vivo = false;
     };
-  }, [aberto, municipios]);
+  }, [localInicial]);
+  useEffect(() => campoDoTermo.current?.focus(), []);
   const cidadesDaUf = municipios?.[o.uf] ?? null;
   const cidadeEscolhida = cidadesDaUf?.find((c) => c.ibge === o.cidadeIbge) ?? null;
   const vista = useMemo(
     () => (cidadeEscolhida?.lat != null && cidadeEscolhida.lng != null ? { lat: cidadeEscolhida.lat, lng: cidadeEscolhida.lng, zoom: 12 } : null),
     [cidadeEscolhida],
   );
-  // Fora da cidade escolhida: avisa (pela sede mais próxima), não bloqueia.
-  const vizinha = o.area && municipios ? cidadeMaisProxima(municipios, o.area) : null;
-  const centroFora = vizinha !== null && vizinha.ibge !== o.cidadeIbge;
+  // O pino do mapa: o centro ajustado, ou a sede da cidade escolhida (sem raio).
+  const centro = useMemo(() => (o.area ? o.area : vista ? { lat: vista.lat, lng: vista.lng, raioKm: null } : null), [o.area, vista]);
+  // Mover o centro: a área nasce (com o raio padrão) e, se o ponto caiu noutra cidade,
+  // UF e cidade dos campos vão para ela (a sede mais próxima da lista).
   const moverCentro = useCallback(
     (lat: number, lng: number) =>
-      setO((atual) => ({ ...atual, area: { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5, raioKm: atual.area?.raioKm ?? RAIO_PADRAO_KM } })),
-    [],
+      setO((atual) => {
+        const ponto = { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+        const area = { ...ponto, raioKm: atual.area?.raioKm ?? RAIO_PADRAO_KM };
+        const perto = municipios ? cidadeMaisProxima(municipios, ponto) : null;
+        return perto && perto.ibge !== atual.cidadeIbge
+          ? { ...atual, area, uf: perto.uf, cidade: perto.nome, cidadeIbge: perto.ibge }
+          : { ...atual, area };
+      }),
+    [municipios],
   );
   const mudarRaio = (passo: 1 | -1) => {
     if (!o.area) {
@@ -134,42 +160,88 @@ export default function NovaBusca({
   );
   const maximo = maximoDaBusca(comDigitado);
 
+  const enviar = async () => {
+    if (problemas.length > 0) return;
+    setEnviando(true);
+    setFalha(null);
+    try {
+      const r = await aoBuscar({ ...comDigitado, cidade: comDigitado.cidade.trim() });
+      if (!r.ok) setFalha(r.erro);
+    } catch (e) {
+      console.error("nova busca:", e);
+      setFalha("Não deu para começar a busca agora. Tente de novo em instantes.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   return (
-    <Dialog open={aberto} onOpenChange={aoMudar}>
-      <DialogContent
-        tamanho="gestao"
-        className="max-w-xl"
-        data-slot="nova-busca"
-        // O foco vai para o segmento, não para o "x" de fechar (o primeiro focável).
-        onOpenAutoFocus={(e) => {
-          e.preventDefault();
-          campoDoTermo.current?.focus();
-        }}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-6 py-4">
-          <div>
-            <DialogTitle>Nova busca</DialogTitle>
-            <DialogDescription className="mt-1">Empresas do Google Maps. Roda em segundo plano, leva alguns minutos.</DialogDescription>
-          </div>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon-chrome" aria-label="Fechar">
-              <X size={18} />
+    <form
+      aria-label="Nova busca"
+      className="flex min-h-0 min-w-0 flex-1 flex-col bg-raised md:rounded-xl md:border md:border-line"
+      data-slot="nova-busca"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void enviar();
+      }}
+    >
+      <header className="flex items-center gap-3 border-b border-line px-4 py-3 md:px-5">
+        <Button type="button" variant="ghost" size="icon-chrome" aria-label="Voltar para Leads" onClick={voltar} data-slot="nova-busca-voltar">
+          <ArrowLeft aria-hidden />
+        </Button>
+        <div className="min-w-0">
+          <h2 className="text-titulo text-ink">Nova busca</h2>
+          <p className="truncate text-legenda text-ink-3">Empresas do Google Maps. Roda em segundo plano, leva alguns minutos.</p>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* O mapa: a peça principal (no celular, em cima). */}
+        <div className="flex shrink-0 flex-col gap-2 border-b border-line p-3 lg:order-last lg:min-h-0 lg:flex-1 lg:border-b-0 lg:p-4" data-bloco="nova-busca-area">
+          <Mapa
+            vista={vista}
+            area={centro}
+            aoMoverCentro={moverCentro}
+            rotulo={o.cidade ? `Mapa de ${o.cidade}: arraste o centro ou clique para mover` : "Mapa da busca"}
+            className="h-64 lg:h-auto lg:min-h-0 lg:flex-1"
+            data-slot="nova-busca-mapa"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-chrome"
+              aria-label="Diminuir o raio"
+              disabled={!o.area || o.area.raioKm <= RAIOS_KM[0]}
+              onClick={() => mudarRaio(-1)}
+            >
+              <Minus aria-hidden />
             </Button>
-          </DialogClose>
+            <span className="min-w-36 text-center text-apoio tabular-nums text-ink" aria-live="polite" data-slot="nova-busca-raio">
+              {o.area ? `Raio: ${o.area.raioKm} km` : "Raio: a cidade inteira"}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-chrome"
+              aria-label="Aumentar o raio"
+              disabled={!vista || (o.area !== null && o.area.raioKm >= RAIOS_KM[RAIOS_KM.length - 1])}
+              onClick={() => mudarRaio(1)}
+            >
+              <Plus aria-hidden />
+            </Button>
+            {o.area && (
+              <Button type="button" variant="link" size="link" className="ml-auto" onClick={() => mudar({ area: null })} data-slot="nova-busca-cidade-inteira">
+                Usar a cidade inteira
+              </Button>
+            )}
+          </div>
         </div>
 
-        <form
-          className="flex min-h-0 flex-1 flex-col"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (problemas.length > 0) return;
-            aoBuscar({ ...comDigitado, cidade: comDigitado.cidade.trim() });
-            setO(OPCOES_PADRAO);
-            setTermo("");
-          }}
-        >
+        {/* Os campos: uma coluna que rola por dentro, com o rodapé de "Buscar" sempre à vista. */}
+        <div className="flex min-h-0 flex-1 flex-col lg:w-[440px] lg:flex-none lg:border-r lg:border-line">
           <AreaRolavel className="min-h-0 flex-1">
-            <div className="flex flex-col gap-6 px-6 py-5">
+            <div className="flex flex-col gap-6 px-5 py-5">
               <Campo titulo="O que buscar">
                 <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-[var(--input-bg)] p-1.5 focus-within:border-brand-line">
                   {o.termos.map((t) => (
@@ -239,54 +311,6 @@ export default function NovaBusca({
                     data-campo="nova-busca-cidade"
                   />
                 </div>
-                {vista && (
-                  <div className="flex flex-col gap-2" data-bloco="nova-busca-area">
-                    <Mapa
-                      vista={vista}
-                      area={o.area}
-                      aoMoverCentro={moverCentro}
-                      rotulo={`Mapa de ${o.cidade}: arraste o centro ou clique para mover`}
-                      className="h-56"
-                      data-slot="nova-busca-mapa"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-chrome"
-                        aria-label="Diminuir o raio"
-                        disabled={!o.area || o.area.raioKm <= RAIOS_KM[0]}
-                        onClick={() => mudarRaio(-1)}
-                      >
-                        <Minus aria-hidden />
-                      </Button>
-                      <span className="min-w-36 text-center text-apoio tabular-nums text-ink" aria-live="polite" data-slot="nova-busca-raio">
-                        {o.area ? `Raio: ${o.area.raioKm} km` : "Raio: a cidade inteira"}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-chrome"
-                        aria-label="Aumentar o raio"
-                        disabled={o.area !== null && o.area.raioKm >= RAIOS_KM[RAIOS_KM.length - 1]}
-                        onClick={() => mudarRaio(1)}
-                      >
-                        <Plus aria-hidden />
-                      </Button>
-                      {o.area && (
-                        <Button type="button" variant="link" size="link" className="ml-auto" onClick={() => mudar({ area: null })} data-slot="nova-busca-cidade-inteira">
-                          Usar a cidade inteira
-                        </Button>
-                      )}
-                    </div>
-                    {centroFora && vizinha && (
-                      <Aviso tom="warn" data-bloco="nova-busca-centro-fora">
-                        O centro está em {vizinha.nome}
-                        {vizinha.uf !== o.uf ? `, ${vizinha.uf}` : ""}.
-                      </Aviso>
-                    )}
-                  </div>
-                )}
               </Campo>
 
               <Campo titulo="Quantas empresas por segmento">
@@ -381,23 +405,36 @@ export default function NovaBusca({
             </div>
           </AreaRolavel>
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-line px-6 py-4">
-            <p className="text-legenda tabular-nums text-ink-3" data-slot="nova-busca-custo">
-              {maximo > 0
-                ? `Até ${numeroBR(maximo)} empresas, a partir de ${usd(custoMinimoDaBuscaUsd(comDigitado))}${comDigitado.buscarContatos ? " mais os contatos" : ""}`
-                : "Escolha o segmento"}
-            </p>
-            <div className="ml-auto flex gap-2">
-              <Button type="button" variant="ghost" onClick={() => aoMudar(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={problemas.length > 0} title={problemas.join(". ") || undefined} data-slot="nova-busca-buscar">
-                Buscar
-              </Button>
+          <div className="flex flex-col gap-2 border-t border-line px-5 py-3" data-slot="nova-busca-rodape">
+            {falha && (
+              <Aviso tom="danger" data-bloco="nova-busca-falha">
+                {falha}
+              </Aviso>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-legenda tabular-nums text-ink-3" data-slot="nova-busca-custo">
+                {maximo > 0
+                  ? `Até ${numeroBR(maximo)} empresas, a partir de ${usd(custoMinimoDaBuscaUsd(comDigitado))}${comDigitado.buscarContatos ? " mais os contatos" : ""}`
+                  : "Escolha o segmento"}
+              </p>
+              <div className="ml-auto flex gap-2">
+                <Button type="button" variant="ghost" onClick={voltar}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={problemas.length > 0}
+                  carregando={enviando}
+                  title={problemas.join(". ") || undefined}
+                  data-slot="nova-busca-buscar"
+                >
+                  Buscar
+                </Button>
+              </div>
             </div>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </form>
   );
 }

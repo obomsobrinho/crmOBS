@@ -114,3 +114,8 @@ line (risk 4 and D4 in the plan).
   "pulado" returned the lead to the queue, so the cron would claim the same lead forever.
 - The actor's accepted values for `placeMinimumStars` and `website` are still unconfirmed; the same
   filters run on our side (`filtrarPelasOpcoes`), so the base never gets what the owner left out.
+- Map inside a dialog (31/10/2026): the Nova busca modal grew a Leaflet map; the Radix dialog's scroll lock
+  cancelled the wheel over the map (the map did not zoom on the wheel either), so after picking the city
+  the form looked frozen under the mouse. Measured in Playwright: over the fields the modal scrolled 300 px,
+  over the map 0; the same map outside a dialog let the page scroll. Nova busca became a page and the wheel
+  over the map zooms it (`ui.md`).
