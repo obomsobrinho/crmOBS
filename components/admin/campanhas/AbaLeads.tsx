@@ -22,14 +22,12 @@ import {
   textoDoLocal,
   tipoDoTelefone,
   type DiaDeEnvio,
-  type OpcoesDaBusca,
   type ResumoDaBase,
   type SemanaContada,
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import { FaixaDeNumeros } from "./faixa";
-import NovaBusca from "./NovaBusca";
 import FichaDoLead from "./FichaDoLead";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
@@ -872,6 +870,7 @@ function AbaLeads({
   rascunho,
   abrirBusca,
   aoMudar,
+  novaBusca,
   criarCampanhaDaBusca,
   voltarAoRascunho,
 }: {
@@ -887,34 +886,17 @@ function AbaLeads({
   buscaAberta: string | null;
   rascunho: CampanhaEditavel | null;
   abrirBusca: (id: string | null) => void;
-  /** Depois de uma escrita que muda números de outras telas (nova busca, busca que terminou). */
+  /** Depois de uma escrita que muda números de outras telas (uma busca que terminou). */
   aoMudar: () => void;
+  /** Abre a página da Nova busca. */
+  novaBusca: () => void;
   criarCampanhaDaBusca: (busca: Busca) => void;
   voltarAoRascunho: () => void;
 }) {
-  const [dialogo, setDialogo] = useState(false);
-  const [falha, setFalha] = useState<string | null>(null);
   const aberta = useLeitura(`busca|${buscaAberta ?? ""}`, () => (buscaAberta ? fonte.busca(buscaAberta) : Promise.resolve(null)));
   const busca = buscaAberta && aberta.dados?.id === buscaAberta ? aberta.dados : null;
-  const buscar = async (o: OpcoesDaBusca) => {
-    setDialogo(false);
-    setFalha(null);
-    try {
-      const r = await fonte.novaBusca(o);
-      if (!r.ok) setFalha(r.erro);
-    } catch (e) {
-      console.error("nova busca:", e);
-      setFalha("Não deu para começar a busca agora. Tente de novo em instantes.");
-    }
-    aoMudar();
-  };
   return (
     <>
-      {falha && (
-        <Aviso tom="danger" forma="faixa" className="mb-4" data-bloco="leads-falha">
-          {falha}
-        </Aviso>
-      )}
       {busca ? (
         <DetalheDaBusca
           abas={abas}
@@ -934,12 +916,11 @@ function AbaLeads({
           agora={agora}
           rascunho={rascunho}
           abrir={abrirBusca}
-          novaBusca={() => setDialogo(true)}
+          novaBusca={novaBusca}
           voltarAoRascunho={voltarAoRascunho}
           aoTerminarBusca={aoMudar}
         />
       )}
-      <NovaBusca aberto={dialogo} aoMudar={setDialogo} aoBuscar={buscar} />
     </>
   );
 }

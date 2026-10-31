@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import type { Circle, CircleMarker, Map as MapaLeaflet, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
-import { ROTULO_NO_MAPA, type AreaDaBusca } from "@/lib/prospeccao";
+import { ROTULO_NO_MAPA } from "@/lib/prospeccao";
 import type { PontoNoMapa } from "./tipos";
 
 // O MAPA DE CAMPANHAS, um só (revisão do dono, 30/10/2026), usado no detalhe de uma
@@ -38,8 +38,11 @@ export default function Mapa({
   aoEscolher?: (id: string) => void;
   /** Onde o mapa olha quando não há pino nem área (a cidade escolhida). */
   vista?: { lat: number; lng: number; zoom: number } | null;
-  /** O centro arrastável e o círculo do raio (null = sem área). */
-  area?: AreaDaBusca | null;
+  /**
+   * O centro arrastável e, com `raioKm`, o círculo do raio (null = sem centro). Um centro sem
+   * raio é a sede da cidade escolhida: arrastar ou clicar cria a área.
+   */
+  area?: { lat: number; lng: number; raioKm: number | null } | null;
   /** Arrastar o centro ou clicar no mapa (só com `aoMoverCentro`). */
   aoMoverCentro?: (lat: number, lng: number) => void;
   /** O nome acessível do mapa. */
@@ -66,7 +69,8 @@ export default function Mapa({
     void import("leaflet").then((L) => {
       if (!vivo || !elemento.current) return;
       leaflet.current = L;
-      const m = L.map(elemento.current, { scrollWheelZoom: false, attributionControl: true });
+      // A roda sobre o mapa dá zoom NO MAPA (revisão de 30/10/2026); fora dele, a página rola.
+      const m = L.map(elemento.current, { scrollWheelZoom: true, attributionControl: true });
       L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>',
@@ -125,13 +129,17 @@ export default function Mapa({
           if (p) mover.current?.(p.lat, p.lng);
         })
         .addTo(m);
-      circulo.current = L.circle(ponto, { radius: area.raioKm * 1000, className: "area-do-mapa", weight: 2, fillOpacity: 0.12 }).addTo(m);
-    } else {
-      centro.current.setLatLng(ponto);
-      circulo.current?.setLatLng(ponto).setRadius(area.raioKm * 1000);
+    } else centro.current.setLatLng(ponto);
+    if (area.raioKm === null) {
+      circulo.current?.remove();
+      circulo.current = null;
+      m.setView(ponto, Math.max(m.getZoom(), 12), { animate: false });
+      return;
     }
-    const limites = circulo.current?.getBounds();
-    if (limites) m.fitBounds(limites, { padding: [16, 16], animate: false });
+    if (!circulo.current) {
+      circulo.current = L.circle(ponto, { radius: area.raioKm * 1000, className: "area-do-mapa", weight: 2, fillOpacity: 0.12 }).addTo(m);
+    } else circulo.current.setLatLng(ponto).setRadius(area.raioKm * 1000);
+    m.fitBounds(circulo.current.getBounds(), { padding: [16, 16], animate: false });
   }
 
   function olharPara() {

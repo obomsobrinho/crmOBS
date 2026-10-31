@@ -8,7 +8,7 @@ import { fonteDeMentira } from "./fonte-de-mentira";
 // Preview de Campanhas v2, a prospecção do dono do produto (docs/plano-campanhas.md).
 // Dev-only, sem banco e sem sessão: empresas de mentira, nenhuma busca paga,
 // nenhuma mensagem enviada. `?tela=` abre direto numa tela:
-// leads | busca | campanhas | campanha | rascunho;
+// leads | busca | nova-busca | campanhas | campanha | rascunho;
 // `?cenario=vazio` mostra tudo sem dados (os estados vazios); `?cenario=travado`, leituras
 // que nunca voltam (o tempo limite).
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 const TELAS: Record<string, Tela> = {
   leads: { aba: "leads", busca: null },
   busca: { aba: "leads", busca: "b1" },
+  "nova-busca": { aba: "leads", nova: true },
   campanhas: { aba: "campanhas", vista: "lista" },
   campanha: { aba: "campanhas", vista: "detalhe", id: "g8" },
   rascunho: { aba: "campanhas", vista: "editar", id: "c3" },

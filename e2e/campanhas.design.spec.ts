@@ -11,7 +11,7 @@ const ID = "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b";
 
 /** UF primeiro, depois a cidade DA LISTA, digitando no combobox. */
 async function escolherCidade(page: Page, uf: string, digitado: string, nome: string) {
-  const dialogo = page.getByRole("dialog");
+  const dialogo = page.locator('[data-slot="nova-busca"]');
   await dialogo.getByRole("combobox", { name: "Estado" }).click();
   await page.getByRole("option", { name: uf, exact: true }).click();
   const cidade = dialogo.getByRole("combobox", { name: "Cidade" });
@@ -93,7 +93,7 @@ test.describe("Campanhas no preview", () => {
     test.setTimeout(60_000);
     await page.goto("/design/campanhas?tela=leads");
     await page.locator('[data-slot="leads-nova-busca"]').click();
-    const dialogo = page.getByRole("dialog");
+    const dialogo = page.locator('[data-slot="nova-busca"]');
     await dialogo.getByRole("textbox", { name: "Segmento" }).fill("pet shop");
     await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
     await escolherCidade(page, "MG", "mutum", "Mutum");
@@ -164,49 +164,91 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     expect((await grupo.locator("a").allInnerTexts()).map((t) => t.trim())).toEqual(["Campanhas", "Clientes"]);
   });
 
-  test("Nova busca: a cidade escolhida abre o mapa; o raio aparece, muda e volta para a cidade inteira", async ({ page }) => {
+  test("Nova busca é uma página: o mapa já aparece aberto na cidade da última busca, e voltar leva a Leads", async ({ page }) => {
     await page.goto("/design/campanhas?tela=leads");
     await page.locator('[data-slot="leads-nova-busca"]').click();
-    const dialogo = page.getByRole("dialog");
-    await expect(dialogo.locator('[data-slot="nova-busca-mapa"]')).toHaveCount(0);
-    await escolherCidade(page, "MG", "mutum", "Mutum");
-    await expect(dialogo.locator('[data-slot="nova-busca-mapa"]')).toBeVisible();
-    const raio = dialogo.locator('[data-slot="nova-busca-raio"]');
-    await expect(raio).toHaveText("Raio: a cidade inteira");
-    await dialogo.getByRole("button", { name: "Aumentar o raio" }).click();
-    await expect(raio).toHaveText("Raio: 5 km");
-    await expect(dialogo.locator(".pino-central")).toHaveCount(1);
-    await expect(dialogo.locator("path.area-do-mapa")).toHaveCount(1);
-    await dialogo.getByRole("button", { name: "Aumentar o raio" }).click();
-    await expect(raio).toHaveText("Raio: 8 km");
-    await dialogo.getByRole("button", { name: "Diminuir o raio" }).click();
-    await dialogo.getByRole("button", { name: "Diminuir o raio" }).click();
-    await expect(raio).toHaveText("Raio: 3 km");
-    await dialogo.locator('[data-slot="nova-busca-cidade-inteira"]').click();
-    await expect(raio).toHaveText("Raio: a cidade inteira");
-    await expect(dialogo.locator(".pino-central")).toHaveCount(0);
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(pagina.locator('[data-slot="nova-busca-mapa"]')).toBeVisible();
+    // A última busca do preview é a de barbearias em Caratinga.
+    await expect(pagina.getByRole("combobox", { name: "Estado" })).toHaveText(/MG/);
+    await expect(pagina.getByRole("combobox", { name: "Cidade" })).toHaveText("Caratinga");
+    await expect(pagina.locator(".pino-central")).toHaveCount(1);
+    // "Buscar" à vista sem rolar, em 1280x720.
+    await expect(pagina.locator('[data-slot="nova-busca-buscar"]')).toBeInViewport();
+    await pagina.locator('[data-slot="nova-busca-voltar"]').click();
+    await expect(page.locator('[data-slot="leads-buscas"]')).toBeVisible();
   });
 
-  test("Nova busca: clicar longe no mapa move o centro e avisa a cidade vizinha, sem bloquear", async ({ page }) => {
-    await page.goto("/design/campanhas?tela=leads");
-    await page.locator('[data-slot="leads-nova-busca"]').click();
-    const dialogo = page.getByRole("dialog");
-    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("padaria");
-    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+  test("Nova busca: o raio aparece, muda e volta para a cidade inteira", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
     await escolherCidade(page, "MG", "mutum", "Mutum");
-    // Da cidade inteira até o maior raio: 5, 8, 10, 15, 20, 30, 50 km (no fim o "+" desliga).
-    const mais = dialogo.getByRole("button", { name: "Aumentar o raio" });
-    for (let i = 0; i < 7; i++) await mais.click();
-    await expect(dialogo.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 50 km");
-    await expect(mais).toBeDisabled();
-    await expect(dialogo.locator('[data-bloco="nova-busca-centro-fora"]')).toHaveCount(0);
-    const mapa = dialogo.locator('[data-slot="nova-busca-mapa"]');
-    await mapa.scrollIntoViewIfNeeded();
+    const raio = pagina.locator('[data-slot="nova-busca-raio"]');
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(0);
+    await pagina.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 5 km");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(1);
+    await pagina.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(raio).toHaveText("Raio: 8 km");
+    await pagina.getByRole("button", { name: "Diminuir o raio" }).click();
+    await pagina.getByRole("button", { name: "Diminuir o raio" }).click();
+    await expect(raio).toHaveText("Raio: 3 km");
+    await pagina.locator('[data-slot="nova-busca-cidade-inteira"]').click();
+    await expect(raio).toHaveText("Raio: a cidade inteira");
+    await expect(pagina.locator("path.area-do-mapa")).toHaveCount(0);
+    // O pino continua, na sede da cidade.
+    await expect(pagina.locator(".pino-central")).toHaveCount(1);
+  });
+
+  test("Nova busca: mover o centro para dentro de outra cidade troca UF e cidade nos campos", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await pagina.getByRole("textbox", { name: "Segmento" }).fill("padaria");
+    await pagina.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    const cidade = pagina.getByRole("combobox", { name: "Cidade" });
+    // Um clique perto do centro fica em Mutum e já cria a área.
+    const mapa = pagina.locator('[data-slot="nova-busca-mapa"]');
     const caixa = await mapa.boundingBox();
     if (!caixa) throw new Error("mapa sem caixa");
-    await page.mouse.click(caixa.x + caixa.width - 40, caixa.y + caixa.height / 2);
-    await expect(dialogo.locator('[data-bloco="nova-busca-centro-fora"]')).toContainText("O centro está em");
-    await expect(dialogo.getByRole("button", { name: "Buscar", exact: true })).toBeEnabled();
+    await page.mouse.click(caixa.x + caixa.width / 2 + 15, caixa.y + caixa.height / 2 + 15);
+    await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 5 km");
+    await expect(cidade).toHaveText("Mutum");
+    // Com o raio de 50 km o mapa mostra a região; um clique perto da borda cai noutra cidade.
+    const mais = pagina.getByRole("button", { name: "Aumentar o raio" });
+    for (let i = 0; i < 6; i++) await mais.click();
+    await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 50 km");
+    await page.mouse.click(caixa.x + caixa.width - 30, caixa.y + caixa.height / 2);
+    await expect(cidade).not.toHaveText("Mutum");
+    await expect(pagina.getByRole("combobox", { name: "Estado" })).toHaveText(/MG|ES/);
+    await expect(pagina.getByRole("button", { name: "Buscar", exact: true })).toBeEnabled();
+    // O aviso antigo saiu: a referência agora são os próprios campos.
+    await expect(pagina.locator('[data-bloco="nova-busca-centro-fora"]')).toHaveCount(0);
+  });
+
+  test("rolagem: a roda sobre o mapa dá zoom no mapa; sobre os campos, a coluna rola (bug de 30/10/2026)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const pagina = page.locator('[data-slot="nova-busca"]');
+    await escolherCidade(page, "MG", "mutum", "Mutum");
+    const mapa = pagina.locator('[data-slot="nova-busca-mapa"]');
+    const zoom = () => mapa.locator(".leaflet-proxy").evaluate((e) => (e as HTMLElement).style.transform);
+    const coluna = pagina.locator('[data-slot="area-rolavel"]');
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem caixa");
+    const antes = await zoom();
+    await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+    await page.mouse.wheel(0, -500);
+    await expect.poll(zoom).not.toBe(antes);
+    expect(await coluna.evaluate((e) => e.scrollTop)).toBe(0);
+    // Fora do mapa a página (a coluna dos campos) rola normalmente, depois de escolher a cidade.
+    const campos = await coluna.boundingBox();
+    if (!campos) throw new Error("coluna sem caixa");
+    await page.mouse.move(campos.x + 100, campos.y + campos.height / 2);
+    await page.mouse.wheel(0, 400);
+    await expect.poll(() => coluna.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
   });
 
   test("o detalhe da busca diz onde ela procurou: a cidade e o raio usado", async ({ page }) => {
@@ -214,19 +256,17 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     await expect(page.getByText("Mutum, MG · raio de 5 km")).toBeVisible();
   });
 
-  test("Nova busca: sem cidade da lista não busca; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
-    await page.goto("/design/campanhas?tela=leads");
-    await page.locator('[data-slot="leads-nova-busca"]').click();
-    const dialogo = page.getByRole("dialog");
+  test("Nova busca: trocar a UF limpa a cidade e trava o Buscar; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=nova-busca");
+    const dialogo = page.locator('[data-slot="nova-busca"]');
     await dialogo.getByRole("textbox", { name: "Segmento" }).fill("clínica de estética");
     await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
     const buscar = dialogo.getByRole("button", { name: "Buscar", exact: true });
-    await expect(buscar).toBeDisabled();
-    // Sem UF a cidade nem abre.
-    await expect(dialogo.getByRole("combobox", { name: "Cidade" })).toBeDisabled();
-    // No ES não existe Mutum.
+    await expect(buscar).toBeEnabled();
+    // No ES não existe Mutum, e trocar a UF limpa a cidade (sem cidade da lista, não busca).
     await dialogo.getByRole("combobox", { name: "Estado" }).click();
     await page.getByRole("option", { name: "ES", exact: true }).click();
+    await expect(buscar).toBeDisabled();
     await dialogo.getByRole("combobox", { name: "Cidade" }).click();
     await page.getByRole("textbox", { name: "Cidade: buscar" }).fill("Mutúm");
     await expect(page.getByText("Nenhuma cidade com esse nome neste estado")).toBeVisible();
