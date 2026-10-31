@@ -238,16 +238,27 @@ export type TrechoDoDia = [inicioMin: number, fimMin: number];
 export function trechosAbertosDoDia(dia: string, hours: BusinessHours | null, config?: FeriadosDaAgenda): TrechoDoDia[] {
   if (!hours) return [];
   const base = inicioDoDiaSP(dia);
-  const emMin = (t: number) => Math.round((Math.min(t, base + DIA_MS) - base) / MIN);
-  const atende = (d: string) => !config || !feriadoQueFecha(d, config);
-  const trechos: TrechoDoDia[] = [];
   const ontem = somarDias(dia, -1);
-  const vespera = atende(ontem) ? expedienteDoDia(ontem, hours) : null;
-  if (vespera && vespera.fim > base) trechos.push([0, emMin(vespera.fim)]);
-  const hoje = atende(dia) ? expedienteDoDia(dia, hours) : null;
-  if (hoje) trechos.push([emMin(hoje.inicio), emMin(hoje.fim)]);
+  const vespera = atendeNoDia(ontem, config) ? expedienteDoDia(ontem, hours) : null;
+  const trechos: TrechoDoDia[] = [];
+  if (vespera && vespera.fim > base) trechos.push([0, Math.round((Math.min(vespera.fim, base + DIA_MS) - base) / MIN)]);
+  const proprio = trechoProprioDoDia(dia, hours, config);
+  if (proprio) trechos.push(proprio);
   // A sobra da véspera começa às 00:00 e vem antes: a lista já sai em ordem.
   return trechos.filter(([a, b]) => b > a);
+}
+
+/** O feriado do dia não fecha a agenda (sem `config`, o feriado não conta). */
+function atendeNoDia(dia: string, config: FeriadosDaAgenda): boolean {
+  return !config || !feriadoQueFecha(dia, config);
+}
+
+/** O expediente que COMEÇA no dia, cortado à meia-noite (sem a sobra da véspera); null fechado. */
+function trechoProprioDoDia(dia: string, hours: BusinessHours, config: FeriadosDaAgenda): TrechoDoDia | null {
+  const e = atendeNoDia(dia, config) ? expedienteDoDia(dia, hours) : null;
+  if (!e) return null;
+  const base = inicioDoDiaSP(dia);
+  return [Math.round((e.inicio - base) / MIN), Math.round((Math.min(e.fim, base + DIA_MS) - base) / MIN)];
 }
 
 /** O complemento: os trechos do dia em que a agenda NÃO atende (o dia inteiro, se fechado). */
@@ -275,13 +286,15 @@ export function minutoParaCentralizar(dias: string[], hours: BusinessHours | nul
     const min = minutosNoDia(agora);
     if (trechosAbertosDoDia(hoje, hours, config).some(([a, b]) => min >= a && min < b)) return min;
   }
+  // O expediente que começa em cada dia, sem a sobra da véspera: um horário que vira a noite
+  // (18h às 02h) centraliza nas 21h, não no meio-dia fechado entre a madrugada e a noite.
   let de = Infinity;
   let ate = -Infinity;
   for (const d of dias) {
-    for (const [a, b] of trechosAbertosDoDia(d, hours, config)) {
-      de = Math.min(de, a);
-      ate = Math.max(ate, b);
-    }
+    const t = hours ? trechoProprioDoDia(d, hours, config) : null;
+    if (!t) continue;
+    de = Math.min(de, t[0]);
+    ate = Math.max(ate, t[1]);
   }
   return Number.isFinite(de) ? Math.round((de + ate) / 2) : MEIO_DO_DIA_COMERCIAL;
 }

@@ -439,6 +439,9 @@ test.describe("Grade semanal: trechos abertos e fechados do dia (redesenho de 31
     expect(trechosAbertosDoDia("2026-10-30", noite)).toEqual([[1080, 1440]]);
     expect(trechosAbertosDoDia("2026-10-31", noite)).toEqual([[0, 120]]);
     expect(trechosFechadosDoDia("2026-10-31", noite)).toEqual([[120, 1440]]);
+    // A grade abre no meio do expediente da noite (21h), não ao meio-dia entre a madrugada e a noite.
+    const semana = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"];
+    expect(minutoParaCentralizar(semana, noite, inicioDoDiaSP("2026-11-05"))).toBe(21 * 60);
   });
 
   test("horário de uma hora: dois trechos fechados em volta; um dia fechado no meio da semana", () => {

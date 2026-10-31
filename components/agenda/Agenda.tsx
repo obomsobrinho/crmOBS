@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Ban,
@@ -148,10 +148,20 @@ export default function Agenda(p: PropsAgenda) {
 
   // Ao abrir (e a cada semana), a rolagem fica mais ou menos no meio do horário de
   // atendimento, ou na hora de agora quando ela está dentro dele.
+  // Antes da pintura (sem a grade piscar em 0h e pular), e só quando a SEMANA muda: um
+  // render que refaz as props não devolve a rolagem do dono ao centro.
+  /** O que fica fora do horário em cada dia da semana: uma conta por semana, não por tecla. */
+  const fechadosPorDia = useMemo(
+    () => Object.fromEntries(dias.map((d) => [d, trechosFechadosDoDia(d, p.hours, p.config)])),
+    [dias, p.hours, p.config],
+  );
   const grade = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const centralizadaEm = useRef<string | null>(null);
+  useLayoutEffect(() => {
     const el = grade.current;
-    if (!el) return;
+    const semanaAberta = dias.join();
+    if (!el || centralizadaEm.current === semanaAberta) return;
+    centralizadaEm.current = semanaAberta;
     const minuto = minutoParaCentralizar(dias, p.hours, p.agora, p.config);
     el.scrollTop = Math.max(0, (minuto / 60) * HORA_PX - el.clientHeight / 2);
     // Marca (no DOM, sem estado) que a rolagem inicial já aconteceu: quem clica num cartão
@@ -246,7 +256,7 @@ export default function Agenda(p: PropsAgenda) {
 
           {/* ⚠️ O mesmo `scrollbar-gutter: stable` no cabeçalho e na grade (31/10/2026): a barra de rolagem
               só existe na grade, e sem a reserva as colunas de cima saíam mais largas que as de baixo. */}
-          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] overflow-y-hidden border-b border-line [scrollbar-gutter:stable] max-md:hidden" data-agenda="cabecalho-dias">
+          <div className="grid shrink-0 grid-cols-[52px_repeat(7,minmax(0,1fr))] overflow-hidden border-b border-line [scrollbar-gutter:stable] max-md:hidden" data-agenda="cabecalho-dias">
             <span />
             {dias.map((d, i) => (
               <div
@@ -295,7 +305,7 @@ export default function Agenda(p: PropsAgenda) {
                   dia={d}
                   hoje={hoje}
                   agora={p.agora}
-                  fechados={trechosFechadosDoDia(d, p.hours, p.config)}
+                  fechados={fechadosPorDia[d] ?? []}
                   itens={itens.filter((l) => diaIsoSP(l.inicio) === d)}
                   bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + DIA_MS && b.fim > inicioDoDia(d))}
                   escondidaNoCelular={d !== diaCelular}
@@ -472,7 +482,8 @@ function ColunaDoDia({
               "absolute inset-x-1 z-10 flex-col items-start justify-center overflow-hidden rounded-md border border-line bg-raised pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
               passou && "opacity-60"
             )}
-            style={{ top: topo(l.inicio), height: altura(l.inicio, l.fim) }}
+            // Um horário que passa da meia-noite para no fim da grade (24h), como os bloqueios.
+            style={{ top: topo(l.inicio), height: Math.min(altura(l.inicio, l.fim), Math.max(20, alturaTotal - topo(l.inicio))) }}
           >
             <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
             <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">
