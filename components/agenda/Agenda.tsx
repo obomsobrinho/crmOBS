@@ -38,6 +38,7 @@ import {
   expedienteDoDia,
   minutoParaCentralizar,
   trechosFechadosDoDia,
+  type TrechoDoDia,
   faixaHoraria,
   hhmm,
   quandoFalado,
@@ -151,12 +152,12 @@ export default function Agenda(p: PropsAgenda) {
   useEffect(() => {
     const el = grade.current;
     if (!el) return;
-    const minuto = minutoParaCentralizar(dias, p.hours, p.agora);
+    const minuto = minutoParaCentralizar(dias, p.hours, p.agora, p.config);
     el.scrollTop = Math.max(0, (minuto / 60) * HORA_PX - el.clientHeight / 2);
     // Marca (no DOM, sem estado) que a rolagem inicial já aconteceu: quem clica num cartão
     // logo ao abrir (os testes) espera por ela, para o clique não mudar de lugar.
     el.dataset.centralizada = "sim";
-  }, [dias, p.hours, p.agora]);
+  }, [dias, p.hours, p.agora, p.config]);
 
   const irPara = (dia: string) => {
     setSemana(segundaDaSemana(dia));
@@ -175,7 +176,6 @@ export default function Agenda(p: PropsAgenda) {
       </Card>
     );
   }
-
 
   return (
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
@@ -268,7 +268,6 @@ export default function Agenda(p: PropsAgenda) {
             ))}
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col">
           <AreaRolavel ref={grade} className="min-h-0 flex-1 [scrollbar-gutter:stable]" data-agenda="grade">
             <div
               className="relative grid grid-cols-[52px_repeat(7,minmax(0,1fr))] max-md:grid-cols-[44px_minmax(0,1fr)]"
@@ -296,9 +295,9 @@ export default function Agenda(p: PropsAgenda) {
                   dia={d}
                   hoje={hoje}
                   agora={p.agora}
-                  hours={p.hours}
+                  fechados={trechosFechadosDoDia(d, p.hours, p.config)}
                   itens={itens.filter((l) => diaIsoSP(l.inicio) === d)}
-                  bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + 86_400_000 && b.fim > inicioDoDia(d))}
+                  bloqueios={bloqueios.filter((b) => b.inicio < inicioDoDia(d) + DIA_MS && b.fim > inicioDoDia(d))}
                   escondidaNoCelular={d !== diaCelular}
                   onAbrir={setDetalhe}
                   feriado={!!feriadoQueFecha(d, p.config)}
@@ -311,7 +310,6 @@ export default function Agenda(p: PropsAgenda) {
               ))}
             </div>
           </AreaRolavel>
-          </div>
         </div>
       </div>
 
@@ -372,7 +370,7 @@ function ColunaDoDia({
   dia,
   hoje,
   agora,
-  hours,
+  fechados,
   itens,
   bloqueios,
   escondidaNoCelular,
@@ -383,7 +381,11 @@ function ColunaDoDia({
   dia: string;
   hoje: string;
   agora: number;
-  hours: BusinessHours | null;
+  /**
+   * Fora do horário da agenda (antes, depois, o dia fechado, o feriado que a agenda não
+   * atende): UM visual só, o dos dias fechados; o time ainda marca ali, a IA não.
+   */
+  fechados: TrechoDoDia[];
   itens: LinhaAgenda[];
   bloqueios: BloqueioAgenda[];
   escondidaNoCelular: boolean;
@@ -392,15 +394,10 @@ function ColunaDoDia({
   feriado: boolean;
   onVazio: (dia: string, inicio: number) => void;
 }) {
-  const horaPx = HORA_PX;
-  const nHoras = HORAS;
   const base = inicioDoDia(dia);
-  const topo = (t: number) => ((t - base) / 60_000 / 60) * horaPx;
-  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * horaPx - 2);
-  // Fora do horário da agenda (antes, depois, o dia fechado, o feriado que a agenda não
-  // atende) tem UM visual só, o dos dias fechados: o time ainda marca ali, a IA não.
-  const fechados = trechosFechadosDoDia(dia, feriado ? null : hours);
-  const alturaTotal = nHoras * horaPx;
+  const topo = (t: number) => ((t - base) / 60_000 / 60) * HORA_PX;
+  const altura = (de: number, ate: number) => Math.max(20, ((ate - de) / 60_000 / 60) * HORA_PX - 2);
+  const alturaTotal = HORAS * HORA_PX;
   return (
     <div
       data-agenda="coluna"
@@ -422,21 +419,21 @@ function ColunaDoDia({
         className="absolute inset-0 z-0 rounded-none"
         onClick={(e) => {
           const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
-          const min = Math.floor(((y / horaPx) * 60) / 30) * 30;
+          const min = Math.floor(((y / HORA_PX) * 60) / 30) * 30;
           onVazio(dia, base + min * 60_000);
         }}
       />
       {/* Linhas só ENTRE as horas: no topo vale a borda do cabeçalho e no fim a
           borda do cartão (ajuste do dono: eram duas linhas coladas). */}
-      {Array.from({ length: Math.max(0, nHoras - 1) }, (_, i) => (
-        <div key={`h${i}`} className="pointer-events-none absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * horaPx }} aria-hidden />
+      {Array.from({ length: Math.max(0, HORAS - 1) }, (_, i) => (
+        <div key={`h${i}`} className="pointer-events-none absolute inset-x-0 h-px bg-[var(--line-soft)]" style={{ top: (i + 1) * HORA_PX }} aria-hidden />
       ))}
       {fechados.map(([de, ate]) => (
         <div
           key={`f${de}`}
           data-agenda="fechado"
           className="pointer-events-none absolute inset-x-0 bg-[var(--chip-bg)] opacity-60"
-          style={{ top: (de / 60) * horaPx, height: ((ate - de) / 60) * horaPx }}
+          style={{ top: (de / 60) * HORA_PX, height: ((ate - de) / 60) * HORA_PX }}
           aria-hidden
         />
       ))}

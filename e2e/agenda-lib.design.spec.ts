@@ -461,4 +461,17 @@ test.describe("Grade semanal: trechos abertos e fechados do dia (redesenho de 31
     // Sem horário nenhum: o meio do dia comercial.
     expect(minutoParaCentralizar(semana, null, inicioDoDiaSP("2026-10-29"))).toBe(13 * 60);
   });
+
+  test("feriado que a agenda guarda fechado: o dia todo fechado, e a grade não centraliza no agora dele", () => {
+    // 02/11/2026 (segunda) é Finados, nacional.
+    expect(trechosAbertosDoDia("2026-11-02", obs, CFG)).toEqual([]);
+    expect(trechosFechadosDoDia("2026-11-02", obs, CFG)).toEqual([[0, 1440]]);
+    // Liberado pelo dono, volta a atender; sem a config, o feriado não conta.
+    expect(trechosAbertosDoDia("2026-11-02", obs, { ...CFG, feriadosLiberados: ["2026-11-02"] })).toEqual([[780, 1080]]);
+    expect(trechosAbertosDoDia("2026-11-02", obs)).toEqual([[780, 1080]]);
+    const semana = ["2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08"];
+    const quatorzeDoFeriado = inicioDoDiaSP("2026-11-02") + 14 * 60 * 60_000;
+    expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado, CFG)).toBe(15 * 60 + 30);
+    expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado)).toBe(14 * 60);
+  });
 });
