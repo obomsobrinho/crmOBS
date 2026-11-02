@@ -6,15 +6,15 @@ Chat with the owner in Portuguese (BR). Code, docs, specs and ADRs in English. U
 Hard rules live in `.claude/rules/` (see "Where to read more"). `engineering.md` is always loaded; the others load by file path.
 
 ## What this is
-Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack. Many companies (tenants) use the same system, each sees only its own data, and an AI agent answers on each tenant's WhatsApp. Paid product: every new company gets a 7-day trial, then picks a plan (Essencial, Profissional or Avançado, prices and limits in `PLANS`, `lib/billing.ts`); Vitalício (full access, never charged) is for the owner's internal accounts and special cases. Billing goes through Asaas (`lib/asaas.ts`; any `ASAAS_ENV` other than `producao` is sandbox) and an expired trial blocks the account (read-only mode) unless it is Vitalício. The CRM is a spin-off of OBS (O Bom Sobrinho): no fixed product name in components (`lib/brand.ts`).
+Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack. Many companies (tenants) use the same system, each sees only its own data, and an AI agent answers on each tenant's WhatsApp. Paid product: every new company gets a 7-day trial, then picks a plan (Essencial, Profissional or Avançado, prices and limits in `PLANS`, `lib/billing.ts`); Vitalício (full access, never charged) is for the owner's internal accounts and special cases. Billing goes through Asaas (`lib/asaas.ts`; any `ASAAS_ENV` other than `producao` is sandbox) and an expired trial blocks the account (read-only mode) unless it is Vitalício. The CRM is a spin-off of OBS (O Bom Sobrinho) and its product name is **Atenda** (decided by the owner on 2026-10-19, own logo still to be made); no product name is hardcoded in components, it lives in `lib/brand.ts` (which still says "Atendimento" until the logo lands). Production: `https://atendimento.obomsobrinho.com.br` (Vercel).
 
 ## Who does what
-- **Evolution API** = WhatsApp connection (one *instance* per tenant). The CRM talks to it only in onboarding (create instance, QR/pairing code) and for status/notice targets.
+- **Evolution API** = WhatsApp connection (one *instance* per tenant). The CRM talks to it only in onboarding (create instance, connect by QR only: the pairing code is off since 2026-10-17, `docs/adr/2026-10-17-pairing-code-off-qr-only.md`) and for status/notice targets.
 - **n8n** = the pipe (PRODUCTION). Receives the Evolution webhook, calls the brain `POST /api/agent`, sends replies, records messages with `service_role`. No business logic in n8n.
 - **CRM (this repo, Next.js 16)** = interface and brain. Reads Supabase with the USER session (RLS per tenant); sends manual messages through an n8n webhook; the brain (`processTurn`) runs here. Never writes conversation tables directly (except granted columns).
 
 ## Glossary ("cliente" is AMBIGUOUS, read this)
-- **`clients` = the TENANT**: the company that USES the CRM (e.g. OBM, Loja Teste). PK uuid. NOT a lead. In the product owner's central (`/clientes`) these companies are called "clientes"; in the tenants' app the people who message them are "Contatos" (`/contatos`).
+- **`clients` = the TENANT**: the company that USES the CRM (e.g. OBS). PK uuid. NOT a lead. In the product owner's central (`/clientes`) these companies are called "clientes"; in the tenants' app the people who message them are "Contatos" (`/contatos`).
 - **`dados_cliente` = the CONTACTS/LEADS**: who messages a tenant's WhatsApp ("the customer of your customer"). PK bigint, unique `(client_id, telefone)`. Route and screen: `/contatos`, "Contatos".
 - `client_id` in `chat_messages` and `dados_cliente` ALWAYS points to the tenant, NOT NULL, never to the contact.
 - `chat_messages` = messages (`user_message` received and/or `bot_message` sent). Linked to a contact by `phone = dados_cliente.telefone` within the same `client_id` (no FK).
@@ -31,7 +31,7 @@ Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack.
 - `tags` + `conversation_tags`, `conversation_notes` (never sent to WhatsApp), `quick_replies`, `feedback` (user reports, browser write-only).
 - `nomewpp` = WhatsApp pushName owned by n8n; "Você" on sent messages is not a name. `imported` = pre-AI history, not an AI reply.
 - `inbox_pagina` / `inbox_contagens` = SQL functions feeding the conversation list. `provision_tenant` = SQL function creating tenant + owner + funnel.
-- Test tenant: OBS = OBM (OBM in the DB, OBS in docs), the owner's parked number, `prompt_mode = 'avancado'`; Loja Teste = secondary tenant for `dryRun` checks. DDD 00 phone = e2e test conversation, never notified.
+- Test tenant: OBS, the owner's own company (the `clients` row is named OBS; "OBM" and "Loja Teste" in older docs and ADRs are history, both rows were purged), the owner's parked number, `prompt_mode = 'avancado'`. DDD 00 phone = e2e test conversation, never notified.
 - "Agente ativo" / "Desativado" = the agent switch; "pausada" = the AI of ONE conversation when a human took over.
 
 ## Owner's working rules (universal)
@@ -39,8 +39,8 @@ Multi-tenant CRM on top of an existing **n8n + Evolution API + Supabase** stack.
 - Menu "Em breve" = Follow-up. Campanhas is NOT a tenant feature: it lives with Clientes in the owner-only section at the end of the menu (`BRAND.secaoDoDono`), his own prospecting at `/campanhas`.
 - n8n is PRODUCTION: never modify or activate workflows live without explicit confirmation (`validateOnly` first). Never commit `x-lookup-secret` (skill `exportar-n8n`). Never paste secrets in chat.
 - Atendimento is the product: an attendance bug comes before any side finding. Before asking the owner to test an attendance change, run `npm run test:e2e:n8n` (see `testing.md`).
-- Never build mass sending over the QR (Baileys) connection, and never write marketing that promises mass sending, "não pague a API da Meta" or ban protection. Exception (decided 29/09/2026): the owner's OWN prospecting inside `/admin`, his user only, dedicated number, daily cap and interval (not built yet; never a tenant feature).
-- Active messaging (reminders, birthdays, Follow-up) only to contacts with a recent conversation, never cold or imported lists; daily cap + random interval; "responda SAIR" exit; channel-agnostic.
+- Never build mass sending over the QR (Baileys) connection, and never write marketing that promises mass sending, "não pague a API da Meta" or ban protection. Exception (decided 29/09/2026): the owner's OWN prospecting inside his central (`/clientes`, formerly `/admin`), his user only, dedicated number, daily cap and interval (not built yet; never a tenant feature).
+- Active messaging (reminders, birthdays, Follow-up) only to contacts with a recent conversation, never cold or imported lists; daily cap + random interval; "responda SAIR" exit; channel-agnostic. Exception (decided 02/11/2026): the owner's OWN prospecting (Campanhas, `/campanhas`) may import an Excel (.xlsx) contact list into a campaign, his user only, with phone validation, no duplicate leads, anyone who answered SAIR never contacted again, and the same daily cap and interval; never a tenant feature.
 - Never build a full own agenda nor a visual automation builder. Agenda = Google Calendar integration, later, and it needs agent tools (function calling in `/api/agent`).
 - Positioning anchors are ZapResponder (floor) and HelenaCRM (ceiling), but the field has many more peers: open the full list in `docs/estrategia-2026-07.md` before saying who the competitors are. Looking at a competitor means bringing what to adopt and do better, not a scoreboard.
 - Meta charges Official API service messages from 01/10/2026: migration math needs variable cost, not zero.
@@ -75,6 +75,7 @@ API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground
 - `docs/design-system/` = tokens, base layer and the reasoning. `docs/adr/` = one decision per file (the "why" behind every rule line; index in `docs/adr/README.md`). `docs/plano-*.md` = feature plans. System maps (owner's, outside git): `Desktop/arquitetura-crm/`.
 - `.claude/rules/`: `engineering.md` (always) plus `data`, `realtime`, `ui`, `agent-ai`, `n8n`, `testing`, `billing`, `dashboard`, `onboarding`, `admin` (loaded when matching files are read).
 - Next 16 differs from your training data: read `node_modules/next/dist/docs/` first.
+- Business context (OBS brand and voice, offer, clients, channels, go-to-market of the product) lives in the owner's vault, outside this repo: `Desktop/segundo cerebro/` (start at `projetos/atenda.md` and `negocio/marca.md`). Read it for marketing copy or business decisions; code questions stay here.
 
 ## How rules evolve
 Every bug or architectural slip found becomes, in this order: (1) a rule line in the right `.claude/rules/` file (imperative, names the canonical file, ends with `(why: docs/adr/...)`); (2) an ADR in `docs/adr/` with context, decision, consequences and evidence (numbers and incidents preserved); (3) when possible, a lint rule or a test, because a rule nobody can check gets forgotten. Status and diary (test counts, dates, "what I did today") go to `docs/handoff.md`, never into rules or this file. Cross-cutting musts that must hold even for NEW files go in `engineering.md` (unscoped); scoped files only load when a matching file is read.
