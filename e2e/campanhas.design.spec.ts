@@ -98,8 +98,7 @@ test.describe("Campanhas no preview", () => {
     await page.goto("/design/campanhas?tela=leads");
     await page.locator('[data-slot="leads-nova-busca"]').click();
     const dialogo = page.locator('[data-slot="nova-busca"]');
-    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("pet shop");
-    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    await dialogo.getByRole("textbox", { name: "Nome da busca" }).fill("pet shop");
     await escolherCidade(page, "MG", "mutum", "Mutum");
     await dialogo.getByRole("button", { name: "Buscar", exact: true }).click();
     const nova = page.locator('[data-slot="busca-linha"]', { hasText: "pet shop" });
@@ -209,8 +208,6 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
   test("Nova busca: mover o centro para dentro de outra cidade troca UF e cidade nos campos", async ({ page }) => {
     await page.goto("/design/campanhas?tela=nova-busca");
     const pagina = page.locator('[data-slot="nova-busca"]');
-    await pagina.getByRole("textbox", { name: "Segmento" }).fill("padaria");
-    await pagina.getByRole("textbox", { name: "Segmento" }).press("Enter");
     await escolherCidade(page, "MG", "mutum", "Mutum");
     const cidade = pagina.getByRole("combobox", { name: "Cidade" });
     // Um clique perto do centro fica em Mutum e já cria a área.
@@ -219,10 +216,18 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     if (!caixa) throw new Error("mapa sem caixa");
     await page.mouse.click(caixa.x + caixa.width / 2 + 15, caixa.y + caixa.height / 2 + 15);
     await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 5 km");
+    // O raio é um só: o campo do formulário mostra o mesmo valor do controle do mapa, e vice-versa.
+    const campoDoRaio = pagina.getByRole("combobox", { name: "Raio da busca" });
+    await expect(campoDoRaio).toHaveText("5 km em volta do centro");
+    await campoDoRaio.click();
+    await page.getByRole("option", { name: "2 km em volta do centro" }).click();
+    await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 2 km");
+    await pagina.getByRole("button", { name: "Aumentar o raio" }).click();
+    await expect(campoDoRaio).toHaveText("3 km em volta do centro");
     await expect(cidade).toHaveText("Mutum");
     // Com o raio de 50 km o mapa mostra a região; um clique perto da borda cai noutra cidade.
     const mais = pagina.getByRole("button", { name: "Aumentar o raio" });
-    for (let i = 0; i < 6; i++) await mais.click();
+    for (let i = 0; i < 7; i++) await mais.click();
     await expect(pagina.locator('[data-slot="nova-busca-raio"]')).toHaveText("Raio: 50 km");
     await page.mouse.click(caixa.x + caixa.width - 30, caixa.y + caixa.height / 2);
     await expect(cidade).not.toHaveText("Mutum");
@@ -267,8 +272,7 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
   test("Nova busca: trocar a UF limpa a cidade e trava o Buscar; a cidade casa sem acento e só na UF escolhida", async ({ page }) => {
     await page.goto("/design/campanhas?tela=nova-busca");
     const dialogo = page.locator('[data-slot="nova-busca"]');
-    await dialogo.getByRole("textbox", { name: "Segmento" }).fill("clínica de estética");
-    await dialogo.getByRole("textbox", { name: "Segmento" }).press("Enter");
+    // Sem segmento (02/11/2026): com a cidade da lista, já busca; o nome é opcional.
     const buscar = dialogo.getByRole("button", { name: "Buscar", exact: true });
     await expect(buscar).toBeEnabled();
     // No ES não existe Mutum, e trocar a UF limpa a cidade (sem cidade da lista, não busca).
@@ -281,14 +285,16 @@ test.describe("Campanhas, revisão de 30/10/2026 (preview)", () => {
     await page.keyboard.press("Escape");
     await escolherCidade(page, "MG", "MUTÚM", "Mutum");
     await expect(buscar).toBeEnabled();
-    // As categorias sugeridas saem do segmento; marcar uma é o filtro pago da fonte, e o custo sobe.
+    // O teto escolhido é o custo máximo (plano grátis: US$ 0,004 por empresa mais US$ 0,001 de pular fechadas).
     const custo = dialogo.locator('[data-slot="nova-busca-custo"]');
-    const antes = await custo.innerText();
-    await expect(dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" })).toBeVisible();
-    await dialogo.getByRole("group", { name: "Só desta categoria" }).last().getByRole("button", { name: "Esteticista" }).click();
-    await expect(dialogo.getByText("Marcada, a fonte só traz essa categoria e cobra a mais por empresa.")).toBeVisible();
-    await expect(custo).not.toHaveText(antes);
-    await expect(dialogo.getByRole("group", { name: "Mínimo de avaliações no Google" }).first()).toBeVisible();
+    await expect(custo).toHaveText("Até 50 empresas, no máximo US$ 0,25");
+    await dialogo.getByRole("group", { name: "Quantas empresas no máximo" }).getByRole("button", { name: "Até 500" }).click();
+    await expect(custo).toHaveText("Até 500 empresas, no máximo US$ 2,50");
+    // Os filtros saíram da busca: moram na tabela de leads.
+    for (const saiu of ["Nota mínima no Google", "Mínimo de avaliações no Google", "Só desta categoria", "Site"]) {
+      await expect(dialogo.getByRole("group", { name: saiu, exact: true })).toHaveCount(0);
+    }
+    await expect(dialogo.getByText('Vazio, ela vira "Busca em Mutum".')).toBeVisible();
   });
 
   test("o mapa da busca: um pino por lead com coordenadas, a legenda conta os estados", async ({ page }) => {

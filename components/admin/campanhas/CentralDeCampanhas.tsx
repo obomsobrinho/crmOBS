@@ -119,7 +119,7 @@ export default function CentralDeCampanhas({
           situacao: "rascunho",
           agendadaPara: null,
           conexaoId: conexaoPadrao?.id ?? null,
-          filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+          filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
           variantes: [...variantesSugeridas],
           criadaEm: agoraMs,
           salvaEm: agoraMs,
@@ -300,7 +300,7 @@ export default function CentralDeCampanhas({
                 novaBusca={abrirNovaBusca ? () => abrirNovaBusca(rascunhoEsperando?.id ?? null) : () => setTela({ aba: "leads", nova: true })}
                 criarCampanhaDaBusca={(b: Busca) => {
                   const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
-                  novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null } });
+                  novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false } });
                 }}
                 voltarAoRascunho={() => {
                   if (!rascunhoEsperando) return;
@@ -323,7 +323,7 @@ export default function CentralDeCampanhas({
                     nome: `${origem.nome}, segunda chance`,
                     conexaoId: origem.conexaoId,
                     variantes: [...origem.variantes],
-                    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: origem.id },
+                    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: origem.id, incluirJaContatados: false },
                     passo: 2,
                   })
                 }

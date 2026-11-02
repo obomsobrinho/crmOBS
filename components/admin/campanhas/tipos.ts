@@ -1,4 +1,5 @@
 import type { PeriodoKey } from "@/lib/periodo";
+import type { PreviaDaPlanilha } from "@/lib/planilha-de-leads";
 import {
   podeEntrarNaCampanha,
   siteDoLead,
@@ -10,6 +11,9 @@ import {
   type ResultadoDobrado,
   type SinaisDoLead,
   type ResumoDobrado,
+  type FiltroDeSiteDaBusca,
+  type MinimoDeAvaliacoes,
+  type NotaMinima,
   type OpcoesDaBusca,
   type SituacaoDaBusca,
   type SituacaoDaCampanha,
@@ -66,6 +70,8 @@ export interface FiltroDeContatos {
   soSemSiteProprio: boolean;
   /** "Nova campanha com quem não respondeu": os leads vêm desta campanha, escolhidos de propósito. */
   quemNaoRespondeuDe: string | null;
+  /** Quem já passou por outra campanha entra também (o dono decide; a prévia avisa quantos são). */
+  incluirJaContatados: boolean;
 }
 
 export interface EnvioDaCampanha {
@@ -129,7 +135,7 @@ export function leadsDoFiltro(leads: Lead[], filtro: FiltroDeContatos, campanhas
       (filtro.buscaId === "todas" || l.buscaId === filtro.buscaId) &&
       (!filtro.soMarcadosComoBons || l.marcacao === "bom") &&
       (!filtro.soSemSiteProprio || siteDoLead(l.site) !== "sim") &&
-      podeEntrarNaCampanha({ ...l, campanhas: l.campanhaIds.length }),
+      podeEntrarNaCampanha({ ...l, campanhas: l.campanhaIds.length }, filtro.incluirJaContatados),
   );
 }
 
@@ -165,8 +171,23 @@ export interface LeadDaTabela extends Lead {
   pontuacao?: number;
 }
 
-/** Os recortes do botão de filtro da tabela de leads. */
-export type FiltroDosLeads = "nao_contatados" | "bons" | "sem_site" | "nota" | "nao_reivindicado";
+/** Os recortes liga/desliga do botão de filtro da tabela de leads (site, nota, avaliações e categoria têm grupo próprio). */
+export type FiltroDosLeads = "nao_contatados" | "bons" | "nao_reivindicado";
+
+/** Uma categoria que veio nos leads do recorte, com quantos leads a têm (o filtro "Categoria"). */
+export interface CategoriaDoRecorte {
+  categoria: string;
+  n: number;
+}
+
+/** O círculo de uma busca já feita (as áreas anteriores no mapa da Nova busca). */
+export interface AreaAnterior {
+  lat: number;
+  lng: number;
+  raioKm: number;
+  /** O nome da busca (o balão do círculo). */
+  nome: string;
+}
 
 /** Um pino no mapa da busca: o lead, onde está e a cor do estado. */
 export interface PontoNoMapa {
@@ -183,7 +204,24 @@ export interface RecorteDosLeads {
   texto: string;
   cidade: string | null;
   filtros: FiltroDosLeads[];
+  /** Os filtros que saíram da busca (02/11/2026) e moram aqui: a busca traz tudo, a tabela filtra. */
+  site: FiltroDeSiteDaBusca;
+  notaMinima: NotaMinima;
+  minAvaliacoes: MinimoDeAvaliacoes;
+  /** As categorias marcadas (das que vieram no resultado); vazio = qualquer. */
+  categorias: string[];
 }
+
+/** O recorte sem filtro nenhum (a tabela abre assim). */
+export const RECORTE_LIVRE: Omit<RecorteDosLeads, "buscaId"> = {
+  texto: "",
+  cidade: null,
+  filtros: [],
+  site: "todos",
+  notaMinima: null,
+  minAvaliacoes: null,
+  categorias: [],
+};
 
 /** A campanha sem os envios: o que o assistente edita e o topo do detalhe mostra. */
 export type CampanhaEditavel = Omit<Campanha, "envios">;
@@ -231,6 +269,8 @@ export interface PreviaDoFiltro {
   primeiros: string[];
   /** O nome da campanha de origem em "quem não respondeu". */
   origem: string | null;
+  /** Quantos do recorte já passaram por outra campanha (entram só com `incluirJaContatados`). */
+  jaContatados: number;
 }
 
 /** As contagens do topo (as abas) e dos botões de filtro. */
@@ -268,6 +308,14 @@ export interface FonteDeCampanhas {
   /** Os pinos de uma busca (todos os leads dela que têm coordenadas). */
   pontosDaBusca(buscaId: string): Promise<PontoNoMapa[]>;
   cidades(buscaId: string | null): Promise<string[]>;
+  /** As categorias que vieram nos leads de uma busca (ou de todas), com a contagem. */
+  categorias(buscaId: string | null): Promise<CategoriaDoRecorte[]>;
+  /** O endereço do .xlsx com os leads do recorte; null onde não há arquivo (o preview). */
+  linkDaExportacao(recorte: RecorteDosLeads): string | null;
+  /** Lê a planilha e mostra o que vai entrar, sem gravar. */
+  previaDaPlanilha(arquivo: File): Promise<{ ok: true; previa: PreviaDaPlanilha } | { ok: false; erro: string }>;
+  /** Grava a planilha como uma busca (fonte "planilha") e devolve o id dela. */
+  importarPlanilha(arquivo: File, nome: string): Promise<{ ok: true; buscaId: string } | { ok: false; erro: string }>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
   campanhas(p: { texto: string; situacao: SituacaoDaCampanha | null; pagina: number }): Promise<Pagina<CampanhaDaTabela>>;

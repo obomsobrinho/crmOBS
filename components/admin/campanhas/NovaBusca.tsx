@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Minus, Plus, X } from "lucide-react";
+import { ArrowLeft, Minus, Plus } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,31 +13,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { numeroBR } from "@/lib/format";
 import { buscarCidades, carregarMunicipios, cidadeDoCodigo, cidadeMaisProxima, type MunicipiosPorUf } from "@/lib/municipios";
 import {
-  MINIMOS_DE_AVALIACOES,
   OPCOES_PADRAO,
   RAIOS_KM,
   RAIO_PADRAO_KM,
   proximoRaio,
   QUANTIDADES_POR_TERMO,
   UFS,
-  categoriasSugeridas,
   custoMinimoDaBuscaUsd,
   maximoDaBusca,
+  nomeDaBusca,
   problemasDaBusca,
-  type FiltroDeSiteDaBusca,
-  type NotaMinima,
   type OpcoesDaBusca,
 } from "@/lib/prospeccao";
-import type { LocalInicial } from "./tipos";
+import type { AreaAnterior, LocalInicial } from "./tipos";
 
-// NOVA BUSCA (dono, 29/10/2026: "essa criação da busca não está muito pobre?").
-// O que buscar (um ou mais segmentos), onde (o estado primeiro e a cidade DA LISTA
-// do IBGE, digitando, revisão de 30/10/2026: nunca um nome errado), quantas
-// empresas por segmento (o teto de custo) e os filtros. Nota, site, categoria e
-// mínimo de avaliações são aplicados do NOSSO lado (o dado já vem em todo item; o
-// filtro da fonte custa por empresa); "fechadas", os contatos e, quando marcada, a
-// categoria (o filtro pago) vão para a fonte.
-// O rodapé mostra o máximo de empresas e o custo mínimo pelo preço de tabela.
+// NOVA BUSCA (dono, 29/10/2026: "essa criação da busca não está muito pobre?"; refeita
+// em 02/11/2026). A busca traz TODAS as empresas da área, sem termo nem categoria: em
+// cidade pequena muita empresa está mal classificada no Google, e o dono escolhe pelo
+// nome depois. Nota, site, avaliações e categoria são filtros da tabela de leads (de
+// graça); na fonte vai só "pular fechadas" (o filtro pago que o dono quis) e, se
+// marcado, o e-mail e as redes. Os campos: um nome livre, onde (o estado e a cidade DA
+// LISTA do IBGE), o raio (o mesmo valor do controle do mapa) e o teto de empresas. O
+// rodapé mostra o teto e o custo máximo pelo preço de tabela do plano grátis.
 //
 // É uma PÁGINA (revisão de 30/10/2026, segunda rodada; antes era um modal pequeno
 // para o mapa): o mapa grande é a peça principal e os campos ficam numa coluna ao
@@ -45,31 +42,17 @@ import type { LocalInicial } from "./tipos";
 // Mapa e campos são uma coisa só: escolher UF e cidade move o mapa; mover o centro
 // (arrastar o pino ou clicar) para dentro de outra cidade troca UF e cidade nos
 // campos, pela sede mais próxima. O mapa abre na cidade da última busca, ou em
-// Mutum (MG), a cidade da OBS, quando ainda não houve busca.
+// Mutum (MG), a cidade da OBS, quando ainda não houve busca. Os círculos das buscas
+// já feitas aparecem tracejados, para a nova ficar fora deles (não pagar de novo).
 
-const NOTAS: { valor: NotaMinima; rotulo: string }[] = [
-  { valor: null, rotulo: "Qualquer" },
-  { valor: 3.5, rotulo: "3,5 ou mais" },
-  { valor: 4, rotulo: "4 ou mais" },
-  { valor: 4.5, rotulo: "4,5 ou mais" },
-];
-
-const SITES: { valor: FiltroDeSiteDaBusca; rotulo: string }[] = [
-  { valor: "todos", rotulo: "Todas" },
-  { valor: "sem_site", rotulo: "Só sem site" },
-  { valor: "com_site", rotulo: "Só com site" },
-];
+/** O valor do campo de raio sem área (a cidade inteira). */
+const CIDADE_INTEIRA = "cidade";
 
 /** Onde o mapa abre sem busca anterior: Mutum (MG), a cidade da OBS (código IBGE). */
 const CIDADE_DA_OBS = { uf: "MG", ibge: 3144003 };
 
 // O mapa (Leaflet) só carrega no navegador.
 const Mapa = dynamic(() => import("./Mapa"), { ssr: false });
-
-const MINIMOS: { valor: (typeof MINIMOS_DE_AVALIACOES)[number]; rotulo: string }[] = MINIMOS_DE_AVALIACOES.map((m) => ({
-  valor: m,
-  rotulo: m === null ? "Qualquer" : `${m} ou mais`,
-}));
 
 const usd = (v: number) => `US$ ${v.toFixed(2).replace(".", ",")}`;
 
@@ -86,28 +69,22 @@ export default function NovaBusca({
   voltar,
   aoBuscar,
   localInicial,
+  areasAnteriores,
 }: {
   voltar: () => void;
   /** Começa a busca; devolve a recusa em uma frase (a página fica aberta para corrigir). */
   aoBuscar: (o: OpcoesDaBusca) => Promise<{ ok: true } | { ok: false; erro: string }>;
   /** A cidade da última busca (UF e código IBGE); null = Mutum, a cidade da OBS. */
   localInicial: LocalInicial | null;
+  /** Os círculos das buscas já feitas (tracejados no mapa). */
+  areasAnteriores?: AreaAnterior[];
 }) {
   const [o, setO] = useState<OpcoesDaBusca>(OPCOES_PADRAO);
-  const [termo, setTermo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [falha, setFalha] = useState<string | null>(null);
-  const campoDoTermo = useRef<HTMLInputElement>(null);
+  const campoDoNome = useRef<HTMLInputElement>(null);
   const mudar = (patch: Partial<OpcoesDaBusca>) => setO((atual) => ({ ...atual, ...patch }));
-  const adicionar = () => {
-    const t = termo.trim().replace(/,$/, "").trim();
-    if (t.length >= 3 && !o.termos.includes(t)) mudar({ termos: [...o.termos, t] });
-    setTermo("");
-  };
-  // O que está digitado e ainda não virou pílula também conta.
-  const comDigitado: OpcoesDaBusca = termo.trim().length >= 3 ? { ...o, termos: [...o.termos, termo.trim()] } : o;
-  const problemas = problemasDaBusca(comDigitado);
-  const sugestoes = categoriasSugeridas(comDigitado.termos);
+  const problemas = problemasDaBusca(o);
 
   // A lista de cidades (um pedaço à parte, ~100 KB) baixa quando a página abre; com ela,
   // os campos já nascem na cidade da última busca (ou em Mutum) e o mapa vai até lá.
@@ -126,7 +103,7 @@ export default function NovaBusca({
       vivo = false;
     };
   }, [localInicial]);
-  useEffect(() => campoDoTermo.current?.focus(), []);
+  useEffect(() => campoDoNome.current?.focus(), []);
   const cidadesDaUf = municipios?.[o.uf] ?? null;
   const cidadeEscolhida = cidadesDaUf?.find((c) => c.ibge === o.cidadeIbge) ?? null;
   const vista = useMemo(
@@ -156,18 +133,26 @@ export default function NovaBusca({
     }
     mudar({ area: { ...o.area, raioKm: proximoRaio(o.area.raioKm, passo) } });
   };
+  // O raio escolhido no campo: o MESMO da área do mapa (sem área, o círculo nasce na sede da cidade).
+  const escolherRaio = (v: string) => {
+    if (v === CIDADE_INTEIRA) return mudar({ area: null });
+    const raioKm = Number(v);
+    if (o.area) mudar({ area: { ...o.area, raioKm } });
+    else if (vista) mudar({ area: { lat: vista.lat, lng: vista.lng, raioKm } });
+  };
   const buscarCidade = useCallback(
     (texto: string) => buscarCidades(cidadesDaUf ?? [], texto).map((c) => ({ valor: String(c.ibge), rotulo: c.nome })),
     [cidadesDaUf],
   );
-  const maximo = maximoDaBusca(comDigitado);
+  const maximo = maximoDaBusca(o);
+  const nomeVazio = `"${nomeDaBusca({ ...o, nome: "" })}"`;
 
   const enviar = async () => {
     if (problemas.length > 0) return;
     setEnviando(true);
     setFalha(null);
     try {
-      const r = await aoBuscar({ ...comDigitado, cidade: comDigitado.cidade.trim() });
+      const r = await aoBuscar({ ...o, nome: o.nome.trim(), cidade: o.cidade.trim() });
       if (!r.ok) setFalha(r.erro);
     } catch (e) {
       console.error("nova busca:", e);
@@ -203,6 +188,7 @@ export default function NovaBusca({
           <Mapa
             vista={vista}
             area={centro}
+            areasAnteriores={areasAnteriores}
             aoMoverCentro={moverCentro}
             rotulo={o.cidade ? `Mapa de ${o.cidade}: arraste o centro ou clique para mover` : "Mapa da busca"}
             className="h-64 lg:h-auto lg:min-h-0 lg:flex-1"
@@ -244,42 +230,16 @@ export default function NovaBusca({
         <div className="flex min-h-0 flex-1 flex-col lg:w-[440px] lg:flex-none lg:border-r lg:border-line">
           <AreaRolavel className="min-h-0 flex-1">
             <div className="flex flex-col gap-6 px-5 py-5">
-              <Campo titulo="O que buscar">
-                <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-[var(--input-bg)] p-1.5 focus-within:border-brand-line">
-                  {o.termos.map((t) => (
-                    <span key={t} className="flex items-center gap-1 rounded-md bg-bloco py-1 pl-2.5 pr-1 text-apoio text-ink" data-slot="nova-busca-termo">
-                      {t}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-chrome"
-                        className="size-5"
-                        aria-label={`Tirar ${t}`}
-                        onClick={() => mudar({ termos: o.termos.filter((x) => x !== t) })}
-                      >
-                        <X size={12} />
-                      </Button>
-                    </span>
-                  ))}
-                  <Input
-                    variant="limpo"
-                    value={termo}
-                    onChange={(e) => setTermo(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && termo.trim()) {
-                        e.preventDefault();
-                        adicionar();
-                      } else if (e.key === "Backspace" && !termo && o.termos.length > 0) {
-                        mudar({ termos: o.termos.slice(0, -1) });
-                      }
-                    }}
-                    placeholder={o.termos.length === 0 ? "clínica de estética" : "Outro segmento"}
-                    aria-label="Segmento"
-                    className="min-w-40 flex-1 px-1.5 text-apoio"
-                    ref={campoDoTermo}
-                  />
-                </div>
-                <p className="text-legenda text-ink-3">Enter para juntar mais de um segmento na mesma busca.</p>
+              <Campo titulo="Nome da busca">
+                <Input
+                  value={o.nome}
+                  onChange={(e) => mudar({ nome: e.target.value.slice(0, 80) })}
+                  placeholder="clínicas e supermercados de dezembro"
+                  aria-label="Nome da busca"
+                  data-slot="nova-busca-nome"
+                  ref={campoDoNome}
+                />
+                <p className="text-legenda text-ink-3">Só para você achar a busca depois. Vazio, ela vira {nomeVazio}.</p>
               </Campo>
 
               <Campo titulo="Onde">
@@ -315,96 +275,44 @@ export default function NovaBusca({
                 </div>
               </Campo>
 
-              <Campo titulo="Quantas empresas por segmento">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Quantas empresas por segmento">
+              <Campo titulo="Raio">
+                <Select value={o.area ? String(o.area.raioKm) : CIDADE_INTEIRA} onValueChange={escolherRaio} disabled={!vista && !o.area}>
+                  <SelectTrigger size="field" aria-label="Raio da busca" data-slot="nova-busca-raio-campo">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={CIDADE_INTEIRA}>A cidade inteira</SelectItem>
+                    {RAIOS_KM.map((r) => (
+                      <SelectItem key={r} value={String(r)}>
+                        {r} km em volta do centro
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-legenda text-ink-3">O centro é o pino do mapa: arraste ou clique no mapa para mudar.</p>
+              </Campo>
+
+              <Campo titulo="Quantas empresas no máximo">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Quantas empresas no máximo">
                   {QUANTIDADES_POR_TERMO.map((n) => (
                     <Button key={n} type="button" variant="alternavel" size="control" aria-pressed={o.porTermo === n} onClick={() => mudar({ porTermo: n })}>
                       Até {n}
                     </Button>
                   ))}
                 </div>
+                <p className="text-legenda text-ink-3">
+                  Vêm todas as empresas da área, de qualquer segmento, e as fechadas ficam de fora. Nota, site, avaliações e categoria você filtra
+                  depois, na lista de leads.
+                </p>
               </Campo>
 
-              <Campo titulo="Nota mínima no Google">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Nota mínima no Google">
-                  {NOTAS.map((n) => (
-                    <Button
-                      key={n.rotulo}
-                      type="button"
-                      variant="alternavel"
-                      size="control"
-                      aria-pressed={o.notaMinima === n.valor}
-                      onClick={() => mudar({ notaMinima: n.valor })}
-                    >
-                      {n.rotulo}
-                    </Button>
-                  ))}
-                </div>
-              </Campo>
-
-              <Campo titulo="Mínimo de avaliações no Google">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Mínimo de avaliações no Google">
-                  {MINIMOS.map((m) => (
-                    <Button
-                      key={m.rotulo}
-                      type="button"
-                      variant="alternavel"
-                      size="control"
-                      aria-pressed={o.minAvaliacoes === m.valor}
-                      onClick={() => mudar({ minAvaliacoes: m.valor })}
-                    >
-                      {m.rotulo}
-                    </Button>
-                  ))}
-                </div>
-              </Campo>
-
-              {sugestoes.length > 0 && (
-                <Campo titulo="Só desta categoria">
-                  <div className="flex flex-wrap gap-2" role="group" aria-label="Só desta categoria" data-grupo="nova-busca-categorias">
-                    {sugestoes.map((c) => {
-                      const marcada = o.categorias.includes(c);
-                      return (
-                        <Button
-                          key={c}
-                          type="button"
-                          variant="alternavel"
-                          size="control"
-                          aria-pressed={marcada}
-                          onClick={() => mudar({ categorias: marcada ? o.categorias.filter((x) => x !== c) : [...o.categorias, c] })}
-                        >
-                          {c}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <p className="text-legenda text-ink-3">Marcada, a fonte só traz essa categoria e cobra a mais por empresa.</p>
-                </Campo>
-              )}
-
-              <Campo titulo="Site">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Site">
-                  {SITES.map((s) => (
-                    <Button key={s.valor} type="button" variant="alternavel" size="control" aria-pressed={o.site === s.valor} onClick={() => mudar({ site: s.valor })}>
-                      {s.rotulo}
-                    </Button>
-                  ))}
-                </div>
-              </Campo>
-
-              <div className="flex flex-col gap-3">
-                <label className="flex items-center gap-2.5 text-apoio text-ink">
-                  <Checkbox checked={o.ignorarFechados} onCheckedChange={(v) => mudar({ ignorarFechados: v === true })} />
-                  Deixar de fora empresas fechadas
-                </label>
-                <label className="flex items-start gap-2.5 text-apoio text-ink">
-                  <Checkbox className="mt-0.5" checked={o.buscarContatos} onCheckedChange={(v) => mudar({ buscarContatos: v === true })} />
-                  <span>
-                    Buscar e-mail e redes sociais no site da empresa
-                    <span className="block text-legenda text-ink-3">Custa a mais por empresa na fonte.</span>
-                  </span>
-                </label>
-              </div>
+              <label className="flex items-start gap-2.5 text-apoio text-ink">
+                <Checkbox className="mt-0.5" checked={o.buscarContatos} onCheckedChange={(v) => mudar({ buscarContatos: v === true })} />
+                <span>
+                  Buscar e-mail e redes sociais no site da empresa
+                  <span className="block text-legenda text-ink-3">Custa a mais por empresa na fonte.</span>
+                </span>
+              </label>
             </div>
           </AreaRolavel>
 
@@ -416,9 +324,7 @@ export default function NovaBusca({
             )}
             <div className="flex flex-wrap items-center gap-3">
               <p className="text-legenda tabular-nums text-ink-3" data-slot="nova-busca-custo">
-                {maximo > 0
-                  ? `Até ${numeroBR(maximo)} empresas, a partir de ${usd(custoMinimoDaBuscaUsd(comDigitado))}${comDigitado.buscarContatos ? " mais os contatos" : ""}`
-                  : "Escolha o segmento"}
+                {`Até ${numeroBR(maximo)} empresas, no máximo ${usd(custoMinimoDaBuscaUsd(o))}${o.buscarContatos ? " mais os contatos" : ""}`}
               </p>
               <div className="ml-auto flex gap-2">
                 <Button type="button" variant="ghost" onClick={voltar}>

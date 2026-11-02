@@ -7,6 +7,8 @@ import type {
   CampanhaEditavel,
   ConexaoDisponivel,
   FiltroDeContatos,
+  AreaAnterior,
+  CategoriaDoRecorte,
   LeadDaTabela,
   LeadNaCampanha,
   LocalInicial,
@@ -40,6 +42,7 @@ import {
   estadoNoMapa,
   numeroOuNull,
   OPCOES_PADRAO,
+  nomeDaBusca,
   POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
   resultadoDasLinhas,
@@ -89,8 +92,11 @@ function opcoesDoJson(j: Json, termo: string, cidade: string, uf: string | null)
   const o = j !== null && typeof j === "object" && !Array.isArray(j) ? j : {};
   const termos = Array.isArray(o.termos) ? o.termos.filter((t): t is string => typeof t === "string") : [];
   const nota = NOTAS.find((n) => n === o.notaMinima) ?? null;
+  // Uma busca nova grava o NOME em `termo` e nenhum termo: os termos de uma antiga saem da coluna.
+  const nome = typeof o.nome === "string" ? o.nome : "";
   return {
-    termos: termos.length > 0 ? termos : termo.split(",").map((t) => t.trim()),
+    nome,
+    termos: termos.length > 0 || "nome" in o ? termos : termo.split(",").map((t) => t.trim()),
     cidade: typeof o.cidade === "string" ? o.cidade : cidade,
     uf: typeof o.uf === "string" ? o.uf : (uf ?? ""),
     porTermo: typeof o.porTermo === "number" ? o.porTermo : OPCOES_PADRAO.porTermo,
@@ -221,6 +227,27 @@ export async function buscasParaEscolher(svc: Supa): Promise<Busca[]> {
   return (data ?? []).map(paraBusca);
 }
 
+/** Quantos círculos de buscas anteriores o mapa da Nova busca mostra (as mais novas). */
+const AREAS_ANTERIORES = 50;
+
+/** Os círculos das buscas já feitas (as que não falharam), para o dono pôr a busca nova fora deles. */
+export async function areasAnteriores(svc: Supa): Promise<AreaAnterior[]> {
+  const { data, error } = await svc
+    .from("prospeccao_buscas")
+    .select("termo, opcoes")
+    .neq("status", "falhou")
+    .not("opcoes->area", "is", null)
+    .order("criada_em", { ascending: false })
+    .order("id")
+    .limit(AREAS_ANTERIORES);
+  if (error) throw error;
+  return (data ?? []).flatMap((b) => {
+    const o = b.opcoes !== null && typeof b.opcoes === "object" && !Array.isArray(b.opcoes) ? b.opcoes : {};
+    const a = areaDe(o.area);
+    return a ? [{ ...a, nome: b.termo }] : [];
+  });
+}
+
 /** Onde o mapa da Nova busca abre: a cidade da busca mais recente que tem cidade da lista (uma linha). */
 export async function cidadeDaUltimaBusca(svc: Supa): Promise<LocalInicial | null> {
   const { data, error } = await svc
@@ -253,17 +280,29 @@ function parametrosDoRecorte(p: RecorteDosLeads) {
     p_cidade: p.cidade ?? undefined,
     p_nao_contatados: p.filtros.includes("nao_contatados"),
     p_so_bons: p.filtros.includes("bons"),
-    p_so_sem_site: p.filtros.includes("sem_site"),
-    p_nota_minima: p.filtros.includes("nota") ? 4.5 : undefined,
+    p_so_sem_site: p.site === "sem_site",
+    p_so_com_site: p.site === "com_site",
+    p_nota_minima: p.notaMinima ?? undefined,
+    p_min_avaliacoes: p.minAvaliacoes ?? undefined,
+    p_categorias: p.categorias.length > 0 ? p.categorias : undefined,
     p_nao_reivindicado: p.filtros.includes("nao_reivindicado"),
   };
 }
 
-export async function paginaDeLeads(svc: Supa, p: RecorteDosLeads & { pagina: number }): Promise<Pagina<LeadDaTabela>> {
+/** As categorias que vieram nos leads de uma busca (ou de todas), com quantos leads cada uma tem. */
+export async function categoriasDoRecorte(svc: Supa, buscaId: string | null): Promise<CategoriaDoRecorte[]> {
+  const { data, error } = await svc.rpc("prospeccao_categorias_do_recorte", { p_busca: buscaId ?? undefined });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ categoria: r.categoria, n: r.n }));
+}
+
+/** Uma página da tabela de leads (10; a exportação lê de 50, o teto do SQL). */
+export async function paginaDeLeads(svc: Supa, p: RecorteDosLeads & { pagina: number; porPagina?: number }): Promise<Pagina<LeadDaTabela>> {
+  const porPagina = p.porPagina ?? POR_PAGINA;
   const { data, error } = await svc.rpc("prospeccao_leads_pagina", {
     ...parametrosDoRecorte(p),
-    p_offset: (p.pagina - 1) * POR_PAGINA,
-    p_limite: POR_PAGINA,
+    p_offset: (p.pagina - 1) * porPagina,
+    p_limite: porPagina,
   });
   if (error) throw error;
   const linhas = data ?? [];
@@ -501,7 +540,7 @@ async function campanhaEditavel(svc: Supa, id: string): Promise<CampanhaEditavel
     situacao: situacaoDaCampanha(r.status),
     agendadaPara: ms(r.agendada_para),
     conexaoId: r.client_id,
-    filtro: filtroDe(r.filtro) ?? { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+    filtro: filtroDe(r.filtro) ?? { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     variantes: (v.data ?? []).map((x) => x.texto),
     criadaEm: Date.parse(r.criada_em),
     salvaEm: Date.parse(r.salva_em),
@@ -549,24 +588,38 @@ export async function leadsDaCampanha(
   };
 }
 
-/** Quem entra pelo recorte (a MESMA função SQL que monta a fila ao iniciar): o total e os primeiros nomes. */
+/**
+ * Quem entra pelo recorte (a MESMA função SQL que monta a fila ao iniciar): o total, os primeiros
+ * nomes e quantos do recorte já passaram por outra campanha (o aviso; entram só se o dono incluir).
+ */
 export async function previaDoFiltro(svc: Supa, f: FiltroDeContatos): Promise<PreviaDoFiltro> {
-  const [fila, origem] = await Promise.all([
+  const doFiltro = (incluir: boolean, limite: number) =>
     svc.rpc("prospeccao_leads_do_filtro", {
       p_busca: f.buscaId === "todas" ? null : f.buscaId,
       p_so_bons: f.soMarcadosComoBons,
       p_so_sem_site: f.soSemSiteProprio,
       p_origem: f.quemNaoRespondeuDe,
-      p_limite: 8,
-    }),
+      p_limite: limite,
+      p_incluir_contatados: incluir,
+    });
+  const [fila, comTodos, semContatados, origem] = await Promise.all([
+    doFiltro(f.incluirJaContatados, 8),
+    // As duas contagens do aviso (uma linha cada: o total vem em toda linha).
+    f.quemNaoRespondeuDe ? null : doFiltro(true, 1),
+    f.quemNaoRespondeuDe ? null : doFiltro(false, 1),
     f.quemNaoRespondeuDe
       ? svc.from("prospeccao_campanhas").select("nome").eq("id", f.quemNaoRespondeuDe).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ]);
-  if (fila.error) throw fila.error;
-  if (origem.error) throw origem.error;
+  for (const r of [fila, comTodos, semContatados, origem]) if (r?.error) throw r.error;
   const linhas = fila.data ?? [];
-  return { total: linhas[0]?.total ?? 0, primeiros: linhas.map((l) => l.nome), origem: origem.data?.nome ?? null };
+  const total = (r: typeof comTodos) => r?.data?.[0]?.total ?? 0;
+  return {
+    total: linhas[0]?.total ?? 0,
+    primeiros: linhas.map((l) => l.nome),
+    origem: origem.data?.nome ?? null,
+    jaContatados: Math.max(0, total(comTodos) - total(semContatados)),
+  };
 }
 
 // ── Escritas do admin (uma função SQL cada, com a linha em admin_acoes) ──
@@ -682,7 +735,7 @@ export async function criarBusca(
   const { error } = await svc.rpc("prospeccao_criar_busca", {
     p_quem: a.admin,
     p_id: a.id,
-    p_termo: a.opcoes.termos.join(", "),
+    p_termo: nomeDaBusca(a.opcoes),
     p_cidade: a.opcoes.cidade,
     p_uf: a.opcoes.uf,
     p_fonte: a.fonte,
@@ -718,7 +771,7 @@ export async function fecharBusca(svc: Supa, fonte: FonteDeLeads, buscaId: strin
     return "falhou";
   }
   const opcoes = opcoesDoJson(b.opcoes, b.termo, b.cidade, b.uf);
-  const termo = opcoes.termos[0] ?? b.termo;
+  const termo = opcoes.termos[0] ?? "";
   const itens = filtrarPelasOpcoes(
     leitura.itens.map((i) => fonte.mapearItem(i, termo)),
     opcoes,
@@ -732,7 +785,8 @@ export function desistirDaBusca(svc: Supa, buscaId: string): Promise<void> {
   return concluir(svc, buscaId, null, "A fonte não respondeu a tempo. Nada foi gravado; dá para buscar de novo.");
 }
 
-async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {
+/** Grava o fim de uma busca (`prospeccao_concluir_busca`): os itens já traduzidos, ou o erro. */
+export async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {
   const { error } = await svc.rpc("prospeccao_concluir_busca", { p_busca: buscaId, p_itens: paraJson(itens ?? []), p_erro: erro });
   if (error) throw error;
 }

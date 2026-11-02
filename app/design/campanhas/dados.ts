@@ -277,7 +277,7 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
     situacao: "rascunho",
     agendadaPara: null,
     conexaoId: "obs",
-    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+    filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     variantes: [...VARIANTES_SUGERIDAS],
     envios: [],
     criadaEm: agora - D,
@@ -287,10 +287,10 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
   });
 
   // Dentistas: concluída há uma semana, todos enviados num dia.
-  const c2Leads = leadsDoFiltro(leads, { buscaId: "b2", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null }, []).slice(0, 8);
+  const c2Leads = leadsDoFiltro(leads, { buscaId: "b2", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false }, []).slice(0, 8);
   const c2 = base("c2", "Dentistas de Manhuaçu", {
     situacao: "concluida",
-    filtro: { buscaId: "b2", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+    filtro: { buscaId: "b2", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     envios: enviar(c2Leads, c2Leads.length, 8, agora, sorteio, { 1: "respondeu", 3: "respondeu", 5: "parou", 8: "respondeu" }),
     criadaEm: agora - 9 * D,
     salvaEm: agora - 8 * D,
@@ -298,10 +298,10 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
   });
 
   // Estética: rodando desde ontem, 7 enviadas e 2 na fila.
-  const c1Leads = leadsDoFiltro(leads, { buscaId: "b1", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null }, []).slice(0, 9);
+  const c1Leads = leadsDoFiltro(leads, { buscaId: "b1", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false }, []).slice(0, 9);
   const c1 = base("c1", "Estética em Mutum", {
     situacao: "rodando",
-    filtro: { buscaId: "b1", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+    filtro: { buscaId: "b1", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     envios: enviar(c1Leads, Math.min(c1Leads.length, 7), 1, agora, sorteio, {
       0: "respondeu",
       2: "respondeu",
@@ -331,7 +331,7 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
     });
     leads.push(...leadsDaBusca(buscaId, h.cidade, h.segmento, h.ddd, baseGerada(h.prefixo, h.leads, sorteio), 1000 + k * 100));
     if (!h.campanha) return;
-    const filtro = { buscaId, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null };
+    const filtro = { buscaId, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false };
     const daBusca = leadsDoFiltro(leads, filtro, []).slice(0, h.campanha.tamanho);
     const inicio = somarDias(diaIsoSP(agora), -h.diasAtras);
     geradas.push(
@@ -351,7 +351,7 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
     for (const e of c.envios) if (e.situacao === "parou") leads.find((l) => l.id === e.leadId)!.parouEm = e.respondeuEm;
 
   // Quem não respondeu aos dentistas: agendada para amanhã às 8h.
-  const c4Filtro = { buscaId: "todas" as const, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: "c2" };
+  const c4Filtro = { buscaId: "todas" as const, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: "c2", incluirJaContatados: false };
   const c4 = base("c4", "Dentistas de Manhuaçu, segunda chance", {
     situacao: "agendada",
     agendadaPara: inicioDoDiaSP(somarDias(diaIsoSP(agora), 1)) + 8 * H,
@@ -365,7 +365,7 @@ export function dadosDeMentira(agora: number, vazio: boolean): DadosDeMentira {
 
   // Barbearias: rascunho parado no passo Contatos, esperando a busca terminar.
   const c3 = base("c3", "Barbearias de Caratinga", {
-    filtro: { buscaId: "b3", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null },
+    filtro: { buscaId: "b3", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     criadaEm: agora - 10 * MIN,
     salvaEm: agora - 8 * MIN,
     passo: 2,

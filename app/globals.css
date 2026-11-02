@@ -1396,3 +1396,9 @@ select:focus-visible,
   stroke: var(--brand-fill);
   fill: var(--brand-fill);
 }
+/* As áreas das buscas anteriores (Nova busca): neutras e tracejadas, para o círculo novo ficar fora delas. */
+.mapa-da-busca .area-anterior-do-mapa {
+  stroke: var(--ink-3);
+  fill: var(--ink-3);
+  stroke-dasharray: 6 6;
+}

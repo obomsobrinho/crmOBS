@@ -21,7 +21,11 @@ import {
 const SITUACOES_DA_BUSCA: SituacaoDaBusca[] = ["buscando", "pronta", "falhou"];
 const SITUACOES_DA_CAMPANHA: SituacaoDaCampanha[] = ["rascunho", "agendada", "rodando", "pausada", "concluida"];
 export const SITUACOES_NA_CAMPANHA: SituacaoNaCampanha[] = ["na_fila", "enviado", "respondeu", "falhou", "parou"];
-const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "sem_site", "nota", "nao_reivindicado"];
+const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "nao_reivindicado"];
+const SITES: FiltroDeSiteDaBusca[] = ["todos", "sem_site", "com_site"];
+const NOTAS: NotaMinima[] = [null, 3.5, 4, 4.5];
+/** Teto de categorias marcadas no filtro da tabela (a lista do recorte tem até 200). */
+const MAXIMO_DE_CATEGORIAS = 30;
 export { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA };
 
 /** Um id (uuid) bem formado: a mesma regra das rotas da central (`ehUuid`). */
@@ -49,16 +53,54 @@ export function paginaDe(v: string | null): number | null {
 export const textoDe = (v: string | null) => (v ?? "").trim().slice(0, 100);
 
 /**
- * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b`), o mesmo
- * da página e da "página do lead"; o motivo (string) quando algo veio torto.
+ * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b&site=&nota=&avaliacoes=&categorias=[json]`),
+ * o mesmo da página e da "página do lead"; o motivo (string) quando algo veio torto.
  */
 export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
   const busca = q.get("busca");
   if (busca !== null && !ehId(busca)) return "busca inválida";
   const filtros = (q.get("filtros") ?? "").split(",").filter(Boolean);
   if (!filtros.every(ehFiltroDosLeads)) return "filtro inválido";
+  const site = q.get("site") ?? "todos";
+  if (!de(SITES, site)) return "filtro de site inválido";
+  const nota = NOTAS.find((n) => String(n) === (q.get("nota") ?? "null"));
+  if (nota === undefined) return "nota inválida";
+  const minAvaliacoes = MINIMOS_DE_AVALIACOES.find((m) => String(m) === (q.get("avaliacoes") ?? "null"));
+  if (minAvaliacoes === undefined) return "mínimo de avaliações inválido";
+  let categorias: unknown = [];
+  try {
+    categorias = JSON.parse(q.get("categorias") ?? "[]");
+  } catch {
+    return "categorias inválidas";
+  }
+  if (!Array.isArray(categorias) || categorias.length > MAXIMO_DE_CATEGORIAS || !categorias.every((c) => typeof c === "string" && c.length <= 120)) {
+    return "categorias inválidas";
+  }
   const cidade = q.get("cidade");
-  return { buscaId: busca, texto: textoDe(q.get("texto")), cidade: cidade ? cidade.slice(0, 120) : null, filtros };
+  return {
+    buscaId: busca,
+    texto: textoDe(q.get("texto")),
+    cidade: cidade ? cidade.slice(0, 120) : null,
+    filtros,
+    site,
+    notaMinima: nota,
+    minAvaliacoes,
+    categorias: categorias as string[],
+  };
+}
+
+/** O recorte na query da rota (o par de `recorteDe`: o que um escreve, o outro lê). */
+export function recorteParaQuery(p: RecorteDosLeads): Record<string, string | null> {
+  return {
+    busca: p.buscaId,
+    texto: p.texto,
+    cidade: p.cidade,
+    filtros: p.filtros.join(","),
+    site: p.site === "todos" ? null : p.site,
+    nota: p.notaMinima === null ? null : String(p.notaMinima),
+    avaliacoes: p.minAvaliacoes === null ? null : String(p.minAvaliacoes),
+    categorias: p.categorias.length > 0 ? JSON.stringify(p.categorias) : null,
+  };
 }
 
 /**
@@ -81,12 +123,12 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   if (v === null || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const termos = Array.isArray(o.termos) ? o.termos.filter((t): t is string => typeof t === "string").map((t) => t.trim().slice(0, 80)) : null;
-  const notas: NotaMinima[] = [null, 3.5, 4, 4.5];
-  const sites: FiltroDeSiteDaBusca[] = ["todos", "sem_site", "com_site"];
-  if (!termos || termos.length === 0 || termos.length > 10) return null;
+  // Sem termo é o padrão (todas as empresas da área); o nome é livre e pode vir vazio.
+  if (!termos || termos.length > 10) return null;
+  if (typeof o.nome !== "string") return null;
   if (typeof o.cidade !== "string" || typeof o.uf !== "string" || !(UFS as readonly string[]).includes(o.uf)) return null;
   if (!(QUANTIDADES_POR_TERMO as readonly unknown[]).includes(o.porTermo)) return null;
-  if (!notas.includes(o.notaMinima as NotaMinima) || !sites.includes(o.site as FiltroDeSiteDaBusca)) return null;
+  if (!NOTAS.includes(o.notaMinima as NotaMinima) || !SITES.includes(o.site as FiltroDeSiteDaBusca)) return null;
   if (typeof o.ignorarFechados !== "boolean" || typeof o.buscarContatos !== "boolean") return null;
   if (o.cidadeIbge !== null && (typeof o.cidadeIbge !== "number" || !Number.isInteger(o.cidadeIbge))) return null;
   const minimo = MINIMOS_DE_AVALIACOES.find((m) => m === o.minAvaliacoes);
@@ -96,7 +138,8 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
   const area = areaDe(o.area);
   if (area === undefined) return null;
   return {
-    termos,
+    nome: o.nome.trim().slice(0, 80),
+    termos: termos.filter(Boolean),
     cidade: o.cidade.trim().slice(0, 80),
     uf: o.uf,
     cidadeIbge: o.cidadeIbge,
@@ -118,7 +161,13 @@ export function filtroDe(v: unknown): FiltroDeContatos | null {
   const buscaId = o.buscaId === "todas" || ehId(o.buscaId) ? o.buscaId : null;
   const origem = o.quemNaoRespondeuDe === null || o.quemNaoRespondeuDe === undefined ? null : ehId(o.quemNaoRespondeuDe) ? o.quemNaoRespondeuDe : undefined;
   if (buscaId === null || origem === undefined) return null;
-  return { buscaId, soMarcadosComoBons: o.soMarcadosComoBons === true, soSemSiteProprio: o.soSemSiteProprio === true, quemNaoRespondeuDe: origem };
+  return {
+    buscaId,
+    soMarcadosComoBons: o.soMarcadosComoBons === true,
+    soSemSiteProprio: o.soSemSiteProprio === true,
+    quemNaoRespondeuDe: origem,
+    incluirJaContatados: o.incluirJaContatados === true,
+  };
 }
 
 /** O rascunho vindo do assistente, conferido; null quando algo está fora. */

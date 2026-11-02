@@ -1,5 +1,5 @@
 import "server-only";
-import { ACTOR_APIFY, entradaApify, itemDoApify, leituraDoStatus, webhooksDaExecucao } from "./apify-campos";
+import { ACTOR_APIFY, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "./apify-campos";
 import type { FonteDeLeads } from "./fonte-de-leads";
 
 // A FONTE DE LEADS DE HOJE: o actor `compass/crawler-google-places` no Apify
@@ -31,7 +31,12 @@ export const fonteApify: FonteDeLeads = {
   id: ACTOR_APIFY,
 
   async iniciar(opcoes, webhook) {
-    const q = new URLSearchParams({ webhooks: webhooksDaExecucao(webhook.url, webhook.segredo) });
+    // `maxTotalChargeUsd`: o Apify para a execução nesse gasto, mesmo que o actor ignore o teto de
+    // lugares no modo sem termo (o actor exige no mínimo US$ 0,50).
+    const q = new URLSearchParams({
+      webhooks: webhooksDaExecucao(webhook.url, webhook.segredo),
+      maxTotalChargeUsd: String(tetoDeGastoUsd(opcoes)),
+    });
     const r = dadosDe(
       await apify(`/acts/${ACTOR_NA_URL}/runs?${q}`, {
         method: "POST",

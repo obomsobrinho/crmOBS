@@ -1,5 +1,6 @@
 import { localDaBusca } from "./municipios";
 import {
+  custoMinimoDaBuscaUsd,
   lerHorarios,
   pontuarLead,
   siteDoLead,
@@ -21,16 +22,24 @@ import type { ItemDaFonteDeLeads, LeituraDaExecucao } from "./fonte-de-leads";
 // é a categoria quando o dono marca "Só desta categoria" (31/10/2026): vai como
 // `categoryFilterWords`, para a fonte não trazer (e cobrar) o lugar de outra
 // categoria, e é conferida do nosso lado também.
+//
+// Desde 02/11/2026 a busca nova vai SEM termo: `allPlacesNoSearchAction` traz todas
+// as empresas visíveis no mapa da área, até o teto, e só pula as fechadas na fonte
+// (o único filtro pago que o dono quis). O resto se filtra na tabela de leads.
 
 export const ACTOR_APIFY = "compass/crawler-google-places";
 
 /** O nome de um lugar que veio sem nome (o mesmo do SQL): fica na base, nunca entra numa mensagem. */
 export const NOME_AUSENTE = "Sem nome";
 
+/** O modo "todas as empresas visíveis no mapa" do actor (o outro valor, por mouse, está obsoleto). */
+export const TODAS_AS_EMPRESAS = "all_places_no_search_ocr";
+
 /** A entrada do actor para as opções do diálogo "Nova busca". */
 export function entradaApify(o: OpcoesDaBusca): Record<string, unknown> {
+  const termos = o.termos.map((t) => t.trim()).filter(Boolean);
   return {
-    searchStringsArray: o.termos.map((t) => t.trim()).filter(Boolean),
+    ...(termos.length > 0 ? { searchStringsArray: termos } : { allPlacesNoSearchAction: TODAS_AS_EMPRESAS }),
     // Com o centro ou o raio ajustados no mapa, o círculo e NÃO a cidade (formato conferido
     // numa execução real em 30/10/2026, run Rfb0VfmDckdMIbiwT: LONGITUDE primeiro).
     ...(o.area
@@ -42,6 +51,14 @@ export function entradaApify(o: OpcoesDaBusca): Record<string, unknown> {
     skipClosedPlaces: o.ignorarFechados,
     scrapeContacts: o.buscarContatos,
   };
+}
+
+/** O mínimo que o actor aceita em `maxTotalChargeUsd` (`minimalMaxTotalChargeUsd`, API pública, 02/11/2026). */
+export const GASTO_MINIMO_DA_EXECUCAO_USD = 0.5;
+
+/** O teto de gasto da execução: o custo máximo da busca pelo preço de tabela, nunca abaixo do mínimo do actor. */
+export function tetoDeGastoUsd(o: OpcoesDaBusca): number {
+  return Math.max(GASTO_MINIMO_DA_EXECUCAO_USD, Math.ceil(custoMinimoDaBuscaUsd(o) * 100) / 100);
 }
 
 /**
@@ -144,10 +161,11 @@ export function itemDoApify(bruto: unknown, termo: string): ItemDaFonteDeLeads {
   const nota = notaBruta !== null && notaBruta > 0 && notaBruta <= 5 ? Math.round(notaBruta * 10) / 10 : null;
   const reviews = numero(o, ["reviewsCount"]);
   const avaliacoes = reviews !== null && reviews >= 0 ? Math.round(reviews) : null;
-  // Sem categoria, o segmento é o termo que achou o lugar (`searchString`), ou o primeiro pedido.
-  const segmento = texto(o, ["categoryName", "searchString"]) ?? termo;
+  // Sem categoria, o segmento é o termo que achou o lugar (`searchString`), ou o primeiro pedido
+  // (uma busca sem termo não tem: fica sem segmento).
+  const segmento = texto(o, ["categoryName", "searchString"]) ?? (termo.trim() || null);
   const detalhes = detalhesDoApify(o);
-  const { pontos } = pontuarLead({ telefone, segmento, site, nota, avaliacoes, reivindicado: detalhes.reivindicado, horarios: detalhes.horarios });
+  const { pontos } = pontuarLead({ telefone, segmento: segmento ?? "", site, nota, avaliacoes, reivindicado: detalhes.reivindicado, horarios: detalhes.horarios });
   return {
     telefone: telefoneDoLead(telefone),
     telefone_original: telefone,

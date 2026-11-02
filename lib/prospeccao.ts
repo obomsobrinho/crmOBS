@@ -680,20 +680,31 @@ export const UFS = [
   "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 ] as const;
 
-/** Quantas empresas por termo (o teto de custo da busca). 50 é a recomendação do plano (D7, em aberto). */
-export const QUANTIDADES_POR_TERMO = [50, 100, 200] as const;
+/** O teto de empresas da busca (o teto de custo). Sem termo, a busca traz todas da área até o teto. */
+export const QUANTIDADES_POR_TERMO = [50, 100, 200, 500] as const;
 
-/** Preço de tabela do actor no Apify Store em 29/10/2026: "from $1.50 / 1,000 scraped places". */
-export const PRECO_POR_MIL_LUGARES_USD = 1.5;
+/**
+ * Preço por lugar do actor no plano GRÁTIS do Apify (o do dono), lido da API pública do actor em
+ * 02/11/2026 (`pricingInfos`, evento `place-scraped`, faixa FREE: US$ 0,004).
+ */
+export const PRECO_POR_MIL_LUGARES_USD = 4;
 
-/** Cada filtro pago do actor (a categoria, `categoryFilterWords`), por lugar, no preço de tabela do Store. */
+/** Cada filtro pago do actor (pular fechadas, categoria), por lugar, na faixa FREE do mesmo preço. */
 export const PRECO_DO_FILTRO_POR_LUGAR_USD = 0.001;
 
 export type NotaMinima = null | 3.5 | 4 | 4.5;
 export type FiltroDeSiteDaBusca = "todos" | "sem_site" | "com_site";
 
 export interface OpcoesDaBusca {
-  /** Um ou mais segmentos ("clínica de estética", "estética"). */
+  /**
+   * O nome livre que o dono dá à busca ("clinicas e supermercados dezembro"), só para se achar
+   * depois; vazio = um nome montado (`nomeDaBusca`). Grava na coluna `termo` da busca.
+   */
+  nome: string;
+  /**
+   * Os termos pesquisados no Google Maps. Vazio (o padrão desde 02/11/2026) = TODAS as empresas
+   * da área, sem termo nem categoria (`allPlacesNoSearchAction`): os filtros moram na tabela de leads.
+   */
   termos: string[];
   /** A cidade como o IBGE escreve, escolhida na lista da UF (nunca texto livre). */
   cidade: string;
@@ -796,6 +807,7 @@ export function categoriasSugeridas(termos: string[]): string[] {
 }
 
 export const OPCOES_PADRAO: OpcoesDaBusca = {
+  nome: "",
   termos: [],
   cidade: "",
   uf: "",
@@ -813,26 +825,30 @@ export const OPCOES_PADRAO: OpcoesDaBusca = {
 /** O que falta para buscar (vazio = pode buscar). */
 export function problemasDaBusca(o: OpcoesDaBusca): string[] {
   const p: string[] = [];
-  if (o.termos.filter((t) => t.trim().length >= 3).length === 0) p.push("Falta o segmento");
   if (!UFS.includes(o.uf as (typeof UFS)[number])) p.push("Falta o estado");
   else if (o.cidadeIbge === null || o.cidade.trim().length < 2) p.push("Escolha a cidade na lista");
   return p;
 }
 
-/** O máximo de empresas que a busca pode trazer (antes de tirar as repetidas). */
+/** O máximo de empresas que a busca pode trazer (antes de tirar as repetidas); sem termo, o próprio teto. */
 export function maximoDaBusca(o: OpcoesDaBusca): number {
-  return o.termos.length * o.porTermo;
+  return Math.max(1, o.termos.length) * o.porTermo;
 }
 
-/** O custo mínimo em dólar pelo preço de tabela, com o filtro pago da categoria (os contatos custam a mais). */
+/** O custo máximo em dólar pelo preço de tabela, com os filtros pagos (pular fechadas, categoria; os contatos custam a mais). */
 export function custoMinimoDaBuscaUsd(o: OpcoesDaBusca): number {
-  const porLugar = PRECO_POR_MIL_LUGARES_USD / 1000 + (o.categorias.length > 0 ? PRECO_DO_FILTRO_POR_LUGAR_USD : 0);
-  return maximoDaBusca(o) * porLugar;
+  const filtros = (o.ignorarFechados ? 1 : 0) + (o.categorias.length > 0 ? 1 : 0);
+  return maximoDaBusca(o) * (PRECO_POR_MIL_LUGARES_USD / 1000 + filtros * PRECO_DO_FILTRO_POR_LUGAR_USD);
 }
 
-/** As opções em pílulas curtas, para a tela da busca ("50 por termo", "Nota 4 ou mais"). */
+/** O nome que a busca grava: o que o dono escreveu, os termos de uma busca antiga, ou "Busca em Mutum". */
+export function nomeDaBusca(o: Pick<OpcoesDaBusca, "nome" | "termos" | "cidade">): string {
+  return o.nome.trim() || o.termos.join(", ") || `Busca em ${o.cidade}`;
+}
+
+/** As opções em pílulas curtas, para a tela da busca ("Até 50 empresas", "Nota 4 ou mais"). */
 export function resumoDasOpcoes(o: OpcoesDaBusca): string[] {
-  const r = [`${o.porTermo} por termo`];
+  const r = [o.termos.length > 0 ? `${o.porTermo} por termo` : `Até ${o.porTermo} empresas`];
   if (o.notaMinima !== null) r.push(`Nota ${String(o.notaMinima).replace(".", ",")} ou mais`);
   if (o.site === "sem_site") r.push("Só sem site");
   if (o.site === "com_site") r.push("Só com site");
