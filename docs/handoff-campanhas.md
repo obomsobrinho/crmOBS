@@ -1,5 +1,29 @@
 # Handoff: Campanhas v2
 
+## Rodada de 02/11/2026: busca da área inteira, filtros na tabela, planilha (branch `claude/campanhas-busca-ampla`)
+
+Decisões do Franck e o porquê: `docs/adr/2026-11-02-campanhas-wide-search-filters-in-the-list.md`.
+
+- **Migration** `20261102184345_prospeccao_busca_ampla.sql` JÁ APLICADA em produção (só funções, compatível
+  com o código antigo: parâmetros novos com padrão). Tipos regenerados.
+- **Nova busca:** nome livre, UF e cidade, raio (o mesmo no campo e no mapa), teto 50/100/200/500. Sem termo
+  e sem categoria (`allPlacesNoSearchAction`), só "pular fechadas" na fonte, `maxTotalChargeUsd` por
+  execução. Os círculos das buscas anteriores aparecem tracejados no mapa.
+- **Tabela de leads:** filtros de site (com/sem), nota, avaliações, perfil não reivindicado e categoria (só
+  as que vieram no resultado, com contagem). Botão de exportar para Excel (até 2000).
+- **Campanha, passo Contatos:** "Incluir quem já participou de outra campanha" com o aviso de quantos são;
+  "Importar uma planilha (.xlsx)" com a prévia antes de gravar.
+- **Fora, de propósito:** aviso "já é cliente do Atenda" (o banco não guarda o número de WhatsApp de cada
+  empresa); filtro de celular por padrão (só identificado na linha).
+
+### O que testei
+- `campanhas-lib` e `central-clientes-lib` (110), `campanhas.design` (25), typecheck, lint, checagens.
+
+### O que falta / precisa do Franck
+1. Uma busca real sem termo, raio pequeno: conferir se o Apify respeitou o teto (`maxCrawledPlacesPerSearch`
+   no modo sem termo) e o custo no Console.
+2. Importar uma planilha real e conferir a amostra dos números.
+
 ## Rodada de 31/10/2026 (Parte A, a parte real): detalhes do lead no banco, Nova busca de verdade (branch `claude/lucid-cerf-1wh6fc`)
 
 **Parado para o "pode aplicar" do Franck.** O código da parte real está pronto e testado; ele depende da

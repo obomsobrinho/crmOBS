@@ -46,14 +46,17 @@ import {
   type LinhaDoResultado,
   type LinhaDoResumo,
   type OpcoesDaBusca,
+  maximoDaBusca,
+  nomeDaBusca,
 } from "../lib/prospeccao";
-import { entradaApify, itemDoApify, leituraDoStatus, webhooksDaExecucao } from "../lib/apify-campos";
+import { TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
+import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../lib/planilha-de-leads";
 import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
 import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
 import { normalizar } from "../lib/clientes";
-import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, textoDe } from "../lib/campanhas-pedidos";
-import { localDaUltimaBusca } from "../components/admin/campanhas/tipos";
+import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, recorteParaQuery, textoDe } from "../lib/campanhas-pedidos";
+import { RECORTE_LIVRE, localDaUltimaBusca } from "../components/admin/campanhas/tipos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
 import { dadosDeMentira } from "../app/design/campanhas/dados";
 
@@ -393,9 +396,30 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
   test("\"Só desta categoria\" marcada vai à fonte como categoryFilterWords (pago) e entra no custo; sem ela, nada", () => {
     expect(entradaApify({ ...opcoes, categorias: ["Clínica de estética", "Spa"] }).categoryFilterWords).toEqual(["Clínica de estética", "Spa"]);
     expect(entradaApify({ ...opcoes, categorias: [] })).not.toHaveProperty("categoryFilterWords");
-    // 2 termos x 50 = 100 lugares: US$ 0,15 pela tabela, mais US$ 0,001 por lugar com o filtro.
-    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: [] })).toBeCloseTo(0.15, 6);
-    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: ["Spa"] })).toBeCloseTo(0.25, 6);
+    // 2 termos x 50 = 100 lugares a US$ 0,004 (plano grátis), mais US$ 0,001 por lugar para cada filtro pago
+    // (pular fechadas, e a categoria quando marcada).
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: [] })).toBeCloseTo(0.5, 6);
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: ["Spa"] })).toBeCloseTo(0.6, 6);
+    expect(custoMinimoDaBuscaUsd({ ...opcoes, categorias: [], ignorarFechados: false })).toBeCloseTo(0.4, 6);
+  });
+
+  test("sem termo (02/11/2026): todas as empresas da área até o teto, só as fechadas puladas na fonte, e o teto de gasto da execução", () => {
+    const toda = { ...OPCOES_PADRAO, cidade: "Mutum", uf: "MG", cidadeIbge: 3144003, area: { lat: -19.82, lng: -41.44, raioKm: 5 } };
+    const entrada = entradaApify(toda);
+    expect(entrada.allPlacesNoSearchAction).toBe(TODAS_AS_EMPRESAS);
+    expect(entrada).not.toHaveProperty("searchStringsArray");
+    expect(entrada.maxCrawledPlacesPerSearch).toBe(50);
+    expect(entrada.skipClosedPlaces).toBe(true);
+    for (const pago of ["placeMinimumStars", "website", "categoryFilterWords"]) expect(entrada).not.toHaveProperty(pago);
+    expect(maximoDaBusca(toda)).toBe(50);
+    // 500 x US$ 0,005 = US$ 2,50; 50 x 0,005 = 0,25 sobe para o mínimo do actor (US$ 0,50).
+    expect(tetoDeGastoUsd({ ...toda, porTermo: 500 })).toBeCloseTo(2.5, 6);
+    expect(tetoDeGastoUsd(toda)).toBe(0.5);
+    expect(problemasDaBusca(toda)).toEqual([]);
+    expect(nomeDaBusca(toda)).toBe("Busca em Mutum");
+    expect(nomeDaBusca({ ...toda, nome: "  clinicas e supermercados dezembro " })).toBe("clinicas e supermercados dezembro");
+    // Sem termo, o lugar sem categoria fica sem segmento (nunca o nome da busca).
+    expect(itemDoApify({ title: "Loja", placeId: "p1" }, "").segmento).toBeNull();
   });
 
   test("o webhook da execução: vai em base64 na query, com o segredo num header e nunca na URL", () => {
@@ -578,16 +602,26 @@ test.describe("Pedidos das rotas (lib/campanhas-pedidos.ts): o que não confere 
     expect(textoDe("  x ".repeat(80)).length).toBeLessThanOrEqual(100);
     const ok = { ...OPCOES_PADRAO, termos: ["dentista"], cidade: "Manhuaçu", uf: "MG" };
     expect(opcoesDe(ok)).toEqual(ok);
+    // Sem termo é o padrão desde 02/11/2026; o nome é livre (aparado, com teto).
+    expect(opcoesDe({ ...ok, termos: [] })).toEqual({ ...ok, termos: [] });
+    expect(opcoesDe({ ...ok, nome: "  dezembro " })?.nome).toBe("dezembro");
+    expect(opcoesDe({ ...ok, nome: 3 })).toBeNull();
     expect(opcoesDe({ ...ok, uf: "XX" })).toBeNull();
     expect(opcoesDe({ ...ok, porTermo: 5000 })).toBeNull();
     expect(opcoesDe({ ...ok, notaMinima: 2 })).toBeNull();
-    expect(opcoesDe({ ...ok, termos: [] })).toBeNull();
     expect(opcoesDe("nada")).toBeNull();
   });
 
   test("o recorte e o rascunho: ids uuid, passo de 1 a 4, no máximo 3 variantes", () => {
     const id = "6f1d2c3b-4a5e-4f60-8a7b-9c0d1e2f3a4b";
-    expect(filtroDe({ buscaId: "todas" })).toEqual({ buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null });
+    expect(filtroDe({ buscaId: "todas" })).toEqual({
+      buscaId: "todas",
+      soMarcadosComoBons: false,
+      soSemSiteProprio: false,
+      quemNaoRespondeuDe: null,
+      incluirJaContatados: false,
+    });
+    expect(filtroDe({ buscaId: "todas", incluirJaContatados: true })?.incluirJaContatados).toBe(true);
     expect(filtroDe({ buscaId: id, quemNaoRespondeuDe: id, soMarcadosComoBons: true })).toMatchObject({ buscaId: id, quemNaoRespondeuDe: id, soMarcadosComoBons: true });
     expect(filtroDe({ buscaId: "b1" })).toBeNull();
     expect(filtroDe({ buscaId: "todas", quemNaoRespondeuDe: "c2" })).toBeNull();
@@ -754,12 +788,23 @@ test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmad
   test("o recorte da tabela na query: busca uuid, filtros da lista (com \"Perfil não reivindicado\"), cidade e texto com teto", () => {
     const id = "6f1c2d3e-4a5b-4c6d-8e7f-0a1b2c3d4e5f";
     expect(recorteDe(new URLSearchParams({ busca: id, filtros: "nao_reivindicado,bons", cidade: "Mutum", texto: "  bela " }))).toEqual({
+      ...RECORTE_LIVRE,
       buscaId: id,
       texto: "bela",
       cidade: "Mutum",
       filtros: ["nao_reivindicado", "bons"],
     });
-    expect(recorteDe(new URLSearchParams())).toEqual({ buscaId: null, texto: "", cidade: null, filtros: [] });
+    expect(recorteDe(new URLSearchParams())).toEqual({ ...RECORTE_LIVRE, buscaId: null });
+    // Os filtros que saíram da busca (02/11/2026): ida e volta pela query, e o torto é 400.
+    const cheio = { ...RECORTE_LIVRE, buscaId: id, site: "com_site" as const, notaMinima: 4 as const, minAvaliacoes: 30 as const, categorias: ["Clínica médica", "Padaria"] };
+    const query = new URLSearchParams(Object.entries(recorteParaQuery(cheio)).filter((e): e is [string, string] => e[1] !== null));
+    expect(recorteDe(query)).toEqual(cheio);
+    expect(recorteDe(new URLSearchParams({ site: "talvez" }))).toBe("filtro de site inválido");
+    expect(recorteDe(new URLSearchParams({ nota: "2" }))).toBe("nota inválida");
+    expect(recorteDe(new URLSearchParams({ avaliacoes: "7" }))).toBe("mínimo de avaliações inválido");
+    expect(recorteDe(new URLSearchParams({ categorias: "{" }))).toBe("categorias inválidas");
+    expect(recorteDe(new URLSearchParams({ categorias: "[1]" }))).toBe("categorias inválidas");
+    expect(recorteDe(new URLSearchParams({ filtros: "nota" }))).toBe("filtro inválido");
     expect(recorteDe(new URLSearchParams({ busca: "x" }))).toBe("busca inválida");
     expect(recorteDe(new URLSearchParams({ filtros: "nao_reivindicado,todos" }))).toBe("filtro inválido");
   });
@@ -778,5 +823,44 @@ test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmad
     expect(localDaUltimaBusca([busca(null, "MG"), busca(3112406, "MG"), busca(3144003, "MG")])).toEqual({ uf: "MG", ibge: 3112406 });
     expect(localDaUltimaBusca([busca(null, "MG")])).toBeNull();
     expect(localDaUltimaBusca([])).toBeNull();
+  });
+});
+
+test.describe("Planilha de leads (lib/planilha-de-leads.ts, 02/11/2026)", () => {
+  test("acha as colunas pelo cabeçalho, só celular entra, repetido e vazio saem, e a amostra mostra como ficou", () => {
+    const linhas = [
+      ["Empresa", "Cidade", "WhatsApp"],
+      ["Padaria A", "Mutum", "(33) 90000-0001"],
+      ["Mercado B", "Mutum", "33 3300-0000"],
+      ["Padaria A de novo", "Mutum", "5533900000001"],
+      ["Sem número", "Mutum", ""],
+      ["Clínica C", "", "+55 33 90000-0002"],
+    ];
+    const { colunas, temCabecalho } = colunasDaPlanilha(linhas);
+    expect(temCabecalho).toBe(true);
+    expect(colunas).toEqual({ telefone: 2, nome: 0, cidade: 1 });
+    const r = lerLinhas(linhas.slice(1), colunas, 2);
+    expect(r.validas.map((v) => v.telefone)).toEqual(["5533900000001", "5533900000002"]);
+    expect(r.validas[1]).toMatchObject({ nome: "Clínica C", cidade: null });
+    expect(r.invalidas).toEqual([{ linha: 3, valor: "33 3300-0000" }]);
+    expect(r.repetidas).toBe(1);
+    expect(r.vazias).toBe(1);
+    expect(amostraDosNumeros(r.validas)).toEqual([
+      { original: "(33) 90000-0001", comoFica: "+55 (33) 90000-0001" },
+      { original: "+55 33 90000-0002", comoFica: "+55 (33) 90000-0002" },
+    ]);
+    const item = itemDaPlanilha(r.validas[0]);
+    expect(item).toMatchObject({ telefone: "5533900000001", tipo_telefone: "celular", nome: "Padaria A", fonte_id: null, site_classe: "nao" });
+  });
+
+  test("sem cabeçalho de telefone: a coluna em que a maioria é telefone; sem nenhuma, nada", () => {
+    const sem = [
+      ["Padaria A", "33900000001"],
+      ["Mercado B", "33900000003"],
+    ];
+    expect(colunasDaPlanilha(sem)).toEqual({ colunas: { telefone: 1 }, temCabecalho: false });
+    expect(colunasDaPlanilha([["Nome", "Cidade"], ["A", "Mutum"]]).colunas.telefone).toBeUndefined();
+    expect(nomeDaColuna(["Nome", "Cel"], false, 1)).toBe("Coluna B");
+    expect(nomeDaColuna(["Nome", "Cel"], true, 1)).toBe("Cel");
   });
 });

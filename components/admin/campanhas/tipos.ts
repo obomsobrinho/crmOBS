@@ -1,4 +1,5 @@
 import type { PeriodoKey } from "@/lib/periodo";
+import type { PreviaDaPlanilha } from "@/lib/planilha-de-leads";
 import {
   podeEntrarNaCampanha,
   siteDoLead,
@@ -309,6 +310,12 @@ export interface FonteDeCampanhas {
   cidades(buscaId: string | null): Promise<string[]>;
   /** As categorias que vieram nos leads de uma busca (ou de todas), com a contagem. */
   categorias(buscaId: string | null): Promise<CategoriaDoRecorte[]>;
+  /** O endereço do .xlsx com os leads do recorte; null onde não há arquivo (o preview). */
+  linkDaExportacao(recorte: RecorteDosLeads): string | null;
+  /** Lê a planilha e mostra o que vai entrar, sem gravar. */
+  previaDaPlanilha(arquivo: File): Promise<{ ok: true; previa: PreviaDaPlanilha } | { ok: false; erro: string }>;
+  /** Grava a planilha como uma busca (fonte "planilha") e devolve o id dela. */
+  importarPlanilha(arquivo: File, nome: string): Promise<{ ok: true; buscaId: string } | { ok: false; erro: string }>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
   campanhas(p: { texto: string; situacao: SituacaoDaCampanha | null; pagina: number }): Promise<Pagina<CampanhaDaTabela>>;

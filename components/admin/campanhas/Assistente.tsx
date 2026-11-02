@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Check, ChevronDown, CircleCheck, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CircleCheck, FileSpreadsheet, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
 import { Aviso } from "@/components/ui/aviso";
+import ImportarPlanilha from "./ImportarPlanilha";
 import { haQuanto } from "./pecas";
 import { useLeitura } from "./tabela";
 import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./tipos";
@@ -189,7 +190,10 @@ function Assistente({
     setAberta(p === 1 ? "nome" : p === 2 ? "lista" : p === 3 ? "v0" : null);
   };
 
-  const { dados: buscas } = useLeitura("buscas-do-assistente", () => fonte.buscasParaEscolher());
+  // A lista de buscas relê depois de uma planilha importada (ela vira uma busca nova).
+  const [listas, setListas] = useState(0);
+  const [importando, setImportando] = useState(false);
+  const { dados: buscas } = useLeitura(`buscas-do-assistente|${listas}`, () => fonte.buscasParaEscolher());
   const filtro = useDebounce(campanha.filtro, 300);
   const { dados: previa } = useLeitura(`previa|${JSON.stringify(filtro)}`, () => fonte.previaDoFiltro(filtro));
   const quantos = previa?.total ?? 0;
@@ -216,13 +220,14 @@ function Assistente({
     : campanha.filtro.buscaId === "todas"
       ? "Todas as buscas"
       : buscaEscolhida
-        ? `${buscaEscolhida.termo} · ${buscaEscolhida.cidade}`
+        ? [buscaEscolhida.termo, buscaEscolhida.cidade].filter(Boolean).join(" · ")
         : "Escolha uma busca";
   const recortes = [
     campanha.filtro.soMarcadosComoBons ? "só os bons" : null,
     campanha.filtro.soSemSiteProprio ? "sem site próprio" : null,
-    "não contatados",
+    campanha.filtro.incluirJaContatados ? "com quem já participou" : "não contatados",
   ].filter(Boolean);
+  const jaContatados = previa?.jaContatados ?? 0;
 
   const dataAgendada = campanha.agendadaPara ? diaIsoSP(campanha.agendadaPara) : "";
 
@@ -367,7 +372,7 @@ function Assistente({
                             <SelectItem value="todas">Todas as buscas</SelectItem>
                             {(buscas ?? []).map((b) => (
                               <SelectItem key={b.id} value={b.id} disabled={b.situacao !== "pronta"}>
-                                {b.termo} · {b.cidade}
+                                {[b.termo, b.cidade].filter(Boolean).join(" · ")}
                                 {b.situacao === "buscando" ? " (buscando)" : b.situacao === "falhou" ? " (falhou)" : ""}
                               </SelectItem>
                             ))}
@@ -390,11 +395,42 @@ function Assistente({
                           />
                           Só quem não tem site próprio
                         </label>
+                        <label className="flex items-center gap-2.5 text-apoio text-ink">
+                          <Checkbox
+                            checked={campanha.filtro.incluirJaContatados}
+                            onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, incluirJaContatados: v === true } })}
+                            data-slot="assistente-incluir-contatados"
+                          />
+                          Incluir quem já participou de outra campanha
+                        </label>
+                        {jaContatados > 0 && (
+                          <Aviso tom={campanha.filtro.incluirJaContatados ? "warn" : "neutro"} data-bloco="assistente-ja-contatados">
+                            {numeroBR(jaContatados)} {plural(jaContatados, "lead desta lista já participou", "leads desta lista já participaram")} de outra
+                            campanha.{" "}
+                            {campanha.filtro.incluirJaContatados
+                              ? `${plural(jaContatados, "Ele vai receber", "Eles vão receber")} de novo.`
+                              : `${plural(jaContatados, "Fica", "Ficam")} de fora; marque acima para incluir.`}
+                          </Aviso>
+                        )}
                       </div>
                       <Button variant="link" size="link" className="self-start" onClick={irParaLeads} data-slot="assistente-nova-busca">
                         <Search aria-hidden />
                         Falta lead? Fazer uma nova busca
                       </Button>
+                      <Button variant="link" size="link" className="self-start" onClick={() => setImportando(true)} data-slot="assistente-importar">
+                        <FileSpreadsheet aria-hidden />
+                        Importar uma planilha (.xlsx)
+                      </Button>
+                      <ImportarPlanilha
+                        fonte={fonte}
+                        aberto={importando}
+                        aoFechar={() => setImportando(false)}
+                        aoImportar={(buscaId) => {
+                          setImportando(false);
+                          setListas((n) => n + 1);
+                          aoMudar({ filtro: { ...campanha.filtro, buscaId } });
+                        }}
+                      />
                     </div>
                   )}
                 </Secao>

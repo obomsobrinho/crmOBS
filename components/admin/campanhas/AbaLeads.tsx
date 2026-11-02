@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronRight, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
+import { ChevronRight, Download, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -608,6 +608,7 @@ function TabelaDeLeads({
     [buscaId, busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias],
   );
   const ler = useCallback((pagina: number) => fonte.leads({ ...recorte, pagina }), [fonte, recorte]);
+  const linkDaExportacao = fonte.linkDaExportacao(recorte);
   const tabela = usePaginaDaFonte(JSON.stringify(recorte), ler, versao);
   const { mudarItem, setPagina } = tabela;
   // Um pino clicado leva a tabela até a página do lead, no recorte que está na tela.
@@ -710,13 +711,22 @@ function TabelaDeLeads({
         placeholder="Nome ou telefone"
         rotuloDaBusca="Buscar lead pelo nome ou telefone"
         filtro={
-          <BotaoDeFiltro
-            slot="leads-filtro"
-            largura="w-60"
-            ativos={ativos}
-            rotulo={ativos > 0 ? `Filtrar leads: ${ativos} ligados` : "Filtrar leads"}
-            grupos={grupos}
-          />
+          <>
+            <BotaoDeFiltro
+              slot="leads-filtro"
+              largura="w-60"
+              ativos={ativos}
+              rotulo={ativos > 0 ? `Filtrar leads: ${ativos} ligados` : "Filtrar leads"}
+              grupos={grupos}
+            />
+            {linkDaExportacao && (
+              <Button asChild variant="outline" size="icon-control" className="shrink-0">
+                <a href={linkDaExportacao} download aria-label="Exportar estes leads para Excel" title="Exportar para Excel" data-slot="leads-exportar">
+                  <Download size={15} />
+                </a>
+              </Button>
+            )}
+          </>
         }
       >
         {esquerda}
@@ -896,7 +906,8 @@ function DetalheDaBusca({
         rotuloDoVoltar="Leads"
         titulo={
           <>
-            <span className="first-letter:uppercase">{busca.termo}</span> em {busca.cidade}
+            <span className="first-letter:uppercase">{busca.termo}</span>
+            {busca.cidade ? ` em ${busca.cidade}` : ""}
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}

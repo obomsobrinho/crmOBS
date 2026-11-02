@@ -16,6 +16,7 @@ import type {
   Totais,
 } from "@/components/admin/campanhas/tipos";
 import { recorteParaQuery } from "./campanhas-pedidos";
+import type { PreviaDaPlanilha } from "./planilha-de-leads";
 import type { MarcacaoDoLead, ResumoDobrado, SituacaoDaCampanha } from "./prospeccao";
 
 // DE ONDE A TELA DE CAMPANHAS TIRA OS DADOS na página de verdade: as rotas
@@ -45,7 +46,8 @@ async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${caminho}`, {
     ...init,
     signal: AbortSignal.timeout(LIMITE_DA_LEITURA_MS),
-    headers: init?.body ? { "Content-Type": "application/json" } : undefined,
+    // Um formulário (a planilha) leva o próprio Content-Type, com a fronteira das partes.
+    headers: typeof init?.body === "string" ? { "Content-Type": "application/json" } : undefined,
     cache: "no-store",
   });
   if (!res.ok) {
@@ -88,6 +90,17 @@ const recorteNaQuery = recorteParaQuery;
 
 const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
 
+/** O arquivo da planilha no formulário da rota; com `nome`, o pedido de gravar (sem, a prévia). */
+function formularioDaPlanilha(arquivo: File, nome?: string): FormData {
+  const f = new FormData();
+  f.set("arquivo", arquivo);
+  if (nome !== undefined) {
+    f.set("confirmar", "1");
+    f.set("nome", nome);
+  }
+  return f;
+}
+
 /** A fonte de verdade: uma instância por página (sem estado; cada leitura é uma rota). */
 export function fonteDasRotas(): FonteDeCampanhas {
   const acao = async (id: string, a: "iniciar" | "pausar" | "retomar") =>
@@ -107,6 +120,15 @@ export function fonteDasRotas(): FonteDeCampanhas {
     pontosDaBusca: (buscaId) => pedir<PontoNoMapa[]>(`/buscas/${buscaId}/pontos`),
     cidades: (buscaId) => pedir<string[]>(`/leads${q({ cidades: 1, busca: buscaId })}`),
     categorias: (buscaId) => pedir<CategoriaDoRecorte[]>(`/leads${q({ categoriasDoRecorte: 1, busca: buscaId })}`),
+    linkDaExportacao: (recorte) => `${BASE}/leads/exportar${q(recorteNaQuery(recorte))}`,
+    previaDaPlanilha: async (arquivo) => {
+      const r = await recusaSe4xx(pedir<PreviaDaPlanilha>("/planilha", { method: "POST", body: formularioDaPlanilha(arquivo) }));
+      return r.ok ? { ok: true, previa: r.valor } : r;
+    },
+    importarPlanilha: async (arquivo, nome) => {
+      const r = await recusaSe4xx(pedir<{ buscaId: string }>("/planilha", { method: "POST", body: formularioDaPlanilha(arquivo, nome) }));
+      return r.ok ? { ok: true, buscaId: r.valor.buscaId } : r;
+    },
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),

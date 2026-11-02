@@ -296,11 +296,13 @@ export async function categoriasDoRecorte(svc: Supa, buscaId: string | null): Pr
   return (data ?? []).map((r) => ({ categoria: r.categoria, n: r.n }));
 }
 
-export async function paginaDeLeads(svc: Supa, p: RecorteDosLeads & { pagina: number }): Promise<Pagina<LeadDaTabela>> {
+/** Uma página da tabela de leads (10; a exportação lê de 50, o teto do SQL). */
+export async function paginaDeLeads(svc: Supa, p: RecorteDosLeads & { pagina: number; porPagina?: number }): Promise<Pagina<LeadDaTabela>> {
+  const porPagina = p.porPagina ?? POR_PAGINA;
   const { data, error } = await svc.rpc("prospeccao_leads_pagina", {
     ...parametrosDoRecorte(p),
-    p_offset: (p.pagina - 1) * POR_PAGINA,
-    p_limite: POR_PAGINA,
+    p_offset: (p.pagina - 1) * porPagina,
+    p_limite: porPagina,
   });
   if (error) throw error;
   const linhas = data ?? [];
@@ -783,7 +785,8 @@ export function desistirDaBusca(svc: Supa, buscaId: string): Promise<void> {
   return concluir(svc, buscaId, null, "A fonte não respondeu a tempo. Nada foi gravado; dá para buscar de novo.");
 }
 
-async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {
+/** Grava o fim de uma busca (`prospeccao_concluir_busca`): os itens já traduzidos, ou o erro. */
+export async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typeof itemParaOBanco>[] | null, erro: string | null) {
   const { error } = await svc.rpc("prospeccao_concluir_busca", { p_busca: buscaId, p_itens: paraJson(itens ?? []), p_erro: erro });
   if (error) throw error;
 }

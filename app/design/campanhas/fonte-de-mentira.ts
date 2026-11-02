@@ -3,6 +3,7 @@ import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 import { PERIODOS } from "@/lib/periodo";
 import {
   DIAS_DA_LINHA,
+  OPCOES_PADRAO,
   POR_PAGINA_DE_CAMPANHAS,
   contagemPorSemana,
   enviosPorDia,
@@ -176,6 +177,37 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async cidades(buscaId) {
       return [...new Set(daBusca(buscaId).map((l) => l.cidade))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    },
+
+    // No preview não há arquivo: a exportação some e a planilha devolve uma prévia de mentira.
+    linkDaExportacao: () => null,
+
+    async previaDaPlanilha() {
+      return {
+        ok: true,
+        previa: {
+          linhas: 12,
+          colunas: { nome: "Empresa", telefone: "Celular", cidade: "Cidade" },
+          validas: 10,
+          invalidas: 1,
+          exemplosInvalidos: [{ linha: 6, valor: "(33) 3300-0000" }],
+          vazias: 0,
+          repetidas: 1,
+          jaNaBase: 2,
+          pediramSair: 0,
+          amostra: [
+            { original: "33 90000-0001", comoFica: "+55 (33) 90000-0001" },
+            { original: "(33)900000002", comoFica: "+55 (33) 90000-0002" },
+          ],
+        },
+      };
+    },
+
+    async importarPlanilha(arquivo, nome) {
+      const id = `b${Date.now()}`;
+      const opcoes = { ...OPCOES_PADRAO, nome: nome || `Planilha ${arquivo.name}` };
+      buscas.unshift({ id, termo: nomeDaBusca(opcoes), cidade: "", criadaEm: Date.now(), situacao: "pronta", total: 0, erro: null, opcoes });
+      return { ok: true, buscaId: id };
     },
 
     async categorias(buscaId) {
