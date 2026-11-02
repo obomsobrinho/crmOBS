@@ -15,6 +15,7 @@ import { mascaraTelefoneBR, numeroBR, pct, plural } from "@/lib/format";
 import { diaMesHoraSP } from "@/lib/fuso";
 import {
   FAIXAS_DE_NOTA,
+  MINIMOS_DE_AVALIACOES,
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
   estadoNoMapa,
@@ -23,6 +24,9 @@ import {
   textoDoLocal,
   tipoDoTelefone,
   type DiaDeEnvio,
+  type FiltroDeSiteDaBusca,
+  type MinimoDeAvaliacoes,
+  type NotaMinima,
   type ResumoDaBase,
   type SemanaContada,
   type SituacaoDaBusca,
@@ -47,6 +51,7 @@ import {
   type Lead,
   type LeadDaTabela,
   type Pagina,
+  type RecorteDosLeads,
   type Totais,
 } from "./tipos";
 
@@ -370,8 +375,8 @@ function TabelaDeBuscas({
       <BarraDaTabela
         busca={q}
         aoBuscar={setQ}
-        placeholder="Segmento ou cidade"
-        rotuloDaBusca="Buscar por segmento ou cidade"
+        placeholder="Nome da busca ou cidade"
+        rotuloDaBusca="Buscar pelo nome da busca ou pela cidade"
         filtro={
           <BotaoDeFiltro
             slot="buscas-filtro"
@@ -423,10 +428,22 @@ type Filtro = FiltroDosLeads;
 const FILTROS: { chave: Filtro; rotulo: string }[] = [
   { chave: "nao_contatados", rotulo: "Não contatados" },
   { chave: "bons", rotulo: "Marcados como bons" },
-  { chave: "sem_site", rotulo: "Sem site próprio" },
-  { chave: "nota", rotulo: "Nota 4,5 ou mais" },
   { chave: "nao_reivindicado", rotulo: "Perfil não reivindicado" },
 ];
+
+// Os filtros que saíram da Nova busca (02/11/2026): a busca traz tudo e a tabela filtra.
+const SITES: { valor: FiltroDeSiteDaBusca; rotulo: string }[] = [
+  { valor: "todos", rotulo: "Com ou sem site" },
+  { valor: "sem_site", rotulo: "Sem site próprio" },
+  { valor: "com_site", rotulo: "Com site próprio" },
+];
+const NOTAS: { valor: NotaMinima; rotulo: string }[] = [
+  { valor: null, rotulo: "Qualquer nota" },
+  { valor: 3.5, rotulo: "3,5 ou mais" },
+  { valor: 4, rotulo: "4 ou mais" },
+  { valor: 4.5, rotulo: "4,5 ou mais" },
+];
+const AVALIACOES = MINIMOS_DE_AVALIACOES.map((m) => ({ valor: m, rotulo: m === null ? "Qualquer quantidade" : `${m} ou mais` }));
 
 const GRADE_LEADS =
   "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_148px] xl:items-center xl:gap-4";
@@ -580,19 +597,25 @@ function TabelaDeLeads({
   const busca = useDebounce(q.trim(), 300);
   const [cidade, setCidade] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<Filtro[]>([]);
+  const [site, setSite] = useState<FiltroDeSiteDaBusca>("todos");
+  const [notaMinima, setNotaMinima] = useState<NotaMinima>(null);
+  const [minAvaliacoes, setMinAvaliacoes] = useState<MinimoDeAvaliacoes>(null);
+  const [categorias, setCategorias] = useState<string[]>([]);
   const { dados: cidades } = useLeitura(`cidades|${buscaId ?? ""}|${versao}`, () => fonte.cidades(buscaId));
-  const ler = useCallback(
-    (pagina: number) => fonte.leads({ buscaId, texto: busca, cidade, filtros, pagina }),
-    [fonte, buscaId, busca, cidade, filtros],
+  const { dados: categoriasDoRecorte } = useLeitura(`categorias|${buscaId ?? ""}|${versao}`, () => fonte.categorias(buscaId));
+  const recorte = useMemo<RecorteDosLeads>(
+    () => ({ buscaId, texto: busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias }),
+    [buscaId, busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias],
   );
-  const tabela = usePaginaDaFonte(`${buscaId ?? ""}|${busca}|${cidade ?? ""}|${filtros.join(",")}`, ler, versao);
+  const ler = useCallback((pagina: number) => fonte.leads({ ...recorte, pagina }), [fonte, recorte]);
+  const tabela = usePaginaDaFonte(JSON.stringify(recorte), ler, versao);
   const { mudarItem, setPagina } = tabela;
   // Um pino clicado leva a tabela até a página do lead, no recorte que está na tela.
   useEffect(() => {
     if (!focoDoMapa) return;
     let vivo = true;
     fonte
-      .paginaDoLead({ buscaId, texto: busca, cidade, filtros }, focoDoMapa.id)
+      .paginaDoLead(recorte, focoDoMapa.id)
       .then((p) => {
         if (vivo && p !== null) setPagina(p);
       })
@@ -604,6 +627,7 @@ function TabelaDeLeads({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the jump answers the click, not later filter changes
   }, [focoDoMapa]);
   const alternar = (f: Filtro) => setFiltros((atual) => (atual.includes(f) ? atual.filter((x) => x !== f) : [...atual, f]));
+  const alternarCategoria = (c: string) => setCategorias((atual) => (atual.includes(c) ? atual.filter((x) => x !== c) : [...atual, c]));
   const marcar = useCallback(
     async (id: string, m: Lead["marcacao"]) => {
       // A linha muda na hora; se o servidor recusar, volta ao que era.
@@ -625,12 +649,46 @@ function TabelaDeLeads({
     [aoMarcar, fonte, mudarItem],
   );
 
+  const ativos =
+    filtros.length + (cidade ? 1 : 0) + (site !== "todos" ? 1 : 0) + (notaMinima !== null ? 1 : 0) + (minAvaliacoes !== null ? 1 : 0) + categorias.length;
   const grupos = [
     {
       titulo: "Mostrar só",
       multiplo: true,
       opcoes: FILTROS.map((f) => ({ chave: f.chave, rotulo: f.rotulo, marcado: filtros.includes(f.chave), aoEscolher: () => alternar(f.chave) })),
     },
+    {
+      titulo: "Site",
+      opcoes: SITES.map((s) => ({ chave: `site-${s.valor}`, rotulo: s.rotulo, marcado: site === s.valor, aoEscolher: () => setSite(s.valor) })),
+    },
+    {
+      titulo: "Nota no Google",
+      opcoes: NOTAS.map((n) => ({ chave: `nota-${n.valor}`, rotulo: n.rotulo, marcado: notaMinima === n.valor, aoEscolher: () => setNotaMinima(n.valor) })),
+    },
+    {
+      titulo: "Avaliações no Google",
+      opcoes: AVALIACOES.map((a) => ({
+        chave: `avaliacoes-${a.valor}`,
+        rotulo: a.rotulo,
+        marcado: minAvaliacoes === a.valor,
+        aoEscolher: () => setMinAvaliacoes(a.valor),
+      })),
+    },
+    ...(categoriasDoRecorte && categoriasDoRecorte.length > 0
+      ? [
+          {
+            titulo: "Categoria",
+            multiplo: true,
+            opcoes: categoriasDoRecorte.map((c) => ({
+              chave: `categoria-${c.categoria}`,
+              rotulo: c.categoria,
+              contagem: c.n,
+              marcado: categorias.includes(c.categoria),
+              aoEscolher: () => alternarCategoria(c.categoria),
+            })),
+          },
+        ]
+      : []),
     ...(cidades && cidades.length > 1
       ? [
           {
@@ -655,8 +713,8 @@ function TabelaDeLeads({
           <BotaoDeFiltro
             slot="leads-filtro"
             largura="w-60"
-            ativos={filtros.length + (cidade ? 1 : 0)}
-            rotulo={filtros.length + (cidade ? 1 : 0) > 0 ? `Filtrar leads: ${filtros.length + (cidade ? 1 : 0)} ligados` : "Filtrar leads"}
+            ativos={ativos}
+            rotulo={ativos > 0 ? `Filtrar leads: ${ativos} ligados` : "Filtrar leads"}
             grupos={grupos}
           />
         }
@@ -760,7 +818,7 @@ function HomeDosLeads({
           <EstadoVazio
             icone={Search}
             titulo="Nenhuma busca ainda"
-            texto="Comece buscando um segmento e uma cidade, por exemplo clínica de estética em Mutum."
+            texto="Comece com uma busca: escolha a cidade e o raio, e vêm todas as empresas da área."
           >
             <Button className="mt-2" onClick={novaBusca}>
               <Plus aria-hidden />

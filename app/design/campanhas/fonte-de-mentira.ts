@@ -13,6 +13,7 @@ import {
   resultadoDaCampanha,
   resumoDaBase,
   siteDoLead,
+  nomeDaBusca,
   telefoneDoLead,
   type EnvioParaResultado,
 } from "@/lib/prospeccao";
@@ -67,7 +68,9 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
     passo: c.passo,
   });
   /** Os leads do recorte da tabela, na ordem da pontuação (a mesma da tabela de verdade). */
-  const doRecorte = ({ buscaId, texto, cidade, filtros }: RecorteDosLeads): Lead[] => {
+  /** As categorias de um lead (as da fonte, ou o segmento de um lead de antes): o mesmo `coalesce` do SQL. */
+  const categoriasDoLead = (l: Lead) => (l.detalhes?.categorias.length ? l.detalhes.categorias : [l.segmento]);
+  const doRecorte = ({ buscaId, texto, cidade, filtros, site, notaMinima, minAvaliacoes, categorias }: RecorteDosLeads): Lead[] => {
     const q = normalizar(texto);
     const digitos = texto.replace(/\D/g, "");
     return daBusca(buscaId)
@@ -77,8 +80,11 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
           (cidade === null || l.cidade === cidade) &&
           (!filtros.includes("nao_contatados") || l.campanhaIds.length === 0) &&
           (!filtros.includes("bons") || l.marcacao === "bom") &&
-          (!filtros.includes("sem_site") || siteDoLead(l.site) !== "sim") &&
-          (!filtros.includes("nota") || (l.nota ?? 0) >= 4.5) &&
+          (site !== "sem_site" || siteDoLead(l.site) !== "sim") &&
+          (site !== "com_site" || siteDoLead(l.site) === "sim") &&
+          (notaMinima === null || (l.nota !== null && l.nota >= notaMinima)) &&
+          (minAvaliacoes === null || (l.avaliacoes ?? 0) >= minAvaliacoes) &&
+          (categorias.length === 0 || categoriasDoLead(l).some((c) => categorias.includes(c))) &&
           (!filtros.includes("nao_reivindicado") || l.detalhes?.reivindicado === false),
       )
       .sort((a, b) => pontos(b) - pontos(a) || a.nome.localeCompare(b.nome, "pt-BR"));
@@ -131,11 +137,11 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async novaBusca(opcoes) {
       const id = `b${Date.now()}`;
-      buscas.unshift({ id, termo: opcoes.termos.join(", "), cidade: opcoes.cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null, opcoes });
+      buscas.unshift({ id, termo: nomeDaBusca(opcoes), cidade: opcoes.cidade, criadaEm: Date.now(), situacao: "buscando", total: 0, erro: null, opcoes });
       // A fonte de verdade avisa por webhook; aqui, alguns segundos de espera.
       window.setTimeout(() => {
         const ja = new Set(leads.map((l) => telefoneDoLead(l.telefone)).filter(Boolean));
-        const achados = resultadoDaBuscaDeMentira(id, opcoes.termos[0], opcoes.cidade, 3000 + leads.length);
+        const achados = resultadoDaBuscaDeMentira(id, opcoes.termos[0] ?? "Empresa", opcoes.cidade, 3000 + leads.length);
         leads = [...leads, ...achados.filter((l) => !ja.has(telefoneDoLead(l.telefone)))];
         const b = buscas.find((x) => x.id === id);
         if (b) Object.assign(b, { situacao: "pronta", total: achados.length } satisfies Partial<Busca>);
@@ -170,6 +176,12 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async cidades(buscaId) {
       return [...new Set(daBusca(buscaId).map((l) => l.cidade))].sort((a, b) => a.localeCompare(b, "pt-BR"));
+    },
+
+    async categorias(buscaId) {
+      const n = new Map<string, number>();
+      for (const l of daBusca(buscaId)) for (const c of categoriasDoLead(l)) if (c.trim()) n.set(c, (n.get(c) ?? 0) + 1);
+      return [...n].map(([categoria, k]) => ({ categoria, n: k })).sort((a, b) => b.n - a.n || a.categoria.localeCompare(b.categoria, "pt-BR"));
     },
 
     async marcar(id, marcacao) {
@@ -274,7 +286,11 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
     async previaDoFiltro(filtro) {
       const fila = leadsDoFiltro(leads, filtro, campanhas).sort((a, b) => pontos(b) - pontos(a));
       const origem = filtro.quemNaoRespondeuDe ? (campanhas.find((c) => c.id === filtro.quemNaoRespondeuDe)?.nome ?? null) : null;
-      return { total: fila.length, primeiros: fila.slice(0, 8).map((l) => l.nome), origem };
+      const jaContatados = filtro.quemNaoRespondeuDe
+        ? 0
+        : leadsDoFiltro(leads, { ...filtro, incluirJaContatados: true }, campanhas).length -
+          leadsDoFiltro(leads, { ...filtro, incluirJaContatados: false }, campanhas).length;
+      return { total: fila.length, primeiros: fila.slice(0, 8).map((l) => l.nome), origem, jaContatados };
     },
 
     async salvar(c) {

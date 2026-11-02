@@ -5,7 +5,7 @@ import type { Circle, CircleMarker, Map as MapaLeaflet, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 import { ROTULO_NO_MAPA } from "@/lib/prospeccao";
-import type { PontoNoMapa } from "./tipos";
+import type { AreaAnterior, PontoNoMapa } from "./tipos";
 
 // O MAPA DE CAMPANHAS, um só (revisão do dono, 30/10/2026), usado no detalhe de uma
 // busca (os pinos dos leads) e na "Nova busca" (o centro arrastável e o raio).
@@ -16,6 +16,7 @@ import type { PontoNoMapa } from "./tipos";
 
 /** Sem pinos (a Nova busca): uma lista só, para o efeito dos pinos não rodar a cada render. */
 const SEM_PONTOS: PontoNoMapa[] = [];
+const SEM_AREAS: AreaAnterior[] = [];
 
 const RAIO = 7;
 const RAIO_DESTACADO = 11;
@@ -27,11 +28,14 @@ export default function Mapa({
   aoEscolher,
   vista,
   area = null,
+  areasAnteriores = SEM_AREAS,
   aoMoverCentro,
   rotulo,
   className,
   ...props
 }: {
+  /** Os círculos das buscas já feitas (Nova busca), tracejados: o dono põe o novo fora deles. */
+  areasAnteriores?: AreaAnterior[];
   /** Os pinos dos leads. */
   pontos?: PontoNoMapa[];
   /** O lead destacado (o pino cresce e vai para a frente). */
@@ -178,6 +182,21 @@ export default function Mapa({
     desenharArea();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- redraw only when the circle changes
   }, [area?.lat, area?.lng, area?.raioKm, area === null]);
+
+  // As áreas anteriores: só desenho, sem clique (o clique no mapa continua movendo o centro).
+  useEffect(() => {
+    const L = leaflet.current;
+    const m = mapa.current;
+    if (!pronto || !L || !m) return;
+    const circulos = areasAnteriores.map((a) =>
+      L.circle([a.lat, a.lng], { radius: a.raioKm * 1000, className: "area-anterior-do-mapa", weight: 1.5, fillOpacity: 0.06, interactive: false })
+        .bindTooltip(a.nome)
+        .addTo(m),
+    );
+    return () => {
+      for (const c of circulos) c.remove();
+    };
+  }, [areasAnteriores, pronto]);
 
   useEffect(() => {
     olharPara();

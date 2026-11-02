@@ -2024,6 +2024,13 @@ export type Database = {
           total_geral: number
         }[]
       }
+      prospeccao_categorias_do_recorte: {
+        Args: { p_busca?: string }
+        Returns: {
+          categoria: string
+          n: number
+        }[]
+      }
       prospeccao_cidades: {
         Args: { p_busca?: string }
         Returns: {
@@ -2101,6 +2108,7 @@ export type Database = {
       prospeccao_leads_do_filtro: {
         Args: {
           p_busca?: string
+          p_incluir_contatados?: boolean
           p_limite?: number
           p_origem?: string
           p_so_bons?: boolean
@@ -2116,14 +2124,17 @@ export type Database = {
       prospeccao_leads_pagina: {
         Args: {
           p_busca?: string
+          p_categorias?: string[]
           p_cidade?: string
           p_digitos?: string
           p_limite?: number
+          p_min_avaliacoes?: number
           p_nao_contatados?: boolean
           p_nao_reivindicado?: boolean
           p_nota_minima?: number
           p_offset?: number
           p_so_bons?: boolean
+          p_so_com_site?: boolean
           p_so_sem_site?: boolean
           p_texto?: string
         }
@@ -2153,6 +2164,7 @@ export type Database = {
           segmento: string
           site: string
           telefone: string
+          tipo_telefone: string
           total_geral: number
         }[]
       }
@@ -2165,14 +2177,17 @@ export type Database = {
       prospeccao_pagina_do_lead: {
         Args: {
           p_busca?: string
+          p_categorias?: string[]
           p_cidade?: string
           p_digitos?: string
           p_lead: string
+          p_min_avaliacoes?: number
           p_nao_contatados?: boolean
           p_nao_reivindicado?: boolean
           p_nota_minima?: number
           p_por_pagina?: number
           p_so_bons?: boolean
+          p_so_com_site?: boolean
           p_so_sem_site?: boolean
           p_texto?: string
         }

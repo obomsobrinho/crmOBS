@@ -3,6 +3,7 @@ import type {
   BuscaDaTabela,
   CampanhaAberta,
   CampanhaDaTabela,
+  CategoriaDoRecorte,
   ConexaoDisponivel,
   FonteDeCampanhas,
   LeadDaTabela,
@@ -10,11 +11,11 @@ import type {
   Pagina,
   PontoNoMapa,
   PreviaDoFiltro,
-  RecorteDosLeads,
   Resultados,
   RespostaDeIniciar,
   Totais,
 } from "@/components/admin/campanhas/tipos";
+import { recorteParaQuery } from "./campanhas-pedidos";
 import type { MarcacaoDoLead, ResumoDobrado, SituacaoDaCampanha } from "./prospeccao";
 
 // DE ONDE A TELA DE CAMPANHAS TIRA OS DADOS na página de verdade: as rotas
@@ -83,7 +84,7 @@ async function recusaSe4xx<T>(p: Promise<T>): Promise<{ ok: true; valor: T } | {
 }
 
 /** O recorte da tabela de leads na query (o mesmo que `recorteDe` confere na rota). */
-const recorteNaQuery = (p: RecorteDosLeads) => ({ busca: p.buscaId, texto: p.texto, cidade: p.cidade, filtros: p.filtros.join(",") });
+const recorteNaQuery = recorteParaQuery;
 
 const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
 
@@ -105,6 +106,7 @@ export function fonteDasRotas(): FonteDeCampanhas {
     paginaDoLead: async (p, leadId) => (await pedir<{ pagina: number | null }>(`/leads/${leadId}${q(recorteNaQuery(p))}`)).pagina,
     pontosDaBusca: (buscaId) => pedir<PontoNoMapa[]>(`/buscas/${buscaId}/pontos`),
     cidades: (buscaId) => pedir<string[]>(`/leads${q({ cidades: 1, busca: buscaId })}`),
+    categorias: (buscaId) => pedir<CategoriaDoRecorte[]>(`/leads${q({ categoriasDoRecorte: 1, busca: buscaId })}`),
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
