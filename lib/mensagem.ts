@@ -137,6 +137,26 @@ export function semLoteAtual<
 }
 
 /**
+ * As linhas do histórico (da mais NOVA para a mais antiga) com o envio da campanha
+ * no lugar dele, como fala da empresa (03/11/2026). O envio não é linha de
+ * `chat_messages`: o cron da prospecção manda direto pela Evolution. Se a janela
+ * já está cheia de linhas mais novas que o envio, ele fica de fora (a seção
+ * ORIGEM DESTE CONTATO do prompt já traz o texto).
+ */
+export function comEnvioDaCampanha<T extends { user_message: string | null; bot_message: string | null; created_at: string | null }>(
+  linhas: T[],
+  envio: { enviadoEm: string; texto: string },
+  janela: number
+): (T | { user_message: null; bot_message: string; created_at: string })[] {
+  const t = Date.parse(envio.enviadoEm);
+  // A primeira linha que não é mais nova que o envio; -1 = todas são.
+  const i = linhas.findIndex((l) => !(Date.parse(l.created_at ?? "") > t));
+  if (i === -1 && linhas.length >= janela) return linhas;
+  const linha = { user_message: null, bot_message: envio.texto, created_at: envio.enviadoEm };
+  return i === -1 ? [...linhas, linha] : [...linhas.slice(0, i), linha, ...linhas.slice(i)];
+}
+
+/**
  * Quantas mensagens a conversa aberta traz por vez (01/10/2026,
  * docs/plano-carregamento.md, fase 4): as mais recentes ao abrir, e as
  * anteriores de tantas em tantas ao rolar para cima.

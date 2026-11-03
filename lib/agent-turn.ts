@@ -36,7 +36,7 @@ import {
   somarConsumoDoTurno,
   type ConsumoDoMes,
 } from "@/lib/consumo-ia";
-import { semLoteAtual } from "@/lib/mensagem";
+import { comEnvioDaCampanha, semLoteAtual } from "@/lib/mensagem";
 import {
   SAIDA_DA_AGENDA_VAZIA,
   TEXTO_PEDE_DIA_E_PERIODO,
@@ -72,6 +72,8 @@ import type {
   RagMatchDiag,
   PersonaOrigem,
 } from "@/lib/agent-diagnostics";
+import { blocoDeOrigem, type OrigemDaCampanha } from "@/lib/prospeccao";
+import { origemDaCampanha } from "@/lib/campanhas-origem";
 
 // Orquestração de um turno do agente. STATELESS por turno; reaproveitável pelas
 // duas rotas: /api/agent (n8n, autenticado pelo segredo) e a bancada de teste
@@ -162,6 +164,13 @@ export interface ProcessTurnParams {
    * bancada guarda do lado dela). Em produção a lista sai da tabela `handoffs`.
    */
   pedidosAbertos?: string[];
+  /**
+   * Só no dryRun: a origem de campanha da conversa de teste (o script de ensaio
+   * do prompt, `scripts/ensaio-do-prompt.mjs`), para a seção ORIGEM DESTE
+   * CONTATO; o envio no histórico vem no `history`, como a bancada manda o resto.
+   * Em produção sai das tabelas de prospecção (`origemDaCampanha`).
+   */
+  origemOverride?: OrigemDaCampanha | null;
 }
 
 /**
@@ -459,7 +468,11 @@ export async function processTurn(
   // Pedidos de ajuda ainda abertos, do mais antigo para o mais novo (a fila).
   let abertos: { id: number; summary: string | null; motivo: string | null }[] = [];
   let resolvidos: string[] = [];
+  // A campanha que abriu esta conversa, se houve (`### ORIGEM DESTE CONTATO`).
+  let origem: OrigemDaCampanha | null = null;
   if (dryRun) {
+    // O histórico do chamador já traz o envio (o script de ensaio o põe primeiro).
+    origem = params.origemOverride ?? null;
     history = sanitizeHistory(params.history);
     instruction = retomada
       ? retomada.instruction.trim()
@@ -471,9 +484,10 @@ export async function processTurn(
       .slice(0, 10)
       .map((summary, i) => ({ id: -1 - i, summary: summary.slice(0, 500), motivo: null }));
   } else {
-    // As quatro leituras do turno de uma vez: histórico, conversa, pedidos já
-    // fechados (`pedidosResolvidos`, best-effort) e a fila aberta.
-    const [{ data: rows, error: histErr }, { data: conv }, { data: pedidos }, { data: fila }] = await Promise.all([
+    // As leituras do turno de uma vez: histórico, conversa, pedidos já fechados
+    // (`pedidosResolvidos`, best-effort), a fila aberta e a origem de campanha
+    // (best-effort: falhar ali só tira a seção, nunca o atendimento).
+    const [{ data: rows, error: histErr }, { data: conv }, { data: pedidos }, { data: fila }, daCampanha] = await Promise.all([
       svc
         .from("chat_messages")
         .select("user_message, bot_message, created_at")
@@ -502,11 +516,19 @@ export async function processTurn(
         .eq("phone", phone)
         .is("closed_at", null)
         .order("opened_at", { ascending: true }),
+      origemDaCampanha(svc, clientId, phone).catch((e) => {
+        console.error("falha ao ler a origem de campanha:", e);
+        return null;
+      }),
     ]);
     if (histErr) throw new TurnError(500, "falha ao carregar o histórico");
+    origem = daCampanha;
+    // O envio da campanha não é linha de chat_messages (o cron manda direto pela
+    // Evolution): entra no histórico no lugar dele, para a IA ver o que a empresa disse.
+    const linhas = origem ? comEnvioDaCampanha(rows ?? [], origem, HISTORY_ROWS) : (rows ?? []);
     // As mensagens do lote que está sendo respondido já estão gravadas e vêm no
     // `message`: sem o corte a IA leria cada uma duas vezes (`semLoteAtual`).
-    history = buildHistory(retomada ? rows : semLoteAtual(rows ?? [], Date.now(), message));
+    history = buildHistory(retomada ? linhas : semLoteAtual(linhas, Date.now(), message));
     resolvidos = pedidosResolvidos(rows, pedidos);
     abertos = fila ?? [];
     const pend = conv?.pending_instruction ?? null;
@@ -572,6 +594,7 @@ export async function processTurn(
     agenda: agenda
       ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config, hours: agenda.hours })
       : null,
+    origem: origem ? blocoDeOrigem(origem) : null,
   });
   const raw = run.output;
 

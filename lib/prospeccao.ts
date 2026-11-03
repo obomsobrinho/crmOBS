@@ -1,6 +1,7 @@
 import { chaveTelefone } from "./avisos";
 import { normalizar } from "./clientes";
-import { diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
+import { formatTime } from "./format";
+import { dataLongaSP, diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
 // CAMPANHAS v2 (29/10/2026, docs/plano-campanhas.md): a prospecção do DONO DO
 // PRODUTO, nunca recurso dos clientes. Módulo puro (sem I/O): o telefone, o site
@@ -372,10 +373,42 @@ export function problemasDaVariante(modelo: string): string[] {
 
 /** As três variantes sugeridas (plano, seção 9; aprovadas pelo dono em 29/10/2026): o texto pré-preenchido de uma campanha nova. */
 export const VARIANTES_SUGERIDAS = [
-  "Oi, tudo bem? Sou o Franck, da OBS. Achei a {empresa} numa busca no Google. A gente monta sistemas sob medida que deixam o WhatsApp respondendo sozinho e tiram o trabalho repetido da rotina. Posso te mostrar em 2 minutos como ficaria aí?",
-  "Oi! Aqui é o Franck, da OBS. Vi a {empresa} no Google e fiquei curioso: quando um cliente chama no WhatsApp fora do horário, alguém responde? A gente monta um sistema que atende, organiza e agenda sozinho. Se fizer sentido, te mostro rapidinho.",
-  "Oi, tudo bem? Sou o Franck, da OBS. A gente cria sistemas sob medida pra tirar tarefa chata da rotina: atendimento no WhatsApp que responde sozinho, agenda, lembrete, controle. Vale uma conversa rápida pra eu entender como funciona aí na {empresa} hoje?",
+  "Oi, tudo bem? Sou o Tony, da OBS. Achei a {empresa} numa busca no Google. A gente monta sistemas sob medida que deixam o WhatsApp respondendo sozinho e tiram o trabalho repetido da rotina. Posso te mostrar em 2 minutos como ficaria aí?",
+  "Oi! Aqui é o Tony, da OBS. Vi a {empresa} no Google e fiquei curioso: quando um cliente chama no WhatsApp fora do horário, alguém responde? A gente monta um sistema que atende, organiza e agenda sozinho. Se fizer sentido, te mostro rapidinho.",
+  "Oi, tudo bem? Sou o Tony, da OBS. A gente cria sistemas sob medida pra tirar tarefa chata da rotina: atendimento no WhatsApp que responde sozinho, agenda, lembrete, controle. Vale uma conversa rápida pra eu entender como funciona aí na {empresa} hoje?",
 ];
+
+// ── Origem do contato, para o agente ─────────────────────────────────────
+
+/** O envio de campanha que abriu a conversa com um telefone (o mais recente da empresa). */
+export interface OrigemDaCampanha {
+  /** Quando saiu (ISO). */
+  enviadoEm: string;
+  /** O texto exato que o lead recebeu (`textoParaLead`). */
+  texto: string;
+  /** Quando o lead pediu para parar (ISO), ou null. */
+  parouEm: string | null;
+}
+
+/** O nome da seção do prompt; a persona pode citar por este nome. */
+export const SECAO_ORIGEM = "ORIGEM DESTE CONTATO";
+
+/**
+ * A seção que diz ao agente que a EMPRESA procurou a pessoa primeiro (03/11/2026,
+ * antes da primeira campanha real). Só fatos: data e texto enviado. Tom e conduta
+ * moram na persona de cada empresa, nunca aqui.
+ */
+export function blocoDeOrigem(o: OrigemDaCampanha): string {
+  const quando = (iso: string) => `${dataLongaSP(iso)}, às ${formatTime(iso)}`;
+  return [
+    `### ${SECAO_ORIGEM}`,
+    `A empresa procurou esta pessoa por iniciativa própria: mandou a ela uma mensagem de prospecção (campanha) em ${quando(o.enviadoEm)}. A mensagem enviada foi exatamente esta:`,
+    '"""',
+    o.texto.trim(),
+    '"""',
+    ...(o.parouEm ? [`Em ${quando(o.parouEm)}, a pessoa pediu para não receber mais mensagens de campanha.`] : []),
+  ].join("\n");
+}
 
 /** Qual variante (0, 1, 2) vai para o lead na posição `ordem` da fila: revezamento simples. */
 export function varianteDaOrdem(ordem: number, quantas: number): number {

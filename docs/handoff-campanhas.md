@@ -260,6 +260,10 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
    conversa com a OBS ("Pausar IA (Franck digitou)" no `obs-atendimento`). Para um lead NOVO não há
    `dados_cliente` ainda, então nada pausa; para um telefone que já conversa com a OBS, pode pausar. Eu não
    toquei no n8n; me diga o que viu e decidimos.
+   **Respondida em 03/11/2026**: não pausa. Envio pela API da Evolution nunca chega ao webhook (conferido nas
+   execuções do n8n: o lembrete de 02/11 não gerou execução nenhuma), então o nó só roda para mensagem
+   digitada. A hipótese acima sobre lead novo também estava errada (o `Cria Lead` vem antes da `Direção`),
+   mas não importa, porque o evento não chega. `docs/adr/2026-11-03-campaign-origin-in-agent-turn.md`.
 8. **Revisar e fazer o merge** quando estiver de acordo (o fluxo: você faz o merge).
 
 ## Estado
