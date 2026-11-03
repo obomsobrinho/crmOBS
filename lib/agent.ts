@@ -295,6 +295,8 @@ export async function runAgent(params: {
    * `blocoDaAgenda` (lib/agenda.ts), ou nada quando a agenda está desligada.
    */
   agenda?: string | null;
+  /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (lib/prospeccao.ts), ou nada. */
+  origem?: string | null;
 }): Promise<AgentRun> {
   const { persona, history, message, apiKey } = params;
   const model = params.model || AGENT_MODEL;
@@ -310,6 +312,8 @@ export async function runAgent(params: {
   // Os horários livres da agenda própria logo depois: mudam a cada minuto e a
   // cada marcação, então também ficam fora do prefixo do cache.
   if (params.agenda) parts.push(params.agenda);
+  // Quem procurou quem (campanha): fato da conversa, fora do prefixo do cache.
+  if (params.origem) parts.push(params.origem);
   // Depois do AGORA, junto do que muda a cada turno: não mexe no prefixo que o
   // cache de prompt reaproveita (persona).
   if (params.pedidosResolvidos && params.pedidosResolvidos.length > 0) {

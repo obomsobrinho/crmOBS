@@ -1,0 +1,10 @@
+{
+  "agora": "2026-11-04T10:30:00-03:00",
+  "cenarios": [
+    {
+      "nome": "Lead de campanha pergunta quem é e o preço",
+      "campanha": { "empresa": "Clínica Sorriso" },
+      "mensagens": ["oi, quem é?", "quanto custa isso?"]
+    }
+  ]
+}
