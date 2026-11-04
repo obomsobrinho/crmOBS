@@ -64,8 +64,8 @@ export interface Lead {
 
 /** O recorte de leads que a campanha usa (passo Contatos). */
 export interface FiltroDeContatos {
-  /** Uma busca, ou todas. */
-  buscaId: string | "todas";
+  /** Uma busca (ou lista de planilha), todas, ou "" = nenhuma escolhida ainda (o passo não avança). */
+  buscaId: string | "todas" | "";
   soMarcadosComoBons: boolean;
   soSemSiteProprio: boolean;
   /** "Nova campanha com quem não respondeu": os leads vêm desta campanha, escolhidos de propósito. */

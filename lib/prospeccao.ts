@@ -1167,6 +1167,16 @@ export function resumoDasLinhas(linhas: LinhaDoResumo[], hoje: string, semanas: 
 
 // ── O que o servidor confere antes de iniciar ───────────────────────────
 
+/** O passo Contatos tem de onde tirar os contatos: uma lista escolhida, ou "quem não respondeu" de outra campanha. */
+export function temListaEscolhida(f: { buscaId: string; quemNaoRespondeuDe: string | null }): boolean {
+  return f.quemNaoRespondeuDe !== null || f.buscaId !== "";
+}
+
+/** O nome de uma lista (busca ou planilha) nos seletores: "termo · cidade", ou só o termo quando não há cidade. */
+export function nomeDaLista(b: { termo: string; cidade: string }): string {
+  return [b.termo, b.cidade].filter(Boolean).join(" · ");
+}
+
 /** O que impede de iniciar (vazio = pode). As mesmas regras que travam o assistente, de novo no servidor. */
 export function problemasParaIniciar(c: {
   nome: string;
@@ -1174,9 +1184,11 @@ export function problemasParaIniciar(c: {
   agendadaPara: number | null;
   variantes: string[];
   agora: number;
+  filtro: { buscaId: string; quemNaoRespondeuDe: string | null };
 }): string[] {
   const p: string[] = [];
   if (c.nome.trim() === "") p.push("Falta o nome da campanha");
+  if (!temListaEscolhida(c.filtro)) p.push("Falta escolher de onde vêm os contatos");
   if (!c.conexaoId) p.push("Falta o número que envia");
   if (c.agendadaPara !== null && c.agendadaPara <= c.agora) p.push("A data agendada já passou");
   if (c.variantes.length === 0) p.push("Falta a mensagem");

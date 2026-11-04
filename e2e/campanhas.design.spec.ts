@@ -111,6 +111,8 @@ test.describe("Campanhas no preview", () => {
     await page.locator('[data-slot="campanhas-nova"]').click();
     await page.getByRole("textbox", { name: "Nome da campanha" }).fill("Teste do assistente");
     await page.locator('[data-slot="assistente-continuar"]').click();
+    await page.locator('[data-campo="assistente-busca"]').click();
+    await page.getByRole("option", { name: "Todas as listas" }).click();
     await expect(page.locator('[data-secao="quem"]')).toContainText(/\d+ leads?, \d+ dias?/);
     await page.locator('[data-slot="assistente-continuar"]').click();
     const variante = page.getByRole("textbox", { name: "Texto da variante 1" });
@@ -121,6 +123,49 @@ test.describe("Campanhas no preview", () => {
     await variante.fill("Oi, vi a {empresa} no Google.");
     await expect(page.locator('[data-slot="assistente-continuar"]')).toBeEnabled();
     await expect(page.locator('[data-slot="assistente-salvo"]')).toContainText("Salvo");
+  });
+
+  test("Contatos (04/11/2026): abre na aba Lista de leads, sem lista escolhida, sem contagem e sem avançar", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=campanhas");
+    await page.locator('[data-slot="campanhas-nova"]').click();
+    await page.getByRole("textbox", { name: "Nome da campanha" }).fill("Contatos vazio");
+    await page.locator('[data-slot="assistente-continuar"]').click();
+    await expect(page.getByText("De onde vêm os contatos?")).toBeVisible();
+    await expect(page.locator('[data-slot="assistente-aba-lista"]')).toHaveAttribute("data-state", "active");
+    await expect(page.locator('[data-campo="assistente-busca"]')).toContainText("Escolha uma busca ou planilha");
+    const quem = page.locator('[data-secao="quem"]');
+    await expect(quem).toContainText("Escolha a lista primeiro");
+    await expect(quem).not.toContainText(/\d+ leads?/);
+    await expect(page.locator('[data-slot="assistente-continuar"]')).toBeDisabled();
+    // O modal antigo e o link "Importar uma planilha" sob o Recorte não existem mais.
+    await expect(page.locator('[data-slot="assistente-importar"]')).toHaveCount(0);
+    await expect(page.locator('[data-slot="planilha-dialogo"]')).toHaveCount(0);
+  });
+
+  test("Contatos: a aba Importar planilha mostra o formato e o modelo; importada, volta para a lista com ela escolhida", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=campanhas");
+    await page.locator('[data-slot="campanhas-nova"]').click();
+    await page.getByRole("textbox", { name: "Nome da campanha" }).fill("Contatos planilha");
+    await page.locator('[data-slot="assistente-continuar"]').click();
+    await page.locator('[data-slot="assistente-aba-planilha"]').click();
+    const formato = page.locator('[data-slot="planilha-formato"]');
+    for (const c of ["Telefone", "Empresa", "Cidade", "Segmento", "Sim, só celular"]) await expect(formato).toContainText(c);
+    await expect(page.locator('[data-slot="planilha-modelo"]')).toHaveAttribute("href", "/modelos/modelo-contatos.xlsx");
+    await expect(page.locator('[data-slot="planilha-modelo"]')).toHaveAttribute("download", "");
+    // O preview não lê o arquivo (a fonte de mentira devolve uma prévia pronta).
+    await page.locator('[data-slot="planilha-arquivo"]').setInputFiles({
+      name: "contatos_sem_cidade.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from("x"),
+    });
+    const previa = page.locator('[data-slot="planilha-previa"]');
+    await expect(previa).toContainText("contatos entram");
+    await expect(page.locator('[data-slot="planilha-nome"]')).toHaveValue("contatos_sem_cidade");
+    await page.locator('[data-slot="planilha-importar"]').click();
+    await expect(page.locator('[data-slot="assistente-aba-lista"]')).toHaveAttribute("data-state", "active");
+    await expect(page.locator('[data-campo="assistente-busca"]')).toContainText("contatos_sem_cidade");
+    // Lista sem cidade: nada de "· " sobrando.
+    await expect(page.locator('[data-campo="assistente-busca"]')).not.toContainText("·");
   });
 
   test("o detalhe pausa e retoma", async ({ page }) => {

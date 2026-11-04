@@ -119,7 +119,7 @@ export default function CentralDeCampanhas({
           situacao: "rascunho",
           agendadaPara: null,
           conexaoId: conexaoPadrao?.id ?? null,
-          filtro: { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
+          filtro: { buscaId: "", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
           variantes: [...variantesSugeridas],
           criadaEm: agoraMs,
           salvaEm: agoraMs,
@@ -299,7 +299,7 @@ export default function CentralDeCampanhas({
                 aoMudar={mudou}
                 novaBusca={abrirNovaBusca ? () => abrirNovaBusca(rascunhoEsperando?.id ?? null) : () => setTela({ aba: "leads", nova: true })}
                 criarCampanhaDaBusca={(b: Busca) => {
-                  const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)} em ${b.cidade}`;
+                  const nome = `${b.termo.charAt(0).toUpperCase()}${b.termo.slice(1)}${b.cidade ? ` em ${b.cidade}` : ""}`;
                   novoRascunho({ nome, filtro: { buscaId: b.id, soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false } });
                 }}
                 voltarAoRascunho={() => {

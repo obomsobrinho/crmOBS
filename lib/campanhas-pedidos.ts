@@ -158,7 +158,7 @@ export function opcoesDe(v: unknown): OpcoesDaBusca | null {
 export function filtroDe(v: unknown): FiltroDeContatos | null {
   if (v === null || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
-  const buscaId = o.buscaId === "todas" || ehId(o.buscaId) ? o.buscaId : null;
+  const buscaId = o.buscaId === "todas" || o.buscaId === "" || ehId(o.buscaId) ? o.buscaId : null;
   const origem = o.quemNaoRespondeuDe === null || o.quemNaoRespondeuDe === undefined ? null : ehId(o.quemNaoRespondeuDe) ? o.quemNaoRespondeuDe : undefined;
   if (buscaId === null || origem === undefined) return null;
   return {

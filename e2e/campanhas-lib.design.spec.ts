@@ -27,6 +27,7 @@ import {
   pontuarLead,
   problemasDaVariante,
   problemasParaIniciar,
+  temListaEscolhida,
   proximoEnvioEm,
   respostasDosEnvios,
   respostasPorEspera,
@@ -174,7 +175,7 @@ test.describe("A mensagem", () => {
   });
 
   test("problemasParaIniciar repete no servidor o que trava o assistente", () => {
-    const ok = { nome: "Estética", conexaoId: "x", agendadaPara: null, variantes: ["Vi a {empresa}"], agora: AGORA };
+    const ok = { nome: "Estética", conexaoId: "x", agendadaPara: null, variantes: ["Vi a {empresa}"], agora: AGORA, filtro: { buscaId: "todas", quemNaoRespondeuDe: null } };
     expect(problemasParaIniciar(ok)).toEqual([]);
     expect(problemasParaIniciar({ ...ok, nome: " " })).toContain("Falta o nome da campanha");
     expect(problemasParaIniciar({ ...ok, conexaoId: null })).toContain("Falta o número que envia");
@@ -184,6 +185,12 @@ test.describe("A mensagem", () => {
       "No máximo 3 variantes",
     );
     expect(problemasParaIniciar({ ...ok, variantes: ["Vi a {empresa}", "sem campo"] })).toContain("Variante 2: Falta {empresa} no texto");
+    // Contatos sem lista escolhida (04/11/2026): o servidor recusa antes do SQL.
+    const sem = "Falta escolher de onde vêm os contatos";
+    expect(problemasParaIniciar({ ...ok, filtro: { buscaId: "", quemNaoRespondeuDe: null } })).toContain(sem);
+    expect(problemasParaIniciar({ ...ok, filtro: { buscaId: "todas", quemNaoRespondeuDe: null } })).not.toContain(sem);
+    expect(problemasParaIniciar({ ...ok, filtro: { buscaId: "", quemNaoRespondeuDe: "c1" } })).not.toContain(sem);
+    expect(temListaEscolhida({ buscaId: "", quemNaoRespondeuDe: null })).toBe(false);
   });
 
   test("varianteDaOrdem reveza na ordem da fila", () => {
@@ -623,6 +630,7 @@ test.describe("Pedidos das rotas (lib/campanhas-pedidos.ts): o que não confere 
     });
     expect(filtroDe({ buscaId: "todas", incluirJaContatados: true })?.incluirJaContatados).toBe(true);
     expect(filtroDe({ buscaId: id, quemNaoRespondeuDe: id, soMarcadosComoBons: true })).toMatchObject({ buscaId: id, quemNaoRespondeuDe: id, soMarcadosComoBons: true });
+    expect(filtroDe({ buscaId: "" })?.buscaId).toBe("");
     expect(filtroDe({ buscaId: "b1" })).toBeNull();
     expect(filtroDe({ buscaId: "todas", quemNaoRespondeuDe: "c2" })).toBeNull();
     const r = { nome: "Estética", conexaoId: id, agendadaPara: null, filtro: { buscaId: "todas" }, passo: 2, variantes: ["Vi a {empresa}"] };
@@ -827,6 +835,29 @@ test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmad
 });
 
 test.describe("Planilha de leads (lib/planilha-de-leads.ts, 02/11/2026)", () => {
+  test("o modelo para baixar (04/11/2026) tem só o cabeçalho, e a leitura acha as quatro colunas nele", async () => {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.readFile("public/modelos/modelo-contatos.xlsx");
+    const aba = wb.worksheets[0];
+    expect(aba.rowCount).toBe(1);
+    const cabecalho = (aba.getRow(1).values as unknown[]).slice(1).map(String);
+    expect(cabecalho).toEqual(["Telefone", "Empresa", "Cidade", "Segmento"]);
+    expect(colunasDaPlanilha([cabecalho])).toEqual({ colunas: { telefone: 0, nome: 1, cidade: 2, segmento: 3 }, temCabecalho: true });
+  });
+
+  test("planilha sem a coluna Cidade (o caso de 03/11/2026): lê telefone e empresa, cidade fica vazia", () => {
+    const linhas = [
+      ["Telefone", "Nome"],
+      ["(35) 98477-0001", "Empresa A"],
+    ];
+    const { colunas, temCabecalho } = colunasDaPlanilha(linhas);
+    expect(colunas).toEqual({ telefone: 0, nome: 1 });
+    const leitura = lerLinhas(linhas.slice(1), colunas, temCabecalho ? 2 : 1);
+    expect(leitura.validas).toHaveLength(1);
+    expect(leitura.validas[0].cidade).toBeNull();
+  });
+
   test("acha as colunas pelo cabeçalho, só celular entra, repetido e vazio saem, e a amostra mostra como ficou", () => {
     const linhas = [
       ["Empresa", "Cidade", "WhatsApp"],
