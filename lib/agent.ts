@@ -4,6 +4,7 @@ import { calendarioBlock, diaDosHorarios, notaDeHorarios } from "./horarios";
 import type { BusinessHours } from "./agent-prompt";
 import { MOTIVOS_DO_MODELO, motivosParaPrompt } from "./motivos";
 import { acoesDoTurno, type SaidaDaAgenda } from "./agenda";
+import { campoMidiaDoEsquema, midiaDaSaida } from "./midias";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -50,6 +51,13 @@ export interface AgentOutput {
    * cancelar, por código. Só o `processTurn` lê (`decidirAgenda`); o n8n ignora.
    */
   agenda: SaidaDaAgenda;
+  /**
+   * MÍDIAS DO AGENTE (04/11/2026, lib/midias.ts): a chave da mídia cadastrada
+   * que vai depois das mensagens, ou "". Só existe no esquema quando o turno
+   * traz `### MÍDIAS PARA ENVIAR`; quem valida (catálogo, uma vez por conversa)
+   * é o `processTurn` (`escolherMidia`), e o n8n lê o `midia` do resultado.
+   */
+  midia: string;
 }
 
 export interface ChatTurn {
@@ -230,13 +238,22 @@ const OUTPUT_SCHEMA = {
  * O esquema do turno: sem a agenda ligada o enum de `action` não tem `agendar`
  * (`acoesDoTurno`, lib/agenda.ts), então o modelo não consegue marcar nada.
  */
-function esquemaDaSaida(comAgenda: boolean) {
-  return {
+function esquemaDaSaida(comAgenda: boolean, chavesDeMidia: string[] = []) {
+  const base = {
     ...OUTPUT_SCHEMA,
     properties: {
       ...OUTPUT_SCHEMA.properties,
       action: { ...OUTPUT_SCHEMA.properties.action, enum: acoesDoTurno(comAgenda) },
     },
+  };
+  // Sem mídia cadastrada o esquema fica igual ao de sempre (nenhum campo novo
+  // para as empresas que não usam). Com mídia, o enum só tem as chaves dela.
+  const midia = campoMidiaDoEsquema(chavesDeMidia);
+  if (!midia) return base;
+  return {
+    ...base,
+    properties: { ...base.properties, midia },
+    required: [...base.required, "midia"],
   };
 }
 
@@ -297,6 +314,11 @@ export async function runAgent(params: {
   agenda?: string | null;
   /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (lib/prospeccao.ts), ou nada. */
   origem?: string | null;
+  /**
+   * `### MÍDIAS PARA ENVIAR` (`blocoDeMidias`, lib/midias.ts) e as chaves do enum
+   * do campo `midia`, ou nada quando a empresa não tem mídia disponível.
+   */
+  midias?: { bloco: string; chaves: string[] } | null;
 }): Promise<AgentRun> {
   const { persona, history, message, apiKey } = params;
   const model = params.model || AGENT_MODEL;
@@ -314,6 +336,8 @@ export async function runAgent(params: {
   if (params.agenda) parts.push(params.agenda);
   // Quem procurou quem (campanha): fato da conversa, fora do prefixo do cache.
   if (params.origem) parts.push(params.origem);
+  // As mídias que ainda podem ir nesta conversa: mudam quando uma é enviada.
+  if (params.midias) parts.push(params.midias.bloco);
   // Depois do AGORA, junto do que muda a cada turno: não mexe no prefixo que o
   // cache de prompt reaproveita (persona).
   if (params.pedidosResolvidos && params.pedidosResolvidos.length > 0) {
@@ -349,7 +373,7 @@ export async function runAgent(params: {
         messages,
         response_format: {
           type: "json_schema",
-          json_schema: { name: "resposta_agente", strict: true, schema: esquemaDaSaida(!!params.agenda) },
+          json_schema: { name: "resposta_agente", strict: true, schema: esquemaDaSaida(!!params.agenda, params.midias?.chaves ?? []) },
         },
       }),
     });
@@ -424,6 +448,7 @@ export function normalizeOutput(raw: Partial<AgentOutput>): AgentOutput {
         : 0,
     informacao_nova: raw.informacao_nova === true,
     agenda: normalizarSaidaDaAgenda(raw.agenda),
+    midia: midiaDaSaida(raw.midia),
   };
 }
 

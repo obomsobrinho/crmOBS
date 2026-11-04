@@ -40,6 +40,8 @@ export const TABELAS_DO_CLIENTE = [
   "dados_cliente",
   "agent_turns",
   "agent_publications",
+  // Mídias do agente (04/11/2026, lib/midias.ts); os arquivos saem com o resto do bucket whatsapp-media.
+  "agent_midias",
   "consumo_ia_mensal",
   "quick_replies",
   "feedback",

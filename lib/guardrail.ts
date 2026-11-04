@@ -77,6 +77,8 @@ export function applyGuardrail(
     informacao_nova: false,
     // Resposta barrada nunca marca nada na agenda.
     agenda: SAIDA_DA_AGENDA_VAZIA,
+    // Nem manda mídia (`escolherMidia`, lib/midias.ts).
+    midia: "",
   };
   return { output: degraded, guardrail: { blocked: true, reason, draft } };
 }

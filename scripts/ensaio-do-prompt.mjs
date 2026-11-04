@@ -9,6 +9,7 @@
 //             "campanha": true usa a 1ª variante sugerida com "Empresa Exemplo"; ou
 //             { "texto"?, "enviadoEm"?, "empresa"? } para o envio exato. Sem "campanha", contato que chegou sozinho.
 // --cliente   a empresa (padrão: a única chamada OBS)
+// --midias    catálogo de mídias de teste (JSON: [{ chave, tipo, path: "biblioteca/x.mp4", mime, descricao, quando_enviar, legenda? }])
 // --saida     grava a transcrição também neste arquivo
 //
 // Lê o .env.local (Supabase e OpenAI). Cada mensagem é um turno de `processTurn`

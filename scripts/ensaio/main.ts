@@ -72,6 +72,16 @@ export async function ensaiar(args: string[]): Promise<void> {
 
   const svc = createServiceClient();
   const cliente = await clienteAlvo(svc, argumento(args, "cliente"));
+  // `--midias catalogo.json`: mídias de teste no lugar de `agent_midias` (lib/midias.ts). O caminho
+  // de cada uma é relativo à pasta da empresa ("biblioteca/x.mp4"); nada é lido do bucket.
+  const arquivoMidias = argumento(args, "midias");
+  const catalogoOverride = arquivoMidias
+    ? (JSON.parse(readFileSync(arquivoMidias, "utf8")) as { path?: string }[]).map((m) => ({
+        chave: null, tipo: null, mime: null, nome_arquivo: null, descricao: null, quando_enviar: null, legenda: null,
+        ...m,
+        path: `${cliente.id}/${String(m.path ?? "").replace(/^\/+/, "")}`,
+      }))
+    : undefined;
   // A agenda decide o rabo do prompt como no turno de verdade (`personaDoTenant`).
   const agenda = await agendaDoTurno({
     svc,
@@ -103,6 +113,8 @@ export async function ensaiar(args: string[]): Promise<void> {
     // Como na produção (`comEnvioDaCampanha`): o envio é a primeira fala da conversa.
     const history: ChatTurn[] = origem ? [{ role: "assistant", content: origem.texto }] : [];
     const pedidosAbertos: string[] = [];
+    // Mídias já enviadas nesta conversa de teste (uma vez por conversa, lib/midias.ts).
+    const midiasEnviadas: string[] = [];
     for (const mensagem of c.mensagens) {
       const { output, diagnostics: d } = await processTurn({
         clientId: cliente.id,
@@ -114,7 +126,9 @@ export async function ensaiar(args: string[]): Promise<void> {
         personaOverride: persona,
         agoraTeste: agora ?? null,
         origemOverride: origem,
+        catalogoOverride,
         pedidosAbertos,
+        midiasEnviadas,
       });
       saida.push(`**Lead:** ${mensagem}`, "");
       for (const m of output.messages) saida.push(`> ${m}`);
@@ -124,11 +138,18 @@ export async function ensaiar(args: string[]): Promise<void> {
       const a = output.agenda;
       if (a.acao) linha.push(`agenda: ${a.acao}${a.dia ? ` dia=${a.dia}` : ""}${a.periodo ? ` periodo=${a.periodo}` : ""}${a.hora ? ` hora=${a.hora}` : ""}`);
       if (d.agenda) linha.push(`decisão da agenda: ${d.agenda.decisao}`);
+      if (d.midia) linha.push(`midia: ${d.midia.enviada ?? "nenhuma"}${d.midia.pedida && d.midia.pedida !== d.midia.enviada ? ` (pediu ${d.midia.pedida}, recusada)` : ""}`);
       if (d.guardrail.blocked) linha.push(`guardrail barrou: ${d.guardrail.reason ?? ""}`);
       if (d.limiteIa) linha.push("TURNO SILENCIADO: teto mensal de IA da empresa");
       saida.push("", `\`${linha.join(" · ")}\``, "");
       history.push({ role: "user", content: mensagem });
       if (output.messages.length > 0) history.push({ role: "assistant", content: output.messages.join("\n") });
+      // Como em produção: a mídia enviada entra no histórico como fala da empresa.
+      if (output.midia) {
+        midiasEnviadas.push(output.midia);
+        history.push({ role: "assistant", content: `[Mídia enviada pela empresa: ${output.midia}]` });
+        saida.push(`> [mídia: ${output.midia}]`, "");
+      }
       if (output.action === "pausar" && d.pedidoNaFila && output.summary) pedidosAbertos.push(output.summary);
     }
   }
