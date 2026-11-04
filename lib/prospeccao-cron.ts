@@ -1,5 +1,5 @@
 import "server-only";
-import { grafiasDeDigitos } from "./avisos";
+import { grafiasDoTelefone } from "./clientes";
 import { desistirDaBusca, estadoDoNumero, fecharBusca } from "./campanhas-servidor";
 import { NOME_AUSENTE } from "./apify-campos";
 import { enviarMensagemAtiva } from "./envio-ativo";
@@ -38,7 +38,7 @@ const OBSERVACAO_DIAS = 14;
 const BUSCA_PRESA_MS = 8 * 60_000;
 /** Campanhas atendidas por execução (cada uma manda no máximo uma mensagem). */
 const CAMPANHAS_POR_EXECUCAO = 20;
-/** Celulares por leitura de `chat_messages` (as grafias com e sem o nono dígito vão juntas). */
+/** Celulares por leitura de `chat_messages` (as grafias com e sem o nono dígito e com e sem o JID vão juntas). */
 const FONES_POR_LEITURA = 25;
 /** Mensagens por página dessa leitura (o teto do PostgREST); a leitura segue de página em página até o fim. */
 const MENSAGENS_POR_PAGINA = 1000;
@@ -303,7 +303,9 @@ async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], 
       .from("chat_messages")
       .select("id, phone, user_message, created_at")
       .eq("client_id", clientId)
-      .in("phone", fones.flatMap(grafiasDeDigitos))
+      // O n8n grava `phone` como JID (`55...@s.whatsapp.net`): só dígitos nunca casava, e
+      // nenhuma resposta nem SAIR era registrado (teste de 04/11/2026).
+      .in("phone", fones.flatMap(grafiasDoTelefone))
       .gt("created_at", new Date(desde).toISOString())
       .not("user_message", "is", null);
     // O instante vai entre aspas: tem ":" e "+", que o `or` do PostgREST leria como sintaxe.

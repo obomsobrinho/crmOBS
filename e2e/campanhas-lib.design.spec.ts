@@ -55,7 +55,7 @@ import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDa
 import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
 import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
-import { normalizar } from "../lib/clientes";
+import { grafiasDoTelefone, normalizar } from "../lib/clientes";
 import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, recorteParaQuery, textoDe } from "../lib/campanhas-pedidos";
 import { RECORTE_LIVRE, localDaUltimaBusca } from "../components/admin/campanhas/tipos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
@@ -221,6 +221,15 @@ test.describe("Respostas (respostasDosEnvios, o cron só lê chat_messages)", ()
       ],
     );
     expect(r).toEqual([{ campanhaId: "c1", leadId: "l1", respondeuEm: as(HOJE, 9, 30) }]);
+  });
+
+  test("a mensagem como o n8n grava (JID, sem o nono dígito): o cron busca essa grafia e ela casa com o lead (04/11/2026)", () => {
+    // O bug: o cron buscava só dígitos e `chat_messages.phone` é `55...@s.whatsapp.net`; nenhuma
+    // resposta nem SAIR era registrado. A busca usa `grafiasDoTelefone` (lib/prospeccao-cron.ts).
+    expect(grafiasDoTelefone("5533999990001")).toContain("553399990001@s.whatsapp.net");
+    expect(
+      respostasDosEnvios([envio()], [{ telefone: "553399990001@s.whatsapp.net", texto: "Sair", em: as(HOJE, 10) }]),
+    ).toEqual([{ campanhaId: "c1", leadId: "l1", respondeuEm: as(HOJE, 10), parouEm: as(HOJE, 10) }]);
   });
 
   test("um pedido para parar marca parou; quem já respondeu só ganha o parou", () => {
