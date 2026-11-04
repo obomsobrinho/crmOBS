@@ -152,7 +152,8 @@ export async function gravarPlanilha(svc: Supa, a: { admin: string; nome: string
   const id = randomUUID();
   const cidades = new Map<string, number>();
   for (const v of a.leitura.validas) if (v.cidade) cidades.set(v.cidade, (cidades.get(v.cidade) ?? 0) + 1);
-  // A cidade da busca (a coluna é obrigatória): a que mais aparece na planilha, ou nenhuma.
+  // A cidade da lista: a que mais aparece na planilha, ou vazia (planilha sem a coluna Cidade; o banco
+  // aceita cidade vazia só para a fonte "planilha", migration 20261104040309).
   const cidade = [...cidades].sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
   await criarBusca(svc, {
     admin: a.admin,

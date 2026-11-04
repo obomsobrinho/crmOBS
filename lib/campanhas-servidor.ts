@@ -48,6 +48,7 @@ import {
   resultadoDasLinhas,
   resumoDasLinhas,
   serieDasLinhas,
+  temListaEscolhida,
   type MarcacaoDoLead,
   type NotaMinima,
   type OpcoesDaBusca,
@@ -540,7 +541,7 @@ async function campanhaEditavel(svc: Supa, id: string): Promise<CampanhaEditavel
     situacao: situacaoDaCampanha(r.status),
     agendadaPara: ms(r.agendada_para),
     conexaoId: r.client_id,
-    filtro: filtroDe(r.filtro) ?? { buscaId: "todas", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
+    filtro: filtroDe(r.filtro) ?? { buscaId: "", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
     variantes: (v.data ?? []).map((x) => x.texto),
     criadaEm: Date.parse(r.criada_em),
     salvaEm: Date.parse(r.salva_em),
@@ -593,6 +594,8 @@ export async function leadsDaCampanha(
  * nomes e quantos do recorte já passaram por outra campanha (o aviso; entram só se o dono incluir).
  */
 export async function previaDoFiltro(svc: Supa, f: FiltroDeContatos): Promise<PreviaDoFiltro> {
+  // Nenhuma lista escolhida: ninguém entra, sem ir ao banco.
+  if (!temListaEscolhida(f)) return { total: 0, primeiros: [], origem: null, jaContatados: 0 };
   const doFiltro = (incluir: boolean, limite: number) =>
     svc.rpc("prospeccao_leads_do_filtro", {
       p_busca: f.buscaId === "todas" ? null : f.buscaId,

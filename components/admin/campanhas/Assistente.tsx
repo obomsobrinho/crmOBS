@@ -1,13 +1,14 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Check, ChevronDown, CircleCheck, FileSpreadsheet, Plus, Search, Trash2 } from "lucide-react";
+import { Check, ChevronDown, CircleCheck, Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR, plural } from "@/lib/format";
@@ -17,7 +18,9 @@ import {
   MAXIMO_DE_VARIANTES,
   TETO_DIARIO,
   diasParaEnviar,
+  nomeDaLista,
   problemasDaVariante,
+  temListaEscolhida,
   textoParaLead,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
@@ -25,7 +28,7 @@ import { Aviso } from "@/components/ui/aviso";
 import ImportarPlanilha from "./ImportarPlanilha";
 import { haQuanto } from "./pecas";
 import { useLeitura } from "./tabela";
-import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./tipos";
+import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas, PreviaDoFiltro } from "./tipos";
 
 // O ASSISTENTE de criação (referência: "Asset Group Setup", Dribbble 21751329):
 // passos no topo; cada seção é uma linha com o check e, à direita, o resumo do
@@ -35,6 +38,7 @@ import type { CampanhaEditavel, ConexaoDisponivel, FonteDeCampanhas } from "./ti
 // vem da fonte, pela mesma regra do servidor que monta a fila ao iniciar.
 
 const PASSOS = ["Campanha", "Contatos", "Mensagem", "Confirmar"] as const;
+const PREVIA_VAZIA: PreviaDoFiltro = { total: 0, primeiros: [], origem: null, jaContatados: 0 };
 const HORA = 3_600_000;
 
 // ── Peças do assistente ─────────────────────────────────────────────────
@@ -192,10 +196,13 @@ function Assistente({
 
   // A lista de buscas relê depois de uma planilha importada (ela vira uma busca nova).
   const [listas, setListas] = useState(0);
-  const [importando, setImportando] = useState(false);
+  const [origemDosContatos, setOrigemDosContatos] = useState<"lista" | "planilha">("lista");
   const { dados: buscas } = useLeitura(`buscas-do-assistente|${listas}`, () => fonte.buscasParaEscolher());
   const filtro = useDebounce(campanha.filtro, 300);
-  const { dados: previa } = useLeitura(`previa|${JSON.stringify(filtro)}`, () => fonte.previaDoFiltro(filtro));
+  // Sem lista escolhida ninguém entra: nem vai ao servidor.
+  const { dados: previa } = useLeitura(`previa|${JSON.stringify(filtro)}`, () =>
+    temListaEscolhida(filtro) ? fonte.previaDoFiltro(filtro) : Promise.resolve(PREVIA_VAZIA),
+  );
   const quantos = previa?.total ?? 0;
   const origem = campanha.filtro.quemNaoRespondeuDe ? { nome: previa?.origem ?? "a campanha de origem" } : null;
   const buscaEscolhida = buscas?.find((b) => b.id === campanha.filtro.buscaId);
@@ -215,13 +222,14 @@ function Assistente({
   ];
   const tudoPronto = completos.slice(0, 3).every(Boolean);
 
+  const semLista = !temListaEscolhida(campanha.filtro);
   const resumoDaLista = origem
     ? `Quem não respondeu: ${origem.nome}`
     : campanha.filtro.buscaId === "todas"
-      ? "Todas as buscas"
+      ? "Todas as listas"
       : buscaEscolhida
-        ? [buscaEscolhida.termo, buscaEscolhida.cidade].filter(Boolean).join(" · ")
-        : "Escolha uma busca";
+        ? nomeDaLista(buscaEscolhida)
+        : "Escolha de onde vêm os contatos";
   const recortes = [
     campanha.filtro.soMarcadosComoBons ? "só os bons" : null,
     campanha.filtro.soSemSiteProprio ? "sem site próprio" : null,
@@ -337,7 +345,7 @@ function Assistente({
                 <Secao
                   id="lista"
                   titulo="Lista"
-                  resumo={`${resumoDaLista}${origem ? "" : `, ${recortes.join(", ")}`}`}
+                  resumo={`${resumoDaLista}${origem || semLista ? "" : `, ${recortes.join(", ")}`}`}
                   completa={quantos > 0}
                   aberta={aberta === "lista"}
                   alternar={alternar("lista")}
@@ -352,93 +360,110 @@ function Assistente({
                         variant="link"
                         size="link"
                         className="self-start"
-                        onClick={() => aoMudar({ filtro: { ...campanha.filtro, quemNaoRespondeuDe: null, buscaId: "todas" } })}
+                        onClick={() => aoMudar({ filtro: { ...campanha.filtro, quemNaoRespondeuDe: null, buscaId: "" } })}
                       >
                         Escolher outra lista
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-4">
-                      <label className="flex max-w-sm flex-col gap-1.5">
-                        <Rotulo>Busca</Rotulo>
-                        <Select
-                          value={campanha.filtro.buscaId}
-                          onValueChange={(v) => aoMudar({ filtro: { ...campanha.filtro, buscaId: v } })}
-                        >
-                          <SelectTrigger className="w-full" data-slot="assistente-busca">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="todas">Todas as buscas</SelectItem>
-                            {(buscas ?? []).map((b) => (
-                              <SelectItem key={b.id} value={b.id} disabled={b.situacao !== "pronta"}>
-                                {[b.termo, b.cidade].filter(Boolean).join(" · ")}
-                                {b.situacao === "buscando" ? " (buscando)" : b.situacao === "falhou" ? " (falhou)" : ""}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </label>
-                      <div className="flex flex-col gap-2.5">
-                        <Rotulo>Recorte</Rotulo>
-                        <label className="flex items-center gap-2.5 text-apoio text-ink">
-                          <Checkbox
-                            checked={campanha.filtro.soMarcadosComoBons}
-                            onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, soMarcadosComoBons: v === true } })}
-                          />
-                          Só os que marquei como bons
-                        </label>
-                        <label className="flex items-center gap-2.5 text-apoio text-ink">
-                          <Checkbox
-                            checked={campanha.filtro.soSemSiteProprio}
-                            onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, soSemSiteProprio: v === true } })}
-                          />
-                          Só quem não tem site próprio
-                        </label>
-                        <label className="flex items-center gap-2.5 text-apoio text-ink">
-                          <Checkbox
-                            checked={campanha.filtro.incluirJaContatados}
-                            onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, incluirJaContatados: v === true } })}
-                            data-slot="assistente-incluir-contatados"
-                          />
-                          Incluir quem já participou de outra campanha
-                        </label>
-                        {jaContatados > 0 && (
-                          <Aviso tom={campanha.filtro.incluirJaContatados ? "warn" : "neutro"} data-bloco="assistente-ja-contatados">
-                            {numeroBR(jaContatados)} {plural(jaContatados, "lead desta lista já participou", "leads desta lista já participaram")} de outra
-                            campanha.{" "}
-                            {campanha.filtro.incluirJaContatados
-                              ? `${plural(jaContatados, "Ele vai receber", "Eles vão receber")} de novo.`
-                              : `${plural(jaContatados, "Fica", "Ficam")} de fora; marque acima para incluir.`}
-                          </Aviso>
-                        )}
+                    <Tabs
+                      value={origemDosContatos}
+                      onValueChange={(v) => setOrigemDosContatos(v === "planilha" ? "planilha" : "lista")}
+                      className="gap-4"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <Rotulo>De onde vêm os contatos?</Rotulo>
+                        <TabsList variant="painel" aria-label="De onde vêm os contatos" className="bg-canvas">
+                          <TabsTrigger value="lista" variant="painel" data-slot="assistente-aba-lista">
+                            Lista de leads
+                          </TabsTrigger>
+                          <TabsTrigger value="planilha" variant="painel" data-slot="assistente-aba-planilha">
+                            Importar planilha
+                          </TabsTrigger>
+                        </TabsList>
                       </div>
-                      <Button variant="link" size="link" className="self-start" onClick={irParaLeads} data-slot="assistente-nova-busca">
-                        <Search aria-hidden />
-                        Falta lead? Fazer uma nova busca
-                      </Button>
-                      <Button variant="link" size="link" className="self-start" onClick={() => setImportando(true)} data-slot="assistente-importar">
-                        <FileSpreadsheet aria-hidden />
-                        Importar uma planilha (.xlsx)
-                      </Button>
-                      <ImportarPlanilha
-                        fonte={fonte}
-                        aberto={importando}
-                        aoFechar={() => setImportando(false)}
-                        aoImportar={(buscaId) => {
-                          setImportando(false);
-                          setListas((n) => n + 1);
-                          aoMudar({ filtro: { ...campanha.filtro, buscaId } });
-                        }}
-                      />
-                    </div>
+                      <TabsContent value="planilha" forceMount>
+                        <ImportarPlanilha
+                          fonte={fonte}
+                          aoImportar={(buscaId) => {
+                            setListas((n) => n + 1);
+                            setOrigemDosContatos("lista");
+                            aoMudar({ filtro: { ...campanha.filtro, buscaId } });
+                          }}
+                        />
+                      </TabsContent>
+                      <TabsContent value="lista" forceMount>
+                        <div className="flex flex-col gap-4">
+                          <label className="flex max-w-sm flex-col gap-1.5">
+                            <Rotulo>Lista</Rotulo>
+                            <Select
+                              value={campanha.filtro.buscaId}
+                              onValueChange={(v) => aoMudar({ filtro: { ...campanha.filtro, buscaId: v } })}
+                            >
+                              <SelectTrigger className="w-full" data-campo="assistente-busca">
+                                <SelectValue placeholder="Escolha uma busca ou planilha" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(buscas ?? []).map((b) => (
+                                  <SelectItem key={b.id} value={b.id} disabled={b.situacao !== "pronta"}>
+                                    {nomeDaLista(b)}
+                                    {b.situacao === "buscando" ? " (buscando)" : b.situacao === "falhou" ? " (falhou)" : ""}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="todas">Todas as listas</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </label>
+                          <div className="flex flex-col gap-2.5">
+                            <Rotulo>Recorte</Rotulo>
+                            <label className="flex items-center gap-2.5 text-apoio text-ink">
+                              <Checkbox
+                                checked={campanha.filtro.soMarcadosComoBons}
+                                onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, soMarcadosComoBons: v === true } })}
+                              />
+                              Só os que marquei como bons
+                            </label>
+                            <label className="flex items-center gap-2.5 text-apoio text-ink">
+                              <Checkbox
+                                checked={campanha.filtro.soSemSiteProprio}
+                                onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, soSemSiteProprio: v === true } })}
+                              />
+                              Só quem não tem site próprio
+                            </label>
+                            <label className="flex items-center gap-2.5 text-apoio text-ink">
+                              <Checkbox
+                                checked={campanha.filtro.incluirJaContatados}
+                                onCheckedChange={(v) => aoMudar({ filtro: { ...campanha.filtro, incluirJaContatados: v === true } })}
+                                data-slot="assistente-incluir-contatados"
+                              />
+                              Incluir quem já participou de outra campanha
+                            </label>
+                            {jaContatados > 0 && (
+                              <Aviso tom={campanha.filtro.incluirJaContatados ? "warn" : "neutro"} data-bloco="assistente-ja-contatados">
+                                {numeroBR(jaContatados)} {plural(jaContatados, "lead desta lista já participou", "leads desta lista já participaram")} de outra
+                                campanha.{" "}
+                                {campanha.filtro.incluirJaContatados
+                                  ? `${plural(jaContatados, "Ele vai receber", "Eles vão receber")} de novo.`
+                                  : `${plural(jaContatados, "Fica", "Ficam")} de fora; marque acima para incluir.`}
+                              </Aviso>
+                            )}
+                          </div>
+                          <Button variant="link" size="link" className="self-start" onClick={irParaLeads} data-slot="assistente-nova-busca">
+                            <Search aria-hidden />
+                            Falta lead? Fazer uma nova busca
+                          </Button>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   )}
                 </Secao>
                 <Secao
                   id="quem"
                   titulo="Quem entra"
                   resumo={
-                    quantos === 0
+                    semLista
+                      ? "Escolha a lista primeiro"
+                      : quantos === 0
                       ? "Ninguém ainda"
                       : `${numeroBR(quantos)} ${plural(quantos, "lead", "leads")}, ${dias} ${plural(dias, "dia", "dias")}`
                   }
@@ -451,7 +476,9 @@ function Assistente({
                       tamanho="compacto"
                       className="items-start p-0 text-left"
                       texto={
-                        buscaEscolhida?.situacao === "buscando"
+                        semLista
+                          ? "Escolha acima de onde vêm os contatos: uma lista de leads ou uma planilha."
+                          : buscaEscolhida?.situacao === "buscando"
                           ? "A busca ainda está rodando. Volte quando ela ficar pronta, o rascunho fica salvo."
                           : "Ninguém nesse recorte. Tire um recorte ou faça uma nova busca."
                       }

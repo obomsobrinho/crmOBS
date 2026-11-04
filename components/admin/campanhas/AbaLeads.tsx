@@ -264,10 +264,12 @@ function LinhaDaBusca({
       >
         <span className="min-w-0 basis-full xl:basis-auto">
           <span className="block truncate text-corpo font-semibold text-ink first-letter:uppercase">{busca.termo}</span>
-          <span className="flex items-center gap-1 truncate text-legenda text-ink-3">
-            <MapPin size={12} aria-hidden />
-            {busca.cidade}
-          </span>
+          {busca.cidade && (
+            <span className="flex items-center gap-1 truncate text-legenda text-ink-3">
+              <MapPin size={12} aria-hidden />
+              {busca.cidade}
+            </span>
+          )}
         </span>
         <span>
           <SeloDaBusca situacao={busca.situacao} />
@@ -911,7 +913,9 @@ function DetalheDaBusca({
           </>
         }
         selo={<SeloDaBusca situacao={busca.situacao} />}
-        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, textoDoLocal({ ...busca.opcoes, cidade: busca.cidade }), ...resumoDasOpcoes(busca.opcoes)].join(" · ")}
+        apoio={[`Busca de ${diaMesHoraSP(busca.criadaEm)}`, textoDoLocal({ ...busca.opcoes, cidade: busca.cidade }), ...resumoDasOpcoes(busca.opcoes)]
+          .filter(Boolean)
+          .join(" · ")}
       />
 
       {painel && <PainelDaBusca r={painel.resumo} respostasPorDia={painel.respostasPorDia} />}
