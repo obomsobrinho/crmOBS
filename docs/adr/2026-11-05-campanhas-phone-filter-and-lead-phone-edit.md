@@ -19,10 +19,9 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
   and on the route); a number already on another lead is refused (no duplicate leads).
 - **Only a lead with no history** (`leadSemHistorico`) changes number: the cron reads replies and SAIR by the
   lead's number, so changing it after a send would lose them.
-
 - **Discard**: a search with no term brings every place in the area, so `Todas as empresas mutum mg`
-  (02/11/2026, 1 km) brought squares and bus stops. `CATEGORIAS_DESCARTADAS` (`lib/fonte-de-leads.ts`) drops
-  four real categories in `filtrarPelasOpcoes`, by the MAIN category only, so a snack bar whose second
+  (02/11/2026, 1 km) brought squares and bus stops. `CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`, the
+  names are the source's) drops four real categories, by the MAIN category only, so a snack bar whose second
   category is "Marco histórico" stays. Left out because they can drop good clients: Jardim, Escola,
   Pré-escola, Apartamentos. Squares, churches and the city hall need the source's real category name:
   the X had deleted those leads, and only their names are in `admin_acoes`. A list entry is never a guess.
@@ -30,4 +29,5 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
 
 ## Consequences
 A new search that finds the lead again keeps the typed number: `prospeccao_concluir_busca` never rewrites
-the phone. The phone is not in the score, so the score does not change.
+the phone. The phone is not in the score, so the score does not change. A mobile added to a lead with a
+landline replaces it; the landline stays only in `admin_acoes`.

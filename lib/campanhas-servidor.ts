@@ -45,7 +45,7 @@ import {
   nomeDaBusca,
   POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
-  RECUSA_AO_APAGAR,
+  RECUSA_DA_ESCRITA,
   resultadoDasLinhas,
   resumoDasLinhas,
   serieDasLinhas,
@@ -749,33 +749,33 @@ export async function retomarCampanha(svc: Supa, admin: string, id: string, agor
 
 // ── Apagar (uma função SQL cada, com a linha em admin_acoes) ─────────────
 
-/** A resposta HTTP do que a função SQL devolveu: `corpo` quando deu certo, ou a recusa com a frase. */
-function respostaAoApagar({ data, error }: { data: string | null; error: unknown }, corpo: unknown = { ok: true }): Response {
+/** A resposta HTTP do que a função SQL devolveu: `{ ok: true }` ou a recusa com a frase. */
+function respostaDaEscrita({ data, error }: { data: string | null; error: unknown }): Response {
   if (error) throw error;
-  if (data === "ok") return Response.json(corpo);
-  const recusa = Object.entries(RECUSA_AO_APAGAR).find(([chave]) => chave === data);
+  if (data === "ok") return Response.json({ ok: true });
+  const recusa = Object.entries(RECUSA_DA_ESCRITA).find(([chave]) => chave === data);
   const status = data === "nao_encontrada" || data === "nao_encontrado" ? 404 : 409;
-  return Response.json({ error: recusa?.[1] ?? "Não deu para apagar." }, { status });
+  return Response.json({ error: recusa?.[1] ?? "Não deu para fazer isso agora." }, { status });
 }
 
 /** Apaga a campanha (suave): ativa recusa; a fila sai dela; quem recebeu segue marcado (a proteção da segunda mensagem e do SAIR). */
 export async function apagarCampanha(svc: Supa, admin: string, id: string): Promise<Response> {
-  return respostaAoApagar(await svc.rpc("prospeccao_apagar_campanha", { p_quem: admin, p_id: id }));
+  return respostaDaEscrita(await svc.rpc("prospeccao_apagar_campanha", { p_quem: admin, p_id: id }));
 }
 
 /** Apaga a lista (suave): os leads saem dela, e da base quem não tem outra lista nem histórico. */
 export async function apagarBusca(svc: Supa, admin: string, id: string): Promise<Response> {
-  return respostaAoApagar(await svc.rpc("prospeccao_apagar_busca", { p_quem: admin, p_id: id }));
+  return respostaDaEscrita(await svc.rpc("prospeccao_apagar_busca", { p_quem: admin, p_id: id }));
 }
 
 /** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
 export async function removerLead(svc: Supa, admin: string, id: string, buscaId: string | null): Promise<Response> {
-  return respostaAoApagar(await svc.rpc("prospeccao_remover_lead", { p_quem: admin, p_lead: id, p_busca: buscaId ?? undefined }));
+  return respostaDaEscrita(await svc.rpc("prospeccao_remover_lead", { p_quem: admin, p_lead: id, p_busca: buscaId ?? undefined }));
 }
 
-/** Põe um celular no lead (a chave de `telefoneDoLead`); a tabela passa a mostrar esse número. */
+/** Põe um celular no lead (a chave de `telefoneDoLead`). */
 export async function editarTelefone(svc: Supa, admin: string, id: string, celular: string): Promise<Response> {
-  return respostaAoApagar(await svc.rpc("prospeccao_editar_telefone", { p_quem: admin, p_lead: id, p_telefone: celular }), { telefone: celular });
+  return respostaDaEscrita(await svc.rpc("prospeccao_editar_telefone", { p_quem: admin, p_lead: id, p_telefone: celular }));
 }
 
 // ── A busca na fonte ─────────────────────────────────────────────────────

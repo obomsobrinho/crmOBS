@@ -61,9 +61,7 @@ export function situacaoDoTelefone(telefone: string | null | undefined): Situaca
 /** Por que um número digitado não serve para um lead; null = é um celular do Brasil. */
 export function problemaDoCelular(digitado: string): string | null {
   if (telefoneDoLead(digitado) !== null) return null;
-  return tipoDoTelefone(digitado) === "fixo"
-    ? "Esse número é fixo: campanha só sai para celular."
-    : "Confira o número: DDD e celular com 9 dígitos.";
+  return tipoDoTelefone(digitado) === "fixo" ? "Esse número é fixo: campanha só sai para celular." : RECUSA_DA_ESCRITA.invalido;
 }
 
 // ── Site (só pela URL que a busca trouxe) ────────────────────────────────
@@ -362,13 +360,14 @@ export function campanhaAindaEnvia(situacao: SituacaoDaCampanha): boolean {
 }
 
 /** A frase de cada recusa ao apagar, tirar ou editar algo (as respostas das funções SQL); o preview usa as mesmas. */
-export const RECUSA_AO_APAGAR = {
+export const RECUSA_DA_ESCRITA = {
   nao_encontrada: "Isto já não existe mais.",
   nao_encontrado: "Este lead já saiu da lista.",
   ativa: "Pause a campanha antes de apagar: ela ainda pode enviar.",
   buscando: "A busca ainda está rodando. Espere terminar para apagar.",
   na_fila: "Há lead na fila de uma campanha. Apague a campanha antes, ou espere a fila andar.",
   contatado: "Este lead já foi contatado ou pediu para parar: ele fica na base para nunca receber de novo.",
+  com_historico: "Este lead já foi contatado ou pediu para parar: o número dele não muda.",
   duplicado: "Este celular já está em outro lead.",
   invalido: "Confira o número: DDD e celular com 9 dígitos.",
 } as const;
@@ -1077,8 +1076,7 @@ export function resumoDaBase(leads: LeadParaResumo[]): ResumoDaBase {
     somarNoGrupo(cidades, l.cidade, l, pode);
     somarNoGrupo(segmentos, l.segmento || "Sem segmento", l, pode);
     somarNoGrupo(bairros, l.bairro || "Sem bairro", l, pode);
-    const tipo = tipoDoTelefone(l.telefone);
-    porTelefone[l.telefone && tipo !== "invalido" ? tipo : "sem"]++;
+    porTelefone[situacaoDoTelefone(l.telefone)]++;
     if (l.nota !== null) {
       somaDasNotas += l.nota;
       comNota++;

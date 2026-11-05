@@ -5,7 +5,7 @@ import {
   DIAS_DA_LINHA,
   OPCOES_PADRAO,
   POR_PAGINA_DE_CAMPANHAS,
-  RECUSA_AO_APAGAR,
+  RECUSA_DA_ESCRITA,
   campanhaAindaEnvia,
   contagemPorSemana,
   enviosPorDia,
@@ -228,11 +228,11 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async removerLead(id, buscaId) {
       const l = leads.find((x) => x.id === id);
-      if (!l) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrado };
+      if (!l) return { ok: false, erro: RECUSA_DA_ESCRITA.nao_encontrado };
       const fila = campanhas.some((c) => c.envios.some((e) => e.leadId === id && e.situacao === "na_fila"));
-      if (fila) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
+      if (fila) return { ok: false, erro: RECUSA_DA_ESCRITA.na_fila };
       const livre = leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length });
-      if (buscaId === null && !livre) return { ok: false, erro: RECUSA_AO_APAGAR.contatado };
+      if (buscaId === null && !livre) return { ok: false, erro: RECUSA_DA_ESCRITA.contatado };
       // Aqui cada lead tem uma lista só (`buscaId`): quem fica na base sai dela.
       leads = livre ? leads.filter((x) => x.id !== id) : leads.map((x) => (x.id === id ? { ...x, buscaId: "" } : x));
       return { ok: true };
@@ -240,10 +240,10 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async apagarBusca(id) {
       const b = buscas.find((x) => x.id === id);
-      if (!b) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrada };
-      if (b.situacao === "buscando") return { ok: false, erro: RECUSA_AO_APAGAR.buscando };
+      if (!b) return { ok: false, erro: RECUSA_DA_ESCRITA.nao_encontrada };
+      if (b.situacao === "buscando") return { ok: false, erro: RECUSA_DA_ESCRITA.buscando };
       const naFila = new Set(campanhas.flatMap((c) => c.envios.filter((e) => e.situacao === "na_fila").map((e) => e.leadId)));
-      if (daBusca(id).some((l) => naFila.has(l.id))) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
+      if (daBusca(id).some((l) => naFila.has(l.id))) return { ok: false, erro: RECUSA_DA_ESCRITA.na_fila };
       leads = leads
         .filter((l) => l.buscaId !== id || !leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length }))
         .map((l) => (l.buscaId === id ? { ...l, buscaId: "" } : l));
@@ -253,13 +253,13 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async editarTelefone(id, celular) {
       const l = leads.find((x) => x.id === id);
-      if (!l) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrado };
-      if (!leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length })) return { ok: false, erro: RECUSA_AO_APAGAR.contatado };
+      if (!l) return { ok: false, erro: RECUSA_DA_ESCRITA.nao_encontrado };
+      if (!leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length })) return { ok: false, erro: RECUSA_DA_ESCRITA.com_historico };
       const telefone = telefoneDoLead(celular);
-      if (!telefone) return { ok: false, erro: RECUSA_AO_APAGAR.invalido };
-      if (leads.some((x) => x.id !== id && telefoneDoLead(x.telefone) === telefone)) return { ok: false, erro: RECUSA_AO_APAGAR.duplicado };
+      if (!telefone) return { ok: false, erro: RECUSA_DA_ESCRITA.invalido };
+      if (leads.some((x) => x.id !== id && telefoneDoLead(x.telefone) === telefone)) return { ok: false, erro: RECUSA_DA_ESCRITA.duplicado };
       leads = leads.map((x) => (x.id === id ? { ...x, telefone } : x));
-      return { ok: true, telefone };
+      return { ok: true };
     },
 
     async painelDaBase(buscaId) {
@@ -380,8 +380,8 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
 
     async apagarCampanha(id) {
       const c = campanhas.find((x) => x.id === id);
-      if (!c) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrada };
-      if (campanhaAindaEnvia(c.situacao)) return { ok: false, erro: RECUSA_AO_APAGAR.ativa };
+      if (!c) return { ok: false, erro: RECUSA_DA_ESCRITA.nao_encontrada };
+      if (campanhaAindaEnvia(c.situacao)) return { ok: false, erro: RECUSA_DA_ESCRITA.ativa };
       campanhas = campanhas.filter((x) => x.id !== id);
       return { ok: true };
     },

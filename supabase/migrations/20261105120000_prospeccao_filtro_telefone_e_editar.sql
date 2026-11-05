@@ -5,6 +5,7 @@
 -- (lib/prospeccao.ts); quem muda um muda o outro. Aditivo: parametro novo com padrao, chamadas antigas valem.
 
 drop function if exists public.prospeccao_leads_pagina(uuid, text, text, text, boolean, boolean, boolean, numeric, int, int, boolean, boolean, int, text[]);
+drop function if exists public.prospeccao_leads_pagina(uuid, text, text, text, boolean, boolean, boolean, numeric, int, int, boolean, boolean, int, text[], text);
 create function public.prospeccao_leads_pagina(
   p_busca uuid default null,
   p_texto text default null,
@@ -72,11 +73,8 @@ as $$
       and (p_nota_minima is null or l.nota >= p_nota_minima)
       and (p_min_avaliacoes is null or coalesce(l.avaliacoes, 0) >= p_min_avaliacoes)
       and (not coalesce(p_nao_reivindicado, false) or l.reivindicado is false)
-      and (p_telefone is null or case p_telefone
-        when 'celular' then l.telefone is not null
-        when 'fixo' then l.telefone is null and l.tipo_telefone = 'fixo'
-        when 'sem' then l.telefone is null and l.tipo_telefone is distinct from 'fixo'
-        else false end)
+      and (p_telefone is null or p_telefone =
+        case when l.telefone is not null then 'celular' when l.tipo_telefone = 'fixo' then 'fixo' else 'sem' end)
       and (coalesce(cardinality(p_categorias), 0) = 0
         or coalesce(l.categorias, array[l.segmento]) && p_categorias)
       and (p_texto is null
@@ -114,6 +112,7 @@ revoke execute on function public.prospeccao_leads_pagina(uuid, text, text, text
 grant execute on function public.prospeccao_leads_pagina(uuid, text, text, text, boolean, boolean, boolean, numeric, int, int, boolean, boolean, int, text[], text) to service_role;
 
 drop function if exists public.prospeccao_pagina_do_lead(uuid, uuid, text, text, text, boolean, boolean, boolean, numeric, boolean, int, boolean, int, text[]);
+drop function if exists public.prospeccao_pagina_do_lead(uuid, uuid, text, text, text, boolean, boolean, boolean, numeric, boolean, int, boolean, int, text[], text);
 create function public.prospeccao_pagina_do_lead(
   p_lead uuid,
   p_busca uuid default null,
@@ -151,11 +150,8 @@ as $$
       and (p_nota_minima is null or l.nota >= p_nota_minima)
       and (p_min_avaliacoes is null or coalesce(l.avaliacoes, 0) >= p_min_avaliacoes)
       and (not coalesce(p_nao_reivindicado, false) or l.reivindicado is false)
-      and (p_telefone is null or case p_telefone
-        when 'celular' then l.telefone is not null
-        when 'fixo' then l.telefone is null and l.tipo_telefone = 'fixo'
-        when 'sem' then l.telefone is null and l.tipo_telefone is distinct from 'fixo'
-        else false end)
+      and (p_telefone is null or p_telefone =
+        case when l.telefone is not null then 'celular' when l.tipo_telefone = 'fixo' then 'fixo' else 'sem' end)
       and (coalesce(cardinality(p_categorias), 0) = 0
         or coalesce(l.categorias, array[l.segmento]) && p_categorias)
       and (p_texto is null
@@ -174,7 +170,7 @@ grant execute on function public.prospeccao_pagina_do_lead(uuid, uuid, text, tex
 -- campanha ou pediu para parar e observado pelo numero antigo (respostas e SAIR), e trocar o numero
 -- perderia isso. O numero chega como chave do celular (telefoneDoLead); o mesmo celular em outro lead
 -- recusa, porque a base nunca tem lead repetido (indice prospeccao_leads_telefone).
--- Respostas: ok | nao_encontrado | contatado | invalido | duplicado.
+-- Respostas: ok | nao_encontrado | com_historico | invalido | duplicado.
 create or replace function public.prospeccao_editar_telefone(p_quem uuid, p_lead uuid, p_telefone text)
 returns text
 language plpgsql
@@ -192,7 +188,7 @@ begin
     return 'nao_encontrado';
   end if;
   if l.parou_em is not null or exists (select 1 from public.prospeccao_campanha_leads cl where cl.lead_id = p_lead) then
-    return 'contatado';
+    return 'com_historico';
   end if;
   begin
     update public.prospeccao_leads

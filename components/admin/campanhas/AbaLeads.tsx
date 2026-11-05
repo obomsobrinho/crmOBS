@@ -19,7 +19,6 @@ import {
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
   estadoNoMapa,
-  leadSemHistorico,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
   textoDoLocal,
@@ -42,6 +41,7 @@ import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
 import { BarraDaTabela, BotaoDeApagarDaLinha, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
 import {
+  semHistorico,
   sinaisDoLead,
   somaDe,
   type Busca,
@@ -794,18 +794,21 @@ function TabelaDeLeads({
         vazio={busca ? `Nenhum lead com "${q.trim()}".` : "Nenhum lead com esses filtros."}
       >
         <ul className="divide-y divide-line-soft" data-slot="leads-tabela">
-          {tabela.itens.map((l) => (
+          {tabela.itens.map((l) => {
+            const livre = semHistorico(l);
+            return (
             <LinhaDoLead
               key={l.id}
               lead={l}
               marcar={(m) => marcar(l.id, m)}
               abrirFicha={() => abrirFicha(l, false)}
-              editarTelefone={leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => abrirFicha(l, true) : null}
-              remover={buscaId || leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => setRemovendo(l) : null}
+              editarTelefone={livre ? () => abrirFicha(l, true) : null}
+              remover={buscaId || livre ? () => setRemovendo(l) : null}
               destacada={destaque === l.id}
               verNoMapa={verNoMapa && l.detalhes?.lat != null ? () => verNoMapa(l.id) : null}
             />
-          ))}
+            );
+          })}
         </ul>
       </CorpoDaTabela>
       <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" lido={tabela.lido} />

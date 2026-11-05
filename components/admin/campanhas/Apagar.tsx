@@ -1,8 +1,8 @@
 "use client";
 
 import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
-import { campanhaAindaEnvia, leadSemHistorico, type SituacaoDaCampanha } from "@/lib/prospeccao";
-import type { FonteDeCampanhas, LeadDaTabela, RespostaDeApagar } from "./tipos";
+import { campanhaAindaEnvia, type SituacaoDaCampanha } from "@/lib/prospeccao";
+import { semHistorico, type FonteDeCampanhas, type LeadDaTabela, type RespostaDaEscrita } from "./tipos";
 
 // AS CONFIRMAÇÕES de Campanhas (dono, 04/11/2026): apagar uma campanha, apagar uma lista e tirar um
 // lead. Sobre o diálogo da central: a falha aparece dentro dele e o sucesso fecha. Cada uma só monta com
@@ -13,7 +13,7 @@ import type { FonteDeCampanhas, LeadDaTabela, RespostaDeApagar } from "./tipos";
 const FALHOU = "Não deu para fazer isso agora. Tente de novo.";
 
 /** Roda a escrita e devolve o que `DialogoDaAcao` espera: a frase do erro, ou null quando deu certo. */
-async function confirmar(escrita: () => Promise<RespostaDeApagar>, aoApagar: () => void): Promise<string | null> {
+async function confirmar(escrita: () => Promise<RespostaDaEscrita>, aoApagar: () => void): Promise<string | null> {
   try {
     const r = await escrita();
     if (!r.ok) return r.erro;
@@ -111,7 +111,7 @@ export function RemoverLead({
   aoRemover: () => void;
 }) {
   if (!lead) return null;
-  const fica = !leadSemHistorico({ parouEm: lead.parouEm, campanhas: lead.campanhas.length });
+  const fica = !semHistorico(lead);
   return (
     <DialogoDaAcao
       aberto

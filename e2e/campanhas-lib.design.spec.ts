@@ -56,9 +56,9 @@ import {
   maximoDaBusca,
   nomeDaBusca,
 } from "../lib/prospeccao";
-import { TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
+import { CATEGORIAS_DESCARTADAS, TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
 import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../lib/planilha-de-leads";
-import { CATEGORIAS_DESCARTADAS, filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
+import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
 import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
 import { grafiasDoTelefone, normalizar } from "../lib/clientes";

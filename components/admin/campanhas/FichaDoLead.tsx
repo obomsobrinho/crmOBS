@@ -13,16 +13,15 @@ import {
   DIAS_DA_SEMANA,
   faixaDaPontuacao,
   ganchosDoHorario,
-  leadSemHistorico,
   pontuacaoExibida,
   problemaDoCelular,
   textoDoDia,
   textosDosGanchos,
-  situacaoDoTelefone,
+  telefoneDoLead,
   tipoDoTelefone,
 } from "@/lib/prospeccao";
 import { DA_FAIXA, TextoDoSite } from "./pecas";
-import { sinaisDoLead, type FonteDeCampanhas, type LeadDaTabela } from "./tipos";
+import { semHistorico, sinaisDoLead, type FonteDeCampanhas, type LeadDaTabela } from "./tipos";
 
 // A FICHA DE UM LEAD (revisão do dono, 30/10/2026): o que a fonte trouxe além da
 // linha da tabela. A pontuação com os motivos; o perfil do Google reivindicado
@@ -56,21 +55,21 @@ function TelefoneDoLead({
   comecarEditando: boolean;
   aoSalvar: (telefone: string) => void;
 }) {
-  const podeEditar = leadSemHistorico({ parouEm: lead.parouEm, campanhas: lead.campanhas.length });
-  const [editando, setEditando] = useState(comecarEditando && podeEditar);
+  const [editando, setEditando] = useState(comecarEditando);
   const [valor, setValor] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
   async function salvar() {
     const problema = problemaDoCelular(valor);
+    const celular = telefoneDoLead(valor);
     setErro(problema);
-    if (problema) return;
+    if (problema || !celular) return;
     setSalvando(true);
     try {
-      const r = await fonte.editarTelefone(lead.id, valor);
+      const r = await fonte.editarTelefone(lead.id, celular);
       if (r.ok) {
-        aoSalvar(r.telefone);
+        aoSalvar(celular);
         setEditando(false);
         setValor("");
       } else setErro(r.erro);
@@ -111,7 +110,15 @@ function TelefoneDoLead({
           <Button type="submit" size="control" carregando={salvando} data-slot="lead-telefone-salvar">
             Salvar
           </Button>
-          <Button type="button" variant="outline" size="control" onClick={() => setEditando(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            size="control"
+            onClick={() => {
+              setEditando(false);
+              setErro(null);
+            }}
+          >
             Cancelar
           </Button>
         </div>
@@ -119,22 +126,20 @@ function TelefoneDoLead({
     );
   }
 
-  const situacao = situacaoDoTelefone(lead.telefone);
+  const tipo = tipoDoTelefone(lead.telefone);
   return (
     <>
       {lead.telefone ? (
         <>
           {mascaraTelefoneBR(lead.telefone)}
-          {situacao !== "celular" && (
-            <span className="ml-2 text-legenda text-warn-ink">{tipoDoTelefone(lead.telefone) === "fixo" ? "Fixo, não entra em campanha" : "Inválido"}</span>
-          )}
+          {tipo !== "celular" && <span className="ml-2 text-legenda text-warn-ink">{tipo === "fixo" ? "Fixo, não entra em campanha" : "Inválido"}</span>}
         </>
       ) : (
         <span className="text-ink-3">Sem telefone</span>
       )}
-      {podeEditar && (
+      {semHistorico(lead) && (
         <Button variant="link" size="link" onClick={() => setEditando(true)} className="block" data-slot="lead-telefone-editar">
-          {situacao === "celular" ? "Trocar o celular" : "Adicionar celular"}
+          {tipo === "celular" ? "Trocar o celular" : "Adicionar celular"}
         </Button>
       )}
     </>
@@ -144,14 +149,14 @@ function TelefoneDoLead({
 export default function FichaDoLead({
   lead,
   fonte,
-  editarTelefone = false,
+  editarTelefone,
   aoFechar,
   aoSalvarTelefone,
 }: {
   lead: LeadDaTabela | null;
   fonte: FonteDeCampanhas;
   /** A ficha abriu pelo lápis da tabela: já começa no campo do telefone. */
-  editarTelefone?: boolean;
+  editarTelefone: boolean;
   aoFechar: () => void;
   aoSalvarTelefone: (telefone: string) => void;
 }) {

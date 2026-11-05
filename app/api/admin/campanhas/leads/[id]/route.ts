@@ -38,8 +38,9 @@ export const PATCH = rotaDoAdmin(
     const corpo: unknown = await req.json().catch(() => null);
     const digitado = campoDe(corpo, "telefone");
     if (typeof digitado !== "string") return torto("telefone inválido");
+    const problema = problemaDoCelular(digitado);
     const celular = telefoneDoLead(digitado);
-    if (!celular) return Response.json({ error: problemaDoCelular(digitado) }, { status: 422 });
+    if (problema || !celular) return torto(problema ?? "telefone inválido");
     try {
       return await editarTelefone(createServiceClient(), admin, id, celular);
     } catch (e) {

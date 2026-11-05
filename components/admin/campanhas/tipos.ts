@@ -1,6 +1,7 @@
 import type { PeriodoKey } from "@/lib/periodo";
 import type { PreviaDaPlanilha } from "@/lib/planilha-de-leads";
 import {
+  leadSemHistorico,
   podeEntrarNaCampanha,
   siteDoLead,
   type DetalhesDoLead,
@@ -306,7 +307,7 @@ export interface InicialDaCentral {
 export type RespostaDeIniciar = { ok: true; situacao: SituacaoDaCampanha } | { ok: false; erro: string };
 
 /** Apagar ou tirar algo: deu certo, ou a frase da recusa para a tela. */
-export type RespostaDeApagar = { ok: true } | { ok: false; erro: string };
+export type RespostaDaEscrita = { ok: true } | { ok: false; erro: string };
 
 /** De onde as telas de Campanhas leem e para onde escrevem. */
 export interface FonteDeCampanhas {
@@ -333,10 +334,10 @@ export interface FonteDeCampanhas {
   importarPlanilha(arquivo: File, nome: string): Promise<{ ok: true; buscaId: string } | { ok: false; erro: string }>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
   /** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
-  removerLead(id: string, buscaId: string | null): Promise<RespostaDeApagar>;
-  apagarBusca(id: string): Promise<RespostaDeApagar>;
-  /** Põe um celular no lead; `telefone` é o que a tabela passa a mostrar. */
-  editarTelefone(id: string, celular: string): Promise<{ ok: true; telefone: string } | { ok: false; erro: string }>;
+  removerLead(id: string, buscaId: string | null): Promise<RespostaDaEscrita>;
+  apagarBusca(id: string): Promise<RespostaDaEscrita>;
+  /** Põe um celular no lead. */
+  editarTelefone(id: string, celular: string): Promise<RespostaDaEscrita>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
   campanhas(p: { texto: string; situacao: SituacaoDaCampanha | null; pagina: number }): Promise<Pagina<CampanhaDaTabela>>;
   /** As campanhas que já enviaram algo (o seletor do painel de resultados). */
@@ -348,7 +349,7 @@ export interface FonteDeCampanhas {
   previaDoFiltro(f: FiltroDeContatos): Promise<PreviaDoFiltro>;
   /** Salva o rascunho (cria na primeira vez); devolve quando salvou. */
   salvar(c: CampanhaEditavel): Promise<number>;
-  apagarCampanha(id: string): Promise<RespostaDeApagar>;
+  apagarCampanha(id: string): Promise<RespostaDaEscrita>;
   iniciar(id: string): Promise<RespostaDeIniciar>;
   pausar(id: string): Promise<SituacaoDaCampanha>;
   retomar(id: string): Promise<SituacaoDaCampanha>;
@@ -372,6 +373,11 @@ export function localDaUltimaBusca(buscas: Busca[]): LocalInicial | null {
 /** O total de um registro de contagens por situação (as abas e o "Todas" dos filtros). */
 export function somaDe(contagens: Record<string, number> | null | undefined): number {
   return contagens ? Object.values(contagens).reduce((a, b) => a + b, 0) : 0;
+}
+
+/** O lead da tabela não tem histórico (`leadSemHistorico`): pode sair da base e trocar de número. */
+export function semHistorico(l: LeadDaTabela): boolean {
+  return leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhas.length });
 }
 
 /** Os sinais da pontuação de um lead, com os detalhes da fonte quando existem. */
