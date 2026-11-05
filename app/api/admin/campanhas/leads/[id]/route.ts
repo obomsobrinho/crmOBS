@@ -1,6 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe, recorteDe } from "@/lib/campanhas-pedidos";
-import { falhou, marcarLead, paginaDoLead, torto } from "@/lib/campanhas-servidor";
+import { campoDe, ehId, recorteDe } from "@/lib/campanhas-pedidos";
+import { falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/lib/campanhas-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Em que página do recorte (`?busca=&texto=&cidade=&filtros=`) o lead está: o pino
@@ -26,6 +26,20 @@ export const PUT = rotaDoAdmin(
       return r ? Response.json(r) : Response.json({ error: "lead não encontrado" }, { status: 404 });
     } catch (e) {
       return falhou("marcar o lead", e);
+    }
+  },
+  { revalidar: true },
+);
+
+// Tira o lead de uma lista (`?busca=`), ou da base inteira (sem `busca`).
+export const DELETE = rotaDoAdmin(
+  async ({ req, admin, id }) => {
+    const busca = req.nextUrl.searchParams.get("busca");
+    if (busca !== null && !ehId(busca)) return torto("busca inválida");
+    try {
+      return await removerLead(createServiceClient(), admin, id, busca);
+    } catch (e) {
+      return falhou("tirar o lead", e);
     }
   },
   { revalidar: true },

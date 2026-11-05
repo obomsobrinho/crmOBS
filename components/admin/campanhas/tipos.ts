@@ -5,6 +5,7 @@ import {
   siteDoLead,
   type DetalhesDoLead,
   type DiaDeEnvio,
+  type EstadoDaFila,
   type EstadoNoMapa,
   type MarcacaoDoLead,
   type ResultadoDaCampanha,
@@ -239,6 +240,8 @@ export interface CampanhaDaTabela extends Omit<CampanhaEditavel, "filtro" | "var
 export interface CampanhaAberta {
   campanha: CampanhaEditavel;
   contagens: Record<SituacaoNaCampanha, number>;
+  /** De onde sai a previsão da fila (`previsaoDaFila`), lida junto com a campanha. */
+  fila: EstadoDaFila;
 }
 
 /** Um lead dentro de uma campanha (a tabela do detalhe). */
@@ -251,6 +254,10 @@ export interface LeadNaCampanha {
   variante: number | null;
   enviadoEm: number | null;
   respondeuEm: number | null;
+  /** A posição na ordem de envio da campanha (0 = a primeira). */
+  ordem: number;
+  /** Quantos ainda saem antes dele; null = não está na fila. */
+  posicaoNaFila: number | null;
 }
 
 /** O painel de resultados já dobrado (`resultadoDaCampanha`, ou o SQL pelo seu gêmeo). */
@@ -281,17 +288,21 @@ export interface Totais {
 }
 
 /**
- * O que a página de verdade já leu no servidor para a primeira tela (aba Leads): os
- * totais, a primeira página de buscas e o painel da base. Um refresh já chega com
- * os números no HTML; cada peça que falhou no servidor vem null e a tela lê de novo.
+ * O que a página de verdade já leu no servidor para a tela que abre: os totais e a primeira página de
+ * campanhas (aba Campanhas), ou a primeira página de buscas e o painel da base (aba Leads). Um refresh já
+ * chega com os números no HTML; a peça que não foi lida ou falhou vem null e a tela lê sozinha.
  */
 export interface InicialDaCentral {
   totais: Totais | null;
+  campanhas: Pagina<CampanhaDaTabela> | null;
   buscas: Pagina<BuscaDaTabela> | null;
   painel: ResumoDobrado | null;
 }
 
 export type RespostaDeIniciar = { ok: true; situacao: SituacaoDaCampanha } | { ok: false; erro: string };
+
+/** Apagar ou tirar algo: deu certo, ou a frase da recusa para a tela. */
+export type RespostaDeApagar = { ok: true } | { ok: false; erro: string };
 
 /** De onde as telas de Campanhas leem e para onde escrevem. */
 export interface FonteDeCampanhas {
@@ -317,6 +328,9 @@ export interface FonteDeCampanhas {
   /** Grava a planilha como uma busca (fonte "planilha") e devolve o id dela. */
   importarPlanilha(arquivo: File, nome: string): Promise<{ ok: true; buscaId: string } | { ok: false; erro: string }>;
   marcar(id: string, marcacao: MarcacaoDoLead): Promise<MarcacaoDoLead>;
+  /** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
+  removerLead(id: string, buscaId: string | null): Promise<RespostaDeApagar>;
+  apagarBusca(id: string): Promise<RespostaDeApagar>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
   campanhas(p: { texto: string; situacao: SituacaoDaCampanha | null; pagina: number }): Promise<Pagina<CampanhaDaTabela>>;
   /** As campanhas que já enviaram algo (o seletor do painel de resultados). */
@@ -328,6 +342,7 @@ export interface FonteDeCampanhas {
   previaDoFiltro(f: FiltroDeContatos): Promise<PreviaDoFiltro>;
   /** Salva o rascunho (cria na primeira vez); devolve quando salvou. */
   salvar(c: CampanhaEditavel): Promise<number>;
+  apagarCampanha(id: string): Promise<RespostaDeApagar>;
   iniciar(id: string): Promise<RespostaDeIniciar>;
   pausar(id: string): Promise<SituacaoDaCampanha>;
   retomar(id: string): Promise<SituacaoDaCampanha>;

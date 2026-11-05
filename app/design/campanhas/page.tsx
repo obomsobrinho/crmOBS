@@ -40,6 +40,7 @@ export default async function DesignCampanhasPage({
     ? null
     : {
         totais: await fonte.totais(),
+        campanhas: await fonte.campanhas({ texto: "", situacao: null, pagina: 1 }),
         buscas: await fonte.buscas({ texto: "", situacao: null, pagina: 1 }),
         painel: await fonte.painelDaBase(null),
       };

@@ -44,6 +44,9 @@ test.describe("Campanhas sem login", () => {
     expect((await request.post("/api/admin/campanhas/buscas", { data: {}, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/${ID}/acao`, { data: { acao: "iniciar" }, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/leads/${ID}`, { data: { marcacao: "bom" }, maxRedirects: 0 })).status()).toBe(404);
+    for (const r of [`/api/admin/campanhas/${ID}`, `/api/admin/campanhas/buscas/${ID}`, `/api/admin/campanhas/leads/${ID}`]) {
+      expect((await request.delete(r, { maxRedirects: 0 })).status(), r).toBe(404);
+    }
   });
 
   test("o webhook da fonte e o cron recusam sem o segredo", async ({ request }) => {
@@ -184,6 +187,113 @@ test.describe("Campanhas no preview", () => {
     await expect(page.getByText("Nenhuma busca ainda")).toBeVisible();
     await page.locator('[data-slot="campanhas-aba-campanhas"]').click();
     await expect(page.getByText("Nenhuma campanha ainda")).toBeVisible();
+  });
+});
+
+test.describe("Campanhas, ajustes de 04/11/2026 (preview)", () => {
+  test("as abas: Campanhas primeiro, Leads depois", async ({ page }) => {
+    await page.goto("/design/campanhas");
+    await expect(page.locator('[data-slot="campanhas-lista"]')).toBeVisible();
+    const abas = await page.getByRole("tablist", { name: "Seções" }).getByRole("tab").allInnerTexts();
+    expect(abas.map((t) => t.split(/\s/)[0])).toEqual(["Campanhas", "Leads"]);
+  });
+
+  test("apagar campanha: rodando pede para pausar; parada some da lista depois de confirmar", async ({ page }) => {
+    await page.goto("/design/campanhas");
+    const linhas = page.locator('[data-slot="campanhas-lista"] li');
+    const dialogo = page.locator('[data-slot="campanha-apagar-dialogo"]');
+    // A tabela já vem no HTML: o clique antes de a tela hidratar não abre nada, então tenta de novo.
+    await expect(async () => {
+      await linhas.filter({ hasText: "Rodando" }).first().locator('[data-slot="campanha-apagar"]').click();
+      await expect(dialogo.getByText("Pause antes de apagar.")).toBeVisible({ timeout: 500 });
+    }).toPass();
+    await expect(dialogo.locator('[data-slot="central-acao-confirmar"]')).toBeDisabled();
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+
+    const concluida = linhas.filter({ hasText: "Concluída" }).first();
+    const id = await concluida.locator('[data-slot="campanha-linha"]').getAttribute("data-campanha");
+    await concluida.locator('[data-slot="campanha-apagar"]').click();
+    await dialogo.locator('[data-slot="central-acao-confirmar"]').click();
+    await expect(dialogo).toHaveCount(0);
+    await expect(page.locator(`[data-campanha="${id}"]`)).toHaveCount(0);
+  });
+
+  test("o detalhe mostra a ordem e a previsão de quem está na fila, e apaga depois de pausar", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=campanha");
+    const fila = page.locator('[data-slot="campanha-lead"][data-situacao="na_fila"]').first();
+    await page.locator('[data-slot="campanha-filtro"]').click();
+    await page.getByRole("menuitem", { name: /Na fila/ }).click();
+    await expect(fila.locator('[data-slot="campanha-lead-ordem"]')).toHaveText(/\dº/);
+    await expect(fila.locator('[data-slot="campanha-lead-previsao"]')).toHaveText(/por volta de \d{2}\/\d{2}/);
+    await expect(page.locator('[data-slot="campanha-cadencia"]')).toContainText("até 10 por dia");
+
+    await page.locator('[data-slot="campanha-pausar"]').click();
+    await expect(fila.locator('[data-slot="campanha-lead-previsao"]')).toHaveText("Campanha pausada");
+    await page.getByRole("button", { name: "Apagar", exact: true }).click();
+    await page.locator('[data-slot="central-acao-confirmar"]').click();
+    await expect(page.locator('[data-slot="campanhas-lista"]')).toBeVisible();
+  });
+
+  test("o X pede confirmação e tira o lead da lista; Só os bons recorta para a triagem", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const livre = page.locator('[data-slot="lead-linha"]').filter({ hasText: "Nenhuma" }).first();
+    const id = await livre.getAttribute("data-lead");
+    await livre.locator('[data-slot="lead-remover"]').click();
+    const dialogo = page.locator('[data-slot="lead-remover-dialogo"]');
+    await expect(dialogo).toBeVisible();
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.locator(`[data-lead="${id}"]`)).toHaveCount(1);
+    await page.locator(`[data-lead="${id}"] [data-slot="lead-remover"]`).click();
+    await dialogo.locator('[data-slot="central-acao-confirmar"]').click();
+    await expect(page.locator(`[data-lead="${id}"]`)).toHaveCount(0);
+
+    const outra = page.locator('[data-slot="lead-linha"][data-marcacao="nenhuma"]').first();
+    const bom = await outra.getAttribute("data-lead");
+    await outra.locator('[data-slot="lead-marcar-bom"]').click();
+    await expect(page.locator(`[data-lead="${bom}"] [data-slot="lead-marcar-bom"]`)).toHaveAttribute("aria-pressed", "true");
+    await page.locator('[data-slot="leads-so-bons"]').click();
+    await expect(page.locator(`[data-lead="${bom}"]`)).toBeVisible();
+    await expect(page.locator('[data-slot="lead-linha"][data-marcacao="nenhuma"]')).toHaveCount(0);
+  });
+
+  test("apagar lista: a lista sai da tabela", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    const linhas = page.locator('[data-slot="leads-buscas"] li');
+    const primeira = linhas.filter({ has: page.locator('[data-slot="busca-linha"]') }).last();
+    const id = await primeira.locator('[data-slot="busca-linha"]').getAttribute("data-busca");
+    await primeira.locator('[data-slot="busca-apagar"]').click();
+    const dialogo = page.locator('[data-slot="busca-apagar-dialogo"]');
+    await dialogo.locator('[data-slot="central-acao-confirmar"]').click();
+    await expect(dialogo.or(page.locator(`[data-busca="${id}"]`))).toHaveCount(0);
+  });
+
+  test("o botão de centralizar volta a enquadrar os pinos depois de arrastar", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    const mapa = page.locator('[data-slot="busca-mapa"]');
+    await expect(mapa.locator("path.pino-do-mapa").first()).toBeVisible();
+    // A caixa do mapa é medida a cada conta: clicar rola a página.
+    const visiveis = () =>
+      mapa.locator("path.pino-do-mapa").evaluateAll((ps) => {
+        const c = ps[0].closest('[data-slot="busca-mapa"]')?.getBoundingClientRect();
+        return c
+          ? ps.filter((p) => {
+              const r = p.getBoundingClientRect();
+              return r.left >= c.left && r.right <= c.right && r.top >= c.top && r.bottom <= c.bottom;
+            }).length
+          : 0;
+      });
+    const todos = await visiveis();
+    // Arrasta o mapa para longe dos pinos.
+    await mapa.scrollIntoViewIfNeeded();
+    const caixa = await mapa.boundingBox();
+    if (!caixa) throw new Error("mapa sem caixa");
+    await page.mouse.move(caixa.x + caixa.width - 40, caixa.y + caixa.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(caixa.x + 40, caixa.y + caixa.height / 2, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(visiveis).toBeLessThan(todos);
+    await page.locator('[data-slot="mapa-centralizar"]').click();
+    await expect.poll(visiveis).toBe(todos);
   });
 });
 

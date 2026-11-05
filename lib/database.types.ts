@@ -1076,6 +1076,7 @@ export type Database = {
       }
       prospeccao_buscas: {
         Row: {
+          apagada_em: string | null
           cidade: string
           concluida_em: string | null
           criada_em: string
@@ -1091,6 +1092,7 @@ export type Database = {
           uf: string | null
         }
         Insert: {
+          apagada_em?: string | null
           cidade: string
           concluida_em?: string | null
           criada_em?: string
@@ -1106,6 +1108,7 @@ export type Database = {
           uf?: string | null
         }
         Update: {
+          apagada_em?: string | null
           cidade?: string
           concluida_em?: string | null
           criada_em?: string
@@ -1176,6 +1179,7 @@ export type Database = {
       prospeccao_campanhas: {
         Row: {
           agendada_para: string | null
+          apagada_em: string | null
           client_id: string | null
           concluida_em: string | null
           criada_em: string
@@ -1193,6 +1197,7 @@ export type Database = {
         }
         Insert: {
           agendada_para?: string | null
+          apagada_em?: string | null
           client_id?: string | null
           concluida_em?: string | null
           criada_em?: string
@@ -1210,6 +1215,7 @@ export type Database = {
         }
         Update: {
           agendada_para?: string | null
+          apagada_em?: string | null
           client_id?: string | null
           concluida_em?: string | null
           criada_em?: string
@@ -1956,6 +1962,14 @@ export type Database = {
         }[]
       }
       prospeccao_apagar_antigos: { Args: { p_antes: string }; Returns: number }
+      prospeccao_apagar_busca: {
+        Args: { p_id: string; p_quem: string }
+        Returns: string
+      }
+      prospeccao_apagar_campanha: {
+        Args: { p_id: string; p_quem: string }
+        Returns: string
+      }
       prospeccao_ativar_agendadas: {
         Args: { p_agora: string }
         Returns: number
@@ -2099,6 +2113,8 @@ export type Database = {
           enviado_em: string
           lead_id: string
           nome: string
+          ordem: number
+          posicao_na_fila: number
           respondeu_em: string
           status: string
           total_geral: number
@@ -2248,6 +2264,10 @@ export type Database = {
           telefone: string
           variantes: string[]
         }[]
+      }
+      prospeccao_remover_lead: {
+        Args: { p_busca?: string; p_lead: string; p_quem: string }
+        Returns: string
       }
       prospeccao_resultados: {
         Args: {

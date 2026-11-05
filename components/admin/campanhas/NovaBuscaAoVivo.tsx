@@ -22,7 +22,7 @@ export default function NovaBuscaAoVivo({
 }) {
   const fonte = useMemo(() => fonteDasRotas(), []);
   const router = useRouter();
-  const voltar = () => router.replace(`/campanhas${rascunho ? `?rascunho=${rascunho}` : ""}`);
+  const voltar = () => router.replace(`/campanhas?aba=leads${rascunho ? `&rascunho=${rascunho}` : ""}`);
   return (
     <NovaBusca
       voltar={voltar}

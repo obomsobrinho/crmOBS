@@ -337,6 +337,26 @@ export function podeEntrarNaCampanha(
   return l.campanhas === 0 || escolhidoDeProposito;
 }
 
+/** Rodando ou agendada, um envio ainda pode sair: há previsão da fila, e apagar pede pausar antes (o SQL repete). */
+export function campanhaAindaEnvia(situacao: SituacaoDaCampanha): boolean {
+  return situacao === "rodando" || situacao === "agendada";
+}
+
+/** A frase de cada recusa ao apagar ou tirar algo (as respostas das funções SQL); o preview usa as mesmas. */
+export const RECUSA_AO_APAGAR = {
+  nao_encontrada: "Isto já não existe mais.",
+  nao_encontrado: "Este lead já saiu da lista.",
+  ativa: "Pause a campanha antes de apagar: ela ainda pode enviar.",
+  buscando: "A busca ainda está rodando. Espere terminar para apagar.",
+  na_fila: "Há lead na fila de uma campanha. Apague a campanha antes, ou espere a fila andar.",
+  contatado: "Este lead já foi contatado ou pediu para parar: ele fica na base para nunca receber de novo.",
+} as const;
+
+/** Sair da base de vez? Nunca quem já entrou em campanha ou pediu para parar: a marca evita a segunda mensagem (o SQL repete). */
+export function leadSaiDaBase(l: { parouEm: number | null; campanhas: number }): boolean {
+  return l.parouEm === null && l.campanhas === 0;
+}
+
 // ── A mensagem ───────────────────────────────────────────────────────────
 
 /** A única variável da mensagem. */
@@ -512,6 +532,50 @@ export function proximoEnvioEm(
   const pausa = (PAUSA_MINUTOS[0] + sorteio() * (PAUSA_MINUTOS[1] - PAUSA_MINUTOS[0])) * MINUTO_MS;
   const candidato = Math.max(dentroDaFaixa(abreHoje + enviadosHoje * faixa), agora + pausa);
   return candidato < fechaHoje ? Math.round(candidato) : amanha();
+}
+
+/** Quanto a previsão é arredondada: o horário exato é sorteado, e a tela não finge precisão. */
+const ARREDONDAR_PREVISAO_MS = 10 * MINUTO_MS;
+
+/** O que a fila sabe agora: o próximo envio gravado, quantos saíram hoje e quando começa uma agendada. */
+export interface EstadoDaFila {
+  agora: number;
+  proximoEnvioEm: number | null;
+  enviadosHoje: number;
+  agendadaPara: number | null;
+}
+
+/**
+ * A PREVISÃO DA FILA: quando sai cada um dos próximos `quantos` leads (o índice é a posição na fila,
+ * 0 = o próximo). Nunca inventa uma agenda: anda a MESMA `proximoEnvioEm` do cron, com o sorteio no meio
+ * da faixa, a partir do próximo envio gravado, zerando a conta de cada dia. É uma previsão: o horário
+ * real é sorteado na faixa, e um lead que falhar ou pedir para parar adianta os seguintes.
+ */
+export function previsaoDaFila(f: EstadoDaFila, quantos: number): number[] {
+  const opcoes = { sorteio: () => 0.5 };
+  const desde = Math.max(f.agora, f.agendadaPara ?? 0);
+  let n = desde > f.agora ? 0 : f.enviadosHoje;
+  let t = Math.max(f.proximoEnvioEm ?? 0, desde);
+  // Sem próximo gravado (agendada), ou já vencido fora da janela: a mesma conta do cron decide.
+  if (f.proximoEnvioEm === null || !dentroDaJanela(t)) t = proximoEnvioEm(desde, n, opcoes);
+  let dia = diaIsoSP(desde);
+  const previsoes: number[] = [];
+  for (let i = 0; i < quantos; i++) {
+    const hoje = diaIsoSP(t);
+    if (hoje !== dia) {
+      dia = hoje;
+      n = 0;
+    }
+    previsoes.push(Math.round(t / ARREDONDAR_PREVISAO_MS) * ARREDONDAR_PREVISAO_MS);
+    n++;
+    t = proximoEnvioEm(t, n, opcoes);
+  }
+  return previsoes;
+}
+
+/** A cadência em uma frase (a legenda da previsão), dos mesmos números do cron. */
+export function textoDaCadencia(): string {
+  return `A previsão segue a cadência do envio: até ${TETO_DIARIO} por dia, das ${JANELA.inicioHora}h às ${JANELA.fimHora}h, de segunda a sábado. O horário exato de cada envio é sorteado.`;
 }
 
 // ── Resultado ────────────────────────────────────────────────────────────

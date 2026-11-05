@@ -45,6 +45,7 @@ import {
   nomeDaBusca,
   POR_PAGINA_DE_CAMPANHAS as POR_PAGINA,
   proximoEnvioEm,
+  RECUSA_AO_APAGAR,
   resultadoDasLinhas,
   resumoDasLinhas,
   serieDasLinhas,
@@ -147,7 +148,7 @@ function paraBusca(r: LinhaDeBusca): Busca {
 }
 
 const COLUNAS_DA_BUSCA = "id, termo, cidade, uf, status, opcoes, erro, criada_em, total";
-const COLUNAS_DA_CAMPANHA = "id, nome, status, agendada_para, client_id, filtro, passo, criada_em, salva_em";
+const COLUNAS_DA_CAMPANHA = "id, nome, status, agendada_para, client_id, filtro, passo, criada_em, salva_em, proximo_envio_em";
 
 // ── Leituras das telas ─────────────────────────────────────────────────
 
@@ -220,6 +221,7 @@ export async function buscasParaEscolher(svc: Supa): Promise<Busca[]> {
   const { data, error } = await svc
     .from("prospeccao_buscas")
     .select(COLUNAS_DA_BUSCA)
+    .is("apagada_em", null)
     .order("criada_em", { ascending: false })
     .order("id")
     // eslint-disable-next-line no-restricted-syntax -- the options of one select (the wizard's search), newest first, never filtered in memory
@@ -236,6 +238,7 @@ export async function areasAnteriores(svc: Supa): Promise<AreaAnterior[]> {
   const { data, error } = await svc
     .from("prospeccao_buscas")
     .select("termo, opcoes")
+    .is("apagada_em", null)
     .neq("status", "falhou")
     .not("opcoes->area", "is", null)
     .order("criada_em", { ascending: false })
@@ -254,6 +257,7 @@ export async function cidadeDaUltimaBusca(svc: Supa): Promise<LocalInicial | nul
   const { data, error } = await svc
     .from("prospeccao_buscas")
     .select("termo, cidade, uf, opcoes")
+    .is("apagada_em", null)
     // `->>`: o JSON null vira NULL (com `->`, `cidadeIbge: null` passaria no filtro).
     .not("opcoes->>cidadeIbge", "is", null)
     .order("criada_em", { ascending: false })
@@ -266,7 +270,7 @@ export async function cidadeDaUltimaBusca(svc: Supa): Promise<LocalInicial | nul
 }
 
 export async function buscaPorId(svc: Supa, id: string): Promise<Busca | null> {
-  const { data, error } = await svc.from("prospeccao_buscas").select(COLUNAS_DA_BUSCA).eq("id", id).maybeSingle();
+  const { data, error } = await svc.from("prospeccao_buscas").select(COLUNAS_DA_BUSCA).eq("id", id).is("apagada_em", null).maybeSingle();
   if (error) throw error;
   return data ? paraBusca(data) : null;
 }
@@ -436,6 +440,7 @@ export async function campanhasComEnvio(svc: Supa): Promise<{ id: string; nome: 
   const { data, error } = await svc
     .from("prospeccao_campanhas")
     .select("id, nome")
+    .is("apagada_em", null)
     .not("iniciada_em", "is", null)
     .order("criada_em", { ascending: false })
     .order("id")
@@ -526,9 +531,9 @@ export async function resultados(
   };
 }
 
-async function campanhaEditavel(svc: Supa, id: string): Promise<CampanhaEditavel | null> {
+async function lerCampanha(svc: Supa, id: string): Promise<{ campanha: CampanhaEditavel; proximoEnvioEm: number | null } | null> {
   const [c, v] = await Promise.all([
-    svc.from("prospeccao_campanhas").select(COLUNAS_DA_CAMPANHA).eq("id", id).maybeSingle(),
+    svc.from("prospeccao_campanhas").select(COLUNAS_DA_CAMPANHA).eq("id", id).is("apagada_em", null).maybeSingle(),
     svc.from("prospeccao_variantes").select("texto, ordem").eq("campanha_id", id).order("ordem"),
   ]);
   if (c.error) throw c.error;
@@ -536,27 +541,36 @@ async function campanhaEditavel(svc: Supa, id: string): Promise<CampanhaEditavel
   if (!c.data) return null;
   const r = c.data;
   return {
-    id: r.id,
-    nome: r.nome,
-    situacao: situacaoDaCampanha(r.status),
-    agendadaPara: ms(r.agendada_para),
-    conexaoId: r.client_id,
-    filtro: filtroDe(r.filtro) ?? { buscaId: "", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
-    variantes: (v.data ?? []).map((x) => x.texto),
-    criadaEm: Date.parse(r.criada_em),
-    salvaEm: Date.parse(r.salva_em),
-    passo: r.passo,
+    proximoEnvioEm: ms(r.proximo_envio_em),
+    campanha: {
+      id: r.id,
+      nome: r.nome,
+      situacao: situacaoDaCampanha(r.status),
+      agendadaPara: ms(r.agendada_para),
+      conexaoId: r.client_id,
+      filtro: filtroDe(r.filtro) ?? { buscaId: "", soMarcadosComoBons: false, soSemSiteProprio: false, quemNaoRespondeuDe: null, incluirJaContatados: false },
+      variantes: (v.data ?? []).map((x) => x.texto),
+      criadaEm: Date.parse(r.criada_em),
+      salvaEm: Date.parse(r.salva_em),
+      passo: r.passo,
+    },
   };
 }
 
-export async function campanhaAberta(svc: Supa, id: string): Promise<CampanhaAberta | null> {
-  const [campanha, contagens] = await Promise.all([campanhaEditavel(svc, id), svc.rpc("prospeccao_contagens_da_campanha", { p_campanha: id })]);
+export async function campanhaAberta(svc: Supa, id: string, agora: number): Promise<CampanhaAberta | null> {
+  const [lida, contagens, hoje] = await Promise.all([
+    lerCampanha(svc, id),
+    svc.rpc("prospeccao_contagens_da_campanha", { p_campanha: id }),
+    enviadosHoje(svc, id, agora),
+  ]);
   if (contagens.error) throw contagens.error;
-  if (!campanha) return null;
+  if (!lida) return null;
+  const { campanha, proximoEnvioEm } = lida;
   const linhas = contagens.data ?? [];
   return {
     campanha,
     contagens: contarPorSituacao(SITUACOES_NA_CAMPANHA, linhas),
+    fila: { agora, proximoEnvioEm, enviadosHoje: hoje, agendadaPara: campanha.agendadaPara },
   };
 }
 
@@ -585,6 +599,8 @@ export async function leadsDaCampanha(
       variante: r.variante,
       enviadoEm: ms(r.enviado_em),
       respondeuEm: ms(r.respondeu_em),
+      ordem: r.ordem,
+      posicaoNaFila: r.posicao_na_fila,
     })),
   };
 }
@@ -690,8 +706,9 @@ export async function iniciarCampanha(
   agora: number,
   problemas: (c: CampanhaEditavel) => string[],
 ): Promise<RespostaDaAcao> {
-  const [c, empresas] = await Promise.all([campanhaEditavel(svc, id), empresasDoAdmin(svc, admin)]);
-  if (!c) return { ok: false, ...RECUSAS_DO_INICIO.nao_encontrada };
+  const [lida, empresas] = await Promise.all([lerCampanha(svc, id), empresasDoAdmin(svc, admin)]);
+  if (!lida) return { ok: false, ...RECUSAS_DO_INICIO.nao_encontrada };
+  const c = lida.campanha;
   if (c.situacao !== "rascunho") return { ok: false, ...RECUSAS_DO_INICIO.nao_e_rascunho };
   const p = problemas(c);
   if (p.length > 0) return { ok: false, status: 422, erro: p[0] };
@@ -727,6 +744,32 @@ export async function retomarCampanha(svc: Supa, admin: string, id: string, agor
   if (error) throw error;
   if (data === "nao_encontrada") return { ok: false, ...RECUSAS_DO_INICIO.nao_encontrada };
   return { ok: true, situacao: await situacaoAgora(svc, id) };
+}
+
+// ── Apagar (uma função SQL cada, com a linha em admin_acoes) ─────────────
+
+/** A resposta HTTP do que a função SQL de apagar devolveu: `{ ok: true }` ou a recusa com a frase. */
+function respostaAoApagar({ data, error }: { data: string | null; error: unknown }): Response {
+  if (error) throw error;
+  if (data === "ok") return Response.json({ ok: true });
+  const recusa = Object.entries(RECUSA_AO_APAGAR).find(([chave]) => chave === data);
+  const status = data === "nao_encontrada" || data === "nao_encontrado" ? 404 : 409;
+  return Response.json({ error: recusa?.[1] ?? "Não deu para apagar." }, { status });
+}
+
+/** Apaga a campanha (suave): ativa recusa; a fila sai dela; quem recebeu segue marcado (a proteção da segunda mensagem e do SAIR). */
+export async function apagarCampanha(svc: Supa, admin: string, id: string): Promise<Response> {
+  return respostaAoApagar(await svc.rpc("prospeccao_apagar_campanha", { p_quem: admin, p_id: id }));
+}
+
+/** Apaga a lista (suave): os leads saem dela, e da base quem não tem outra lista nem histórico. */
+export async function apagarBusca(svc: Supa, admin: string, id: string): Promise<Response> {
+  return respostaAoApagar(await svc.rpc("prospeccao_apagar_busca", { p_quem: admin, p_id: id }));
+}
+
+/** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
+export async function removerLead(svc: Supa, admin: string, id: string, buscaId: string | null): Promise<Response> {
+  return respostaAoApagar(await svc.rpc("prospeccao_remover_lead", { p_quem: admin, p_lead: id, p_busca: buscaId ?? undefined }));
 }
 
 // ── A busca na fonte ─────────────────────────────────────────────────────

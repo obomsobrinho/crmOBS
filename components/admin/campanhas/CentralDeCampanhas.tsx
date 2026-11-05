@@ -13,9 +13,9 @@ import { useLeitura } from "./tabela";
 import { localDaUltimaBusca, somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
-// par de abas no topo de cada tela troca a tela inteira: Leads (o painel da base e as tabelas de
-// buscas e de leads) e Campanhas (o painel de resultados, a tabela de
-// campanhas, o assistente e o detalhe). Cada tela lê da `fonte` (as rotas
+// par de abas no topo de cada tela troca a tela inteira: Campanhas (o painel de resultados, a tabela
+// de campanhas, o assistente e o detalhe) e Leads (o painel da base e as tabelas de
+// buscas e de leads). Cada tela lê da `fonte` (as rotas
 // `/api/admin/campanhas/*` na página de verdade, a memória no preview); depois de
 // uma escrita a `versao` muda e as leituras voltam ao servidor. O rascunho do
 // assistente é salvo sozinho, uma pausa curta depois da última mudança.
@@ -226,20 +226,20 @@ export default function CentralDeCampanhas({
   const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" && rascunho?.id === tela.id ? rascunho : null;
   const nCampanhas = somaDe(totais?.campanhas);
 
-  // Leads | Campanhas: o par de abas no canto esquerdo da linha de cima de cada tela (dono, 29/10/2026).
+  // Campanhas | Leads (dono, 04/11/2026): o par de abas no canto esquerdo da linha de cima de cada tela.
   const abas = (
     <Tabs
       value={tela.aba}
       onValueChange={(v) => (v === "leads" ? setTela({ aba: "leads", busca: null }) : irParaCampanhas())}
     >
       <TabsList variant="painel" aria-label="Seções">
-        <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
-          Leads
-          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
-        </TabsTrigger>
         <TabsTrigger value="campanhas" variant="painel" data-slot="campanhas-aba-campanhas">
           Campanhas
           {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(nCampanhas)}</span>}
+        </TabsTrigger>
+        <TabsTrigger value="leads" variant="painel" data-slot="campanhas-aba-leads">
+          Leads
+          {totais && <span className="ml-1.5 tabular-nums text-ink-3">{numeroBR(totais.leads)}</span>}
         </TabsTrigger>
       </TabsList>
     </Tabs>
@@ -334,11 +334,16 @@ export default function CentralDeCampanhas({
                 fonte={fonte}
                 versao={versao}
                 totais={totais}
+                inicial={inicial?.campanhas ?? null}
                 conexoes={conexoes ?? []}
                 agora={agora}
                 abrir={(id) => setTela({ aba: "campanhas", vista: "detalhe", id })}
                 editar={(id) => void editar(id)}
                 nova={() => novoRascunho({})}
+                aoApagar={(id) => {
+                  setRascunhoEsperando((r) => (r?.id === id ? null : r));
+                  mudou();
+                }}
               />
             )}
           </div>
