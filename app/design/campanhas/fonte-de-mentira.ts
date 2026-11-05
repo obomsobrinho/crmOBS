@@ -5,9 +5,12 @@ import {
   DIAS_DA_LINHA,
   OPCOES_PADRAO,
   POR_PAGINA_DE_CAMPANHAS,
+  RECUSA_AO_APAGAR,
+  campanhaAindaEnvia,
   contagemPorSemana,
   enviosPorDia,
   estadoNoMapa,
+  leadSaiDaBase,
   pontuarLead,
   problemasParaIniciar,
   respostasPorEspera,
@@ -221,6 +224,31 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       return marcacao;
     },
 
+    async removerLead(id, buscaId) {
+      const l = leads.find((x) => x.id === id);
+      if (!l) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrado };
+      const fila = campanhas.some((c) => c.envios.some((e) => e.leadId === id && e.situacao === "na_fila"));
+      if (fila) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
+      const livre = leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhaIds.length });
+      if (buscaId === null && !livre) return { ok: false, erro: RECUSA_AO_APAGAR.contatado };
+      // Aqui cada lead tem uma lista só (`buscaId`): quem fica na base sai dela.
+      leads = livre ? leads.filter((x) => x.id !== id) : leads.map((x) => (x.id === id ? { ...x, buscaId: "" } : x));
+      return { ok: true };
+    },
+
+    async apagarBusca(id) {
+      const b = buscas.find((x) => x.id === id);
+      if (!b) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrada };
+      if (b.situacao === "buscando") return { ok: false, erro: RECUSA_AO_APAGAR.buscando };
+      const naFila = new Set(campanhas.flatMap((c) => c.envios.filter((e) => e.situacao === "na_fila").map((e) => e.leadId)));
+      if (daBusca(id).some((l) => naFila.has(l.id))) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
+      leads = leads
+        .filter((l) => l.buscaId !== id || !leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhaIds.length }))
+        .map((l) => (l.buscaId === id ? { ...l, buscaId: "" } : l));
+      buscas.splice(buscas.indexOf(b), 1);
+      return { ok: true };
+    },
+
     async painelDaBase(buscaId) {
       const ls = daBusca(buscaId);
       const r = responderam();
@@ -298,9 +326,11 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const c = campanhas.find((x) => x.id === id);
       if (!c) return null;
       const contar = (s: string) => c.envios.filter((e) => e.situacao === s).length;
+      const hoje = inicioDoDiaSP(diaIsoSP(agora));
       return {
         campanha: editavel(c),
         contagens: { na_fila: contar("na_fila"), enviado: contar("enviado"), respondeu: contar("respondeu"), falhou: contar("falhou"), parou: contar("parou") },
+        fila: { agora, proximoEnvioEm: null, enviadosHoje: c.envios.filter((e) => (e.enviadoEm ?? 0) >= hoje).length, agendadaPara: c.agendadaPara },
       };
     },
 
@@ -308,8 +338,9 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const c = campanhas.find((x) => x.id === id);
       const porLead = new Map(leads.map((l) => [l.id, l]));
       const q = normalizar(texto);
+      const fila = (c?.envios ?? []).filter((e) => e.situacao === "na_fila");
       const lista = (c?.envios ?? [])
-        .map((e) => ({ e, l: porLead.get(e.leadId) }))
+        .map((e, ordem) => ({ e: { ...e, ordem, posicaoNaFila: e.situacao === "na_fila" ? fila.indexOf(e) : null }, l: porLead.get(e.leadId) }))
         .filter(({ e, l }) => (situacao === null || e.situacao === situacao) && (!q || normalizar(l?.nome ?? "").includes(q)))
         .map(({ e, l }) => ({ ...e, nome: l?.nome ?? "Lead", bairro: l?.bairro ?? "", cidade: l?.cidade ?? "" }));
       return pagina(lista, n);
@@ -332,6 +363,14 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const nova: Campanha = { ...c, envios: atual?.envios ?? [], salvaEm };
       campanhas = atual ? campanhas.map((x) => (x.id === c.id ? nova : x)) : [nova, ...campanhas];
       return salvaEm;
+    },
+
+    async apagarCampanha(id) {
+      const c = campanhas.find((x) => x.id === id);
+      if (!c) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrada };
+      if (campanhaAindaEnvia(c.situacao)) return { ok: false, erro: RECUSA_AO_APAGAR.ativa };
+      campanhas = campanhas.filter((x) => x.id !== id);
+      return { ok: true };
     },
 
     async iniciar(id) {

@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronRight, Download, Loader2, MapPin, Plus, Search, Star, ThumbsUp, X } from "lucide-react";
+import { ChevronRight, Download, Heart, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
   estadoNoMapa,
+  leadSaiDaBase,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
   textoDoLocal,
@@ -32,12 +33,13 @@ import {
   type SituacaoDaBusca,
 } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
+import { ApagarBusca, RemoverLead } from "./Apagar";
 import { FaixaDeNumeros } from "./faixa";
 import FichaDoLead from "./FichaDoLead";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
-import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
+import { BarraDaTabela, BotaoDeApagarDaLinha, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
 import {
   sinaisDoLead,
   somaDe,
@@ -244,15 +246,17 @@ function LinhaDaBusca({
   contagem,
   agora,
   abrir,
+  apagar,
 }: {
   busca: BuscaDaTabela;
   contagem: ContagemDaBusca;
   agora: number;
   abrir: () => void;
+  apagar: () => void;
 }) {
   const pronta = busca.situacao === "pronta";
   return (
-    <li>
+    <li className="flex items-center">
       <Button
         variant="linha"
         size="none"
@@ -260,7 +264,7 @@ function LinhaDaBusca({
         disabled={!pronta}
         data-slot="busca-linha"
         data-busca={busca.id}
-        className={`flex w-full flex-wrap items-center gap-x-5 gap-y-2 rounded-none px-5 py-3.5 text-left disabled:cursor-default disabled:opacity-100 ${GRADE_BUSCAS}`}
+        className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-2 rounded-none px-5 py-3.5 text-left disabled:cursor-default disabled:opacity-100 ${GRADE_BUSCAS}`}
       >
         <span className="min-w-0 basis-full xl:basis-auto">
           <span className="block truncate text-corpo font-semibold text-ink first-letter:uppercase">{busca.termo}</span>
@@ -315,6 +319,7 @@ function LinhaDaBusca({
         <span className="text-legenda text-ink-3">{haQuanto(busca.criadaEm, agora)}</span>
         {pronta ? <ChevronRight size={16} aria-hidden className="ml-auto text-ink-3 xl:ml-0" /> : <span />}
       </Button>
+      <BotaoDeApagarDaLinha rotulo={`Apagar a lista ${busca.termo}`} aoClicar={apagar} slot="busca-apagar" />
     </li>
   );
 }
@@ -329,7 +334,7 @@ function TabelaDeBuscas({
   inicial,
   agora,
   abrir,
-  aoTerminarBusca,
+  aoMudar,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -339,9 +344,10 @@ function TabelaDeBuscas({
   inicial: Pagina<BuscaDaTabela> | null;
   agora: number;
   abrir: (id: string) => void;
-  /** Uma busca da página saiu de "buscando": o painel e as contagens leem de novo. */
-  aoTerminarBusca: () => void;
+  /** Uma busca da página saiu de "buscando", ou uma lista foi apagada: o painel e as contagens leem de novo. */
+  aoMudar: () => void;
 }) {
+  const [apagando, setApagando] = useState<BuscaDaTabela | null>(null);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaBusca | null>(null);
@@ -368,8 +374,8 @@ function TabelaDeBuscas({
       if (b.situacao === "buscando") rodando.current.add(b.id);
       else rodando.current.delete(b.id);
     }
-    if (terminou) aoTerminarBusca();
-  }, [itens, aoTerminarBusca]);
+    if (terminou) aoMudar();
+  }, [itens, aoMudar]);
   const todas = somaDe(contagens);
 
   return (
@@ -404,7 +410,7 @@ function TabelaDeBuscas({
       >
         {esquerda}
       </BarraDaTabela>
-      <CabecalhoDaTabela grade={GRADE_BUSCAS} colunas={["Busca", "Situação", "Achadas", "Com celular", "Bons", "Contatados", "Quando", ""]} />
+      <CabecalhoDaTabela comAcao grade={GRADE_BUSCAS} colunas={["Busca", "Situação", "Achadas", "Com celular", "Bons", "Contatados", "Quando", ""]} />
       <CorpoDaTabela
         lido={tabela.lido}
         erro={tabela.erro}
@@ -414,11 +420,12 @@ function TabelaDeBuscas({
       >
         <ul className="divide-y divide-line-soft" data-slot="leads-buscas">
           {itens.map((b) => (
-            <LinhaDaBusca key={b.id} busca={b} contagem={b.contagem} agora={agora} abrir={() => abrir(b.id)} />
+            <LinhaDaBusca key={b.id} busca={b} contagem={b.contagem} agora={agora} abrir={() => abrir(b.id)} apagar={() => setApagando(b)} />
           ))}
         </ul>
       </CorpoDaTabela>
       <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="buscas" lido={tabela.lido} />
+      <ApagarBusca busca={apagando} fonte={fonte} aoFechar={() => setApagando(null)} aoApagar={aoMudar} />
     </>
   );
 }
@@ -471,9 +478,12 @@ function LinhaDoLead({
   abrirFicha,
   destacada,
   verNoMapa,
+  remover,
 }: {
   lead: LeadDaTabela;
   marcar: (m: Lead["marcacao"]) => void;
+  /** Abre a confirmação de tirar o lead; null = ele não pode sair daqui (Todos os leads, já contatado). */
+  remover: (() => void) | null;
   abrirFicha: () => void;
   /** O pino deste lead foi clicado no mapa. */
   destacada: boolean;
@@ -482,6 +492,7 @@ function LinhaDoLead({
 }) {
   const { respondeu } = lead;
   const descartado = lead.marcacao === "descartado";
+  const bom = lead.marcacao === "bom";
   return (
     <li
       data-slot="lead-linha"
@@ -549,23 +560,18 @@ function LinhaDoLead({
         <Button
           variant="alternavel"
           size="chip"
-          aria-pressed={lead.marcacao === "bom"}
-          onClick={() => marcar(lead.marcacao === "bom" ? null : "bom")}
+          aria-pressed={bom}
+          onClick={() => marcar(bom ? null : "bom")}
           data-slot="lead-marcar-bom"
         >
-          <ThumbsUp aria-hidden />
+          <Heart aria-hidden fill={bom ? "currentColor" : "none"} />
           Bom
         </Button>
-        <Button
-          variant="danger-ghost"
-          size="icon-chrome"
-          aria-label={descartado ? `Desfazer descarte de ${lead.nome}` : `Descartar ${lead.nome}`}
-          aria-pressed={descartado}
-          onClick={() => marcar(descartado ? null : "descartado")}
-          data-slot="lead-descartar"
-        >
-          <X aria-hidden />
-        </Button>
+        {remover && (
+          <Button variant="danger-ghost" size="icon-chrome" aria-label={`Tirar ${lead.nome}`} onClick={remover} data-slot="lead-remover">
+            <X aria-hidden />
+          </Button>
+        )}
       </div>
     </li>
   );
@@ -580,6 +586,7 @@ function TabelaDeLeads({
   focoDoMapa = null,
   verNoMapa = null,
   aoMarcar,
+  aoRemover,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -593,8 +600,11 @@ function TabelaDeLeads({
   verNoMapa?: ((id: string) => void) | null;
   /** Uma marcação que valeu (o mapa da busca recolore o pino sem reler). */
   aoMarcar?: (id: string, m: Lead["marcacao"]) => void;
+  /** Um lead saiu: a tabela, o painel e os pinos leem de novo. */
+  aoRemover: () => void;
 }) {
   const [ficha, setFicha] = useState<LeadDaTabela | null>(null);
+  const [removendo, setRemovendo] = useState<LeadDaTabela | null>(null);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
   const [cidade, setCidade] = useState<string | null>(null);
@@ -714,6 +724,17 @@ function TabelaDeLeads({
         rotuloDaBusca="Buscar lead pelo nome ou telefone"
         filtro={
           <>
+            <Button
+              variant="alternavel"
+              size="chip"
+              aria-pressed={filtros.includes("bons")}
+              onClick={() => alternar("bons")}
+              className="shrink-0"
+              data-slot="leads-so-bons"
+            >
+              <Heart aria-hidden fill={filtros.includes("bons") ? "currentColor" : "none"} />
+              Só os bons
+            </Button>
             <BotaoDeFiltro
               slot="leads-filtro"
               largura="w-60"
@@ -748,6 +769,7 @@ function TabelaDeLeads({
               lead={l}
               marcar={(m) => marcar(l.id, m)}
               abrirFicha={() => setFicha(l)}
+              remover={buscaId || leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => setRemovendo(l) : null}
               destacada={destaque === l.id}
               verNoMapa={verNoMapa && l.detalhes?.lat != null ? () => verNoMapa(l.id) : null}
             />
@@ -756,6 +778,7 @@ function TabelaDeLeads({
       </CorpoDaTabela>
       <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" lido={tabela.lido} />
       <FichaDoLead lead={ficha} aoFechar={() => setFicha(null)} />
+      <RemoverLead lead={removendo} buscaId={buscaId} fonte={fonte} aoFechar={() => setRemovendo(null)} aoRemover={aoRemover} />
     </>
   );
 }
@@ -773,7 +796,7 @@ function HomeDosLeads({
   abrir,
   novaBusca,
   voltarAoRascunho,
-  aoTerminarBusca,
+  aoMudar,
 }: {
   abas: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -785,7 +808,7 @@ function HomeDosLeads({
   abrir: (id: string) => void;
   novaBusca: () => void;
   voltarAoRascunho: () => void;
-  aoTerminarBusca: () => void;
+  aoMudar: () => void;
 }) {
   const [vista, setVista] = useState<"buscas" | "leads">("buscas");
   const { dados: painel } = useLeitura(`painel-base|${versao}`, () => fonte.painelDaBase(null), inicial?.painel ?? null);
@@ -851,10 +874,10 @@ function HomeDosLeads({
                 inicial={inicial?.buscas ?? null}
                 agora={agora}
                 abrir={abrir}
-                aoTerminarBusca={aoTerminarBusca}
+                aoMudar={aoMudar}
               />
             ) : (
-              <TabelaDeLeads esquerda={seletorDaVista} fonte={fonte} versao={versao} buscaId={null} />
+              <TabelaDeLeads esquerda={seletorDaVista} fonte={fonte} versao={versao} buscaId={null} aoRemover={aoMudar} />
             )}
           </Card>
         </>
@@ -870,6 +893,7 @@ function DetalheDaBusca({
   busca,
   voltar,
   criarCampanha,
+  aoMudar,
 }: {
   abas: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -877,7 +901,9 @@ function DetalheDaBusca({
   busca: Busca;
   voltar: () => void;
   criarCampanha: () => void;
+  aoMudar: () => void;
 }) {
+  const [apagando, setApagando] = useState(false);
   const { dados: painel } = useLeitura(`painel-busca|${busca.id}|${versao}`, () => fonte.painelDaBase(busca.id));
   const { dados: lidos } = useLeitura(`pontos|${busca.id}|${versao}`, () => fonte.pontosDaBusca(busca.id));
   // A marcação feita na tabela recolore o pino na hora (respondeu e contatado ganham da marcação).
@@ -899,9 +925,15 @@ function DetalheDaBusca({
     <div className="flex flex-col gap-4" data-slot="busca-detalhe">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
-        <Button className="ml-auto" onClick={criarCampanha} data-slot="busca-criar-campanha">
-          Criar campanha com esta busca
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={() => setApagando(true)} data-slot="busca-apagar">
+            <Trash2 aria-hidden />
+            Apagar lista
+          </Button>
+          <Button onClick={criarCampanha} data-slot="busca-criar-campanha">
+            Criar campanha com esta busca
+          </Button>
+        </div>
       </div>
       <TopoDeDetalhe
         voltar={voltar}
@@ -943,8 +975,18 @@ function DetalheDaBusca({
           focoDoMapa={destaque?.origem === "mapa" ? destaque : null}
           verNoMapa={pontos && pontos.length > 0 ? (id) => destacar(id, "tabela") : null}
           aoMarcar={aoMarcar}
+          aoRemover={aoMudar}
         />
       </Card>
+      <ApagarBusca
+        busca={apagando ? busca : null}
+        fonte={fonte}
+        aoFechar={() => setApagando(false)}
+        aoApagar={() => {
+          voltar();
+          aoMudar();
+        }}
+      />
     </div>
   );
 }
@@ -966,7 +1008,7 @@ function AbaLeads({
   criarCampanhaDaBusca,
   voltarAoRascunho,
 }: {
-  /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
+  /** O seletor Campanhas | Leads, no canto esquerdo da linha de cima. */
   abas: React.ReactNode;
   fonte: FonteDeCampanhas;
   /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
@@ -978,7 +1020,7 @@ function AbaLeads({
   buscaAberta: string | null;
   rascunho: CampanhaEditavel | null;
   abrirBusca: (id: string | null) => void;
-  /** Depois de uma escrita que muda números de outras telas (uma busca que terminou). */
+  /** Depois de uma escrita que muda números de outras telas (uma busca que terminou, algo apagado). */
   aoMudar: () => void;
   /** Abre a página da Nova busca. */
   novaBusca: () => void;
@@ -997,6 +1039,7 @@ function AbaLeads({
           busca={busca}
           voltar={() => abrirBusca(null)}
           criarCampanha={() => criarCampanhaDaBusca(busca)}
+          aoMudar={aoMudar}
         />
       ) : (
         <HomeDosLeads
@@ -1010,7 +1053,7 @@ function AbaLeads({
           abrir={abrirBusca}
           novaBusca={novaBusca}
           voltarAoRascunho={voltarAoRascunho}
-          aoTerminarBusca={aoMudar}
+          aoMudar={aoMudar}
         />
       )}
     </>

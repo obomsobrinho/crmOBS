@@ -12,6 +12,7 @@ import type {
   PontoNoMapa,
   PreviaDoFiltro,
   Resultados,
+  RespostaDeApagar,
   RespostaDeIniciar,
   Totais,
 } from "@/components/admin/campanhas/tipos";
@@ -105,6 +106,10 @@ function formularioDaPlanilha(arquivo: File, nome?: string): FormData {
 export function fonteDasRotas(): FonteDeCampanhas {
   const acao = async (id: string, a: "iniciar" | "pausar" | "retomar") =>
     (await pedir<{ situacao: SituacaoDaCampanha }>(`/${id}/acao`, enviar({ acao: a }))).situacao;
+  const apagar = async (caminho: string): Promise<RespostaDeApagar> => {
+    const r = await recusaSe4xx(pedir<{ ok: true }>(caminho, { method: "DELETE" }));
+    return r.ok ? { ok: true } : r;
+  };
   return {
     totais: () => pedir<Totais>("/totais"),
     conexoes: () => pedir<ConexaoDisponivel[]>("/conexoes"),
@@ -130,6 +135,8 @@ export function fonteDasRotas(): FonteDeCampanhas {
       return r.ok ? { ok: true, buscaId: r.valor.buscaId } : r;
     },
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
+    removerLead: (id, buscaId) => apagar(`/leads/${id}${q({ busca: buscaId })}`),
+    apagarBusca: (id) => apagar(`/buscas/${id}`),
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     campanhasComEnvio: () => pedir<{ id: string; nome: string }[]>("?com_envio=1"),
@@ -155,6 +162,7 @@ export function fonteDasRotas(): FonteDeCampanhas {
         throw e;
       }
     },
+    apagarCampanha: (id) => apagar(`/${id}`),
     iniciar: async (id): Promise<RespostaDeIniciar> => {
       const r = await recusaSe4xx(acao(id, "iniciar"));
       return r.ok ? { ok: true, situacao: r.valor } : r;

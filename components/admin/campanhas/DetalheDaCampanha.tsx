@@ -1,7 +1,7 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
-import { Pause, Play, Repeat } from "lucide-react";
+import { memo, useCallback, useMemo, useState } from "react";
+import { Pause, Play, Repeat, Trash2 } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Aviso } from "@/components/ui/aviso";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,9 @@ import { Card } from "@/components/ui/card";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { numeroBR } from "@/lib/format";
 import { diaMesHoraSP } from "@/lib/fuso";
-import { ROTULO_NA_CAMPANHA, diasParaEnviar, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
+import { ROTULO_NA_CAMPANHA, campanhaAindaEnvia, diasParaEnviar, previsaoDaFila, textoDaCadencia, textoDoTempo, type SituacaoNaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
+import { ApagarCampanha } from "./Apagar";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, SeloNaCampanha, TopoDeDetalhe } from "./pecas";
 import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
@@ -18,11 +19,12 @@ import { somaDe, type CampanhaEditavel, type ConexaoDisponivel, type FonteDeCamp
 
 // O DETALHE de uma campanha: o mesmo painel de resultados da aba (desde o
 // início da campanha, sem "Envios por dia": todo dia sai a mesma cota) e a
-// tabela dos leads dela, 10 por página, com busca e filtro por situação.
+// tabela dos leads dela NA ORDEM DE ENVIO (a do cron), com a previsão de quem está na
+// fila, 10 por página, com busca e filtro por situação.
 // Pausar para o cron; "Nova campanha com quem não respondeu" abre o assistente
 // com esses leads escolhidos.
 
-const GRADE = "xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_120px] xl:items-center xl:gap-4";
+const GRADE = "xl:grid xl:grid-cols-[36px_minmax(0,2fr)_minmax(0,0.8fr)_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_120px] xl:items-center xl:gap-4";
 const SITUACOES: SituacaoNaCampanha[] = ["respondeu", "enviado", "na_fila", "parou", "falhou"];
 
 function DetalheDaCampanha({
@@ -42,7 +44,7 @@ function DetalheDaCampanha({
   versao: number;
   conexoes: ConexaoDisponivel[];
   voltar: () => void;
-  /** Depois de pausar ou retomar (as outras telas leem de novo). */
+  /** Depois de pausar, retomar ou apagar (as outras telas leem de novo). */
   aoMudar: () => void;
   reenviarParaQuemNaoRespondeu: (origem: CampanhaEditavel) => void;
 }) {
@@ -50,6 +52,7 @@ function DetalheDaCampanha({
   const { dados: resultados } = useLeitura(`resultados|${id}|${versao}`, () => fonte.resultados({ campanhaId: id, periodo: null }));
   const [mudando, setMudando] = useState(false);
   const [falhaAoMudar, setFalhaAoMudar] = useState(false);
+  const [apagando, setApagando] = useState(false);
 
   // ── A tabela ──
   const [q, setQ] = useState("");
@@ -57,6 +60,14 @@ function DetalheDaCampanha({
   const [situacao, setSituacao] = useState<SituacaoNaCampanha | null>(null);
   const ler = useCallback((pagina: number) => fonte.leadsDaCampanha(id, { texto: busca, situacao, pagina }), [fonte, id, busca, situacao]);
   const tabela = usePaginaDaFonte(`${id}|${busca}|${situacao ?? ""}`, ler, versao);
+
+  // A previsão anda só até o último da página: a fila inteira pode ter milhares.
+  const lida = aberta.dados;
+  const ultimaPosicao = Math.max(0, ...tabela.itens.map((e) => e.posicaoNaFila ?? 0));
+  const previsoes = useMemo(
+    () => (lida && campanhaAindaEnvia(lida.campanha.situacao) ? previsaoDaFila(lida.fila, ultimaPosicao + 1) : []),
+    [lida, ultimaPosicao],
+  );
 
   if (!aberta.dados) {
     return (
@@ -105,6 +116,7 @@ function DetalheDaCampanha({
       : naFila > 0
         ? `faltam ${numeroBR(naFila)}, cerca de ${diasParaEnviar(naFila)} ${diasParaEnviar(naFila) === 1 ? "dia" : "dias"}`
         : "todos os leads já receberam",
+    ...(naFila > 0 && previsoes.length > 0 ? [`próximo envio por volta de ${diaMesHoraSP(previsoes[0])}`] : []),
   ].join(", ");
 
   return (
@@ -129,6 +141,10 @@ function DetalheDaCampanha({
               {campanha.situacao === "pausada" ? "Retomar" : "Pausar"}
             </Button>
           )}
+          <Button variant="outline" onClick={() => setApagando(true)} data-slot="campanha-apagar">
+            <Trash2 aria-hidden />
+            Apagar
+          </Button>
         </div>
       </div>
 
@@ -181,7 +197,12 @@ function DetalheDaCampanha({
         >
           <h3 className="text-cartao text-ink">Leads da campanha</h3>
         </BarraDaTabela>
-        <CabecalhoDaTabela grade={GRADE} colunas={["Empresa", "Mensagem", "Enviada", "Respondeu", "Em", "Situação"]} />
+        {naFila > 0 && previsoes.length > 0 && (
+          <p className="border-b border-line px-5 py-2 text-legenda text-ink-3" data-slot="campanha-cadencia">
+            {textoDaCadencia()}
+          </p>
+        )}
+        <CabecalhoDaTabela grade={GRADE} colunas={["Ordem", "Empresa", "Mensagem", "Envio", "Respondeu", "Em", "Situação"]} />
         <CorpoDaTabela
           lido={tabela.lido}
           erro={tabela.erro}
@@ -193,6 +214,7 @@ function DetalheDaCampanha({
             {tabela.itens.map((e) => {
               const espera =
                 e.enviadoEm !== null && e.respondeuEm !== null ? Math.round((e.respondeuEm - e.enviadoEm) / 60_000) : null;
+              const previsao = e.posicaoNaFila === null ? undefined : previsoes[e.posicaoNaFila];
               return (
                 <li
                   key={e.leadId}
@@ -200,12 +222,21 @@ function DetalheDaCampanha({
                   data-slot="campanha-lead"
                   data-situacao={e.situacao}
                 >
+                  <span className="tabular-nums text-ink-3" data-slot="campanha-lead-ordem">
+                    {numeroBR(e.ordem + 1)}º
+                  </span>
                   <span className="min-w-0 basis-full xl:basis-auto">
                     <span className="block truncate text-corpo font-semibold text-ink">{e.nome}</span>
                     <span className="block truncate text-legenda text-ink-3">{[e.bairro, e.cidade].filter(Boolean).join(", ")}</span>
                   </span>
                   <span className="text-ink-2">{e.variante === null ? "" : `Variante ${e.variante + 1}`}</span>
-                  <span className="tabular-nums text-ink-2">{e.enviadoEm ? diaMesHoraSP(e.enviadoEm) : ""}</span>
+                  {e.enviadoEm ? (
+                    <span className="tabular-nums text-ink-2">{diaMesHoraSP(e.enviadoEm)}</span>
+                  ) : (
+                    <span className="tabular-nums text-ink-3" data-slot="campanha-lead-previsao">
+                      {previsao !== undefined ? `por volta de ${diaMesHoraSP(previsao)}` : e.situacao === "na_fila" ? "Campanha pausada" : ""}
+                    </span>
+                  )}
                   <span className="tabular-nums text-ink-2">{e.respondeuEm ? diaMesHoraSP(e.respondeuEm) : ""}</span>
                   <span className="tabular-nums text-ink-3">{espera === null ? "" : textoDoTempo(espera)}</span>
                   <span className="ml-auto xl:ml-0">
@@ -218,6 +249,15 @@ function DetalheDaCampanha({
         </CorpoDaTabela>
         <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanha-leads" lido={tabela.lido} />
       </Card>
+      <ApagarCampanha
+        campanha={apagando ? campanha : null}
+        fonte={fonte}
+        aoFechar={() => setApagando(false)}
+        aoApagar={() => {
+          voltar();
+          aoMudar();
+        }}
+      />
     </div>
   );
 }
