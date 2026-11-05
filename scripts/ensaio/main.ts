@@ -1,3 +1,4 @@
+import { catalogoDasLinhas, marcaDeMidiaEnviada } from "../../lib/midias";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createServiceClient } from "@/lib/supabase/service";
 import { compilarDoTenant, LIMITS } from "@/lib/agent-prompt";
@@ -186,7 +187,7 @@ export async function ensaiar(args: string[]): Promise<void> {
         // Como em produção: a mídia enviada entra no histórico como fala da empresa.
         if (output.midia) {
           midiasEnviadas.push(output.midia);
-          history.push({ role: "assistant", content: `[Mídia enviada pela empresa: ${output.midia}]` });
+          history.push({ role: "assistant", content: marcaDeMidiaEnviada(catalogoDasLinhas(cliente.id, catalogoOverride ?? []).find((m) => m.chave === output.midia) ?? null) });
           saida.push(`> [mídia: ${output.midia}]`, "");
         }
         if (output.action === "pausar" && d.pedidoNaFila && output.summary) pedidosAbertos.push(output.summary);

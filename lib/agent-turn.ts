@@ -85,7 +85,7 @@ import {
   type MidiaDoCatalogo,
   type MidiaDoTurno,
 } from "@/lib/midias";
-import { MIDIA_DA_IA } from "@/lib/mensagem";
+import { ehMidiaDaIa, MIDIA_DA_IA } from "@/lib/mensagem";
 
 // Orquestração de um turno do agente. STATELESS por turno; reaproveitável pelas
 // duas rotas: /api/agent (n8n, autenticado pelo segredo) e a bancada de teste
@@ -265,12 +265,6 @@ export async function processTurn(
   const message = retomada ? "" : params.message;
   const svc = createServiceClient();
   const t0 = Date.now();
-  // Mídias do agente (lib/midias.ts): o catálogo e as já enviadas nesta conversa
-  // correm junto com o resto do turno. Best-effort: falhar só tira as mídias.
-  const midiasP =
-    dryRun && params.catalogoOverride
-      ? Promise.resolve({ catalogo: catalogoDasLinhas(clientId, params.catalogoOverride), enviadas: params.midiasEnviadas ?? [] })
-      : lerMidias(svc, clientId, phone, dryRun ? (params.midiasEnviadas ?? []) : null);
 
   // Configuração do tenant. A persona é MONTADA NA LEITURA (ver
   // `personaDoTenant`), então o que importa aqui é `agent_config` +
@@ -437,6 +431,14 @@ export async function processTurn(
     }
     return t;
   }
+
+  // Mídias do agente (lib/midias.ts): o catálogo e as já enviadas nesta conversa
+  // correm junto com o resto do turno, só depois dos gates (turno silenciado não
+  // gasta leitura). Best-effort: falhar só tira as mídias.
+  const midiasP =
+    dryRun && params.catalogoOverride
+      ? Promise.resolve({ catalogo: catalogoDasLinhas(clientId, params.catalogoOverride), enviadas: params.midiasEnviadas ?? [] })
+      : lerMidias(svc, clientId, phone, dryRun ? (params.midiasEnviadas ?? []) : null);
 
   // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
   // com datas (`horarioCadastrado`). O avançado também tem horário salvo
@@ -969,27 +971,25 @@ async function lerMidias(
   enviadasDoTeste: string[] | null
 ): Promise<{ catalogo: MidiaDoCatalogo[]; enviadas: string[] }> {
   try {
-    const [{ data: linhas, error }, jaEnviadas] = await Promise.all([
-      svc
-        .from("agent_midias")
-        .select("chave, tipo, path, mime, nome_arquivo, descricao, quando_enviar, legenda")
-        .eq("client_id", clientId)
-        .eq("ativo", true)
-        .order("created_at", { ascending: true })
-        .limit(10),
-      enviadasDoTeste
-        ? Promise.resolve({ data: enviadasDoTeste.map((c) => ({ media_url: c })), error: null })
-        : svc
-            .from("chat_messages")
-            .select("media_url")
-            .eq("client_id", clientId)
-            .eq("phone", phone)
-            .eq("message_type", MIDIA_DA_IA)
-            .limit(20),
-    ]);
+    const { data: linhas, error } = await svc
+      .from("agent_midias")
+      .select("chave, tipo, path, mime, nome_arquivo, descricao, quando_enviar, legenda")
+      .eq("client_id", clientId)
+      .eq("ativo", true)
+      .order("created_at", { ascending: true })
+      .limit(10);
     if (error) throw error;
     const catalogo = catalogoDasLinhas(clientId, linhas ?? []);
-    const enviadas = (jaEnviadas.data ?? [])
+    // Sem catálogo não há o que conferir: a empresa sem mídia paga só a leitura acima.
+    if (catalogo.length === 0 || enviadasDoTeste) return { catalogo, enviadas: enviadasDoTeste ?? [] };
+    const { data: jaEnviadas } = await svc
+      .from("chat_messages")
+      .select("media_url")
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .eq("message_type", MIDIA_DA_IA)
+      .limit(20);
+    const enviadas = (jaEnviadas ?? [])
       .map((r) => r.media_url)
       .filter((v): v is string => typeof v === "string" && v !== "");
     return { catalogo, enviadas };
@@ -1242,7 +1242,7 @@ function buildHistory(
   for (const r of (rows ?? []).slice().reverse()) {
     // Mídia que a IA mandou (lib/midias.ts): a linha não tem texto, então vira
     // uma fala da empresa dizendo o que foi (pela descrição do catálogo).
-    if (r.message_type === MIDIA_DA_IA) {
+    if (ehMidiaDaIa(r.message_type ?? null)) {
       const m = catalogo.find((c) => c.path === r.media_url) ?? null;
       history.push({ role: "assistant", content: marcaDeMidiaEnviada(m) });
       continue;

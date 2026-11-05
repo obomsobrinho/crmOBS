@@ -43,3 +43,9 @@ revoke all on public.agent_midias from anon;
 revoke insert, update, delete on public.agent_midias from authenticated;
 grant select on public.agent_midias to authenticated;
 grant all on public.agent_midias to service_role;
+
+-- The once-per-conversation check reads only these rows, on every turn of a tenant with media.
+create index chat_messages_midia_ia_idx
+  on public.chat_messages (client_id, phone)
+  include (media_url)
+  where message_type = 'midia_ia';
