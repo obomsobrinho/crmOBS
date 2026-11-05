@@ -50,6 +50,20 @@ export const MANUAL = "manual";
  * entra em nenhuma conta de quem respondeu.
  */
 export const LEMBRETE = "lembrete";
+/**
+ * Mídia que a IA mandou (04/11/2026, `lib/midias.ts`): o n8n grava a linha com
+ * `media_url` e SEM `bot_message`, então ela não é resposta da IA nem do time em
+ * nenhuma conta (a frase que acompanha já é a resposta). Na conversa vira balão
+ * enviado da IA (`components/thread/bolhas.ts`), e na ficha não entra em Arquivos
+ * (que lista os tipos recebidos). As cópias em SQL não mudam: todas exigem
+ * `bot_message` não vazio.
+ */
+export const MIDIA_DA_IA = "midia_ia";
+
+/** A linha é uma mídia que a IA mandou (vídeo ou imagem do catálogo da empresa). */
+export function ehMidiaDaIa(messageType: string | null): boolean {
+  return messageType === MIDIA_DA_IA;
+}
 
 /** A linha veio do histórico importado (portanto é anterior ao agente). */
 export function ehImportada(messageType: string | null): boolean {

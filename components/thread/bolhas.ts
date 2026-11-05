@@ -1,4 +1,4 @@
-import { ehLembrete, ehManual, respostaHumana } from "@/lib/mensagem";
+import { ehLembrete, ehManual, ehMidiaDaIa, respostaHumana } from "@/lib/mensagem";
 import { formatTime } from "@/lib/format";
 import { dataLongaSP } from "@/lib/fuso";
 import { diaSP } from "@/lib/inbox";
@@ -14,6 +14,19 @@ export function rowsToBubbles(rows: ChatRow[]): Bubble[] {
     // "out"), qualquer outro = recebido do contato (balão "in"). Não dá para
     // usar bot_message, porque mídia enviada sem legenda tem bot_message ''.
     const isManual = ehManual(r.message_type);
+    // Mídia que a IA mandou (`lib/midias.ts`): balão enviado da IA, sem texto.
+    if (ehMidiaDaIa(r.message_type) && media) {
+      bubbles.push({
+        key: `i${r.id}`,
+        side: "out",
+        author: "ia",
+        content: "",
+        created_at: r.created_at ?? "",
+        mediaUrl: media,
+        mediaType,
+      });
+      continue;
+    }
     // Balão recebido: tem texto do contato, ou é mídia recebida (não manual e
     // sem resposta do bot na mesma linha).
     if (r.user_message || (media && !isManual && !r.bot_message)) {

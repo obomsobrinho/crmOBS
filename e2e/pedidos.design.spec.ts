@@ -5,6 +5,7 @@ import { SOLUCOES, rotuloDaSolucao, solucaoDoBanco } from "../lib/solucoes";
 import {
   HISTORIA_VAZIA,
   encaixarNaHistoria,
+  mensagensQueLevaram,
   montarSecoes,
   recorteAntes,
   recorteDepois,
@@ -390,6 +391,13 @@ test.describe("Seções do pedido (lib/historia-do-pedido.ts)", () => {
     expect(s.respostas).toHaveLength(1);
     expect(s.respostas[0].quem).toBe("ia");
     expect(s.respostas[0].mensagens.map((m) => m.texto)).toEqual(["Custa R$ 100.", "Posso ajudar em algo mais?"]);
+  });
+
+  test("a mídia que a IA mandou (midia_ia) nunca é do cliente: entra como resposta da IA", () => {
+    const midia = l(H + 500, { message_type: "midia_ia", media_url: "x/biblioteca/v.mp4", media_type: "video" });
+    expect(mensagensQueLevaram([midia])).toEqual([]);
+    const s = montarSecoes({ ...vazia, depois: [midia] });
+    expect(s.respostas.map((r) => [r.quem, r.mensagens[0].midia])).toEqual([["ia", "Vídeo"]]);
   });
 
   test("quem mandou sai de lib/mensagem.ts: manual e importado são time, o resto é IA", () => {

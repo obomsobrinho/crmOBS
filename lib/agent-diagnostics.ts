@@ -45,6 +45,12 @@ export interface TurnDiagnostics {
   ragMatches: RagMatchDiag[]; // trechos recuperados, com similaridade
   stageWouldMove: string | null; // estágio (key) que a IA moveria; null = não move
   guardrail: GuardrailDiag;
+  /**
+   * Mídias do agente (04/11/2026, lib/midias.ts): a chave que o modelo pediu e
+   * a que o código aceitou (catálogo, uma vez por conversa). Ausente quando a
+   * empresa não tem mídia disponível neste turno.
+   */
+  midia?: { pedida: string; enviada: string | null };
   handoffOpened: boolean; // o turno abriu handoff (pausar/agendar ou guardrail)
   // O turno pôs um pedido NA FILA (29/09/2026). É a MESMA regra do atendimento
   // (`entraNaFila` em lib/agent-turn.ts, com a rede de segurança), calculada

@@ -9,6 +9,7 @@
 //             "campanha": true usa a 1ª variante sugerida com "Empresa Exemplo"; ou
 //             { "texto"?, "enviadoEm"?, "empresa"? } para o envio exato. Sem "campanha", contato que chegou sozinho.
 // --cliente   a empresa (padrão: a única chamada OBS)
+// --midias    catálogo de mídias de teste (JSON: [{ chave, tipo, path: "biblioteca/x.mp4", mime, descricao, quando_enviar, legenda? }])
 // --documentos  base de conhecimento candidata (md, txt, csv, pdf, docx, xlsx) separada por vírgula: fatiada e
 //             embedada só em memória como na produção, top 5 por cosseno a cada turno; os trechos gravados da
 //             empresa são ignorados e nada sobe para o banco nem para a conta

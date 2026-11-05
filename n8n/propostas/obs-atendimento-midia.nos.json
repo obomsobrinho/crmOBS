@@ -1,0 +1,373 @@
+{
+  "nos_novos": [
+    {
+      "id": "midia-ia-tem",
+      "name": "Tem mídia da IA?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7604,
+        428
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "tem-midia",
+              "leftValue": "={{ !!($('Atendente').item.json.midia && $('Atendente').item.json.midia.url) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "midia-ia-telefone",
+      "name": "Telefone real? (mídia)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7804,
+        428
+      ],
+      "executeOnce": true,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "telefone-real-midia",
+              "leftValue": "={{ !String($('Dados').item.json.Telefone || '').replace(/[^0-9]/g, '').startsWith('5500') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "midia-ia-tipo",
+      "name": "Tipo da mídia da IA",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        8004,
+        428
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mi1",
+                    "leftValue": "={{ $('Atendente').item.json.midia.tipo }}",
+                    "rightValue": "video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "video"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "mi2",
+                    "leftValue": "={{ $('Atendente').item.json.midia.tipo }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "image"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "midia-ia-video",
+      "name": "Envia vídeo da IA",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        8204,
+        348
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-video",
+        "instanceName": "={{ $('Dados').item.json.instance }}",
+        "remoteJid": "={{ $('Dados').item.json.Telefone }}",
+        "media": "={{ $('Atendente').item.json.midia.url }}",
+        "mimetype": "={{ $('Atendente').item.json.midia.mime }}",
+        "caption": "={{ $('Atendente').item.json.midia.legenda }}",
+        "fileName": "={{ $('Atendente').item.json.midia.nomeArquivo }}",
+        "options_message": {
+          "delay": 1500,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "midia-ia-imagem",
+      "name": "Envia imagem da IA",
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        8204,
+        508
+      ],
+      "parameters": {
+        "resource": "messages-api",
+        "operation": "send-image",
+        "instanceName": "={{ $('Dados').item.json.instance }}",
+        "remoteJid": "={{ $('Dados').item.json.Telefone }}",
+        "media": "={{ $('Atendente').item.json.midia.url }}",
+        "mimetype": "={{ $('Atendente').item.json.midia.mime }}",
+        "caption": "={{ $('Atendente').item.json.midia.legenda }}",
+        "fileName": "={{ $('Atendente').item.json.midia.nomeArquivo }}",
+        "options_message": {
+          "delay": 1500,
+          "linkPreview": false
+        }
+      },
+      "credentials": {
+        "evolutionApi": {
+          "id": "NhrloDUqGVTkh9Xq",
+          "name": "Evo Global"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "midia-ia-salva",
+      "name": "Salva mídia da IA",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        8404,
+        428
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "KfaFJK3xoVfTJGUL",
+          "name": "Supabase account"
+        }
+      },
+      "parameters": {
+        "tableId": "chat_messages",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "phone",
+              "fieldValue": "={{ $('Dados').item.json.Telefone }}"
+            },
+            {
+              "fieldId": "media_url",
+              "fieldValue": "={{ $('Atendente').item.json.midia.path }}"
+            },
+            {
+              "fieldId": "media_type",
+              "fieldValue": "={{ $('Atendente').item.json.midia.tipo }}"
+            },
+            {
+              "fieldId": "message_type",
+              "fieldValue": "midia_ia"
+            },
+            {
+              "fieldId": "nomewpp",
+              "fieldValue": "={{ $('Dados').item.json.NomeWpp }}"
+            },
+            {
+              "fieldId": "created_at",
+              "fieldValue": "={{ $now }}"
+            },
+            {
+              "fieldId": "client_id",
+              "fieldValue": "={{ $('Resolve tenant').first().json.id }}"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "ligacoes": {
+    "Loop envio": {
+      "main": [
+        [
+          {
+            "node": "Tem mídia da IA?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telefone real? (envio)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem mídia da IA?": {
+      "main": [
+        [
+          {
+            "node": "Telefone real? (mídia)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telefone real? (mídia)": {
+      "main": [
+        [
+          {
+            "node": "Tipo da mídia da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo da mídia da IA": {
+      "main": [
+        [
+          {
+            "node": "Envia vídeo da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia imagem da IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia vídeo da IA": {
+      "main": [
+        [
+          {
+            "node": "Salva mídia da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia imagem da IA": {
+      "main": [
+        [
+          {
+            "node": "Salva mídia da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva mídia da IA": {
+      "main": [
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

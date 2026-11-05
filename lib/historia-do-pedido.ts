@@ -28,7 +28,7 @@
 // o outro.
 
 import type { Tables } from "./database.types";
-import { ehManual, respostaDaIa, respostaHumana } from "./mensagem";
+import { ehManual, ehMidiaDaIa, MIDIA_DA_IA, respostaDaIa, respostaHumana } from "./mensagem";
 import { separarMensagens } from "./painel";
 import { ehAberto, type PedidoItem } from "./pedidos";
 
@@ -136,7 +136,7 @@ function ordemDaHistoria(a: LinhaHistoria, b: LinhaHistoria): number {
 
 /** A linha traz uma mensagem DO CLIENTE (texto, ou mídia recebida sem resposta junto). */
 function linhaDoCliente(l: LinhaHistoria): boolean {
-  if (ehManual(l.message_type)) return false;
+  if (ehManual(l.message_type) || ehMidiaDaIa(l.message_type)) return false;
   return !!l.user_message?.trim() || (!!l.media_url && !l.bot_message);
 }
 
@@ -145,13 +145,15 @@ function linhaDoCliente(l: LinhaHistoria): boolean {
  * contar só linhas do cliente (sem isto a mídia mandada pelo time, `manual`,
  * ocupava vaga e o corte "há mensagens anteriores" sumia). `message_type` nulo
  * conta como não manual (`neq` sozinho deixaria o nulo de fora). Única
- * diferença: texto só de espaços passa aqui e sai em `linhaDoCliente`.
+ * diferença: texto só de espaços passa aqui e sai em `linhaDoCliente`. A mídia
+ * que a IA mandou (`MIDIA_DA_IA`) também tem `media_url` sem `bot_message`, e não
+ * é do cliente.
  */
 export const FILTRO_DO_CLIENTE = [
   "and(message_type.is.null,user_message.not.is.null)",
   "and(message_type.is.null,media_url.not.is.null,bot_message.is.null)",
   "and(message_type.neq.manual,user_message.not.is.null)",
-  "and(message_type.neq.manual,media_url.not.is.null,bot_message.is.null)",
+  `and(message_type.neq.manual,message_type.neq.${MIDIA_DA_IA},media_url.not.is.null,bot_message.is.null)`,
 ].join(",");
 
 /**
@@ -165,7 +167,7 @@ function linhaDeResposta(l: LinhaHistoria, p: JanelaDoPedido): boolean {
 }
 
 /** O mesmo, no filtro do PostgREST, para o resolvido (o aberto é `message_type = manual`). */
-export const FILTRO_DE_RESPOSTA = "bot_message.not.is.null,and(message_type.eq.manual,media_url.not.is.null)";
+export const FILTRO_DE_RESPOSTA = `bot_message.not.is.null,and(message_type.eq.manual,media_url.not.is.null),message_type.eq.${MIDIA_DA_IA}`;
 
 /** A linha cai na janela do "depois" (resolvido: até 24h; aberto: sem fim). */
 function naJanelaDoDepois(l: LinhaHistoria, p: JanelaDoPedido): boolean {
@@ -301,6 +303,9 @@ function respostaDaLinha(l: LinhaHistoria): { quem: "ia" | "time"; mensagens: Me
   }
   if (respostaHumana(l)) {
     return { quem: "time", mensagens: [{ chave: `t${l.id}`, em, texto: l.bot_message!.trim(), midia: null }] };
+  }
+  if (ehMidiaDaIa(l.message_type) && l.media_url) {
+    return { quem: "ia", mensagens: [{ chave: `m${l.id}`, em, texto: "", midia: rotuloDaMidia(l.media_type) }] };
   }
   if (ehManual(l.message_type) && l.media_url) {
     // Envio manual só com mídia (sem legenda).

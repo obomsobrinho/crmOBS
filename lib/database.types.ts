@@ -208,6 +208,59 @@ export type Database = {
           },
         ]
       }
+      agent_midias: {
+        Row: {
+          ativo: boolean
+          chave: string
+          client_id: string
+          created_at: string
+          descricao: string
+          id: number
+          legenda: string
+          mime: string
+          nome_arquivo: string
+          path: string
+          quando_enviar: string
+          tipo: string
+        }
+        Insert: {
+          ativo?: boolean
+          chave: string
+          client_id: string
+          created_at?: string
+          descricao: string
+          id?: never
+          legenda?: string
+          mime: string
+          nome_arquivo?: string
+          path: string
+          quando_enviar: string
+          tipo: string
+        }
+        Update: {
+          ativo?: boolean
+          chave?: string
+          client_id?: string
+          created_at?: string
+          descricao?: string
+          id?: never
+          legenda?: string
+          mime?: string
+          nome_arquivo?: string
+          path?: string
+          quando_enviar?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_midias_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_publications: {
         Row: {
           client_id: string

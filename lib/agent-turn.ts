@@ -75,6 +75,17 @@ import type {
 } from "@/lib/agent-diagnostics";
 import { blocoDeOrigem, type OrigemDaCampanha } from "@/lib/prospeccao";
 import { origemDaCampanha } from "@/lib/campanhas-origem";
+import {
+  blocoDeMidias,
+  catalogoDasLinhas,
+  chavesParaOModelo,
+  escolherMidia,
+  marcaDeMidiaEnviada,
+  midiasDisponiveis,
+  type MidiaDoCatalogo,
+  type MidiaDoTurno,
+} from "@/lib/midias";
+import { ehMidiaDaIa, MIDIA_DA_IA } from "@/lib/mensagem";
 
 // Orquestração de um turno do agente. STATELESS por turno; reaproveitável pelas
 // duas rotas: /api/agent (n8n, autenticado pelo segredo) e a bancada de teste
@@ -172,6 +183,18 @@ export interface ProcessTurnParams {
    * Em produção sai das tabelas de prospecção (`origemDaCampanha`).
    */
   origemOverride?: OrigemDaCampanha | null;
+  /**
+   * Só no dryRun: as chaves das mídias já enviadas na conversa de teste (o
+   * script de ensaio guarda do lado dele). Em produção saem de `chat_messages`
+   * (`message_type = 'midia_ia'`).
+   */
+  midiasEnviadas?: string[];
+  /**
+   * Só no dryRun: um catálogo de mídias de teste no lugar de `agent_midias`
+   * (o script de ensaio, `--midias`). Passa pela mesma validação
+   * (`catalogoDasLinhas`).
+   */
+  catalogoOverride?: Parameters<typeof catalogoDasLinhas>[1];
 }
 
 /**
@@ -235,7 +258,7 @@ function personaDoTenant(client: {
 
 export async function processTurn(
   params: ProcessTurnParams
-): Promise<{ output: AgentOutput; diagnostics: TurnDiagnostics }> {
+): Promise<{ output: AgentOutput; diagnostics: TurnDiagnostics; midia?: MidiaDoTurno | null }> {
   const { clientId, phone, apiKey } = params;
   const dryRun = params.dryRun === true;
   const retomada = params.retomada?.instruction?.trim() ? params.retomada : null;
@@ -409,6 +432,14 @@ export async function processTurn(
     return t;
   }
 
+  // Mídias do agente (lib/midias.ts): o catálogo e as já enviadas nesta conversa
+  // correm junto com o resto do turno, só depois dos gates (turno silenciado não
+  // gasta leitura). Best-effort: falhar só tira as mídias.
+  const midiasP =
+    dryRun && params.catalogoOverride
+      ? Promise.resolve({ catalogo: catalogoDasLinhas(clientId, params.catalogoOverride), enviadas: params.midiasEnviadas ?? [] })
+      : lerMidias(svc, clientId, phone, dryRun ? (params.midiasEnviadas ?? []) : null);
+
   // ⚠️ O CADASTRADO, nunca o padrão: sem horário salvo o calendário sai só
   // com datas (`horarioCadastrado`). O avançado também tem horário salvo
   // (`agent_config.hours`, gravado à parte do prompt).
@@ -491,7 +522,7 @@ export async function processTurn(
     const [{ data: rows, error: histErr }, { data: conv }, { data: pedidos }, { data: fila }, daCampanha] = await Promise.all([
       svc
         .from("chat_messages")
-        .select("user_message, bot_message, created_at")
+        .select("user_message, bot_message, created_at, media_url, message_type")
         .eq("client_id", clientId)
         .eq("phone", phone)
         .order("created_at", { ascending: false })
@@ -529,7 +560,10 @@ export async function processTurn(
     const linhas = origem ? comEnvioDaCampanha(rows ?? [], origem, HISTORY_ROWS) : (rows ?? []);
     // As mensagens do lote que está sendo respondido já estão gravadas e vêm no
     // `message`: sem o corte a IA leria cada uma duas vezes (`semLoteAtual`).
-    history = buildHistory(retomada ? linhas : semLoteAtual(linhas, Date.now(), message));
+    // A mídia que a IA já mandou entra no histórico como uma linha da empresa
+    // (`marcaDeMidiaEnviada`): sem ela a IA não saberia que o vídeo foi.
+    const { catalogo: doCatalogo } = await midiasP;
+    history = buildHistory(retomada ? linhas : semLoteAtual(linhas, Date.now(), message), doCatalogo);
     resolvidos = pedidosResolvidos(rows, pedidos);
     abertos = fila ?? [];
     const pend = conv?.pending_instruction ?? null;
@@ -580,6 +614,11 @@ export async function processTurn(
   const listaDoModelo = abertos.filter((p) => (p.summary ?? "").trim() !== "");
 
 
+  // As mídias que ainda podem ir nesta conversa (`### MÍDIAS PARA ENVIAR`).
+  const { catalogo, enviadas } = await midiasP;
+  const disponiveis = retomada ? [] : midiasDisponiveis(catalogo, enviadas);
+  const blocoMidias = blocoDeMidias(disponiveis);
+
   // Modelo. Lança AgentError em falha (a rota mapeia para 502).
   const run = await runAgent({
     persona,
@@ -596,6 +635,8 @@ export async function processTurn(
       ? blocoDaAgenda({ agora: agoraMsAgenda, daPessoa: agenda.daPessoa, servicos: agenda.servicos, config: agenda.config, hours: agenda.hours })
       : null,
     origem: origem ? blocoDeOrigem(origem) : null,
+    // Na retomada a resposta sai pelo "CRM Envio IA", que não manda mídia.
+    midias: blocoMidias ? { bloco: blocoMidias, chaves: chavesParaOModelo(disponiveis) } : null,
   });
   const raw = run.output;
 
@@ -847,9 +888,24 @@ export async function processTurn(
     }
   }
 
+  // MÍDIA DO TURNO (lib/midias.ts): o código confere a chave contra o catálogo
+  // e contra as já enviadas, e assina a URL que o n8n manda à Evolution (1 hora,
+  // como no envio manual). No dryRun nada é assinado nem enviado.
+  const pedida = output.midia;
+  const escolhida = escolherMidia({
+    escolhida: pedida,
+    catalogo: disponiveis,
+    enviadas,
+    guardrailBarrou: guardrail.blocked,
+    retomada: !!retomada,
+  });
+  output = { ...output, midia: escolhida?.chave ?? "" };
+  const midia = escolhida && !dryRun ? await midiaParaEnviar(svc, escolhida) : null;
+
   const diagnostics: TurnDiagnostics = {
     personaOrigem,
     latencyMs: Date.now() - t0,
+    ...(blocoMidias ? { midia: { pedida, enviada: escolhida?.chave ?? null } } : {}),
     action: output.action,
     summary: output.summary,
     preferenciaHorario: output.preferencia_horario,
@@ -897,7 +953,71 @@ export async function processTurn(
     });
   }
 
-  return { output, diagnostics };
+  return { output, diagnostics, midia };
+}
+
+const BUCKET_DAS_MIDIAS = "whatsapp-media";
+
+/**
+ * O catálogo de mídias da empresa (`agent_midias`, ativas) e o que já foi
+ * enviado nesta conversa: no dryRun as chaves vêm do chamador; em produção os
+ * caminhos das linhas `midia_ia` de `chat_messages`. Best-effort: tabela
+ * ausente ou erro de leitura = sem mídia, e o atendimento segue.
+ */
+async function lerMidias(
+  svc: ReturnType<typeof createServiceClient>,
+  clientId: string,
+  phone: string,
+  enviadasDoTeste: string[] | null
+): Promise<{ catalogo: MidiaDoCatalogo[]; enviadas: string[] }> {
+  try {
+    const { data: linhas, error } = await svc
+      .from("agent_midias")
+      .select("chave, tipo, path, mime, nome_arquivo, descricao, quando_enviar, legenda")
+      .eq("client_id", clientId)
+      .eq("ativo", true)
+      .order("created_at", { ascending: true })
+      .limit(10);
+    if (error) throw error;
+    const catalogo = catalogoDasLinhas(clientId, linhas ?? []);
+    // Sem catálogo não há o que conferir: a empresa sem mídia paga só a leitura acima.
+    if (catalogo.length === 0 || enviadasDoTeste) return { catalogo, enviadas: enviadasDoTeste ?? [] };
+    const { data: jaEnviadas } = await svc
+      .from("chat_messages")
+      .select("media_url")
+      .eq("client_id", clientId)
+      .eq("phone", phone)
+      .eq("message_type", MIDIA_DA_IA)
+      .limit(20);
+    const enviadas = (jaEnviadas ?? [])
+      .map((r) => r.media_url)
+      .filter((v): v is string => typeof v === "string" && v !== "");
+    return { catalogo, enviadas };
+  } catch (e) {
+    console.error("falha ao ler as mídias do agente:", e);
+    return { catalogo: [], enviadas: [] };
+  }
+}
+
+/** Assina o arquivo para a Evolution baixar. Falhar = não manda a mídia (as mensagens seguem). */
+async function midiaParaEnviar(
+  svc: ReturnType<typeof createServiceClient>,
+  m: MidiaDoCatalogo
+): Promise<MidiaDoTurno | null> {
+  const { data, error } = await svc.storage.from(BUCKET_DAS_MIDIAS).createSignedUrl(m.path, 3600);
+  if (error || !data?.signedUrl) {
+    console.error("falha ao assinar a mídia do agente:", error?.message ?? "sem url");
+    return null;
+  }
+  return {
+    chave: m.chave,
+    tipo: m.tipo,
+    path: m.path,
+    mime: m.mime,
+    nomeArquivo: m.nomeArquivo,
+    legenda: m.legenda,
+    url: data.signedUrl,
+  };
 }
 
 /**
@@ -1079,6 +1199,7 @@ function silentTurn(
       pedido_aberto: 0,
       informacao_nova: false,
       agenda: SAIDA_DA_AGENDA_VAZIA,
+      midia: "",
     },
     diagnostics: {
       // Turno silenciado não chega a montar persona: nada foi lido do tenant e
@@ -1114,10 +1235,18 @@ function sanitizeHistory(input: ChatTurn[] | undefined): ChatTurn[] {
 
 // Reconstrói o histórico a partir das linhas de chat_messages (produção).
 function buildHistory(
-  rows: { user_message: string | null; bot_message: string | null }[] | null
+  rows: { user_message: string | null; bot_message: string | null; media_url?: string | null; message_type?: string | null }[] | null,
+  catalogo: MidiaDoCatalogo[] = []
 ): ChatTurn[] {
   const history: ChatTurn[] = [];
   for (const r of (rows ?? []).slice().reverse()) {
+    // Mídia que a IA mandou (lib/midias.ts): a linha não tem texto, então vira
+    // uma fala da empresa dizendo o que foi (pela descrição do catálogo).
+    if (ehMidiaDaIa(r.message_type ?? null)) {
+      const m = catalogo.find((c) => c.path === r.media_url) ?? null;
+      history.push({ role: "assistant", content: marcaDeMidiaEnviada(m) });
+      continue;
+    }
     const um = typeof r.user_message === "string" ? r.user_message.trim() : "";
     const bm = typeof r.bot_message === "string" ? r.bot_message.trim() : "";
     if (um) history.push({ role: "user", content: um.slice(0, MAX_TURN_CHARS) });
