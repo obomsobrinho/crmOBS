@@ -16,7 +16,7 @@ const textareaVariants = cva(
     variants: {
       variant: {
         caixa:
-          "min-h-16 rounded-lg border border-line bg-[var(--input-bg)] px-3 py-2 text-apoio transition-colors",
+          "min-h-16 rounded-lg border border-[var(--input-line)] bg-[var(--input-bg)] px-3 py-2 text-apoio transition-colors",
         /** O editor do composer: a moldura é da "casa" em volta, não dele. */
         limpo: "resize-none bg-transparent",
       },

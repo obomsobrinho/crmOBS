@@ -74,6 +74,7 @@ claro daria 1,99:1.
 | `--line` | `oklch(0 0 0 / 8%)` | `oklch(1 0 0 / 10%)` | **borda de cartão** |
 | `--line-soft` | `oklch(0 0 0 / 6%)` | `oklch(1 0 0 / 6%)` | **divisor interno**: cabeçalho, rodapé, separador de lista |
 | `--line-strong` | `oklch(0 0 0 / 18%)` | `oklch(1 0 0 / 22%)` | foco, hover de controle, guia, borda tracejada |
+| `--input-line` | `--line-strong` | `--line` | **moldura de campo**: no claro o campo é branco sobre cartão branco e a borda é o único sinal |
 
 `--line-soft` entrou em 30/08/2026 com o painel. A diferença entre ela e `--line` é o que faz um
 cartão ter contorno **sem parecer uma tabela**.

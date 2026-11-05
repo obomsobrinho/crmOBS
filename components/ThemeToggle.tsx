@@ -24,13 +24,13 @@ export default function ThemeToggle({
    */
   linha?: boolean;
 }) {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
     // Sincroniza com o data-theme que o servidor já colocou no <html>.
     const current = document.documentElement.getAttribute("data-theme");
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTheme(current === "light" ? "light" : "dark");
+    setTheme(current === "dark" ? "dark" : "light");
   }, []);
 
   function toggle() {

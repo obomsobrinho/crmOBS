@@ -43,7 +43,7 @@ function CampoBusca({
       {...props}
       data-slot="campo-busca"
       className={cn(
-        "flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line",
+        "flex h-[var(--h-control)] items-center gap-2 rounded-lg border border-[var(--input-line)] bg-[var(--input-bg)] px-2.5 transition-colors focus-within:border-brand-line",
         className,
       )}
     >
