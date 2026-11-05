@@ -614,12 +614,25 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
   test("a busca nova descarta as categorias da lista pela categoria principal, nunca pela secundária", () => {
     const livre = { ...opcoes, notaMinima: null, site: "todos" as const };
     const itens = [
-      ...CATEGORIAS_DESCARTADAS.map((c, i) => itemDoApify({ title: c, categoryName: c, phone: `+553399999002${i}`, placeId: `d${i}` }, "")),
-      itemDoApify({ title: "Com outra grafia", categoryName: "PONTO DE ONIBUS", phone: "+5533999990030", placeId: "d8" }, ""),
-      itemDoApify({ title: "Lanchonete do Mirante", categoryName: "Lanchonete", categories: ["Lanchonete", "Marco histórico"], phone: "+5533999990031", placeId: "d9" }, ""),
-      itemDoApify({ title: "Sem categoria", phone: "+5533999990032", placeId: "d10" }, ""),
+      ...CATEGORIAS_DESCARTADAS.map((c, i) => itemDoApify({ title: c, categoryName: c, phone: `+55339999900${20 + i}`, placeId: `d${i}` }, "")),
+      itemDoApify({ title: "Com outra grafia", categoryName: "PONTO DE ONIBUS", phone: "+5533999990040", placeId: "d18" }, ""),
+      itemDoApify({ title: "Lanchonete do Mirante", categoryName: "Lanchonete", categories: ["Lanchonete", "Marco histórico"], phone: "+5533999990041", placeId: "d19" }, ""),
+      itemDoApify({ title: "Sem categoria", phone: "+5533999990042", placeId: "d20" }, ""),
+      // Fora da lista por decisão do dono: podem ser cliente bom.
+      ...["Jardim", "Escola de educação geral", "Pré-escola", "Apartamentos", "Complexo habitacional"].map((c, i) =>
+        itemDoApify({ title: c, categoryName: c, phone: `+55339999900${50 + i}`, placeId: `f${i}` }, ""),
+      ),
     ];
-    expect(filtrarPelasOpcoes(itens, livre).map((i) => i.nome)).toEqual(["Lanchonete do Mirante", "Sem categoria"]);
+    expect(CATEGORIAS_DESCARTADAS).toHaveLength(10);
+    expect(filtrarPelasOpcoes(itens, livre).map((i) => i.nome)).toEqual([
+      "Lanchonete do Mirante",
+      "Sem categoria",
+      "Jardim",
+      "Escola de educação geral",
+      "Pré-escola",
+      "Apartamentos",
+      "Complexo habitacional",
+    ]);
   });
 
   test("filtrarPelasOpcoes aplica nota, site e fechadas do nosso lado e tira os repetidos", () => {
