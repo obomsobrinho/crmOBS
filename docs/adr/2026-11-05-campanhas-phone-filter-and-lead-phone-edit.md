@@ -1,6 +1,6 @@
-# Campanhas: filter leads by phone and add a mobile number to a lead
+# Campanhas: filter leads by phone, add a mobile number to a lead, discard non-business categories
 - Date: 2026-11-05
-- Status: Proposed (the screens await the owner's check; the migration is not applied until he says so)
+- Status: Accepted (owner on 05/11/2026: "mete bronca, são coisas simples"; the cut of the discard list below was read from that message and is his to revisit)
 - Area: admin, product
 
 ## Context
@@ -19,6 +19,14 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
   and on the route); a number already on another lead is refused (no duplicate leads).
 - **Only a lead with no history** (`leadSemHistorico`) changes number: the cron reads replies and SAIR by the
   lead's number, so changing it after a send would lose them.
+
+- **Discard**: a search with no term brings every place in the area, so `Todas as empresas mutum mg`
+  (02/11/2026, 1 km) brought squares and bus stops. `CATEGORIAS_DESCARTADAS` (`lib/fonte-de-leads.ts`) drops
+  four real categories in `filtrarPelasOpcoes`, by the MAIN category only, so a snack bar whose second
+  category is "Marco histórico" stays. Left out because they can drop good clients: Jardim, Escola,
+  Pré-escola, Apartamentos. Squares, churches and the city hall need the source's real category name:
+  the X had deleted those leads, and only their names are in `admin_acoes`. A list entry is never a guess.
+  Only new searches are affected: no existing lead is deleted.
 
 ## Consequences
 A new search that finds the lead again keeps the typed number: `prospeccao_concluir_busca` never rewrites

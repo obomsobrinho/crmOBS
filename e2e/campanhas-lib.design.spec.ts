@@ -58,7 +58,7 @@ import {
 } from "../lib/prospeccao";
 import { TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
 import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../lib/planilha-de-leads";
-import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
+import { CATEGORIAS_DESCARTADAS, filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
 import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
 import { grafiasDoTelefone, normalizar } from "../lib/clientes";
@@ -609,6 +609,17 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
     expect(torto.lat).toBeNull();
     expect(torto.horarios).toEqual([{ dow: 1, faixas: [[600, 720]] }]);
     expect(torto.distribuicao).toBeNull();
+  });
+
+  test("a busca nova descarta as categorias da lista pela categoria principal, nunca pela secundária", () => {
+    const livre = { ...opcoes, notaMinima: null, site: "todos" as const };
+    const itens = [
+      ...CATEGORIAS_DESCARTADAS.map((c, i) => itemDoApify({ title: c, categoryName: c, phone: `+553399999002${i}`, placeId: `d${i}` }, "")),
+      itemDoApify({ title: "Com outra grafia", categoryName: "PONTO DE ONIBUS", phone: "+5533999990030", placeId: "d8" }, ""),
+      itemDoApify({ title: "Lanchonete do Mirante", categoryName: "Lanchonete", categories: ["Lanchonete", "Marco histórico"], phone: "+5533999990031", placeId: "d9" }, ""),
+      itemDoApify({ title: "Sem categoria", phone: "+5533999990032", placeId: "d10" }, ""),
+    ];
+    expect(filtrarPelasOpcoes(itens, livre).map((i) => i.nome)).toEqual(["Lanchonete do Mirante", "Sem categoria"]);
   });
 
   test("filtrarPelasOpcoes aplica nota, site e fechadas do nosso lado e tira os repetidos", () => {

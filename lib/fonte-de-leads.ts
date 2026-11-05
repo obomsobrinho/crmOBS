@@ -50,6 +50,15 @@ export interface FonteDeLeads {
 }
 
 /**
+ * As categorias principais do Google que nunca viram cliente: a busca sem termo traz tudo da área, praça e
+ * ponto de ônibus também (05/11/2026). A lista é do dono. Para acrescentar, use o nome que a FONTE traz em
+ * `categoryName`, nunca um palpite. Vale só para busca nova: lead que já está na base não sai.
+ */
+export const CATEGORIAS_DESCARTADAS = ["Ponto de ônibus", "Marco histórico", "Ginásio poliesportivo", "Universidade pública"] as const;
+
+const DESCARTADAS = new Set<string>(CATEGORIAS_DESCARTADAS.map(normalizar));
+
+/**
  * O que a busca pediu, conferido do NOSSO lado também: a fonte pode ignorar um
  * filtro (os valores aceitos ainda não foram vistos numa execução real), e a base
  * não deve receber o que o dono mandou deixar de fora. Repetidos pelo celular ou
@@ -59,6 +68,7 @@ export function filtrarPelasOpcoes(itens: ItemDaFonteDeLeads[], o: OpcoesDaBusca
   const vistos = new Set<string>();
   return itens.filter((i) => {
     if (o.ignorarFechados && i.fechado) return false;
+    if (DESCARTADAS.has(normalizar(i.segmento ?? ""))) return false;
     if (o.notaMinima !== null && (i.nota === null || i.nota < o.notaMinima)) return false;
     if (o.minAvaliacoes !== null && (i.avaliacoes ?? 0) < o.minAvaliacoes) return false;
     if (!daCategoria(i, o.categorias)) return false;
