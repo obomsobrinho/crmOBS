@@ -162,7 +162,8 @@
           "id": "NhrloDUqGVTkh9Xq",
           "name": "Evo Global"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "midia-ia-imagem",
@@ -192,7 +193,8 @@
           "id": "NhrloDUqGVTkh9Xq",
           "name": "Evo Global"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "id": "midia-ia-salva",
@@ -328,6 +330,13 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Action",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
@@ -336,6 +345,13 @@
         [
           {
             "node": "Salva mídia da IA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action",
             "type": "main",
             "index": 0
           }
