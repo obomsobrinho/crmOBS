@@ -33,7 +33,18 @@ import type { ItemDaFonteDeLeads, LeituraDaExecucao } from "./fonte-de-leads";
  * ponto de ônibus também (05/11/2026). A lista é do dono. Para acrescentar, use o nome que a fonte traz em
  * `categoryName`, nunca um palpite. Vale só para busca nova: lead que já está na base não sai.
  */
-export const CATEGORIAS_DESCARTADAS = ["Ponto de ônibus", "Marco histórico", "Ginásio poliesportivo", "Universidade pública"] as const;
+export const CATEGORIAS_DESCARTADAS = [
+  "Ponto de ônibus",
+  "Marco histórico",
+  "Ginásio poliesportivo",
+  "Universidade pública",
+  "Igreja católica",
+  "Parque",
+  "Escola pública",
+  "Centro médico público",
+  "Correios",
+  "Atração turística",
+] as const;
 
 const DESCARTADAS = new Set<string>(CATEGORIAS_DESCARTADAS.map(normalizar));
 

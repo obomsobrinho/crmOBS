@@ -25,7 +25,10 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
   category is "Marco histórico" stays. Left out because they can drop good clients: Jardim, Escola,
   Pré-escola, Apartamentos. Squares, churches and the city hall need the source's real category name:
   the X had deleted those leads, and only their names are in `admin_acoes`. A list entry is never a guess.
-  Only new searches are affected: no existing lead is deleted.
+  Only new searches are affected: no existing lead is deleted. The owner then cut six more from the
+  names in the run's dataset (`OKDFBgFUOJDxSXlR7`): Igreja católica, Parque, Escola pública, Centro médico
+  público, Correios, Atração turística. Out by his cut: Jardim, Escola de educação geral, Pré-escola,
+  Apartamentos, Complexo habitacional. The city hall has no known category, so it is not listed.
 
 ## Consequences
 A new search that finds the lead again keeps the typed number: `prospeccao_concluir_busca` never rewrites

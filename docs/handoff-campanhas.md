@@ -5,10 +5,9 @@
 Decisões e porquê: `docs/adr/2026-11-05-campanhas-phone-filter-and-lead-phone-edit.md`. Migration
 `20261105135447` aplicada, tipos regenerados.
 
-Para o Franck decidir: o corte da lista `CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`) foi lido do "mete bronca",
-não escolhido item a item. Jardim, Escola, Pré-escola e Apartamentos ficaram de fora. Praça, igreja e prefeitura
-precisam do nome real da categoria: o X apagou esses leads, e o `admin_acoes` guarda só o nome. Os resultados
-da busca seguem no Apify (execução `uxwtPIOwyBhMJvWcU`), mas o `APIFY_TOKEN` só existe na Vercel.
+`CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`) tem 10 categorias, as 6 últimas cortadas pelo Franck a partir
+dos nomes reais do dataset `OKDFBgFUOJDxSXlR7`. Ficam de fora: Jardim, Escola de educação geral, Pré-escola,
+Apartamentos e Complexo habitacional. Prefeitura não tem categoria conhecida e não entra por palpite.
 
 ## Rodada de 05/11/2026: ajustes do teste de 04/11 (branch `claude/campanhas-ajustes-348e3b`)
 
