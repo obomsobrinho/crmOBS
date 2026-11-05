@@ -45,6 +45,7 @@ import {
   travaSemAgenda,
   blocoDaAgenda,
   consultaDeSeguranca,
+  consultaBarradaNaAbertura,
   saidaComODiaDaPessoa,
   decidirAgenda,
   horarioDaAgenda,
@@ -676,7 +677,17 @@ export async function processTurn(
   // passou para o time "para ver horário"): o código consulta no lugar dele
   // (`consultaDeSeguranca`, lib/agenda.ts). Nunca com o guardrail barrando.
   if (agenda && !guardrail.blocked) {
-    const rede = consultaDeSeguranca({
+    // Primeira resposta a um lead de campanha que não pediu horário: nada de
+    // lista de horários (`consultaBarradaNaAbertura`, lib/agenda.ts). Decidido
+    // ANTES da rede, para um pedido de ajuda do modelo seguir intacto.
+    const barrada = consultaBarradaNaAbertura({
+      daCampanha: origem !== null,
+      // O envio da campanha entra no histórico como fala da empresa (`comEnvioDaCampanha`).
+      respostasAntes: Math.max(0, history.filter((t) => t.role === "assistant").length - 1),
+      mensagem: retomada ? null : message || null,
+      agora: agoraMsAgenda,
+    });
+    const rede = !barrada && consultaDeSeguranca({
       mensagem: message || null,
       resposta: output.messages.join(" "),
       action: output.action,
@@ -690,6 +701,7 @@ export async function processTurn(
       output = { ...output, action: "none", summary: "", agenda: { ...output.agenda, acao: "consultar", dia: rede.dia, periodo: rede.periodo } };
     }
     output = { ...output, agenda: saidaComODiaDaPessoa(output.agenda, message || null, agoraMsAgenda) };
+    if (barrada && output.agenda.acao === "consultar") output = { ...output, agenda: { ...output.agenda, acao: "" } };
   }
   // Pedido de ajuda (do modelo ou do guardrail que barrou) ganha da agenda: o
   // turno segue como pausar, sem marcar nem oferecer, e o time assume.

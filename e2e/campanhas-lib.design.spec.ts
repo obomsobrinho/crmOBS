@@ -17,7 +17,11 @@ import {
   OPCOES_PADRAO,
   PAUSA_MINUTOS,
   TETO_DIARIO,
+  campanhaAindaEnvia,
   contagemPorSemana,
+  leadSaiDaBase,
+  previsaoDaFila,
+  dentroDaJanela,
   diaDaSemanaSP,
   ehPedidoParaParar,
   faixaDaNota,
@@ -73,6 +77,51 @@ const H = 60 * MIN;
 const AGORA = Date.parse("2026-10-29T13:00:00Z");
 const HOJE = diaIsoSP(AGORA);
 const as = (dia: string, hora: number, min = 0) => inicioDoDiaSP(dia) + hora * H + min * MIN;
+
+test.describe("Previsão da fila (previsaoDaFila) e o que pode ser apagado (ajustes de 04/11/2026)", () => {
+  // 02/11/2026 é uma segunda.
+  const SP = as;
+  const dia = diaIsoSP;
+
+  test("parte do próximo envio gravado, fica na janela e passa para o dia seguinte depois do teto", () => {
+    const p = previsaoDaFila({ agora: SP("2026-11-02", 8), proximoEnvioEm: SP("2026-11-02", 8, 30), enviadosHoje: 0, agendadaPara: null }, 12);
+    expect(p).toHaveLength(12);
+    expect(p[0]).toBe(SP("2026-11-02", 8, 30));
+    expect(p.slice(0, TETO_DIARIO).every((t) => dia(t) === "2026-11-02")).toBe(true);
+    expect(p.slice(TETO_DIARIO).every((t) => dia(t) === "2026-11-03")).toBe(true);
+    expect(p.every((t, i) => i === 0 || t > p[i - 1])).toBe(true);
+    expect(p.every((t) => dentroDaJanela(t))).toBe(true);
+  });
+
+  test("a cota de hoje já cheia e o sábado pulam para a próxima abertura; domingo nunca", () => {
+    const p = previsaoDaFila({ agora: SP("2026-11-07", 17), proximoEnvioEm: null, enviadosHoje: TETO_DIARIO, agendadaPara: null }, 1);
+    expect(dia(p[0])).toBe("2026-11-09");
+  });
+
+  test("uma campanha iniciada de tarde recupera no mesmo dia, como o cron (a pausa, não a faixa)", () => {
+    const p = previsaoDaFila({ agora: SP("2026-11-02", 15), proximoEnvioEm: SP("2026-11-02", 15, 10), enviadosHoje: 0, agendadaPara: null }, 3);
+    expect(p.every((t) => dia(t) === "2026-11-02")).toBe(true);
+    expect(p[2] - p[0]).toBeLessThan(2 * PAUSA_MINUTOS[1] * 60_000 + 600_000);
+  });
+
+  test("uma agendada começa no início marcado, com a conta do dia zerada", () => {
+    const p = previsaoDaFila({ agora: SP("2026-11-02", 9), proximoEnvioEm: null, enviadosHoje: 4, agendadaPara: SP("2026-11-04", 8) }, 1);
+    expect(dia(p[0])).toBe("2026-11-04");
+    expect(horaSP(p[0])).toBe(8);
+  });
+
+  test("sem ninguém na fila, nenhuma previsão", () => {
+    expect(previsaoDaFila({ agora: SP("2026-11-02", 9), proximoEnvioEm: null, enviadosHoje: 0, agendadaPara: null }, 0)).toEqual([]);
+  });
+
+  test("só apaga campanha parada; a base só perde quem nunca foi contatado nem pediu para parar", () => {
+    expect(campanhaAindaEnvia("rascunho") || campanhaAindaEnvia("pausada") || campanhaAindaEnvia("concluida")).toBe(false);
+    expect(campanhaAindaEnvia("rodando") && campanhaAindaEnvia("agendada")).toBe(true);
+    expect(leadSaiDaBase({ parouEm: null, campanhas: 0 })).toBe(true);
+    expect(leadSaiDaBase({ parouEm: null, campanhas: 1 })).toBe(false);
+    expect(leadSaiDaBase({ parouEm: 1, campanhas: 0 })).toBe(false);
+  });
+});
 
 test.describe("Agenda de envio (proximoEnvioEm)", () => {
   test("espalha: o envio N do dia cai na faixa N da janela, nunca antes de agora mais a pausa mínima", () => {

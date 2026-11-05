@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Circle, CircleMarker, Map as MapaLeaflet, Marker } from "leaflet";
+import { LocateFixed } from "lucide-react";
 import "leaflet/dist/leaflet.css";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ROTULO_NO_MAPA } from "@/lib/prospeccao";
 import type { AreaAnterior, PontoNoMapa } from "./tipos";
@@ -167,15 +169,32 @@ export default function Mapa({
       circulo.current = L.circle(ponto, { radius: area.raioKm * 1000, className: "area-do-mapa", weight: 2, fillOpacity: 0.12, interactive: false }).addTo(m);
     } else circulo.current.setLatLng(ponto).setRadius(area.raioKm * 1000);
     // O círculo inteiro à vista, e os pinos também (no detalhe, um lead pode ficar fora do raio).
-    const caixa = circulo.current.getBounds();
+    m.fitBounds(caixaDoMapa(L), { padding: [16, 16], animate: false });
+  }
+
+  /** O que há no mapa: os pinos e o círculo. */
+  function caixaDoMapa(L: typeof import("leaflet")) {
+    const caixa = L.latLngBounds([]);
     for (const pino of pinos.current.values()) caixa.extend(pino.getLatLng());
-    m.fitBounds(caixa, { padding: [16, 16], animate: false });
+    if (circulo.current) caixa.extend(circulo.current.getBounds());
+    return caixa;
   }
 
   function olharPara() {
     const m = mapa.current;
     if (!m || area || pontos.length > 0 || !vista) return;
     m.setView([vista.lat, vista.lng], vista.zoom, { animate: false });
+  }
+
+  /** O botão de centralizar: volta a enquadrar os pinos e o círculo depois do zoom e do arrasto do dono. */
+  function centralizarTudo() {
+    const L = leaflet.current;
+    const m = mapa.current;
+    if (!L || !m) return;
+    const caixa = caixaDoMapa(L);
+    if (caixa.isValid()) m.fitBounds(caixa, { padding: [24, 24], maxZoom: 15 });
+    else if (area) m.setView([area.lat, area.lng], 12);
+    else olharPara();
   }
 
   useEffect(() => {
@@ -218,12 +237,21 @@ export default function Mapa({
   }, [destaque, centralizar, pontos]);
 
   return (
-    <div
-      ref={elemento}
-      role="img"
-      aria-label={rotulo}
-      className={cn("mapa-da-busca relative z-0 overflow-hidden rounded-lg border border-line", className)}
-      {...props}
-    />
+    <div className={cn("relative z-0", className)}>
+      <div ref={elemento} role="img" aria-label={rotulo} className="mapa-da-busca absolute inset-0 isolate overflow-hidden rounded-lg border border-line" {...props} />
+      {/* Fora do elemento do Leaflet: o clique aqui nunca vira um clique no mapa (que move o centro). O `isolate` acima segura as camadas dele (z-index 400) abaixo deste botão. */}
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-control"
+        aria-label="Centralizar o mapa"
+        title="Centralizar o mapa"
+        onClick={centralizarTudo}
+        className="absolute right-2.5 top-2.5 z-10 bg-raised"
+        data-slot="mapa-centralizar"
+      >
+        <LocateFixed aria-hidden />
+      </Button>
+    </div>
   );
 }

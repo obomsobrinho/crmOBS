@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
@@ -142,10 +143,22 @@ export function BarraDaTabela({
   );
 }
 
-/** A grade das colunas: só no desktop largo; abaixo dele cada linha empilha. */
-export function CabecalhoDaTabela({ grade, colunas }: { grade: string; colunas: string[] }) {
+/**
+ * O botão de apagar no fim de uma linha (fora da grade, ao lado do botão da linha). O `comAcao` do
+ * cabeçalho reserva a largura dele: 28 do botão, 12 da margem e 20 do `px-5`.
+ */
+export function BotaoDeApagarDaLinha({ rotulo, aoClicar, slot }: { rotulo: string; aoClicar: () => void; slot: string }) {
   return (
-    <div aria-hidden className={cn("hidden border-b border-line px-5 py-2.5 text-rotulo uppercase text-ink-3", grade)}>
+    <Button variant="danger-ghost" size="icon-chrome" aria-label={rotulo} onClick={aoClicar} className="mr-3 shrink-0" data-slot={slot}>
+      <Trash2 aria-hidden />
+    </Button>
+  );
+}
+
+/** A grade das colunas: só no desktop largo; abaixo dele cada linha empilha. `comAcao` = a linha tem o `BotaoDeApagarDaLinha`. */
+export function CabecalhoDaTabela({ grade, colunas, comAcao = false }: { grade: string; colunas: string[]; comAcao?: boolean }) {
+  return (
+    <div aria-hidden className={cn("hidden border-b border-line px-5 py-2.5 text-rotulo uppercase text-ink-3", comAcao && "pr-[60px]", grade)}>
       {colunas.map((c, i) => (
         <span key={`${c}-${i}`}>{c}</span>
       ))}

@@ -15,10 +15,11 @@ import { diaMesHoraSP } from "@/lib/fuso";
 import { PERIODOS, type PeriodoKey } from "@/lib/periodo";
 import { DIAS_DA_LINHA, textoDoDiaDeEnvio, type SituacaoDaCampanha } from "@/lib/prospeccao";
 import { useDebounce } from "@/lib/use-debounce";
+import { ApagarCampanha } from "./Apagar";
 import PainelDeResultados from "./PainelDeResultados";
 import { SeloDaCampanha, haQuanto, textoDaTaxa } from "./pecas";
-import { BarraDaTabela, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
-import { somaDe, type CampanhaDaTabela, type ConexaoDisponivel, type FonteDeCampanhas, type Totais } from "./tipos";
+import { BarraDaTabela, BotaoDeApagarDaLinha, CabecalhoDaTabela, CorpoDaTabela, RodapeDaTabela, useLeitura, usePaginaDaFonte } from "./tabela";
+import { somaDe, type CampanhaDaTabela, type ConexaoDisponivel, type FonteDeCampanhas, type Pagina, type Totais } from "./tipos";
 
 // CAMPANHAS: o painel de resultados no topo (todas as campanhas ou uma, no
 // período) e embaixo a tabela de campanhas, 10 por página, com busca pelo nome
@@ -41,11 +42,13 @@ function LinhaDaCampanha({
   conexoes,
   agora,
   abrir,
+  apagar,
 }: {
   campanha: CampanhaDaTabela;
   conexoes: ConexaoDisponivel[];
   agora: number;
   abrir: () => void;
+  apagar: () => void;
 }) {
   const numero = conexoes.find((c) => c.id === campanha.conexaoId);
   const rascunho = campanha.situacao === "rascunho";
@@ -58,14 +61,14 @@ function LinhaDaCampanha({
   );
 
   return (
-    <li>
+    <li className="flex items-center">
       <Button
         variant="linha"
         size="none"
         onClick={abrir}
         data-slot="campanha-linha"
         data-campanha={campanha.id}
-        className={`flex w-full flex-wrap items-center gap-x-5 gap-y-2 rounded-none px-5 py-3.5 text-left ${GRADE}`}
+        className={`flex min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-2 rounded-none px-5 py-3.5 text-left ${GRADE}`}
       >
         <span className="min-w-0 basis-full xl:basis-auto">
           <span className="block truncate text-corpo font-semibold text-ink">{campanha.nome || "Campanha sem nome"}</span>
@@ -119,6 +122,7 @@ function LinhaDaCampanha({
         </span>
         <ChevronRight size={16} aria-hidden className="ml-auto text-ink-3 xl:ml-0" />
       </Button>
+      <BotaoDeApagarDaLinha rotulo={`Apagar ${campanha.nome || "campanha sem nome"}`} aoClicar={apagar} slot="campanha-apagar" />
     </li>
   );
 }
@@ -128,23 +132,29 @@ function AbaCampanhas({
   fonte,
   versao,
   totais,
+  inicial,
   conexoes,
   agora,
   abrir,
   editar,
   nova,
+  aoApagar,
 }: {
-  /** O seletor Leads | Campanhas, no canto esquerdo da linha de cima. */
+  /** O seletor Campanhas | Leads, no canto esquerdo da linha de cima. */
   abas: React.ReactNode;
   fonte: FonteDeCampanhas;
   /** Muda depois de cada escrita: as leituras desta aba voltam ao servidor. */
   versao: number;
   totais: Totais | null;
+  /** A primeira página que o servidor já leu (recorte padrão). */
+  inicial: Pagina<CampanhaDaTabela> | null;
   conexoes: ConexaoDisponivel[];
   agora: number;
   abrir: (id: string) => void;
   editar: (id: string) => void;
   nova: () => void;
+  /** Uma campanha apagada (as outras telas leem de novo). */
+  aoApagar: (id: string) => void;
 }) {
   // ── O painel: período e campanha ──
   const [periodo, setPeriodo] = useState<PeriodoKey>("mes");
@@ -160,7 +170,8 @@ function AbaCampanhas({
   const busca = useDebounce(q.trim(), 300);
   const [situacao, setSituacao] = useState<SituacaoDaCampanha | null>(null);
   const ler = useCallback((pagina: number) => fonte.campanhas({ texto: busca, situacao, pagina }), [fonte, busca, situacao]);
-  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao);
+  const tabela = usePaginaDaFonte(`${busca}|${situacao ?? ""}`, ler, versao, inicial);
+  const [apagando, setApagando] = useState<CampanhaDaTabela | null>(null);
   const contagens = totais?.campanhas;
   const todas = somaDe(contagens);
 
@@ -253,6 +264,7 @@ function AbaCampanhas({
           <h3 className="text-cartao text-ink">Campanhas</h3>
         </BarraDaTabela>
         <CabecalhoDaTabela
+          comAcao
           grade={GRADE}
           colunas={["Campanha", "Situação", "Progresso", "Respostas", `${DIAS_DA_LINHA} dias`, "Quando", ""]}
         />
@@ -271,12 +283,23 @@ function AbaCampanhas({
                 conexoes={conexoes}
                 agora={agora}
                 abrir={() => (c.situacao === "rascunho" ? editar(c.id) : abrir(c.id))}
+                apagar={() => setApagando(c)}
               />
             ))}
           </ul>
         </CorpoDaTabela>
         <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="campanhas" lido={tabela.lido} />
       </Card>
+      <ApagarCampanha
+        campanha={apagando}
+        fonte={fonte}
+        aoFechar={() => setApagando(null)}
+        aoApagar={() => {
+          // O painel não fica olhando uma campanha que saiu do seletor.
+          if (apagando?.id === escolhida) setEscolhida("todas");
+          if (apagando) aoApagar(apagando.id);
+        }}
+      />
     </div>
   );
 }

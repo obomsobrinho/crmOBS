@@ -1,5 +1,15 @@
 # Handoff: Campanhas v2
 
+## Rodada de 05/11/2026: ajustes do teste de 04/11 (branch `claude/campanhas-ajustes-348e3b`)
+
+Abas na ordem Campanhas e Leads, apagar campanha e lista, X com confirmação, "bom" como favorito, centralizar
+o mapa, ordem e previsão da fila. Decisões tomadas sem o Franck e o porquê:
+`docs/adr/2026-11-05-campanhas-delete-triage-and-queue-forecast.md`. Migrations `20261105024006` e
+`20261105034529` aplicadas, tipos regenerados.
+
+Para ele decidir: um segundo nível para "razoável" (`marcacao` só aceita `bom` e `descartado`) e se o X de
+Todos os leads deve descartar quem já foi contatado (hoje o botão não aparece nesses).
+
 ## Rodada de 02/11/2026: busca da área inteira, filtros na tabela, planilha (branch `claude/campanhas-busca-ampla`)
 
 Decisões do Franck e o porquê: `docs/adr/2026-11-02-campanhas-wide-search-filters-in-the-list.md`.
