@@ -17,7 +17,7 @@
 
 import { DAY_LABEL, normalizeHours, type BusinessHours, type DayKey } from "./agent-prompt";
 import { diaIsoSP, diaMes, inicioDoDiaSP, somarDias } from "./fuso";
-import { horaTexto, minutosAgoraSP } from "./horarios";
+import { horariosCitados, horaTexto, minutosAgoraSP } from "./horarios";
 import { feriadoDoDia, type Feriado } from "./feriados";
 
 const MIN = 60_000;
@@ -718,12 +718,26 @@ export function pedidoDeHorario(mensagem: string, agora: number): { dia: string;
 }
 
 /**
+ * A PESSOA fala em marcar: pede para marcar, agendar, reservar ou uma consulta,
+ * pergunta se tem horário livre, ou fala de período ("manhã ou tarde"). A palavra
+ * "horário" sozinha NÃO conta (04/11/2026, ensaio com lead simulado: "fora do
+ * horário ninguém responde", "qual o horário de vocês hoje?" viravam lista de
+ * horários). Saudação ("bom dia", "boa tarde") também não, nem aqui nem em
+ * `pedidoDeHorario`. "Agendamento" e "agenda" como assunto também não: só o
+ * verbo ("agendar", "agenda pra mim"); "Hoje aqui chega mais pedido de
+ * agendamento" era conversa sobre o produto e virava lista de horários.
+ */
+export function falaEmMarcar(mensagem: string): boolean {
+  return /\bmarc(ar|o|amos|ação|ado|ada)\b|\bmarca (pra|para|um|uma|a[ií])\b|\bmarque\b|\bagend(ar|e|o|amos|ou|ado|ada)\b|\bagenda (pra|para|um|uma|a[ií])\b|reserv|consulta|hor[aá]rios? (livres?|dispon[ií]ve(l|is)|vagos?)|\b(tem|ter[aá]|algum|outro|h[aá]) hor[aá]rio|per[ií]odo|manh[ãa] ou (à |a )?tarde/i.test(mensagem);
+}
+
+/**
  * REDE DO CÓDIGO (29/10/2026, teste do dono na OBS): com a agenda ligada, a
  * pessoa disse um dia e o modelo NÃO consultou (perguntou "manhã ou tarde?"
  * seguindo o texto da empresa, ou passou para o time "para ver os horários").
- * Se a conversa é sobre horário (a mensagem ou a resposta falam em marcar,
- * horário ou período), o código consulta no lugar dele. Nunca passa por cima de
- * um pedido de ajuda de outro motivo (pessoa, reclamação, manipulação...).
+ * Se a pessoa fala em marcar, ou o modelo perguntou o período ou pediu ajuda
+ * para ver horário, o código consulta no lugar dele. Nunca passa por cima de um
+ * pedido de ajuda de outro motivo (pessoa, reclamação, manipulação...).
  */
 export function consultaDeSeguranca(a: {
   mensagem: string | null;
@@ -745,12 +759,42 @@ export function consultaDeSeguranca(a: {
   // Com pedido de ajuda, só a consulta é refeita (cancelar e confirmar ficam com o time).
   if (a.action === "pausar" && a.acao !== "" && a.acao !== "consultar") return null;
   const sobreHorario = /hor[aá]rio|per[ií]odo|marcar|agend|reserv|manh[ãa] ou (à |a )?tarde|consulta/i;
-  if (!sobreHorario.test(a.mensagem) && !sobreHorario.test(a.resposta)) return null;
+  // ⚠️ 04/11/2026, ensaio com lead simulado: a resposta do PRÓPRIO modelo
+  // ("posso agendar uma demonstração") bastava para o código consultar quem só
+  // disse "hoje to sem tempo, me explica". Agora a resposta só conta nos dois
+  // casos de 29/10: o modelo perguntou "manhã ou tarde?" ou pediu ajuda para ver
+  // horário (fechar/falta_info, já filtrado acima).
+  const perguntouPeriodo = /manh[ãa] ou (à |a )?tarde/i.test(a.resposta);
+  if (!falaEmMarcar(a.mensagem) && !perguntouPeriodo && !(a.action === "pausar" && sobreHorario.test(a.resposta))) return null;
   const daMensagem = pedidoDeHorario(a.mensagem, a.agora);
   if (daMensagem) return daMensagem;
   // O dia dito antes na conversa, que o modelo já pôs na consulta.
   const doModelo = a.acao === "consultar" && a.dia ? diaDaSaida(a.dia, a.agora) : null;
   return doModelo ? { dia: doModelo, periodo: a.periodo && ehPeriodo(a.periodo) ? a.periodo : "" } : null;
+}
+
+/**
+ * ABERTURA DE CAMPANHA (04/11/2026, ensaio com lead simulado): na PRIMEIRA
+ * resposta a quem recebeu uma mensagem de prospecção, a pessoa ainda não pediu
+ * nada; o modelo (ou a rede acima) consultava a agenda e o sistema trocava a
+ * resposta por uma lista de horários para quem só disse "bom dia, me explica
+ * por aqui". Barra o `consultar` nesse turno, a menos que a mensagem da pessoa
+ * fale em marcar ou traga um dia com período ou hora.
+ */
+export function consultaBarradaNaAbertura(a: {
+  /** A conversa nasceu de uma campanha (`origemDaCampanha`). */
+  daCampanha: boolean;
+  /** Respostas da empresa no histórico, sem contar o envio da campanha. */
+  respostasAntes: number;
+  mensagem: string | null;
+  agora: number;
+}): boolean {
+  if (!a.daCampanha || a.respostasAntes > 0 || !a.mensagem) return false;
+  if (falaEmMarcar(a.mensagem)) return false;
+  // Um dia solto não basta ("hoje depende da recepção", a resposta natural à
+  // pergunta da campanha): só com período ou hora ("pode ser amanhã às 10").
+  const p = pedidoDeHorario(a.mensagem, a.agora);
+  return !(p && (p.periodo !== "" || horariosCitados(a.mensagem).length > 0));
 }
 
 /**
@@ -784,6 +828,11 @@ export function blocoDaAgenda(a: {
   const linhas = [
     "### AGENDA",
     "A empresa marca horários pela conversa, e o sistema confere a agenda. Você não sabe quais horários estão livres: nunca diga um horário por conta própria.",
+    // ⚠️ 04/11/2026, ensaio com lead simulado (6 de 48 conversas): com a agenda
+    // ligada, o modelo consultava já na primeira resposta a quem só cumprimentou
+    // ou pediu explicação ("pode me explicar por aqui? não tenho tempo pra
+    // ligação"), e o sistema trocava a resposta dele por uma lista de horários.
+    'Os passos abaixo só valem quando a pessoa quer marcar: ela pediu para marcar, remarcar ou ver horário, ou aceitou um convite seu para marcar. Cumprimento, pergunta sobre como funciona, preço, pedido de explicação pela conversa ou recusa de ligação NUNCA é agenda.acao "consultar": responda o que ela perguntou, com agenda.acao vazia. Nunca escolha o dia por ela. Saudação ("bom dia", "boa tarde", "boa noite") não é a pessoa dizendo um dia ou período, nem uma palavra de tempo no meio de outro assunto ("hoje a gente usa outro sistema", "fora do horário ninguém responde").',
     varios
       ? "1. Se ainda não sabe o serviço, pergunte qual é (lista abaixo)."
       : "1. Só há um serviço: não pergunte qual.",

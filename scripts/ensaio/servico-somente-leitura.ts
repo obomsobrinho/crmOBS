@@ -1,5 +1,6 @@
 // Caminho relativo de propósito: o alias do script troca só `@/lib/supabase/service`.
 import { createServiceClient as clienteDeVerdade } from "../../lib/supabase/service";
+import { buscarTrechos, quantosTrechos, ragEmMemoriaAtivo } from "./rag-em-memoria";
 
 // O `createServiceClient` do ensaio do prompt (scripts/ensaio-do-prompt.mjs troca
 // `@/lib/supabase/service` por este arquivo). Lê o banco de verdade, mas TODA
@@ -14,18 +15,23 @@ const RPC_DE_LEITURA = new Set(["match_knowledge_chunks"]);
 /** O que foi barrado nesta execução, para o relatório. */
 export const escritasBarradas: string[] = [];
 
-/** Um resultado vazio que aceita qualquer encadeamento (`.select().single()`) e pode ser aguardado. */
-function nada(rotulo: string): unknown {
-  escritasBarradas.push(rotulo);
-  const vazio = { data: null, error: null, count: null, status: 200, statusText: "ensaio" };
+/** Um resultado pronto que aceita qualquer encadeamento e pode ser aguardado. */
+function resposta(r: { data: unknown; count: number | null }): unknown {
+  const v = { ...r, error: null, status: 200, statusText: "ensaio" };
   const cadeia: unknown = new Proxy(function () {}, {
     get: (_alvo, chave) =>
       chave === "then"
-        ? (ok: (v: typeof vazio) => unknown, falha: (e: unknown) => unknown) => Promise.resolve(vazio).then(ok, falha)
+        ? (ok: (x: typeof v) => unknown, falha: (e: unknown) => unknown) => Promise.resolve(v).then(ok, falha)
         : () => cadeia,
     apply: () => cadeia,
   });
   return cadeia;
+}
+
+/** Um resultado vazio que aceita qualquer encadeamento (`.select().single()`) e pode ser aguardado. */
+function nada(rotulo: string): unknown {
+  escritasBarradas.push(rotulo);
+  return resposta({ data: null, count: null });
 }
 
 export function createServiceClient() {
@@ -34,6 +40,8 @@ export function createServiceClient() {
     get(alvo, chave, receptor) {
       if (chave === "from") {
         return (tabela: string) => {
+          // `--documentos`: a contagem de trechos vem da base em memória, nunca da gravada.
+          if (tabela === "knowledge_chunks" && ragEmMemoriaAtivo()) return resposta({ data: null, count: quantosTrechos() });
           const consulta = alvo.from(tabela as never);
           return new Proxy(consulta, {
             get(q, metodo, r) {
@@ -46,7 +54,9 @@ export function createServiceClient() {
       }
       if (chave === "rpc") {
         return (nome: string, ...args: unknown[]) =>
-          RPC_DE_LEITURA.has(nome) ? (alvo.rpc as (...a: unknown[]) => unknown)(nome, ...args) : nada(`rpc ${nome}`);
+          nome === "match_knowledge_chunks" && ragEmMemoriaAtivo()
+            ? resposta({ data: buscarTrechos((args[0] ?? {}) as Parameters<typeof buscarTrechos>[0]), count: null })
+            : RPC_DE_LEITURA.has(nome) ? (alvo.rpc as (...a: unknown[]) => unknown)(nome, ...args) : nada(`rpc ${nome}`);
       }
       const v = Reflect.get(alvo, chave, receptor);
       return typeof v === "function" ? v.bind(alvo) : v;

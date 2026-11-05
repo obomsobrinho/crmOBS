@@ -5,8 +5,10 @@ import { agendaDoTurno } from "@/lib/agenda-servidor";
 import { horarioCadastrado } from "@/lib/horarios";
 import { processTurn } from "@/lib/agent-turn";
 import { blocoDeOrigem, textoParaLead, VARIANTES_SUGERIDAS, type OrigemDaCampanha } from "@/lib/prospeccao";
-import type { ChatTurn } from "@/lib/agent";
+import { AGENT_MODEL, type ChatTurn } from "@/lib/agent";
 import { escritasBarradas } from "./servico-somente-leitura";
+import { carregarDocumentos } from "./rag-em-memoria";
+import { FIM, MODELO_DO_LEAD, proximaFalaDoLead, temperaturaUsada, type LeadSimulado } from "./lead-simulado";
 
 // ENSAIO DO PROMPT (03/11/2026): roda uma persona CANDIDATA contra o turno de
 // produção (`processTurn` em dryRun), com o modelo de verdade e as etapas depois
@@ -20,7 +22,10 @@ interface Cenario {
   nome: string;
   /** true = origem de campanha com a 1ª variante sugerida; ou o envio exato. */
   campanha?: boolean | { texto?: string; enviadoEm?: string; empresa?: string };
-  mensagens: string[];
+  /** Falas fixas do lead, uma por turno. */
+  mensagens?: string[];
+  /** Ou uma pessoa simulada por outro modelo (scripts/ensaio/lead-simulado.ts). */
+  lead?: LeadSimulado;
   /** Hora fixa do cenário (ISO); sem ela, a hora de agora. */
   agora?: string;
 }
@@ -69,6 +74,15 @@ export async function ensaiar(args: string[]): Promise<void> {
   const candidata = readFileSync(arquivoPersona, "utf8");
   const entrada = JSON.parse(readFileSync(arquivoCenarios, "utf8")) as Entrada;
   if (!Array.isArray(entrada.cenarios) || entrada.cenarios.length === 0) throw new Error("O JSON precisa de `cenarios` com pelo menos um item.");
+  for (const c of entrada.cenarios) {
+    if (!c.lead && !Array.isArray(c.mensagens)) throw new Error(`O cenário "${c.nome}" precisa de \`mensagens\` ou de \`lead\`.`);
+  }
+
+  // `--documentos a.md,b.md`: base de conhecimento candidata só em memória (scripts/ensaio/rag-em-memoria.ts).
+  const documentos = argumento(args, "documentos");
+  const resumoDocs = documentos
+    ? await carregarDocumentos(documentos.split(",").map((s) => s.trim()).filter(Boolean), apiKey)
+    : null;
 
   const svc = createServiceClient();
   const cliente = await clienteAlvo(svc, argumento(args, "cliente"));
@@ -89,49 +103,78 @@ export async function ensaiar(args: string[]): Promise<void> {
   const saida: string[] = [
     `# Ensaio do prompt: ${cliente.name}`,
     "",
-    `Persona: ${arquivoPersona} (${persona.length} de ${LIMITS.persona} caracteres montados${compilado.ok ? "" : ", ACIMA DO LIMITE"}). Agenda: ${agenda ? "ligada" : "desligada"}.`,
+    `Persona: ${arquivoPersona} (${persona.length} de ${LIMITS.persona} caracteres montados${compilado.ok ? "" : ", ACIMA DO LIMITE"}). Agenda: ${agenda ? "ligada" : "desligada"}. Modelo do agente: ${AGENT_MODEL}.`,
   ];
+  saida.push(
+    resumoDocs
+      ? `Base de conhecimento: SÓ os documentos do ensaio, em memória (${resumoDocs.join("; ")}); os trechos gravados da empresa foram ignorados.`
+      : "Base de conhecimento: a gravada da empresa (knowledge_chunks).",
+  );
   if (compilado.ok && compilado.removed && compilado.removed.length > 0) {
     saida.push(`Seções da base retiradas do texto candidato (o rabo de hoje entra no lugar): ${compilado.removed.join(", ")}.`);
   }
 
+  const repeticoes = Math.max(1, Number.parseInt(argumento(args, "repeticoes") ?? "1", 10) || 1);
+  const temLead = entrada.cenarios.some((c) => c.lead);
+  if (temLead) saida.push(`Lead simulado: ${MODELO_DO_LEAD} (vê só a conversa, nunca o prompt do agente).`);
+  if (repeticoes > 1) saida.push(`Repetições: ${repeticoes} por cenário, cada uma do zero.`);
+
   for (const c of entrada.cenarios) {
-    const agora = c.agora ?? entrada.agora;
-    const origem = origemDoCenario(c, agora);
-    saida.push("", `## ${c.nome}`, "");
-    if (origem) saida.push("```text", blocoDeOrigem(origem), "```", "");
-    // Como na produção (`comEnvioDaCampanha`): o envio é a primeira fala da conversa.
-    const history: ChatTurn[] = origem ? [{ role: "assistant", content: origem.texto }] : [];
-    const pedidosAbertos: string[] = [];
-    for (const mensagem of c.mensagens) {
-      const { output, diagnostics: d } = await processTurn({
-        clientId: cliente.id,
-        phone: TELEFONE_DE_TESTE,
-        message: mensagem,
-        apiKey,
-        dryRun: true,
-        history,
-        personaOverride: persona,
-        agoraTeste: agora ?? null,
-        origemOverride: origem,
-        pedidosAbertos,
-      });
-      saida.push(`**Lead:** ${mensagem}`, "");
-      for (const m of output.messages) saida.push(`> ${m}`);
-      const linha = [`action: ${output.action}`];
-      if (output.motivo) linha.push(`motivo: ${output.motivo}`);
-      if (output.summary) linha.push(`summary: ${output.summary}`);
-      const a = output.agenda;
-      if (a.acao) linha.push(`agenda: ${a.acao}${a.dia ? ` dia=${a.dia}` : ""}${a.periodo ? ` periodo=${a.periodo}` : ""}${a.hora ? ` hora=${a.hora}` : ""}`);
-      if (d.agenda) linha.push(`decisão da agenda: ${d.agenda.decisao}`);
-      if (d.guardrail.blocked) linha.push(`guardrail barrou: ${d.guardrail.reason ?? ""}`);
-      if (d.limiteIa) linha.push("TURNO SILENCIADO: teto mensal de IA da empresa");
-      saida.push("", `\`${linha.join(" · ")}\``, "");
-      history.push({ role: "user", content: mensagem });
-      if (output.messages.length > 0) history.push({ role: "assistant", content: output.messages.join("\n") });
-      if (output.action === "pausar" && d.pedidoNaFila && output.summary) pedidosAbertos.push(output.summary);
+    for (let rodada = 1; rodada <= repeticoes; rodada++) {
+      const agora = c.agora ?? entrada.agora;
+      const origem = origemDoCenario(c, agora);
+      saida.push("", `## ${c.nome}${repeticoes > 1 ? ` (rodada ${rodada} de ${repeticoes})` : ""}`, "");
+      if (c.lead && rodada === 1) saida.push(`Pessoa simulada: ${c.lead.persona.trim()}`, "");
+      if (origem) saida.push("```text", blocoDeOrigem(origem), "```", "");
+      // Como na produção (`comEnvioDaCampanha`): o envio é a primeira fala da conversa.
+      const history: ChatTurn[] = origem ? [{ role: "assistant", content: origem.texto }] : [];
+      const pedidosAbertos: string[] = [];
+      const acoes: string[] = [];
+      const teto = c.lead ? Math.max(1, c.lead.maxTurnos ?? 8) : c.mensagens!.length;
+      let fim = c.lead ? `teto de ${teto} mensagens da pessoa` : "mensagens fixas";
+      for (let turno = 0; turno < teto; turno++) {
+        const mensagem = c.lead ? await proximaFalaDoLead(apiKey, c.lead, history) : c.mensagens![turno];
+        if (c.lead && mensagem.includes(FIM)) {
+          fim = `a pessoa parou de responder (${FIM}) depois de ${turno} mensagens`;
+          break;
+        }
+        const { output, diagnostics: d } = await processTurn({
+          clientId: cliente.id,
+          phone: TELEFONE_DE_TESTE,
+          message: mensagem,
+          apiKey,
+          dryRun: true,
+          history,
+          personaOverride: persona,
+          agoraTeste: agora ?? null,
+          origemOverride: origem,
+          pedidosAbertos,
+        });
+        saida.push(`**Lead:** ${mensagem}`, "");
+        for (const m of output.messages) saida.push(`> ${m}`);
+        const linha = [`action: ${output.action}`];
+        if (output.motivo) linha.push(`motivo: ${output.motivo}`);
+        if (output.summary) linha.push(`summary: ${output.summary}`);
+        const a = output.agenda;
+        if (a.acao) linha.push(`agenda: ${a.acao}${a.dia ? ` dia=${a.dia}` : ""}${a.periodo ? ` periodo=${a.periodo}` : ""}${a.hora ? ` hora=${a.hora}` : ""}`);
+        if (d.agenda) linha.push(`decisão da agenda: ${d.agenda.decisao}`);
+        if (d.guardrail.blocked) linha.push(`guardrail barrou: ${d.guardrail.reason ?? ""}`);
+        if (d.limiteIa) linha.push("TURNO SILENCIADO: teto mensal de IA da empresa");
+        saida.push("", `\`${linha.join(" · ")}\``, "");
+        if (d.ragSearched) {
+          saida.push(d.ragMatches.length ? "Trechos da base:" : "Trechos da base: nenhum.");
+          for (const m of d.ragMatches) saida.push(`- ${m.similarity.toFixed(3)} · ${m.preview.replace(/\s+/g, " ").slice(0, 80)}`);
+          saida.push("");
+        }
+        history.push({ role: "user", content: mensagem });
+        if (output.messages.length > 0) history.push({ role: "assistant", content: output.messages.join("\n") });
+        if (output.action === "pausar" && d.pedidoNaFila && output.summary) pedidosAbertos.push(output.summary);
+        acoes.push(output.action);
+      }
+      saida.push(`_Fim: ${fim}. Ações do agente: ${acoes.join(", ") || "nenhuma"}._`);
     }
   }
+  if (temLead) saida.push("", `Temperatura do lead simulado: ${temperaturaUsada()}.`);
   saida.push("", `Escritas barradas (nada foi gravado): ${escritasBarradas.length ? escritasBarradas.join(", ") : "nenhuma"}.`);
 
   const texto = saida.join("\n");

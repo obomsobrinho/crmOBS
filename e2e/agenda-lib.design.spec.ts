@@ -6,6 +6,8 @@ import {
   diaDaSaida,
   pedidoDeHorario,
   consultaDeSeguranca,
+  consultaBarradaNaAbertura,
+  falaEmMarcar,
   saidaComODiaDaPessoa,
   textoPedeDia,
   travaSemAgenda,
@@ -476,5 +478,85 @@ test.describe("Grade semanal: trechos abertos e fechados do dia (redesenho de 31
     const quatorzeDoFeriado = inicioDoDiaSP("2026-11-02") + 14 * 60 * 60_000;
     expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado, CFG)).toBe(15 * 60 + 30);
     expect(minutoParaCentralizar(semana, obs, quatorzeDoFeriado)).toBe(14 * 60);
+  });
+});
+
+test.describe("lib/agenda: ensaio com lead simulado (04/11/2026)", () => {
+  const agora = em("2026-11-05", "10:30"); // quinta
+  const base = { agora, motivo: "", acao: "" };
+
+  test("a resposta do próprio modelo não basta para a rede consultar", () => {
+    // Antes: "posso agendar" na resposta + "hoje" na mensagem = lista de horários.
+    expect(consultaDeSeguranca({ ...base, mensagem: "hoje to sem tempo, me explica", resposta: "Posso agendar uma demonstração rápida.", action: "none" })).toBeNull();
+    expect(consultaDeSeguranca({ ...base, mensagem: "amanhã eu vejo", resposta: "Quer agendar um horário?", action: "none" })).toBeNull();
+    // A mensagem da pessoa continua valendo sozinha.
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero marcar uma consulta amanhã", resposta: "Claro!", action: "none" })).toEqual({ dia: "2026-11-06", periodo: "" });
+    // Pedido de ajuda para ver horário (o caso de 29/10): a resposta ainda conta.
+    expect(consultaDeSeguranca({ ...base, mensagem: "terça que vem, à tarde", resposta: "Vou ver os horários e já te confirmo.", action: "pausar", motivo: "fechar" })).toEqual({ dia: "2026-11-10", periodo: "tarde" });
+  });
+
+  test("primeira resposta a lead de campanha: sem consulta, a menos que ele fale em marcar ou num dia", () => {
+    const abertura = { agora, daCampanha: true, respostasAntes: 0 };
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "Bom dia. Pode me explicar por aqui mesmo? nao tenho tempo pra ligação." })).toBe(true);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "quero entender melhor" })).toBe(true);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "quanto custa?" })).toBe(true);
+    // Pediu para marcar, falou em horário ou trouxe um dia: a consulta segue.
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "quero marcar uma consulta amanhã" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "tem horário essa semana?" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "pode ser segunda à tarde" })).toBe(false);
+    // Fora da abertura de campanha a trava não existe.
+    expect(consultaBarradaNaAbertura({ ...abertura, daCampanha: false, mensagem: "Bom dia, me explica por aqui" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, respostasAntes: 1, mensagem: "Bom dia, me explica por aqui" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: null })).toBe(false);
+    // Dia com hora, em qualquer grafia (a regra é `horariosCitados`), libera; número que não é hora, não.
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "pode ser amanhã às 16h30" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "amanhã 10hrs" })).toBe(false);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "hoje às 5 reais de diferença" })).toBe(true);
+  });
+  test("o modelo perguntou manhã ou tarde depois de a pessoa dizer o dia: consulta (29/10)", () => {
+    expect(consultaDeSeguranca({ ...base, mensagem: "segunda", resposta: "Prefere manhã ou tarde?", action: "none" })).toEqual({ dia: "2026-11-09", periodo: "" });
+    // Só a resposta oferecendo agendar continua não contando.
+    expect(consultaDeSeguranca({ ...base, mensagem: "segunda", resposta: "Posso agendar uma demonstração?", action: "none" })).toBeNull();
+    expect(falaEmMarcar("acha horário bom pra isso")).toBe(false);
+  });
+  test("saudação e palavra de tempo no meio do assunto não são pedido de horário", () => {
+    const abertura = { agora, daCampanha: true, respostasAntes: 0 };
+    const semCampanha = { ...abertura, daCampanha: false };
+    // "Bom dia" sozinho: nem dia, nem consulta, com ou sem campanha.
+    expect(pedidoDeHorario("Bom dia", agora)).toBeNull();
+    expect(pedidoDeHorario("boa noite!", agora)).toBeNull();
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "Bom dia" })).toBe(true);
+    expect(consultaDeSeguranca({ ...base, mensagem: "Bom dia", resposta: "", action: "none" })).toBeNull();
+    expect(consultaDeSeguranca({ ...base, mensagem: "Bom dia", resposta: "Posso agendar?", action: "none" })).toBeNull();
+    // A resposta natural à pergunta da campanha (round 4 do ensaio).
+    const resposta = "Bom dia\n\nhoje depende da recepção mesmo\n\nfora do horario normalmente fica pra responder depois";
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: resposta })).toBe(true);
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "Pode me explicar por aqui mesmo? Hoje às vezes demora sim, depende do horário" })).toBe(true);
+    expect(consultaDeSeguranca({ ...base, mensagem: resposta, resposta: "", action: "none" })).toBeNull();
+    // Pergunta do horário de funcionamento não é lista de horários (vale sem campanha, em produção).
+    expect(falaEmMarcar("vocês abrem hoje? qual o horário?")).toBe(false);
+    expect(consultaDeSeguranca({ ...base, mensagem: "vocês abrem hoje? qual o horário?", resposta: "", action: "none" })).toBeNull();
+    // Saudação junto de um pedido de verdade: consulta.
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "Bom dia, quero marcar amanhã" })).toBe(false);
+    expect(consultaDeSeguranca({ ...base, mensagem: "Bom dia, quero marcar amanhã", resposta: "", action: "none" })).toEqual({ dia: "2026-11-06", periodo: "" });
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "boa tarde, tem horário hoje?" })).toBe(false);
+    expect(consultaDeSeguranca({ ...base, mensagem: "boa tarde, tem horário hoje?", resposta: "", action: "none" })).toEqual({ dia: "2026-11-05", periodo: "" });
+    expect(consultaBarradaNaAbertura({ ...semCampanha, mensagem: "Bom dia" })).toBe(false);
+    // Dia com hora ou período na abertura ainda consulta ("posso te mostrar?" "pode ser amanhã às 10").
+    expect(consultaBarradaNaAbertura({ ...abertura, mensagem: "pode ser amanhã às 10" })).toBe(false);
+  });
+
+  test("agendamento como assunto do produto não é pedido de horário (rodada 6 do ensaio)", () => {
+    const p14 = "Hoje ele faz mais menu mesmo\n\nOrçamento e agendamento nao faz redondo nao\n\nMas sinceramente eu nao quero trocar agora nao";
+    const p02 = "Entendi. Na prática ele marca sozinho mesmo ou precisa aprovar antes?\n\nHoje aqui chega mais pedido de agendamento.";
+    expect(falaEmMarcar(p14)).toBe(false);
+    expect(falaEmMarcar(p02)).toBe(false);
+    expect(consultaDeSeguranca({ ...base, mensagem: p14, resposta: "", action: "none" })).toBeNull();
+    expect(consultaDeSeguranca({ ...base, mensagem: p02, resposta: "", action: "none" })).toBeNull();
+    // O verbo continua valendo.
+    expect(falaEmMarcar("quero agendar pra amanhã")).toBe(true);
+    expect(falaEmMarcar("agenda pra mim segunda")).toBe(true);
+    expect(falaEmMarcar("pode agendar?")).toBe(true);
+    expect(consultaDeSeguranca({ ...base, mensagem: "quero agendar pra amanhã", resposta: "", action: "none" })).toEqual({ dia: "2026-11-06", periodo: "" });
   });
 });
