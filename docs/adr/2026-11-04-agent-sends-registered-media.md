@@ -52,3 +52,4 @@ already plays video (`MediaView`).
   - "como funciona isso na prática?" sent `como_funciona`, with the reply announcing the video.
   - Asking again later did not resend it (the block disappears once sent).
   - "quanto custa?" sent nothing.
+- Real send (04/11/2026, owner's personal number, with his OK): Evolution `POST /message/sendMedia` with the flat body (`mediatype: "video"`, `mimetype`, `caption`, `media` = signed whatsapp-media URL, `fileName`) answered 201 and the video arrived and played on WhatsApp.
