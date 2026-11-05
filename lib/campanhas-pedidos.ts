@@ -7,6 +7,7 @@ import {
   type AreaDaBusca,
   UFS,
   type FiltroDeSiteDaBusca,
+  type FiltroDeTelefone,
   type NotaMinima,
   type OpcoesDaBusca,
   type SituacaoDaBusca,
@@ -23,6 +24,7 @@ const SITUACOES_DA_CAMPANHA: SituacaoDaCampanha[] = ["rascunho", "agendada", "ro
 export const SITUACOES_NA_CAMPANHA: SituacaoNaCampanha[] = ["na_fila", "enviado", "respondeu", "falhou", "parou"];
 const FILTROS_DOS_LEADS: FiltroDosLeads[] = ["nao_contatados", "bons", "nao_reivindicado"];
 const SITES: FiltroDeSiteDaBusca[] = ["todos", "sem_site", "com_site"];
+const TELEFONES: FiltroDeTelefone[] = ["todos", "celular", "fixo", "sem"];
 const NOTAS: NotaMinima[] = [null, 3.5, 4, 4.5];
 /** Teto de categorias marcadas no filtro da tabela (a lista do recorte tem até 200). */
 const MAXIMO_DE_CATEGORIAS = 30;
@@ -53,7 +55,7 @@ export function paginaDe(v: string | null): number | null {
 export const textoDe = (v: string | null) => (v ?? "").trim().slice(0, 100);
 
 /**
- * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b&site=&nota=&avaliacoes=&categorias=[json]`),
+ * O recorte da tabela de leads na query (`?busca=&texto=&cidade=&filtros=a,b&site=&nota=&avaliacoes=&categorias=[json]&telefone=`),
  * o mesmo da página e da "página do lead"; o motivo (string) quando algo veio torto.
  */
 export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
@@ -63,6 +65,8 @@ export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
   if (!filtros.every(ehFiltroDosLeads)) return "filtro inválido";
   const site = q.get("site") ?? "todos";
   if (!de(SITES, site)) return "filtro de site inválido";
+  const telefone = q.get("telefone") ?? "todos";
+  if (!de(TELEFONES, telefone)) return "filtro de telefone inválido";
   const nota = NOTAS.find((n) => String(n) === (q.get("nota") ?? "null"));
   if (nota === undefined) return "nota inválida";
   const minAvaliacoes = MINIMOS_DE_AVALIACOES.find((m) => String(m) === (q.get("avaliacoes") ?? "null"));
@@ -86,6 +90,7 @@ export function recorteDe(q: URLSearchParams): RecorteDosLeads | string {
     notaMinima: nota,
     minAvaliacoes,
     categorias: categorias as string[],
+    telefone,
   };
 }
 
@@ -100,6 +105,7 @@ export function recorteParaQuery(p: RecorteDosLeads): Record<string, string | nu
     nota: p.notaMinima === null ? null : String(p.notaMinima),
     avaliacoes: p.minAvaliacoes === null ? null : String(p.minAvaliacoes),
     categorias: p.categorias.length > 0 ? JSON.stringify(p.categorias) : null,
+    telefone: p.telefone === "todos" ? null : p.telefone,
   };
 }
 

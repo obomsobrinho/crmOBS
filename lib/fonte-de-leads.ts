@@ -26,6 +26,8 @@ export interface ItemDaFonteDeLeads {
   pontuacao: number;
   /** Fechado de vez na fonte (sai quando a busca pede "sem fechadas"). Não vai ao banco. */
   fechado: boolean;
+  /** A fonte sabe que este lugar nunca é cliente (praça, ponto de ônibus): não entra na base. Não vai ao banco. */
+  descartavel: boolean;
   /** Coordenadas, perfil reivindicado, horário, notas, fotos, categorias e o @ do Instagram. */
   detalhes: DetalhesDoLead;
 }
@@ -59,6 +61,7 @@ export function filtrarPelasOpcoes(itens: ItemDaFonteDeLeads[], o: OpcoesDaBusca
   const vistos = new Set<string>();
   return itens.filter((i) => {
     if (o.ignorarFechados && i.fechado) return false;
+    if (i.descartavel) return false;
     if (o.notaMinima !== null && (i.nota === null || i.nota < o.notaMinima)) return false;
     if (o.minAvaliacoes !== null && (i.avaliacoes ?? 0) < o.minAvaliacoes) return false;
     if (!daCategoria(i, o.categorias)) return false;

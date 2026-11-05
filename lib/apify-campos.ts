@@ -1,3 +1,4 @@
+import { normalizar } from "./clientes";
 import { localDaBusca } from "./municipios";
 import {
   custoMinimoDaBuscaUsd,
@@ -26,6 +27,15 @@ import type { ItemDaFonteDeLeads, LeituraDaExecucao } from "./fonte-de-leads";
 // Desde 02/11/2026 a busca nova vai SEM termo: `allPlacesNoSearchAction` traz todas
 // as empresas visíveis no mapa da área, até o teto, e só pula as fechadas na fonte
 // (o único filtro pago que o dono quis). O resto se filtra na tabela de leads.
+
+/**
+ * As categorias principais do Google que nunca viram cliente: a busca sem termo traz tudo da área, praça e
+ * ponto de ônibus também (05/11/2026). A lista é do dono. Para acrescentar, use o nome que a fonte traz em
+ * `categoryName`, nunca um palpite. Vale só para busca nova: lead que já está na base não sai.
+ */
+export const CATEGORIAS_DESCARTADAS = ["Ponto de ônibus", "Marco histórico", "Ginásio poliesportivo", "Universidade pública"] as const;
+
+const DESCARTADAS = new Set<string>(CATEGORIAS_DESCARTADAS.map(normalizar));
 
 export const ACTOR_APIFY = "compass/crawler-google-places";
 
@@ -182,6 +192,7 @@ export function itemDoApify(bruto: unknown, termo: string): ItemDaFonteDeLeads {
     avaliacoes,
     pontuacao: pontos,
     fechado: o.permanentlyClosed === true,
+    descartavel: DESCARTADAS.has(normalizar(texto(o, ["categoryName"]) ?? "")),
     detalhes,
   };
 }

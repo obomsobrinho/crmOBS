@@ -44,6 +44,7 @@ test.describe("Campanhas sem login", () => {
     expect((await request.post("/api/admin/campanhas/buscas", { data: {}, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/${ID}/acao`, { data: { acao: "iniciar" }, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/leads/${ID}`, { data: { marcacao: "bom" }, maxRedirects: 0 })).status()).toBe(404);
+    expect((await request.patch(`/api/admin/campanhas/leads/${ID}`, { data: { telefone: "33999887766" }, maxRedirects: 0 })).status()).toBe(404);
     for (const r of [`/api/admin/campanhas/${ID}`, `/api/admin/campanhas/buscas/${ID}`, `/api/admin/campanhas/leads/${ID}`]) {
       expect((await request.delete(r, { maxRedirects: 0 })).status(), r).toBe(404);
     }
@@ -294,6 +295,51 @@ test.describe("Campanhas, ajustes de 04/11/2026 (preview)", () => {
     await expect.poll(visiveis).toBeLessThan(todos);
     await page.locator('[data-slot="mapa-centralizar"]').click();
     await expect.poll(visiveis).toBe(todos);
+  });
+});
+
+test.describe("Campanhas, telefone do lead (pedido de 05/11/2026, preview)", () => {
+  /** O filtro de telefone pelo botão de filtro da tabela, com a tela já hidratada. */
+  async function filtrarTelefone(page: Page, opcao: RegExp) {
+    await page.locator('[data-slot="leads-filtro"]').click();
+    await page.getByRole("menuitem", { name: opcao }).click();
+    await page.keyboard.press("Escape");
+  }
+
+  test("o filtro separa quem entra em campanha de fixo e de sem telefone", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await expect(page.locator('[data-slot="lead-linha"]').first()).toBeVisible();
+    await filtrarTelefone(page, /Com celular/);
+    await expect(page.locator('[data-slot="leads-rodape"]')).not.toContainText("de 17");
+    await expect(page.locator('[data-slot="lead-telefone-invalido"]')).toHaveCount(0);
+    await expect(page.getByText("Sem telefone", { exact: true })).toHaveCount(0);
+  });
+
+  test("adicionar celular: o lead sem telefone recebe o número, o fixo é recusado, e ele vira contatável", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await expect(page.locator('[data-slot="lead-linha"]').first()).toBeVisible();
+    await filtrarTelefone(page, /Só fixo/);
+    const linha = page.locator('[data-slot="lead-linha"]').filter({ has: page.locator('[data-slot="lead-adicionar-celular"]') }).first();
+    const id = await linha.getAttribute("data-lead");
+    await linha.locator('[data-slot="lead-adicionar-celular"]').click();
+    const campo = page.locator('[data-slot="lead-telefone-campo"]');
+    await campo.fill("3332411000");
+    await page.locator('[data-slot="lead-telefone-salvar"]').click();
+    await expect(page.locator('[data-slot="lead-telefone-erro"]')).toContainText("fixo");
+    await campo.fill("33999887766");
+    await expect(campo).toHaveValue("(33) 99988-7766");
+    await page.locator('[data-slot="lead-telefone-salvar"]').click();
+    await expect(page.locator('[data-slot="lead-telefone-form"]')).toHaveCount(0);
+    await expect(page.locator('[data-slot="lead-ficha"]')).toContainText("(33) 99988-7766");
+    await page.keyboard.press("Escape");
+    await expect(page.locator(`[data-lead="${id}"]`)).toHaveCount(0);
+  });
+
+  test("quem já entrou em campanha não troca de número", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=busca");
+    await page.locator('[data-slot="lead-linha"]').filter({ has: page.locator('[data-slot="lead-campanha"]') }).first().locator('[data-slot="lead-abrir-ficha"]').click();
+    await expect(page.locator('[data-slot="lead-ficha"]')).toBeVisible();
+    await expect(page.locator('[data-slot="lead-telefone-editar"]')).toHaveCount(0);
   });
 });
 

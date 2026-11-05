@@ -19,8 +19,10 @@ import {
   TETO_DIARIO,
   campanhaAindaEnvia,
   contagemPorSemana,
-  leadSaiDaBase,
+  leadSemHistorico,
   previsaoDaFila,
+  problemaDoCelular,
+  situacaoDoTelefone,
   dentroDaJanela,
   diaDaSemanaSP,
   ehPedidoParaParar,
@@ -54,7 +56,7 @@ import {
   maximoDaBusca,
   nomeDaBusca,
 } from "../lib/prospeccao";
-import { TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
+import { CATEGORIAS_DESCARTADAS, TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
 import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../lib/planilha-de-leads";
 import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
 import arquivoDeMunicipios from "../lib/dados/municipios.json";
@@ -77,6 +79,35 @@ const H = 60 * MIN;
 const AGORA = Date.parse("2026-10-29T13:00:00Z");
 const HOJE = diaIsoSP(AGORA);
 const as = (dia: string, hora: number, min = 0) => inicioDoDiaSP(dia) + hora * H + min * MIN;
+
+test.describe("Telefone do lead (pedido de 05/11/2026)", () => {
+  test("só o celular conta como contatável; inválido é o mesmo que sem telefone", () => {
+    expect(situacaoDoTelefone("+55 33 99920-8738")).toBe("celular");
+    expect(situacaoDoTelefone("(33) 3241-1000")).toBe("fixo");
+    expect(situacaoDoTelefone(null)).toBe("sem");
+    expect(situacaoDoTelefone("123")).toBe("sem");
+  });
+
+  test("o número digitado: celular passa; fixo e torto dizem por quê", () => {
+    expect(problemaDoCelular("(33) 99920-8738")).toBeNull();
+    expect(problemaDoCelular("(33) 3241-1000")).toContain("fixo");
+    expect(problemaDoCelular("99920")).toContain("Confira");
+    expect(problemaDoCelular("")).toContain("Confira");
+  });
+
+  test("o filtro de telefone vai e volta pela query, e valor torto recusa", () => {
+    const de = (telefone: "todos" | "celular" | "fixo" | "sem") => {
+      const q = recorteParaQuery({ ...RECORTE_LIVRE, buscaId: null, telefone });
+      return new URLSearchParams(Object.entries(q).flatMap(([k, v]) => (v === null ? [] : [[k, v]])));
+    };
+    expect(de("todos").get("telefone")).toBeNull();
+    for (const t of ["celular", "fixo", "sem", "todos"] as const) {
+      const r = recorteDe(de(t));
+      expect(typeof r !== "string" && r.telefone).toBe(t);
+    }
+    expect(recorteDe(new URLSearchParams("telefone=outro"))).toBe("filtro de telefone inválido");
+  });
+});
 
 test.describe("Previsão da fila (previsaoDaFila) e o que pode ser apagado (ajustes de 04/11/2026)", () => {
   // 02/11/2026 é uma segunda.
@@ -117,9 +148,9 @@ test.describe("Previsão da fila (previsaoDaFila) e o que pode ser apagado (ajus
   test("só apaga campanha parada; a base só perde quem nunca foi contatado nem pediu para parar", () => {
     expect(campanhaAindaEnvia("rascunho") || campanhaAindaEnvia("pausada") || campanhaAindaEnvia("concluida")).toBe(false);
     expect(campanhaAindaEnvia("rodando") && campanhaAindaEnvia("agendada")).toBe(true);
-    expect(leadSaiDaBase({ parouEm: null, campanhas: 0 })).toBe(true);
-    expect(leadSaiDaBase({ parouEm: null, campanhas: 1 })).toBe(false);
-    expect(leadSaiDaBase({ parouEm: 1, campanhas: 0 })).toBe(false);
+    expect(leadSemHistorico({ parouEm: null, campanhas: 0 })).toBe(true);
+    expect(leadSemHistorico({ parouEm: null, campanhas: 1 })).toBe(false);
+    expect(leadSemHistorico({ parouEm: 1, campanhas: 0 })).toBe(false);
   });
 });
 
@@ -578,6 +609,17 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
     expect(torto.lat).toBeNull();
     expect(torto.horarios).toEqual([{ dow: 1, faixas: [[600, 720]] }]);
     expect(torto.distribuicao).toBeNull();
+  });
+
+  test("a busca nova descarta as categorias da lista pela categoria principal, nunca pela secundária", () => {
+    const livre = { ...opcoes, notaMinima: null, site: "todos" as const };
+    const itens = [
+      ...CATEGORIAS_DESCARTADAS.map((c, i) => itemDoApify({ title: c, categoryName: c, phone: `+553399999002${i}`, placeId: `d${i}` }, "")),
+      itemDoApify({ title: "Com outra grafia", categoryName: "PONTO DE ONIBUS", phone: "+5533999990030", placeId: "d8" }, ""),
+      itemDoApify({ title: "Lanchonete do Mirante", categoryName: "Lanchonete", categories: ["Lanchonete", "Marco histórico"], phone: "+5533999990031", placeId: "d9" }, ""),
+      itemDoApify({ title: "Sem categoria", phone: "+5533999990032", placeId: "d10" }, ""),
+    ];
+    expect(filtrarPelasOpcoes(itens, livre).map((i) => i.nome)).toEqual(["Lanchonete do Mirante", "Sem categoria"]);
   });
 
   test("filtrarPelasOpcoes aplica nota, site e fechadas do nosso lado e tira os repetidos", () => {

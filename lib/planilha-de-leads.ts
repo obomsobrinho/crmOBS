@@ -135,6 +135,7 @@ export function itemDaPlanilha(v: LinhaImportada): ItemDaFonteDeLeads {
     avaliacoes: null,
     pontuacao: pontuarLead({ telefone: v.telefone, segmento, site: null, nota: null, avaliacoes: null }).pontos,
     fechado: false,
+    descartavel: false,
     detalhes: { lat: null, lng: null, reivindicado: null, horarios: null, distribuicao: null, fotos: null, categorias: [], endereco: null, instagram: null },
   };
 }

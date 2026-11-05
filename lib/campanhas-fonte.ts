@@ -12,7 +12,7 @@ import type {
   PontoNoMapa,
   PreviaDoFiltro,
   Resultados,
-  RespostaDeApagar,
+  RespostaDaEscrita,
   RespostaDeIniciar,
   Totais,
 } from "@/components/admin/campanhas/tipos";
@@ -106,8 +106,8 @@ function formularioDaPlanilha(arquivo: File, nome?: string): FormData {
 export function fonteDasRotas(): FonteDeCampanhas {
   const acao = async (id: string, a: "iniciar" | "pausar" | "retomar") =>
     (await pedir<{ situacao: SituacaoDaCampanha }>(`/${id}/acao`, enviar({ acao: a }))).situacao;
-  const apagar = async (caminho: string): Promise<RespostaDeApagar> => {
-    const r = await recusaSe4xx(pedir<{ ok: true }>(caminho, { method: "DELETE" }));
+  const escrever = async (caminho: string, init: RequestInit = { method: "DELETE" }): Promise<RespostaDaEscrita> => {
+    const r = await recusaSe4xx(pedir<{ ok: true }>(caminho, init));
     return r.ok ? { ok: true } : r;
   };
   return {
@@ -135,8 +135,9 @@ export function fonteDasRotas(): FonteDeCampanhas {
       return r.ok ? { ok: true, buscaId: r.valor.buscaId } : r;
     },
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
-    removerLead: (id, buscaId) => apagar(`/leads/${id}${q({ busca: buscaId })}`),
-    apagarBusca: (id) => apagar(`/buscas/${id}`),
+    removerLead: (id, buscaId) => escrever(`/leads/${id}${q({ busca: buscaId })}`),
+    apagarBusca: (id) => escrever(`/buscas/${id}`),
+    editarTelefone: (id, celular) => escrever(`/leads/${id}`, enviar({ telefone: celular }, "PATCH")),
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     campanhasComEnvio: () => pedir<{ id: string; nome: string }[]>("?com_envio=1"),
@@ -162,7 +163,7 @@ export function fonteDasRotas(): FonteDeCampanhas {
         throw e;
       }
     },
-    apagarCampanha: (id) => apagar(`/${id}`),
+    apagarCampanha: (id) => escrever(`/${id}`),
     iniciar: async (id): Promise<RespostaDeIniciar> => {
       const r = await recusaSe4xx(acao(id, "iniciar"));
       return r.ok ? { ok: true, situacao: r.valor } : r;
