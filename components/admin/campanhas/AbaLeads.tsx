@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronRight, Download, Heart, Loader2, MapPin, Plus, Search, Star, Trash2, X } from "lucide-react";
+import { ChevronRight, Download, Heart, Loader2, MapPin, Pencil, Plus, Search, Star, Trash2, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,14 @@ import {
   ROTULO_DA_BUSCA,
   ROTULO_DO_SITE,
   estadoNoMapa,
-  leadSaiDaBase,
+  leadSemHistorico,
   resumoDasOpcoes,
   textoDoDiaDeEnvio,
   textoDoLocal,
   tipoDoTelefone,
   type DiaDeEnvio,
   type FiltroDeSiteDaBusca,
+  type FiltroDeTelefone,
   type MinimoDeAvaliacoes,
   type NotaMinima,
   type ResumoDaBase,
@@ -446,6 +447,13 @@ const SITES: { valor: FiltroDeSiteDaBusca; rotulo: string }[] = [
   { valor: "sem_site", rotulo: "Sem site próprio" },
   { valor: "com_site", rotulo: "Com site próprio" },
 ];
+// Dono, 05/11/2026: empresa sem telefone não faz sentido na lista, e só o celular entra em campanha.
+const TELEFONES: { valor: FiltroDeTelefone; rotulo: string }[] = [
+  { valor: "todos", rotulo: "Com ou sem telefone" },
+  { valor: "celular", rotulo: "Com celular (entra em campanha)" },
+  { valor: "fixo", rotulo: "Só fixo (não entra em campanha)" },
+  { valor: "sem", rotulo: "Sem telefone" },
+];
 const NOTAS: { valor: NotaMinima; rotulo: string }[] = [
   { valor: null, rotulo: "Qualquer nota" },
   { valor: 3.5, rotulo: "3,5 ou mais" },
@@ -457,16 +465,26 @@ const AVALIACOES = MINIMOS_DE_AVALIACOES.map((m) => ({ valor: m, rotulo: m === n
 const GRADE_LEADS =
   "xl:grid xl:grid-cols-[minmax(0,2fr)_104px_110px_minmax(150px,1fr)_56px_minmax(0,1.6fr)_148px] xl:items-center xl:gap-4";
 
-function Telefone({ telefone }: { telefone: string | null }) {
+function Telefone({ telefone, editar }: { telefone: string | null; editar: (() => void) | null }) {
   const tipo = tipoDoTelefone(telefone);
-  if (!telefone) return <Badge variant="estado-aviso">Sem telefone</Badge>;
   return (
     <span className="flex flex-wrap items-center gap-1.5">
-      <span className="whitespace-nowrap tabular-nums text-ink-2">{mascaraTelefoneBR(telefone)}</span>
-      {tipo !== "celular" && (
-        <Badge variant="estado-aviso" data-slot="lead-telefone-invalido">
-          {tipo === "fixo" ? "Fixo" : "Inválido"}
-        </Badge>
+      {telefone ? (
+        <>
+          <span className="whitespace-nowrap tabular-nums text-ink-2">{mascaraTelefoneBR(telefone)}</span>
+          {tipo !== "celular" && (
+            <Badge variant="estado-aviso" title="Não entra em campanha" data-slot="lead-telefone-invalido">
+              {tipo === "fixo" ? "Fixo" : "Inválido"}
+            </Badge>
+          )}
+        </>
+      ) : (
+        <Badge variant="estado-aviso">Sem telefone</Badge>
+      )}
+      {editar && tipo !== "celular" && (
+        <Button variant="ghost" size="icon-chrome" aria-label="Adicionar celular" title="Adicionar celular" onClick={editar} data-slot="lead-adicionar-celular">
+          <Pencil aria-hidden />
+        </Button>
       )}
     </span>
   );
@@ -476,6 +494,7 @@ function LinhaDoLead({
   lead,
   marcar,
   abrirFicha,
+  editarTelefone,
   destacada,
   verNoMapa,
   remover,
@@ -485,6 +504,8 @@ function LinhaDoLead({
   /** Abre a confirmação de tirar o lead; null = ele não pode sair daqui (Todos os leads, já contatado). */
   remover: (() => void) | null;
   abrirFicha: () => void;
+  /** Abre a ficha no campo do telefone; null = o número deste lead não muda (já tem histórico). */
+  editarTelefone: (() => void) | null;
   /** O pino deste lead foi clicado no mapa. */
   destacada: boolean;
   /** Só no detalhe de uma busca, e só para lead com coordenadas. */
@@ -530,7 +551,7 @@ function LinhaDoLead({
         <TextoDoSite url={lead.site} />
       </p>
       <div className="text-apoio">
-        <Telefone telefone={lead.telefone} />
+        <Telefone telefone={lead.telefone} editar={editarTelefone} />
       </div>
       <div>
         <SeloDaPontuacao sinais={sinaisDoLead(lead)} pontos={lead.pontuacao} />
@@ -586,7 +607,7 @@ function TabelaDeLeads({
   focoDoMapa = null,
   verNoMapa = null,
   aoMarcar,
-  aoRemover,
+  aoMudar,
 }: {
   esquerda: React.ReactNode;
   fonte: FonteDeCampanhas;
@@ -600,10 +621,11 @@ function TabelaDeLeads({
   verNoMapa?: ((id: string) => void) | null;
   /** Uma marcação que valeu (o mapa da busca recolore o pino sem reler). */
   aoMarcar?: (id: string, m: Lead["marcacao"]) => void;
-  /** Um lead saiu: a tabela, o painel e os pinos leem de novo. */
-  aoRemover: () => void;
+  /** Um lead saiu ou ganhou celular: a tabela, o painel e os pinos leem de novo. */
+  aoMudar: () => void;
 }) {
   const [ficha, setFicha] = useState<LeadDaTabela | null>(null);
+  const [fichaNoTelefone, setFichaNoTelefone] = useState(false);
   const [removendo, setRemovendo] = useState<LeadDaTabela | null>(null);
   const [q, setQ] = useState("");
   const busca = useDebounce(q.trim(), 300);
@@ -613,11 +635,12 @@ function TabelaDeLeads({
   const [notaMinima, setNotaMinima] = useState<NotaMinima>(null);
   const [minAvaliacoes, setMinAvaliacoes] = useState<MinimoDeAvaliacoes>(null);
   const [categorias, setCategorias] = useState<string[]>([]);
+  const [telefone, setTelefone] = useState<FiltroDeTelefone>("todos");
   const { dados: cidades } = useLeitura(`cidades|${buscaId ?? ""}|${versao}`, () => fonte.cidades(buscaId));
   const { dados: categoriasDoRecorte } = useLeitura(`categorias|${buscaId ?? ""}|${versao}`, () => fonte.categorias(buscaId));
   const recorte = useMemo<RecorteDosLeads>(
-    () => ({ buscaId, texto: busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias }),
-    [buscaId, busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias],
+    () => ({ buscaId, texto: busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias, telefone }),
+    [buscaId, busca, cidade, filtros, site, notaMinima, minAvaliacoes, categorias, telefone],
   );
   const ler = useCallback((pagina: number) => fonte.leads({ ...recorte, pagina }), [fonte, recorte]);
   const linkDaExportacao = fonte.linkDaExportacao(recorte);
@@ -662,13 +685,21 @@ function TabelaDeLeads({
     [aoMarcar, fonte, mudarItem],
   );
 
+  const abrirFicha = (l: LeadDaTabela, noTelefone: boolean) => {
+    setFichaNoTelefone(noTelefone);
+    setFicha(l);
+  };
   const ativos =
-    filtros.length + (cidade ? 1 : 0) + (site !== "todos" ? 1 : 0) + (notaMinima !== null ? 1 : 0) + (minAvaliacoes !== null ? 1 : 0) + categorias.length;
+    filtros.length + (cidade ? 1 : 0) + (site !== "todos" ? 1 : 0) + (telefone !== "todos" ? 1 : 0) + (notaMinima !== null ? 1 : 0) + (minAvaliacoes !== null ? 1 : 0) + categorias.length;
   const grupos = [
     {
       titulo: "Mostrar só",
       multiplo: true,
       opcoes: FILTROS.map((f) => ({ chave: f.chave, rotulo: f.rotulo, marcado: filtros.includes(f.chave), aoEscolher: () => alternar(f.chave) })),
+    },
+    {
+      titulo: "Telefone",
+      opcoes: TELEFONES.map((t) => ({ chave: `telefone-${t.valor}`, rotulo: t.rotulo, marcado: telefone === t.valor, aoEscolher: () => setTelefone(t.valor) })),
     },
     {
       titulo: "Site",
@@ -768,8 +799,9 @@ function TabelaDeLeads({
               key={l.id}
               lead={l}
               marcar={(m) => marcar(l.id, m)}
-              abrirFicha={() => setFicha(l)}
-              remover={buscaId || leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => setRemovendo(l) : null}
+              abrirFicha={() => abrirFicha(l, false)}
+              editarTelefone={leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => abrirFicha(l, true) : null}
+              remover={buscaId || leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhas.length }) ? () => setRemovendo(l) : null}
               destacada={destaque === l.id}
               verNoMapa={verNoMapa && l.detalhes?.lat != null ? () => verNoMapa(l.id) : null}
             />
@@ -777,8 +809,17 @@ function TabelaDeLeads({
         </ul>
       </CorpoDaTabela>
       <RodapeDaTabela pagina={tabela.pagina} total={tabela.total} aoMudar={tabela.setPagina} slot="leads" lido={tabela.lido} />
-      <FichaDoLead lead={ficha} aoFechar={() => setFicha(null)} />
-      <RemoverLead lead={removendo} buscaId={buscaId} fonte={fonte} aoFechar={() => setRemovendo(null)} aoRemover={aoRemover} />
+      <FichaDoLead
+        lead={ficha}
+        fonte={fonte}
+        editarTelefone={fichaNoTelefone}
+        aoFechar={() => setFicha(null)}
+        aoSalvarTelefone={(novo) => {
+          setFicha((f) => (f ? { ...f, telefone: novo } : f));
+          aoMudar();
+        }}
+      />
+      <RemoverLead lead={removendo} buscaId={buscaId} fonte={fonte} aoFechar={() => setRemovendo(null)} aoRemover={aoMudar} />
     </>
   );
 }
@@ -877,7 +918,7 @@ function HomeDosLeads({
                 aoMudar={aoMudar}
               />
             ) : (
-              <TabelaDeLeads esquerda={seletorDaVista} fonte={fonte} versao={versao} buscaId={null} aoRemover={aoMudar} />
+              <TabelaDeLeads esquerda={seletorDaVista} fonte={fonte} versao={versao} buscaId={null} aoMudar={aoMudar} />
             )}
           </Card>
         </>
@@ -975,7 +1016,7 @@ function DetalheDaBusca({
           focoDoMapa={destaque?.origem === "mapa" ? destaque : null}
           verNoMapa={pontos && pontos.length > 0 ? (id) => destacar(id, "tabela") : null}
           aoMarcar={aoMarcar}
-          aoRemover={aoMudar}
+          aoMudar={aoMudar}
         />
       </Card>
       <ApagarBusca

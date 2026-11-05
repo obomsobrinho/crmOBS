@@ -1,6 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
 import { campoDe, ehId, recorteDe } from "@/lib/campanhas-pedidos";
-import { falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/lib/campanhas-servidor";
+import { editarTelefone, falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/lib/campanhas-servidor";
+import { problemaDoCelular, telefoneDoLead } from "@/lib/prospeccao";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Em que página do recorte (`?busca=&texto=&cidade=&filtros=`) o lead está: o pino
@@ -26,6 +27,23 @@ export const PUT = rotaDoAdmin(
       return r ? Response.json(r) : Response.json({ error: "lead não encontrado" }, { status: 404 });
     } catch (e) {
       return falhou("marcar o lead", e);
+    }
+  },
+  { revalidar: true },
+);
+
+// Põe um celular no lead: `{ telefone }`, com a mesma conferência da tela (`problemaDoCelular`).
+export const PATCH = rotaDoAdmin(
+  async ({ req, admin, id }) => {
+    const corpo: unknown = await req.json().catch(() => null);
+    const digitado = campoDe(corpo, "telefone");
+    if (typeof digitado !== "string") return torto("telefone inválido");
+    const celular = telefoneDoLead(digitado);
+    if (!celular) return Response.json({ error: problemaDoCelular(digitado) }, { status: 422 });
+    try {
+      return await editarTelefone(createServiceClient(), admin, id, celular);
+    } catch (e) {
+      return falhou("editar o lead", e);
     }
   },
   { revalidar: true },

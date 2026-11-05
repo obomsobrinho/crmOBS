@@ -1,5 +1,11 @@
 # Handoff: Campanhas v2
 
+## Rodada de 05/11/2026 (2): filtro de telefone e editar o celular do lead (branch `claude/campanhas-leads-telefone`)
+
+Migration `20261105120000_prospeccao_filtro_telefone_e_editar.sql` NÃO aplicada: produção espera o OK digitado do
+Franck. Aplicar ANTES do deploy; os tipos de `lib/database.types.ts` foram escritos à mão com o que o gerador
+vai devolver, e devem ser regenerados depois de aplicar. O nome do arquivo muda para a versão que o banco registrar.
+
 ## Rodada de 05/11/2026: ajustes do teste de 04/11 (branch `claude/campanhas-ajustes-348e3b`)
 
 Abas na ordem Campanhas e Leads, apagar campanha e lista, X com confirmação, "bom" como favorito, centralizar

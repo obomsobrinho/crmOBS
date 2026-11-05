@@ -291,6 +291,7 @@ function parametrosDoRecorte(p: RecorteDosLeads) {
     p_min_avaliacoes: p.minAvaliacoes ?? undefined,
     p_categorias: p.categorias.length > 0 ? p.categorias : undefined,
     p_nao_reivindicado: p.filtros.includes("nao_reivindicado"),
+    p_telefone: p.telefone === "todos" ? undefined : p.telefone,
   };
 }
 
@@ -748,10 +749,10 @@ export async function retomarCampanha(svc: Supa, admin: string, id: string, agor
 
 // ── Apagar (uma função SQL cada, com a linha em admin_acoes) ─────────────
 
-/** A resposta HTTP do que a função SQL de apagar devolveu: `{ ok: true }` ou a recusa com a frase. */
-function respostaAoApagar({ data, error }: { data: string | null; error: unknown }): Response {
+/** A resposta HTTP do que a função SQL devolveu: `corpo` quando deu certo, ou a recusa com a frase. */
+function respostaAoApagar({ data, error }: { data: string | null; error: unknown }, corpo: unknown = { ok: true }): Response {
   if (error) throw error;
-  if (data === "ok") return Response.json({ ok: true });
+  if (data === "ok") return Response.json(corpo);
   const recusa = Object.entries(RECUSA_AO_APAGAR).find(([chave]) => chave === data);
   const status = data === "nao_encontrada" || data === "nao_encontrado" ? 404 : 409;
   return Response.json({ error: recusa?.[1] ?? "Não deu para apagar." }, { status });
@@ -770,6 +771,11 @@ export async function apagarBusca(svc: Supa, admin: string, id: string): Promise
 /** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
 export async function removerLead(svc: Supa, admin: string, id: string, buscaId: string | null): Promise<Response> {
   return respostaAoApagar(await svc.rpc("prospeccao_remover_lead", { p_quem: admin, p_lead: id, p_busca: buscaId ?? undefined }));
+}
+
+/** Põe um celular no lead (a chave de `telefoneDoLead`); a tabela passa a mostrar esse número. */
+export async function editarTelefone(svc: Supa, admin: string, id: string, celular: string): Promise<Response> {
+  return respostaAoApagar(await svc.rpc("prospeccao_editar_telefone", { p_quem: admin, p_lead: id, p_telefone: celular }), { telefone: celular });
 }
 
 // ── A busca na fonte ─────────────────────────────────────────────────────

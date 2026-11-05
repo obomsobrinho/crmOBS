@@ -6,6 +6,7 @@ import {
   type DetalhesDoLead,
   type DiaDeEnvio,
   type EstadoDaFila,
+  type FiltroDeTelefone,
   type EstadoNoMapa,
   type MarcacaoDoLead,
   type ResultadoDaCampanha,
@@ -211,6 +212,8 @@ export interface RecorteDosLeads {
   minAvaliacoes: MinimoDeAvaliacoes;
   /** As categorias marcadas (das que vieram no resultado); vazio = qualquer. */
   categorias: string[];
+  /** Quem pode ser contatado: só o celular entra em campanha. */
+  telefone: FiltroDeTelefone;
 }
 
 /** O recorte sem filtro nenhum (a tabela abre assim). */
@@ -222,6 +225,7 @@ export const RECORTE_LIVRE: Omit<RecorteDosLeads, "buscaId"> = {
   notaMinima: null,
   minAvaliacoes: null,
   categorias: [],
+  telefone: "todos",
 };
 
 /** A campanha sem os envios: o que o assistente edita e o topo do detalhe mostra. */
@@ -331,6 +335,8 @@ export interface FonteDeCampanhas {
   /** Tira o lead de uma lista, ou da base inteira (`buscaId` null). */
   removerLead(id: string, buscaId: string | null): Promise<RespostaDeApagar>;
   apagarBusca(id: string): Promise<RespostaDeApagar>;
+  /** Põe um celular no lead; `telefone` é o que a tabela passa a mostrar. */
+  editarTelefone(id: string, celular: string): Promise<{ ok: true; telefone: string } | { ok: false; erro: string }>;
   painelDaBase(buscaId: string | null): Promise<ResumoDobrado>;
   campanhas(p: { texto: string; situacao: SituacaoDaCampanha | null; pagina: number }): Promise<Pagina<CampanhaDaTabela>>;
   /** As campanhas que já enviaram algo (o seletor do painel de resultados). */

@@ -10,13 +10,14 @@ import {
   contagemPorSemana,
   enviosPorDia,
   estadoNoMapa,
-  leadSaiDaBase,
+  leadSemHistorico,
   pontuarLead,
   problemasParaIniciar,
   respostasPorEspera,
   resultadoDaCampanha,
   resumoDaBase,
   siteDoLead,
+  situacaoDoTelefone,
   nomeDaBusca,
   telefoneDoLead,
   type EnvioParaResultado,
@@ -74,7 +75,7 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
   /** Os leads do recorte da tabela, na ordem da pontuação (a mesma da tabela de verdade). */
   /** As categorias de um lead (as da fonte, ou o segmento de um lead de antes): o mesmo `coalesce` do SQL. */
   const categoriasDoLead = (l: Lead) => (l.detalhes?.categorias.length ? l.detalhes.categorias : [l.segmento]);
-  const doRecorte = ({ buscaId, texto, cidade, filtros, site, notaMinima, minAvaliacoes, categorias }: RecorteDosLeads): Lead[] => {
+  const doRecorte = ({ buscaId, texto, cidade, filtros, site, notaMinima, minAvaliacoes, categorias, telefone }: RecorteDosLeads): Lead[] => {
     const q = normalizar(texto);
     const digitos = texto.replace(/\D/g, "");
     return daBusca(buscaId)
@@ -89,7 +90,8 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
           (notaMinima === null || (l.nota !== null && l.nota >= notaMinima)) &&
           (minAvaliacoes === null || (l.avaliacoes ?? 0) >= minAvaliacoes) &&
           (categorias.length === 0 || categoriasDoLead(l).some((c) => categorias.includes(c))) &&
-          (!filtros.includes("nao_reivindicado") || l.detalhes?.reivindicado === false),
+          (!filtros.includes("nao_reivindicado") || l.detalhes?.reivindicado === false) &&
+          (telefone === "todos" || situacaoDoTelefone(l.telefone) === telefone),
       )
       .sort((a, b) => pontos(b) - pontos(a) || a.nome.localeCompare(b.nome, "pt-BR"));
   };
@@ -229,7 +231,7 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       if (!l) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrado };
       const fila = campanhas.some((c) => c.envios.some((e) => e.leadId === id && e.situacao === "na_fila"));
       if (fila) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
-      const livre = leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhaIds.length });
+      const livre = leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length });
       if (buscaId === null && !livre) return { ok: false, erro: RECUSA_AO_APAGAR.contatado };
       // Aqui cada lead tem uma lista só (`buscaId`): quem fica na base sai dela.
       leads = livre ? leads.filter((x) => x.id !== id) : leads.map((x) => (x.id === id ? { ...x, buscaId: "" } : x));
@@ -243,10 +245,21 @@ export function fonteDeMentira(dados: DadosDeMentira, agora: number): FonteDeCam
       const naFila = new Set(campanhas.flatMap((c) => c.envios.filter((e) => e.situacao === "na_fila").map((e) => e.leadId)));
       if (daBusca(id).some((l) => naFila.has(l.id))) return { ok: false, erro: RECUSA_AO_APAGAR.na_fila };
       leads = leads
-        .filter((l) => l.buscaId !== id || !leadSaiDaBase({ parouEm: l.parouEm, campanhas: l.campanhaIds.length }))
+        .filter((l) => l.buscaId !== id || !leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length }))
         .map((l) => (l.buscaId === id ? { ...l, buscaId: "" } : l));
       buscas.splice(buscas.indexOf(b), 1);
       return { ok: true };
+    },
+
+    async editarTelefone(id, celular) {
+      const l = leads.find((x) => x.id === id);
+      if (!l) return { ok: false, erro: RECUSA_AO_APAGAR.nao_encontrado };
+      if (!leadSemHistorico({ parouEm: l.parouEm, campanhas: l.campanhaIds.length })) return { ok: false, erro: RECUSA_AO_APAGAR.contatado };
+      const telefone = telefoneDoLead(celular);
+      if (!telefone) return { ok: false, erro: RECUSA_AO_APAGAR.invalido };
+      if (leads.some((x) => x.id !== id && telefoneDoLead(x.telefone) === telefone)) return { ok: false, erro: RECUSA_AO_APAGAR.duplicado };
+      leads = leads.map((x) => (x.id === id ? { ...x, telefone } : x));
+      return { ok: true, telefone };
     },
 
     async painelDaBase(buscaId) {

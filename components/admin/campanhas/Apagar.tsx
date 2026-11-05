@@ -1,7 +1,7 @@
 "use client";
 
 import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
-import { campanhaAindaEnvia, leadSaiDaBase, type SituacaoDaCampanha } from "@/lib/prospeccao";
+import { campanhaAindaEnvia, leadSemHistorico, type SituacaoDaCampanha } from "@/lib/prospeccao";
 import type { FonteDeCampanhas, LeadDaTabela, RespostaDeApagar } from "./tipos";
 
 // AS CONFIRMAÇÕES de Campanhas (dono, 04/11/2026): apagar uma campanha, apagar uma lista e tirar um
@@ -111,7 +111,7 @@ export function RemoverLead({
   aoRemover: () => void;
 }) {
   if (!lead) return null;
-  const fica = !leadSaiDaBase({ parouEm: lead.parouEm, campanhas: lead.campanhas.length });
+  const fica = !leadSemHistorico({ parouEm: lead.parouEm, campanhas: lead.campanhas.length });
   return (
     <DialogoDaAcao
       aberto

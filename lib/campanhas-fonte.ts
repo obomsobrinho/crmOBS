@@ -137,6 +137,10 @@ export function fonteDasRotas(): FonteDeCampanhas {
     marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
     removerLead: (id, buscaId) => apagar(`/leads/${id}${q({ busca: buscaId })}`),
     apagarBusca: (id) => apagar(`/buscas/${id}`),
+    editarTelefone: async (id, celular) => {
+      const r = await recusaSe4xx(pedir<{ telefone: string }>(`/leads/${id}`, enviar({ telefone: celular }, "PATCH")));
+      return r.ok ? { ok: true, telefone: r.valor.telefone } : r;
+    },
     painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
     campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
     campanhasComEnvio: () => pedir<{ id: string; nome: string }[]>("?com_envio=1"),

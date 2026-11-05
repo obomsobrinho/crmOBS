@@ -47,6 +47,25 @@ export function telefoneDoLead(telefone: string | null | undefined): string | nu
   return d.startsWith("55") && d.length >= 12 ? d : `55${d}`;
 }
 
+/** O telefone de um lead para a campanha: só `celular` pode receber; `sem` inclui o número inválido. */
+export type SituacaoDoTelefone = "celular" | "fixo" | "sem";
+
+/** O filtro da tabela de leads (`p_telefone` no SQL, que repete `situacaoDoTelefone`). */
+export type FiltroDeTelefone = SituacaoDoTelefone | "todos";
+
+export function situacaoDoTelefone(telefone: string | null | undefined): SituacaoDoTelefone {
+  const tipo = tipoDoTelefone(telefone);
+  return tipo === "invalido" ? "sem" : tipo;
+}
+
+/** Por que um número digitado não serve para um lead; null = é um celular do Brasil. */
+export function problemaDoCelular(digitado: string): string | null {
+  if (telefoneDoLead(digitado) !== null) return null;
+  return tipoDoTelefone(digitado) === "fixo"
+    ? "Esse número é fixo: campanha só sai para celular."
+    : "Confira o número: DDD e celular com 9 dígitos.";
+}
+
 // ── Site (só pela URL que a busca trouxe) ────────────────────────────────
 
 /** Tem site: sim, só rede social, ou não. */
@@ -342,7 +361,7 @@ export function campanhaAindaEnvia(situacao: SituacaoDaCampanha): boolean {
   return situacao === "rodando" || situacao === "agendada";
 }
 
-/** A frase de cada recusa ao apagar ou tirar algo (as respostas das funções SQL); o preview usa as mesmas. */
+/** A frase de cada recusa ao apagar, tirar ou editar algo (as respostas das funções SQL); o preview usa as mesmas. */
 export const RECUSA_AO_APAGAR = {
   nao_encontrada: "Isto já não existe mais.",
   nao_encontrado: "Este lead já saiu da lista.",
@@ -350,10 +369,15 @@ export const RECUSA_AO_APAGAR = {
   buscando: "A busca ainda está rodando. Espere terminar para apagar.",
   na_fila: "Há lead na fila de uma campanha. Apague a campanha antes, ou espere a fila andar.",
   contatado: "Este lead já foi contatado ou pediu para parar: ele fica na base para nunca receber de novo.",
+  duplicado: "Este celular já está em outro lead.",
+  invalido: "Confira o número: DDD e celular com 9 dígitos.",
 } as const;
 
-/** Sair da base de vez? Nunca quem já entrou em campanha ou pediu para parar: a marca evita a segunda mensagem (o SQL repete). */
-export function leadSaiDaBase(l: { parouEm: number | null; campanhas: number }): boolean {
+/**
+ * Lead sem histórico: nunca entrou em campanha nem pediu para parar. Só ele sai da base e só dele o número
+ * muda: a marca evita a segunda mensagem, e o cron observa respostas e SAIR pelo número (o SQL repete).
+ */
+export function leadSemHistorico(l: { parouEm: number | null; campanhas: number }): boolean {
   return l.parouEm === null && l.campanhas === 0;
 }
 

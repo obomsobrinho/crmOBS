@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { AtSign, Clock, Globe, Image as Foto, MapPin, Phone, ShieldAlert, ShieldCheck, Star, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
+import { Input } from "@/components/ui/input";
 import { Medidor } from "@/components/ui/medidor";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { mascaraTelefoneBR, numeroBR, pct } from "@/lib/format";
@@ -10,19 +13,24 @@ import {
   DIAS_DA_SEMANA,
   faixaDaPontuacao,
   ganchosDoHorario,
+  leadSemHistorico,
   pontuacaoExibida,
+  problemaDoCelular,
   textoDoDia,
   textosDosGanchos,
+  situacaoDoTelefone,
   tipoDoTelefone,
 } from "@/lib/prospeccao";
 import { DA_FAIXA, TextoDoSite } from "./pecas";
-import { sinaisDoLead, type LeadDaTabela } from "./tipos";
+import { sinaisDoLead, type FonteDeCampanhas, type LeadDaTabela } from "./tipos";
 
 // A FICHA DE UM LEAD (revisão do dono, 30/10/2026): o que a fonte trouxe além da
 // linha da tabela. A pontuação com os motivos; o perfil do Google reivindicado
 // ou não (sinal de presença digital fraca); o horário, com os ganchos do
 // atendimento fora do horário (fecha cedo, não abre sábado, fecha no almoço); as
-// avaliações por estrela; fotos, categorias, endereço e o @ do Instagram.
+// avaliações por estrela; fotos, categorias, endereço e o @ do Instagram. O telefone
+// é o único campo editável (dono, 05/11/2026): um celular achado em outro lugar põe o
+// lead em condição de entrar numa campanha.
 
 function Linha({ icone: Icone, rotulo, children }: { icone: typeof Phone; rotulo: string; children: React.ReactNode }) {
   return (
@@ -36,7 +44,117 @@ function Linha({ icone: Icone, rotulo, children }: { icone: typeof Phone; rotulo
   );
 }
 
-export default function FichaDoLead({ lead, aoFechar }: { lead: LeadDaTabela | null; aoFechar: () => void }) {
+/** O telefone do lead e, para quem não tem histórico, adicionar ou trocar o celular. */
+function TelefoneDoLead({
+  lead,
+  fonte,
+  comecarEditando,
+  aoSalvar,
+}: {
+  lead: LeadDaTabela;
+  fonte: FonteDeCampanhas;
+  comecarEditando: boolean;
+  aoSalvar: (telefone: string) => void;
+}) {
+  const podeEditar = leadSemHistorico({ parouEm: lead.parouEm, campanhas: lead.campanhas.length });
+  const [editando, setEditando] = useState(comecarEditando && podeEditar);
+  const [valor, setValor] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  async function salvar() {
+    const problema = problemaDoCelular(valor);
+    setErro(problema);
+    if (problema) return;
+    setSalvando(true);
+    try {
+      const r = await fonte.editarTelefone(lead.id, valor);
+      if (r.ok) {
+        aoSalvar(r.telefone);
+        setEditando(false);
+        setValor("");
+      } else setErro(r.erro);
+    } catch (e) {
+      console.error("lead, editar telefone:", e);
+      setErro("Não deu para salvar agora. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  if (editando) {
+    return (
+      <form
+        noValidate
+        className="flex flex-col gap-2"
+        data-slot="lead-telefone-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void salvar();
+        }}
+      >
+        <Input
+          autoFocus
+          inputMode="tel"
+          placeholder="(33) 90000-0000"
+          aria-label={`Celular de ${lead.nome}`}
+          value={valor}
+          onChange={(e) => setValor(mascaraTelefoneBR(e.target.value))}
+          data-slot="lead-telefone-campo"
+        />
+        {erro && (
+          <p role="alert" className="text-legenda text-danger-ink" data-slot="lead-telefone-erro">
+            {erro}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <Button type="submit" size="control" carregando={salvando} data-slot="lead-telefone-salvar">
+            Salvar
+          </Button>
+          <Button type="button" variant="outline" size="control" onClick={() => setEditando(false)}>
+            Cancelar
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  const situacao = situacaoDoTelefone(lead.telefone);
+  return (
+    <>
+      {lead.telefone ? (
+        <>
+          {mascaraTelefoneBR(lead.telefone)}
+          {situacao !== "celular" && (
+            <span className="ml-2 text-legenda text-warn-ink">{tipoDoTelefone(lead.telefone) === "fixo" ? "Fixo, não entra em campanha" : "Inválido"}</span>
+          )}
+        </>
+      ) : (
+        <span className="text-ink-3">Sem telefone</span>
+      )}
+      {podeEditar && (
+        <Button variant="link" size="link" onClick={() => setEditando(true)} className="block" data-slot="lead-telefone-editar">
+          {situacao === "celular" ? "Trocar o celular" : "Adicionar celular"}
+        </Button>
+      )}
+    </>
+  );
+}
+
+export default function FichaDoLead({
+  lead,
+  fonte,
+  editarTelefone = false,
+  aoFechar,
+  aoSalvarTelefone,
+}: {
+  lead: LeadDaTabela | null;
+  fonte: FonteDeCampanhas;
+  /** A ficha abriu pelo lápis da tabela: já começa no campo do telefone. */
+  editarTelefone?: boolean;
+  aoFechar: () => void;
+  aoSalvarTelefone: (telefone: string) => void;
+}) {
   const d = lead?.detalhes ?? null;
   const ganchos = textosDosGanchos(ganchosDoHorario(d?.horarios));
   const pontos = lead ? pontuacaoExibida(sinaisDoLead(lead), lead.pontuacao) : null;
@@ -80,16 +198,7 @@ export default function FichaDoLead({ lead, aoFechar }: { lead: LeadDaTabela | n
 
               <dl className="flex flex-col gap-4 border-t border-line pt-5">
                 <Linha icone={Phone} rotulo="Telefone">
-                  {lead.telefone ? (
-                    <>
-                      {mascaraTelefoneBR(lead.telefone)}
-                      {tipoDoTelefone(lead.telefone) !== "celular" && (
-                        <span className="ml-2 text-legenda text-warn-ink">{tipoDoTelefone(lead.telefone) === "fixo" ? "Fixo" : "Inválido"}</span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-ink-3">Sem telefone</span>
-                  )}
+                  <TelefoneDoLead key={lead.id} lead={lead} fonte={fonte} comecarEditando={editarTelefone} aoSalvar={aoSalvarTelefone} />
                 </Linha>
                 <Linha icone={Globe} rotulo="Site">
                   <TextoDoSite url={lead.site} />
