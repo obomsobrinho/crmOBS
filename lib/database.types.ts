@@ -2131,6 +2131,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      prospeccao_editar_telefone: {
+        Args: { p_lead: string; p_quem: string; p_telefone: string }
+        Returns: string
+      }
       prospeccao_em_observacao: {
         Args: { p_desde: string }
         Returns: {
@@ -2190,10 +2194,6 @@ export type Database = {
           total: number
         }[]
       }
-      prospeccao_editar_telefone: {
-        Args: { p_lead: string; p_quem: string; p_telefone: string }
-        Returns: string
-      }
       prospeccao_leads_pagina: {
         Args: {
           p_busca?: string
@@ -2250,7 +2250,6 @@ export type Database = {
       }
       prospeccao_pagina_do_lead: {
         Args: {
-          p_telefone?: string
           p_busca?: string
           p_categorias?: string[]
           p_cidade?: string
@@ -2264,6 +2263,7 @@ export type Database = {
           p_so_bons?: boolean
           p_so_com_site?: boolean
           p_so_sem_site?: boolean
+          p_telefone?: string
           p_texto?: string
         }
         Returns: number

@@ -44,6 +44,7 @@ test.describe("Campanhas sem login", () => {
     expect((await request.post("/api/admin/campanhas/buscas", { data: {}, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/${ID}/acao`, { data: { acao: "iniciar" }, maxRedirects: 0 })).status()).toBe(404);
     expect((await request.put(`/api/admin/campanhas/leads/${ID}`, { data: { marcacao: "bom" }, maxRedirects: 0 })).status()).toBe(404);
+    expect((await request.patch(`/api/admin/campanhas/leads/${ID}`, { data: { telefone: "33999887766" }, maxRedirects: 0 })).status()).toBe(404);
     for (const r of [`/api/admin/campanhas/${ID}`, `/api/admin/campanhas/buscas/${ID}`, `/api/admin/campanhas/leads/${ID}`]) {
       expect((await request.delete(r, { maxRedirects: 0 })).status(), r).toBe(404);
     }

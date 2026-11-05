@@ -101,6 +101,7 @@ function TelefoneDoLead({
           onChange={(e) => setValor(mascaraTelefoneBR(e.target.value))}
           data-slot="lead-telefone-campo"
         />
+        {lead.telefone && <p className="text-legenda text-ink-3">O celular substitui o número {mascaraTelefoneBR(lead.telefone)}.</p>}
         {erro && (
           <p role="alert" className="text-legenda text-danger-ink" data-slot="lead-telefone-erro">
             {erro}

@@ -1,10 +1,14 @@
 # Handoff: Campanhas v2
 
-## Rodada de 05/11/2026 (2): filtro de telefone e editar o celular do lead (branch `claude/campanhas-leads-telefone`)
+## Rodada de 05/11/2026 (2): filtro de telefone, editar o celular do lead e descarte de categorias (branch `claude/campanhas-leads-telefone`)
 
-Migration `20261105120000_prospeccao_filtro_telefone_e_editar.sql` NÃO aplicada: produção espera o OK digitado do
-Franck. Aplicar ANTES do deploy; os tipos de `lib/database.types.ts` foram escritos à mão com o que o gerador
-vai devolver, e devem ser regenerados depois de aplicar. O nome do arquivo muda para a versão que o banco registrar.
+Decisões e porquê: `docs/adr/2026-11-05-campanhas-phone-filter-and-lead-phone-edit.md`. Migration
+`20261105135447` aplicada, tipos regenerados.
+
+Para o Franck decidir: o corte da lista `CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`) foi lido do "mete bronca",
+não escolhido item a item. Jardim, Escola, Pré-escola e Apartamentos ficaram de fora. Praça, igreja e prefeitura
+precisam do nome real da categoria: o X apagou esses leads, e o `admin_acoes` guarda só o nome. Os resultados
+da busca seguem no Apify (execução `uxwtPIOwyBhMJvWcU`), mas o `APIFY_TOKEN` só existe na Vercel.
 
 ## Rodada de 05/11/2026: ajustes do teste de 04/11 (branch `claude/campanhas-ajustes-348e3b`)
 
