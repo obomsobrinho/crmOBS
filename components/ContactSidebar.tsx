@@ -560,7 +560,7 @@ export default function ContactSidebar({
                   onClick={() => setFilter(k)}
                 >
                   {CHIP_ROTULO[k]}
-                  <span className="font-bold tabular-nums opacity-75">
+                  <span className="font-bold tabular-nums dark:opacity-75">
                     {contagem[k]}
                   </span>
                 </Button>

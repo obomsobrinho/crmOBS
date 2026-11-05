@@ -237,7 +237,7 @@ export default function ContactTags({
               }}
               placeholder="Nova tag"
               aria-label="Nome da nova tag"
-              className="w-auto flex-1 rounded-lg border border-line bg-[var(--input-bg)] px-2.5 py-1.5 text-legenda transition-colors"
+              className="w-auto flex-1 rounded-lg border border-[var(--input-line)] bg-[var(--input-bg)] px-2.5 py-1.5 text-legenda transition-colors"
             />
             <Button
               variant="brand"

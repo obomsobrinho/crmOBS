@@ -46,9 +46,9 @@ export default async function RootLayout({
 }>) {
   // Tema definido no servidor a partir do cookie (escrito pelo ThemeToggle).
   // Assim o data-theme já vem no HTML e não há flash nem timing de script no
-  // refresh. Sem cookie, cai no dark (obm2.0 é dark-native).
+  // refresh. Sem cookie, abre no claro (decisão do dono, 05/11/2026).
   const theme =
-    (await cookies()).get("theme")?.value === "light" ? "light" : "dark";
+    (await cookies()).get("theme")?.value === "dark" ? "dark" : "light";
 
   return (
     <html

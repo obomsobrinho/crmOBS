@@ -24,7 +24,7 @@ const inputVariants = cva(
         caixa:
           // `max-md:h-11`: no celular todo campo tem 44px, o alvo mínimo de toque
           // (plano do mobile, fase 5).
-          "h-[var(--h-field)] rounded-lg border border-line bg-[var(--input-bg)] px-3 text-apoio transition-colors max-md:h-11",
+          "h-[var(--h-field)] rounded-lg border border-[var(--input-line)] bg-[var(--input-bg)] px-3 text-apoio transition-colors max-md:h-11",
         /** Sem moldura e sem fundo: mora dentro de um bloco que já tem os dois. */
         limpo: "bg-transparent",
         /**
@@ -37,14 +37,14 @@ const inputVariants = cva(
          * `control` (32px) em vez dos 40px do `caixa`, porque a coluna tem 292px
          * e a linha já carrega rótulo, valor e o gutter do botão de remover.
          *
-         * ⚠️ A moldura é `line` (8%), a MESMA do `caixa`, e não `line-soft`.
+         * ⚠️ A moldura é `--input-line`, a MESMA do `caixa`, e não `line-soft`.
          * Medido: no tema claro a coluna do cliente, `--input-bg` e `--s-campo`
          * são todos #fff, então o fundo não distingue nada e a borda é o único
          * sinal que sobra. Com `line-soft` ela some, e o campo volta a ser o
          * texto que ninguém percebeu que dava para editar.
          */
         sutil:
-          "h-[var(--h-control)] rounded-md border border-line bg-[var(--input-bg)] px-2 text-apoio transition-colors hover:border-line-strong",
+          "h-[var(--h-control)] rounded-md border border-[var(--input-line)] bg-[var(--input-bg)] px-2 text-apoio transition-colors hover:border-line-strong",
       },
     },
     defaultVariants: { variant: "caixa" },
