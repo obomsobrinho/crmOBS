@@ -1,6 +1,6 @@
 # The agent sends a registered video or image, chosen by its description, once per conversation
 - Date: 2026-11-04
-- Status: Proposed (branch `claude/agente-midia`; the n8n change waits for the owner's OK)
+- Status: Accepted (live 2026-11-05, no catalog row yet: inert until the real video is registered)
 - Area: agent-ai, n8n, data
 
 ## Context
@@ -33,7 +33,7 @@ already plays video (`MediaView`).
 - **n8n sends, after the text loop:** `Tem mídia da IA?`, then `Telefone real? (mídia)` (once), then send
   video or image, then `Salva mídia da IA`.
   - The saved row has `message_type = 'midia_ia'` and no `bot_message`.
-  - The proposal is in `n8n/propostas/` and is NOT applied.
+  - Applied to the live workflow on 2026-11-05 (export in `n8n/obs-atendimento.json`); a failed send goes on to `Action`.
 - **Metrics:** the media row is not an AI reply (`respostaDaIa` needs `bot_message`), so no SQL copy
   changes. The sentence that announces the video is the reply.
 - **History:** a `midia_ia` row becomes an assistant line, "[Vídeo enviado pela empresa: chave. descrição]",
