@@ -11,15 +11,16 @@ test("sem cookie o HTML já vem em Light, em tela pública e na casca", async ({
   }
 });
 
-test("quem escolheu Dark continua em Dark desde o HTML", async ({ request }) => {
-  const resposta = await request.get("/login", { headers: { cookie: "theme=dark" } });
-  expect(temaDoHtml(await resposta.text())).toBe("dark");
-});
-
-test("cookie desconhecido cai no padrão Light", async ({ request }) => {
-  const resposta = await request.get("/login", { headers: { cookie: "theme=azul" } });
-  expect(temaDoHtml(await resposta.text())).toBe("light");
-});
+for (const [cookie, esperado] of [
+  ["theme=dark", "dark"],
+  ["theme=light", "light"],
+  ["theme=azul", "light"],
+]) {
+  test(`com o cookie ${cookie} o HTML vem em ${esperado}`, async ({ request }) => {
+    const resposta = await request.get("/login", { headers: { cookie } });
+    expect(temaDoHtml(await resposta.text())).toBe(esperado);
+  });
+}
 
 test("o botão troca nos dois sentidos e a escolha sobrevive à recarga", async ({ page }) => {
   const tema = () => page.evaluate(() => document.documentElement.dataset.theme);
@@ -36,20 +37,17 @@ test("o botão troca nos dois sentidos e a escolha sobrevive à recarga", async 
   expect(await tema()).toBe("light");
 });
 
-test("a moldura do campo é mais forte no claro, onde ela é o único sinal", async ({ page }) => {
-  const token = () =>
-    page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue("--input-line").trim(),
-    );
-  const forte = () =>
-    page.evaluate(() =>
-      getComputedStyle(document.documentElement).getPropertyValue("--line-strong").trim(),
+test("a moldura do campo só sobe no claro, onde ela é o único sinal", async ({ page }) => {
+  const token = (nome: string) =>
+    page.evaluate(
+      (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim(),
+      nome,
     );
 
   await page.goto("/login");
-  expect(await token()).toBe(await forte());
+  expect(await token("--input-line")).toBe(await token("--line-strong"));
 
   await page.context().addCookies([{ name: "theme", value: "dark", url: "http://localhost" }]);
   await page.reload();
-  expect(await token()).not.toBe(await forte());
+  expect(await token("--input-line")).toBe(await token("--line"));
 });

@@ -145,9 +145,9 @@ avança. Medir e aplicar por JS funciona, está coberto por teste e é um mecani
 
 ## Tema
 
-Abre no **claro** (decisão do dono, 05/11/2026, `docs/adr/2026-11-05-light-is-the-default-theme.md`); o
-escuro é escolha de quem usa, e fica no cookie. Vem de **cookie**, escrito como `data-theme` no `<html>` (`app/layout.tsx`), e não de
-`prefers-color-scheme`. Quem traduz isso para o `dark:` do Tailwind é a primeira linha do
+Abre no **claro** (decisão do dono, 05/11/2026, `docs/adr/2026-11-05-light-is-the-default-theme.md`);
+o escuro é escolha de quem usa. Vem de **cookie**, escrito como `data-theme` no `<html>`
+(`app/layout.tsx`), e não de `prefers-color-scheme`. Quem traduz isso para o `dark:` do Tailwind é a primeira linha do
 `globals.css`:
 
 ```css

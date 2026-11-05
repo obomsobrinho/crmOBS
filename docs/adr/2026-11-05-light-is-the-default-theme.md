@@ -11,7 +11,7 @@ Opening every `/design` route and the public screens in Light, a WCAG audit of e
 ## Decision
 - No cookie, or an unknown value, means Light. Only `theme=dark` means Dark. `app/layout.tsx` decides on the server and `components/ThemeToggle.tsx` starts on the same value, so the theme itself never flashes and whoever already chose keeps the choice.
 - New token `--input-line` for the frame of a field (`Input`, `Textarea`, `Select`, `CampoBusca`, the tag field): `--line-strong` in Light, `--line` in Dark, so Dark does not change by a pixel.
-- The inbox chip counter loses the opacity in Light only (`dark:opacity-75`).
+- The inbox chip counter loses the opacity in Light only (`dark:opacity-75`). The same `opacity-75` counters in `components/Pedidos.tsx` and `components/pipeline/FaixaDeEstagios.tsx` were covered by the same audit and passed, so they stay.
 
 ## Consequences
 - `--input-line` must be declared in the dark block too: `:root` and `[data-theme="dark"]` match the same element, so a `var()` written only in `:root` resolves to the dark value.
