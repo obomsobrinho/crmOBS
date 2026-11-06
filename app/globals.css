@@ -1537,12 +1537,13 @@ select:focus-visible,
     min-height: 0;
     padding: clamp(18px, 3.4cqh, 34px) 0 clamp(24px, 5cqh, 52px) var(--margem);
   }
-  /* A lista é a coluna esquerda inteira: os itens se distribuem até a base. */
+  /* A lista mora na parte de baixo da coluna esquerda e termina perto da base. */
   .painel-marca-lista {
     position: relative;
     z-index: 1;
     height: 100%;
-    align-content: space-between;
+    align-content: end;
+    gap: clamp(16px, 6.6cqh, 72px);
     max-width: clamp(150px, calc(42cqw - 80px), 320px);
   }
   .painel-marca-lista li:not([data-faixa]) {
