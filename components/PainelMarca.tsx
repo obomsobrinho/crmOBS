@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import {
+  BadgeCheck,
   BatteryFull,
   BellRing,
   BookOpen,
@@ -9,12 +10,12 @@ import {
   MessagesSquare,
   ReceiptText,
   SignalHigh,
-  User,
   UserPlus,
   Wifi,
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
 // O painel de marca das telas de entrada (hoje só o login; feito para o /cadastro
@@ -208,10 +209,15 @@ function CelularConversa() {
           <div className="celular-topo">
             <ChevronLeft />
             <span className="celular-avatar">
-              <User />
+              {/* A arte clara sempre: a tela do celular não muda com o tema. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={BRAND.markLight} alt="" />
             </span>
             <span className="celular-contato">
-              <strong>Cliente</strong>
+              <strong>
+                Cliente
+                <BadgeCheck className="celular-verificado" />
+              </strong>
               <span>online</span>
             </span>
           </div>

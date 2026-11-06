@@ -95,6 +95,8 @@ test.describe("Login (/login)", () => {
     const celular = page.locator('[data-slot="celular-conversa"]');
     await expect(celular).toHaveAttribute("aria-hidden", "true");
     await expect(celular.locator("a, button, input")).toHaveCount(0);
+    await expect(celular.locator(".celular-avatar img")).toHaveAttribute("src", "/marca/obs-mark-light.png");
+    await expect(celular.locator(".celular-verificado")).toBeVisible();
   });
 
   test("a cena tem fim, e só o que flutua continua, sem mexer no layout", async ({ page }) => {

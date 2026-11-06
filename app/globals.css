@@ -1569,14 +1569,14 @@ select:focus-visible,
   .painel-marca-corpo {
     flex: 1;
     min-height: 0;
-    padding: clamp(16px, 3cqh, 30px) 0 clamp(24px, 5.4cqh, 58px) var(--margem);
+    padding: clamp(18px, 9.6cqh, 96px) 0 clamp(24px, 5.4cqh, 58px) var(--margem);
   }
-  /* A lista mora na parte de baixo da coluna esquerda e termina perto da base. */
+  /* A lista começa perto da frase: longe dela, o título e a lista viram dois blocos. */
   .painel-marca-lista {
     position: relative;
     z-index: 1;
     height: 100%;
-    align-content: end;
+    align-content: start;
     gap: clamp(14px, 5cqh, 56px);
     max-width: clamp(150px, calc(46cqw - 100px), 340px);
   }
@@ -1611,6 +1611,7 @@ select:focus-visible,
   --cel-enviada-hora: #2c6b4f;
   --cel-check: #10714a;
   --cel-marca: #6b21e8;
+  --cel-verificado: #1d8cf0;
 
   top: clamp(24px, 3cqh, 40px);
   right: clamp(24px, calc(17cqw - 84px), 150px);
@@ -1792,12 +1793,13 @@ select:focus-visible,
   height: 2.6em;
   flex: none;
   border-radius: 50%;
-  background: #e4e0ee;
-  color: var(--cel-apoio);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
-.celular-avatar svg {
-  width: 1.5em;
-  height: 1.5em;
+.celular-avatar img {
+  width: 68%;
+  height: 68%;
+  object-fit: contain;
 }
 .celular-contato {
   display: flex;
@@ -1805,7 +1807,17 @@ select:focus-visible,
   line-height: 1.25;
 }
 .celular-contato strong {
+  display: flex;
+  align-items: center;
+  gap: 0.25em;
   font-weight: 600;
+}
+.celular-verificado {
+  width: 1.1em;
+  height: 1.1em;
+  flex: none;
+  fill: var(--cel-verificado);
+  color: #ffffff;
 }
 .celular-contato span {
   font-size: max(12px, 0.82em);
