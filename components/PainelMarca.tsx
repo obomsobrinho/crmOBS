@@ -168,7 +168,7 @@ function RespostaDigitada({
   t: number;
   children: ReactNode;
 }) {
-  const dura = t + 0.1 - digitaEm;
+  const dura = (t + 0.1 - digitaEm).toFixed(1);
   return (
     <div className="celular-vaga">
       <div className="celular-digitando" style={{ ...aos(digitaEm), "--dura": `${dura}s` } as CSSProperties}>

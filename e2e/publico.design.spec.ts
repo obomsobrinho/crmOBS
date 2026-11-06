@@ -137,7 +137,7 @@ test.describe("Login (/login)", () => {
 
   test("os cartões e a lista não cobrem texto em nenhuma janela de computador", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    for (const [width, height] of [[1024, 768], [1280, 640], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]]) {
+    for (const [width, height] of [[1024, 768], [1180, 820], [1180, 1000], [1280, 640], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]]) {
       await page.setViewportSize({ width, height });
       await page.goto("/login");
       // O painel vai até o fim da tela em cima, embaixo e à direita: nenhum canto
@@ -163,6 +163,13 @@ test.describe("Login (/login)", () => {
         });
         return {
           fora: fora.map((c) => c.textContent),
+          // O foguete é mais largo inclinado: a caixa dele é a medida certa aqui.
+          fogueteNoTitulo: (() => {
+            const faixa = document.createRange();
+            faixa.selectNodeContents(document.querySelector(".painel-marca-texto h2")!);
+            const foguete = caixa(document.querySelector('[data-slot="painel-marca-foguete"]')!);
+            return foguete.width > 0 && cruza(foguete, faixa.getBoundingClientRect());
+          })(),
           sobre: cartoes.flatMap((c) =>
             texto.filter((t) => cruza(caixa(c), caixa(t))).map((t) => `${c.textContent} x ${t.textContent}`),
           ),
@@ -193,7 +200,7 @@ test.describe("Login (/login)", () => {
             .map((li) => li.textContent),
         };
       });
-      expect(colisoes, `${width}x${height}`).toEqual({ fora: [], sobre: [], balaoSobCartao: [], listaNoCelular: [] });
+      expect(colisoes, `${width}x${height}`).toEqual({ fora: [], fogueteNoTitulo: false, sobre: [], balaoSobCartao: [], listaNoCelular: [] });
     }
   });
 });

@@ -20,6 +20,8 @@ export const BRAND = {
      trocam de cor (carvão no claro, branco no escuro). */
   markLight: "/marca/obs-mark-light.png",
   markDark: "/marca/obs-mark-dark.png",
+  /** O WhatsApp de atendimento da OBS, para quem travou antes de entrar. */
+  whatsappAjuda: "https://wa.me/5533984033279",
   /** Assinatura de rodapé: o CRM é subproduto da OBS, não a OBS. */
   footer: "um produto OBS",
   /**

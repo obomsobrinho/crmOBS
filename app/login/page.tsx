@@ -4,6 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { BRAND } from "@/lib/brand";
 import { createClient } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
 import { Aviso } from "@/components/ui/aviso";
@@ -15,8 +16,6 @@ import { Input } from "@/components/ui/input";
 /** Fora do componente: o painel é fixo, e a tela renderiza a cada tecla digitada. */
 const PAINEL = <PainelMarca />;
 
-/** O WhatsApp de atendimento da OBS, para quem travou antes de entrar. */
-const AJUDA_WHATSAPP = "https://wa.me/5533984033279";
 
 export default function LoginPage({
   searchParams,
@@ -120,6 +119,11 @@ export default function LoginPage({
               id="password"
               type={verSenha ? "text" : "password"}
               autoComplete="current-password"
+              // Com o olho ligado o campo vira texto: o teclado do celular não pode
+              // capitalizar nem corrigir a senha.
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="Digite sua senha"
               required
               value={password}
@@ -130,7 +134,7 @@ export default function LoginPage({
                   variant="ghost"
                   size="icon-control"
                   onClick={() => setVerSenha((v) => !v)}
-                  className="text-ink-3"
+                  className="text-ink-3 max-md:size-11"
                 >
                   {verSenha ? <EyeOff size={16} /> : <Eye size={16} />}
                   {/* ⚠️ Texto, e não `aria-label`: `getByLabel("Senha")` dos
@@ -177,7 +181,7 @@ export default function LoginPage({
         <p className="text-center text-legenda text-ink-2">
           Precisa de ajuda?{" "}
           <a
-            href={AJUDA_WHATSAPP}
+            href={BRAND.whatsappAjuda}
             target="_blank"
             rel="noopener noreferrer"
             className="font-medium text-brand-ink hover:underline"

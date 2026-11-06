@@ -104,8 +104,10 @@
   .painel-marca-lista li:not([data-faixa]) {
     display: none;
   }
-  /* O degradê é horizontal, igual ao da camada forte do contorno. */
-  .painel-marca-recorte {
+  /* O degradê é horizontal, igual ao da camada forte do contorno. As duas classes
+     juntas porque `.brand-grad-painel` vem do globals.css, outro arquivo: a ordem
+     entre eles não pode decidir. */
+  .painel-marca-recorte.brand-grad-painel {
     background-image: linear-gradient(
       90deg,
       var(--brand-grad-start),
