@@ -83,7 +83,7 @@ cartão ter contorno **sem parecer uma tabela**.
 
 `--brand-grad-end` (`#4464d4`) existe **só porque a logo termina nele**. Escopo fechado: gradiente
 de marca, símbolo e superfície decorativa a partir de 28px. Não pinta texto, não pinta ícone, não
-pinta estado. O único lugar autorizado é a classe `.brand-grad`.
+pinta estado. Os únicos lugares autorizados são as classes `.brand-grad` e `.brand-grad-painel` (a superfície grande do painel de marca da entrada).
 
 Isso é uma pendência de marca, não uma decisão fechada. Ver [pendencias.md](pendencias.md).
 

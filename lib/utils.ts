@@ -47,6 +47,8 @@ const twMerge = extendTailwindMerge({
             // nascia sem os 16px e sem o peso 600. Nome de papel tipográfico
             // não pode repetir nome de cor.
             "cartao",
+            // Título das telas de entrada (28/34), pelo mesmo motivo.
+            "entrada",
           ],
         },
       ],

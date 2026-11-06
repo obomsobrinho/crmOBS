@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
 import { Aviso } from "@/components/ui/aviso";
+import PainelMarca from "@/components/PainelMarca";
 import { Button } from "@/components/ui/button";
-import { cardVariants } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
 export default function LoginPage({
@@ -47,95 +46,97 @@ export default function LoginPage({
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-canvas p-4 max-md:items-stretch max-md:p-0">
-      <form
-        onSubmit={handleSubmit}
-        className={cn(cardVariants({ variant: "pagina" }), "w-full max-w-sm space-y-5 p-7 max-md:max-w-none max-md:px-5 max-md:pb-8 max-md:pt-12")}
-      >
-        <BrandMark />
+    <div className="flex min-h-dvh flex-col bg-raised lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+      <main className="flex flex-1 items-start justify-center px-5 pb-8 pt-12 lg:items-center lg:p-10">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
+          <div className="pb-5 lg:pb-9">
+            <BrandMark />
+          </div>
 
-        <div>
-          <h1 className="text-titulo">Entrar</h1>
-          <p className="text-apoio text-ink-2">Acesse a conta da sua empresa.</p>
-        </div>
+          <div className="space-y-1">
+            <h1 className="text-entrada">Entrar</h1>
+            <p className="text-corpo text-ink-2">Acesse a conta da sua empresa.</p>
+          </div>
 
-        {linkFalhou && (
-          <Aviso role="alert" data-slot="aviso-link">
-            {/* ⚠️ "o MAIS RECENTE" (29/09/2026, achado do dono): pedir um link
-                novo invalida os anteriores, e clicar num e-mail antigo prendia
-                a pessoa num ciclo de pedir link e cair aqui de novo. */}
-            {/* ⚠️ "Esqueci minha senha" CONFUNDIA quem foi convidado e nunca
-                criou senha (achado do dono, 29/09/2026; resolvido em 02/10). O
-                caminho é o mesmo (link novo pelo Supabase Auth, cai em
-                /definir-senha), mas a tela diz "criar", não "recuperar". */}
-            Esse link expirou ou já foi usado.{" "}
-            <Link
-              href="/recuperar-senha?modo=criar"
-              className="font-semibold underline"
-            >
-              Receber um link novo para criar a senha
-            </Link>{" "}
-            e abra só o e-mail mais recente: cada link novo cancela os anteriores.
-          </Aviso>
-        )}
+          {linkFalhou && (
+            <Aviso role="alert" data-slot="aviso-link">
+              {/* ⚠️ "o MAIS RECENTE" (29/09/2026, achado do dono): pedir um link
+                  novo invalida os anteriores, e clicar num e-mail antigo prendia
+                  a pessoa num ciclo de pedir link e cair aqui de novo. */}
+              {/* ⚠️ "Esqueci minha senha" CONFUNDIA quem foi convidado e nunca
+                  criou senha (achado do dono, 29/09/2026; resolvido em 02/10). O
+                  caminho é o mesmo (link novo pelo Supabase Auth, cai em
+                  /definir-senha), mas a tela diz "criar", não "recuperar". */}
+              Esse link expirou ou já foi usado.{" "}
+              <Link
+                href="/recuperar-senha?modo=criar"
+                className="font-semibold underline"
+              >
+                Receber um link novo para criar a senha
+              </Link>{" "}
+              e abra só o e-mail mais recente: cada link novo cancela os anteriores.
+            </Aviso>
+          )}
 
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="text-apoio font-medium">
-            E-mail
-          </label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <div className="flex items-baseline justify-between">
-            <label htmlFor="password" className="text-apoio font-medium">
-              Senha
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="text-apoio font-medium">
+              E-mail
             </label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between">
+              <label htmlFor="password" className="text-apoio font-medium">
+                Senha
+              </label>
+              <Link
+                href="/recuperar-senha"
+                className="text-legenda text-ink-2 transition-colors hover:text-ink"
+              >
+                Esqueci minha senha
+              </Link>
+            </div>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {error && <p className="text-apoio text-danger-ink">{error}</p>}
+
+          <Button
+            type="submit"
+            size="field"
+            carregando={loading}
+            className="w-full justify-center max-md:h-11"
+          >
+            {loading ? "Entrando…" : "Entrar"}
+          </Button>
+
+          <div className="border-t border-line pt-4 text-center">
+            <span className="text-legenda text-ink-2">Ainda não tem conta? </span>
             <Link
-              href="/recuperar-senha"
-              className="text-legenda text-ink-2 transition-colors hover:text-ink"
+              href="/cadastro"
+              className="text-legenda font-medium text-brand-ink transition-colors hover:underline"
             >
-              Esqueci minha senha
+              Criar conta
             </Link>
           </div>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-
-        {error && <p className="text-apoio text-danger-ink">{error}</p>}
-
-        <Button
-          type="submit"
-          size="field"
-          carregando={loading}
-          className="w-full justify-center max-md:h-11"
-        >
-          {loading ? "Entrando…" : "Entrar"}
-        </Button>
-
-        <div className="border-t border-line pt-4 text-center">
-          <span className="text-legenda text-ink-2">Ainda não tem conta? </span>
-          <Link
-            href="/cadastro"
-            className="text-legenda font-medium text-brand-ink transition-colors hover:underline"
-          >
-            Criar conta
-          </Link>
-        </div>
-      </form>
+        </form>
+      </main>
+      <PainelMarca />
     </div>
   );
 }

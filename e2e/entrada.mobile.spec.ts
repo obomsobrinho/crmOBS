@@ -19,6 +19,19 @@ test("login sem moldura de cartão e com campos de 44px", async ({ page }) => {
   );
 });
 
+test("no login do celular o formulário vem antes e o painel é uma faixa sem animação", async ({ page }) => {
+  await page.goto("/login");
+  await page.waitForLoadState("networkidle");
+  const painel = page.locator('[data-slot="painel-marca"]');
+  await expect(painel.getByRole("heading")).toBeVisible();
+  await expect(page.locator('[data-slot="celular-conversa"]')).toBeHidden();
+  const form = (await page.locator("form").boundingBox())!;
+  const faixa = (await painel.boundingBox())!;
+  expect(faixa.y).toBeGreaterThanOrEqual(form.y + form.height);
+  expect(faixa.height).toBeLessThan(200);
+  expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
+});
+
 test("na tela de conexão o celular vê o QR, com o caminho do computador escrito", async ({ page }) => {
   // ⚠️ REESCRITO EM 17/10/2026. O código de pareamento (padrão no celular desde
   // 24/09) foi desligado: o WhatsApp recusa o código da Evolution 2.3.7

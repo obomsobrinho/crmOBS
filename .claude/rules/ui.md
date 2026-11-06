@@ -40,6 +40,7 @@ Base-layer reuse, `AreaRolavel`, `carregando`, tokens and no-dash are in `engine
 
 ## Motion
 - Animation is house CSS (`.anim-flutuante`, `.anim-fundo`, `.msg-in`, `.anim-lateral`, `.painel-*`), no `tw-animate-css`, no Motion. Tailwind v4 emits `-translate-x-1/2` as the `translate` property, so a keyframe that repeats it ADDS: `.anim-flutuante` must not touch `translate`; `sheet` has its own `.anim-lateral`. Honor `prefers-reduced-motion`.  (why: docs/design-system/fundamentos-animacao.md)
+- The entry screens' brand panel is `components/PainelMarca.tsx`: no hook and no state, the phone is an illustration (`aria-hidden`, colors local to `.celular`, equal in both themes). Its resting state is the COMPLETE conversation and all motion lives inside `prefers-reduced-motion: no-preference`; the animation touches only `opacity` and `transform`, is never `infinite`, and never reflows. Below 1024px it is a strip after the form, with no phone.  (why: docs/adr/2026-11-06-login-brand-panel.md)
 
 ## Copy and inbox behavior
 - Fixed screen text never assumes appointment, patient or scheduling (mixed audience); segment language comes from the preset.  (why: docs/adr/2026-08-26-beta-mvp-scope-and-menu.md)

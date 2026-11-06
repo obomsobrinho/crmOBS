@@ -38,6 +38,7 @@ Na entrada da tela do painel, cartão, número e barra **começam juntos**. O es
 | `.anim-flutuante` | entrada e saída de popover, dropdown, dialog |
 | `.anim-fundo` | o fundo escurecido do dialog |
 | `.anim-lateral` | entrada e saída do `sheet` |
+| `.celular-*` | a conversa do painel de marca da entrada (`components/PainelMarca.tsx`): uma vez só, para sozinha, e o repouso é a conversa completa |
 | `.painel-cartao` | entrada do cartão do painel |
 | `.painel-barra` | barra do gráfico de hora |
 | `.painel-area` | a área do gráfico de movimento |
