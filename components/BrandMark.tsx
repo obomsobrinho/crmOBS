@@ -9,25 +9,20 @@ import { cn } from "@/lib/utils";
 // no globals.css, reagindo a [data-theme]). É de propósito: o tema vem de cookie
 // e é aplicado no <html>, então decidir aqui em JS causaria troca visível depois
 // da primeira pintura. Duas imagens de 35 KB custam menos que esse flash.
-export default function BrandMark({
-  size = "md",
-  empilhada = false,
-}: {
-  /** sm = nav rail (32px), md = telas de entrada (40px), lg = selo em destaque (88px). */
-  size?: "sm" | "md" | "lg";
-  /** Nome embaixo do selo, centralizado (o topo do login). */
-  empilhada?: boolean;
-}) {
-  const px = size === "sm" ? 32 : size === "lg" ? 88 : 40;
-  const label = size === "sm" ? "text-corpo" : size === "lg" ? "text-marca" : "text-titulo";
+const TAMANHOS = {
+  /** Nav rail. */
+  sm: { px: 32, nome: "text-corpo font-semibold", caixa: "gap-2.5" },
+  /** Telas de entrada. */
+  md: { px: 40, nome: "text-titulo font-semibold", caixa: "gap-2.5" },
+  /** O selo em destaque do login: o nome vem embaixo, centralizado. */
+  lg: { px: 88, nome: "text-marca", caixa: "flex-col gap-2" },
+};
+
+export default function BrandMark({ size = "md" }: { size?: keyof typeof TAMANHOS }) {
+  const { px, nome, caixa } = TAMANHOS[size];
 
   return (
-    <div
-      className={cn(
-        "flex min-w-0 items-center",
-        empilhada ? "flex-col gap-2" : "gap-2.5",
-      )}
-    >
+    <div className={cn("flex min-w-0 items-center", caixa)}>
       <span
         className="relative block shrink-0"
         style={{ width: px, height: px }}
@@ -50,7 +45,7 @@ export default function BrandMark({
           className="mark-dark h-full w-full object-contain"
         />
       </span>
-      <span className={cn("truncate", size === "lg" ? "font-bold" : "font-semibold", label)}>{BRAND.name}</span>
+      <span className={cn("truncate", nome)}>{BRAND.name}</span>
     </div>
   );
 }

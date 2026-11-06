@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
-import { DesenhoDoFoguete, RastroDoFoguete } from "@/components/Foguete";
+import { DesenhoDoFoguete } from "@/components/Foguete";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -161,7 +161,6 @@ function IlustracaoDoFoguete() {
           <stop offset="0" style={{ stopColor: "var(--brand-fill)" }} />
           <stop offset="1" style={{ stopColor: "var(--brand-grad-end)" }} />
         </linearGradient>
-        <RastroDoFoguete id="novidades-rastro" />
       </defs>
 
       <rect width="384" height="172" fill="url(#novidades-ceu)" />

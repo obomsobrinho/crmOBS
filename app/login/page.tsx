@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { CampoComAcao } from "@/components/ui/campo-com-acao";
 import { Input } from "@/components/ui/input";
 
+/** Fora do componente: o painel é fixo, e a tela renderiza a cada tecla digitada. */
+const PAINEL = <PainelMarca />;
+
 /** O WhatsApp de atendimento da OBS, para quem travou antes de entrar. */
 const AJUDA_WHATSAPP = "https://wa.me/5533984033279";
 
@@ -55,8 +58,8 @@ export default function LoginPage({
     <div className="flex min-h-dvh flex-col bg-raised lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)]">
       <main className="flex flex-1 flex-col items-center gap-6 px-5 pb-6 pt-10 lg:px-6 lg:py-6">
         <form onSubmit={handleSubmit} className="my-auto w-full max-w-sm space-y-4">
-          <div className="flex justify-center pb-1">
-            <BrandMark size="lg" empilhada />
+          <div className="pb-1">
+            <BrandMark size="lg" />
           </div>
 
           <div className="space-y-1 pb-1 text-center">
@@ -183,7 +186,7 @@ export default function LoginPage({
           </a>
         </p>
       </main>
-      <PainelMarca />
+      {PAINEL}
     </div>
   );
 }

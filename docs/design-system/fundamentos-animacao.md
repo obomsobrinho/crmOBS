@@ -38,7 +38,7 @@ Na entrada da tela do painel, cartão, número e barra **começam juntos**. O es
 | `.anim-flutuante` | entrada e saída de popover, dropdown, dialog |
 | `.anim-fundo` | o fundo escurecido do dialog |
 | `.anim-lateral` | entrada e saída do `sheet` |
-| `.celular-*`, `.divisor-*` | a cena do painel de marca da entrada (`components/PainelMarca.tsx`): conversa, lista e entrada dos cartões rodam uma vez; só as camadas do divisor e os cartões flutuam, bem devagar. O repouso é a cena completa |
+| `.celular-*`, `.divisor-*` (`components/painel-marca.css`) | a cena do painel de marca da entrada (`components/PainelMarca.tsx`): conversa, lista e entrada dos cartões rodam uma vez; só as camadas do divisor e os cartões flutuam, bem devagar. O repouso é a cena completa |
 | `.painel-cartao` | entrada do cartão do painel |
 | `.painel-barra` | barra do gráfico de hora |
 | `.painel-area` | a área do gráfico de movimento |

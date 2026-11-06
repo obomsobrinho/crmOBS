@@ -14,18 +14,18 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { DesenhoDoFoguete, RastroDoFoguete } from "@/components/Foguete";
+import { DesenhoDoFoguete } from "@/components/Foguete";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
+import "./painel-marca.css";
 
 // O painel de marca das telas de entrada (hoje só o login; feito para o /cadastro
 // usar igual). O que ele mostra é o trabalho do produto, uma conversa sendo
 // atendida, e não um print de tela.
 //
-// Sem hook, sem estado e sem JavaScript: a animação é só CSS (`.celular-*`,
-// `.divisor-*` e `.painel-marca-*` no globals.css). Os tempos moram aqui, em
-// `--t`, para o roteiro da conversa, a lista e os cartões serem lidos juntos: o
-// que a lista promete acontece na conversa ao lado.
+// Sem hook e sem estado: a animação é só CSS (`painel-marca.css`). Os tempos moram
+// aqui, em `--t`, para o roteiro da conversa, a lista e os cartões serem lidos
+// juntos: o que a lista promete acontece na conversa ao lado.
 
 /** Uma linha só com o `--t` de quem entra em `t` segundos. */
 function aos(t: number) {
@@ -93,7 +93,7 @@ function Divisor({ deitado = false }: { deitado?: boolean }) {
             <defs>
               {/* Deitada, ela encosta na faixa, que usa este mesmo degradê na
                   horizontal: assim não sobra emenda em largura nenhuma. Em pé,
-                  a emenda some pela máscara do globals.css. */}
+                  a emenda some pela máscara do painel-marca.css. */}
               <linearGradient
                 id={idDoTom}
                 gradientUnits={deitado ? "userSpaceOnUse" : "objectBoundingBox"}
@@ -143,7 +143,7 @@ function BalaoDaConversa({
   children: ReactNode;
 }) {
   return (
-    <div className={cn("celular-balao", `celular-balao-${lado}`)} style={aos(t)}>
+    <div className={cn("celular-balao", lado === "enviada" && "celular-balao-enviada")} style={aos(t)}>
       {children}
       <span className="celular-hora">
         {hora}
@@ -153,18 +153,37 @@ function BalaoDaConversa({
   );
 }
 
-/** "Digitando" que ocupa a mesma vaga da resposta, então nada na conversa pula. */
-function Digitando({ t, dura }: { t: number; dura: number }) {
+/**
+ * A resposta com o "digitando" antes, os dois na mesma vaga, então nada na conversa
+ * pula. O "digitando" sai um instante depois de a resposta começar a entrar.
+ */
+function RespostaDigitada({
+  digitaEm,
+  hora,
+  t,
+  children,
+}: {
+  digitaEm: number;
+  hora: string;
+  t: number;
+  children: ReactNode;
+}) {
+  const dura = t + 0.1 - digitaEm;
   return (
-    <div className="celular-digitando" style={{ ...aos(t), "--dura": `${dura}s` } as CSSProperties}>
-      <span />
-      <span />
-      <span />
+    <div className="celular-vaga">
+      <div className="celular-digitando" style={{ ...aos(digitaEm), "--dura": `${dura}s` } as CSSProperties}>
+        <span />
+        <span />
+        <span />
+      </div>
+      <BalaoDaConversa lado="enviada" hora={hora} t={t}>
+        {children}
+      </BalaoDaConversa>
     </div>
   );
 }
 
-/** Cartão de vidro em volta do aparelho: a posição é de cada um, no globals.css. */
+/** Cartão de vidro em volta do aparelho: a posição é de cada um, no painel-marca.css. */
 function CartaoDeVidro({
   posicao,
   icone: Icone,
@@ -225,21 +244,15 @@ function CelularConversa() {
             <BalaoDaConversa lado="recebida" hora="22:14" t={0.6}>
               Boa noite! Vocês têm horário amanhã?
             </BalaoDaConversa>
-            <div className="celular-vaga">
-              <Digitando t={1.3} dura={1.4} />
-              <BalaoDaConversa lado="enviada" hora="22:14" t={2.6}>
-                Boa noite! Tenho às 9h ou às 14h. Qual fica melhor?
-              </BalaoDaConversa>
-            </div>
+            <RespostaDigitada digitaEm={1.3} hora="22:14" t={2.6}>
+              Boa noite! Tenho às 9h ou às 14h. Qual fica melhor?
+            </RespostaDigitada>
             <BalaoDaConversa lado="recebida" hora="22:15" t={4}>
               Às 14h.
             </BalaoDaConversa>
-            <div className="celular-vaga">
-              <Digitando t={4.6} dura={1.2} />
-              <BalaoDaConversa lado="enviada" hora="22:15" t={5.7}>
-                Pronto, marcado para amanhã às 14h.
-              </BalaoDaConversa>
-            </div>
+            <RespostaDigitada digitaEm={4.6} hora="22:15" t={5.7}>
+              Pronto, marcado para amanhã às 14h.
+            </RespostaDigitada>
           </div>
           <div className="celular-reflexo" />
         </div>
@@ -254,16 +267,13 @@ function CelularConversa() {
   );
 }
 
-export default function PainelMarca({ className }: { className?: string }) {
+export default function PainelMarca() {
   return (
-    <aside data-slot="painel-marca" className={cn("painel-marca", className)}>
+    <aside data-slot="painel-marca" className="painel-marca">
       <Divisor />
       <Divisor deitado />
       <div className="painel-marca-recorte brand-grad-painel">
         <svg className="painel-marca-foguete" data-slot="painel-marca-foguete" viewBox="152 26 80 148" aria-hidden>
-          <defs>
-            <RastroDoFoguete id="painel-marca-rastro" />
-          </defs>
           <DesenhoDoFoguete idDoRastro="painel-marca-rastro" />
         </svg>
         <div className="painel-marca-texto">

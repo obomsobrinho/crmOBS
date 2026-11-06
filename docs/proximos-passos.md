@@ -25,6 +25,14 @@ direção travada).
   dinâmico, mitigada com `loading.tsx`; não é motivo de troca de stack. Reavaliar só se o produto
   virar uma SPA pura com backend próprio à parte (não é o caso).
 
+## Anotado para a semana de 09/11/2026: levar o peso do login para as outras telas
+
+Fala do dono em 06/11/2026, depois do login novo: o Light do projeto estava sem peso e difícil de
+ver, o login acertou em cheio, e isso precisa ser replicado nas outras páginas. A maioria dos
+clientes usa Light, e o desenho vinha focado demais no Dark. Light é o padrão desde 05/11/2026
+(`docs/adr/2026-11-05-light-is-the-default-theme.md`). Antes de começar: confirmar com o dono por
+quais telas ir primeiro e o que exatamente levar do login.
+
 ## ⭐ PLANO VIGENTE: prioridades aprovadas pelo dono em 29/09/2026
 
 **Esta lista manda na ordem de trabalho.** As seções mais abaixo (plano da demo, MVP do beta, fases)

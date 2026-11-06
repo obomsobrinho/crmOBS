@@ -114,7 +114,7 @@ test.describe("Login (/login)", () => {
       return animacoes;
     });
     const continuas = medida.filter((a) => a.fim === Infinity).map((a) => a.nome);
-    expect(new Set(continuas)).toEqual(new Set(["divisor-flutua", "cartao-flutua", "foguete-paira"]));
+    expect(new Set(continuas)).toEqual(new Set(["painel-flutua", "foguete-paira"]));
     const comFim = medida.filter((a) => a.fim !== Infinity);
     expect(comFim.length).toBeGreaterThan(0);
     expect(Math.max(...comFim.map((a) => a.fim))).toBeLessThan(8_500);

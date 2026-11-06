@@ -1,21 +1,18 @@
 // O foguete da casa, em SVG e sem imagem: o mesmo desenho do topo das Novidades e
 // do painel da entrada. Mora dentro de um `<svg>` de quem usa, porque cada um
-// compõe a sua cena; o rastro lê um degradê que quem usa declara em `<defs>`
-// (`RastroDoFoguete`), já que um id repetido na página pintaria o degradê errado.
-
-export function RastroDoFoguete({ id }: { id: string }) {
-  return (
-    <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" style={{ stopColor: "var(--brand-on)", stopOpacity: 0.9 }} />
-      <stop offset="1" style={{ stopColor: "var(--brand-on)", stopOpacity: 0 }} />
-    </linearGradient>
-  );
-}
+// compõe a sua cena. `idDoRastro` é único por uso: um id repetido na página pintaria
+// o degradê errado.
 
 /** Desenhado em x 160 a 224 e y 34 a 170, com o rastro. */
 export function DesenhoDoFoguete({ idDoRastro }: { idDoRastro: string }) {
   return (
     <g className="anim-foguete">
+      <defs>
+        <linearGradient id={idDoRastro} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" style={{ stopColor: "var(--brand-on)", stopOpacity: 0.9 }} />
+          <stop offset="1" style={{ stopColor: "var(--brand-on)", stopOpacity: 0 }} />
+        </linearGradient>
+      </defs>
       <rect x="185" y="118" width="14" height="52" rx="7" fill={`url(#${idDoRastro})`} />
       <path
         d="M192 34c13 10 19 28 19 50v34h-38V84c0-22 6-40 19-50z"
