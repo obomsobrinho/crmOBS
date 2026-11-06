@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandMark from "@/components/BrandMark";
+import { DesenhoDoFoguete, RastroDoFoguete } from "@/components/Foguete";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -160,10 +161,7 @@ function IlustracaoDoFoguete() {
           <stop offset="0" style={{ stopColor: "var(--brand-fill)" }} />
           <stop offset="1" style={{ stopColor: "var(--brand-grad-end)" }} />
         </linearGradient>
-        <linearGradient id="novidades-rastro" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" style={{ stopColor: "var(--brand-on)", stopOpacity: 0.9 }} />
-          <stop offset="1" style={{ stopColor: "var(--brand-on)", stopOpacity: 0 }} />
-        </linearGradient>
+        <RastroDoFoguete id="novidades-rastro" />
       </defs>
 
       <rect width="384" height="172" fill="url(#novidades-ceu)" />
@@ -188,17 +186,7 @@ function IlustracaoDoFoguete() {
         <circle cx="350" cy="148" r="44" />
       </g>
 
-      <g className="anim-foguete">
-        <rect x="185" y="118" width="14" height="52" rx="7" fill="url(#novidades-rastro)" />
-        <path
-          d="M192 34c13 10 19 28 19 50v34h-38V84c0-22 6-40 19-50z"
-          style={{ fill: "var(--brand-on)" }}
-        />
-        <path d="M173 94l-13 17v12l13-6z" style={{ fill: "var(--brand-on)" }} fillOpacity="0.85" />
-        <path d="M211 94l13 17v12l-13-6z" style={{ fill: "var(--brand-on)" }} fillOpacity="0.85" />
-        <circle cx="192" cy="74" r="10" style={{ fill: "var(--brand-grad-end)", stroke: "var(--brand-fill)" }} strokeWidth="3" />
-        <rect x="181" y="118" width="22" height="6" rx="3" style={{ fill: "var(--brand-on)" }} fillOpacity="0.7" />
-      </g>
+      <DesenhoDoFoguete idDoRastro="novidades-rastro" />
 
       {/* Nuvem da frente: a cor do corpo do diálogo. */}
       <g style={{ fill: "var(--raised)" }}>

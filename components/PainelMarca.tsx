@@ -7,7 +7,6 @@ import {
   CalendarCheck,
   CheckCheck,
   ChevronLeft,
-  MessagesSquare,
   ReceiptText,
   SignalHigh,
   UserPlus,
@@ -15,6 +14,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { DesenhoDoFoguete, RastroDoFoguete } from "@/components/Foguete";
 import { BRAND } from "@/lib/brand";
 import { cn } from "@/lib/utils";
 
@@ -260,9 +260,12 @@ export default function PainelMarca({ className }: { className?: string }) {
       <Divisor />
       <Divisor deitado />
       <div className="painel-marca-recorte brand-grad-painel">
-        <span className="painel-marca-selo" aria-hidden>
-          <MessagesSquare />
-        </span>
+        <svg className="painel-marca-foguete" data-slot="painel-marca-foguete" viewBox="152 26 80 148" aria-hidden>
+          <defs>
+            <RastroDoFoguete id="painel-marca-rastro" />
+          </defs>
+          <DesenhoDoFoguete idDoRastro="painel-marca-rastro" />
+        </svg>
         <div className="painel-marca-texto">
           <h2>
             A central inteligente do seu <span>WhatsApp</span>.

@@ -1387,8 +1387,8 @@ select:focus-visible,
 .painel-marca-texto h2 span {
   color: var(--painel-lilas);
 }
-/* O ícone de conversa do canto só existe onde sobra canto. */
-.painel-marca-selo {
+/* O foguete do canto só existe onde sobra canto. */
+.painel-marca-foguete {
   display: none;
 }
 /* Na faixa o título basta: a frase volta no layout dividido. */
@@ -1538,26 +1538,19 @@ select:focus-visible,
     letter-spacing: -0.03em;
   }
   /* O canto de cima à direita, quando o título não chega lá. */
-  .painel-marca-selo {
+  .painel-marca-foguete {
     position: absolute;
     z-index: 1;
-    top: clamp(20px, 4cqh, 40px);
-    right: clamp(20px, 3.6cqw, 44px);
-    place-items: center;
-    width: clamp(52px, 8cqh, 76px);
-    height: clamp(52px, 8cqh, 76px);
-    border-radius: 24%;
-    background: rgba(255, 255, 255, 0.13);
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
-    transform: rotate(10deg);
+    top: clamp(10px, 2.6cqh, 28px);
+    right: clamp(34px, 5.4cqw, 66px);
+    width: auto;
+    height: clamp(92px, 14.5cqh, 150px);
+    overflow: visible;
+    transform: rotate(32deg);
   }
-  .painel-marca-selo svg {
-    width: 50%;
-    height: 50%;
-  }
-  @container (min-width: 700px) {
-    .painel-marca-selo {
-      display: grid;
+  @container (min-width: 640px) {
+    .painel-marca-foguete {
+      display: block;
     }
   }
   .painel-marca-texto p {

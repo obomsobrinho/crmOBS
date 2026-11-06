@@ -97,6 +97,8 @@ test.describe("Login (/login)", () => {
     await expect(celular.locator("a, button, input")).toHaveCount(0);
     await expect(celular.locator(".celular-avatar img")).toHaveAttribute("src", "/marca/obs-mark-light.png");
     await expect(celular.locator(".celular-verificado")).toBeVisible();
+    await expect(page.locator('[data-slot="painel-marca-foguete"]')).toBeVisible();
+    await expect(page.locator('[data-slot="painel-marca-foguete"]')).toHaveAttribute("aria-hidden", "true");
   });
 
   test("a cena tem fim, e só o que flutua continua, sem mexer no layout", async ({ page }) => {
@@ -112,7 +114,7 @@ test.describe("Login (/login)", () => {
       return animacoes;
     });
     const continuas = medida.filter((a) => a.fim === Infinity).map((a) => a.nome);
-    expect(new Set(continuas)).toEqual(new Set(["divisor-flutua", "cartao-flutua"]));
+    expect(new Set(continuas)).toEqual(new Set(["divisor-flutua", "cartao-flutua", "foguete-paira"]));
     const comFim = medida.filter((a) => a.fim !== Infinity);
     expect(comFim.length).toBeGreaterThan(0);
     expect(Math.max(...comFim.map((a) => a.fim))).toBeLessThan(8_500);
