@@ -149,17 +149,15 @@ export default function LoginPage({
             {loading ? "Entrando…" : "Entrar"}
           </Button>
 
-          <div className="space-y-2 border-t border-line pt-4 text-center">
-            <p className="text-apoio text-ink-2">Ainda não tem conta?</p>
+          <div className="border-t border-line pt-4">
             <Button
               asChild
               variant="outline"
               size="field"
               className="w-full justify-center max-md:h-11"
             >
-              <Link href="/cadastro">Criar conta grátis</Link>
+              <Link href="/cadastro">Criar conta grátis por 7 dias</Link>
             </Button>
-            <p className="text-legenda text-ink-2">7 dias para testar</p>
           </div>
         </form>
 

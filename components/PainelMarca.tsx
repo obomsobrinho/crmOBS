@@ -32,70 +32,43 @@ function aos(t: number) {
   return { "--t": `${t}s` } as CSSProperties;
 }
 
-// ── O divisor: balões de conversa em três camadas ───────────────────────────
-// Cada balão é medido no eixo do divisor: `y` e `h` ao longo dele, `alcance` para
-// fora do painel. Os mesmos dados desenham a borda vertical do computador e a
-// horizontal da faixa do celular, trocando x por y.
-
-type Balao = { y: number; h: number; alcance: number; ponta?: boolean };
+// ── O divisor: um contorno ondulado em três tons ─────────────────────────────
+// Um traçado só, de ponta a ponta da tela, com uma ponta de balão no meio. As
+// camadas são o MESMO contorno recuado, e os mesmos dados desenham a borda em pé do
+// computador e a deitada da faixa do celular, trocando x por y.
 
 const ESPESSURA = 200;
 const COMPRIMENTO = 1000;
-const RAIO = 46;
 
-const CAMADAS: { classe: string; baloes: Balao[] }[] = [
-  {
-    classe: "divisor-claro",
-    baloes: [
-      { y: 8, h: 150, alcance: 146 },
-      { y: 130, h: 158, alcance: 170, ponta: true },
-      { y: 280, h: 190, alcance: 136 },
-      { y: 438, h: 172, alcance: 164, ponta: true },
-      { y: 590, h: 150, alcance: 146 },
-      { y: 700, h: 170, alcance: 172, ponta: true },
-      { y: 852, h: 140, alcance: 152 },
-    ],
-  },
-  {
-    classe: "divisor-medio",
-    baloes: [
-      { y: 4, h: 96, alcance: 118 },
-      { y: 72, h: 136, alcance: 150 },
-      { y: 190, h: 170, alcance: 112, ponta: true },
-      { y: 342, h: 130, alcance: 156 },
-      { y: 452, h: 196, alcance: 118, ponta: true },
-      { y: 630, h: 124, alcance: 158 },
-      { y: 736, h: 150, alcance: 120 },
-      { y: 862, h: 132, alcance: 150, ponta: true },
-    ],
-  },
-  {
-    classe: "divisor-forte",
-    baloes: [
-      { y: 0, h: 92, alcance: 100 },
-      { y: 72, h: 168, alcance: 78, ponta: true },
-      { y: 222, h: 112, alcance: 114 },
-      { y: 316, h: 158, alcance: 82 },
-      { y: 456, h: 112, alcance: 110, ponta: true },
-      { y: 546, h: 170, alcance: 76 },
-      { y: 698, h: 118, alcance: 114 },
-      { y: 798, h: 124, alcance: 86, ponta: true },
-      { y: 904, h: 96, alcance: 104 },
-      // O corpo da camada: garante que a borda reta do painel nunca apareça.
-      { y: 0, h: 1000, alcance: 62 },
-    ],
-  },
+/** Sai de cima da tela e passa do fim dela, para o movimento nunca abrir vão. */
+const INICIO = [92, -60];
+const ONDA = [
+  [70, 20, 52, 90, 62, 170],
+  [72, 250, 118, 280, 116, 350],
+  [114, 410, 76, 430, 72, 486],
+  // A ponta do balão.
+  [70, 510, 62, 532, 46, 548],
+  [66, 552, 82, 546, 94, 530],
+  [118, 566, 120, 610, 96, 680],
+  [76, 740, 54, 790, 66, 860],
+  [76, 920, 104, 980, 92, 1060],
 ];
 
-function caminhoDoBalao({ y, h, alcance, ponta }: Balao, deitado: boolean) {
-  const p = (a: number, b: number) => (deitado ? `${b} ${a}` : `${a} ${b}`);
-  const borda = ESPESSURA - alcance;
+const CAMADAS = [
+  { classe: "divisor-claro", recuo: 44 },
+  { classe: "divisor-medio", recuo: 22 },
+  { classe: "divisor-forte", recuo: 0 },
+];
+
+function caminhoDoContorno(recuo: number, deitado: boolean) {
+  const p = (x: number, y: number) => (deitado ? `${y} ${x}` : `${x} ${y}`);
   const fim = ESPESSURA + 40;
-  const base = y + h;
-  const fecho = ponta
-    ? `Q${p(borda, base - 4)} ${p(borda - 24, base + 12)}Q${p(borda + 18, base + 10)} ${p(borda + 48, base)}`
-    : `Q${p(borda, base)} ${p(borda + RAIO, base)}`;
-  return `M${p(fim, y)}L${p(borda + RAIO, y)}Q${p(borda, y)} ${p(borda, y + RAIO)}L${p(borda, base - RAIO)}${fecho}L${p(fim, base)}Z`;
+  const curvas = ONDA.map(
+    ([x1, y1, x2, y2, x, y]) =>
+      `C${p(x1 - recuo, y1)} ${p(x2 - recuo, y2)} ${p(x - recuo, y)}`,
+  );
+  const [x0, y0] = INICIO;
+  return `M${p(fim, y0)}L${p(x0 - recuo, y0)}${curvas.join("")}L${p(fim, COMPRIMENTO + 60)}Z`;
 }
 
 /** As três camadas, em pé (computador) ou deitadas (faixa do celular). */
@@ -103,7 +76,7 @@ function Divisor({ deitado = false }: { deitado?: boolean }) {
   const idDoTom = deitado ? "divisor-tom-deitado" : "divisor-tom";
   return (
     <div className={deitado ? "divisor divisor-deitado" : "divisor"} aria-hidden>
-      {CAMADAS.map(({ classe, baloes }) => (
+      {CAMADAS.map(({ classe, recuo }) => (
         <svg
           key={classe}
           className={classe}
@@ -112,23 +85,25 @@ function Divisor({ deitado = false }: { deitado?: boolean }) {
         >
           {classe === "divisor-forte" && (
             <defs>
-              <linearGradient id={idDoTom} x1="0" y1="0" x2={deitado ? "1" : "0"} y2={deitado ? "0" : "1"}>
+              {/* Deitada, ela encosta na faixa, que usa este mesmo degradê na
+                  horizontal: assim não sobra emenda em largura nenhuma. Em pé,
+                  a emenda some pela máscara do globals.css. */}
+              <linearGradient
+                id={idDoTom}
+                gradientUnits={deitado ? "userSpaceOnUse" : "objectBoundingBox"}
+                x1="0"
+                y1="0"
+                x2={deitado ? COMPRIMENTO : "0"}
+                y2={deitado ? "0" : "1"}
+              >
                 <stop offset="0" stopColor="var(--brand-grad-start)" />
-                {/* Deitada, ela encosta na borda de cima da faixa, que só chega
-                    perto do meio do degradê. Em pé, a borda esquerda vai além. */}
-                <stop
-                  offset="1"
-                  stopColor={
-                    deitado
-                      ? "color-mix(in srgb, var(--brand-grad-start) 19%, var(--brand-grad-mid))"
-                      : "var(--brand-grad-mid)"
-                  }
-                />
+                <stop offset={deitado ? "0.58" : "1"} stopColor="var(--brand-grad-mid)" />
+                {deitado && <stop offset="1" stopColor="var(--brand-grad-end)" />}
               </linearGradient>
             </defs>
           )}
           <path
-            d={baloes.map((b) => caminhoDoBalao(b, deitado)).join("")}
+            d={caminhoDoContorno(recuo, deitado)}
             fill={classe === "divisor-forte" ? `url(#${idDoTom})` : undefined}
           />
         </svg>

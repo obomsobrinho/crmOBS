@@ -41,11 +41,11 @@ test.describe("Login (/login)", () => {
     await expect(page).toHaveTitle("Atenda");
     await expect(page.getByRole("heading", { name: "Bem-vindo de volta" })).toBeVisible();
     await expect(page.locator("form")).toContainText("Atenda");
-    await expect(page.locator("main")).toContainText("7 dias para testar");
-    await expect(page.getByRole("link", { name: "Criar conta grátis" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "Criar conta grátis por 7 dias" })).toHaveAttribute(
       "href",
       "/cadastro",
     );
+    await expect(page.locator("main")).not.toContainText("Ainda não tem conta?");
     const ajuda = page.getByRole("link", { name: "Fale com a gente no WhatsApp" });
     await expect(ajuda).toHaveAttribute("href", "https://wa.me/5533984033279");
     await expect(ajuda).toHaveAttribute("target", "_blank");
@@ -136,6 +136,12 @@ test.describe("Login (/login)", () => {
     for (const [width, height] of [[1024, 768], [1280, 640], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]]) {
       await page.setViewportSize({ width, height });
       await page.goto("/login");
+      // O painel vai até o fim da tela em cima, embaixo e à direita: nenhum canto
+      // sobrando de um lado só.
+      const borda = await page.locator(".painel-marca-recorte").boundingBox();
+      expect(borda!.y, `${width}x${height}`).toBe(0);
+      expect(borda!.height, `${width}x${height}`).toBe(height);
+      expect(borda!.x + borda!.width, `${width}x${height}`).toBeCloseTo(width, 0);
       const colisoes = await page.evaluate(() => {
         const caixa = (el: Element) => el.getBoundingClientRect();
         const cruza = (a: DOMRect, b: DOMRect) =>
