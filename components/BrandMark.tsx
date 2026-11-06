@@ -11,15 +11,23 @@ import { cn } from "@/lib/utils";
 // da primeira pintura. Duas imagens de 35 KB custam menos que esse flash.
 export default function BrandMark({
   size = "md",
+  empilhada = false,
 }: {
-  /** sm = nav rail (32px), md = telas de entrada (40px). */
-  size?: "sm" | "md";
+  /** sm = nav rail (32px), md = telas de entrada (40px), lg = selo em destaque (64px). */
+  size?: "sm" | "md" | "lg";
+  /** Nome embaixo do selo, centralizado (o topo do login). */
+  empilhada?: boolean;
 }) {
-  const px = size === "sm" ? 32 : 40;
+  const px = size === "sm" ? 32 : size === "lg" ? 64 : 40;
   const label = size === "sm" ? "text-corpo" : "text-titulo";
 
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
+    <div
+      className={cn(
+        "flex min-w-0 items-center",
+        empilhada ? "flex-col gap-2" : "gap-2.5",
+      )}
+    >
       <span
         className="relative block shrink-0"
         style={{ width: px, height: px }}

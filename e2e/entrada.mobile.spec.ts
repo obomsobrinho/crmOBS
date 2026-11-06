@@ -19,7 +19,7 @@ test("login sem moldura de cartão e com campos de 44px", async ({ page }) => {
   );
 });
 
-test("no login do celular o formulário vem antes e o painel é uma faixa sem animação", async ({ page }) => {
+test("no login do celular o formulário vem antes e o painel é uma faixa com três benefícios", async ({ page }) => {
   await page.goto("/login");
   await page.waitForLoadState("networkidle");
   const painel = page.locator('[data-slot="painel-marca"]');
@@ -28,7 +28,12 @@ test("no login do celular o formulário vem antes e o painel é uma faixa sem an
   const form = (await page.locator("form").boundingBox())!;
   const faixa = (await painel.boundingBox())!;
   expect(faixa.y).toBeGreaterThanOrEqual(form.y + form.height);
-  expect(faixa.height).toBeLessThan(200);
+  expect(faixa.height).toBeLessThan(320);
+  await expect(page.locator('[data-slot="painel-marca-lista"] li:visible')).toHaveText([
+    "Responde na hora",
+    "Marca horário na sua agenda",
+    "Chama você quando precisa",
+  ]);
   expect(await page.evaluate(() => document.getAnimations().length)).toBe(0);
 });
 

@@ -1349,29 +1349,25 @@ select:focus-visible,
    O celular é ILUSTRAÇÃO e fica igual nos dois temas, por isso as cores dele são
    valores próprios aqui, e não os `--bubble-*`, que viram no escuro. Tudo dentro
    dele é medido em `em`: a escala é um `font-size` só, ligado à altura do painel
-   (`cqh`), então o celular cabe de 640px a 1080px sem outra regra.
+   (`cqh`), então cartões e aparelho andam juntos de 640px a 1080px.
 
-   O ESTADO DE REPOUSO É A CONVERSA COMPLETA. A animação mora inteira dentro de
+   O ESTADO DE REPOUSO É A CENA COMPLETA. Toda animação mora dentro de
    `no-preference` e só escreve os estados de partida (`both`): quem pede menos
-   movimento cai direto no fim. Só anima `opacity` e `transform` e para sozinha:
-   nada de `infinite`, nada mexe no layout (a vaga da resposta existe desde o
-   primeiro quadro). */
+   movimento cai direto no fim. A conversa, a lista e a entrada dos cartões rodam
+   uma vez e param; o que fica em movimento, bem devagar, são as camadas do
+   divisor e os cartões, só com `transform` e `translate`, sem mexer no layout. */
 .painel-marca {
   position: relative;
-  margin: 0 12px 12px;
-}
-.painel-marca-ponta {
-  display: none;
 }
 .painel-marca-recorte {
   position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 24px;
 }
 .painel-marca-texto {
-  padding: 24px;
+  position: relative;
+  padding: 4px 20px 0;
 }
 .painel-marca-texto h2 {
   font-size: 22px;
@@ -1380,57 +1376,180 @@ select:focus-visible,
   font-weight: 600;
   text-wrap: balance;
 }
+/* Na faixa o título basta: a frase volta no layout dividido. */
 .painel-marca-texto p {
-  margin-top: 8px;
-  font-size: var(--text-apoio);
-  line-height: var(--text-apoio--line-height);
-}
-/* Faixa curta até o layout dividido: sem celular e sem animação. */
-.painel-marca-palco {
   display: none;
+}
+.painel-marca-corpo {
+  position: relative;
+  padding: 14px 20px 24px;
+}
+.painel-marca-lista {
+  display: grid;
+  gap: 10px;
+}
+.painel-marca-lista li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-apoio);
+  line-height: 1.25;
+  font-weight: 600;
+}
+/* Na faixa só os três benefícios combinados. */
+.painel-marca-lista li:not([data-faixa]) {
+  display: none;
+}
+/* O ícone mora num balãozinho, a mesma forma do divisor. */
+.painel-marca-lista-icone {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 11px 11px 11px 3px;
+  background: rgba(255, 255, 255, 0.17);
+}
+.painel-marca-lista-icone svg {
+  width: 16px;
+  height: 16px;
+}
+
+.divisor {
+  display: none;
+}
+.divisor-claro {
+  fill: #dac6fb;
+  opacity: 0.62;
+}
+.divisor-medio {
+  fill: #a66bf3;
+  opacity: 0.74;
+}
+/* Sobre o fundo escuro o lilás claro translúcido viraria cinza. */
+[data-theme="dark"] .divisor-claro {
+  fill: #a67ff0;
+  opacity: 0.55;
+}
+[data-theme="dark"] .divisor-medio {
+  fill: #8d4fea;
+  opacity: 0.8;
+}
+.divisor-deitado {
+  position: relative;
+  display: block;
+  height: 60px;
+  margin-bottom: -1px;
+  overflow: hidden;
+}
+.divisor-deitado svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Faixa curta até o layout dividido: sem aparelho e sem animação. */
+.celular {
+  display: none;
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .painel-marca-lista {
+    grid-template-columns: repeat(3, auto);
+    justify-content: start;
+    gap: 20px;
+  }
 }
 
 @media (min-width: 1024px) {
   .painel-marca {
+    --divisor-fora: min(14dvh, 9vw);
+    --divisor-dentro: calc(var(--divisor-fora) * 0.43);
     position: sticky;
     top: 12px;
     height: calc(100dvh - 24px);
     min-height: 560px;
-    margin: 12px 12px 12px 0;
+    margin: 12px 12px 12px var(--divisor-fora);
   }
-  .painel-marca-ponta {
+  .divisor {
     display: block;
     position: absolute;
-    top: 0;
-    left: -17px;
-    width: 18px;
-    height: 24px;
-    fill: var(--brand-grad-start);
+    z-index: 1;
+    inset: 0 auto 0 calc(var(--divisor-fora) * -1);
+    width: calc(var(--divisor-fora) + var(--divisor-dentro));
+    overflow: hidden;
+  }
+  .divisor svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  /* As duas claras param na borda do painel (translúcidas, clareariam o roxo e
+     passariam atrás do título). A forte entra e some nele: é o que apaga a emenda
+     entre o degradê dela e o do painel, que varia com a proporção da janela. */
+  .divisor-claro,
+  .divisor-medio {
+    mask-image: linear-gradient(to right, #000 70%, transparent 70%);
+  }
+  .divisor-forte {
+    mask-image: linear-gradient(to right, #000 70%, transparent 100%);
+  }
+  .divisor-deitado {
+    display: none;
   }
   .painel-marca-recorte {
+    --margem: calc(var(--divisor-dentro) + clamp(14px, 2.4cqw, 28px));
     height: 100%;
-    border-radius: 0 28px 28px 28px;
+    border-radius: 0 28px 28px 0;
     container-type: size;
   }
+  /* A textura discreta: balões em traço, sumindo para o topo, onde mora o texto. */
+  .painel-marca-recorte::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='150' fill='none' stroke='white' stroke-width='1.5'%3E%3Cpath d='M14 16h46a11 11 0 0 1 11 11v18a11 11 0 0 1-11 11H30l-11 10V56h-5A11 11 0 0 1 3 45V27a11 11 0 0 1 11-11z'/%3E%3Cpath d='M106 84h38a10 10 0 0 1 10 10v15a10 10 0 0 1-10 10h-2v9l-10-9h-26a10 10 0 0 1-10-10V94a10 10 0 0 1 10-10z'/%3E%3C/svg%3E");
+    opacity: 0.06;
+    mask-image: linear-gradient(to bottom, transparent 42%, #000 78%);
+  }
   .painel-marca-texto {
-    padding: clamp(32px, 6.5cqh, 64px) clamp(32px, 7.5cqw, 64px) 0;
+    z-index: 1;
+    padding: clamp(28px, 5.6cqh, 56px) clamp(24px, 5cqw, 56px) 0 var(--margem);
   }
   .painel-marca-texto h2 {
-    max-width: 14.5em;
-    font-size: clamp(30px, 5.2cqh, 48px);
+    max-width: 16em;
+    font-size: clamp(30px, 5cqh, 46px);
     line-height: 1.08;
     letter-spacing: -0.025em;
   }
   .painel-marca-texto p {
-    margin-top: clamp(10px, 1.6cqh, 16px);
+    display: block;
+    margin-top: clamp(8px, 1.4cqh, 14px);
     font-size: clamp(15px, 1.9cqh, 18px);
     line-height: 1.4;
   }
-  .painel-marca-palco {
-    display: block;
-    position: relative;
+  .painel-marca-corpo {
     flex: 1;
     min-height: 0;
+    padding: clamp(14px, 3cqh, 30px) 0 0 var(--margem);
+  }
+  .painel-marca-lista {
+    position: relative;
+    z-index: 1;
+    gap: clamp(7px, 1.35cqh, 14px);
+    max-width: clamp(150px, 27cqw, 250px);
+  }
+  .painel-marca-lista li:not([data-faixa]) {
+    display: flex;
+  }
+  .painel-marca-lista li {
+    gap: clamp(8px, 1.2cqh, 12px);
+    font-size: clamp(13px, 1.7cqh, 16px);
+  }
+  .painel-marca-lista-icone {
+    width: clamp(28px, 3.7cqh, 36px);
+    height: clamp(28px, 3.7cqh, 36px);
   }
 }
 
@@ -1444,40 +1563,142 @@ select:focus-visible,
   --cel-enviada-tinta: #06251b;
   --cel-enviada-hora: #2c6b4f;
   --cel-check: #10714a;
+  --cel-marca: #6b21e8;
 
-  position: absolute;
-  top: clamp(36px, 6cqh, 60px);
-  right: clamp(36px, 8cqw, 96px);
+  top: clamp(30px, 5.4cqh, 54px);
+  right: clamp(14px, calc(22cqw - 90px), 180px);
   width: 23em;
-  font-size: clamp(13px, 1.95cqh, 20px);
+  font-size: clamp(13px, 1.76cqh, 19px);
   font-family: var(--font-sans);
   color: var(--cel-tinta);
   transform: rotate(-8deg);
   transform-origin: 50% 0;
 }
+@media (min-width: 1024px) {
+  .celular {
+    display: block;
+    position: absolute;
+  }
+}
+/* O brilho e os anéis ficam atrás do aparelho, no plano dele. */
+.celular::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  top: -12em;
+  left: -16em;
+  width: 58em;
+  height: 58em;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(190, 150, 255, 0.17), transparent);
+}
+.celular-aneis,
+.celular-aneis::before,
+.celular-aneis::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.celular-aneis {
+  top: -3em;
+  left: -7em;
+  width: 40em;
+  height: 40em;
+}
+.celular-aneis::before,
+.celular-aneis::after {
+  content: "";
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.celular-aneis::before {
+  width: 54em;
+  height: 54em;
+}
+.celular-aneis::after {
+  width: 70em;
+  height: 70em;
+  border-color: rgba(255, 255, 255, 0.07);
+}
+/* Moldura de metal escuro: o degradê é o aro; o preto por dentro, a borda da tela. */
 .celular-corpo {
+  position: relative;
   height: 49em;
-  padding: 0.6em;
-  border-radius: 3.5em;
-  background: #15131c;
+  padding: 0.62em;
+  border-radius: 3.7em;
+  background: linear-gradient(
+    140deg,
+    #6d6a76 0%,
+    #2b2a32 14%,
+    #15141a 46%,
+    #24232b 78%,
+    #5f5c68 100%
+  );
   box-shadow:
-    inset 0 0 0 0.09em rgba(255, 255, 255, 0.22),
-    -1.6em 2.4em 4.5em rgba(22, 2, 70, 0.5);
+    inset 0 0 0 0.07em rgba(255, 255, 255, 0.28),
+    inset 0 0 0 0.3em #08070b,
+    -0.8em 1.2em 2em rgba(20, 2, 60, 0.5),
+    -3.4em 5em 6em rgba(20, 2, 60, 0.42),
+    -8em 12em 13em rgba(20, 2, 60, 0.26);
+}
+.celular-botao {
+  position: absolute;
+  width: 0.2em;
+  border-radius: 0.1em 0 0 0.1em;
+  background: linear-gradient(90deg, #77747f, #2f2e36);
+}
+.celular-botao-acao {
+  left: -0.17em;
+  top: 8.4em;
+  height: 2.1em;
+}
+.celular-botao-volume-1 {
+  left: -0.17em;
+  top: 12em;
+  height: 3.8em;
+}
+.celular-botao-volume-2 {
+  left: -0.17em;
+  top: 16.6em;
+  height: 3.8em;
+}
+.celular-botao-ligar {
+  right: -0.17em;
+  top: 13.5em;
+  height: 5.8em;
+  border-radius: 0 0.1em 0.1em 0;
+  background: linear-gradient(90deg, #2f2e36, #77747f);
 }
 .celular-tela {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  border-radius: 2.95em;
+  border-radius: 3.1em;
   background: var(--cel-parede);
+}
+/* O reflexo do vidro: em cima de tudo, fraco o bastante para não pesar no texto. */
+.celular-reflexo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    112deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.07) 24%,
+    transparent 24.4%,
+    transparent 100%
+  );
 }
 .celular-status {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85em 1.7em 0.25em;
+  padding: 0.85em 1.8em 0.25em;
   background: var(--cel-topo);
   font-size: 0.95em;
   font-weight: 600;
@@ -1492,7 +1713,7 @@ select:focus-visible,
   height: 1.55em;
   margin-left: -3em;
   border-radius: 1em;
-  background: #15131c;
+  background: #0b0a0f;
 }
 .celular-status-icones {
   display: flex;
@@ -1605,36 +1826,56 @@ select:focus-visible,
   border-radius: 50%;
   background: var(--cel-enviada-hora);
 }
-/* Sai do plano do celular (fica reto, sobre a borda dele): é o resultado da
-   conversa, e o único elemento branco contra o roxo. */
-.celular-selo {
+/* Vidro claro e tinta escura, e não branco sobre vidro: o cartão passa por cima do
+   roxo e do aparelho, e o contraste precisa fechar nos dois. Fica reto, fora do
+   plano inclinado do celular; o que mora entre dois balões acompanha o plano,
+   senão a inclinação faz ele encostar neles. */
+.celular-cartao {
+  --giro: 8deg;
   position: absolute;
-  top: 27.2em;
-  left: -4.2em;
   display: flex;
   align-items: center;
   gap: 0.55em;
-  padding: 0.65em 1.1em 0.65em 0.7em;
-  border-radius: 1.2em;
-  background: #ffffff;
-  box-shadow: 0 1em 2.4em rgba(22, 2, 70, 0.4);
+  padding: 0.5em 1em 0.5em 0.5em;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 1.15em;
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  box-shadow: 0 0.9em 2.2em rgba(22, 2, 70, 0.34);
   font-weight: 600;
   white-space: nowrap;
-  transform: rotate(8deg);
+  transform: rotate(var(--giro));
 }
-.celular-selo-check {
+.celular-cartao-icone {
   display: grid;
   place-items: center;
-  width: 1.65em;
-  height: 1.65em;
-  border-radius: 50%;
-  background: #10714a;
+  width: 1.85em;
+  height: 1.85em;
+  border-radius: 0.7em 0.7em 0.7em 0.2em;
+  background: var(--cel-marca);
   color: #ffffff;
 }
-.celular-selo-check svg {
-  width: 1.05em;
-  height: 1.05em;
-  stroke-width: 3;
+.celular-cartao-icone svg {
+  width: 1.1em;
+  height: 1.1em;
+}
+.celular-cartao-novo {
+  top: 3.7em;
+  right: -0.4em;
+}
+.celular-cartao-orcamento {
+  top: 18.3em;
+  right: 0.8em;
+  --giro: 0deg;
+}
+.celular-cartao-horario {
+  top: 24.5em;
+  left: -12.8em;
+}
+.celular-cartao-resolvido {
+  top: 29.3em;
+  left: -7.6em;
 }
 
 @keyframes celular-digitando {
@@ -1647,15 +1888,33 @@ select:focus-visible,
     opacity: 1;
   }
 }
-@keyframes celular-selo {
+@keyframes celular-cartao {
   from {
     opacity: 0;
-    transform: rotate(8deg) translateY(0.6em) scale(0.92);
+    transform: rotate(var(--giro)) translateY(0.6em) scale(0.92);
   }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .celular-balao {
-    animation: msg-in var(--dur-slow) var(--ease-out) var(--t) both;
+/* `translate`, e não `transform`: soma com a entrada e com a rotação do cartão. */
+@keyframes cartao-flutua {
+  from {
+    translate: 0 -0.2em;
+  }
+  to {
+    translate: 0 0.2em;
+  }
+}
+@keyframes divisor-flutua {
+  from {
+    transform: translateY(calc(var(--flutua) * -1));
+  }
+  to {
+    transform: translateY(var(--flutua));
+  }
+}
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .celular-balao,
+  .painel-marca-lista li {
+    animation: msg-in var(--dur-cartao) var(--ease-out) var(--t) both;
   }
   .celular-digitando {
     animation: celular-digitando var(--dura) linear var(--t) both;
@@ -1671,8 +1930,33 @@ select:focus-visible,
   .celular-digitando span:nth-child(3) {
     animation-delay: calc(var(--t) + 0.24s);
   }
-  .celular-selo {
-    animation: celular-selo 420ms var(--ease-out) 6.5s both;
+  .celular-cartao {
+    animation:
+      celular-cartao 420ms var(--ease-out) var(--t) both,
+      cartao-flutua var(--f, 7s) ease-in-out infinite alternate;
+  }
+  .celular-cartao-orcamento {
+    --f: 9s;
+  }
+  .celular-cartao-horario {
+    --f: 8s;
+  }
+  .celular-cartao-resolvido {
+    --f: 10s;
+  }
+  .divisor svg {
+    --flutua: 10px;
+    animation: divisor-flutua 22s ease-in-out infinite alternate;
+  }
+  .divisor-medio {
+    --flutua: 7px;
+    animation-duration: 17s;
+    animation-direction: alternate-reverse;
+  }
+  /* Quase parada: ela encosta na borda de cima e de baixo do painel. */
+  .divisor-forte {
+    --flutua: 2px;
+    animation-duration: 13s;
   }
 }
 
