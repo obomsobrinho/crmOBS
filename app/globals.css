@@ -184,10 +184,16 @@
 
   /* Título das telas de entrada (login). Tela sem casca e com muito ar: os 18 do
      `titulo` somem ali. Escopo fechado nessas telas. */
-  --text-entrada: 28px;
-  --text-entrada--line-height: 34px;
-  --text-entrada--letter-spacing: -0.02em;
-  --text-entrada--font-weight: 600;
+  --text-entrada: 32px;
+  --text-entrada--line-height: 38px;
+  --text-entrada--letter-spacing: -0.025em;
+  --text-entrada--font-weight: 700;
+
+  /* O nome do produto embaixo do selo grande, no topo do login. */
+  --text-marca: 24px;
+  --text-marca--line-height: 30px;
+  --text-marca--letter-spacing: -0.02em;
+  --text-marca--font-weight: 700;
 
   /* Raio. Cinco degraus mais o balão, que é assinatura do produto.
      A escala é LITERAL de propósito: o padrão do shadcn deriva tudo de
@@ -802,15 +808,15 @@ h3 {
   background-image: var(--grad);
   color: #fff;
 }
-/* A versão de superfície grande (painel de marca da entrada): com o meio roxo
-   fundo, porque em 700px os dois pontos de `--grad` viram um lavado de lilás. */
+/* A versão de superfície grande (painel de marca da entrada): sobre um roxo bem
+   mais fundo que a marca (`--painel-fundo`), a cor viva entra como luz nos cantos.
+   É o que dá profundidade: o branco fecha AA folgado em toda a área do texto. */
 .brand-grad-painel {
-  background-image: linear-gradient(
-    150deg,
-    var(--brand-grad-start),
-    var(--brand-grad-mid) 58%,
-    var(--brand-grad-end)
-  );
+  background-image:
+    radial-gradient(70% 55% at 0% 0%, var(--brand-grad-start), transparent 72%),
+    radial-gradient(60% 50% at 100% 100%, color-mix(in srgb, var(--brand-grad-end) 70%, transparent), transparent 72%),
+    radial-gradient(55% 45% at 100% 0%, color-mix(in srgb, var(--brand-grad-mid) 80%, transparent), transparent 74%),
+    linear-gradient(160deg, var(--brand-grad-mid), var(--painel-fundo) 62%);
   color: #fff;
 }
 
@@ -1357,6 +1363,8 @@ select:focus-visible,
    uma vez e param; o que fica em movimento, bem devagar, são as camadas do
    divisor e os cartões, só com `transform` e `translate`, sem mexer no layout. */
 .painel-marca {
+  --painel-fundo: #2a0a8f;
+  --painel-lilas: #cdb8ff;
   position: relative;
 }
 .painel-marca-recorte {
@@ -1375,6 +1383,13 @@ select:focus-visible,
   letter-spacing: -0.02em;
   font-weight: 600;
   text-wrap: balance;
+}
+.painel-marca-texto h2 span {
+  color: var(--painel-lilas);
+}
+/* O ícone de conversa do canto só existe onde sobra canto. */
+.painel-marca-selo {
+  display: none;
 }
 /* Na faixa o título basta: a frase volta no layout dividido. */
 .painel-marca-texto p {
@@ -1419,21 +1434,17 @@ select:focus-visible,
   display: none;
 }
 .divisor-claro {
-  fill: #dac6fb;
-  opacity: 0.62;
+  fill: #d8c7fb;
+  opacity: 0.72;
 }
 .divisor-medio {
-  fill: #a66bf3;
-  opacity: 0.74;
+  fill: #8f55f5;
+  opacity: 0.9;
 }
 /* Sobre o fundo escuro o lilás claro translúcido viraria cinza. */
 [data-theme="dark"] .divisor-claro {
   fill: #a67ff0;
   opacity: 0.55;
-}
-[data-theme="dark"] .divisor-medio {
-  fill: #8d4fea;
-  opacity: 0.8;
 }
 .divisor-deitado {
   position: relative;
@@ -1459,8 +1470,8 @@ select:focus-visible,
     background-image: linear-gradient(
       90deg,
       var(--brand-grad-start),
-      var(--brand-grad-mid) 58%,
-      var(--brand-grad-end)
+      var(--brand-grad-mid) 50%,
+      var(--painel-fundo)
     );
   }
 }
@@ -1474,8 +1485,8 @@ select:focus-visible,
 
 @media (min-width: 1024px) {
   .painel-marca {
-    --divisor-fora: min(14dvh, 9vw);
-    --divisor-dentro: calc(var(--divisor-fora) * 0.43);
+    --divisor-fora: min(18dvh, 11vw);
+    --divisor-dentro: calc(var(--divisor-fora) * 0.3);
     position: sticky;
     top: 0;
     height: 100dvh;
@@ -1503,16 +1514,16 @@ select:focus-visible,
      entre o degradê dela e o do painel, que varia com a proporção da janela. */
   .divisor-claro,
   .divisor-medio {
-    mask-image: linear-gradient(to right, #000 70%, transparent 70%);
+    mask-image: linear-gradient(to right, #000 76.9%, transparent 76.9%);
   }
   .divisor-forte {
-    mask-image: linear-gradient(to right, #000 70%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 76.9%, transparent 100%);
   }
   .divisor-deitado {
     display: none;
   }
   .painel-marca-recorte {
-    --margem: calc(var(--divisor-dentro) + clamp(14px, 2.4cqw, 28px));
+    --margem: calc(var(--divisor-dentro) + clamp(14px, 3cqw, 36px));
     height: 100%;
     container-type: size;
   }
@@ -1521,10 +1532,33 @@ select:focus-visible,
     padding: clamp(28px, 5.6cqh, 56px) clamp(24px, 5cqw, 56px) 0 var(--margem);
   }
   .painel-marca-texto h2 {
-    max-width: 16em;
-    font-size: clamp(30px, 5cqh, 46px);
+    max-width: 14em;
+    font-size: clamp(32px, min(6.2cqh, 7.2cqw), 62px);
     line-height: 1.08;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
+  }
+  /* O canto de cima à direita, quando o título não chega lá. */
+  .painel-marca-selo {
+    position: absolute;
+    z-index: 1;
+    top: clamp(20px, 4cqh, 40px);
+    right: clamp(20px, 3.6cqw, 44px);
+    place-items: center;
+    width: clamp(52px, 8cqh, 76px);
+    height: clamp(52px, 8cqh, 76px);
+    border-radius: 24%;
+    background: rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+    transform: rotate(10deg);
+  }
+  .painel-marca-selo svg {
+    width: 50%;
+    height: 50%;
+  }
+  @container (min-width: 700px) {
+    .painel-marca-selo {
+      display: grid;
+    }
   }
   .painel-marca-texto p {
     display: block;
@@ -1535,7 +1569,7 @@ select:focus-visible,
   .painel-marca-corpo {
     flex: 1;
     min-height: 0;
-    padding: clamp(18px, 3.4cqh, 34px) 0 clamp(24px, 5cqh, 52px) var(--margem);
+    padding: clamp(16px, 3cqh, 30px) 0 clamp(24px, 5.4cqh, 58px) var(--margem);
   }
   /* A lista mora na parte de baixo da coluna esquerda e termina perto da base. */
   .painel-marca-lista {
@@ -1543,20 +1577,22 @@ select:focus-visible,
     z-index: 1;
     height: 100%;
     align-content: end;
-    gap: clamp(16px, 6.6cqh, 72px);
-    max-width: clamp(150px, calc(42cqw - 80px), 320px);
+    gap: clamp(14px, 5cqh, 56px);
+    max-width: clamp(150px, calc(46cqw - 100px), 340px);
   }
   .painel-marca-lista li:not([data-faixa]) {
     display: flex;
   }
   .painel-marca-lista li {
-    gap: clamp(10px, 1.5cqh, 16px);
-    font-size: clamp(13px, 1.8cqh, 18px);
+    gap: clamp(10px, 1.7cqh, 18px);
+    font-size: clamp(14px, min(2.05cqh, 2.7cqw), 21px);
   }
   .painel-marca-lista-icone {
-    width: clamp(36px, 5.6cqh, 58px);
-    height: clamp(36px, 5.6cqh, 58px);
-    border-radius: clamp(13px, 1.9cqh, 20px) clamp(13px, 1.9cqh, 20px) clamp(13px, 1.9cqh, 20px) 4px;
+    width: clamp(38px, min(6.2cqh, 7cqw), 66px);
+    height: clamp(38px, min(6.2cqh, 7cqw), 66px);
+    border-radius: 27%;
+    background: rgba(143, 85, 245, 0.34);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   }
   .painel-marca-lista-icone svg {
     width: 46%;
@@ -1576,13 +1612,13 @@ select:focus-visible,
   --cel-check: #10714a;
   --cel-marca: #6b21e8;
 
-  top: clamp(30px, 5.4cqh, 54px);
-  right: clamp(14px, calc(22cqw - 90px), 180px);
+  top: clamp(24px, 3cqh, 40px);
+  right: clamp(24px, calc(17cqw - 84px), 150px);
   width: 23em;
-  font-size: clamp(13px, 1.76cqh, 19px);
+  font-size: clamp(13px, min(2cqh, 2.5cqw), 22px);
   font-family: var(--font-sans);
   color: var(--cel-tinta);
-  transform: rotate(-8deg);
+  transform: rotate(-7deg);
   transform-origin: 50% 0;
 }
 @media (min-width: 1024px) {
@@ -1601,7 +1637,7 @@ select:focus-visible,
   width: 58em;
   height: 58em;
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(190, 150, 255, 0.17), transparent);
+  background: radial-gradient(closest-side, rgba(150, 100, 255, 0.3), transparent);
 }
 .celular-aneis,
 .celular-aneis::before,
@@ -1641,18 +1677,19 @@ select:focus-visible,
   border-radius: 3.7em;
   background: linear-gradient(
     140deg,
-    #6d6a76 0%,
-    #2b2a32 14%,
-    #15141a 46%,
-    #24232b 78%,
-    #5f5c68 100%
+    #7f7796 0%,
+    #352e4d 14%,
+    #17132a 46%,
+    #2a2441 78%,
+    #6f6789 100%
   );
   box-shadow:
-    inset 0 0 0 0.07em rgba(255, 255, 255, 0.28),
-    inset 0 0 0 0.3em #08070b,
-    -0.8em 1.2em 2em rgba(20, 2, 60, 0.5),
-    -3.4em 5em 6em rgba(20, 2, 60, 0.42),
-    -8em 12em 13em rgba(20, 2, 60, 0.26);
+    inset 0 0 0 0.07em rgba(255, 255, 255, 0.3),
+    inset 0 0 0 0.3em #0a0814,
+    0 0 3em rgba(150, 100, 255, 0.28),
+    -0.8em 1.2em 2em rgba(14, 2, 60, 0.45),
+    -3.4em 5em 6em rgba(14, 2, 60, 0.4),
+    -8em 12em 13em rgba(14, 2, 60, 0.26);
 }
 .celular-botao {
   position: absolute;
@@ -1839,10 +1876,9 @@ select:focus-visible,
 }
 /* Vidro claro e tinta escura, e não branco sobre vidro: o cartão passa por cima do
    roxo e do aparelho, e o contraste precisa fechar nos dois. Fica reto, fora do
-   plano inclinado do celular; o que mora entre dois balões acompanha o plano,
-   senão a inclinação faz ele encostar neles. */
+   plano inclinado do celular. */
 .celular-cartao {
-  --giro: 8deg;
+  --giro: 7deg;
   position: absolute;
   display: flex;
   align-items: center;
@@ -1875,18 +1911,9 @@ select:focus-visible,
   top: 3.7em;
   right: -0.4em;
 }
-.celular-cartao-orcamento {
-  top: 18.3em;
-  right: 0.8em;
-  --giro: 0deg;
-}
 .celular-cartao-horario {
-  top: 27.6em;
-  left: -2.4em;
-}
-.celular-cartao-resolvido {
-  top: 32em;
-  left: 2.6em;
+  top: 28.6em;
+  left: 0.8em;
 }
 
 @keyframes celular-digitando {
@@ -1946,14 +1973,8 @@ select:focus-visible,
       celular-cartao 420ms var(--ease-out) var(--t) both,
       cartao-flutua var(--f, 7s) ease-in-out infinite alternate;
   }
-  .celular-cartao-orcamento {
-    --f: 9s;
-  }
   .celular-cartao-horario {
-    --f: 8s;
-  }
-  .celular-cartao-resolvido {
-    --f: 10s;
+    --f: 9s;
   }
   .divisor svg {
     --flutua: 9px;

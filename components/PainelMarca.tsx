@@ -6,8 +6,7 @@ import {
   CalendarCheck,
   CheckCheck,
   ChevronLeft,
-  CircleCheck,
-  FileText,
+  MessagesSquare,
   ReceiptText,
   SignalHigh,
   User,
@@ -32,43 +31,49 @@ function aos(t: number) {
   return { "--t": `${t}s` } as CSSProperties;
 }
 
-// ── O divisor: um contorno ondulado em três tons ─────────────────────────────
-// Um traçado só, de ponta a ponta da tela, com uma ponta de balão no meio. As
-// camadas são o MESMO contorno recuado, e os mesmos dados desenham a borda em pé do
-// computador e a deitada da faixa do celular, trocando x por y.
+// ── O divisor: um contorno em curvas largas, em três tons ────────────────────
+// Um traçado só, de ponta a ponta da tela. As duas camadas de fundo são o mesmo
+// contorno recuado e um pouco defasado (é a defasagem que faz a faixa engrossar e
+// afinar), e só a da frente leva a ponta de balão. Os mesmos dados desenham a borda
+// em pé do computador e a deitada da faixa do celular, trocando x por y.
 
 const ESPESSURA = 200;
 const COMPRIMENTO = 1000;
 
 /** Sai de cima da tela e passa do fim dela, para o movimento nunca abrir vão. */
-const INICIO = [92, -60];
-const ONDA = [
-  [70, 20, 52, 90, 62, 170],
-  [72, 250, 118, 280, 116, 350],
-  [114, 410, 76, 430, 72, 486],
-  // A ponta do balão.
-  [70, 510, 62, 532, 46, 548],
-  [66, 552, 82, 546, 94, 530],
-  [118, 566, 120, 610, 96, 680],
-  [76, 740, 54, 790, 66, 860],
-  [76, 920, 104, 980, 92, 1060],
+const INICIO = [116, -60];
+const SUBIDA = [
+  [76, 30, 50, 100, 52, 200],
+  [54, 300, 146, 330, 146, 450],
+];
+const DESCIDA = [
+  [146, 610, 54, 620, 54, 760],
+  [54, 870, 112, 960, 126, 1060],
+];
+/** O trecho do meio com a ponta de balão: a curva desce, sai pela ponta e volta. */
+const PONTA = [
+  [146, 500, 128, 544, 110, 572],
+  [96, 590, 84, 604, 66, 612],
+  [86, 618, 96, 612, 104, 604],
+  [84, 640, 54, 680, 54, 760],
 ];
 
 const CAMADAS = [
-  { classe: "divisor-claro", recuo: 44 },
-  { classe: "divisor-medio", recuo: 22 },
-  { classe: "divisor-forte", recuo: 0 },
+  { classe: "divisor-claro", recuo: 46, defasagem: 34, onda: [...SUBIDA, ...DESCIDA] },
+  { classe: "divisor-medio", recuo: 24, defasagem: 16, onda: [...SUBIDA, ...DESCIDA] },
+  { classe: "divisor-forte", recuo: 0, defasagem: 0, onda: [...SUBIDA, ...PONTA, DESCIDA[1]] },
 ];
 
-function caminhoDoContorno(recuo: number, deitado: boolean) {
+function caminhoDoContorno(
+  { recuo, defasagem, onda }: (typeof CAMADAS)[number],
+  deitado: boolean,
+) {
   const p = (x: number, y: number) => (deitado ? `${y} ${x}` : `${x} ${y}`);
+  const q = (x: number, y: number) => p(x - recuo, y + defasagem);
   const fim = ESPESSURA + 40;
-  const curvas = ONDA.map(
-    ([x1, y1, x2, y2, x, y]) =>
-      `C${p(x1 - recuo, y1)} ${p(x2 - recuo, y2)} ${p(x - recuo, y)}`,
-  );
+  const curvas = onda.map(([x1, y1, x2, y2, x, y]) => `C${q(x1, y1)} ${q(x2, y2)} ${q(x, y)}`);
   const [x0, y0] = INICIO;
-  return `M${p(fim, y0)}L${p(x0 - recuo, y0)}${curvas.join("")}L${p(fim, COMPRIMENTO + 60)}Z`;
+  return `M${p(fim, y0 - 60)}L${q(x0, y0 - 60)}L${q(x0, y0)}${curvas.join("")}L${p(fim, COMPRIMENTO + 120)}Z`;
 }
 
 /** As três camadas, em pé (computador) ou deitadas (faixa do celular). */
@@ -76,14 +81,14 @@ function Divisor({ deitado = false }: { deitado?: boolean }) {
   const idDoTom = deitado ? "divisor-tom-deitado" : "divisor-tom";
   return (
     <div className={deitado ? "divisor divisor-deitado" : "divisor"} aria-hidden>
-      {CAMADAS.map(({ classe, recuo }) => (
+      {CAMADAS.map((camada) => (
         <svg
-          key={classe}
-          className={classe}
+          key={camada.classe}
+          className={camada.classe}
           viewBox={deitado ? `0 0 ${COMPRIMENTO} ${ESPESSURA}` : `0 0 ${ESPESSURA} ${COMPRIMENTO}`}
           preserveAspectRatio="none"
         >
-          {classe === "divisor-forte" && (
+          {camada.classe === "divisor-forte" && (
             <defs>
               {/* Deitada, ela encosta na faixa, que usa este mesmo degradê na
                   horizontal: assim não sobra emenda em largura nenhuma. Em pé,
@@ -97,14 +102,14 @@ function Divisor({ deitado = false }: { deitado?: boolean }) {
                 y2={deitado ? "0" : "1"}
               >
                 <stop offset="0" stopColor="var(--brand-grad-start)" />
-                <stop offset={deitado ? "0.58" : "1"} stopColor="var(--brand-grad-mid)" />
-                {deitado && <stop offset="1" stopColor="var(--brand-grad-end)" />}
+                <stop offset={deitado ? "0.5" : "0.6"} stopColor="var(--brand-grad-mid)" />
+                <stop offset="1" stopColor="var(--painel-fundo)" />
               </linearGradient>
             </defs>
           )}
           <path
-            d={caminhoDoContorno(recuo, deitado)}
-            fill={classe === "divisor-forte" ? `url(#${idDoTom})` : undefined}
+            d={caminhoDoContorno(camada, deitado)}
+            fill={camada.classe === "divisor-forte" ? `url(#${idDoTom})` : undefined}
           />
         </svg>
       ))}
@@ -236,14 +241,8 @@ function CelularConversa() {
       <CartaoDeVidro posicao="celular-cartao-novo" icone={UserPlus} t={0.9}>
         Novo cliente
       </CartaoDeVidro>
-      <CartaoDeVidro posicao="celular-cartao-orcamento" icone={FileText} t={3.2}>
-        Orçamento enviado
-      </CartaoDeVidro>
       <CartaoDeVidro posicao="celular-cartao-horario" icone={CalendarCheck} t={6.2}>
         Horário marcado na agenda
-      </CartaoDeVidro>
-      <CartaoDeVidro posicao="celular-cartao-resolvido" icone={CircleCheck} t={7}>
-        Pedido resolvido
       </CartaoDeVidro>
     </div>
   );
@@ -255,8 +254,13 @@ export default function PainelMarca({ className }: { className?: string }) {
       <Divisor />
       <Divisor deitado />
       <div className="painel-marca-recorte brand-grad-painel">
+        <span className="painel-marca-selo" aria-hidden>
+          <MessagesSquare />
+        </span>
         <div className="painel-marca-texto">
-          <h2>A central inteligente do seu WhatsApp.</h2>
+          <h2>
+            A central inteligente do seu <span>WhatsApp</span>.
+          </h2>
           <p>Atende, qualifica e organiza cada cliente até a venda.</p>
         </div>
         <div className="painel-marca-corpo">

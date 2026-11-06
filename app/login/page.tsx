@@ -2,14 +2,15 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Lock, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import BrandMark from "@/components/BrandMark";
 import { Aviso } from "@/components/ui/aviso";
 import PainelMarca from "@/components/PainelMarca";
 import { Button } from "@/components/ui/button";
-import { CampoComIcone } from "@/components/ui/campo-com-icone";
+import { CampoComAcao } from "@/components/ui/campo-com-acao";
+import { Input } from "@/components/ui/input";
 
 /** O WhatsApp de atendimento da OBS, para quem travou antes de entrar. */
 const AJUDA_WHATSAPP = "https://wa.me/5533984033279";
@@ -51,7 +52,7 @@ export default function LoginPage({
   }
 
   return (
-    <div className="flex min-h-dvh flex-col bg-raised lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1.55fr)]">
+    <div className="flex min-h-dvh flex-col bg-raised lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)]">
       <main className="flex flex-1 flex-col items-center gap-6 px-5 pb-6 pt-10 lg:px-6 lg:py-6">
         <form onSubmit={handleSubmit} className="my-auto w-full max-w-sm space-y-4">
           <div className="flex justify-center pb-1">
@@ -84,14 +85,15 @@ export default function LoginPage({
           )}
 
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-apoio font-medium">
+            <label htmlFor="email" className="flex items-center gap-1.5 text-apoio font-medium">
+              <Mail size={15} aria-hidden className="text-ink-2" />
               E-mail
             </label>
-            <CampoComIcone
-              icone={Mail}
+            <Input
               id="email"
               type="email"
               autoComplete="email"
+              placeholder="seu@email.com"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -99,8 +101,9 @@ export default function LoginPage({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <label htmlFor="password" className="text-apoio font-medium">
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="flex items-center gap-1.5 text-apoio font-medium">
+                <Lock size={15} aria-hidden className="text-ink-2" />
                 Senha
               </label>
               <Link
@@ -110,11 +113,11 @@ export default function LoginPage({
                 Esqueci minha senha
               </Link>
             </div>
-            <CampoComIcone
-              icone={Lock}
+            <CampoComAcao
               id="password"
               type={verSenha ? "text" : "password"}
               autoComplete="current-password"
+              placeholder="Digite sua senha"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -146,7 +149,14 @@ export default function LoginPage({
             carregando={loading}
             className="w-full justify-center max-md:h-11"
           >
-            {loading ? "Entrando…" : "Entrar"}
+            {loading ? (
+              "Entrando…"
+            ) : (
+              <>
+                Entrar
+                <ArrowRight size={16} aria-hidden />
+              </>
+            )}
           </Button>
 
           <div className="border-t border-line pt-4">

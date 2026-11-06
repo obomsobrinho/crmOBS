@@ -13,13 +13,13 @@ export default function BrandMark({
   size = "md",
   empilhada = false,
 }: {
-  /** sm = nav rail (32px), md = telas de entrada (40px), lg = selo em destaque (64px). */
+  /** sm = nav rail (32px), md = telas de entrada (40px), lg = selo em destaque (88px). */
   size?: "sm" | "md" | "lg";
   /** Nome embaixo do selo, centralizado (o topo do login). */
   empilhada?: boolean;
 }) {
-  const px = size === "sm" ? 32 : size === "lg" ? 64 : 40;
-  const label = size === "sm" ? "text-corpo" : "text-titulo";
+  const px = size === "sm" ? 32 : size === "lg" ? 88 : 40;
+  const label = size === "sm" ? "text-corpo" : size === "lg" ? "text-marca" : "text-titulo";
 
   return (
     <div
@@ -50,7 +50,7 @@ export default function BrandMark({
           className="mark-dark h-full w-full object-contain"
         />
       </span>
-      <span className={cn("truncate font-semibold", label)}>{BRAND.name}</span>
+      <span className={cn("truncate", size === "lg" ? "font-bold" : "font-semibold", label)}>{BRAND.name}</span>
     </div>
   );
 }

@@ -23,7 +23,8 @@ Piso absoluto da interface: **12px**.
 | `text-apoio` | 13 / 18 | herda | o mais usado da interface |
 | `text-legenda` | 12 / 16 | 500 | legenda, metadado |
 | `text-rotulo` | 12 / 16, `0.08em` | 600 | **RÓTULO**: caixa alta, `--ink-3` |
-| `text-entrada` | 28 / 34, `-0.02em` | 600 | título das **telas de entrada** (login), escopo fechado: sem cartão e com muito ar, os 18 somem |
+| `text-entrada` | 32 / 38, `-0.025em` | 700 | título das **telas de entrada** (login), escopo fechado: sem cartão e com muito ar, os 18 somem |
+| `text-marca` | 24 / 30, `-0.02em` | 700 | nome do produto embaixo do selo grande (`BrandMark size="lg"`), escopo fechado |
 
 ### A hierarquia de título, em três níveis
 

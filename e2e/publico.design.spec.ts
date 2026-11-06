@@ -85,10 +85,10 @@ test.describe("Login (/login)", () => {
     ]);
     await expect(page.locator('[data-slot="celular-cartao"]')).toHaveText([
       "Novo cliente",
-      "Orçamento enviado",
       "Horário marcado na agenda",
-      "Pedido resolvido",
     ]);
+    await expect(page.getByLabel("E-mail", { exact: true })).toHaveAttribute("placeholder", "seu@email.com");
+    await expect(page.getByLabel("Senha", { exact: true })).toHaveAttribute("placeholder", "Digite sua senha");
     // Vocabulário que o dono tirou da tela (voz da marca).
     await expect(page.locator("body")).not.toContainText(/24 horas|CRM|agente de IA|lembrar de mim|google/i);
     // O celular é ilustração: nada nele é focável nem chega ao leitor de tela.
