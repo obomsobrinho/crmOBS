@@ -1,6 +1,8 @@
 import "server-only";
+import { ACTOR_APIFY } from "./apify-campos";
 import { grafiasDeDigitos } from "./avisos";
-import { textoParaLead, type OrigemDaCampanha } from "./prospeccao";
+import { FONTE_PLANILHA } from "./planilha-de-leads";
+import { textoParaLead, type OrigemDaCampanha, type OrigemDoContato } from "./prospeccao";
 import type { Supa } from "./supabase/tipos";
 
 // A ORIGEM DE UM CONTATO para o turno do agente (03/11/2026): se a empresa mandou
@@ -8,16 +10,25 @@ import type { Supa } from "./supabase/tipos";
 // exato que saiu. O texto não é gravado no envio: é refeito pela mesma função do
 // cron (`textoParaLead`, com a variante e o nome do lead), e as variantes só
 // mudam enquanto a campanha é rascunho, então o refeito é o enviado.
+// Desde 07/11/2026 também de onde veio o contato (a fonte da lista do lead): a IA
+// responde "de onde tirou meu número?" pelo fato, não pelo texto enviado.
 // Só leitura; quem decide o que fazer com isso é a persona.
 //
 // Roda em TODO turno de toda empresa, e quase nenhum telefone é lead: começa pelo
 // índice único do telefone e para ali quando não é (uma leitura).
 
+/** A fonte gravada na lista do lead, como a IA a conhece. Fonte desconhecida = null (nunca um palpite). */
+export function origemDoContato(fonte: string | null | undefined): OrigemDoContato | null {
+  if (fonte === ACTOR_APIFY) return "google";
+  if (fonte === FONTE_PLANILHA) return "planilha";
+  return null;
+}
+
 /** O envio de campanha mais recente da empresa para este telefone, ou null. */
 export async function origemDaCampanha(svc: Supa, clientId: string, phone: string): Promise<OrigemDaCampanha | null> {
   const { data: leads, error } = await svc
     .from("prospeccao_leads")
-    .select("id, nome, parou_em")
+    .select("id, nome, parou_em, prospeccao_buscas(fonte)")
     .in("telefone", grafiasDeDigitos(phone.replace(/\D/g, "")));
   if (error) throw error;
   if (!leads || leads.length === 0) return null;
@@ -38,5 +49,6 @@ export async function origemDaCampanha(svc: Supa, clientId: string, phone: strin
     enviadoEm: envio.enviado_em,
     texto: textoParaLead(variante.texto, lead.nome),
     parouEm: lead.parou_em,
+    deOnde: origemDoContato(lead.prospeccao_buscas?.fonte),
   };
 }

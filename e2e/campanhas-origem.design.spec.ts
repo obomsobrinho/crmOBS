@@ -17,6 +17,14 @@ test.describe("Origem de campanha para o agente", () => {
     expect(b).not.toMatch(/[–—]/);
   });
 
+  test("de onde veio o contato é uma linha de fato, pela lista do lead; sem saber, nada (07/11/2026)", () => {
+    const base = { enviadoEm: "2026-11-04T13:30:00Z", texto, parouEm: null };
+    expect(blocoDeOrigem({ ...base, deOnde: "google" })).toContain("\nOrigem do contato: busca no Google.");
+    expect(blocoDeOrigem({ ...base, deOnde: "planilha" })).toContain("\nOrigem do contato: planilha.");
+    expect(blocoDeOrigem({ ...base, deOnde: null })).toContain("\nOrigem do contato: não registrada.");
+    expect(blocoDeOrigem(base)).not.toContain("Origem do contato");
+  });
+
   test("quem pediu para parar ganha a linha com a data", () => {
     const b = blocoDeOrigem({ enviadoEm: "2026-11-04T13:30:00Z", texto, parouEm: "2026-11-05T12:00:00Z" });
     expect(b.split("\n").at(-1)).toBe("Em 05 de novembro de 2026, às 09:00, a pessoa pediu para não receber mais mensagens de campanha.");

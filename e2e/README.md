@@ -34,8 +34,11 @@ assumiam formulário guiado ou um telefone escrito no arquivo. A lição vale pa
 teste novo: **não travar o modo do tenant nem o número da conversa.** Quem precisa
 de uma conversa pega a primeira da lista; quem precisa do construtor trata os dois
 modos. Credenciais em `.env.e2e.local`: `E2E_EMAIL`, `E2E_PASSWORD`,
-`E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD` (o atendente existe desde
-17/09/2026; os três testes de permissão dele ainda não foram escritos).
+`E2E_ATTENDANT_EMAIL` e `E2E_ATTENDANT_PASSWORD` (o atendente existiu de
+17/09/2026 a novembro de 2026). Desde 07/11/2026 as duas do atendente são
+OPCIONAIS (decisão do dono): sem elas a suíte roda só com a conta do dono, o setup
+do atendente e o projeto `atendente` pulam com o motivo escrito
+(`e2e/atendente-de-teste.ts`), e as permissões do papel não são provadas.
 
 ## Permissões do atendente
 

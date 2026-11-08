@@ -432,7 +432,23 @@ export interface OrigemDaCampanha {
   texto: string;
   /** Quando o lead pediu para parar (ISO), ou null. */
   parouEm: string | null;
+  /**
+   * De onde veio o contato (07/11/2026): a lista do lead (`prospeccao_buscas.fonte`),
+   * `google` (busca no Google), `planilha` (lista importada) ou null (não registrado:
+   * a IA não inventa). `undefined` = quem montou a origem não sabe (ensaio antigo).
+   */
+  deOnde?: OrigemDoContato | null;
 }
+
+/** De onde veio o contato de um lead de campanha. */
+export type OrigemDoContato = "google" | "planilha";
+
+/** A linha do bloco que diz de onde veio o contato. Só fato: como dizer mora na persona. */
+const LINHA_DA_ORIGEM: Record<OrigemDoContato | "nenhuma", string> = {
+  google: "Origem do contato: busca no Google.",
+  planilha: "Origem do contato: planilha.",
+  nenhuma: "Origem do contato: não registrada.",
+};
 
 /** O nome da seção do prompt; a persona pode citar por este nome. */
 export const SECAO_ORIGEM = "ORIGEM DESTE CONTATO";
@@ -450,6 +466,7 @@ export function blocoDeOrigem(o: OrigemDaCampanha): string {
     '"""',
     o.texto.trim(),
     '"""',
+    ...(o.deOnde !== undefined ? [LINHA_DA_ORIGEM[o.deOnde ?? "nenhuma"]] : []),
     ...(o.parouEm ? [`Em ${quando(o.parouEm)}, a pessoa pediu para não receber mais mensagens de campanha.`] : []),
   ].join("\n");
 }

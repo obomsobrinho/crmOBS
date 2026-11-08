@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { servico, tenantDeTeste } from "./semente";
+import { SEM_ATENDENTE, TEM_ATENDENTE } from "./atendente-de-teste";
+
+// Sem atendente de teste, o arquivo inteiro pula (nenhuma sessão é aberta).
+test.skip(!TEM_ATENDENTE, SEM_ATENDENTE);
 
 // Permissões do ATENDENTE, com a sessão gravada por `auth.setup.ts` em
 // `e2e/.auth/atendente.json`. Este arquivo fecha os buracos que ficaram

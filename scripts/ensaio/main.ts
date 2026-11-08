@@ -22,7 +22,7 @@ const TELEFONE_DE_TESTE = "5500000000001";
 interface Cenario {
   nome: string;
   /** true = origem de campanha com a 1ª variante sugerida; ou o envio exato. */
-  campanha?: boolean | { texto?: string; enviadoEm?: string; empresa?: string };
+  campanha?: boolean | { texto?: string; enviadoEm?: string; empresa?: string; deOnde?: OrigemDaCampanha["deOnde"] };
   /** Falas fixas do lead, uma por turno. */
   mensagens?: string[];
   /**
@@ -54,6 +54,8 @@ function origemDoCenario(c: Cenario, agora: string | undefined): OrigemDaCampanh
     enviadoEm: o.enviadoEm ?? new Date(base - 2 * 60 * 60_000).toISOString(),
     texto: o.texto ?? textoParaLead(VARIANTES_SUGERIDAS[0], o.empresa ?? "Empresa Exemplo"),
     parouEm: null,
+    // De onde veio o contato, como `origemDaCampanha` lê da lista do lead; sem ele, a busca no Google.
+    deOnde: o.deOnde === undefined ? "google" : o.deOnde,
   };
 }
 

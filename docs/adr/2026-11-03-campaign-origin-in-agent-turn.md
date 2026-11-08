@@ -51,3 +51,12 @@ Before the first real campaign two problems were found by reading code and the n
   same `Promise.all` as the history.
 - Measured on 03/11/2026: the current OBS persona compiles to 15,526 of the 16,000 `LIMITS.persona`
   characters; the origin section is a separate per-turn block and does not count toward it.
+
+## Addendum, 2026-11-07: where the contact came from
+The default variants of 07/11/2026 no longer mention Google, and the persona answered "where did you get my
+number?" by reading the sent text ("cita Google" or not), so a Google lead would hear "a list". The section
+now carries the fact: `Origem do contato: busca no Google.` / `planilha.` / `não registrada.`, from the lead
+list source (`prospeccao_buscas.fonte`: `compass/crawler-google-places` or `planilha`, mapped by
+`origemDoContato` in `lib/campanhas-origem.ts`; an unknown source is "não registrada", never a guess). The
+persona says how to word it. Rehearsal: Google 3/3 and spreadsheet 3/3; "não registrada" still made the model
+say "a list" in 3/3, which is unreachable today (`busca_id` is NOT NULL and only those two sources exist).
