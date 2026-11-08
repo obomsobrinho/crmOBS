@@ -1,5 +1,6 @@
 import { chaveTelefone } from "./avisos";
 import { normalizar } from "./clientes";
+import { respostasAutomaticas } from "./resposta-automatica";
 import { formatTime } from "./format";
 import { dataLongaSP, diaIsoSP, inicioDoDiaSP, somarDias } from "./fuso";
 
@@ -414,11 +415,11 @@ export function problemasDaVariante(modelo: string): string[] {
   return p;
 }
 
-/** As três variantes sugeridas (plano, seção 9; aprovadas pelo dono em 29/10/2026): o texto pré-preenchido de uma campanha nova. */
+/** As três variantes sugeridas (textos do dono de 07/11/2026, no lugar das de 29/10/2026): o texto pré-preenchido de uma campanha nova. */
 export const VARIANTES_SUGERIDAS = [
-  "Oi, tudo bem? Sou o Tony, da OBS. Achei a {empresa} numa busca no Google. A gente monta sistemas sob medida que deixam o WhatsApp respondendo sozinho e tiram o trabalho repetido da rotina. Posso te mostrar em 2 minutos como ficaria aí?",
-  "Oi! Aqui é o Tony, da OBS. Vi a {empresa} no Google e fiquei curioso: quando um cliente chama no WhatsApp fora do horário, alguém responde? A gente monta um sistema que atende, organiza e agenda sozinho. Se fizer sentido, te mostro rapidinho.",
-  "Oi, tudo bem? Sou o Tony, da OBS. A gente cria sistemas sob medida pra tirar tarefa chata da rotina: atendimento no WhatsApp que responde sozinho, agenda, lembrete, controle. Vale uma conversa rápida pra eu entender como funciona aí na {empresa} hoje?",
+  "Oi, tudo bem? Sou o Tony, da OBS (O Bom Sobrinho). Vi a {empresa} e queria entender uma coisa: hoje, quando um cliente chama no WhatsApp fora do horário ou no meio da correria, alguém consegue responder na hora?",
+  "Oi! Aqui é o Tony, da OBS. Vi a {empresa} e fiquei com uma dúvida: quando chega mensagem no WhatsApp com vocês ocupados, quem responde?",
+  "Oi, tudo bem? Sou o Tony, da OBS (O Bom Sobrinho). Hoje, quando alguém pergunta preço ou horário da {empresa} pelo WhatsApp, vocês conseguem responder na hora?",
 ];
 
 // ── Origem do contato, para o agente ─────────────────────────────────────
@@ -431,7 +432,23 @@ export interface OrigemDaCampanha {
   texto: string;
   /** Quando o lead pediu para parar (ISO), ou null. */
   parouEm: string | null;
+  /**
+   * De onde veio o contato (07/11/2026): a lista do lead (`prospeccao_buscas.fonte`),
+   * `google` (busca no Google), `planilha` (lista importada) ou null (não registrado:
+   * a IA não inventa).
+   */
+  deOnde: OrigemDoContato | null;
 }
+
+/** De onde veio o contato de um lead de campanha. */
+export type OrigemDoContato = "google" | "planilha";
+
+/** A linha do bloco que diz de onde veio o contato. Só fato: como dizer mora na persona. */
+const LINHA_DA_ORIGEM: Record<OrigemDoContato | "nenhuma", string> = {
+  google: "Origem do contato: busca no Google.",
+  planilha: "Origem do contato: planilha.",
+  nenhuma: "Origem do contato: não registrada.",
+};
 
 /** O nome da seção do prompt; a persona pode citar por este nome. */
 export const SECAO_ORIGEM = "ORIGEM DESTE CONTATO";
@@ -449,6 +466,7 @@ export function blocoDeOrigem(o: OrigemDaCampanha): string {
     '"""',
     o.texto.trim(),
     '"""',
+    LINHA_DA_ORIGEM[o.deOnde ?? "nenhuma"],
     ...(o.parouEm ? [`Em ${quando(o.parouEm)}, a pessoa pediu para não receber mais mensagens de campanha.`] : []),
   ].join("\n");
 }
@@ -1298,11 +1316,18 @@ export interface EnvioObservado {
   enviadoEm: number;
 }
 
-/** Uma mensagem RECEBIDA (`user_message`) na empresa que enviou. */
+/**
+ * Uma linha de `chat_messages` do celular na empresa que enviou: RECEBIDA
+ * (`user_message`) ou, com `nossa`, uma resposta da IA ou do time (`bot_message`,
+ * com quantas mensagens de WhatsApp ela virou). As nossas só servem para achar a
+ * resposta automática (`lib/resposta-automatica.ts`).
+ */
 export interface MensagemRecebida {
   telefone: string;
   texto: string;
   em: number;
+  nossa?: boolean;
+  partes?: number;
 }
 
 export interface RespostaAchada {
@@ -1319,6 +1344,9 @@ export interface RespostaAchada {
  * conta para o envio do mesmo celular (com e sem o nono dígito, `chaveTelefone`)
  * que veio ANTES dela, e só até o próximo envio ao mesmo lead (uma "segunda
  * chance" não faz a primeira campanha ganhar a resposta da segunda).
+ * Resposta automática (robô de menu, a mesma regra do turno do agente,
+ * `respostasAutomaticas`) nunca conta como "respondeu"; um pedido para parar
+ * conta sempre, venha de onde vier.
  */
 export function respostasDosEnvios(envios: EnvioObservado[], mensagens: MensagemRecebida[]): RespostaAchada[] {
   const agrupar = <T,>(lista: T[], chave: (x: T) => string) => {
@@ -1333,6 +1361,25 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
   };
   const porLead = agrupar(envios, (e) => e.leadId);
   const porFone = agrupar(mensagens, (m) => chaveTelefone(m.telefone));
+  const enviosPorFone = agrupar(envios, (e) => chaveTelefone(e.telefone));
+  // As automáticas de cada celular, julgadas com a conversa inteira em ordem: as
+  // linhas nossas e os envios das campanhas (uma mensagem cada).
+  const automaticas = new Set<MensagemRecebida>();
+  for (const [fone, delas] of porFone) {
+    const linhas = [
+      ...delas.map((m) => ({
+        m,
+        linha: m.nossa
+          ? { nossa: true as const, em: m.em, partes: m.partes ?? 1 }
+          : { nossa: false as const, em: m.em, texto: m.texto },
+      })),
+      ...(enviosPorFone.get(fone) ?? []).map((e) => ({ m: null, linha: { nossa: true as const, em: e.enviadoEm, partes: 1 } })),
+    ].sort((a, b) => a.linha.em - b.linha.em);
+    const flags = respostasAutomaticas(linhas.map((l) => l.linha));
+    linhas.forEach((l, i) => {
+      if (flags[i] && l.m) automaticas.add(l.m);
+    });
+  }
   const achadas: RespostaAchada[] = [];
   for (const e of envios) {
     const proximo = (porLead.get(e.leadId) ?? [])
@@ -1340,12 +1387,13 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
       .filter((t) => t > e.enviadoEm)
       .reduce((a, b) => Math.min(a, b), Infinity);
     const delas = (porFone.get(chaveTelefone(e.telefone)) ?? [])
-      .filter((m) => m.em > e.enviadoEm && m.em < proximo && m.texto.trim() !== "")
+      .filter((m) => !m.nossa && m.em > e.enviadoEm && m.em < proximo && m.texto.trim() !== "")
       .sort((a, b) => a.em - b.em);
     if (delas.length === 0) continue;
     const parada = delas.find((m) => ehPedidoParaParar(m.texto));
+    const pessoa = delas.find((m) => !automaticas.has(m));
     const r: RespostaAchada = { campanhaId: e.campanhaId, leadId: e.leadId };
-    if (e.situacao === "enviado") r.respondeuEm = delas[0].em;
+    if (e.situacao === "enviado" && pessoa) r.respondeuEm = pessoa.em;
     if (parada) r.parouEm = parada.em;
     if (r.respondeuEm !== undefined || r.parouEm !== undefined) achadas.push(r);
   }

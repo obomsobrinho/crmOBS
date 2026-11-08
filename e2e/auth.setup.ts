@@ -1,4 +1,5 @@
 import { test as setup, expect, type Page } from "@playwright/test";
+import { SEM_ATENDENTE, TEM_ATENDENTE } from "./atendente-de-teste";
 
 // Faz login uma vez por PAPEL e salva a sessão em e2e/.auth/. Os testes
 // autenticados reusam esse estado. As senhas vêm de .env.e2e.local (fora do
@@ -54,13 +55,10 @@ setup("autenticar como dono", async ({ page }) => {
 });
 
 setup("autenticar como atendente", async ({ page }) => {
-  const email = process.env.E2E_ATTENDANT_EMAIL;
-  const password = process.env.E2E_ATTENDANT_PASSWORD;
-  if (!email || !password) {
-    throw new Error(
-      "Defina E2E_ATTENDANT_EMAIL e E2E_ATTENDANT_PASSWORD em .env.e2e.local para rodar os testes de permissão do atendente."
-    );
-  }
+  // O atendente é opcional (e2e/atendente-de-teste.ts): sem ele, os testes do papel pulam.
+  setup.skip(!TEM_ATENDENTE, SEM_ATENDENTE);
+  const email = process.env.E2E_ATTENDANT_EMAIL!;
+  const password = process.env.E2E_ATTENDANT_PASSWORD!;
   await entrar(page, email, password);
   await page.context().storageState({ path: ARQUIVO_ATENDENTE });
 });

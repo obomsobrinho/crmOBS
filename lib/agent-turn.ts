@@ -75,6 +75,7 @@ import type {
 } from "@/lib/agent-diagnostics";
 import { blocoDeOrigem, type OrigemDaCampanha } from "@/lib/prospeccao";
 import { origemDaCampanha } from "@/lib/campanhas-origem";
+import { decisaoDoTurno, PEDIDO_AO_ROBO, type DecisaoDoRobo } from "@/lib/resposta-automatica";
 import {
   blocoDeMidias,
   catalogoDasLinhas,
@@ -195,6 +196,12 @@ export interface ProcessTurnParams {
    * (`catalogoDasLinhas`).
    */
   catalogoOverride?: Parameters<typeof catalogoDasLinhas>[1];
+  /**
+   * Só no dryRun, com `origemOverride`: quanto tempo depois da nossa última
+   * mensagem a atual chegou (ms), para o script de ensaio provar a trava do robô
+   * (`lib/resposta-automatica.ts`). Sem ele, a resposta conta como lenta.
+   */
+  intervaloDaRespostaMs?: number;
 }
 
 /**
@@ -502,10 +509,13 @@ export async function processTurn(
   let resolvidos: string[] = [];
   // A campanha que abriu esta conversa, se houve (`### ORIGEM DESTE CONTATO`).
   let origem: OrigemDaCampanha | null = null;
+  // A conversa de campanha caiu num robô de menu (`decisaoDoTurno`): "atender" é o turno normal.
+  let robo: DecisaoDoRobo = "atender";
   if (dryRun) {
     // O histórico do chamador já traz o envio (o script de ensaio o põe primeiro).
     origem = params.origemOverride ?? null;
     history = sanitizeHistory(params.history);
+    if (origem && !retomada) robo = decisaoDoTurno(linhasDeEnsaio(history, message, params.intervaloDaRespostaMs), 1);
     instruction = retomada
       ? retomada.instruction.trim()
       : typeof params.instruction === "string" && params.instruction.trim()
@@ -563,7 +573,10 @@ export async function processTurn(
     // A mídia que a IA já mandou entra no histórico como uma linha da empresa
     // (`marcaDeMidiaEnviada`): sem ela a IA não saberia que o vídeo foi.
     const { catalogo: doCatalogo } = await midiasP;
-    history = buildHistory(retomada ? linhas : semLoteAtual(linhas, Date.now(), message), doCatalogo);
+    const passado = retomada ? linhas : semLoteAtual(linhas, Date.now(), message);
+    // Resposta automática (`lib/resposta-automatica.ts`): só em conversa de campanha.
+    if (origem && !retomada) robo = decisaoDoTurno(linhas, linhas.length - passado.length);
+    history = buildHistory(passado, doCatalogo);
     resolvidos = pedidosResolvidos(rows, pedidos);
     abertos = fila ?? [];
     const pend = conv?.pending_instruction ?? null;
@@ -573,6 +586,27 @@ export async function processTurn(
         ? pend.trim()
         : null;
     handoffAt = conv?.handoff_at ?? null;
+  }
+
+  // RESPOSTA AUTOMÁTICA (07/11/2026, decisão do dono): a campanha caiu num robô de
+  // menu. ANTES do RAG e do modelo: na primeira vez, uma mensagem fixa pedindo uma
+  // pessoa; depois, silêncio. Nunca abre pedido de ajuda, nunca mexe no card, e o
+  // cron da campanha usa a mesma regra para não contar o robô como "respondeu".
+  // Uma mensagem que não bate com os sinais volta ao atendimento normal.
+  if (robo !== "atender") {
+    const t = silentTurn(t0, { respostaAutomatica: robo });
+    if (robo === "pedir") t.output.messages = [PEDIDO_AO_ROBO];
+    await logTurn(svc, {
+      clientId,
+      phone,
+      dryRun,
+      diagnostics: t.diagnostics,
+      messagesSent: t.output.messages.length,
+      silenced: "resposta_automatica",
+      model: null,
+      usage: null,
+    });
+    return t;
   }
 
   // Retrieval da base de conhecimento (RAG). Best-effort e só leitura, então
@@ -1105,7 +1139,11 @@ async function logTurn(
     dryRun: boolean;
     diagnostics: TurnDiagnostics;
     messagesSent: number;
-    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | "desativada" | null;
+    /**
+     * Por que o turno não passou pelo modelo. `resposta_automatica` (07/11/2026)
+     * é a trava do robô: `messages_sent` 1 = mandou `PEDIDO_AO_ROBO`, 0 = silêncio.
+     */
+    silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | "desativada" | "resposta_automatica" | null;
     model: string | null;
     usage: TurnUsage | null;
     /** Mês de São Paulo do turno (`mesSP`): com `usage`, o turno soma no mês. */
@@ -1186,6 +1224,7 @@ function silentTurn(
     numeroDeAvisos?: boolean;
     limiteIa?: boolean;
     contaDesativada?: boolean;
+    respostaAutomatica?: TurnDiagnostics["respostaAutomatica"];
   }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {
@@ -1218,6 +1257,23 @@ function silentTurn(
       ...flags,
     },
   };
+}
+
+/**
+ * As linhas que `decisaoDoTurno` lê, montadas do histórico do dryRun (que não tem
+ * hora): uma linha por minuto, e a mensagem atual `intervaloMs` depois da última
+ * (60 s sem ele). Da mais NOVA para a mais antiga, como `chat_messages`.
+ */
+function linhasDeEnsaio(history: ChatTurn[], message: string, intervaloMs: number | undefined) {
+  const base = Date.UTC(2026, 0, 1);
+  const passadas = history.map((t, i) => ({
+    user_message: t.role === "user" ? t.content : null,
+    bot_message: t.role === "assistant" ? t.content : null,
+    created_at: new Date(base + i * 60_000).toISOString(),
+  }));
+  const ultima = base + Math.max(0, history.length - 1) * 60_000;
+  const atual = { user_message: message, bot_message: null, created_at: new Date(ultima + (intervaloMs ?? 60_000)).toISOString() };
+  return [atual, ...passadas.reverse()];
 }
 
 // Normaliza o histórico vindo do chamador (dryRun): mantém só papéis válidos e

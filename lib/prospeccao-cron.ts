@@ -14,7 +14,9 @@ import {
   textoParaLead,
   varianteDaOrdem,
   type EnvioObservado,
+  type MensagemRecebida,
 } from "./prospeccao";
+import { partesDaLinha } from "./resposta-automatica";
 import type { Supa } from "./supabase/tipos";
 
 // O CRON DA PROSPECÇÃO (docs/plano-campanhas.md, seção 5.2): `GET
@@ -290,30 +292,35 @@ async function registrarRespostas(svc: Supa, agora: number, inicioDoDia: string)
 }
 
 /**
- * As mensagens RECEBIDAS por uma empresa, de alguns celulares, depois de `desde`: de
- * página em página na ordem (`created_at`, `id`), a mesma do índice da tabela por
+ * As mensagens de uma empresa com alguns celulares, depois de `desde`: de página
+ * em página na ordem (`created_at`, `id`), a mesma do índice da tabela por
  * empresa, telefone e data, até o fim, para um "SAIR" depois de uma conversa longa
- * com a IA nunca ficar de fora.
+ * com a IA nunca ficar de fora. As RECEBIDAS e, marcadas `nossa`, as respostas da
+ * IA ou do time: sem elas a resposta automática (robô de menu) contaria como
+ * "respondeu" (`respostasDosEnvios`).
  */
 async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], desde: number) {
-  const recebidas: { telefone: string; texto: string; em: number }[] = [];
+  const recebidas: MensagemRecebida[] = [];
   let cursor: { em: string; id: number } | null = null;
   for (;;) {
     let q = svc
       .from("chat_messages")
-      .select("id, phone, user_message, created_at")
+      .select("id, phone, user_message, bot_message, created_at")
       .eq("client_id", clientId)
       // O n8n grava `phone` como JID (`55...@s.whatsapp.net`): só dígitos nunca casava, e
       // nenhuma resposta nem SAIR era registrado (teste de 04/11/2026).
       .in("phone", fones.flatMap(grafiasDoTelefone))
-      .gt("created_at", new Date(desde).toISOString())
-      .not("user_message", "is", null);
+      .gt("created_at", new Date(desde).toISOString());
     // O instante vai entre aspas: tem ":" e "+", que o `or` do PostgREST leria como sintaxe.
     if (cursor) q = q.or(`created_at.gt."${cursor.em}",and(created_at.eq."${cursor.em}",id.gt.${cursor.id})`);
     const { data, error } = await q.order("created_at").order("id").limit(MENSAGENS_POR_PAGINA);
     if (error) throw error;
     for (const m of data ?? []) {
-      if (m.user_message && m.created_at) recebidas.push({ telefone: m.phone, texto: m.user_message, em: Date.parse(m.created_at) });
+      if (!m.created_at) continue;
+      const em = Date.parse(m.created_at);
+      // A nossa só serve à janela rápida: o texto não é lido.
+      if (m.bot_message?.trim()) recebidas.push({ telefone: m.phone, texto: "", em, nossa: true, partes: partesDaLinha(m.bot_message) });
+      else if (m.user_message) recebidas.push({ telefone: m.phone, texto: m.user_message, em });
     }
     const ultima = data?.[data.length - 1];
     if (!data || data.length < MENSAGENS_POR_PAGINA || !ultima?.created_at) return recebidas;

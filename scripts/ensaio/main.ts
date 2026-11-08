@@ -22,9 +22,14 @@ const TELEFONE_DE_TESTE = "5500000000001";
 interface Cenario {
   nome: string;
   /** true = origem de campanha com a 1ª variante sugerida; ou o envio exato. */
-  campanha?: boolean | { texto?: string; enviadoEm?: string; empresa?: string };
+  campanha?: boolean | { texto?: string; enviadoEm?: string; empresa?: string; deOnde?: OrigemDaCampanha["deOnde"] };
   /** Falas fixas do lead, uma por turno. */
   mensagens?: string[];
+  /**
+   * Com `mensagens` e campanha: quantos segundos depois da linha anterior da
+   * conversa cada fala chegou (a trava do robô, `lib/resposta-automatica.ts`). Sem ele, 60 s.
+   */
+  segundos?: number[];
   /** Ou uma pessoa simulada por outro modelo (scripts/ensaio/lead-simulado.ts). */
   lead?: LeadSimulado;
   /** Hora fixa do cenário (ISO); sem ela, a hora de agora. */
@@ -49,6 +54,8 @@ function origemDoCenario(c: Cenario, agora: string | undefined): OrigemDaCampanh
     enviadoEm: o.enviadoEm ?? new Date(base - 2 * 60 * 60_000).toISOString(),
     texto: o.texto ?? textoParaLead(VARIANTES_SUGERIDAS[0], o.empresa ?? "Empresa Exemplo"),
     parouEm: null,
+    // De onde veio o contato, como `origemDaCampanha` lê da lista do lead; sem ele, a busca no Google.
+    deOnde: o.deOnde === undefined ? "google" : o.deOnde,
   };
 }
 
@@ -161,6 +168,7 @@ export async function ensaiar(args: string[]): Promise<void> {
           personaOverride: persona,
           agoraTeste: agora ?? null,
           origemOverride: origem,
+          intervaloDaRespostaMs: c.segundos?.[turno] !== undefined ? c.segundos[turno] * 1000 : undefined,
           catalogoOverride,
           pedidosAbertos,
           midiasEnviadas,
@@ -176,6 +184,7 @@ export async function ensaiar(args: string[]): Promise<void> {
         if (d.midia) linha.push(`midia: ${d.midia.enviada ?? "nenhuma"}${d.midia.pedida && d.midia.pedida !== d.midia.enviada ? ` (pediu ${d.midia.pedida}, recusada)` : ""}`);
         if (d.guardrail.blocked) linha.push(`guardrail barrou: ${d.guardrail.reason ?? ""}`);
         if (d.limiteIa) linha.push("TURNO SILENCIADO: teto mensal de IA da empresa");
+        if (d.respostaAutomatica) linha.push(`trava do robô: ${d.respostaAutomatica === "pedir" ? "mandou o pedido fixo, sem modelo" : "silêncio, sem modelo"}`);
         saida.push("", `\`${linha.join(" · ")}\``, "");
         if (d.ragSearched) {
           saida.push(d.ragMatches.length ? "Trechos da base:" : "Trechos da base: nenhum.");

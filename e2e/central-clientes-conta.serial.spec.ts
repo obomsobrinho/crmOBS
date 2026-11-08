@@ -1,6 +1,7 @@
 import { inflateRawSync } from "node:zlib";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { segredoDoAgente, servico, tenantDeTeste } from "./semente";
+import { SEM_ATENDENTE, TEM_ATENDENTE } from "./atendente-de-teste";
 import { TABELAS_DA_EXPORTACAO, TABELAS_DO_CLIENTE, TABELAS_MANTIDAS } from "../lib/admin-purga";
 
 // A CENTRAL "CLIENTES", ENTREGA 2, CONTRA O BANCO DE VERDADE (docs/plano-central-clientes.md).
@@ -125,21 +126,26 @@ test("OBS: estender o teste é recusado quando não há teste com prazo", async 
 });
 
 test("OBS: desativar barra o atendente (tela clara, 403) e silencia a IA; reativar devolve", async ({ request, browser }) => {
+  // Sem atendente, a parte dele não roda: o relatório diz, em vez de passar calado.
+  if (!TEM_ATENDENTE) test.info().annotations.push({ type: "parcial", description: SEM_ATENDENTE });
   const des = await acao(request, obs, { acao: "desativar" });
   expect(des.status(), await des.text()).toBe(200);
   try {
-    const ctx = await browser.newContext({ storageState: "e2e/.auth/atendente.json" });
-    try {
-      const page = await ctx.newPage();
-      await page.goto("/inbox");
-      await expect(page).toHaveURL(/\/conta-desativada$/);
-      await expect(page.getByRole("heading", { name: "Conta desativada" })).toBeVisible();
-      // Uma rota de sessão (leitura) também fecha.
-      const rota = await page.request.get(`/api/clients/${obs}/whatsapp-status`);
-      expect(rota.status()).toBe(403);
-      expect((await rota.json()).error).toBe("conta desativada");
-    } finally {
-      await ctx.close();
+    // Sem atendente de teste (e2e/atendente-de-teste.ts), a tela dele não é provada; a IA e a purga são.
+    if (TEM_ATENDENTE) {
+      const ctx = await browser.newContext({ storageState: "e2e/.auth/atendente.json" });
+      try {
+        const page = await ctx.newPage();
+        await page.goto("/inbox");
+        await expect(page).toHaveURL(/\/conta-desativada$/);
+        await expect(page.getByRole("heading", { name: "Conta desativada" })).toBeVisible();
+        // Uma rota de sessão (leitura) também fecha.
+        const rota = await page.request.get(`/api/clients/${obs}/whatsapp-status`);
+        expect(rota.status()).toBe(403);
+        expect((await rota.json()).error).toBe("conta desativada");
+      } finally {
+        await ctx.close();
+      }
     }
     // A IA silencia antes do modelo (bancada, nada gasto, nada enviado).
     const turno = await request.post("/api/agent", {
@@ -158,6 +164,7 @@ test("OBS: desativar barra o atendente (tela clara, 403) e silencia a IA; reativ
     const rea = await acao(request, obs, { acao: "reativar" });
     expect(rea.status()).toBe(200);
   }
+  if (!TEM_ATENDENTE) return;
   const ctx = await browser.newContext({ storageState: "e2e/.auth/atendente.json" });
   try {
     const page = await ctx.newPage();
