@@ -435,9 +435,9 @@ export interface OrigemDaCampanha {
   /**
    * De onde veio o contato (07/11/2026): a lista do lead (`prospeccao_buscas.fonte`),
    * `google` (busca no Google), `planilha` (lista importada) ou null (não registrado:
-   * a IA não inventa). `undefined` = quem montou a origem não sabe (ensaio antigo).
+   * a IA não inventa).
    */
-  deOnde?: OrigemDoContato | null;
+  deOnde: OrigemDoContato | null;
 }
 
 /** De onde veio o contato de um lead de campanha. */
@@ -466,7 +466,7 @@ export function blocoDeOrigem(o: OrigemDaCampanha): string {
     '"""',
     o.texto.trim(),
     '"""',
-    ...(o.deOnde !== undefined ? [LINHA_DA_ORIGEM[o.deOnde ?? "nenhuma"]] : []),
+    LINHA_DA_ORIGEM[o.deOnde ?? "nenhuma"],
     ...(o.parouEm ? [`Em ${quando(o.parouEm)}, a pessoa pediu para não receber mais mensagens de campanha.`] : []),
   ].join("\n");
 }
@@ -1361,6 +1361,7 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
   };
   const porLead = agrupar(envios, (e) => e.leadId);
   const porFone = agrupar(mensagens, (m) => chaveTelefone(m.telefone));
+  const enviosPorFone = agrupar(envios, (e) => chaveTelefone(e.telefone));
   // As automáticas de cada celular, julgadas com a conversa inteira em ordem: as
   // linhas nossas e os envios das campanhas (uma mensagem cada).
   const automaticas = new Set<MensagemRecebida>();
@@ -1369,12 +1370,10 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
       ...delas.map((m) => ({
         m,
         linha: m.nossa
-          ? { nossa: true as const, em: m.em, partes: m.partes ?? 1, texto: m.texto }
+          ? { nossa: true as const, em: m.em, partes: m.partes ?? 1 }
           : { nossa: false as const, em: m.em, texto: m.texto },
       })),
-      ...envios
-        .filter((e) => chaveTelefone(e.telefone) === fone)
-        .map((e) => ({ m: null, linha: { nossa: true as const, em: e.enviadoEm, partes: 1, texto: "" } })),
+      ...(enviosPorFone.get(fone) ?? []).map((e) => ({ m: null, linha: { nossa: true as const, em: e.enviadoEm, partes: 1 } })),
     ].sort((a, b) => a.linha.em - b.linha.em);
     const flags = respostasAutomaticas(linhas.map((l) => l.linha));
     linhas.forEach((l, i) => {

@@ -1,7 +1,7 @@
 import { inflateRawSync } from "node:zlib";
 import { test, expect, type APIRequestContext } from "@playwright/test";
 import { segredoDoAgente, servico, tenantDeTeste } from "./semente";
-import { TEM_ATENDENTE } from "./atendente-de-teste";
+import { SEM_ATENDENTE, TEM_ATENDENTE } from "./atendente-de-teste";
 import { TABELAS_DA_EXPORTACAO, TABELAS_DO_CLIENTE, TABELAS_MANTIDAS } from "../lib/admin-purga";
 
 // A CENTRAL "CLIENTES", ENTREGA 2, CONTRA O BANCO DE VERDADE (docs/plano-central-clientes.md).
@@ -126,6 +126,8 @@ test("OBS: estender o teste é recusado quando não há teste com prazo", async 
 });
 
 test("OBS: desativar barra o atendente (tela clara, 403) e silencia a IA; reativar devolve", async ({ request, browser }) => {
+  // Sem atendente, a parte dele não roda: o relatório diz, em vez de passar calado.
+  if (!TEM_ATENDENTE) test.info().annotations.push({ type: "parcial", description: SEM_ATENDENTE });
   const des = await acao(request, obs, { acao: "desativar" });
   expect(des.status(), await des.text()).toBe(200);
   try {

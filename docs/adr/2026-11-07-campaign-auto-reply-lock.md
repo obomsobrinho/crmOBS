@@ -44,7 +44,7 @@ The campaign cron also counted the bot's menu as the lead's reply ("respondeu").
    tenant's normal conversation silences a real customer, which is an attendance bug. Inbound
    conversations are started by the customer, where menu bots are rare. Widening it is the owner's call.
 4. **Measured in `agent_turns`**: `silenced = 'resposta_automatica'`, with `messages_sent` 1 (fixed
-   message) or 0 (silence); `diagnostics.respostaAutomatica` = `pedido` | `silencio`. No migration
+   message) or 0 (silence); `diagnostics.respostaAutomatica` = `pedir` | `silenciar`. No migration
    (`silenced` is free text).
 5. **The cron uses the same rule.** `mensagensRecebidas` (`lib/prospeccao-cron.ts`) now reads our rows too
    (`bot_message`, marked `nossa`), and `respostasDosEnvios` (`lib/prospeccao.ts`) judges each phone's

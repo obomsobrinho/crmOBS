@@ -594,7 +594,7 @@ export async function processTurn(
   // cron da campanha usa a mesma regra para não contar o robô como "respondeu".
   // Uma mensagem que não bate com os sinais volta ao atendimento normal.
   if (robo !== "atender") {
-    const t = silentTurn(t0, { respostaAutomatica: robo === "pedir" ? "pedido" : "silencio" });
+    const t = silentTurn(t0, { respostaAutomatica: robo });
     if (robo === "pedir") t.output.messages = [PEDIDO_AO_ROBO];
     await logTurn(svc, {
       clientId,
@@ -1224,7 +1224,7 @@ function silentTurn(
     numeroDeAvisos?: boolean;
     limiteIa?: boolean;
     contaDesativada?: boolean;
-    respostaAutomatica?: "pedido" | "silencio";
+    respostaAutomatica?: TurnDiagnostics["respostaAutomatica"];
   }
 ): { output: AgentOutput; diagnostics: TurnDiagnostics } {
   return {
@@ -1259,8 +1259,6 @@ function silentTurn(
   };
 }
 
-// Normaliza o histórico vindo do chamador (dryRun): mantém só papéis válidos e
-// conteúdo não vazio, trunca por turno e limita a janela.
 /**
  * As linhas que `decisaoDoTurno` lê, montadas do histórico do dryRun (que não tem
  * hora): uma linha por minuto, e a mensagem atual `intervaloMs` depois da última
@@ -1278,6 +1276,8 @@ function linhasDeEnsaio(history: ChatTurn[], message: string, intervaloMs: numbe
   return [atual, ...passadas.reverse()];
 }
 
+// Normaliza o histórico vindo do chamador (dryRun): mantém só papéis válidos e
+// conteúdo não vazio, trunca por turno e limita a janela.
 function sanitizeHistory(input: ChatTurn[] | undefined): ChatTurn[] {
   if (!Array.isArray(input)) return [];
   const out: ChatTurn[] = [];

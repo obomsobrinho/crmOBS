@@ -18,7 +18,7 @@ import { normalizar } from "./clientes";
 export const PEDIDO_AO_ROBO = "Queria falar com quem cuida do atendimento aí. Pode me responder por aqui quando der.";
 
 /** O sinal (a): até quanto tempo depois da entrega da nossa mensagem a resposta conta como rápida. */
-export const JANELA_RAPIDA_MS = 5_000;
+const JANELA_RAPIDA_MS = 5_000;
 
 /**
  * Quanto o n8n leva para ENTREGAR cada mensagem nossa depois de gravar a linha.
@@ -27,14 +27,14 @@ export const JANELA_RAPIDA_MS = 5_000;
  * uma mensagem e a próxima. Sem isso, o robô que responde na hora à 2ª mensagem
  * chegaria ~6 s depois da linha e o sinal (a) nunca pegaria. Mudou o n8n, muda aqui.
  */
-export const ATRASO_POR_MENSAGEM_MS = 2_500;
-export const PAUSA_ENTRE_MENSAGENS_MS = 1_000;
+const ATRASO_POR_MENSAGEM_MS = 2_500;
+const PAUSA_ENTRE_MENSAGENS_MS = 1_000;
 
 /**
  * O sinal (c) só vale para texto com pelo menos isto de caracteres normalizados:
  * uma pessoa repete "oi", "ok" ou "sim" sem ser robô; um menu repetido é longo.
  */
-export const TAMANHO_MINIMO_REPETIDA = 12;
+const TAMANHO_MINIMO_REPETIDA = 12;
 
 /** Palavras de automação (lista do dono, 07/11/2026), já sem acento e em caixa baixa. */
 const PALAVRAS_DE_AUTOMACAO = [/\bdigite\b/, /\bopca?o(es)?\b/, /\baguarde\b/, /\bmensagem automatica\b/, /\bretornaremos\b/];
@@ -46,7 +46,7 @@ const PALAVRAS_DE_AUTOMACAO = [/\bdigite\b/, /\bopca?o(es)?\b/, /\baguarde\b/, /
 const MARCADOR_DE_OPCAO = /(?:^|[\s(*])([1-9])(?:️?⃣|\s*[-):]|\.(?=\s|$)|\s+(?:para|pra)\b)/gu;
 
 /** O texto como os sinais comparam: sem acento, em caixa baixa, só letras e números, espaço simples. */
-export function textoComparavel(texto: string): string {
+function textoComparavel(texto: string): string {
   return normalizar(texto)
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -61,7 +61,7 @@ export function temPadraoDeAutomacao(texto: string): boolean {
 }
 
 /** Uma mensagem NOSSA (campanha, IA ou alguém do time): quando a linha foi gravada e quantas mensagens saíram nela. */
-export interface MensagemNossa {
+interface MensagemNossa {
   em: number;
   /** Quantas mensagens de WhatsApp a linha virou (a IA grava "a | b" numa linha só). */
   partes: number;
@@ -81,18 +81,18 @@ export interface SinaisDaResposta {
 
 /**
  * Os três sinais de uma mensagem RECEBIDA. `nossas` = as mensagens nossas da
- * conversa; `anteriores` = os textos recebidos ANTES desta.
+ * conversa; `anteriores` = os textos recebidos ANTES desta, já em `textoComparavel`.
  */
 export function sinaisDaResposta(
   m: { texto: string; em: number },
-  ctx: { nossas: MensagemNossa[]; anteriores: string[] }
+  ctx: { nossas: MensagemNossa[]; anteriores: ReadonlySet<string> }
 ): SinaisDaResposta {
   // (a) Uma mensagem nossa estava saindo até 5 s antes desta chegar. O começo da
   // janela tem 1 s de folga: o relógio do n8n (hora da recebida) e o do banco ou
   // do cron (hora do envio) não são o mesmo.
   const rapida = ctx.nossas.some((n) => m.em >= n.em - 1_000 && m.em <= entregueAte(n) + JANELA_RAPIDA_MS);
   const t = textoComparavel(m.texto);
-  const repetida = t.length >= TAMANHO_MINIMO_REPETIDA && ctx.anteriores.some((a) => textoComparavel(a) === t);
+  const repetida = t.length >= TAMANHO_MINIMO_REPETIDA && ctx.anteriores.has(t);
   return { rapida, padrao: temPadraoDeAutomacao(m.texto), repetida };
 }
 
@@ -102,9 +102,7 @@ export function ehRespostaAutomatica(s: SinaisDaResposta): boolean {
 }
 
 /** Uma linha da conversa em ordem cronológica: nossa (com quantas partes) ou recebida. */
-export type LinhaDaConversa =
-  | { nossa: true; em: number; partes: number; texto: string }
-  | { nossa: false; em: number; texto: string };
+type LinhaDaConversa = { nossa: true; em: number; partes: number } | { nossa: false; em: number; texto: string };
 
 /**
  * Para cada linha (em ordem cronológica), se é uma resposta automática. Linhas
@@ -113,59 +111,52 @@ export type LinhaDaConversa =
  * do robô pode chegar antes de o envio da campanha ser gravado).
  */
 export function respostasAutomaticas(linhas: LinhaDaConversa[]): boolean[] {
-  const nossas = linhas.filter((l) => l.nossa).map((l) => ({ em: l.em, partes: l.partes }));
-  const anteriores: string[] = [];
+  const nossas = linhas.flatMap((l) => (l.nossa ? [{ em: l.em, partes: l.partes }] : []));
+  const anteriores = new Set<string>();
   return linhas.map((l) => {
     if (l.nossa) return false;
     const auto = ehRespostaAutomatica(sinaisDaResposta(l, { nossas, anteriores }));
-    anteriores.push(l.texto);
+    anteriores.add(textoComparavel(l.texto));
     return auto;
   });
 }
 
-/** Quantas mensagens de WhatsApp uma linha nossa virou (`messages.join(" | ")` no n8n). */
-export function partesDaLinha(botMessage: string): number {
-  return Math.max(1, botMessage.split(" | ").length);
-}
-
 /**
- * O que o turno faz com um lote recebido: `atender` (normal), `pedir` (manda
- * `PEDIDO_AO_ROBO`, a primeira vez) ou `silenciar` (já pediu: nada, sem modelo).
- * Só é robô se TODAS as mensagens do lote forem automáticas: uma pessoa no meio
- * do lote volta ao atendimento normal.
+ * Quantas mensagens de WhatsApp uma linha nossa virou: a regra de `separarMensagens`
+ * (`lib/painel.ts`, o n8n junta com " | "), repetida aqui para o bundle das
+ * Campanhas não puxar `lib/agent-prompt.ts` pelo painel.
  */
-export function decisaoDoRobo(loteAutomatico: boolean[], jaPedimos: boolean): DecisaoDoRobo {
-  if (loteAutomatico.length === 0 || loteAutomatico.some((a) => !a)) return "atender";
-  return jaPedimos ? "silenciar" : "pedir";
+export function partesDaLinha(botMessage: string): number {
+  return Math.max(1, botMessage.split(" | ").filter((s) => s.trim()).length);
 }
 
+/** O que o turno faz: `atender` (normal), `pedir` (manda `PEDIDO_AO_ROBO`, a primeira vez) ou `silenciar` (já pediu). */
 export type DecisaoDoRobo = "atender" | "pedir" | "silenciar";
 
 /**
  * A decisão do turno a partir das linhas de `chat_messages` (da mais NOVA para a
  * mais antiga, com o envio da campanha já no lugar dele, `comEnvioDaCampanha`) e
  * de quantas das primeiras são o lote que está sendo respondido (`semLoteAtual`).
- * Linha sem texto (mídia sem legenda) não entra na conta. `jaPedimos` olha a
- * janela do histórico: o pedido ao robô já saiu nesta conversa.
+ * Só é robô se TODAS as recebidas do lote forem automáticas: uma pessoa no meio
+ * volta ao atendimento normal. Linha sem texto (mídia sem legenda) não entra na
+ * conta. `jaPedimos` olha a janela do histórico.
  */
 export function decisaoDoTurno(
   linhas: { user_message: string | null; bot_message: string | null; created_at: string | null }[],
   tamanhoDoLote: number
 ): DecisaoDoRobo {
-  const comIndice = linhas.map((l, i) => ({ l, i, em: Date.parse(l.created_at ?? "") }));
-  const cronologicas: { i: number; linha: LinhaDaConversa }[] = [];
-  for (const { l, i, em } of [...comIndice].reverse()) {
+  const cronologicas: { doLote: boolean; linha: LinhaDaConversa }[] = [];
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    const l = linhas[i];
+    const em = Date.parse(l.created_at ?? "");
     if (!Number.isFinite(em)) continue;
     const bot = l.bot_message?.trim() ?? "";
     const user = l.user_message?.trim() ?? "";
-    if (bot) cronologicas.push({ i, linha: { nossa: true, em, partes: partesDaLinha(bot), texto: bot } });
-    else if (user) cronologicas.push({ i, linha: { nossa: false, em, texto: user } });
+    if (bot) cronologicas.push({ doLote: false, linha: { nossa: true, em, partes: partesDaLinha(bot) } });
+    else if (user) cronologicas.push({ doLote: i < tamanhoDoLote, linha: { nossa: false, em, texto: user } });
   }
   const flags = respostasAutomaticas(cronologicas.map((c) => c.linha));
-  const doLote = cronologicas
-    .map((c, k) => ({ ...c, auto: flags[k] }))
-    .filter((c) => c.i < tamanhoDoLote && !c.linha.nossa)
-    .map((c) => c.auto);
-  const jaPedimos = linhas.some((l) => (l.bot_message ?? "").includes(PEDIDO_AO_ROBO));
-  return decisaoDoRobo(doLote, jaPedimos);
+  const doLote = cronologicas.flatMap((c, k) => (c.doLote ? [flags[k]] : []));
+  if (doLote.length === 0 || doLote.some((a) => !a)) return "atender";
+  return linhas.some((l) => (l.bot_message ?? "").includes(PEDIDO_AO_ROBO)) ? "silenciar" : "pedir";
 }

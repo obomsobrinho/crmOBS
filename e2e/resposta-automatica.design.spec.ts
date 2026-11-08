@@ -34,16 +34,25 @@ test.describe("Sinais da resposta automática", () => {
   test("rápida: até 5 s depois da ENTREGA da nossa última mensagem (2,5 s por mensagem e 1 s entre elas)", () => {
     const nossa = { em: T, partes: 2 };
     // Entregue até T + 2,5 + 1 + 2,5 = T + 6 s; janela até T + 11 s.
-    expect(sinaisDaResposta({ texto: "x", em: T + 10_900 }, { nossas: [nossa], anteriores: [] }).rapida).toBe(true);
-    expect(sinaisDaResposta({ texto: "x", em: T + 11_100 }, { nossas: [nossa], anteriores: [] }).rapida).toBe(false);
+    expect(sinaisDaResposta({ texto: "x", em: T + 10_900 }, { nossas: [nossa], anteriores: new Set<string>() }).rapida).toBe(true);
+    expect(sinaisDaResposta({ texto: "x", em: T + 11_100 }, { nossas: [nossa], anteriores: new Set<string>() }).rapida).toBe(false);
     // O envio da campanha é gravado antes de sair: a resposta pode vir 1 s "antes".
-    expect(sinaisDaResposta({ texto: "x", em: T - 900 }, { nossas: [{ em: T, partes: 1 }], anteriores: [] }).rapida).toBe(true);
-    expect(sinaisDaResposta({ texto: "x", em: T + 60_000 }, { nossas: [{ em: T, partes: 1 }], anteriores: [] }).rapida).toBe(false);
+    expect(sinaisDaResposta({ texto: "x", em: T - 900 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(true);
+    expect(sinaisDaResposta({ texto: "x", em: T + 60_000 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(false);
   });
 
   test("repetida: o mesmo texto normalizado, e nunca para texto curto", () => {
-    expect(sinaisDaResposta({ texto: MENU.toUpperCase(), em: T }, { nossas: [], anteriores: [MENU] }).repetida).toBe(true);
-    expect(sinaisDaResposta({ texto: "ok", em: T }, { nossas: [], anteriores: ["ok"] }).repetida).toBe(false);
+    // O mesmo menu, em caixa alta, horas depois: padrão + repetida.
+    expect(respostasAutomaticas([
+      { nossa: false, em: T, texto: MENU },
+      { nossa: false, em: T + 3_600_000, texto: MENU.toUpperCase() },
+    ])).toEqual([false, true]);
+    // "ok" repetido logo depois da nossa: rápida, mas curto demais para contar como repetida.
+    expect(respostasAutomaticas([
+      { nossa: false, em: T, texto: "ok" },
+      { nossa: true, em: T + 60_000, partes: 1 },
+      { nossa: false, em: T + 61_000, texto: "ok" },
+    ])).toEqual([false, false, false]);
   });
 
   test("é resposta automática com 2 sinais, nunca com 1", () => {
@@ -56,7 +65,7 @@ test.describe("Sinais da resposta automática", () => {
 
   test("uma pessoa que responde rápido, sem menu e sem repetir, é pessoa", () => {
     const flags = respostasAutomaticas([
-      { nossa: true, em: T, partes: 1, texto: "campanha" },
+      { nossa: true, em: T, partes: 1 },
       { nossa: false, em: T + 3_000, texto: "Oi, quem é?" },
     ]);
     expect(flags).toEqual([false, false]);

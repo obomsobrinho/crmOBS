@@ -318,7 +318,8 @@ async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], 
     for (const m of data ?? []) {
       if (!m.created_at) continue;
       const em = Date.parse(m.created_at);
-      if (m.bot_message?.trim()) recebidas.push({ telefone: m.phone, texto: m.bot_message, em, nossa: true, partes: partesDaLinha(m.bot_message) });
+      // A nossa só serve à janela rápida: o texto não é lido.
+      if (m.bot_message?.trim()) recebidas.push({ telefone: m.phone, texto: "", em, nossa: true, partes: partesDaLinha(m.bot_message) });
       else if (m.user_message) recebidas.push({ telefone: m.phone, texto: m.user_message, em });
     }
     const ultima = data?.[data.length - 1];
