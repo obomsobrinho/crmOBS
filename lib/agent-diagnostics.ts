@@ -75,6 +75,9 @@ export interface TurnDiagnostics {
   // true = a conta foi DESATIVADA pelo dono do produto (central "Clientes"):
   // silêncio antes de tudo, também na bancada.
   contaDesativada?: boolean;
+  // A trava do robô de menu (`lib/resposta-automatica.ts`, 07/11/2026): "pedido" =
+  // mandou a mensagem fixa pedindo uma pessoa, "silencio" = já tinha pedido.
+  respostaAutomatica?: "pedido" | "silencio";
   // true = o turno abriu pedido de ajuda e o aviso ao time foi AGENDADO (sai
   // depois da resposta, por `after`). Se a mensagem saiu mesmo, só o log diz.
   avisoAgendado?: boolean;
