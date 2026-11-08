@@ -89,7 +89,7 @@ export function sinaisDaResposta(
 ): SinaisDaResposta {
   // (a) Uma mensagem nossa estava saindo até 5 s antes desta chegar. A janela também
   // abre 5 s ANTES da nossa hora: o envio da campanha é gravado quando a Evolution
-  // confirma (migration 20261108023614), e o robô pode responder antes disso; e o
+  // confirma (migration 20261108030904), e o robô pode responder antes disso; e o
   // relógio do n8n (hora da recebida) não é o do banco. Nenhuma pessoa responde a uma
   // mensagem antes de ela chegar.
   const rapida = ctx.nossas.some((n) => m.em >= n.em - JANELA_RAPIDA_MS && m.em <= entregueAte(n) + JANELA_RAPIDA_MS);

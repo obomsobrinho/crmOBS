@@ -31,7 +31,7 @@ The campaign cron also counted the bot's menu as the lead's reply ("respondeu").
    `enviado_em` used to be the tick START (`p_agora`, written when the lead is claimed), and the real send
    left seconds later, after the tick's reply read, the stuck searches and the other campaigns' sends: the
    first menu after a campaign would pass as a person (found in `/code-review`). Migration
-   `20261108023614_prospeccao_enviado_em_na_confirmacao.sql` writes `enviado_em = now()` when Evolution
+   `20261108030904_prospeccao_enviado_em_na_confirmacao.sql` writes `enviado_em = now()` when Evolution
    confirms. The bot can answer before that confirmation is recorded, and the n8n and database clocks
    differ, so the window also opens 5 s BEFORE our time (no person answers a message before it arrives). The received time is n8n's arrival stamp
    (`recebidoEm`), taken before the 15 s sliding debounce, so the debounce does not distort it. If (a)
