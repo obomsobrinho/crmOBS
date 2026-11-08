@@ -2,6 +2,7 @@ import { rotaDoAdmin } from "@/lib/admin";
 import { campoDe } from "@/lib/campanhas-pedidos";
 import { falhou, iniciarCampanha, pausarCampanha, retomarCampanha, torto } from "@/lib/campanhas-servidor";
 import { agoraMs } from "@/lib/periodo";
+import { envioDeTesteForaDaJanela, leadDeTesteForaDaJanela } from "@/lib/prospeccao-cron";
 import { problemasParaIniciar } from "@/lib/prospeccao";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -22,6 +23,10 @@ export const PUT = rotaDoAdmin(
           : acao === "pausar"
             ? await pausarCampanha(svc, admin, id)
             : await retomarCampanha(svc, admin, id, agora);
+      // Teste local fora da janela (desligado por padrão, nunca em produção): `lib/prospeccao-cron.ts`.
+      if (r.ok && acao === "iniciar" && leadDeTesteForaDaJanela()) {
+        console.log("prospecção, teste fora da janela:", id, await envioDeTesteForaDaJanela(svc, id, agora));
+      }
       return r.ok ? Response.json({ situacao: r.situacao }) : Response.json({ error: r.erro }, { status: r.status });
     } catch (e) {
       return falhou(`${acao} a campanha`, e);

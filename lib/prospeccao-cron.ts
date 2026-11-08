@@ -104,6 +104,33 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
   return { campanhas: devidas?.length ?? 0, enviados, pausadas, respostas };
 }
 
+/**
+ * TESTE LOCAL FORA DA JANELA (dono, 07/11/2026): com `PROSPECCAO_TESTE_LEAD_ID`
+ * preenchido e o servidor rodando em `next dev` fora da Vercel, iniciar uma
+ * campanha cuja fila é SÓ esse lead manda a primeira mensagem na hora, sem
+ * esperar a janela nem o pg_cron. Desligado por padrão; em produção nunca liga.
+ * Atua só na campanha que acabou de iniciar e só se a fila inteira for o lead de
+ * teste: qualquer outra campanha segue a regra de sempre.
+ */
+export function leadDeTesteForaDaJanela(): string | null {
+  if (process.env.NODE_ENV !== "development" || process.env.VERCEL) return null;
+  return process.env.PROSPECCAO_TESTE_LEAD_ID?.trim() || null;
+}
+
+export async function envioDeTesteForaDaJanela(svc: Supa, campanhaId: string, agora: number): Promise<string> {
+  const leadDeTeste = leadDeTesteForaDaJanela();
+  if (!leadDeTeste) return "desligado";
+  const { data, error } = await svc
+    .from("prospeccao_campanha_leads")
+    .select("lead_id")
+    .eq("campanha_id", campanhaId)
+    .limit(2);
+  if (error) throw error;
+  if (data?.length !== 1 || data[0].lead_id !== leadDeTeste) return "fila_nao_e_so_o_lead_de_teste";
+  await adiar(svc, campanhaId, agora);
+  return vezDaCampanha(svc, campanhaId, agora, new Date(inicioDoDiaSP(diaIsoSP(agora))).toISOString());
+}
+
 /** Só muda a vez da campanha (`adiar` não toca em lead nenhum). */
 function adiar(svc: Supa, campanhaId: string, proximo: number) {
   return chamar(
