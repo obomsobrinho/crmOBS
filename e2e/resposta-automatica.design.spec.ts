@@ -36,8 +36,9 @@ test.describe("Sinais da resposta automática", () => {
     // Entregue até T + 2,5 + 1 + 2,5 = T + 6 s; janela até T + 11 s.
     expect(sinaisDaResposta({ texto: "x", em: T + 10_900 }, { nossas: [nossa], anteriores: new Set<string>() }).rapida).toBe(true);
     expect(sinaisDaResposta({ texto: "x", em: T + 11_100 }, { nossas: [nossa], anteriores: new Set<string>() }).rapida).toBe(false);
-    // O envio da campanha é gravado antes de sair: a resposta pode vir 1 s "antes".
-    expect(sinaisDaResposta({ texto: "x", em: T - 900 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(true);
+    // O envio da campanha é gravado quando a Evolution confirma: o robô pode responder até 5 s "antes".
+    expect(sinaisDaResposta({ texto: "x", em: T - 4_900 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(true);
+    expect(sinaisDaResposta({ texto: "x", em: T - 5_100 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(false);
     expect(sinaisDaResposta({ texto: "x", em: T + 60_000 }, { nossas: [{ em: T, partes: 1 }], anteriores: new Set<string>() }).rapida).toBe(false);
   });
 

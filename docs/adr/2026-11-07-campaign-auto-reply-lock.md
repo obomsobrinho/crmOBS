@@ -28,8 +28,12 @@ The campaign cron also counted the bot's menu as the lead's reply ("respondeu").
    second message lands ~6 s after the row, so a plain "5 s after the row" would miss it. The window is
    row time + 2.5 s per message + 1 s between them + 5 s (`ATRASO_POR_MENSAGEM_MS`,
    `PAUSA_ENTRE_MENSAGENS_MS`; they mirror the n8n nodes and change with them). The campaign
-   `enviado_em` is written when the lead is claimed, before the send (no delay), and the window opens 1 s
-   before our time for clock skew between n8n and the database. The received time is n8n's arrival stamp
+   `enviado_em` used to be the tick START (`p_agora`, written when the lead is claimed), and the real send
+   left seconds later, after the tick's reply read, the stuck searches and the other campaigns' sends: the
+   first menu after a campaign would pass as a person (found in `/code-review`). Migration
+   `20261108023614_prospeccao_enviado_em_na_confirmacao.sql` writes `enviado_em = now()` when Evolution
+   confirms. The bot can answer before that confirmation is recorded, and the n8n and database clocks
+   differ, so the window also opens 5 s BEFORE our time (no person answers a message before it arrives). The received time is n8n's arrival stamp
    (`recebidoEm`), taken before the 15 s sliding debounce, so the debounce does not distort it. If (a)
    proves unreliable in production, the alternative is to store the Evolution send acknowledgement time
    (`messageTimestamp` of "Evolution send") and measure from it; (b) plus (c) already catch a repeated
