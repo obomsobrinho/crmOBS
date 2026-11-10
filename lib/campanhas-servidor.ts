@@ -849,5 +849,17 @@ export function falhou(onde: string, e: unknown): Response {
   return Response.json({ error: `falha ao ${onde}` }, { status: 500 });
 }
 
+/**
+ * Como `falhou`, mas uma recusa do BANCO (um erro do Postgres/PostgREST, com `code`) volta como 422 com a
+ * frase do banco, para a tela dizer o que houve em vez de "tente de novo" (só o dono vê Campanhas; a
+ * importação da planilha de 10/11/2026 falhava com o genérico e a causa só aparecia no log).
+ */
+export function falhouComMotivo(onde: string, e: unknown): Response {
+  const pg = e !== null && typeof e === "object" ? (e as { code?: unknown; message?: unknown }) : null;
+  if (typeof pg?.code !== "string" || typeof pg.message !== "string" || !pg.message) return falhou(onde, e);
+  console.error(`campanhas, ${onde}:`, e);
+  return Response.json({ error: `Não deu para ${onde}. O banco respondeu: ${pg.message}` }, { status: 422 });
+}
+
 /** 400 com o motivo (parâmetro torto). */
 export const torto = (motivo: string): Response => Response.json({ error: motivo }, { status: 400 });
