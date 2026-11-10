@@ -856,7 +856,8 @@ export function falhou(onde: string, e: unknown): Response {
  */
 export function falhouComMotivo(onde: string, e: unknown): Response {
   const pg = e !== null && typeof e === "object" ? (e as { code?: unknown; message?: unknown }) : null;
-  if (typeof pg?.code !== "string" || typeof pg.message !== "string" || !pg.message) return falhou(onde, e);
+  // Sem código (uma falha de rede chega com code ""), é o genérico "tente de novo".
+  if (typeof pg?.code !== "string" || !pg.code || typeof pg.message !== "string" || !pg.message) return falhou(onde, e);
   console.error(`campanhas, ${onde}:`, e);
   return Response.json({ error: `Não deu para ${onde}. O banco respondeu: ${pg.message}` }, { status: 422 });
 }

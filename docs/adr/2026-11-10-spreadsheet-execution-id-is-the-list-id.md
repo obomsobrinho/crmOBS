@@ -31,7 +31,11 @@ and the browser source (`recusaSe4xx`) only turns a 4xx with a reason into a sen
   `falhouComMotivo` (`lib/campanhas-servidor.ts`): 422 and "Não deu para importar a planilha. O banco
   respondeu: ...". Campanhas is the owner's own tool, so showing the database sentence is better than
   "tente de novo" with the cause only in the log. Anything else (network, timeout) keeps the generic
-  message and the log.
+  message and the log (a network failure arrives with an empty `code` and stays generic).
+- The Leads tab gets "Importar planilha" next to "Nova busca" (owner's request, same day): it opens
+  the same `ImportarPlanilha` in a page of the tab (no modal), and the saved list opens, so the owner
+  can import just to look and mark the good ones ("Bom"), then pick that list in a campaign with
+  "Só os que marquei como bons". The campaign wizard keeps its own tab. One import path, two doors.
 
 ## Consequences
 - Any number of spreadsheets import; each one is its own list.
