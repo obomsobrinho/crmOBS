@@ -1,6 +1,7 @@
 # Production loading: paginate, server-side search, row-level realtime, session-bound channels
 - Date: 2026-10-01
-- Status: Accepted
+- Status: Accepted (transition: browser layer replaced area by area by docs/plano-dados-e-estado.md, Proposed 2026-11-10)
+- Transition: Step 3 (lists) and Step 4 (Conversas). Until that step lands this ADR describes the code as it is and stays binding.
 - Area: realtime
 
 ## Context

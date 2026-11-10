@@ -1,5 +1,8 @@
 # Plano de implementação do mobile (23/09/2026)
 
+> Archived on 10/11/2026: executed on 23/09/2026, report in `docs/arquivo/relatorio-mobile.md`. Paths inside this file (`docs/relatorio-mobile.md`) are the ones of that day.
+
+
 Leva ao código o desenho do celular feito no Claude Design em 5 rodadas. Escrito para ser
 **executado sozinho**, sem o dono acordado: cada fase tem entrada, entrega, critério de pronto e o
 que fazer quando travar. Quem retomar lê este arquivo mais o `CLAUDE.md`.

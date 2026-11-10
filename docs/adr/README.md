@@ -80,12 +80,12 @@
 | 2026-10-01-n8n-send-failure-continues.md | n8n | Accepted | A failing send must not stop the rest of the execution |
 | 2026-10-01-n8n-sliding-wait-debounce.md | n8n | Accepted | Sliding wait in the n8n debounce |
 | 2026-10-02-n8n-webhooks-secret-path-and-header-auth.md | n8n | Accepted | Secret UUID paths on the three n8n webhooks and header auth on the two CRM flows |
-| 2026-10-01-production-loading-and-realtime-rules.md | realtime | Accepted | Production loading: paginate, server-side search, row-level realtime, session-bound channels |
+| 2026-10-01-production-loading-and-realtime-rules.md | realtime | Accepted (transition: browser layer replaced area by area by docs/plano-dados-e-estado.md, Proposed 2026-11-10) | Production loading: paginate, server-side search, row-level realtime, session-bound channels |
 | 2026-10-01-migrations-versioned-in-repo.md | security | Accepted | Database migrations live in the repo; default privileges give anon nothing |
 | 2026-10-01-profile-photo-copied-to-bucket.md | data | Accepted | Contact profile photos are copied to our bucket |
 | 2026-10-02-list-rpcs-keyset-per-index.md | data | Accepted | List RPCs (inbox, pipeline, clientes) read one index per group and stop at the limit; searches use the trigram index on the exact expression; counters split open requests from the window |
 | 2026-10-02-painel-agrega-no-banco.md | dashboard | Accepted | Panel and subscription numbers aggregate in SQL (Max rows is 1000), classification stays in TS, SQL copy of "who replied" is declared and tested |
-| 2026-10-02-session-by-claims-and-cheap-navigation.md | data | Accepted | Session checked by local JWT claims (getClaims), sensitive writes re-check at Auth, tenant cache only for members, cheaper conversation opening |
+| 2026-10-02-session-by-claims-and-cheap-navigation.md | data | Accepted (transition: browser layer replaced area by area by docs/plano-dados-e-estado.md, Proposed 2026-11-10) | Session checked by local JWT claims (getClaims), sensitive writes re-check at Auth, tenant cache only for members, cheaper conversation opening |
 | 2026-10-03-test-phone-never-reaches-evolution.md | n8n, testing | Accepted | A test phone (DDD 00) never reaches Evolution: IF before every Evolution node in n8n, telefoneImpossivel in the app, checar fails the export otherwise |
 | 2026-10-03-disconnect-and-switch-whatsapp-number.md | onboarding, WhatsApp | Accepted | Owner-only explicit logout of an open instance (agent goes Desativado, history stays), switch number on the same instance via the existing connect flow, webhook re-pointed, notices destination to be rechecked |
 | 2026-10-05-turn-calendar-computed-in-code.md | agent, prompt | Accepted | Every turn gets a code-computed CALENDÁRIO (today plus 7, weekday, open/closed/already closed) from the registered hours only; the model never does calendar arithmetic |

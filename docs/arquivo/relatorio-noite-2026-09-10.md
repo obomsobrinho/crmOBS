@@ -1,5 +1,8 @@
 # Relatório da noite de 10 para 11/09/2026
 
+> Archived on 10/11/2026: one-off report of the night of 10 to 11/09/2026 (demo plan contracts C1 to C5, all closed). Current state: `docs/handoff.md`.
+
+
 Cinco contratos do plano da demo, executados sozinho, na ordem. **Os cinco fecharam.** Todas as
 suítes verdes no fim: 116 sem login, 21 com login (1 pulado) duas vezes seguidas, 12 de 12 no
 projeto `ia`, `tsc` 0, `eslint` 0, `npm run build` limpo. Árvore limpa, `git push origin main` feito.

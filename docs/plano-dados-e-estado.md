@@ -2,12 +2,14 @@
 
 Status: **Proposed**, written 10/11/2026. Nothing here is approved and no code changes until the owner approves this spec. The open decisions are at the end; none of them is assumed below (where a step depends on one, it says so).
 
+**Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
+
 Inputs: the owner's complaints of 10/11/2026 (every screen change shows loading; refresh inside a lead list goes back to the general list; deleting a lead then another answers "Este lead já saiu da lista."), the slowness diagnosis of the same day (production build measured locally against the production Supabase, plus Supabase logs and `pg_stat_statements`), the architecture proposal `arquitetura-atenda-2026-11-10.html` and its review `revisao-arquitetura-atenda-2026-11-10.html` (owner's vault, `assets/atenda/`). Every item the review marked "to check" was checked in the repository and in the database; the answers are inline.
 
 Relation to `docs/plano-carregamento.md`: that plan is **kept and referenced, not replaced**. Its six owner rules (paginate by 10 with infinite scroll, server search with debounce, realtime touches only the changed row, hidden tab does not fetch, Conversas opens on "today" plus open help requests, messages only when the conversation opens) stay binding, and its database work (keyset list RPCs, trigram search, `(select auth.uid())` in RLS) is the foundation this plan builds on. What this spec supersedes is its browser layer: the generic `lib/use-paginada.ts` and the per-screen fetch hooks are replaced, area by area, by the query layer below.
 
 Out of scope for the whole plan:
-- **Design** (Light theme weight on the other screens, component audit, critique). The owner decided on 10/11/2026 that the design front starts only after this whole plan is executed. The component audit is NOT a prerequisite of the Base.
+- **Design** (Light theme weight on the other screens, component audit, accessibility, critique, copy). The owner decided on 10/11/2026 that the design front starts only after this whole plan is executed. The component audit is NOT a prerequisite of the Base. The track it will follow is fixed in section 7; the only design work inside this plan is the single pattern for the new screen states (7.1), defined in the Base.
 - Bulk selection with batch actions in the Leads tab (noted for later).
 - Cache Components / `staleTimes` / `unstable_instant` (Next 16). Re-evaluated after Step 3, with measurements.
 - Buying a bigger Supabase compute. Step 0 measures; the purchase is the owner's call with the numbers.
@@ -174,7 +176,40 @@ Without it nobody can prove the 14.8 s are gone. Two numbers per route, p50 and 
 
 The `queryFn` calls the area SOURCE (`lib/*-fonte.ts` today), taken from a provider. `/design` mounts the same provider with the fake source (`fonte-de-mentira`), so the design e2e suite keeps running without a database. A source never imports the query client; a hook never imports `supabase-js` directly.
 
-## 3. Steps
+## 3. Performance budget
+
+Every number below says where it came from. "Measured" means measured on 10/11/2026: the production build run locally (`next build` + `next start`) against the production Supabase with the owner's session, Playwright timing scripts, and the Supabase logs. "External" means a published threshold, named. Nothing else.
+
+### 3.1 The budget
+
+| # | Metric | Baseline | Budget | Source of the budget |
+|---|---|---|---|---|
+| B1 | Click to the screen's frame, client navigation, with the navigation response delayed 3 s | no per-screen frame on most routes; the generic skeleton or the old screen stays until the server answers (0.2 to 4.7 s measured; 14.8 s for one read in production) | ≤ 300 ms | external: Nielsen's response limits (0.1 s feels instant, 1 s keeps the flow); 300 ms leaves room for the test machine over the 0.1 s target |
+| B2 | Blocking requests when opening a screen seen in the last 30 min (`gcTime`) | 1 server render plus 0 to 5 reads (Campanhas: 5 on the way back) | 0 | the owner's rule ("the click is instant, only dynamic data loads") |
+| B3 | Duplicate reads of the same data in one visit | Campanhas reads on the server and again in the browser: 5 duplicates per entry | 0 | the same rule; a duplicate is pure waste |
+| B4 | Optimistic write visible after the click, with the API delayed 1 s | the row stays until the re-read (seconds in a spike) | ≤ 100 ms | external: Nielsen 0.1 s |
+| B5 | Production, click to frame, p75 per route per day | not measured (no tool today) | ≤ 300 ms | B1 in the field |
+| B6 | Production, click to first data, p75 per route per day | not measured; the Supabase edge saw 652 ms p50 and 7 s p90 for the session read alone on 10/11 | ≤ 1 s | external: Nielsen 1 s |
+| B7 | Production hard load: LCP, INP, CLS at p75 | not measured in the field; local TTFB 0.19 to 0.34 s on Agenda, Agente, Campanhas, Nova busca, Clientes, Equipe and Perfil; 1.4 to 4.8 s on Painel, Conversas, Contatos, Pipeline and Pedidos (cold database, server reads before the HTML); FCP lands about 80 ms after TTFB, so the server decides first paint | LCP ≤ 2.5 s, INP ≤ 200 ms, CLS ≤ 0.1 | external: Google Core Web Vitals "good" thresholds (web.dev) |
+| B8 | JS on a hard load, compressed, per route | login 227 kB; tenant routes 277 to 321 kB (Painel 285, Conversas 302, Contatos 295, Pipeline 309, Pedidos 316, Agenda 312, Agente 321, Equipe 297, Perfil 277, Clientes 300); Campanhas 465 kB, Nova busca 446 kB | login ≤ 240 kB; any tenant route ≤ 340 kB; Campanhas and Nova busca ≤ 480 kB; a route growing more than 10 kB in one delivery says why in its handoff line | measured baseline plus the Base's known cost (TanStack Query 10.8 kB measured) and a small margin; the schema and URL libraries are measured at install, before the ceiling is final |
+| B9 | Supabase REST latency at the edge (upstream time), per working hour | p50 96 to 396 ms, p90 about 0.9 to 2.8 s, p99 1.4 to 9 s (24 h to 10/11); best warm hour p50 6 ms, p90 83 ms (6,029 requests) | p90 ≤ 300 ms, p99 ≤ 1 s | measured: the warm hour shows the database can do it; the gap is what Step 0 attributes |
+| B10 | Server rounds before a page can render | Pipeline, Pedidos, Agenda 3; Painel 2 | Step 0: ≤ 2; from Step 3: the gate only (1) | measured |
+
+### 3.2 How each number is measured and locked
+
+| # | Measured by | Locked by |
+|---|---|---|
+| B1 | Playwright against `next build` + `next start`: `page.route` delays RSC navigation requests (those without the `next-router-prefetch` header) by 3 s, which delays the session gate too; the test clicks the menu item and asserts the frame's heading is visible | a new e2e project on the production build (`frame`), with an allow-list of routes that grows per step; run by `fechar-entrega` |
+| B2, B3 | the same harness counts requests between the click and the data on screen, and flags two requests for the same query key or route in one visit | same e2e project |
+| B4 | e2e per area with writes: API delayed 1 s, five deletes in a row, the row is gone within 100 ms and the total is right | the area's e2e suite |
+| B5, B6, B7 | the production beacon (decision D7): click to frame and click to first data marks, plus `useReportWebVitals` for LCP, INP and CLS | a saved query over the beacon's table, read weekly into `docs/handoff.md`; a route over budget for 3 days in a row is a bug ahead of new features (the same priority as an attendance bug) |
+| B8 | a script after `next build` that sums the compressed JS each route loads, checked once against the Playwright figure above | the script fails above the ceiling; `fechar-entrega` runs it after the build (`checar` stays offline and does not build) |
+| B9 | the hourly edge-log query used in the diagnosis (`edge_logs`, upstream time, `/rest/v1/*`), saved in `docs/instrumentacao-uso.md` | weekly read into `docs/handoff.md`; the fix it calls for is the owner's call (Step 0) |
+| B10 | the Supabase edge log timeline of one navigation (Step 0); after Step 3, B1 makes a waterfall visible as a failure | B1 |
+
+There is no CI in this repository (no `.github/workflows`), so "locked" means the `fechar-entrega` skill and the PostToolUse lint hook, as for every other rule here.
+
+## 4. Steps
 
 Each step closes with the `fechar-entrega` skill (types, lint, build, the right suites), the owner's flow (implement, show him, tests, `/simplify` and `/code-review`, `main`), and one ADR or rule update when it introduces a rule. File moves to `features/` (if decision D6 is yes) go in a commit of their own, with no behavior change, before or after the behavior commit, never mixed.
 
@@ -226,7 +261,9 @@ Scope:
 6. The error shape (2.9): a server helper for routes, a browser parser, the global 401 handler, the shared block error component, `app/(app)/error.tsx`.
 7. Schema helper for route bodies inside `sessaoDaRota`/`rotaDoAdmin` (used by Step 2 on).
 8. Observability (2.10): one day of baseline numbers BEFORE Step 2 ships.
-9. Guardrails (section 4): ADRs, rule lines, lint rules, the frame e2e harness on a production build (allow-list of migrated routes, starting with the Step 0 frames).
+9. Guardrails (section 5): ADRs, rule lines, lint rules, the frame e2e harness on a production build (allow-list of migrated routes, starting with the Step 0 frames).
+10. The performance budget tooling (section 3.2): the `frame` e2e project, the request-count assertions, the JS-per-route script with the B8 ceilings, the saved B9 query.
+11. The screen states pattern (7.1): the base components and their page in `docs/design-system/camada-base.md`, used by every step from Step 2 on.
 
 Files:
 - `package.json`
@@ -320,7 +357,7 @@ Acceptance: refresh and back keep the state on every list (one e2e per list); sh
 
 Out: new filters.
 
-## 4. Guardrails (so this does not come back a third time)
+## 5. Guardrails (so this does not come back a third time)
 
 1. **ADR "The screen never waits for the database to appear"** plus an `engineering.md` line: pages and segment layouts do not await data; every route has a `loading.tsx` frame; server reads in parallel. Also fix the `next.config.ts` comment that credits speed to `loading.tsx` alone.
 2. **ADR "TanStack Query is the only browser data layer"** plus `data.md` and `realtime.md` lines:
@@ -340,8 +377,69 @@ Out: new filters.
    - the concurrent-delete e2e per area with writes;
    - unit tests for cache helpers and schemas (if D2).
 6. **Every new or touched route validates its input with a schema** and answers the single error shape.
+7. **The performance budget (section 3) becomes a rule**: a line in `engineering.md` naming B1 to B10 by reference to this section, so a new screen is born inside the budget; a delivery that breaks one either fixes it or records the owner's exception in an ADR.
 
-## 5. Decisions for the owner
+## 6. Documentation map (one source per subject)
+
+| Subject | Single source | Notes |
+|---|---|---|
+| Data, state and performance in the browser and on navigation | this document | the roadmap until Step 5 ends; then its rules live in `.claude/rules` and two ADRs |
+| Owner's loading rules and the database side of lists | `docs/plano-carregamento.md` | still binding; its browser layer is superseded area by area (note at its top) |
+| Product roadmap and decisions | `docs/proximos-passos.md` | points here for data, state and performance |
+| Where the product stands, traps, status | `docs/handoff.md` | points here; weekly budget readings (B5 to B9) are recorded there |
+| Design: tokens, base layer, reasoning | `docs/design-system/` | the only design source; the code wins on any disagreement (its README) |
+| Why each rule exists | `docs/adr/` with `docs/adr/README.md` | ADRs that this plan will replace carry a transition note, not "Superseded", until the replacing step lands |
+| Finished plans and one-off reports | `docs/arquivo/` | moved there with a line on top saying why and what replaces them; nothing deleted |
+
+## 7. After Step 5: the design track
+
+The design front starts after Step 5 is closed, not before and not in parallel. This section fixes the track so nothing has to be decided again; it does not design anything.
+
+### 7.1 Inside this plan: one pattern for the new screen states
+
+The migration creates states the app does not have today. They get ONE pattern, defined in the Base (Step 1, item 11), so each area does not invent its own:
+
+| State | Today | Pattern (Base) |
+|---|---|---|
+| Block loading | `loading.tsx` and screens draw ad hoc `animate-pulse` divs with loose classes (`app/(app)/loading.tsx`); there is no skeleton in `components/ui/` | one skeleton component in `components/ui/` with variants for line, block and list row, using the existing surface tokens |
+| Block error | none; screens show an inline sentence or nothing | one block error component (reason sentence plus "Tentar de novo"), red only as state (`fundamentos-cor.md`) |
+| Empty | `components/ui/estado-vazio.tsx` exists | kept as is |
+| Item leaving and coming back (optimistic undo) | none | one exit and return transition from the existing animation tokens (`fundamentos-animacao.md`), plus the reason shown in place |
+| Route frame | generic skeleton | each `loading.tsx` composes the real page header components with the skeleton, so the frame and the loaded page do not jump |
+
+Their copy follows the visible-vocabulary rules already in `engineering.md` (no dash, Portuguese UI). Polishing them is part of the design track, not of this plan.
+
+### 7.2 The track, in order, after Step 5
+
+1. Component audit of the base layer and the loose product components (names, fixed values, duplication), deciding what goes to `components/shared` and what to each area folder (if D6 is yes).
+2. Light theme weight: carry the visual weight of the new login to the other screens (the owner's request of 06/11/2026, recorded in `docs/proximos-passos.md`).
+3. Accessibility review (contrast, keyboard, touch target, screen reader), weighing the phone.
+4. Copy of the states from 7.1.
+
+Each design change lands per area, in commits separate from any behavior change.
+
+### 7.3 Design documents: findings of 10/11/2026
+
+- `docs/design-system/pendencias.md` was last updated on 31/08/2026. Its item 12 says mobile "não foi resolvido". The mobile plan ran on 23/09/2026 (`docs/arquivo/relatorio-mobile.md`). A note now says the item is stale and needs re-checking. The Light weight complaint of 06/11/2026 and this design track were not recorded there; both are now listed (items 13 and 14).
+- `docs/design-system/README.md` still opens with the 30/08/2026 context (17 files in `components/ui/`, now 28). That is history, not a conflict, since its rule is "the code wins".
+- `docs/proximos-passos.md` had the Light weight work "anotado para a semana de 09/11/2026". That conflicted with the owner's 10/11 decision to run design after this plan; it now carries a note saying so.
+- No other design document conflicts with this plan: none of them defines loading, error or optimistic states.
+
+## 8. Instruction-file changes waiting for the owner
+
+These files steer every agent session, and the request for this cleanup came through another session, so they were NOT edited here. The owner can approve these exact changes (or apply them himself). Each one is a transition note, so no rule is rewritten for code that does not exist yet.
+
+| File | Line today | Proposed change |
+|---|---|---|
+| `CLAUDE.md`, "Where to read more" | starts with `docs/handoff.md` first | add, right after it: "`docs/plano-dados-e-estado.md` = the single roadmap for data, state and performance (Proposed 10/11/2026; its budget is an acceptance criterion)." |
+| `CLAUDE.md`, "Where things live" | "Client data hooks: `lib/use-paginada.ts`, `lib/use-contagem-ao-vivo.ts`, `lib/use-debounce.ts`, `lib/use-carga.ts` ..." | append: "(being replaced area by area by the query layer of `docs/plano-dados-e-estado.md`, Steps 2 to 5)" |
+| `.claude/rules/engineering.md`, "Never size for a small audience" | "Every list paginates 10 at a time ... (`lib/use-debounce.ts`, `lib/use-paginada.ts`)" | append: "Transition: `use-paginada` becomes an infinite query in Step 3 of `docs/plano-dados-e-estado.md`; until then this line stands." |
+| `.claude/rules/realtime.md` | "Reuse `lib/use-paginada.ts` and `lib/use-contagem-ao-vivo.ts` ..." | same transition note (Steps 3 and 4) |
+| `.claude/rules/realtime.md` | "`REPLICA IDENTITY FULL` is required where UPDATE/DELETE events matter (RLS must evaluate the old row)" | correct the reason now, because it is a fact about Supabase and not a pattern: "FULL keeps the old values on UPDATE; DELETE events are not RLS-checked and not filterable, and under RLS their `old` carries only the primary key (Supabase docs, Postgres Changes)." |
+| `.claude/rules/data.md` | "A mutation never calls `router.refresh()` for a small change: announce on `lib/contato-bus.ts` or patch local state." | append: "Transition: becomes an optimistic mutation on the query cache in Step 3 of `docs/plano-dados-e-estado.md`." |
+| `AGENTS.md` | Next 16 warning only | no change |
+
+## 9. Decisions for the owner
 
 None is assumed in this spec. Each has options and a recommendation.
 

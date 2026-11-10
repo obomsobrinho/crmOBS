@@ -1,6 +1,9 @@
 # Relatório da execução do plano do mobile (23/09/2026)
 
-Execução autônoma de `docs/plano-mobile.md`, sem o dono acordado.
+> Archived on 10/11/2026: one-off report of the execution of `docs/arquivo/plano-mobile.md` (23/09/2026). Current mobile state: the code and `docs/handoff.md`.
+
+
+Execução autônoma de `docs/arquivo/plano-mobile.md`, sem o dono acordado.
 
 ## Tempo
 

@@ -1,5 +1,8 @@
 # Melhorar a tela do agente como um todo (22/09/2026)
 
+> Archived on 10/11/2026: a survey of 22/09/2026 with nothing decided (its own warning says so). The agent screen was rebuilt afterwards; the decisions live in `docs/adr/` (area `agent-ai` and `onboarding`). Its open questions were not re-checked: confirm in the code before acting on one.
+
+
 Pedido do dono depois de aplicar os três ajustes do dia: "quero melhorar essa
 parte dos agentes como um todo". Este arquivo é o ponto de partida dessa
 conversa, escrito para sobreviver a um `/clear`: quem retomar lê só este arquivo

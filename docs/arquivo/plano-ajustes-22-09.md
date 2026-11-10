@@ -1,5 +1,8 @@
 # Plano: três ajustes de design (22/09/2026)
 
+> Archived on 10/11/2026: the three design adjustments of 22/09/2026 were executed the same day (commits `a43f52d`, `2019fbb`, `ff00ffc`, listed in `docs/arquivo/plano-agente.md`). Its "Pendências do dono" section was not re-checked: confirm in the code before acting on one. Design work now follows the track in `docs/plano-dados-e-estado.md`, section 7.
+
+
 Pontos que o dono levantou validando a tela antes de começarmos o MOBILE. Escrito
 para sobreviver a um `/compact`: quem retomar isto lê só este arquivo mais o
 `CLAUDE.md` e consegue executar.
