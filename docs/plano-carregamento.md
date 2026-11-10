@@ -1,5 +1,7 @@
 # Plano: carregamento de dados para produção
 
+> Still binding: the six owner rules and the database work below. The browser layer (`lib/use-paginada.ts` and the per-screen fetch hooks) is superseded, area by area, by `docs/plano-dados-e-estado.md` (Proposed, 10/11/2026).
+
 Decidido pelo dono em **01/10/2026**, depois de o banco (plano free do Supabase) travar por falta de
 memória. A decisão dele, que vale para todo o resto: **estrutura de produção, não de beta.** "Depois,
 em produção com 30 clientes, não tem como fazer alterações estruturais com facilidade."
