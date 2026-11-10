@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronRight, Download, Heart, Loader2, MapPin, Pencil, Plus, Search, Star, Trash2, X } from "lucide-react";
+import { ChevronRight, Download, FileSpreadsheet, Heart, Loader2, MapPin, Pencil, Plus, Search, Star, Trash2, X } from "lucide-react";
 import BotaoDeFiltro from "@/components/BotaoDeFiltro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import { useDebounce } from "@/lib/use-debounce";
 import { ApagarBusca, RemoverLead } from "./Apagar";
 import { FaixaDeNumeros } from "./faixa";
 import FichaDoLead from "./FichaDoLead";
+import ImportarPlanilha from "./ImportarPlanilha";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
@@ -839,6 +840,7 @@ function HomeDosLeads({
   rascunho,
   abrir,
   novaBusca,
+  importarPlanilha,
   voltarAoRascunho,
   aoMudar,
 }: {
@@ -851,6 +853,7 @@ function HomeDosLeads({
   rascunho: CampanhaEditavel | null;
   abrir: (id: string) => void;
   novaBusca: () => void;
+  importarPlanilha: () => void;
   voltarAoRascunho: () => void;
   aoMudar: () => void;
 }) {
@@ -875,10 +878,16 @@ function HomeDosLeads({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         {abas}
-        <Button className="ml-auto" onClick={novaBusca} data-slot="leads-nova-busca">
-          <Plus aria-hidden />
-          Nova busca
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button variant="outline" onClick={importarPlanilha} data-slot="leads-importar-planilha">
+            <FileSpreadsheet aria-hidden />
+            Importar planilha
+          </Button>
+          <Button onClick={novaBusca} data-slot="leads-nova-busca">
+            <Plus aria-hidden />
+            Nova busca
+          </Button>
+        </div>
       </div>
 
       {rascunho && (
@@ -1073,9 +1082,27 @@ function AbaLeads({
 }) {
   const aberta = useLeitura(`busca|${buscaAberta ?? ""}`, () => (buscaAberta ? fonte.busca(buscaAberta) : Promise.resolve(null)));
   const busca = buscaAberta && aberta.dados?.id === buscaAberta ? aberta.dados : null;
+  const [importando, setImportando] = useState(false);
   return (
     <>
-      {busca ? (
+      {importando ? (
+        // A planilha pela aba Leads (dono, 10/11/2026): a mesma importação do passo Contatos; gravada,
+        // abre a lista nova, onde dá para marcar os bons antes de escolher a lista numa campanha.
+        <div className="flex flex-col gap-4" data-slot="leads-planilha">
+          <div className="flex flex-wrap items-center gap-2">{abas}</div>
+          <TopoDeDetalhe voltar={() => setImportando(false)} rotuloDoVoltar="Leads" titulo="Importar planilha" />
+          <Card variant="conteudo" className="p-6">
+            <ImportarPlanilha
+              fonte={fonte}
+              aoImportar={(id) => {
+                setImportando(false);
+                aoMudar();
+                abrirBusca(id);
+              }}
+            />
+          </Card>
+        </div>
+      ) : busca ? (
         <DetalheDaBusca
           abas={abas}
           fonte={fonte}
@@ -1096,6 +1123,7 @@ function AbaLeads({
           rascunho={rascunho}
           abrir={abrirBusca}
           novaBusca={novaBusca}
+          importarPlanilha={() => setImportando(true)}
           voltarAoRascunho={voltarAoRascunho}
           aoMudar={aoMudar}
         />
