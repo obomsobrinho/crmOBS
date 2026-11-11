@@ -70,6 +70,7 @@ API (`app/api/`): `agent` (brain, `x-lookup-secret`), `playground` + `playground
 
 ## Where to read more
 - **`docs/handoff.md` first** (map and state: what to read, where the product stands, what was in progress, the traps).
+- `docs/plano-dados-e-estado.md` = the single roadmap for data, state and performance (its budget is an acceptance criterion); the rules are in `.claude/rules/dados-estado-desempenho.md`.
 - `docs/proximos-passos.md` = SOURCE OF TRUTH for product decisions and roadmap (read before prioritizing or scoping). `docs/estrategia-2026-07.md` = market research (its old prescriptions are superseded; `proximos-passos` wins).
 - `docs/instrumentacao-uso.md` = the five per-company usage SQL queries (no UI, by decision; "AI reply" in SQL must equal `lib/mensagem.ts`).
 - `docs/design-system/` = tokens, base layer and the reasoning. `docs/adr/` = one decision per file (the "why" behind every rule line; index in `docs/adr/README.md`). `docs/plano-*.md` = feature plans. System maps (owner's, outside git): `Desktop/arquitetura-crm/`.

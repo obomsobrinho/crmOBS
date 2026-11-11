@@ -528,9 +528,9 @@ Each design change lands per area, in commits separate from any behavior change.
 
 ## 8. Instruction files
 
-The owner approved on 11/11/2026 (relayed by the Campanhas session) that the data, state and performance rules live in their own rule file, that the existing rules get transition notes, that `realtime.md` gets the corrected `REPLICA IDENTITY FULL` reason, and that `CLAUDE.md` gets only a short reference (to keep it small). These files steer every agent session, so they are applied only after the owner confirms in this session; the exact text is ready below. `AGENTS.md` holds only the Next 16 warning and does not mirror `CLAUDE.md`: no change.
+The owner approved on 11/11/2026 (relayed by the Campanhas session) that the data, state and performance rules live in their own rule file, that the existing rules get transition notes, that `realtime.md` gets the corrected `REPLICA IDENTITY FULL` reason, and that `CLAUDE.md` gets only a short reference (to keep it small). The owner confirmed in the plan session on 11/11/2026 and the changes below are **applied** (the rule file, the transition notes and the `CLAUDE.md` line); the text here is kept as the record of what was written. `AGENTS.md` holds only the Next 16 warning and does not mirror `CLAUDE.md`: no change.
 
-### 8.1 New file `.claude/rules/dados-estado-desempenho.md`
+### 8.1 New file `.claude/rules/dados-estado-desempenho.md` (applied)
 
 ```markdown
 ---
@@ -567,7 +567,7 @@ The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). Th
 - URL state goes through nuqs parsers; a new or complex form uses react-hook-form with the Zod resolver and the `Form` of `components/ui/`.  (why: docs/plano-dados-e-estado.md)
 ```
 
-### 8.2 Transition notes in the existing rules
+### 8.2 Transition notes in the existing rules (applied)
 
 | File | Line today | Change |
 |---|---|---|
@@ -576,7 +576,7 @@ The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). Th
 | `.claude/rules/realtime.md` | "`REPLICA IDENTITY FULL` is required where UPDATE/DELETE events matter (RLS must evaluate the old row)." | replace the reason: "`REPLICA IDENTITY FULL` is required where UPDATE old values matter. DELETE events are not RLS-checked and not filterable, and under RLS their `old` carries only the primary key (Supabase docs, Postgres Changes), so a DELETE is only a hint." |
 | `.claude/rules/data.md` | "A mutation never calls `router.refresh()` for a small change: announce on `lib/contato-bus.ts` or patch local state." | append: "Transition: becomes an optimistic mutation on the query cache in Step 3 of `docs/plano-dados-e-estado.md`." |
 
-### 8.3 `CLAUDE.md`, one line in "Where to read more"
+### 8.3 `CLAUDE.md`, one line in "Where to read more" (applied)
 
 Right after the `docs/handoff.md` line:
 
