@@ -1,6 +1,6 @@
 # Session checked by local claims; navigation and conversation opening made cheap
 - Date: 2026-10-02
-- Status: Accepted (transition: browser layer replaced area by area by docs/plano-dados-e-estado.md, Proposed 2026-11-10)
+- Status: Accepted (transition: browser layer replaced area by area by docs/plano-dados-e-estado.md, decisions closed 2026-11-11)
 - Transition: Step 3 (contato-bus and router.refresh become cache updates); the session-by-claims part stays. Until that step lands this ADR describes the code as it is and stays binding.
 - Area: data
 
