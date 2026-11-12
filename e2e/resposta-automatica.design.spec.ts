@@ -7,7 +7,7 @@ import {
   sinaisDaResposta,
   temPadraoDeAutomacao,
 } from "../lib/resposta-automatica";
-import { respostasDosEnvios } from "../lib/prospeccao";
+import { ehPedidoParaParar, respostasDosEnvios } from "../lib/prospeccao";
 
 // A trava do robô de menu (07/11/2026): 2 de 3 sinais (rápida, padrão, repetida).
 // Puro, sem banco.
@@ -155,5 +155,93 @@ test.describe("A campanha não conta o robô como resposta", () => {
   test("SAIR conta sempre", () => {
     const r = respostasDosEnvios([envio], [{ telefone: fone, texto: "SAIR", em: T + 60_000 }]);
     expect(r).toEqual([{ campanhaId: "c1", leadId: "l1", respondeuEm: T + 60_000, parouEm: T + 60_000 }]);
+  });
+});
+
+// As respostas reais da "Campanha Lajinha primeira" (10 e 11/11/2026), com o
+// tempo depois do envio confirmado. Antes da ampliação de 11/11/2026 nenhuma
+// travava: só tinham o sinal "rápida". Esperado: 6 de 7 robôs travam; a ausência
+// da advogada chegou 22 min depois (só a frase, 1 sinal) e continua passando,
+// porque uma frase de ausência sozinha não basta (decisão do dono, 11/11/2026).
+test.describe("Respostas reais da campanha de Lajinha (11/11/2026)", () => {
+  const envio = { user_message: null, bot_message: "Oi, tudo bem? Sou o Tony, da OBS.", created_at: iso(T) };
+  const recebida = (texto: string, depoisMs: number) => ({ user_message: texto, bot_message: null, created_at: iso(T + depoisMs) });
+
+  const ROBOS: { quem: string; lote: [string, number][] }[] = [
+    { quem: "Espaço Suellen Mota", lote: [["‎Espaço Suellen Mota agradece seu contato. Como podemos ajudar?", 4_800]] },
+    {
+      quem: "Clínica AME (2 no mesmo segundo, a 1ª um menu de ✅)",
+      lote: [
+        [
+          "🩺Olá, seja bem vindo (a)! \n\nPara agilizar seu atendimento, me informa, em que posso ajudar: \n\nEspecialidades:\n✅Ginecologista/Obstetra\n✅Pediatra\n✅Dermatologista\n✅Depilação a laser\n✅Vacinação \n\n📌 Qual o tipo de atendimento que deseja, e com qual especialista;\n\n🛎️ *Para agilizarmos o seu atendimento, gentileza não enviar áudio* 🛎️",
+          900,
+        ],
+        ["Olá. Somos da clínica AME. Não estamos disponíveis no momento, mas aguarde que assim que possível retornaremos o contato! Para agilizar seu atendimento, nos informe o que deseja agendar!", 1_900],
+      ],
+    },
+    { quem: "Dentista do Trabalhador", lote: [["‎Dentista Do Trabalhador agradece seu contato. Como podemos ajudar?", 4_250]] },
+    {
+      quem: "Clínica Mateus Machado",
+      lote: [["Olá,tudo bem? 😃💎\n\nÉ um prazer lhe atender! Dentro de alguns minutos estarei te respondendo. \n\nGostaria de me adiantar, por qual tratamento você se interessou?✨", 2_200]],
+    },
+    {
+      quem: "Dra. Hinglid",
+      lote: [["Olá, Consultório Odontológica Dra Hinglid, obrigada pelo contato!\nRecebemos a sua mensagem e entraremos em contato com você assim que possível", 2_850]],
+    },
+    {
+      quem: "Espaço Costa",
+      lote: [
+        [
+          "Olá! Atendo de segunda a sexta, com horário marcado. No momento não estou disponível, mas retornarei em breve. ✨\n\nPor favor, informe o procedimento desejado para agilizarmos.\n\nAviso: Cancelamentos devem ser feitos com até 24h de antecedência. O não comparecimento sem aviso prévio gera a cobrança de 50% do valor do serviço.",
+          2_700,
+        ],
+      ],
+    },
+  ];
+
+  for (const r of ROBOS) {
+    test(`robô travado: ${r.quem}`, () => {
+      const linhas = [...r.lote.map(([t, ms]) => recebida(t, ms)).reverse(), envio];
+      expect(decisaoDoTurno(linhas, r.lote.length)).toBe("pedir");
+    });
+  }
+
+  test("a ausência que chega 22 min depois (1 sinal) continua com o Tony", () => {
+    const texto =
+      "Olá!\nNo momento não estou disponível, posso estar em atendimento, reunião ou audiência.\nPeço que deixe seu nome e uma breve mensagem sobre como posso ajudar.\nAssim que possível, retornarei o contato com toda atenção.\n\n💼 Atendimento de segunda a sexta, das 8h às 17h.\n\nAgradeço desde já pela compreensão e pela confiança!";
+    expect(temPadraoDeAutomacao(texto)).toBe(true);
+    expect(decisaoDoTurno([recebida(texto, 1_318_000), envio], 1)).toBe("atender");
+  });
+
+  test("o \"Sair\" de uma pessoa minutos depois é atendido e para a campanha", () => {
+    expect(decisaoDoTurno([recebida("Sair", 190_000), envio], 1)).toBe("atender");
+    expect(ehPedidoParaParar("Sair")).toBe(true);
+  });
+
+  // Frases de pessoa, mesmo chegando 3 s depois do envio (sinal "rápida"): nenhuma é padrão.
+  const PESSOAS = [
+    "Sair",
+    "Quanto custa?",
+    "Não tenho interesse, obrigado",
+    "Agora não posso, te chamo mais tarde",
+    "Oi, quem é?",
+    "Bom dia! Do que se trata?",
+    "Sim, a gente responde na hora",
+    "Aqui quem responde sou eu mesma",
+    "Pode falar, sou a dona",
+    "Me manda mais informações por favor",
+  ];
+  for (const p of PESSOAS) {
+    test(`pessoa não trava: "${p}"`, () => {
+      expect(temPadraoDeAutomacao(p)).toBe(false);
+      expect(decisaoDoTurno([recebida(p, 3_000), envio], 1)).toBe("atender");
+    });
+  }
+
+  test("menu de marcadores: 3 linhas contam, 2 não, e negrito no começo da linha não é marcador", () => {
+    expect(temPadraoDeAutomacao("Serviços:\n• Corte\n• Barba\n• Sobrancelha")).toBe(true);
+    expect(temPadraoDeAutomacao("- Vendas\n- Suporte\n- Financeiro")).toBe(true);
+    expect(temPadraoDeAutomacao("✅ Corte\n✅ Barba")).toBe(false);
+    expect(temPadraoDeAutomacao("*Oi*\n*tudo bem?*\n*quem fala?*")).toBe(false);
   });
 });

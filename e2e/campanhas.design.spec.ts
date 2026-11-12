@@ -120,7 +120,7 @@ test.describe("Campanhas no preview", () => {
     await expect(page.locator('[data-secao="quem"]')).toContainText(/\d+ leads?, \d+ dias?/);
     await page.locator('[data-slot="assistente-continuar"]').click();
     const variante = page.getByRole("textbox", { name: "Texto da variante 1" });
-    await expect(page.getByText("Se não quiser receber mais mensagens, é só responder SAIR.").first()).toBeVisible();
+    await expect(page.getByText("Se não fizer sentido pra vocês, é só me avisar que eu não mando mais.").first()).toBeVisible();
     await variante.fill("Oi, tudo bem? Posso te mostrar uma coisa?");
     await expect(page.getByText("Falta {empresa} no texto.")).toBeVisible();
     await expect(page.locator('[data-slot="assistente-continuar"]')).toBeDisabled();
