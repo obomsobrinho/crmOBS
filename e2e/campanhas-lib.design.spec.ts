@@ -46,6 +46,9 @@ import {
   siteDoLead,
   telefoneDoLead,
   textoParaLead,
+  nomeParaMensagem,
+  saudacaoDaHora,
+  VARIANTES_SUGERIDAS,
   tipoDoTelefone,
   varianteDaOrdem,
   type EnvioParaResultado,
@@ -206,15 +209,29 @@ test.describe("Agenda de envio (proximoEnvioEm)", () => {
 
 test.describe("Pedido para parar e quem pode entrar", () => {
   test("ehPedidoParaParar: as frases de D4, sem acento e sem caixa, por palavra inteira", () => {
-    for (const s of ["SAIR", "sair", "Não quero", "nao quero, obrigado", "Pare de mandar", "parar", "me remove? REMOVER", "Não tenho interesse."]) {
+    for (const s of [
+      "SAIR",
+      "sair",
+      "Não quero",
+      "nao quero, obrigado",
+      "Pare de mandar",
+      "parar",
+      "me remove? REMOVER",
+      "Não tenho interesse.",
+      "Não temos interesse, obrigada",
+      "Não faz sentido pra gente",
+      "Por favor, não mande mais.",
+    ]) {
       expect(ehPedidoParaParar(s), s).toBe(true);
     }
-    for (const s of ["Oi, tudo bem?", "Quero saber o preço", "vou separar os documentos", "sairemos amanhã", "comparar preços", ""]) {
+    for (const s of ["Oi, tudo bem?", "Quero saber o preço", "vou separar os documentos", "sairemos amanhã", "comparar preços", "Faz sentido sim", "mande mais detalhes", ""]) {
       expect(ehPedidoParaParar(s), s).toBe(false);
     }
-    // A linha de saída manda responder uma palavra que a regra reconhece.
-    expect(LINHA_DE_SAIDA).toContain("SAIR");
-    expect(ehPedidoParaParar("SAIR")).toBe(true);
+  });
+
+  test("a linha de saída (11/11/2026) pede um aviso, e as respostas naturais a ela param o envio", () => {
+    expect(LINHA_DE_SAIDA).toBe("Se não fizer sentido pra vocês, é só me avisar que eu não mando mais.");
+    for (const s of ["Não faz sentido", "não mande mais", "Sair"]) expect(ehPedidoParaParar(s), s).toBe(true);
   });
 
   test("podeEntrarNaCampanha: nunca quem parou, sem celular ou descartado; quem já passou só de propósito", () => {
@@ -241,10 +258,79 @@ test.describe("Pedido para parar e quem pode entrar", () => {
 });
 
 test.describe("A mensagem", () => {
-  test("textoParaLead troca {empresa} e põe a linha de saída no fim, sempre", () => {
-    const t = textoParaLead("Oi, aqui é da OBS. Vi a {empresa} no Google.   ", "  Clínica Bela ");
+  // 11:59 e 12:00 em São Paulo (UTC-3).
+  const MANHA = Date.parse("2026-11-12T14:59:00Z");
+  const TARDE = Date.parse("2026-11-12T15:00:00Z");
+
+  test("textoParaLead troca {empresa} pelo nome limpo e põe a linha de saída no fim, sempre", () => {
+    const t = textoParaLead("Oi, aqui é da OBS. Vi a {empresa} no Google.   ", "  Clínica Bela ", { em: MANHA });
     expect(t).toBe(`Oi, aqui é da OBS. Vi a Clínica Bela no Google.\n\n${LINHA_DE_SAIDA}`);
     expect(t.endsWith(LINHA_DE_SAIDA)).toBe(true);
+    expect(textoParaLead("Oi, {empresa}!", "Ótica Focus Lajinha", { em: MANHA, cidade: "Lajinha" })).toBe(`Oi, Ótica Focus!\n\n${LINHA_DE_SAIDA}`);
+  });
+
+  test("{saudacao}: Bom dia até 11:59 e Boa tarde a partir do meio-dia, em São Paulo", () => {
+    expect(saudacaoDaHora(MANHA)).toBe("Bom dia");
+    expect(saudacaoDaHora(TARDE)).toBe("Boa tarde");
+    expect(saudacaoDaHora(Date.parse("2026-11-12T11:00:00Z"))).toBe("Bom dia"); // 08:00
+    expect(saudacaoDaHora(Date.parse("2026-11-12T20:59:00Z"))).toBe("Boa tarde"); // 17:59
+    expect(textoParaLead(VARIANTES_SUGERIDAS[2], "Ótica Focus", { em: MANHA })).toBe(
+      `Bom dia, Ótica Focus! Tudo bem? Sou o Tony, da OBS. Hoje, quando alguém pergunta preço ou horário pelo WhatsApp, vocês conseguem responder na hora?\n\n${LINHA_DE_SAIDA}`,
+    );
+    expect(textoParaLead(VARIANTES_SUGERIDAS[1], "Ótica Focus", { em: TARDE }).startsWith("Boa tarde, Ótica Focus, tudo bem?")).toBe(true);
+  });
+
+  test("as variantes sugeridas (11/11/2026): saudação e nome como vocativo, só \"OBS\", sem problema para iniciar", () => {
+    expect(VARIANTES_SUGERIDAS).toHaveLength(3);
+    for (const v of VARIANTES_SUGERIDAS) {
+      expect(v.startsWith("{saudacao}, {empresa}")).toBe(true);
+      expect(v).toContain("da OBS.");
+      expect(v).not.toContain("O Bom Sobrinho");
+      expect(v).not.toMatch(/Vi a |[–—]/);
+      expect(problemasDaVariante(v)).toEqual([]);
+    }
+  });
+
+  test("nomeParaMensagem: os nomes reais da Campanha Lajinha (12 mudam, os outros ficam)", () => {
+    const MUDAM: [string, string][] = [
+      ["Laryssa Barçante - Advogada Criminalista", "Laryssa Barçante"],
+      ["Miranda & Albuquerque - Soluções Jurídicas", "Miranda & Albuquerque"],
+      ["MR Clínica Médica -Dra Luiza Moura Rossoni", "MR Clínica Médica"],
+      ["OdontoCompany Lajinha", "OdontoCompany"],
+      ["OralDents Lajinha", "OralDents"],
+      ["Ótica Focus Lajinha", "Ótica Focus"],
+      ["Rodrigues de Moraes - Advocacia Especializada", "Rodrigues de Moraes"],
+      ["Taíssa_Borges_studio", "Taíssa Borges Studio"],
+      ["ABC da Construção Lajinha", "ABC da Construção"],
+      ["LANCHONETE DO ALVIM", "Lanchonete do Alvim"],
+      ["lolostore cosmeticos", "Lolostore Cosmeticos"],
+      ["RESTAURANTE FOGÃO A LENHA", "Restaurante Fogão a Lenha"],
+    ];
+    for (const [antes, depois] of MUDAM) expect(nomeParaMensagem(antes, "Lajinha"), antes).toBe(depois);
+    const FICAM = [
+      "Integralis Odontologia", "JM Fitness", "Jr Cabeleireiros", "MedCenter Saúde", "Michelle Salão de Beleza",
+      "Moreira e Oliveira Advocacia", "Moura MED Clínica", "Moveri Studio", "Ótica Itapevi", "Petshop GATO.CAO",
+      "Quiropraxia e Massoterapia Romildo Oliveira", "Rosy Ferreira", "Sanglard Hermisdorff Advocacia", "Studio Layla Ambrósio",
+      "Studio Mais Cachos Vivianni Gonzaga", "Tavares Gym", "Agropecuária De Pai Para Filho", "Agroserve", "Bear King Food Park",
+      "Belizário Supermercado", "Burger Josué", "Chucky Burguer", "EM Love Modas", "Exata Fashion", "Flor de Lis Modas",
+      "Gigante Burger’s", "Jantinha Bistrô", "Lojas Bom Preço", "Moda Exatta", "Palermo Forneria", "Pensão Dona Geni",
+      "Restaurante Cantina da Dinha", "Restaurante e Petiscaria Almeida", "RM casa da construção",
+    ];
+    for (const n of FICAM) expect(nomeParaMensagem(n, "Lajinha"), n).toBe(n);
+  });
+
+  test("nomeParaMensagem: os casos que motivaram a regra, pedaço genérico, Dr. e cidade", () => {
+    expect(nomeParaMensagem("Clínica Odontológica Mateus Machado | Implantes Dentários | Lajinha-MG", "Lajinha")).toBe("Clínica Odontológica Mateus Machado");
+    expect(nomeParaMensagem("Clínica Odontológica - Dentista do Trabalhador", "Lajinha")).toBe("Dentista do Trabalhador");
+    expect(nomeParaMensagem("Clínica Odontológica | Implantodontia | Ortodontia | Faccia Saúde Oral", "Lajinha")).toBe("Faccia Saúde Oral");
+    expect(nomeParaMensagem("Advocacia Dr Leonardo Guimarães", "Lajinha")).toBe("Advocacia Dr. Leonardo Guimarães");
+    expect(nomeParaMensagem("Dra Tatiana Sanglard")).toBe("Dra. Tatiana Sanglard");
+    expect(nomeParaMensagem("Dr. Fabiano Alvim")).toBe("Dr. Fabiano Alvim");
+    expect(nomeParaMensagem("Ótica Central Belo Horizonte MG", "Belo Horizonte")).toBe("Ótica Central");
+    // Só a cidade, ou sem cidade conhecida: nunca vazio, nunca um palpite.
+    expect(nomeParaMensagem("Lajinha", "Lajinha")).toBe("Lajinha");
+    expect(nomeParaMensagem("OdontoCompany Lajinha")).toBe("OdontoCompany Lajinha");
+    expect(nomeParaMensagem("Pizzaria Bom Gosto - MG")).toBe("Pizzaria Bom Gosto");
   });
 
   test("problemasDaVariante: vazia, sem {empresa} ou com campo desconhecido trava", () => {

@@ -383,22 +383,39 @@ export function leadSemHistorico(l: { parouEm: number | null; campanhas: number 
 
 // ── A mensagem ───────────────────────────────────────────────────────────
 
-/** A única variável da mensagem. */
+/** O nome da empresa na mensagem (obrigatório). */
 export const CAMPO_EMPRESA = "{empresa}";
+
+/** "Bom dia" ou "Boa tarde", na hora do envio (dono, 11/11/2026). Opcional. */
+export const CAMPO_SAUDACAO = "{saudacao}";
+
+const CAMPOS_CONHECIDOS = new Set(["empresa", "saudacao"]);
 
 /** Até 3 variantes, que se revezam. */
 export const MAXIMO_DE_VARIANTES = 3;
 
 /**
- * A linha de saída (D4, dono, 29/10/2026): vai no fim de TODA mensagem, posta
- * pelo código, e o dono não tira editando a variante. "sair" está em
- * `FRASES_DE_PARADA`, então responder SAIR sempre tira o lead da lista.
+ * A linha de saída (D4, dono, 29/10/2026; texto de 11/11/2026): vai no fim de TODA
+ * mensagem, posta pelo código, e o dono não tira editando a variante. Quem responde
+ * "não faz sentido", "não mande mais" ou SAIR sai da lista (`FRASES_DE_PARADA`).
  */
-export const LINHA_DE_SAIDA = "Se não quiser receber mais mensagens, é só responder SAIR.";
+export const LINHA_DE_SAIDA = "Se não fizer sentido pra vocês, é só me avisar que eu não mando mais.";
 
-/** O texto pronto para um lead: `{empresa}` vira o nome da empresa e a linha de saída vai no fim. */
-export function textoParaLead(modelo: string, empresa: string): string {
-  return `${modelo.replaceAll(CAMPO_EMPRESA, empresa.trim()).trimEnd()}\n\n${LINHA_DE_SAIDA}`;
+/** A saudação do envio no instante `t`, no horário de São Paulo: "Bom dia" antes do meio-dia, "Boa tarde" depois (a janela fecha às 18h). */
+export function saudacaoDaHora(t: number): string {
+  return horaSP(t) < 12 ? "Bom dia" : "Boa tarde";
+}
+
+/**
+ * O texto pronto para um lead no instante `em` do envio: `{empresa}` vira o nome
+ * limpo (`nomeParaMensagem`), `{saudacao}` a saudação da hora e a linha de saída
+ * vai no fim. É exatamente o que sai e o que fica gravado no envio.
+ */
+export function textoParaLead(modelo: string, empresa: string, envio: { em: number; cidade?: string | null }): string {
+  const texto = modelo
+    .replaceAll(CAMPO_EMPRESA, nomeParaMensagem(empresa, envio.cidade))
+    .replaceAll(CAMPO_SAUDACAO, saudacaoDaHora(envio.em));
+  return `${texto.trimEnd()}\n\n${LINHA_DE_SAIDA}`;
 }
 
 /**
@@ -410,17 +427,110 @@ export function problemasDaVariante(modelo: string): string[] {
   const p: string[] = [];
   if (modelo.trim() === "") return ["A mensagem está vazia"];
   if (!modelo.includes(CAMPO_EMPRESA)) p.push("Falta {empresa} no texto");
-  const outras = [...modelo.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((c) => c !== "empresa");
+  const outras = [...modelo.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((c) => !CAMPOS_CONHECIDOS.has(c));
   if (outras.length > 0) p.push(`Campo desconhecido: {${outras[0]}}`);
   return p;
 }
 
-/** As três variantes sugeridas (textos do dono de 07/11/2026, no lugar das de 29/10/2026): o texto pré-preenchido de uma campanha nova. */
+/**
+ * As três variantes sugeridas (textos do dono de 11/11/2026, no lugar das de
+ * 07/11/2026): o texto pré-preenchido de uma campanha nova. O nome vai como
+ * vocativo ("Bom dia, Ótica Focus!"), então não há artigo para errar.
+ */
 export const VARIANTES_SUGERIDAS = [
-  "Oi, tudo bem? Sou o Tony, da OBS (O Bom Sobrinho). Vi a {empresa} e queria entender uma coisa: hoje, quando um cliente chama no WhatsApp fora do horário ou no meio da correria, alguém consegue responder na hora?",
-  "Oi! Aqui é o Tony, da OBS. Vi a {empresa} e fiquei com uma dúvida: quando chega mensagem no WhatsApp com vocês ocupados, quem responde?",
-  "Oi, tudo bem? Sou o Tony, da OBS (O Bom Sobrinho). Hoje, quando alguém pergunta preço ou horário da {empresa} pelo WhatsApp, vocês conseguem responder na hora?",
+  "{saudacao}, {empresa}! Tudo bem? Sou o Tony, da OBS. Hoje, quando um cliente chama vocês no WhatsApp fora do horário ou no meio da correria, alguém consegue responder na hora?",
+  "{saudacao}, {empresa}, tudo bem? Aqui é o Tony, da OBS. Hoje, quando chega mensagem no WhatsApp com vocês ocupados, quem responde?",
+  "{saudacao}, {empresa}! Tudo bem? Sou o Tony, da OBS. Hoje, quando alguém pergunta preço ou horário pelo WhatsApp, vocês conseguem responder na hora?",
 ];
+
+// ── O nome na mensagem ───────────────────────────────────────────────────
+
+/**
+ * Palavras de categoria: um pedaço do nome feito só delas ("Clínica Odontológica")
+ * não é o nome da empresa. Sem acento e em caixa baixa.
+ */
+const PALAVRAS_GENERICAS = new Set([
+  "clinica", "consultorio", "odontologica", "odontologico", "odontologia", "medica", "medico",
+  "advocacia", "advogada", "advogado", "escritorio", "estetica", "salao", "studio", "estudio",
+  "de", "da", "do", "das", "dos", "e",
+]);
+
+/** Ficam minúsculas no meio de um nome que vira "Só a Primeira Maiúscula". */
+const PARTICULAS = new Set(["a", "e", "o", "de", "da", "do", "das", "dos"]);
+
+/** As palavras de um texto como os nomes comparam: sem acento, em caixa baixa, só letras. */
+function palavras(s: string): string[] {
+  return normalizar(s).replace(/[^a-z]+/g, " ").trim().split(" ").filter(Boolean);
+}
+
+/** É uma sigla de UF? (`UFS` é declarada mais abaixo: lida na chamada, não na carga do módulo.) */
+function ehUf(w: string): boolean {
+  return (UFS as readonly string[]).includes(w.toUpperCase());
+}
+
+/** As palavras são a cidade, com ou sem a UF depois, ou só uma UF ("Lajinha", "Lajinha-MG", "MG")? */
+function ehLocal(ws: string[], cidade: string[]): boolean {
+  if (ws.length === 1 && ehUf(ws[0])) return true;
+  if (cidade.length === 0) return false;
+  const semUf = ws.length === cidade.length + 1 && ehUf(ws.at(-1) ?? "") ? ws.slice(0, -1) : ws;
+  return semUf.join(" ") === cidade.join(" ");
+}
+
+/** Tira a cidade (e a UF colada) do fim: "Ótica Focus Lajinha" vira "Ótica Focus". Nunca deixa vazio. */
+function semCidadeNoFim(nome: string, cidade: string[]): string {
+  if (cidade.length === 0) return nome;
+  const partes = nome.split(" ");
+  for (let k = Math.min(partes.length - 1, cidade.length + 1); k >= 1; k--) {
+    const fim = palavras(partes.slice(-k).join(" "));
+    if (fim[0] === cidade[0] && ehLocal(fim, cidade)) return partes.slice(0, -k).join(" ");
+  }
+  return nome;
+}
+
+/** "RESTAURANTE FOGÃO A LENHA" e "lolostore cosmeticos" viram "Restaurante Fogão a Lenha" e "Lolostore Cosmeticos". */
+function soPrimeirasMaiusculas(nome: string): string {
+  return nome
+    .split(" ")
+    .map((p, i) => {
+      const min = p.toLocaleLowerCase("pt-BR");
+      if (i > 0 && PARTICULAS.has(min)) return min;
+      return min.charAt(0).toLocaleUpperCase("pt-BR") + min.slice(1);
+    })
+    .join(" ");
+}
+
+/**
+ * O nome do lead como vai na mensagem (dono, 11/11/2026). O Google traz o nome
+ * do cadastro, com cauda de propaganda ("Clínica X | Implantes | Lajinha-MG").
+ * Regras, nesta ordem:
+ * - "_" vira espaço;
+ * - corta no "|" e no hífen solto (" - ", " -X"), fica o 1º pedaço; se ele for só
+ *   palavra genérica ("Clínica Odontológica"), fica o último; pedaços que são só a
+ *   cidade ou a UF saem antes;
+ * - tira a cidade do lead (e a UF colada) do fim;
+ * - tudo MAIÚSCULO, tudo minúsculo ou com "_" vira "Só a Primeira Maiúscula"
+ *   ("do", "da", "a"... ficam minúsculas);
+ * - "Dr"/"Dra" ganham ponto.
+ * Puro; o cron, a prévia e a origem do contato usam o mesmo.
+ */
+export function nomeParaMensagem(nome: string, cidade?: string | null): string {
+  const original = nome.normalize("NFC").trim();
+  const tinhaSublinhado = original.includes("_");
+  const limpo = original.replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+  const local = palavras(cidade ?? "");
+  const pedacos = limpo
+    .split(/\s*\|\s*|\s+-\s*|\s*-\s+/)
+    .map((p) => p.trim())
+    .filter((p) => p !== "" && !ehLocal(palavras(p), local));
+  if (pedacos.length === 0) return limpo;
+  const generico = (p: string) => palavras(p).every((w) => PALAVRAS_GENERICAS.has(w));
+  let escolhido = generico(pedacos[0]) && pedacos.length > 1 ? (pedacos.at(-1) ?? pedacos[0]) : pedacos[0];
+  escolhido = semCidadeNoFim(escolhido, local);
+  const letras = escolhido.replace(/[^\p{L}]/gu, "");
+  const tudoIgual = letras !== "" && (letras === letras.toLocaleUpperCase("pt-BR") || letras === letras.toLocaleLowerCase("pt-BR"));
+  if (tudoIgual || tinhaSublinhado) escolhido = soPrimeirasMaiusculas(escolhido);
+  return escolhido.replace(/(^|\s)(dra?)(?=\s|$)/giu, (_, antes: string, dr: string) => `${antes}${dr.charAt(0).toUpperCase()}${dr.slice(1).toLowerCase()}.`);
+}
 
 // ── Origem do contato, para o agente ─────────────────────────────────────
 
@@ -478,8 +588,19 @@ export function varianteDaOrdem(ordem: number, quantas: number): number {
 
 // ── Pedido para parar ────────────────────────────────────────────────────
 
-/** As frases que contam como "pare" (D4, dono, 29/10/2026). */
-export const FRASES_DE_PARADA = ["nao quero", "pare", "parar", "para de mandar", "sair", "remover", "nao tenho interesse"] as const;
+/** As frases que contam como "pare" (D4, dono, 29/10/2026; as 3 últimas de 11/11/2026, junto com a linha de saída nova). */
+export const FRASES_DE_PARADA = [
+  "nao quero",
+  "pare",
+  "parar",
+  "para de mandar",
+  "sair",
+  "remover",
+  "nao tenho interesse",
+  "nao temos interesse",
+  "nao faz sentido",
+  "nao mande mais",
+] as const;
 
 /** A resposta pede para parar? Sem acento e sem caixa, por palavra inteira. */
 export function ehPedidoParaParar(texto: string): boolean {

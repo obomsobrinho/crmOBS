@@ -538,7 +538,7 @@ function Assistente({
                       <div>
                         <p className="text-rotulo uppercase text-ink-3">Como chega para {exemplo}</p>
                         <p className="mt-1.5 max-w-[520px] whitespace-pre-wrap rounded-xl rounded-tl-sm bg-bloco px-3.5 py-2.5 text-apoio text-ink">
-                          {textoParaLead(texto, exemplo)}
+                          {textoParaLead(texto, exemplo, { em: inicio })}
                         </p>
                       </div>
                       {campanha.variantes.length > 1 && (

@@ -52,7 +52,7 @@ function origemDoCenario(c: Cenario, agora: string | undefined): OrigemDaCampanh
   const base = agora ? Date.parse(agora) : Date.now();
   return {
     enviadoEm: o.enviadoEm ?? new Date(base - 2 * 60 * 60_000).toISOString(),
-    texto: o.texto ?? textoParaLead(VARIANTES_SUGERIDAS[0], o.empresa ?? "Empresa Exemplo"),
+    texto: o.texto ?? textoParaLead(VARIANTES_SUGERIDAS[0], o.empresa ?? "Empresa Exemplo", { em: base - 2 * 60 * 60_000 }),
     parouEm: null,
     // De onde veio o contato, como `origemDaCampanha` lê da lista do lead; sem ele, a busca no Google.
     deOnde: o.deOnde === undefined ? "google" : o.deOnde,

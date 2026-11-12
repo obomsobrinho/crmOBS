@@ -1188,6 +1188,7 @@ export type Database = {
           respondeu_em: string | null
           status: string
           tentado_em: string | null
+          texto: string | null
           variante: number | null
         }
         Insert: {
@@ -1199,6 +1200,7 @@ export type Database = {
           respondeu_em?: string | null
           status?: string
           tentado_em?: string | null
+          texto?: string | null
           variante?: number | null
         }
         Update: {
@@ -1210,6 +1212,7 @@ export type Database = {
           respondeu_em?: string | null
           status?: string
           tentado_em?: string | null
+          texto?: string | null
           variante?: number | null
         }
         Relationships: [
@@ -2291,6 +2294,7 @@ export type Database = {
           p_lead: string
           p_proximo: string
           p_resultado: string
+          p_texto?: string
           p_variante: number
         }
         Returns: undefined
@@ -2384,6 +2388,10 @@ export type Database = {
         Returns: {
           salva_em: string
         }[]
+      }
+      prospeccao_texto_antigo: {
+        Args: { p_campanha: string; p_lead: string; p_variante: number }
+        Returns: string
       }
       provision_tenant: {
         Args: {
