@@ -14,7 +14,7 @@ diz onde está cada coisa e o que estava acontecendo no dia em que foi escrito.
 |---|---|
 | **Sempre, antes de tocar em código** | `CLAUDE.md` na raiz. Carrega sozinho no Claude Code. É o guia do projeto: schema, isolamento por tenant, convenções, armadilhas, e o porquê de cada decisão de arquitetura. |
 | Antes de decidir **o que construir** | `docs/proximos-passos.md`. **Fonte de verdade de roadmap.** |
-| Antes de mexer em **leitura de dado, estado, cache, URL, realtime na tela ou desempenho** | `docs/plano-dados-e-estado.md`. **Roteiro único de dados, estado e desempenho** (decisões fechadas pelo dono em 11/11/2026; o passo 0 espera a revisão externa do spec). O orçamento de desempenho (seção 3) é critério de aceite de toda entrega. |
+| Antes de mexer em **leitura de dado, estado, cache, URL, realtime na tela ou desempenho** | `docs/plano-dados-e-estado.md`. **Roteiro único de dados, estado e desempenho** (decisões fechadas pelo dono em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado). O orçamento de desempenho (seção 3) é critério de aceite de toda entrega. |
 | Planos executados e relatórios avulsos | `docs/arquivo/` (o `README.md` de lá diz o que foi arquivado e por quê). |
 | Perguntas de **mercado, concorrente, preço, risco de banimento** | `docs/estrategia-2026-07.md`. É base de pesquisa; as conclusões prescritivas antigas estão superadas, e o banner no topo diz o que vale. |
 | Antes de mexer em **cor, tipografia, espaçamento, componente base** | `docs/design-system/` (8 arquivos). O código tem os valores; esses arquivos têm o porquê. |
@@ -387,7 +387,7 @@ limpo.
 
 ## 4. O que vem agora
 
-**Desde 10/11/2026, dados, estado e desempenho seguem `docs/plano-dados-e-estado.md`** (decisões fechadas em 11/11/2026; o passo 0 espera a revisão externa do spec): passos 0 a 5, orçamento de desempenho na seção 3, e a frente de design só depois do passo 5 (seção 7). A leitura semanal do orçamento (B5 a B9) é registrada aqui.
+**Desde 10/11/2026, dados, estado e desempenho seguem `docs/plano-dados-e-estado.md`** (decisões fechadas em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado): passos 0 a 5, orçamento de desempenho na seção 3, e a frente de design só depois do passo 5 (seção 7). A leitura semanal do orçamento (B5 a B9) é registrada aqui.
 
 O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O grupo que exigia o
 dono na sala **fechou em 17/09/2026** (ver a seção 3).

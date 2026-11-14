@@ -8,25 +8,40 @@ paths:
   - "features/**"
   - "lib/use-*.ts"
   - "lib/*-fonte.ts"
+  - "lib/*-servidor.ts"
   - "lib/query/**"
   - "lib/realtime/**"
+  - "lib/rota.ts"
+  - "lib/admin.ts"
+  - "lib/env.ts"
+  - "proxy.ts"
   - "next.config.ts"
 ---
 # Data, state and performance
 
-The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). This file holds only the rules, and says which ones apply now and which apply to an area once its step has landed. An area that has not migrated keeps following `data.md`, `realtime.md` and `engineering.md` as written.
+The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). This file holds only the rules, and says which ones apply now and which apply from a given step.
+
+## State (updated in the commit that closes each step)
+- Steps done: none. Step 0 is released (external review of 11/11/2026 applied).
+- Areas migrated: none.
+
+**Which pattern new code follows**: in an area not migrated yet, new code follows that area's current pattern (`data.md`, `realtime.md`, `engineering.md` as written, e.g. a new list in Contatos uses `usePaginada` until Contatos migrates). A new screen or a wholly new area is born in the new pattern, from the step whose tooling it needs. A migrated area is one listed above; its files live in `features/<area>/`.
 
 ## Applies now, to all code
-- Performance budget B1 to B10 (spec, section 3) is an acceptance criterion of every delivery. A delivery that breaks one fixes it or records the owner's exception in an ADR. A route over budget in production for 3 days in a row is a bug ahead of new features.  (why: docs/plano-dados-e-estado.md)
 - A new screen does not await data before rendering: its page awaits only the gate (session, tenant, access), it has its own `loading.tsx` with the static frame, and its server reads run in parallel, never in series.  (why: docs/plano-dados-e-estado.md)
 - State has three places, no mixing: server data in the browser data layer, navigation (tab, open item, filters, search, page) in the URL, interaction in the component. No global store; Context only injects a data source, never data.  (why: docs/plano-dados-e-estado.md)
-- A Realtime DELETE event is not filtered by tenant and not checked by RLS, and under RLS its `old` carries only the primary key: use it only as a hint to drop that id and re-read; never read tenant or content from it.  (why: docs/plano-dados-e-estado.md)
-- New files go into `features/<area>/` (vertical slice, spec 2.13), not loose in `lib/` or at the root of `components/`. A move into `features/` is a commit of its own, never mixed with a behavior change.  (why: docs/plano-dados-e-estado.md)
+- Never decide which tenant a row belongs to, or read its content, from a Realtime DELETE payload. What `old` carries and whether DELETE is filtered are under verification (spec, Step 0); until then, a DELETE only drops an id already on screen (`components/ContactNotes.tsx` reads `antigo` on DELETE today; the Step 0 test decides it).  (why: docs/plano-dados-e-estado.md)
+- A new file of an area goes next to that area's current files until the area's move commit; after it, in `features/<area>/`. A move into `features/` is a commit of its own, never mixed with a behavior change, and happens when the area is touched, never in bulk.  (why: docs/plano-dados-e-estado.md)
+- A migration in production is applied outside attendance hours: each one reloads the PostgREST schema cache, and one reload came a minute before the worst spike of 10/11/2026.  (why: docs/plano-dados-e-estado.md)
 
 ## Applies from Step 1 (the Base)
-- Browser reads go through an area hook on TanStack Query, with keys from the area's key factory (`[area, entity, kind, params?]`); never a `useEffect` that fetches, never an inline key.  (why: docs/plano-dados-e-estado.md)
-- Writes are optimistic mutations: change the cache at the click, undo with the inverse operation, invalidate by prefix only when it is the last pending mutation of its key, totals change with the rows.  (why: docs/plano-dados-e-estado.md)
-- Realtime callbacks write to the cache through the area bridge: UPDATE patches the row; INSERT and DELETE invalidate lists and counters with a 500 ms debounce; events of an area with a pending mutation are deferred to that mutation's invalidation.  (why: docs/plano-dados-e-estado.md)
-- Every input crosses a Zod schema (route bodies, webhooks, URL parameters, forms, environment); machine callers and the environment start in shadow mode and reject only after a week with zero mismatches.  (why: docs/plano-dados-e-estado.md)
-- API routes answer `{ error, codigo? }` with the HTTP status; a 401 is handled once, by the query client.  (why: docs/plano-dados-e-estado.md)
-- URL state goes through nuqs parsers; a new or complex form uses react-hook-form with the Zod resolver and the `Form` of `components/ui/`.  (why: docs/plano-dados-e-estado.md)
+- Lab budget (B1 to B4, B8, B10, spec section 3) is an acceptance criterion of every delivery from the day its tool exists. A delivery that breaks one fixes it or records the owner's exception in an ADR. The production budget (B5 to B7, B9) is a weekly reading: a route over budget for 3 days in a row (with the minimum sample) is a bug ahead of new features, below attendance bugs.  (why: docs/plano-dados-e-estado.md)
+- URL state goes through nuqs parsers, shallow mode, no Zod behind them. It lands with each screen, in the step that migrates it.  (why: docs/plano-dados-e-estado.md)
+- Browser reads in a migrated area go through an area hook on TanStack Query, with keys from the area's key factory (`[area, entity, kind, params?]`); never a `useEffect` that fetches, never an inline key. Lists keep the previous result while filters change. Menu links of a migrated area use `prefetch={true}`.  (why: docs/plano-dados-e-estado.md)
+- Writes are optimistic mutations with keys `[area, entity, action]`: change the cache at the click; on a refusal show the reason and let the final invalidation bring the row back; invalidate (debounced) only when it is the last pending write of its `[area, entity]`; totals change with the rows. The inverse operation is an exception for a measured wait only.  (why: docs/plano-dados-e-estado.md)
+- API routes answer `{ error, codigo? }` with the HTTP status. The browser source always throws a typed `ErroDaApi`, never returns an error as a value; an end state equal to success (delete of a row already gone) is success inside the source. A 401 is handled once, by the query client: renew the session once and repeat, then `/login` with an internal-only return path.  (why: docs/plano-dados-e-estado.md)
+- Every route body and query string, the Asaas and Apify webhooks and the crons cross a Zod schema; machine callers start in shadow mode and reject only after a week with zero mismatches. The n8n webhooks validate and log, never refuse (except a missing field the handler cannot work without, with a notice). `lib/env.ts` arrives in Step 5. A new or complex form uses react-hook-form with the Zod resolver and the `Form` of `components/ui/`.  (why: docs/plano-dados-e-estado.md)
+- Lint for these rules is an error in `features/**` and a warning elsewhere.  (why: docs/plano-dados-e-estado.md)
+
+## Applies from Step 3a (the realtime bridge)
+- Realtime callbacks of a migrated area write to the cache through the bridge registered once in the `(app)` layout, never from a screen. UPDATE patches the row by id comparing `new` with the cached row (never depends on `old`). INSERT follows the per-list table of spec 2.7: tenant lists keep today's behavior (fetch one row and place it, e.g. `encaixar`, or patch); only counters and lists without a placement rule invalidate, debounced 500 ms. A DELETE of an id not in the cache is ignored. No echo suppression: applying by id is idempotent.  (why: docs/plano-dados-e-estado.md)

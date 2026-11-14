@@ -2,7 +2,7 @@
 
 Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estrategia-2026-07.md).
 
-**Dados, estado e desempenho (10/11/2026):** o roteiro único é [plano-dados-e-estado.md](plano-dados-e-estado.md) (decisões fechadas em 11/11/2026; o passo 0 espera a revisão externa do spec): passos 0 a 5 e o orçamento de desempenho, que vale como critério de aceite de toda entrega. A frente de design vem depois do passo 5 (seção 7 dele).
+**Dados, estado e desempenho (10/11/2026):** o roteiro único é [plano-dados-e-estado.md](plano-dados-e-estado.md) (decisões fechadas em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado): passos 0 a 5 e o orçamento de desempenho, que vale como critério de aceite de toda entrega. A frente de design vem depois do passo 5 (seção 7 dele).
 
 Última revisão: 29/09/2026 (plano vigente com as prioridades aprovadas pelo dono, logo abaixo da
 direção travada).
