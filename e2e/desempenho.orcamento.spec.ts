@@ -31,6 +31,7 @@ const TETO_KB: Record<string, number> = {
   "/agente": 340,
   "/equipe": 340,
   "/perfil": 340,
+  // Exceção do dono (D15, 14/11/2026): os gráficos de Campanhas ficam na abertura.
   "/campanhas": 480,
   "/campanhas/buscas/nova": 480,
 };
