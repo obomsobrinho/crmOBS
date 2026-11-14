@@ -14,7 +14,7 @@ export async function POST(
   ctx: RouteContext<"/api/clients/[id]/notify-target/teste">
 ) {
   const { id } = await ctx.params;
-  const r = await sessaoDaRota({ id, dono: "só o dono pode testar os avisos" });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode testar os avisos", ativa: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
   if (!mine.evolution_instance) {

@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import type { z } from "zod";
 import { getMyClient, type MyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,4 +71,72 @@ export async function sessaoDaRota(
     return { erro: NextResponse.json({ error: mine.access.message }, { status: 402 }) };
   }
   return { mine };
+}
+
+/**
+ * O formato único de erro das rotas que o app chama (docs/plano-dados-e-estado.md,
+ * 2.9): status HTTP mais `{ error, codigo? }`. `error` é a frase que a tela mostra
+ * (português), `codigo` é o motivo para a máquina (`nao_encontrado`, `entrada_invalida`).
+ * Rota de webhook continua respondendo o que o chamador espera.
+ */
+export function erroDaRota(status: number, frase: string, codigo?: string): NextResponse {
+  return NextResponse.json(codigo ? { error: frase, codigo } : { error: frase }, { status });
+}
+
+/** A frase de entrada recusada. O detalhe vai para o log, não para a tela. */
+const FRASE_ENTRADA_INVALIDA = "Os dados enviados não estão no formato esperado.";
+
+/**
+ * Lê o corpo JSON da requisição pelo esquema Zod da área (2.9). O tipo vem do
+ * esquema. Falhou: `{ erro }` pronto (400, `entrada_invalida`), que a rota só
+ * repassa, como em `sessaoDaRota`.
+ */
+export async function lerCorpo<S extends z.ZodType>(
+  req: Request,
+  esquema: S
+): Promise<{ dados: z.infer<S> } | { erro: NextResponse }> {
+  let bruto: unknown;
+  try {
+    bruto = await req.json();
+  } catch {
+    return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+  }
+  return validar(esquema, bruto, new URL(req.url).pathname);
+}
+
+/** O mesmo para a query string (`?x=...`), lida como objeto de textos. */
+export function lerConsulta<S extends z.ZodType>(
+  req: Request,
+  esquema: S
+): { dados: z.infer<S> } | { erro: NextResponse } {
+  const url = new URL(req.url);
+  return validar(esquema, Object.fromEntries(url.searchParams), url.pathname);
+}
+
+function validar<S extends z.ZodType>(
+  esquema: S,
+  bruto: unknown,
+  onde: string
+): { dados: z.infer<S> } | { erro: NextResponse } {
+  const r = esquema.safeParse(bruto);
+  if (r.success) return { dados: r.data };
+  console.warn("entrada recusada:", onde, r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+  return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+}
+
+/**
+ * Modo sombra para chamador de máquina (Asaas, Apify, crons; 2.9): confere o corpo
+ * pelo esquema e REGISTRA a diferença, sem recusar nada. Só depois de uma semana
+ * sem diferença a rota passa a usar `lerCorpo`. Devolve se bateu, para a contagem.
+ */
+export function conferirNaSombra(esquema: z.ZodType, bruto: unknown, onde: string): boolean {
+  const r = esquema.safeParse(bruto);
+  if (!r.success) {
+    console.warn(
+      "[sombra] entrada fora do esquema:",
+      onde,
+      r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+    );
+  }
+  return r.success;
 }

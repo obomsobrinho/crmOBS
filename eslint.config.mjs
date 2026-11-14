@@ -129,6 +129,20 @@ const conjunto = ({ fuso = true, mensagem = true, refresh = true } = {}) => [
   ...(mensagem ? regraDeMensagem : []),
   ...(refresh ? regraDeRefresh : []),
 ];
+// Data layer rules (docs/plano-dados-e-estado.md, section 5, guardrail 6). ERROR in
+// features/** (the path says the area migrated), never applied to legacy code.
+const regrasDeDados = [
+  {
+    selector: "Property[key.name=/^(queryKey|mutationKey)$/] > ArrayExpression",
+    message:
+      "No query or mutation key written inline: build it with the area's key factory (docs/plano-dados-e-estado.md, 2.5).",
+  },
+  {
+    selector: "CallExpression[callee.name='useEffect'] CallExpression[callee.name='fetch']",
+    message:
+      "No useEffect that fetches: browser reads go through an area hook on TanStack Query (docs/plano-dados-e-estado.md, 2.2).",
+  },
+];
 // router.refresh() is legitimate on login, logout and account switch.
 const REFRESH_PERMITIDO = [
   "app/login/page.tsx",
@@ -159,6 +173,30 @@ const eslintConfig = defineConfig([
   {
     files: REFRESH_PERMITIDO,
     rules: { "no-restricted-syntax": ["warn", ...conjunto({ refresh: false })] },
+  },
+  // Migrated areas (features/**): the project rules plus the data rules, as ERRORS.
+  {
+    files: ["features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": ["error", ...conjunto(), ...regrasDeDados],
+    },
+  },
+  {
+    files: ["features/**/components/**/*.{ts,tsx}", "features/**/hooks/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/supabase/*", "@supabase/*"],
+              message:
+                "A component or hook never talks to Supabase: the area source does (docs/plano-dados-e-estado.md, 2.11).",
+            },
+          ],
+        },
+      ],
+    },
   },
   // service_role never enters code that runs in the browser. ERROR, not warning:
   // there are zero occurrences today.

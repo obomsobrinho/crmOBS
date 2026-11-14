@@ -1,6 +1,6 @@
 # Plan: data and state, one pattern for the whole app
 
-Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). Next: Step 1. The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
+Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). Next: Step 2. The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
 
 **Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
 
@@ -241,7 +241,7 @@ In the browser, the area source turns any failure into a thrown `ErroDaApi` (sta
 
 **Session expired**: one global handler on the query client (queries and mutations); no screen handles 401 by itself.
 - First, renew the session once (through supabase-js) and repeat the call. A 401 guarantees nothing was written, so repeating does not duplicate.
-- Only if it fails again: send to `/login`, keeping the URL to come back. Today `/login` reads only the `erro` parameter; the return parameter is new and accepts only an internal path (starts with `/`, not `//`), never a full URL.
+- Only if it fails again: send to `/login`. **Without a return to the URL** (found in Step 1): docs/adr/2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md records the owner's decision that login does not return to the requested link, for security. The review's "keep the URL to come back" contradicts it, so Step 1 kept the owner's rule; changing it is his call.
 - A reply being typed in Conversas is kept as a draft (per conversation, in the browser) before the redirect, and restored when the person comes back.
 
 **Errors per block**: a query error renders the block's error state with "Tentar de novo" (one shared component), never a blank screen. A render crash is caught by `app/(app)/error.tsx` (none exists today).
@@ -399,7 +399,7 @@ Scope:
 2. `QueryClient` factory with 2.4's defaults; the provider keyed by user plus tenant in `app/(app)/layout.tsx` and in the `/design` layouts (fake source); the debounced invalidator (2.7) and the global write-error notice (2.6).
 3. The key factory convention (2.5, three-level mutation keys) and the pure cache helpers (`tirarDaPagina`, patch by id, both list shapes), with Vitest tests including the concurrent-delete case and two different writes on the same list.
 4. nuqs adapter in the root of the app and the shared parsers (2.8).
-5. The error shape (2.9): a server helper for routes, the browser `ErroDaApi`, the global 401 handler (renew once and repeat, internal-only return path on `/login`), the shared block error component, `app/(app)/error.tsx`.
+5. The error shape (2.9): a server helper for routes, the browser `ErroDaApi`, the global 401 handler (renew once and repeat, then `/login` with no return path, 2.9), the shared block error component, `app/(app)/error.tsx`.
 6. Zod helpers (2.9): body and query parsing inside `sessaoDaRota`/`rotaDoAdmin`; the Asaas webhook schema in shadow mode.
 7. Forms (2.12): `components/ui/form.tsx` and one documented example in `docs/design-system/camada-base.md`; nothing else, no existing form migrated.
 8. Observability (2.10): the saved B9 query over the Supabase edge logs. No beacon, no table, no migration.
@@ -414,7 +414,7 @@ Files:
 - `package.json`, `vitest.config.ts`
 - `lib/query/` (client, keys convention, cache helpers, debounced invalidator)
 - `lib/rota.ts`, `lib/admin.ts` (schema and error helpers)
-- `app/(app)/layout.tsx`, `app/(app)/error.tsx`, `app/login/**` (return path), `app/design/**/layout.tsx`, `app/api/telemetria/route.ts`, `app/api/billing/webhook/route.ts` (shadow schema only)
+- `app/(app)/layout.tsx`, `app/(app)/error.tsx`, `app/layout.tsx` (nuqs adapter), `app/api/billing/webhook/route.ts` (shadow schema only)
 - `components/ui/{form,esqueleto,erro-do-bloco}.tsx` (names settled in Step 1)
 - `eslint.config.mjs`, `e2e/` (frame spec, production web server project)
 - `.claude/rules/`, `docs/adr/`, `docs/instrumentacao-uso.md`, `.claude/skills/fechar-entrega/SKILL.md`
@@ -428,6 +428,19 @@ Acceptance:
 - The Asaas schema is logging in shadow mode, with its mismatch count visible.
 
 Out: migrating any screen; enforcing any schema on a machine caller; `lib/use-canal-ao-vivo.ts`.
+
+**Delivered (14/11/2026):**
+- Dependencies (exact versions, checked against Next 16.2.11 and React 19.2.4): `@tanstack/react-query` 5.107.1, `zod` 4.6.7, `nuqs` 2.10.3, `react-hook-form` 7.92.0, `@hookform/resolvers` 7.0.6, `vitest` 4.1.12 (dev). Vitest 5 asks for `@types/node` 22 or more (the project has 20), and npm 11 loops on the optional peers of `vite`; vitest 4.1.12 was installed with `--legacy-peer-deps` for that one command, and the lock was checked: only the optional `ajv` peer of `@hookform/resolvers` left, four patch bumps (postcss, nanoid, source-map-js, wasm-runtime).
+- Data layer in `lib/query/`: `cliente.ts` (2.4 defaults, 401 to `/login`, global notice), `provedor.tsx` (keyed by user and tenant), `cache.ts` (`tirarDaPagina`, `remendarLinha`, both list shapes), `escrita.ts` (`opcoesDeTirar`, `opcoesDeRemendar`), `invalidar.ts`, `erro.ts` (`ErroDaApi`), `api.ts` (`chamarApi`, one renewal on 401), `aviso-global.ts`; Vitest in `lib/query/escrita.test.ts` (`npm run test:unit`, 4 tests, the concurrent-delete case and two writes on one list).
+- Session without the database on the click (D8): `lib/sessao.tsx` fed by the `(app)` layout, `components/GuardaDaTela.tsx`; the providers wrap the whole shell. `ativa: true` on the 9 write routes of D10.
+- Prefetch on intent (D9): `components/LinkNaIntencao.tsx` on the menu items of `NavRail` (desktop rail, phone bar and "Mais"). Measured: hovering the 7 menu items without clicking made ZERO Supabase requests (edge logs, 14/11/2026 06:06 UTC); the click is what runs the page's gate. Toggling the `Link` prop on hover did not work (the click ignored the prefetch); `router.prefetch` on the gesture does.
+- URL: `NuqsAdapter` in `app/layout.tsx`, shared parsers in `lib/url.ts`.
+- Errors: `erroDaRota`, `lerCorpo`, `lerConsulta`, `conferirNaSombra` in `lib/rota.ts`; `components/ui/erro-do-bloco.tsx`; `app/(app)/error.tsx`; `components/AvisoGlobal.tsx`. Asaas webhook in shadow mode (`lib/asaas-esquema.ts`).
+- Forms: `components/ui/form.tsx` and its example in `docs/design-system/camada-base.md` (with the screen states).
+- Lint: `features/**` gets the project rules plus inline keys and fetching `useEffect` as ERRORS, and no Supabase import in its components and hooks.
+- Budget tooling: `npm run test:orcamento` (`playwright.orcamento.config.ts`, `e2e/desempenho.orcamento.spec.ts`) on `next start`: B1 on the 7 menu routes with a frame (passes, stable after waiting for the intent prefetch response), B2 for migrated areas (none yet), B8 on 12 routes (all within the ceilings). The B9 query is section 6 of `docs/instrumentacao-uso.md`. Both are in `fechar-entrega`.
+- ADRs: `2026-11-14-screen-never-waits-for-the-database.md`, `2026-11-14-tanstack-query-is-the-browser-data-layer.md`, `2026-11-14-every-input-crosses-a-zod-schema.md`, `2026-11-14-vertical-slice-one-folder-per-area.md`.
+- Not done in Step 1: the `/design` layouts do not get the data provider yet (no `/design` screen reads through it until Campanhas, Step 2, which adds it with its fake source).
 
 ### Step 2: Campanhas, the pilot (exit gate for the rest)
 

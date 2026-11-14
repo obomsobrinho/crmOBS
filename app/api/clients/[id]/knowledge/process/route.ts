@@ -21,7 +21,7 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento" });
+  const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento", ativa: true });
   if ("erro" in r) return r.erro;
 
   const apiKey = process.env.OPENAI_API_KEY;

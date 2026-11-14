@@ -9,6 +9,9 @@ import { ehAdminPeloAmbiente } from "@/lib/admin-acesso";
 import { barrarContaDesativada, getMyClient } from "@/lib/auth";
 import { estadoDoConsumoDoTenant } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
+import { ProvedorDeDados } from "@/lib/query/provedor";
+import { ProvedorDeSessao } from "@/lib/sessao";
+import AvisoGlobal from "@/components/AvisoGlobal";
 import NovidadesModal from "@/components/NovidadesModal";
 import { notaAtual, novidadeParaMostrar } from "@/lib/novidades";
 import { inicioDoDiaSP } from "@/lib/fuso";
@@ -53,11 +56,27 @@ export default async function AppLayout({
     redirect("/connect");
   }
 
+  // A sessão lida acima chega às telas sem nova ida ao banco (D8), e o cliente de
+  // dados nasce por identidade: trocou a conta, o cache é outro (2.4). Os dois
+  // envolvem a casca inteira, menu incluído (ele pré-carrega na intenção).
+  const sessao = {
+    clientId: client.id,
+    userId: client.userId,
+    nome: client.name,
+    papel: client.role,
+    access: client.access,
+    contaDesativada: client.contaDesativada,
+    temWhatsapp: !!client.evolution_instance,
+    avisos: client.avisos,
+  };
+
   return (
-    // `h-dvh` e não `h-screen`: no celular a barra do navegador entra e sai, e
-    // `100vh` conta com ela escondida, cortando o rodapé. Abaixo de `md` a casca
-    // vira coluna sem respiro (o conteúdo encosta nas bordas) e o `NavRail` põe a
-    // barra de abas embaixo (plano do mobile, fase 0).
+    <ProvedorDeSessao sessao={sessao}>
+    <ProvedorDeDados identidade={`${client.userId}:${client.id}`}>
+    {/* `h-dvh` e não `h-screen`: no celular a barra do navegador entra e sai, e
+        `100vh` conta com ela escondida, cortando o rodapé. Abaixo de `md` a casca
+        vira coluna sem respiro (o conteúdo encosta nas bordas) e o `NavRail` põe a
+        barra de abas embaixo (plano do mobile, fase 0). */}
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail
         clientName={client.name}
@@ -102,7 +121,10 @@ export default async function AppLayout({
       {/* Novidades: decidido AQUI, no servidor, pela regra pura; o diálogo só
           mostra e grava o "já vi". Conta criada depois da nota não vê. */}
       <NovidadesModal nota={novidadeDoUsuario(client.criadaEm, client.novidadesVista)} dono={client.role === "dono"} />
+      <AvisoGlobal />
     </div>
+    </ProvedorDeDados>
+    </ProvedorDeSessao>
   );
 }
 

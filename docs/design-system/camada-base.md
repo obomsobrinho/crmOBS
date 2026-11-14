@@ -142,6 +142,55 @@ sólido, bolinha no ideal e trecho listrado) é a peça própria `medidor-de-met
 Sem variantes. `dropdown-menu` e `tooltip` usam `.anim-flutuante`. A `scroll-area` imita a barra
 nativa que o `globals.css` já estiliza.
 
+### Estados de tela: `esqueleto` e `erro-do-bloco` (14/11/2026)
+O padrão único dos estados que o plano de dados criou (`docs/plano-dados-e-estado.md`, 7.1):
+- **Carregando**: `Esqueleto` (`components/ui/esqueleto.tsx`), `forma` `linha` (texto, tamanho no
+  `className`), `bloco` (cartão ou área, cor mais suave), `circulo` (avatar), `pilula` (selo, aba).
+  Sempre `aria-hidden`; quem diz que está carregando é o contêiner (`aria-busy`).
+- **Moldura da rota**: o `loading.tsx` de cada rota usa `MolduraDeCarregamento`
+  (`components/MolduraDeCarregamento.tsx`, peça de produto) com o título real da página
+  (`TituloDaPagina`), para a moldura e a página não pularem. Não desenha aba ativa nem filtro: o
+  `loading.tsx` não recebe a URL.
+- **Erro de um bloco**: `ErroDoBloco` (`components/ui/erro-do-bloco.tsx`), a frase do motivo em
+  `danger-ink` e "Tentar de novo" (o `refetch` da consulta, com `tentando` ligando o `carregando`).
+  Nunca a tela em branco. Tela que quebra ao desenhar cai no `app/(app)/error.tsx`, que usa a mesma peça.
+- **Vazio**: `EstadoVazio`, como já era.
+- **Escrita recusada com a tela já trocada**: `AvisoGlobal` (`components/AvisoGlobal.tsx`), uma faixa
+  só, no layout do app.
+
+### `form` (14/11/2026)
+O `Form` do shadcn sobre react-hook-form (`components/ui/form.tsx`), com o esquema Zod da área pelo
+resolver. Só para formulário novo ou complexo (mais de um par de campos, validação entre campos,
+lista de campos); busca e renomear continuam um campo controlado. Nenhum formulário existente foi
+migrado. O campo é o de sempre (`Input`, `Select`...); do `Form` vêm o rótulo, a ligação de
+acessibilidade e a mensagem do esquema (o estado de erro de campo):
+
+```tsx
+const esquema = z.object({ nome: z.string().min(2, "Escreva pelo menos 2 letras.") });
+const form = useForm({ resolver: zodResolver(esquema), defaultValues: { nome: "" } });
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit((v) => salvar.mutate(v))} className="flex flex-col gap-4">
+    <FormField
+      control={form.control}
+      name="nome"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Nome</FormLabel>
+          <FormControl>
+            <Input {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <Button type="submit" carregando={salvar.isPending}>Salvar</Button>
+  </form>
+</Form>
+```
+
+O envio é uma escrita do cliente de dados (`useMutation`), com as mesmas regras de otimista e erro.
+
 ## O que a faxina de 30/08/2026 tirou daqui
 
 - A variante `segmentado` das abas (zero usos).

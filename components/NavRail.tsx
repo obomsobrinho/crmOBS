@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import LinkNaIntencao from "@/components/LinkNaIntencao";
 import { usePathname, useRouter } from "next/navigation";
 import BrandMark from "./BrandMark";
 import { Avatar } from "@/components/ui/avatar";
@@ -289,7 +290,7 @@ export default function NavRail({
             "bg-[var(--rail-active-bg)] font-semibold text-ink shadow-[inset_2px_0_0_var(--sel-bar)]",
         )}
       >
-        <Link href={href} aria-current={active ? "page" : undefined}>
+        <LinkNaIntencao href={href} aria-current={active ? "page" : undefined}>
           <Icon size={18} strokeWidth={1.8} className="shrink-0" />
           {!collapsed && (
             <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -315,7 +316,7 @@ export default function NavRail({
           {esperando && collapsed && (
             <span className="absolute right-0 top-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--s-menu)] bg-[var(--warn-fill)]" />
           )}
-        </Link>
+        </LinkNaIntencao>
       </Button>
     );
     // Recolhido, o rótulo só existe na dica: é ela que diz o que é cada
@@ -628,11 +629,11 @@ function BarraAbas({
     const Icone = n.icon;
     return (
       <Button key={n.href} asChild variant="linha" size="linha">
-        <Link href={n.href} onClick={() => setMaisAberto(false)}>
+        <LinkNaIntencao href={n.href} onClick={() => setMaisAberto(false)}>
           <Icone size={20} strokeWidth={1.8} className="text-ink-2" />
           <span className="flex-1">{n.label}</span>
           <ChevronRight size={18} className="text-ink-3" />
-        </Link>
+        </LinkNaIntencao>
       </Button>
     );
   };
@@ -684,9 +685,9 @@ function BarraAbas({
           a.ativa ? "font-semibold text-brand-ink" : "text-ink-2",
         );
         return a.href ? (
-          <Link key={a.label} href={a.href} className={cls} aria-current={a.ativa ? "page" : undefined}>
+          <LinkNaIntencao key={a.label} href={a.href} className={cls} aria-current={a.ativa ? "page" : undefined}>
             {corpo}
-          </Link>
+          </LinkNaIntencao>
         ) : (
           <Button
             key={a.label}

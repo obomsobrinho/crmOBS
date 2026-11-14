@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { Manrope, Space_Grotesk } from "next/font/google";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { BRAND } from "@/lib/brand";
 import "./globals.css";
 
@@ -66,7 +67,8 @@ export default async function RootLayout({
           Isto silencia só o aviso do PRÓPRIO elemento, um nível, então uma
           diferença de verdade dentro da árvore continua sendo reportada. */}
       <body className="min-h-full" suppressHydrationWarning>
-        {children}
+        {/* Estado de navegação na URL (D3, docs/plano-dados-e-estado.md 2.8), sempre no modo raso. */}
+        <NuqsAdapter>{children}</NuqsAdapter>
       </body>
     </html>
   );

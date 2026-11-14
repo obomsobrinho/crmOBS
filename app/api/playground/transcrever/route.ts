@@ -22,7 +22,7 @@ export const maxDuration = 60;
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "acesso negado" });
+  const r = await sessaoDaRota({ dono: "acesso negado", ativa: true });
   if ("erro" in r) return r.erro;
 
   const apiKey = process.env.OPENAI_API_KEY;

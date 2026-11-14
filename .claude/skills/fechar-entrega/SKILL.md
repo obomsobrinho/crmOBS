@@ -14,10 +14,26 @@ npx tsc --noEmit
 npx eslint .
 ```
 ```bash
+npm run test:unit
+```
+```bash
 npm run build
 ```
+```bash
+npm run test:orcamento
+```
+
+`test:unit` é o Vitest (regra pura, auxiliares de cache, esquemas). `test:orcamento` é o orçamento
+de desempenho no build de produção (B1 moldura no clique, B2 volta sem espera nas áreas migradas,
+B8 JS por rota; docs/plano-dados-e-estado.md, seção 3): roda DEPOIS do build, sobe o próprio
+`next start` na 3005 e usa a sessão do dono. Uma rota que passar do teto ou corrige, ou registra a
+exceção do dono num ADR.
 
 ## As suítes e2e
+
+⚠️ **A suíte com login roda fora do horário de atendimento** (decisão do dono de 14/11/2026): ela lê
+e grava no banco de produção, e em 13/11 levou o Supabase a p90 de 9,8 s com erros. No dia a dia de
+feature pequena, rode só os arquivos da área mexida (`npx playwright test --project=logado <arquivo>`).
 
 ⚠️ **Rodar as DUAS**, sempre. Num passo anterior só a sem-login foi rodada e três testes
 com login ficaram quebrados por seis dias, porque o painel novo tinha renomeado dois cabeçalhos.

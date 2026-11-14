@@ -22,7 +22,7 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const r = await sessaoDaRota({ id });
+  const r = await sessaoDaRota({ id, ativa: true });
   if ("erro" in r) return r.erro;
 
   let body: { filename?: string; mime?: string; size?: number };
