@@ -1,6 +1,6 @@
 # Plan: data and state, one pattern for the whole app
 
-Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). **Step 2 partly delivered on 14/11/2026** (its section says what is left for the owner). The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
+Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). **Step 2 delivered on 14/11/2026** (its section). The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
 
 **Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
 
@@ -483,7 +483,14 @@ Out: the other admin screens; the `/clientes` central (it keeps `lembrar` until 
 - **Left for the owner:**
   - B8: decided (D15), the charts stay in the first view and the ceiling stays 480 kB.
   - B2: decided (D16), Campanhas keeps its server read (the fix of the 30/10 refresh bug) and the admin gate in `adminDaPagina`; B2 and D8 apply to the tenant screens, not to Campanhas.
-  - Not done: the move into `features/campanhas/` (mechanical, many cited paths), Zod and the single error shape on `app/api/admin/campanhas/**`, the Apify webhook and cron in shadow mode (writing their schemas needs real payloads, not guesses).
+  - Not done on 14/11 morning: the move, Zod on the routes, the Apify webhook and cron in shadow mode. Closed the same day, below.
+
+**Delivered (14/11/2026, close of Step 2):**
+- Move commit: `components/admin/campanhas/**` to `features/campanhas/components/`; the source to `features/campanhas/api/fonte.ts`; the server modules (`campanhas`, `origem`, `planilha`, `cron`, `apify`) to `features/campanhas/server/`; `lib/prospeccao.ts` to `features/campanhas/regras.ts`; `pedidos.ts`, `apify-campos.ts`, `fonte-de-leads.ts`, `planilha-de-leads.ts`, `municipios.ts` (and its JSON) to the area root. Every cited path in rules, ADRs, docs and comments followed; applied migrations keep their old comments. The fake source stays in `app/design/campanhas/` (it is the `/design` route's, and moving it would touch the preview only).
+- Zod: the 16 routes read through `features/campanhas/schemas.ts` with `lerConsulta`/`lerCorpo`/`lerFormulario` (new, multipart) and `motivo: true` (new in `lib/rota.ts`: the first issue's message is the sentence, for an area whose screen shows the reason). The schemas call the pure checks of `pedidos.ts` and `regras.ts` instead of repeating them, so the sentences are the same as before (`features/campanhas/schemas.test.ts`). Every error answer is `erroDaRota` with a `codigo` (`entrada_invalida`, `nao_encontrado`, the SQL refusal key, `recusa_do_banco`, `ja_comecou`, `sem_configuracao`).
+- Apify webhook and cron in shadow mode: **not written, on purpose**. The Apify route never reads the webhook body (it asks the source how the run ended, `fecharBusca`); its only inputs are the `x-apify-secret` header and our own `?busca=<uuid>`, already refused when malformed. The cron route has no body and no query, only the bearer. There is no real payload in the repository (no log, fixture or field read) to write a body schema from, and a guessed schema would log false mismatches. If a future change reads the Apify body, its schema starts in shadow mode then.
+- Bug fixed outside the area (spec 2.7, Step 0 result): `components/ContactNotes.tsx` removes a note deleted in another tab by its id only (`lib/notas-ao-vivo.ts`, Vitest).
+- Budget: B1 65 to 144 ms on the 7 menu routes; B8 Campanhas 474 kB, Nova busca 461 kB (ceiling 480, D15), tenant routes 291 to 335 kB.
 
 ### Step 3: the tenant screens, straight to infinite queries
 

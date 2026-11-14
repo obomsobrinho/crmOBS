@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { diaMesCurtoSP } from "@/lib/fuso";
 import { useCanalTenant } from "@/lib/use-canal-ao-vivo";
+import { aplicarEventoDeNota } from "@/lib/notas-ao-vivo";
 import { memberName, type Member } from "@/lib/team";
 import type { ConversationNote } from "@/lib/crm";
 import { CabecalhoBloco } from "./ContactFields";
@@ -96,26 +97,8 @@ export default function ContactNotes({
     modo: "aplicar",
     ativo: conversationId != null,
     revalidar: () => void load(),
-    aoEvento: (ev) => {
-      const r = ev.tipo === "DELETE" ? ev.antigo : ev.novo;
-      if (!r || r.conversation_id !== conversationId) return;
-      const id = r.id as number;
-      if (ev.tipo === "DELETE") {
-        setNotes((cur) => cur.filter((n) => n.id !== id));
-        return;
-      }
-      const nota: ConversationNote = {
-        id,
-        body: r.body as string,
-        authorUserId: (r.author_user_id as string | null) ?? null,
-        createdAt: r.created_at as string,
-      };
-      setNotes((cur) =>
-        (cur.some((n) => n.id === id) ? cur.map((n) => (n.id === id ? nota : n)) : [nota, ...cur]).sort(
-          (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)
-        )
-      );
-    },
+    // DELETE traz só o id (`aplicarEventoDeNota`): tira a nota se ela está na tela.
+    aoEvento: (ev) => setNotes((cur) => aplicarEventoDeNota(cur, ev, conversationId)),
   });
 
   async function remove(id: number) {
