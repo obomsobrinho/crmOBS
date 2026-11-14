@@ -28,25 +28,30 @@ export default async function AgendaPage() {
   const semana = segundaDaSemana(diaIsoSP(agora));
   const de = inicioDoDiaSP(semana);
 
-  const [agenda, { data: c }] = await Promise.all([
+  const fonte = fonteDoBancoAgenda(await createClient(), client.id);
+  // Configuração, agenda, semana e bloqueios saem JUNTOS (passo 0 de
+  // docs/plano-dados-e-estado.md): eram duas viagens em série depois da sessão.
+  // Com a agenda desligada (raro) a semana lida se perde no redirecionamento; sem
+  // a migration, a semana falha e o resultado é o mesmo de antes (indisponível).
+  const [agenda, { data: c }, semanaLida] = await Promise.all([
     agendaDoTenant(svc, client.id),
     svc.from("clients").select("agent_config").eq("id", client.id).maybeSingle(),
+    Promise.all([
+      fonte.semana(de, de + 7 * 86_400_000),
+      fonte.bloqueios(de, de + 7 * 86_400_000),
+    ]).catch((e: unknown) => ({ erro: e })),
   ]);
   if (agenda && !agenda.config.ativa) redirect(client.role === "dono" ? "/agenda/configuracoes" : "/inbox");
 
-  const fonte = fonteDoBancoAgenda(await createClient(), client.id);
   let itens: Awaited<ReturnType<typeof fonte.semana>> = [];
   let bloqueios: Awaited<ReturnType<typeof fonte.bloqueios>> = [];
   let disponivel = !!agenda;
   if (agenda) {
-    try {
-      [itens, bloqueios] = await Promise.all([
-        fonte.semana(de, de + 7 * 86_400_000),
-        fonte.bloqueios(de, de + 7 * 86_400_000),
-      ]);
-    } catch (e) {
-      console.error("agenda indisponível:", e);
+    if ("erro" in semanaLida) {
+      console.error("agenda indisponível:", semanaLida.erro);
       disponivel = false;
+    } else {
+      [itens, bloqueios] = semanaLida;
     }
   }
 

@@ -16,13 +16,18 @@ export const dynamic = "force-dynamic";
 // conversas (mesma fonte do inbox). O gate de auth/instância roda no layout do
 // route group (app). A RLS restringe tudo ao tenant logado.
 export default async function PipelinePage() {
-  const client = await requireActiveTenant();
   const supabase = await createClient();
 
-  const { data: stagesRows } = await supabase
-    .from("pipeline_stages")
-    .select("id, key, name, position, is_canonical, is_default, archived, color")
-    .order("position");
+  // O gate e os estágios saem JUNTOS (passo 0 de docs/plano-dados-e-estado.md):
+  // os estágios não dependem do tenant (a RLS já restringe), então eram uma
+  // viagem a mais em série. Num redirecionamento do gate a leitura se perde.
+  const [client, { data: stagesRows }] = await Promise.all([
+    requireActiveTenant(),
+    supabase
+      .from("pipeline_stages")
+      .select("id, key, name, position, is_canonical, is_default, archived, color")
+      .order("position"),
+  ]);
   const stages = (stagesRows ?? []).map(rowToStage);
 
   // A PRIMEIRA PÁGINA DE CADA COLUNA (10 cards) e os números, pela MESMA função

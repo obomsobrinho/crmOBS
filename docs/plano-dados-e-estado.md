@@ -1,6 +1,6 @@
 # Plan: data and state, one pattern for the whole app
 
-Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 is released.** The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
+Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). Next: Step 1. The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
 
 **Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
 
@@ -44,7 +44,7 @@ Out of scope for the whole plan:
 | Navigation | URL, through nuqs | tab, open list, filters, search, page, open item |
 | Interaction | `useState` in the component (or react-hook-form inside a form, 2.12) | dialog open, field being typed, focus, hover |
 
-No global store and no Context for database data. Context is allowed only to inject the data SOURCE (real or fake for `/design`), never data.
+No global store and no Context for database data. Context is allowed only to inject the data SOURCE (real or fake for `/design`), never data, with one exception: the session (tenant id, role, access kind and the other scalars of `getMyClient`), read once by the `(app)` layout and handed to the screens (2.3, decision of 14/11/2026).
 
 ### 2.2 Read and write path, by operation type (D1)
 
@@ -83,12 +83,11 @@ The pattern:
    - No server prefetch and no `HydrationBoundary` in the initial scope; re-evaluated only for Conversas, in Step 4, with numbers.
 4. Server reads that stay (the gate, an `?abrir=` lookup) run in parallel, never in series.
 5. **A screen already visited opens without waiting for the server** (review finding 1). The frame alone is not enough: Next drops a dynamic page on every navigation (`staleTimes.dynamic` defaults to 0; `next.config.ts` sets nothing, and the NavRail links use the default prefetch, which stops at `loading.tsx`). So the screen component mounts only after the gate answers, and the gate reads Supabase (652 ms p50, 7 s p90 on 10/11), even when its data is in the TanStack cache.
-   - **Mechanism: `prefetch={true}` on the menu links of the migrated areas**, set link by link, area by area, in the step that migrates the area. The whole route is prefetched and kept for 5 minutes in the browser (Next docs, `Link`, checked 11/11/2026), so the click makes zero requests. It is safe because a migrated page loads no data, only the gate and the client component.
+   - **Mechanism (owner, 14/11/2026, replaces the `prefetch={true}` of 11/11): no database on the click, and prefetch on intent.** A migrated page does not read the database at all on the server: `proxy.ts` already checks the login token locally, the `(app)` layout reads the session once (`getMyClient`, on a hard load only) and hands it to the screens through the one session context (2.1), and a client guard redirects (blocked to `/assinatura`, attendant out of owner-only screens, deactivated to `/conta-desativada`) from that context. The real lock is RLS plus the write routes (`sessaoDaRota({ ativa: true })`). With no database behind the page, prefetching it costs nothing on the database, and it is done on intent only: hovering or touching a menu item prefetches that route (and the first page of its main query, 2.4), never every visible link. Consequence accepted by the owner: a company blocked during use keeps seeing screens until a reload or focus return, and cannot write anything.
    - Alternative, re-evaluated only after Step 3: `experimental.staleTimes.dynamic`. It is global, so it would also cache the unmigrated pages that still bring data from the server.
-   - Later, if needed: tenant and role in the JWT, so the gate stops reading the database.
    - A link outside the screen is not prefetched (the "Mais" menu items on the phone): those open with the frame, then the cached data.
    - Step 0 confirms the behavior before the Base is written: "A, B, back to A" with the navigation RSC delayed 3 s.
-   - **Open point (owner's question 1 in section 9):** with the full prefetch the gate runs at prefetch time, not at the click, so a blocked account can take up to 5 minutes to be sent to `/assinatura`. What was checked in the code on 13/11/2026:
+   - **Blocked account (owner, 14/11/2026):** the delay is accepted, and the write routes become the lock: the 9 of the 10 routes below that write without `ativa` get it in Step 1; `team/remove` stays open (removing a member lowers what a blocked company pays) and `billing/subscribe` stays open (it is where it pays). What was checked in the code on 13/11/2026:
      - 14 write routes refuse a blocked account at once through `sessaoDaRota({ ativa: true })` (`lib/rota.ts`, 402): agenda (agendamentos, agendamentos/[id], bloqueios, config), `clients/[id]/{agent-rules,connect-whatsapp,disconnect-whatsapp}`, `contacts`, `conversations/{instrucao,orientar,resolve}`, `playground`, `send`, `team/invite`.
      - 10 writing routes use `sessaoDaRota` without `ativa`: `clients/[id]/{agent-config,publish,notify-target,notify-target/teste,knowledge,knowledge/process,knowledge/upload-url,whatsapp-media/upload-url}`, `playground/transcrever`, `team/remove`. `billing/subscribe` has no `ativa` and must not (a blocked account pays there). Whether each of the 10 is intentional is not judged here.
      - Direct browser writes on granted columns are blocked for a blocked account only if RLS or the grants say so (review, D1 note): not checked in the database.
@@ -107,7 +106,7 @@ Trade-off accepted: on a first visit the data starts after hydration (measured a
 | `placeholderData` | `keepPreviousData` on every list | changing a filter, a search or a page keeps the previous result on screen until the new one arrives; without it every key stroke in a search creates a new key and the list blinks into a skeleton |
 | Prefetch on intent | hovering or touching a menu item prefetches the first page of that screen's main query | the first visit gains 100 to 300 ms (review finding 17) |
 | Persist the cache on the device | no | tenants' customer data (LGPD) on possibly shared devices |
-| Client lifetime (browser) | the `QueryClient` comes from a provider whose React `key` is user id plus tenant id | when the identity changes the cache is a new one, with no `clear()` anyone has to remember. Today there are two `signOut` points (`LogoutButton`, `NavRail`) and no `onAuthStateChange`, so signing out and in as someone else in another tab would not clear this one; a new user or tenant mounts a new client. Keys still do not carry the tenant id, because a client never outlives its identity |
+| Client lifetime (browser) | the `QueryClient` comes from a provider whose React `key` is the user id plus tenant id (one login works in one company only, owner 14/11/2026, so in practice it changes with the user) | when the identity changes the cache is a new one, with no `clear()` anyone has to remember. Today there are two `signOut` points (`LogoutButton`, `NavRail`) and no `onAuthStateChange`, so signing out and in as someone else in another tab would not clear this one; a new user or tenant mounts a new client. Keys still do not carry the tenant id, because a client never outlives its identity |
 | Client lifetime (server) | a new client per request, never a module-level shared one | a shared server client would mix users |
 
 ### 2.5 Query keys: one format
@@ -203,6 +202,8 @@ Each step confirms its list's row against the code before migrating it; "today's
 
 **DELETE, to confirm in Step 0** (review finding 3). The spec of 10/11 said, "checked in the docs", that DELETE events are not filterable and that under RLS `old` carries only the primary key. The Supabase Postgres Changes page read on 11/11/2026 says DELETE can be filtered when the table has `REPLICA IDENTITY FULL`, and confirms RLS is not applied to DELETE; the sentence about "only the primary key" was not found. Code that depends on it today: `components/ContactNotes.tsx` (line 100) reads `ev.antigo` on DELETE and filters by `conversation_id`. If the 10/11 reading were right, that is already broken; if the 11/11 reading is right, the `realtime.md` change of 11/11 replaced a true sentence with a false one, so it was reverted with a note. Step 0 runs the test on the real project (item 4 there) and the final rule is written from its result.
 
+**Result (13/11/2026, Step 0):** with two tabs of the OBS tenant on the test conversation (DDD 00), a note created in tab A reached tab B (INSERT, full `record`); deleting it in A sent tab B a DELETE whose `old_record` was `{"id": 4}`, only the primary key, although `conversation_notes` is `REPLICA IDENTITY FULL`. The 10/11 reading holds for `old`. Consequence today: `ContactNotes.tsx` reads `conversation_id` from that `old`, gets nothing, and never removes a note deleted in another tab (seen on screen). The DELETE event did arrive on the channel filtered by `client_id`, a column it does not carry, so a tenant filter cannot be what selects it; whether it also reaches another tenant's channel was not tested (no second tenant login), and the rule stays "never decide the tenant from a DELETE" either way. `realtime.md` and `dados-estado-desempenho.md` were rewritten from this result.
+
 `REPLICA IDENTITY FULL` keeps the old values on UPDATE. Today 7 published tables are FULL and `conversation_qualifications` is default (append-only).
 
 ### 2.8 URL state (D3: nuqs)
@@ -245,13 +246,12 @@ In the browser, the area source turns any failure into a thrown `ErroDaApi` (sta
 
 **Errors per block**: a query error renders the block's error state with "Tentar de novo" (one shared component), never a blank screen. A render crash is caught by `app/(app)/error.tsx` (none exists today).
 
-### 2.10 Observability in production (D7: own beacon)
+### 2.10 Observability in production (D7 reversed by the owner on 14/11/2026: no own beacon)
 
-Without it nobody can prove the 14.8 s are gone.
-- **Browser marks**: click to frame (the route's `loading.tsx` or the frame painted) and click to first data (the first block's query settled), per route, each with a flag saying whether the screen opened from the cache. Without the flag, revisits pull B6 down and hide a slow first visit (review finding 11). Also Next's `useReportWebVitals` for LCP, INP and CLS.
-- **Transport**: batched and sent with `navigator.sendBeacon` to one route (`/api/telemetria`, Zod on the body, a maximum batch size, no session required beyond the cookie). No per-session rate limit: it would need storage of its own (review finding 21). It never blocks a screen and never retries.
-- **Storage**: one table with route, metric, value in ms, the from-cache flag, day and tenant id. No personal data: no user id, no phone, no URL parameters. RLS on, no grant to `anon` or `authenticated`, insert only through the route with `service_role`. The migration is DDL and waits for the owner's release, like every migration. Column names and retention are settled in Step 1.
-- **Reading**: one saved SQL query (p50, p75, p90 per route per day, first visits and cached visits apart; a route with fewer than 30 measurements in a day is read over the week instead) next to the five usage queries in `docs/instrumentacao-uso.md`, plus the Supabase-side hourly edge query (B9). Read weekly into `docs/handoff.md`.
+The own beacon (browser marks written to a table in the same database) is dropped: one write per navigation on the database that already stalls, for numbers the lab tests and the Supabase logs already give. What stays:
+- **Lab**: the budget tests of 3.2 (B1 to B4, B8, B10) on the production build, every delivery.
+- **Production, database side**: the Supabase edge logs (B9), free and already there; one saved query (p50, p90, p99 of `/rest/v1/*` upstream time per working hour) in `docs/instrumentacao-uso.md`, read weekly into `docs/handoff.md`.
+- **Production, browser side (B5 to B7)**: not measured by us. If the owner wants it, an external tool (Vercel Speed Insights) is the way, his call.
 
 ### 2.11 Source injection and `/design`
 
@@ -303,7 +303,7 @@ Every number below says where it came from:
 | # | Metric | Baseline | Budget | Source of the budget |
 |---|---|---|---|---|
 | B1 | Click to the screen's frame, client navigation, with the navigation response delayed 3 s | no per-screen frame on most routes; the generic skeleton or the old screen stays until the server answers (0.2 to 4.7 s measured; 14.8 s for one read in production) | ≤ 300 ms | external: Nielsen's response limits (0.1 s feels instant, 1 s keeps the flow); 300 ms leaves room for the test machine over the 0.1 s target |
-| B2 | Blocking requests when opening a screen seen in the last 5 min (the `prefetch={true}` window, 2.3), counting the navigation (RSC) request as well as the data reads | 1 server render plus 0 to 5 reads (Campanhas: 5 on the way back) | 0 | the owner's rule ("the click is instant, only dynamic data loads") |
+| B2 | Blocking requests when opening a screen seen in the last 5 min (prefetch on intent plus the cache, 2.3), counting the navigation (RSC) request as well as the data reads | 1 server render plus 0 to 5 reads (Campanhas: 5 on the way back) | 0 | the owner's rule ("the click is instant, only dynamic data loads") |
 | B3 | Duplicate reads of the same data in one visit | Campanhas reads on the server and again in the browser: 5 duplicates per entry | 0 | the same rule; a duplicate is pure waste |
 | B4 | Optimistic write visible before the API answers, with the API delayed 1 s | the row stays until the re-read (seconds in a spike) | the row is gone before the API responds (asserted, not timed: Playwright polls at intervals of the order of 100 ms, so a 100 ms stopwatch would flake) | external: Nielsen 0.1 s is the intent |
 | B5 | Production, click to frame, p75 per route per day | not measured (no tool today) | ≤ 300 ms | B1 in the field |
@@ -320,7 +320,7 @@ Every number below says where it came from:
 | B1 | Playwright against `next build` + `next start`: `page.route` delays RSC navigation requests (those without the `next-router-prefetch` header) by 3 s, which delays the session gate too; the test waits for the link's prefetch to finish, then clicks the menu item and asserts the frame's heading is visible. Menu items outside the screen (the phone's "Mais") are not prefetched and are tested apart | a new e2e project on the production build (`frame`), with an allow-list of routes that grows per step; run by `fechar-entrega` |
 | B2, B3 | the same harness counts requests between the click and the data on screen, the navigation (RSC) request included, and flags two requests for the same query key or route in one visit. B2 runs "A, B, back to A" | same e2e project |
 | B4 | e2e per area with writes: API delayed 1 s, five deletes in a row, each row is gone before its API call answers and the total is right; plus the Vitest test of the concurrent-delete helpers | the area's e2e suite and `npm run test:unit` |
-| B5, B6, B7 | the production beacon (2.10), first and cached visits apart; a route with fewer than 30 measurements in a day is read over the week | the saved query, read weekly into `docs/handoff.md`; a route over budget for 3 days in a row (each day with the minimum sample; otherwise its weekly reading counts) is a bug ahead of new features, below attendance bugs (attendance comes first, `CLAUDE.md`) |
+| B5, B6, B7 | not measured by us since 14/11/2026 (no own beacon, 2.10); an external tool only if the owner wants it | the saved query, read weekly into `docs/handoff.md`; a route over budget for 3 days in a row (each day with the minimum sample; otherwise its weekly reading counts) is a bug ahead of new features, below attendance bugs (attendance comes first, `CLAUDE.md`) |
 | B8 | a script after `next build` that sums the compressed JS each route loads, checked once against the Playwright figure above | the script fails above the ceiling; `fechar-entrega` runs it after the build (`checar` stays offline and does not build) |
 | B9 | the hourly edge-log query used in the diagnosis (`edge_logs`, upstream time, `/rest/v1/*`), saved in `docs/instrumentacao-uso.md` | weekly read into `docs/handoff.md`; the fix it calls for is the owner's call (Step 0) |
 | B10 | the Supabase edge log timeline of one navigation (Step 0); after Step 3, B1 makes a waterfall visible as a failure | B1 |
@@ -335,7 +335,7 @@ Each step closes with:
 - one ADR or rule update when it introduces a rule;
 - the "State" block of `.claude/rules/dados-estado-desempenho.md` updated in the same commit that closes the step (steps done, areas migrated).
 
-Every step that migrates an area also: moves the area into `features/<area>/` in a commit of its own (no behavior change, never mixed with the behavior commit); puts that screen's navigation state in the URL (2.8); turns on `prefetch={true}` on that area's menu links (2.3); adds the area's routes to the `frame` allow-list.
+Every step that migrates an area also: moves the area into `features/<area>/` in a commit of its own (no behavior change, never mixed with the behavior commit); puts that screen's navigation state in the URL (2.8); turns on prefetch on intent on that area's menu links and drops the database from its page (2.3, D8); adds the area's routes to the `frame` allow-list.
 
 Every migration applied in production during the plan runs outside attendance hours: each one reloads the PostgREST schema cache, and one reload happened a minute before the worst spike of 10/11 (Step 0, item 3).
 
@@ -379,6 +379,14 @@ Acceptance (measured):
 
 Out: any change to SQL functions, PostgREST or compute settings; any client cache; any move to `features/`.
 
+**Delivered (13/11/2026):**
+- Parallel reads: Pipeline (gate and stages together), Pedidos (without `?abrir=` the first page joins members and counts), Agenda (config, agenda, week and blocks together), layout (`agenda_config->ativa` comes in the `getMyClient` select, through `normalizarConfigDaAgenda`; `agendaAtivaDoTenant` stays only for the bench). Not counted in the edge timeline yet.
+- Frames: `loading.tsx` for Pipeline, Pedidos, Agenda, Painel, Equipe, Perfil, Agente, Campanhas and Nova busca, all from one product piece, `components/MolduraDeCarregamento.tsx`, over a new base `components/ui/esqueleto.tsx` (the skeleton of 7.1, brought forward from Step 1 so nine frames did not copy the same classes) and `components/TituloDaPagina.tsx` (the header Painel, Equipe and Perfil now render too, so frame and page do not jump).
+- B1 measured on `next build` + `next start` with the navigation RSC delayed 3 s: 51 to 68 ms on every route with a frame (Perfil has no menu link to click; its frame exists).
+- "A, B, back to A" (item 4): the visited screen shows its frame again on the way back (50 ms, then waits for the server). Finding 1 confirmed.
+- DELETE test (item 4): result in 2.7.
+- 14.8 s (item 3), within the time box: the `authenticated` statement timeout is 8 s and the `clients` select never executed longer than 1.1 s (`pg_stat_statements` since 26/06/2026), so the 14.8 s was waiting, not running. The worst minute (15:15 UTC, 10/11) is the minute the 5 min cron route ran `prospeccao_apagar_antigos` (6.1 s) and `prospeccao_ativar_agendadas` (5.6 s) while Campanhas fired about ten `prospeccao_*` RPCs per click (0.6 to 4.3 s each that minute), on a PostgREST pool of 10: (d) correlates. The instance itself was slow too: the cron job took 6.9 s against 0.13 s five minutes before, the `cron.job_run_details` one-row insert has a 78 s maximum, the schema cache query took 1.2 s. The 15:13:04 reload (c) was not a migration (none on 10/11): it came with PostgREST reconnecting its pool and Realtime re-initializing, a consequence more than a cause. The database is 129 MB with a 100% cache hit, so data memory is not it. Left: (a), the dashboard (CPU, IO budget, at 15:10 to 15:20 UTC on 10/11), which these tools cannot read, and (b), which needs a working session. No ADR yet: no cause is confirmed.
+
 ### Step 1: the Base
 
 Scope:
@@ -394,10 +402,11 @@ Scope:
 5. The error shape (2.9): a server helper for routes, the browser `ErroDaApi`, the global 401 handler (renew once and repeat, internal-only return path on `/login`), the shared block error component, `app/(app)/error.tsx`.
 6. Zod helpers (2.9): body and query parsing inside `sessaoDaRota`/`rotaDoAdmin`; the Asaas webhook schema in shadow mode.
 7. Forms (2.12): `components/ui/form.tsx` and one documented example in `docs/design-system/camada-base.md`; nothing else, no existing form migrated.
-8. Observability (2.10): marks with the from-cache flag, beacon route, table (migration released by the owner), saved queries; one day of baseline numbers BEFORE Step 2 ships.
+8. Observability (2.10): the saved B9 query over the Supabase edge logs. No beacon, no table, no migration.
 9. Guardrails (section 5): ADRs, rule lines, lint rules.
 10. The performance budget tooling (section 3.2): the `frame` e2e project, the request-count assertions (RSC included), the JS-per-route script with the B8 ceilings, the saved B9 query.
 11. The screen states pattern (7.1): the base components and their page in `docs/design-system/camada-base.md`, used by every step from Step 2 on.
+12. Session without the database on the click (D8): the session context fed by the `(app)` layout, the client guard (blocked, owner-only, deactivated), the prefetch-on-intent link for the menu, used by the first migrated area; `ativa: true` on the 9 write routes of D10.
 
 Not in the Base (review findings 2 and 21): the realtime bridge (Step 3a, its first consumer), any change to `lib/use-canal-ao-vivo.ts`, `lib/env.ts` (Step 5), an empty `features/` skeleton (each area creates its folder when it moves), a per-session rate limit on the beacon.
 
@@ -408,7 +417,6 @@ Files:
 - `app/(app)/layout.tsx`, `app/(app)/error.tsx`, `app/login/**` (return path), `app/design/**/layout.tsx`, `app/api/telemetria/route.ts`, `app/api/billing/webhook/route.ts` (shadow schema only)
 - `components/ui/{form,esqueleto,erro-do-bloco}.tsx` (names settled in Step 1)
 - `eslint.config.mjs`, `e2e/` (frame spec, production web server project)
-- `supabase/migrations/` (beacon table, after the owner's release)
 - `.claude/rules/`, `docs/adr/`, `docs/instrumentacao-uso.md`, `.claude/skills/fechar-entrega/SKILL.md`
 
 Acceptance:
@@ -431,8 +439,9 @@ Scope:
 - No double read: the server stops pre-reading data the client will query; the page keeps only the gate and the frame.
 - Optimistic writes for remove lead, delete list, delete campaign and mark lead (`nao_encontrado` on delete is success inside the source).
 - Tab, open list, campaign, filters and page in the URL through nuqs (refresh and back keep them).
-- `prefetch={true}` on the Campanhas menu link; `refetchOnWindowFocus` on (no realtime in this area).
+- prefetch on intent on the Campanhas menu link; `refetchOnWindowFocus` on (no realtime in this area).
 - Nova busca frame in `loading.tsx`.
+- The cron (D12): `prospeccao_apagar_antigos` runs in one tick a day, at dawn (São Paulo), not in every 5 min tick.
 - JS weight: find what weighs in Campanhas and Nova busca (the recharts charts in `components/admin/campanhas/graficos.tsx` and the spreadsheet importer are the suspects) and load it on demand, to the 340 kB ceiling of the other routes (B8).
 - Zod and the single error shape in `app/api/admin/campanhas/**`; the Apify webhook and the Campanhas cron in shadow mode.
 
@@ -460,7 +469,7 @@ Scope:
 - Move commit: Pedidos into `features/pedidos/`.
 - The realtime bridge (2.7) is born here, as a new file in `lib/realtime/`, registered once in the `(app)` layout; `lib/use-canal-ao-vivo.ts` keeps owning channels, status callback, the skipped first `SUBSCRIBED` and the hidden-tab park, and its callbacks start calling the bridge. INSERT, UPDATE and DELETE per the 2.7 tables; DELETE per the Step 0 result.
 - Pedidos: frame at the click, data per block through `useQuery` read directly through RLS (D1), the list on `useInfiniteQuery`, the tab counters through the debounced invalidation.
-- Tab and search in the URL (nuqs), `prefetch={true}` on the Pedidos menu link.
+- Tab and search in the URL (nuqs), prefetch on intent on the Pedidos menu link.
 - Zod on the Pedidos routes; the Asaas webhook schema enforced if its shadow week had zero mismatches.
 
 Files: `features/pedidos/**` (after the move), `app/(app)/pedidos/**`, its API routes, `lib/realtime/**`, `lib/use-canal-ao-vivo.ts` (callbacks only), `app/(app)/layout.tsx`.
@@ -480,7 +489,7 @@ Scope:
 - Contatos (list and ficha), Pipeline, Painel and Agenda: frame at the click, data per block through `useQuery`, read directly through RLS (D1).
 - `usePaginada` lists go straight to `useInfiniteQuery` (no double migration).
 - Realtime through the bridge, INSERT per the 2.7 table; `contato-bus` and the data `router.refresh` calls replaced by cache updates.
-- URL state with each screen: Contatos filter and search, Pipeline filters, Agenda week (nuqs); `prefetch={true}` on each menu link.
+- URL state with each screen: Contatos filter and search, Pipeline filters, Agenda week (nuqs); prefetch on intent on each menu link.
 - `contatos/layout.tsx` stops reading the list (its `loading.tsx` becomes possible).
 - Painel's heavy aggregates become per-block queries (the same RPCs).
 - Zod on the routes of these areas; the Agenda cron (`/api/agenda/lembretes`) in shadow mode.
@@ -495,7 +504,6 @@ Acceptance:
 - `e2e/realtime.serial.spec.ts` and `e2e/clientes.serial.spec.ts` pass with RPC call counts not higher than today.
 - Refresh and back keep the filters of each list (one e2e per list).
 - `/design` suites pass; JS per route within B8.
-- Production p75 click to frame within B5 in the observability numbers (with the minimum sample, 2.10).
 
 Out: Conversas, NavRail counters.
 
@@ -505,7 +513,7 @@ Scope:
 - Move into `features/conversas/` (separate commit).
 - `inbox/layout.tsx` (stops awaiting the first page), `ContactSidebar`, the open conversation (`useMensagensDaConversa`, handoffs, notes), NavRail counters (`useContagemAoVivo`).
 - `encaixar` stays the INSERT placement rule of the list; in the open conversation a new message is appended from the event, skipping an id already present, and never invalidates the message list (2.7).
-- Conversas chips and search in the URL (nuqs); `prefetch={true}` on the Conversas menu link.
+- Conversas chips and search in the URL (nuqs); prefetch on intent on the Conversas menu link.
 - The draft of the reply being typed survives a 401 redirect (2.9).
 - Zod for the n8n webhooks (`/api/agent`, `/api/inbound-media`, `/api/clients/by-instance/[instanceName]`): validate and log, never refuse, except a missing field the handler cannot work without, which also raises a notice (2.9).
 - Re-evaluate server prefetch with `HydrationBoundary` for the first inbox page only, with numbers from production.
@@ -524,7 +532,7 @@ Out: any change to n8n workflows or to the brain's behavior.
 ### Step 5: the central and the last routes
 
 The tenant screens already carry their URL state from their own steps (review finding 15). Step 5 keeps:
-- The `/clientes` central: its query layer (the `lembrar` cache moves to TanStack Query), its tabs and filters in the URL, `prefetch={true}` on its link, and its move into `features/central/`.
+- The `/clientes` central: its query layer (the `lembrar` cache moves to TanStack Query), its tabs and filters in the URL, prefetch on intent on its link, and its move into `features/central/`.
 - Folder moves only for what this step touches (the central). Agente, conhecimento, equipe and assinatura move the day a delivery changes them (2.13), not in bulk.
 - Zod sweep: every route not converted by an earlier step gets its schema and the single error shape.
 - `lib/env.ts`: validated once against the Vercel variable list and enforced the same day the owner confirms the list (2.9); from then on, the lint against `process.env` outside it.
@@ -538,7 +546,7 @@ Out: new filters; moving areas that did not change.
 
 ## 5. Guardrails (so this does not come back a third time)
 
-1. **ADR "The screen never waits for the database to appear"** (Step 0 or 1): pages and segment layouts do not await data; every route has a `loading.tsx` frame; server reads in parallel; migrated areas' menu links use `prefetch={true}`. Also fix the `next.config.ts` comment that credits speed to `loading.tsx` alone.
+1. **ADR "The screen never waits for the database to appear"** (Step 0 or 1): pages and segment layouts do not await data; every route has a `loading.tsx` frame; server reads in parallel; a migrated page reads no database and its menu link prefetches on intent. Also fix the `next.config.ts` comment that credits speed to `loading.tsx` alone.
 2. **ADR "TanStack Query is the only browser data layer"** (Step 1):
    - every browser read through an area hook with the key factory;
    - writes are optimistic mutations; a refusal shows its reason and the final invalidation brings the row back; last-write check on `[area, entity]`;
@@ -557,7 +565,7 @@ Out: new filters; moving areas that did not change.
    - the concurrent-delete e2e per area with writes (B4);
    - Vitest for pure rules, cache helpers and schemas, run by `fechar-entrega`.
 8. **The performance budget (section 3) is a rule**, in two kinds: the lab budget (B1 to B4, B8, B10) is an acceptance criterion of a delivery from the day its tool exists (Step 1); the production budget (B5 to B7, B9) is a weekly reading. A delivery that breaks a lab item either fixes it or records the owner's exception in an ADR.
-9. **Deploy with a tab open for days** (the owner's question 4 in section 9): a tab left open runs old JS against routes with new schemas. Route schemas accept the previous body shape for at least one deploy, or the Vercel version protection is used (to check against the Vercel plan).
+9. **Deploy with a tab open for days**: dropped on 14/11/2026, the attendants do not leave Conversas open for days (owner).
 10. **D1 note, not reopened**: with direct reads, the page gate is experience, not security. A blocked account is blocked for data only if RLS or the grants say so (to check in the database; see 2.3, open point).
 
 ## 6. Documentation map (one source per subject)
@@ -567,7 +575,7 @@ Out: new filters; moving areas that did not change.
 | Data, state and performance in the browser and on navigation | this document | the roadmap until Step 5 ends; then its rules live in `.claude/rules/dados-estado-desempenho.md` and the ADRs of section 5 |
 | Owner's loading rules and the database side of lists | `docs/plano-carregamento.md` | still binding; its browser layer is superseded area by area (note at its top) |
 | Product roadmap and decisions | `docs/proximos-passos.md` | points here for data, state and performance |
-| Where the product stands, traps, status | `docs/handoff.md` | points here; weekly budget readings (B5 to B9) are recorded there |
+| Where the product stands, traps, status | `docs/handoff.md` | points here; the weekly B9 reading is recorded there |
 | Design: tokens, base layer, reasoning | `docs/design-system/` | the only design source; the code wins on any disagreement (its README) |
 | Why each rule exists | `docs/adr/` with `docs/adr/README.md` | ADRs that this plan will replace carry a transition note, not "Superseded", until the replacing step lands |
 | Finished plans and one-off reports | `docs/arquivo/` | moved there with a line on top saying why and what replaces them; nothing deleted |
@@ -647,16 +655,27 @@ Right after the `docs/handoff.md` line:
 | D4 | Zod | every input: route bodies, the n8n and Asaas webhooks, URL parameters, environment variables, not only forms | 2.9 lists every input type with its step; Step 5 gains the sweep of every remaining route and `lib/env.ts`; a lint against `process.env` outside `lib/env.ts`. **Adjusted by the owner on 11/11/2026** (review findings 18 to 20): Zod stays on API routes, Asaas, Apify (and the crons) and forms; the n8n webhooks validate and log without refusing (only a missing field the handler cannot work without is refused, with a notice); the URL leaves Zod (nuqs parsers only); `lib/env.ts` is validated once against the Vercel list, with no shadow week |
 | D5 | react-hook-form | ready in the Base for new or complex forms, no migration of the forms that work ("já vamos deixar isso no gatilho pois talvez nossa vertente possa verticalizar") | 2.12; Step 1 adds `react-hook-form`, `@hookform/resolvers` and `components/ui/form.tsx`; a field-error state joins 7.1 |
 | D6 | `features/` | yes, vertical slice ("sim, vertical slice") | 2.13 fixes the structure; each step starts with the move commit of its area; the lint against new loose files starts in Step 1; shared pure rules cited by the rules files stay in `lib/` until their citations move with them |
-| D7 | Production measurement | own beacon ("é uma boa") | 2.10 fixes marks, transport, storage and reading; the beacon table is a migration that waits for the owner's release |
+| D7 | Production measurement | own beacon ("é uma boa"). **Reversed by the owner on 14/11/2026**: no own beacon ("frescura guardar isso em prd") | 2.10: lab tests plus the Supabase edge logs; browser numbers only through an external tool, his call |
 
 The review of 11/11/2026 also had four cuts accepted by the owner the same day: findings 18 and 19 (the D4 adjustment above), 20 (env without a shadow week) and 21 (a smaller Base: no realtime bridge in Step 1, react-hook-form limited to `form.tsx` and one example, an area moves when it is touched, a small area can be a flat folder, no beacon rate limit).
 
 ### Still open
 
-By design: the B8 ceilings are confirmed with the owner once Zod, nuqs and react-hook-form are measured at install; the beacon table's columns and retention are settled in Step 1.
+By design: the B8 ceilings are confirmed with the owner once Zod, nuqs and react-hook-form are measured at install.
 
-Questions to the owner (from the review, not answered here):
-1. Is a delay of up to 5 minutes acceptable in sending a blocked account to `/assinatura` (consequence of `prefetch={true}`, 2.3)?
-2. What is the Supabase plan and instance size today, and is there a monthly ceiling for moving to a bigger one?
-3. Is there, or will there be, a switch between companies without signing out?
-4. Do the attendants leave Conversas open for days without reloading?
+The review's four questions, answered by the owner on 14/11/2026:
+1. A blocked company kept on screen until a reload: accepted ("tudo bem").
+2. Supabase is on the **Free plan (Nano: shared CPU, up to 0.5 GB of memory, burst disk)**; a bigger plan depends on revenue. Recommendation recorded (Step 0): Pro with the Micro size (USD 25 a month, Micro covered by the plan's compute credits) is the most effective performance measure of the whole plan; self-hosting on the owner's VPS is not recommended now (backups, updates, one machine for n8n, Evolution and the database). His call.
+3. No switch between companies: one login (one e-mail) works in one company.
+4. Attendants do not leave Conversas open for days: the deploy guard of guardrail 9 is dropped.
+
+### 9.1 Decisions of 14/11/2026 (owner, after Step 0)
+
+| # | Decision | What it changes |
+|---|---|---|
+| D8 | No database on the click | a migrated page reads nothing on the server; the session comes once from the `(app)` layout through the session context; client guard for redirects; RLS and the write routes are the lock (2.1, 2.3) |
+| D9 | Prefetch on intent, not every visible link | replaces `prefetch={true}` of 11/11 (2.3) |
+| D10 | Blocked company: the write routes are the lock | 9 routes get `ativa: true` in Step 1 (all of the 10 found except `team/remove`); `billing/subscribe` stays open (2.3) |
+| D11 | No own beacon | D7 reversed (2.10) |
+| D12 | Campanhas cron | the 5 min tick stays in `pg_cron` (moving the clock to n8n would call the same route and the same queries, no relief); `prospeccao_apagar_antigos` (D8 of Campanhas, 12 month retention, LGPD) runs once a day at dawn instead of 288 times (Step 2) |
+| D13 | The full logged e2e suites run outside attendance hours | they write and read the production database; on 13/11 night the suite took the Supabase edge to p90 9.8 s with 5xx errors |

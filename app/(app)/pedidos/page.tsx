@@ -33,14 +33,18 @@ export default async function PedidosPage({
   const fonte = fonteDoBanco(supabase, client.id);
   const fora = foraDaLista(client.avisos);
 
-  // O pedido do link primeiro: se já está resolvido, a página abre na aba dele.
-  const [pedidoDoLink, members, contagens] = await Promise.all([
-    Number.isInteger(abrir) && abrir > 0 ? fonte.porId(fora, abrir) : Promise.resolve(null),
+  // Sem `?abrir=` a aba é sempre "abertos", então a primeira página sai junto
+  // com membros e números (passo 0 de docs/plano-dados-e-estado.md). Com o link,
+  // o pedido vem primeiro: se já está resolvido, a página abre na aba dele.
+  const comLink = Number.isInteger(abrir) && abrir > 0;
+  const [pedidoDoLink, members, contagens, itensAbertos] = await Promise.all([
+    comLink ? fonte.porId(fora, abrir) : Promise.resolve(null),
     membrosDoTenant(supabase, client.id),
     fonte.contagens(fora),
+    comLink ? Promise.resolve(null) : fonte.pagina({ aba: "abertos", busca: "", fora }, null, PAGINA_PEDIDOS),
   ]);
   const aba = pedidoDoLink && !ehAberto(pedidoDoLink) ? "resolvidos" : "abertos";
-  const itens = await fonte.pagina({ aba, busca: "", fora }, null, PAGINA_PEDIDOS);
+  const itens = itensAbertos ?? (await fonte.pagina({ aba, busca: "", fora }, null, PAGINA_PEDIDOS));
 
   return (
     <Pedidos

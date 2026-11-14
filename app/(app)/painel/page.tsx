@@ -13,6 +13,7 @@ import {
   PainelUltimaResposta,
 } from "@/components/PainelBlocos";
 import PainelAssuntos from "@/components/painel/PainelAssuntos";
+import TituloDaPagina from "@/components/TituloDaPagina";
 import PainelMotivos, { type MotivosDoPeriodo } from "@/components/painel/PainelMotivos";
 import { contagemPorMotivo } from "@/lib/motivos";
 import ValorResumo from "@/components/ValorResumo";
@@ -277,15 +278,11 @@ export default async function PainelPage() {
           saiu da trilha porque `/painel` é onde o dono cai ao entrar, e o que
           ele precisa saber primeiro é se tem gente esperando. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <div className="min-w-0">
-          <div className="mb-1 flex items-center gap-2">
-            <LayoutDashboard size={20} className="text-brand-ink" />
-            <h1 className="text-titulo">Painel</h1>
-          </div>
-          <p className="text-apoio text-ink-2">
-            O que a IA fez pela conta {client?.name ?? ""}.
-          </p>
-        </div>
+        <TituloDaPagina
+          icone={LayoutDashboard}
+          titulo="Painel"
+          apoio={<>O que a IA fez pela conta {client?.name ?? ""}.</>}
+        />
       </div>
 
       {/* ⚠️ GRADE DE LINHAS COMPARTILHADAS. Ver a explicação em

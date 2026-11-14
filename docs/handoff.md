@@ -14,7 +14,7 @@ diz onde está cada coisa e o que estava acontecendo no dia em que foi escrito.
 |---|---|
 | **Sempre, antes de tocar em código** | `CLAUDE.md` na raiz. Carrega sozinho no Claude Code. É o guia do projeto: schema, isolamento por tenant, convenções, armadilhas, e o porquê de cada decisão de arquitetura. |
 | Antes de decidir **o que construir** | `docs/proximos-passos.md`. **Fonte de verdade de roadmap.** |
-| Antes de mexer em **leitura de dado, estado, cache, URL, realtime na tela ou desempenho** | `docs/plano-dados-e-estado.md`. **Roteiro único de dados, estado e desempenho** (decisões fechadas pelo dono em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado). O orçamento de desempenho (seção 3) é critério de aceite de toda entrega. |
+| Antes de mexer em **leitura de dado, estado, cache, URL, realtime na tela ou desempenho** | `docs/plano-dados-e-estado.md`. **Roteiro único de dados, estado e desempenho** (decisões fechadas pelo dono em 11/11/2026; revisão externa feita em 11/11/2026; passo 0 entregue em 13/11/2026, próximo é o passo 1). O orçamento de desempenho (seção 3) é critério de aceite de toda entrega. |
 | Planos executados e relatórios avulsos | `docs/arquivo/` (o `README.md` de lá diz o que foi arquivado e por quê). |
 | Perguntas de **mercado, concorrente, preço, risco de banimento** | `docs/estrategia-2026-07.md`. É base de pesquisa; as conclusões prescritivas antigas estão superadas, e o banner no topo diz o que vale. |
 | Antes de mexer em **cor, tipografia, espaçamento, componente base** | `docs/design-system/` (8 arquivos). O código tem os valores; esses arquivos têm o porquê. |
@@ -387,7 +387,9 @@ limpo.
 
 ## 4. O que vem agora
 
-**Desde 10/11/2026, dados, estado e desempenho seguem `docs/plano-dados-e-estado.md`** (decisões fechadas em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado): passos 0 a 5, orçamento de desempenho na seção 3, e a frente de design só depois do passo 5 (seção 7). A leitura semanal do orçamento (B5 a B9) é registrada aqui.
+**Desde 10/11/2026, dados, estado e desempenho seguem `docs/plano-dados-e-estado.md`** (decisões fechadas em 11/11/2026; revisão externa feita em 11/11/2026; passo 0 entregue em 13/11/2026, próximo é o passo 1): passos 0 a 5, orçamento de desempenho na seção 3, e a frente de design só depois do passo 5 (seção 7). A leitura semanal do orçamento (B5 a B9) é registrada aqui.
+
+**13/11/2026 (passo 0 do plano de dados):** leituras do servidor em paralelo (Pipeline, Pedidos, Agenda e o layout, que passou a ler a agenda ligada no mesmo select da sessão) e moldura no clique (`loading.tsx`) em Pipeline, Pedidos, Agenda, Painel, Equipe, Perfil, Agente, Campanhas e Nova busca, todas pela mesma peça (`components/MolduraDeCarregamento.tsx` sobre o novo `components/ui/esqueleto.tsx`). B1 medido no build de produção com a navegação atrasada 3 s: 51 a 68 ms. "A, B, volta para A" confirmou o achado 1 (a tela já visitada mostra a moldura de novo). Realtime: o DELETE chega com `old` só com a chave primária (`{"id": 4}`), então o `ContactNotes.tsx` não tira das outras abas uma nota apagada (bug visto na tela, ainda não corrigido). Os 14,8 s de 10/11 foram espera, não consulta (`statement_timeout` de 8 s; o select de `clients` nunca passou de 1,1 s executando): o pior minuto bate com o cron das 15:15 (`prospeccao_apagar_antigos` 6,1 s, `prospeccao_ativar_agendadas` 5,6 s) somado às RPCs de Campanhas num pool de 10 conexões, e a instância estava lenta por dentro (o próprio cron 6,9 s contra 0,13 s). **Pendente com o dono:** olhar no painel do Supabase (Reports, Database) CPU e orçamento de IO entre 15:10 e 15:20 UTC de 10/11; o detalhe está no passo 0 do plano.
 
 **12/11/2026 (campanhas):** o pacote da Campanha Lajinha está em produção (merge `7e05f55`; ADR
 `2026-11-11-campaign-lock-phrases-clean-names-and-sent-text.md`): trava do robô ampliada, nome limpo,
