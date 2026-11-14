@@ -1,6 +1,11 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
+import { mostrarAvisoGlobal } from "@/lib/query/aviso-global";
+import { ErroDaApi } from "@/lib/query/erro";
+import { opcoesDeTirar } from "@/lib/query/escrita";
+import { CHAVE_DE_CAMPANHAS } from "./tabela";
 import { campanhaAindaEnvia, type SituacaoDaCampanha } from "@/lib/prospeccao";
 import { semHistorico, type FonteDeCampanhas, type LeadDaTabela, type RespostaDaEscrita } from "./tipos";
 
@@ -12,17 +17,39 @@ import { semHistorico, type FonteDeCampanhas, type LeadDaTabela, type RespostaDa
 
 const FALHOU = "Não deu para fazer isso agora. Tente de novo.";
 
-/** Roda a escrita e devolve o que `DialogoDaAcao` espera: a frase do erro, ou null quando deu certo. */
-async function confirmar(escrita: () => Promise<RespostaDaEscrita>, aoApagar: () => void): Promise<string | null> {
-  try {
-    const r = await escrita();
-    if (!r.ok) return r.erro;
-    aoApagar();
-    return null;
-  } catch (e) {
-    console.error("campanhas, apagar:", e);
-    return FALHOU;
-  }
+/**
+ * APAGAR OTIMISTA (passo 2 de docs/plano-dados-e-estado.md; a queixa "apaga um lead,
+ * apaga outro e responde Este lead já saiu da lista"): a linha some de toda tabela
+ * em cache no clique de confirmar, com o total, e o diálogo fecha na hora. A rota
+ * roda depois; recusada, o motivo aparece no aviso do app e a releitura final traz a
+ * linha de volta. Só a última escrita pendente relê (lib/query/escrita.ts), então
+ * cinco remoções seguidas não se atropelam. "Não encontrado" já é sucesso na fonte.
+ */
+function useApagar(entidade: "leads" | "buscas" | "campanhas", escrita: (id: string) => Promise<RespostaDaEscrita>) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...opcoesDeTirar<string>({
+      qc,
+      listas: CHAVE_DE_CAMPANHAS,
+      entidade: [CHAVE_DE_CAMPANHAS[0], entidade],
+      acao: "apagar",
+      executar: async (id) => {
+        const r = await escrita(id);
+        if (!r.ok) throw new ErroDaApi(409, r.erro);
+      },
+    }),
+    onError: (e) => {
+      console.error("campanhas, apagar:", e);
+      mostrarAvisoGlobal(e instanceof ErroDaApi ? e.message : FALHOU);
+    },
+  });
+}
+
+/** O que `DialogoDaAcao` espera: null fecha. A linha já saiu; a rota segue sozinha. */
+function confirmarOtimista(apagar: (id: string) => void, id: string, depois: () => void): Promise<null> {
+  apagar(id);
+  depois();
+  return Promise.resolve(null);
 }
 
 export function ApagarCampanha({
@@ -37,6 +64,7 @@ export function ApagarCampanha({
   aoFechar: () => void;
   aoApagar: () => void;
 }) {
+  const apagar = useApagar("campanhas", (id) => fonte.apagarCampanha(id));
   if (!campanha) return null;
   const pode = !campanhaAindaEnvia(campanha.situacao);
   return (
@@ -57,7 +85,7 @@ export function ApagarCampanha({
       perigo
       podeConfirmar={pode}
       slot="campanha-apagar-dialogo"
-      onConfirmar={() => confirmar(() => fonte.apagarCampanha(campanha.id), aoApagar)}
+      onConfirmar={() => confirmarOtimista(apagar.mutate, campanha.id, aoApagar)}
       onFechar={aoFechar}
     />
   );
@@ -75,6 +103,7 @@ export function ApagarBusca({
   aoFechar: () => void;
   aoApagar: () => void;
 }) {
+  const apagar = useApagar("buscas", (id) => fonte.apagarBusca(id));
   if (!busca) return null;
   return (
     <DialogoDaAcao
@@ -89,7 +118,7 @@ export function ApagarBusca({
       rotuloConfirmar="Apagar lista"
       perigo
       slot="busca-apagar-dialogo"
-      onConfirmar={() => confirmar(() => fonte.apagarBusca(busca.id), aoApagar)}
+      onConfirmar={() => confirmarOtimista(apagar.mutate, busca.id, aoApagar)}
       onFechar={aoFechar}
     />
   );
@@ -110,6 +139,7 @@ export function RemoverLead({
   aoFechar: () => void;
   aoRemover: () => void;
 }) {
+  const tirar = useApagar("leads", (id) => fonte.removerLead(id, buscaId));
   if (!lead) return null;
   const fica = !semHistorico(lead);
   return (
@@ -128,7 +158,7 @@ export function RemoverLead({
       rotuloConfirmar="Tirar lead"
       perigo
       slot="lead-remover-dialogo"
-      onConfirmar={() => confirmar(() => fonte.removerLead(lead.id, buscaId), aoRemover)}
+      onConfirmar={() => confirmarOtimista(tirar.mutate, lead.id, aoRemover)}
       onFechar={aoFechar}
     />
   );

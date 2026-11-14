@@ -18,7 +18,7 @@ import type {
 } from "@/components/admin/campanhas/tipos";
 import { recorteParaQuery } from "./campanhas-pedidos";
 import type { PreviaDaPlanilha } from "./planilha-de-leads";
-import type { MarcacaoDoLead, ResumoDobrado, SituacaoDaCampanha } from "./prospeccao";
+import { RECUSA_DA_ESCRITA, type MarcacaoDoLead, type ResumoDobrado, type SituacaoDaCampanha } from "./prospeccao";
 
 // DE ONDE A TELA DE CAMPANHAS TIRA OS DADOS na página de verdade: as rotas
 // `/api/admin/campanhas/*` (service_role no servidor, contas no SQL, páginas de
@@ -108,6 +108,9 @@ export function fonteDasRotas(): FonteDeCampanhas {
     (await pedir<{ situacao: SituacaoDaCampanha }>(`/${id}/acao`, enviar({ acao: a }))).situacao;
   const escrever = async (caminho: string, init: RequestInit = { method: "DELETE" }): Promise<RespostaDaEscrita> => {
     const r = await recusaSe4xx(pedir<{ ok: true }>(caminho, init));
+    // Já não existe (outra aba, um clique duplo): o fim é o mesmo de apagar, então é sucesso
+    // (passo 2 de docs/plano-dados-e-estado.md; era o "Este lead já saiu da lista.").
+    if (!r.ok && init.method === "DELETE" && (r.erro === RECUSA_DA_ESCRITA.nao_encontrado || r.erro === RECUSA_DA_ESCRITA.nao_encontrada)) return { ok: true };
     return r.ok ? { ok: true } : r;
   };
   return {

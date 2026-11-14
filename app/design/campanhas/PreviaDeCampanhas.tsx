@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import CentralDeCampanhas from "@/components/admin/campanhas/CentralDeCampanhas";
+import { ProvedorDeDados } from "@/lib/query/provedor";
 import type { FonteDeCampanhas, InicialDaCentral, Tela } from "@/components/admin/campanhas/tipos";
 import { VARIANTES_SUGERIDAS } from "@/lib/prospeccao";
 import { dadosDeMentira } from "./dados";
@@ -33,7 +34,11 @@ export default function PreviaDeCampanhas({
     const f = fonteDeMentira(dadosDeMentira(agora, vazio), agora);
     return travado ? fonteTravada(f) : f;
   }, [agora, vazio, travado]);
+  // O mesmo cliente de dados da página de verdade, um por cenário: trocar de cenário
+  // (vazio, travado) não herda o cache do outro.
   return (
-    <CentralDeCampanhas telaInicial={tela} agora={agora} fonte={fonte} variantesSugeridas={VARIANTES_SUGERIDAS} inicial={inicial} />
+    <ProvedorDeDados identidade={`design:${vazio}:${travado}`}>
+      <CentralDeCampanhas telaInicial={tela} agora={agora} fonte={fonte} variantesSugeridas={VARIANTES_SUGERIDAS} inicial={inicial} />
+    </ProvedorDeDados>
   );
 }

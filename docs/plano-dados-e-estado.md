@@ -1,6 +1,6 @@
 # Plan: data and state, one pattern for the whole app
 
-Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). Next: Step 2. The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
+Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). **Step 2 partly delivered on 14/11/2026** (its section says what is left for the owner). The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
 
 **Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
 
@@ -471,6 +471,18 @@ Acceptance (measured):
 **Exit gate**: if any criterion fails, the next area does not start; fix the Base or revisit the pattern first.
 
 Out: the other admin screens; the `/clientes` central (it keeps `lembrar` until Step 5).
+
+**Delivered (14/11/2026, partly):**
+- Reads: `useLeitura` (`components/admin/campanhas/tabela.tsx`) now runs on the query cache with the same signature, so the 20 reads of the area changed in one place. The same key does not read again for 30 s: switching tabs and coming back from Nova busca open from the cache. What the server already read enters as fresh data, so the browser no longer reads it again (B3, the double read). The server's first data is used only for the key it read (with the cache, passing it to every page made page 2 show page 1, caught by `campanhas.design.spec.ts`). Focus return re-reads (no realtime here); no retry (the 20 s limit stays the only wait).
+- Writes: `mudou` became an invalidation of the `["campanhas"]` prefix that waits for a pending write (the `versao` stays 0 until the move commit). Removing a lead, deleting a list and deleting a campaign are optimistic (`components/admin/campanhas/Apagar.tsx` over `opcoesDeTirar`): the row and the total leave at the confirm, the dialog closes at once, a refusal shows its reason in the app notice and the final re-read brings the row back; only the last pending write re-reads. "Não encontrado" on a delete is success inside the source (`lib/campanhas-fonte.ts`). Marking a lead was already a local patch and stayed.
+- URL: tab, open list and open campaign (`?aba=`, `?lista=`, `?campanha=&vista=`) through nuqs (`components/admin/campanhas/tela-na-url.ts`); opening pushes a history entry. The preview's in-page Nova busca stays out of the URL (the real one is its own route).
+- Cron (D12): `prospeccao_apagar_antigos` runs only in the 03h00 tick (`ehHoraDaLimpeza`, `lib/prospeccao.ts`, Vitest).
+- JS: the assistant, the campaign detail, Nova busca and the spreadsheet importer load on demand; Campanhas went from 483 kB (over the 480 ceiling after the Base) to 472 kB.
+- Tests: `e2e/campanhas-dados.design.spec.ts` (refresh and back keep tab and list; three leads removed in a row, each gone at the click, no "já saiu da lista", total minus 3); the Campanhas design suites pass (108); `npm run test:orcamento` 20/20.
+- **Left for the owner:**
+  - B8 at 340 kB for Campanhas needs the results charts (recharts, 120 kB compressed) out of the first view; that is a screen change, his call (the ceiling stays 480 until he decides).
+  - B2 (zero requests on a revisit, the navigation request included) is not met: `/campanhas` still reads its first data on the server (the fix of the 30/10 refresh bug) and the admin gate runs there. Making the page read nothing on the server (D8) means accepting the client-side first read for that bug, and moving the admin redirect to `proxy.ts` (admin.md says the redirect lives only in `adminDaPagina`). His call.
+  - Not done: the move into `features/campanhas/` (mechanical, many cited paths), Zod and the single error shape on `app/api/admin/campanhas/**`, the Apify webhook and cron in shadow mode (writing their schemas needs real payloads, not guesses).
 
 ### Step 3: the tenant screens, straight to infinite queries
 

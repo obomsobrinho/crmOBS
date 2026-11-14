@@ -36,7 +36,6 @@ import { useDebounce } from "@/lib/use-debounce";
 import { ApagarBusca, RemoverLead } from "./Apagar";
 import { FaixaDeNumeros } from "./faixa";
 import FichaDoLead from "./FichaDoLead";
-import ImportarPlanilha from "./ImportarPlanilha";
 import { CabecalhoDoGrafico, Rosca } from "./graficos";
 import { CartaoDeRanking, FunilDaBase, OndeEstao } from "./ranking";
 import { SeloDaBusca, SeloDaPontuacao, TextoDoSite, TopoDeDetalhe, haQuanto } from "./pecas";
@@ -58,6 +57,9 @@ import {
   type RecorteDosLeads,
   type Totais,
 } from "./tipos";
+
+// O importador de planilha só aparece quando o dono pede: carrega sob demanda (B8).
+const ImportarPlanilha = dynamic(() => import("./ImportarPlanilha"));
 
 // LEADS, a base: o painel no topo (quantos, onde, quantos já contatados e quem
 // respondeu) e embaixo a tabela, por busca ou com todos os leads, 10 por página,

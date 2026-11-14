@@ -632,6 +632,19 @@ export const PARADAS_PARA_PAUSAR = 2;
 /** D8 (LGPD): quem nunca respondeu sai da base depois disto, contado da entrada; quem pediu para parar fica. */
 export const MESES_DE_RETENCAO = 12;
 
+/**
+ * A limpeza dos leads antigos (D8, LGPD) roda UMA vez por dia, no tick das 03h00 (São Paulo),
+ * e não nos 288 ticks do dia (decisão do dono de 14/11/2026, D12 de docs/plano-dados-e-estado.md):
+ * no pior minuto de 10/11 ela levou 6 s e disputou o banco com o atendimento. O tick roda de 5 em
+ * 5 min, então a janela de 5 min pega exatamente um.
+ */
+export const LIMPEZA_DOS_ANTIGOS_MIN = 3 * 60;
+
+/** O tick deste minuto do dia (São Paulo, 0 a 1439) é o da limpeza? */
+export function ehHoraDaLimpeza(minutosDoDiaSP: number): boolean {
+  return minutosDoDiaSP >= LIMPEZA_DOS_ANTIGOS_MIN && minutosDoDiaSP < LIMPEZA_DOS_ANTIGOS_MIN + 5;
+}
+
 const HORA_MS = 3_600_000;
 const MINUTO_MS = 60_000;
 

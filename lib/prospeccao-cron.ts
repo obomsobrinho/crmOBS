@@ -5,8 +5,10 @@ import { NOME_AUSENTE } from "./apify-campos";
 import { enviarMensagemAtiva } from "./envio-ativo";
 import { fonteApify } from "./fonte-apify";
 import { diaIsoSP, inicioDoDiaSP } from "./fuso";
+import { minutosAgoraSP } from "./horarios";
 import {
   MESES_DE_RETENCAO,
+  ehHoraDaLimpeza,
   PARADAS_PARA_PAUSAR,
   dentroDaJanela,
   proximoEnvioEm,
@@ -67,7 +69,10 @@ export async function tickProspeccao(svc: Supa, agora: number): Promise<ResumoDo
   corte.setUTCMonth(corte.getUTCMonth() - MESES_DE_RETENCAO);
   await Promise.all([
     chamar(svc.rpc("prospeccao_ativar_agendadas", { p_agora: agoraIso })),
-    chamar(svc.rpc("prospeccao_apagar_antigos", { p_antes: corte.toISOString() })),
+    // Uma vez por dia, de madrugada (D12): não a cada 5 min.
+    ehHoraDaLimpeza(minutosAgoraSP(new Date(agora)))
+      ? chamar(svc.rpc("prospeccao_apagar_antigos", { p_antes: corte.toISOString() }))
+      : Promise.resolve(),
   ]);
 
   // As respostas e os pedidos para parar ANTES dos envios: um "SAIR" lido agora já

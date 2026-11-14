@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampoBusca } from "@/components/ui/campo-busca";
@@ -21,50 +22,63 @@ import type { Pagina } from "./tipos";
 export const POR_PAGINA = POR_PAGINA_DE_CAMPANHAS;
 
 
+/** O prefixo de TODA leitura de Campanhas no cache de dados: invalidar ele relê o que está na tela. */
+export const CHAVE_DE_CAMPANHAS = ["campanhas"] as const;
+/** A chave de uma leitura (os parâmetros dela em texto, como sempre foi). */
+export const chaveDaLeitura = (chave: string) => [...CHAVE_DE_CAMPANHAS, "leitura", chave] as const;
+
+/** Uma leitura que não volta vira falha com "Tentar de novo", nunca um "Carregando" eterno. */
+function comPrazo<T>(p: Promise<T>): Promise<T> {
+  let relogio: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<never>((_, rejeitar) => {
+    relogio = setTimeout(() => rejeitar(new Error(`leitura passou de ${LIMITE_DA_LEITURA_MS} ms`)), LIMITE_DA_LEITURA_MS);
+  });
+  return Promise.race([p, limite]).finally(() => clearTimeout(relogio));
+}
+
 /**
- * UMA LEITURA da fonte, de novo a cada `chave` nova (os parâmetros dela em texto)
- * ou `recarregar`. Enquanto a próxima chega, a anterior continua na tela (a tabela
- * não pisca). Resposta de uma leitura já trocada é jogada fora. `mudar` corrige o
- * que está na tela sem ler de novo (marcar um lead muda só aquela linha).
+ * UMA LEITURA da fonte, pelo cache de dados (passo 2 de docs/plano-dados-e-estado.md):
+ * a mesma `chave` não lê de novo por 30 s, então trocar de aba e voltar de Nova busca
+ * abrem do cache, sem requisição. Enquanto uma chave nova chega, a anterior continua
+ * na tela (a tabela não pisca). `mudar` corrige o que está na tela sem ler de novo
+ * (marcar um lead muda só aquela linha). Campanhas não tem realtime: a volta do foco
+ * relê o que estiver velho.
+ *
+ * `inicial` (o que o servidor já leu) entra como dado fresco: o navegador NÃO lê de
+ * novo o que o servidor acabou de mandar (era a leitura dupla, B3).
  */
 export function useLeitura<T>(chave: string, ler: () => Promise<T>, inicial: T | null = null) {
+  const qc = useQueryClient();
   const lerAtual = useRef(ler);
   useEffect(() => {
     lerAtual.current = ler;
   });
-  // `inicial` (o que o servidor já leu) vai direto para a tela, sem "Carregando":
-  // o HTML de um refresh já chega com os dados. A leitura do navegador roda mesmo
-  // assim, para a tela nunca ficar com um dado velho de outra montagem.
-  const [estado, setEstado] = useState<{ dados: T | null; erro: boolean; lida: string | null }>(() => ({
-    dados: inicial,
-    erro: false,
-    lida: inicial === null ? null : chave,
-  }));
-  const [tentativa, setTentativa] = useState(0);
-  useEffect(() => {
-    let vivo = true;
-    // Uma leitura que não volta vira falha com "Tentar de novo", nunca um "Carregando" eterno.
-    let relogio: ReturnType<typeof setTimeout> | undefined;
-    const limite = new Promise<never>((_, rejeitar) => {
-      relogio = setTimeout(() => rejeitar(new Error(`leitura passou de ${LIMITE_DA_LEITURA_MS} ms`)), LIMITE_DA_LEITURA_MS);
-    });
-    Promise.race([lerAtual.current(), limite])
-      .then((dados) => {
-        if (vivo) setEstado({ dados, erro: false, lida: chave });
-      })
-      .catch((e) => {
+  const queryKey = useMemo(() => chaveDaLeitura(chave), [chave]);
+  const q = useQuery({
+    queryKey,
+    queryFn: () =>
+      comPrazo(lerAtual.current()).catch((e: unknown) => {
         console.error("campanhas, leitura:", e);
-        if (vivo) setEstado((cur) => ({ ...cur, erro: true, lida: chave }));
-      })
-      .finally(() => clearTimeout(relogio));
-    return () => {
-      vivo = false;
-      clearTimeout(relogio);
-    };
-  }, [chave, tentativa]);
-  const recarregar = useCallback(() => setTentativa((n) => n + 1), []);
-  const mudar = useCallback((f: (d: T) => T) => setEstado((cur) => (cur.dados === null ? cur : { ...cur, dados: f(cur.dados) })), []);
-  return { dados: estado.dados, erro: estado.erro, carregando: estado.lida !== chave, recarregar, mudar };
+        throw e;
+      }),
+    initialData: inicial ?? undefined,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: true,
+    // Já espera o prazo de 20 s; repetir dobraria a espera do "Tentar de novo".
+    retry: false,
+  });
+  const recarregar = useCallback(() => void q.refetch(), [q]);
+  const mudar = useCallback(
+    (f: (d: T) => T) => qc.setQueryData<T>(queryKey, (d) => (d === undefined ? d : f(d))),
+    [qc, queryKey],
+  );
+  return {
+    dados: (q.data ?? null) as T | null,
+    erro: q.isError,
+    carregando: q.isPending || q.isPlaceholderData,
+    recarregar,
+    mudar,
+  };
 }
 
 /**
@@ -86,7 +100,11 @@ export function usePaginaDaFonte<T>(
     setChaveVista(chave);
     setPagina(1);
   }
-  const lida = useLeitura(`${chave}|${pagina}|${versao}`, () => ler(pagina), inicial);
+  // O que o servidor leu vale SÓ para a chave que ele leu (o recorte padrão, página 1).
+  // Com o cache, passar para outra chave faria a página 2 nascer com os dados da 1.
+  const chaveDaPagina = `${chave}|${pagina}|${versao}`;
+  const [chaveDoServidor] = useState(chaveDaPagina);
+  const lida = useLeitura(chaveDaPagina, () => ler(pagina), chaveDaPagina === chaveDoServidor ? inicial : null);
   const total = lida.dados?.total ?? 0;
   const ultima = Math.max(1, Math.ceil(total / POR_PAGINA));
   if (lida.dados && !lida.carregando && pagina > ultima) setPagina(ultima);

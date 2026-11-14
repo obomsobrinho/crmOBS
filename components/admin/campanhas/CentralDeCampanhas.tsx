@@ -5,11 +5,12 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_PADRAO } from "@/components/ui/dissolver-rolagem";
 import { numeroBR } from "@/lib/format";
 import AbaLeads from "./AbaLeads";
-import NovaBusca from "./NovaBusca";
 import AbaCampanhas from "./AbaCampanhas";
-import Assistente from "./Assistente";
-import DetalheDaCampanha from "./DetalheDaCampanha";
-import { useLeitura } from "./tabela";
+import dynamic from "next/dynamic";
+import { useQueryClient } from "@tanstack/react-query";
+import { invalidarComAtraso } from "@/lib/query/invalidar";
+import { CHAVE_DE_CAMPANHAS, useLeitura } from "./tabela";
+import { useTelaNaUrl } from "./tela-na-url";
 import { localDaUltimaBusca, somaDe, type Busca, type CampanhaEditavel, type FonteDeCampanhas, type InicialDaCentral, type Tela } from "./tipos";
 
 // CAMPANHAS v2, a prospecção do dono do produto (docs/plano-campanhas.md). O
@@ -19,6 +20,12 @@ import { localDaUltimaBusca, somaDe, type Busca, type CampanhaEditavel, type Fon
 // `/api/admin/campanhas/*` na página de verdade, a memória no preview); depois de
 // uma escrita a `versao` muda e as leituras voltam ao servidor. O rascunho do
 // assistente é salvo sozinho, uma pausa curta depois da última mudança.
+
+// O que NÃO aparece ao abrir Campanhas carrega sob demanda (passo 2 de
+// docs/plano-dados-e-estado.md, B8): o assistente, o detalhe de uma campanha e a Nova busca.
+const Assistente = dynamic(() => import("./Assistente"));
+const DetalheDaCampanha = dynamic(() => import("./DetalheDaCampanha"));
+const NovaBusca = dynamic(() => import("./NovaBusca"));
 
 /** A pausa entre a última mudança no assistente e o salvamento do rascunho. */
 const PAUSA_DO_SALVAMENTO_MS = 600;
@@ -50,9 +57,20 @@ export default function CentralDeCampanhas({
   /** O texto pré-preenchido de uma campanha nova (o dono edita). */
   variantesSugeridas: string[];
 }) {
-  const [tela, setTela] = useState<Tela>(telaInicial);
-  const [versao, setVersao] = useState(0);
-  const mudou = useCallback(() => setVersao((v) => v + 1), []);
+  const [tela, setTela] = useTelaNaUrl(telaInicial);
+  // A tela com que a central ABRIU (a URL de um refresh, ou a que a página escolheu).
+  const [telaDeAbertura] = useState<Tela>(tela);
+  // Depois de uma escrita as leituras de Campanhas ficam velhas e as da tela relêem
+  // (a MESMA página, como antes). Era uma `versao` que mudava todas as chaves; agora
+  // é a invalidação do cache de dados (passo 2 de docs/plano-dados-e-estado.md), que
+  // espera uma escrita otimista ainda em voo terminar: senão a linha que acabou de
+  // sair voltaria por um instante. `versao` fica 0 e sai das telas com a mudança de pasta.
+  const qc = useQueryClient();
+  const versao = 0;
+  const mudou = useCallback(() => {
+    if (qc.isMutating({ mutationKey: [...CHAVE_DE_CAMPANHAS] }) > 0) return;
+    invalidarComAtraso(qc, CHAVE_DE_CAMPANHAS, 0);
+  }, [qc]);
   const { dados: totais } = useLeitura(`totais|${versao}`, () => fonte.totais(), inicial?.totais ?? null);
   const { dados: conexoes } = useLeitura("conexoes", () => fonte.conexoes());
 
@@ -98,7 +116,7 @@ export default function CentralDeCampanhas({
       if (salvar) pendente.current = c;
       setTela({ aba: "campanhas", vista: "editar", id: c.id });
     },
-    [],
+    [setTela],
   );
 
   /** O número que uma campanha nova já traz: o primeiro conectado, senão o primeiro. */
@@ -142,7 +160,7 @@ export default function CentralDeCampanhas({
         console.error("campanha, abrir rascunho:", e);
       }
     },
-    [abrirRascunho, fonte],
+    [abrirRascunho, fonte, setTela],
   );
 
   // Voltando da Nova busca com a campanha que esperava contatos: lê ela uma vez para a faixa.
@@ -162,10 +180,10 @@ export default function CentralDeCampanhas({
 
   // Aberta direto num rascunho (o link do preview `?tela=rascunho`): lê a campanha uma vez.
   useEffect(() => {
-    if (telaInicial.aba !== "campanhas" || telaInicial.vista !== "editar") return;
+    if (telaDeAbertura.aba !== "campanhas" || telaDeAbertura.vista !== "editar") return;
     let vivo = true;
     fonte
-      .campanha(telaInicial.id)
+      .campanha(telaDeAbertura.id)
       .then((a) => {
         if (vivo && a?.campanha.situacao === "rascunho") setRascunho(a.campanha);
       })
@@ -173,7 +191,7 @@ export default function CentralDeCampanhas({
     return () => {
       vivo = false;
     };
-  }, [fonte, telaInicial]);
+  }, [fonte, telaDeAbertura]);
 
   const mudarRascunho = useCallback((patch: Partial<CampanhaEditavel>) => {
     setRascunho((atual) => {
@@ -198,7 +216,7 @@ export default function CentralDeCampanhas({
     setRascunho(null);
     setTela({ aba: "campanhas", vista: "lista" });
     mudou();
-  }, [mudou, salvarAgora]);
+  }, [mudou, salvarAgora, setTela]);
 
   const iniciar = useCallback(async () => {
     if (!rascunho) return;
@@ -220,7 +238,7 @@ export default function CentralDeCampanhas({
     } finally {
       setIniciando(false);
     }
-  }, [fonte, mudou, rascunho, salvarAgora]);
+  }, [fonte, mudou, rascunho, salvarAgora, setTela]);
 
   const irParaCampanhas = () => setTela({ aba: "campanhas", vista: "lista" });
   const emEdicao = tela.aba === "campanhas" && tela.vista === "editar" && rascunho?.id === tela.id ? rascunho : null;

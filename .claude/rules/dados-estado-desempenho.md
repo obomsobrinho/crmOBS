@@ -22,7 +22,7 @@ paths:
 The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). This file holds only the rules, and says which ones apply now and which apply from a given step.
 
 ## State (updated in the commit that closes each step)
-- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner) and Step 1, the Base (14/11/2026). Next: Step 2, Campanhas.
+- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner) and Step 1, the Base (14/11/2026). Step 2, Campanhas, partly done (14/11/2026: reads on the query cache through `useLeitura`, optimistic deletes, URL state, daily cleanup cron; the folder move, Zod on its routes and the owner's calls on B2 and B8 are left, spec Step 2).
 - Areas migrated: none.
 
 **Which pattern new code follows**: in an area not migrated yet, new code follows that area's current pattern (`data.md`, `realtime.md`, `engineering.md` as written, e.g. a new list in Contatos uses `usePaginada` until Contatos migrates). A new screen or a wholly new area is born in the new pattern, from the step whose tooling it needs. A migrated area is one listed above; its files live in `features/<area>/`.
