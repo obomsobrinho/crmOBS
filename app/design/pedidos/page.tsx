@@ -1,15 +1,15 @@
 import NavRail from "@/components/NavRail";
-import Pedidos from "@/components/Pedidos";
+import Pedidos from "@/features/pedidos/components/Pedidos";
 import { agoraMs } from "@/lib/periodo";
-import { PAGINA_PEDIDOS, ehAberto } from "@/lib/pedidos";
-import type { ContatoLinha, PedidoLinha, PedidoResolvidoLinha } from "@/lib/pedidos";
-import { fonteDaMemoria } from "@/lib/pedidos-fonte";
-import type { LinhaHistoria } from "@/lib/historia-do-pedido";
+import { PAGINA_PEDIDOS, ehAberto } from "@/features/pedidos/regras";
+import type { ContatoLinha, PedidoLinha, PedidoResolvidoLinha } from "@/features/pedidos/regras";
+import { fonteDaMemoria } from "@/features/pedidos/api/fonte";
+import type { LinhaHistoria } from "@/features/pedidos/historia";
 
 // Preview da página de PEDIDOS (abertos e resolvidos) (dev-only, liberado pelo proxy). Sem
 // banco: três pedidos em duas conversas, um deles acima de 2h (âmbar), três
 // resolvidos (um de cada solução, lib/solucoes.ts) e as mensagens falsas de cada
-// conversa, para a história do pedido (lib/historia-do-pedido.ts). As ações só
+// conversa, para a história do pedido (features/pedidos/historia.ts). As ações só
 // simulam. `?vazio=1` mostra a página sem pedido; `?abrir=` abre a
 // linha como o link do aviso faz.
 export const dynamic = "force-dynamic";

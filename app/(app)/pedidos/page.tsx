@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import Pedidos from "@/components/Pedidos";
+import Pedidos from "@/features/pedidos/components/Pedidos";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { membrosDoTenant } from "@/lib/team-servidor";
 import { foraDaLista } from "@/lib/inbox-lista";
-import { PAGINA_PEDIDOS, ehAberto } from "@/lib/pedidos";
-import { fonteDoBanco } from "@/lib/pedidos-fonte";
+import { PAGINA_PEDIDOS, ehAberto } from "@/features/pedidos/regras";
+import { fonteDoBanco } from "@/features/pedidos/api/fonte";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 //
 // O servidor traz SÓ a primeira página da aba que abre (10 pedidos), os números
 // das abas e, se veio `?abrir=`, aquele pedido; o resto o navegador pede pela
-// MESMA fonte (`lib/pedidos-fonte.ts`).
+// MESMA fonte (`features/pedidos/api/fonte.ts`).
 //
 // ⚠️ `getMyClient` e não `requireActiveTenant`, de propósito (decisão do dono):
 // conta bloqueada vê a fila como vê o `/inbox`, só não age. As rotas de

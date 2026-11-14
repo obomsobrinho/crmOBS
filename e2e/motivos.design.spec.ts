@@ -9,7 +9,7 @@ import {
   rotuloDoMotivo,
 } from "../lib/motivos";
 import { textoDoAviso } from "../lib/avisos";
-import { casaMotivo } from "../lib/pedidos";
+import { casaMotivo } from "../features/pedidos/regras";
 
 // MOTIVO DO PEDIDO DE AJUDA (06/10/2026, P1 item 4, docs/plano-motivo-pedido.md).
 // A regra pura (lib/motivos.ts) e as telas de demonstração, sem banco e sem modelo.

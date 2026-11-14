@@ -16,7 +16,7 @@
 // CARREGAMENTO: só quando um pedido é aberto, nunca na consulta da lista. São
 // três consultas pequenas e limitadas em `chat_messages` (por `client_id`,
 // `phone` e janela de tempo, colunas explícitas, índice
-// `chat_messages_client_phone_created_idx`), em lib/pedidos-fonte.ts:
+// `chat_messages_client_phone_created_idx`), em features/pedidos/api/fonte.ts:
 //   antes    [abertura - 12h, abertura)          8 linhas, delas as 5 últimas do cliente
 //   durante  [abertura, fechamento ou agora]     as 10 mais NOVAS do cliente (+1 para saber se cortou)
 //   depois   resolvido: [fechamento - 2 min, +24h], as 6 primeiras RESPOSTAS (IA ou time)
@@ -27,10 +27,10 @@
 // do /design (`recorteAntes`, `recorteDurante`, `recorteDepois`): mudou um, muda
 // o outro.
 
-import type { Tables } from "./database.types";
-import { ehManual, ehMidiaDaIa, MIDIA_DA_IA, respostaDaIa, respostaHumana } from "./mensagem";
-import { separarMensagens } from "./painel";
-import { ehAberto, type PedidoItem } from "./pedidos";
+import type { Tables } from "@/lib/database.types";
+import { ehManual, ehMidiaDaIa, MIDIA_DA_IA, respostaDaIa, respostaHumana } from "@/lib/mensagem";
+import { separarMensagens } from "@/lib/painel";
+import { ehAberto, type PedidoItem } from "./regras";
 
 /** Quantas mensagens do cliente, antes da abertura, contam como "o que levou ao pedido". */
 const MENSAGENS_QUE_LEVARAM = 5;

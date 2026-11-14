@@ -7,8 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { StatRotulo } from "@/components/ui/stat";
 import { horaNoDiaDe } from "@/lib/fuso";
 import { ehNumeroDeAvisos } from "@/lib/avisos";
-import { ehAberto, type PedidoItem } from "@/lib/pedidos";
-import type { FontePedidos } from "@/lib/pedidos-fonte";
+import { ehAberto, type PedidoItem } from "@/features/pedidos/regras";
+import type { FontePedidos } from "@/features/pedidos/api/fonte";
 import {
   HISTORIA_VAZIA,
   encaixarNaHistoria,
@@ -18,12 +18,12 @@ import {
   type HistoriaDoPedido,
   type LinhaHistoria,
   type MensagemDaSecao,
-} from "@/lib/historia-do-pedido";
+} from "@/features/pedidos/historia";
 import { useCanalConversa } from "@/lib/use-canal-ao-vivo";
 import { cn } from "@/lib/utils";
 
 // O QUE ACONTECEU NO PEDIDO, EM SEÇÕES (08/10/2026, redesenho de Pedidos; regra
-// em lib/historia-do-pedido.ts). Decisão do dono: nada de linha do tempo, só
+// em features/pedidos/historia.ts). Decisão do dono: nada de linha do tempo, só
 // blocos com o que aconteceu, numa COLUNA SÓ em qualquer tela, e só os que têm
 // conteúdo:
 //   "O que o cliente escreveu" (sempre; vazio diz que não achou; inclui, depois

@@ -11,7 +11,7 @@ import {
   recorteDepois,
   recorteDurante,
   type LinhaHistoria,
-} from "../lib/historia-do-pedido";
+} from "../features/pedidos/historia";
 import { atualizacaoDoPedido, entraNaFila, mesmoAssunto } from "../lib/fila-de-pedidos";
 import {
   casaBuscaPedido,
@@ -22,7 +22,7 @@ import {
   paraPedido,
   type PedidoAberto,
   type PedidoResolvido,
-} from "../lib/pedidos";
+} from "../features/pedidos/regras";
 
 // Linha do banco (o que `pedidos_pagina` devolve) para os testes puros.
 const linhaBanco = (o: Record<string, unknown>) => ({
@@ -46,10 +46,10 @@ const linhaBanco = (o: Record<string, unknown>) => ({
 
 // PÁGINA DE PEDIDOS ABERTOS (29/09/2026, docs/plano-pedidos.md).
 //
-// A regra (lib/pedidos.ts, pura) testada direto, e a tela no /design com dado
+// A regra (features/pedidos/regras.ts, pura) testada direto, e a tela no /design com dado
 // falso: três pedidos em duas conversas, o mais antigo há 6h (âmbar).
 
-test.describe("Fila de pedidos (lib/pedidos.ts)", () => {
+test.describe("Fila de pedidos (features/pedidos/regras.ts)", () => {
   const pedidos = [
     { id: 3, phone: "5511955554444", opened_at: "2026-09-29T12:50:00Z", summary: "c" },
     { id: 1, phone: "5511912345678", opened_at: "2026-09-29T07:00:00Z", summary: "a" },
@@ -93,7 +93,7 @@ test.describe("Fila de pedidos (lib/pedidos.ts)", () => {
   });
 });
 
-test.describe("Paginação de pedidos (lib/pedidos.ts, peças puras)", () => {
+test.describe("Paginação de pedidos (features/pedidos/regras.ts, peças puras)", () => {
   test("a linha do banco vira pedido, com o nome limpo e a posição do banco", () => {
     const a = paraPedido(linhaBanco({ nomewpp: "Você", display_name: "Ana", posicao: "2", total: "3" })) as PedidoAberto;
     expect(a).toMatchObject({ nome: "Ana", posicao: 2, total: 3, openedAt: "2026-09-29T10:00:00Z", fotoPath: null });
@@ -274,7 +274,7 @@ test.describe("Página de pedidos (/design/pedidos)", () => {
 
 // ---------------------------------------------------------------------------
 // REDESENHO DE PEDIDOS (08/10/2026): a solução gravada (lib/solucoes.ts), a
-// as seções do pedido com as mensagens reais (lib/historia-do-pedido.ts) e o
+// as seções do pedido com as mensagens reais (features/pedidos/historia.ts) e o
 // layout com a lista estreita.
 // ---------------------------------------------------------------------------
 
@@ -298,7 +298,7 @@ test.describe("Solução do pedido (lib/solucoes.ts)", () => {
   });
 });
 
-test.describe("Seções do pedido (lib/historia-do-pedido.ts)", () => {
+test.describe("Seções do pedido (features/pedidos/historia.ts)", () => {
   const H = 3_600_000;
   const base = Date.parse("2026-10-08T15:00:00Z");
   const iso = (ms: number) => new Date(base + ms).toISOString();

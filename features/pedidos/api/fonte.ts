@@ -18,7 +18,7 @@ import {
   type PedidoLinha,
   type PedidoResolvido,
   type PedidoResolvidoLinha,
-} from "./pedidos";
+} from "../regras";
 import {
   COLUNAS_HISTORIA,
   FILTRO_DE_RESPOSTA,
@@ -37,8 +37,8 @@ import {
   recorteDepois,
   type HistoriaDoPedido,
   type LinhaHistoria,
-} from "./historia-do-pedido";
-import { MANUAL } from "./mensagem";
+} from "../historia";
+import { MANUAL } from "@/lib/mensagem";
 
 // DE ONDE A PÁGINA DE PEDIDOS TIRA OS DADOS (02/10/2026, auditoria F3, R-07).
 //
@@ -47,7 +47,7 @@ import { MANUAL } from "./mensagem";
 // página e o componente escreviam, cada um, a mesma consulta de handoffs mais a
 // de nomes. Duas implementações com o MESMO contrato: o banco
 // (`pedidos_pagina`/`pedidos_contagens`, RLS de quem chama) e a memória, só para
-// o preview `/design`. A regra pura (nome, ordem, busca) é a de lib/pedidos.ts.
+// o preview `/design`. A regra pura (nome, ordem, busca) é a de features/pedidos/regras.ts.
 
 export type AbaPedidos = "abertos" | "resolvidos";
 
@@ -77,7 +77,7 @@ export interface FontePedidos {
   /** Os números das abas, seguindo o filtro de motivo (senão a aba mentiria). */
   contagens(fora: string[], motivo?: string | null): Promise<ContagensPedidos>;
   /**
-   * A história de UM pedido (lib/historia-do-pedido.ts): só quando ele é aberto,
+   * A história de UM pedido (features/pedidos/historia.ts): só quando ele é aberto,
    * nunca na lista. Três consultas pequenas por `client_id` + `phone` + janela.
    */
   historia(p: PedidoItem): Promise<HistoriaComRegra>;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, HandHelping, MessagesSquare } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
-import SecoesDoPedido from "@/components/SecoesDoPedido";
+import SecoesDoPedido from "@/features/pedidos/components/SecoesDoPedido";
 import SolucaoBadge from "@/components/SolucaoBadge";
 import SalvarComoRegra from "@/components/SalvarComoRegra";
 import { EstadoVazio } from "@/components/ui/estado-vazio";
@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
-import { CabecalhoBloco } from "./ContactFields";
+import { CabecalhoBloco } from "@/components/ContactFields";
+// eslint-disable-next-line no-restricted-imports -- move commit of Step 3a; the behavior commit moves the reads into the area source
 import { createClient } from "@/lib/supabase/client";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, prettyPhone } from "@/lib/format";
@@ -42,7 +43,7 @@ import {
   type PedidoLinha,
   type PedidoResolvido,
   type PedidoResolvidoLinha,
-} from "@/lib/pedidos";
+} from "@/features/pedidos/regras";
 import {
   fonteDaMemoria,
   fonteDoBanco,
@@ -50,10 +51,10 @@ import {
   type ContagensPedidos,
   type FontePedidos,
   type ParamsPedidos,
-} from "@/lib/pedidos-fonte";
+} from "@/features/pedidos/api/fonte";
 import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
 import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
-import type { LinhaHistoria } from "@/lib/historia-do-pedido";
+import type { LinhaHistoria } from "@/features/pedidos/historia";
 import { cn } from "@/lib/utils";
 import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
@@ -86,7 +87,7 @@ async function postar(url: string, corpo: unknown): Promise<Response | null> {
 const quando = diaMesCurtoHoraSP;
 
 // PAGINAÇÃO E REALTIME (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
-// A lista da aba ativa vem de UMA fonte (`lib/pedidos-fonte.ts`, a mesma da
+// A lista da aba ativa vem de UMA fonte (`features/pedidos/api/fonte.ts`, a mesma da
 // página do servidor): 10 por vez, mais ao rolar, busca no banco depois de 300ms
 // parado. Trocar de aba troca o recorte (primeira página dela). O realtime não
 // refaz lista: um evento de `handoffs` busca SÓ a fila da conversa que mexeu (ou

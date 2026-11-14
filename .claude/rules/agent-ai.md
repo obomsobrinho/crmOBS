@@ -6,9 +6,9 @@ paths:
   - "lib/avisos.ts"
   - "lib/horarios.ts"
   - "lib/rag.ts"
-  - "lib/pedidos.ts"
+  - "features/pedidos/regras.ts"
   - "lib/solucoes.ts"
-  - "lib/historia-do-pedido.ts"
+  - "features/pedidos/historia.ts"
   - "lib/fila-de-pedidos.ts"
   - "lib/crm.ts"
   - "app/api/agent/**"
@@ -24,8 +24,8 @@ paths:
   - "app/(app)/pedidos/**"
   - "components/Playground.tsx"
   - "components/AgentTestDrawer.tsx"
-  - "components/Pedidos.tsx"
-  - "components/SecoesDoPedido.tsx"
+  - "features/pedidos/components/Pedidos.tsx"
+  - "features/pedidos/components/SecoesDoPedido.tsx"
   - "components/SolucaoBadge.tsx"
   - "components/MessageComposer.tsx"
   - "components/HandoffCard.tsx"
@@ -94,7 +94,7 @@ paths:
 - Bench: one bubble per item of `messages`, but `content` stays the JOIN. Audio is transcribed by `POST /api/playground/transcrever` (owner-only, `whisper-1`, no `language`) and the TEXT goes to the agent, never raw audio. `diagnostico={false}` hides diagnostics only in the assembly.  (why: docs/adr/2026-09-26-playground-as-conversation.md)
 - Bench help request reuses the real `MessageComposer` with the `pedido` prop; never a second request UI. The queue decision is `diagnostics.pedidoNaFila`, computed on the server; the bench sends `pedidosAbertos`.  (why: docs/adr/2026-09-29-help-request-lives-in-the-test-conversation.md)
 - With an open request `MessageComposer` shows it on top and opens on "Orientar a IA" (amber); the selector toggles only orient/Responder; "Resolvido" beside it. `HandoffCard` draws only the closed (gray) line. No "Eu respondo", no "Voltar ao pedido".  (why: docs/adr/2026-09-27-handoff-queue-and-handoffs-table.md)
-- `/pedidos` detail is a request SHEET, never a chat. Tabs Abertos (oldest first) and Resolvidos (30 days, newest first). Orient and Resolvido call `/orientar` and `/resolve`; no new endpoint. Rule in `lib/pedidos.ts`. Login never redirects back to the requested link.  (why: docs/adr/2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md)
-- `/pedidos` detail shows WHAT HAPPENED from the source, in section cards stacked in ONE column on every screen, the "Orientar a IA" box last (never side by side, never a timeline, never bubbles; `lib/historia-do-pedido.ts`, `components/SecoesDoPedido.tsx`, `Card variant="secao"`), only the ones with content: "O que o cliente escreveu" (verbatim; the messages that led to it, then after a "depois do pedido" divider the ones sent while it waited, 10 newest; empty = one neutral line), "Orientação do time", "Resposta da IA"/"Resposta do time" (who sent it per `lib/mensagem.ts`; only reply rows are read; an OPEN request has no "Resposta da IA", only the team's manual messages). Reason, times and resolution live ONLY in the facts strip, never repeated in a section. The AI summary is labeled "Resumo da IA" on top (and is the row title and the notice text). The sections load only when a request is opened (`FontePedidos.historia`: three bounded `chat_messages` queries by `client_id` + `phone` + window), never in the list query; realtime inserts one row from the payload.  (why: docs/adr/2026-10-08-pedido-detail-shows-source-messages.md)
-- `/pedidos` reads ONLY through `lib/pedidos-fonte.ts` (server page and browser): 10 per tab with infinite scroll, server search with debounce, counts from `pedidos_contagens`, and a `handoffs` event fetches ONE conversation queue or one request, never the lists. Order and search live in SQL and in `lib/pedidos.ts`; keep them equal.  (why: docs/adr/2026-10-02-pedidos-paginated-single-source.md)
+- `/pedidos` detail is a request SHEET, never a chat. Tabs Abertos (oldest first) and Resolvidos (30 days, newest first). Orient and Resolvido call `/orientar` and `/resolve`; no new endpoint. Rule in `features/pedidos/regras.ts`. Login never redirects back to the requested link.  (why: docs/adr/2026-09-30-pedidos-detail-is-a-request-sheet-not-a-chat.md)
+- `/pedidos` detail shows WHAT HAPPENED from the source, in section cards stacked in ONE column on every screen, the "Orientar a IA" box last (never side by side, never a timeline, never bubbles; `features/pedidos/historia.ts`, `features/pedidos/components/SecoesDoPedido.tsx`, `Card variant="secao"`), only the ones with content: "O que o cliente escreveu" (verbatim; the messages that led to it, then after a "depois do pedido" divider the ones sent while it waited, 10 newest; empty = one neutral line), "Orientação do time", "Resposta da IA"/"Resposta do time" (who sent it per `lib/mensagem.ts`; only reply rows are read; an OPEN request has no "Resposta da IA", only the team's manual messages). Reason, times and resolution live ONLY in the facts strip, never repeated in a section. The AI summary is labeled "Resumo da IA" on top (and is the row title and the notice text). The sections load only when a request is opened (`FontePedidos.historia`: three bounded `chat_messages` queries by `client_id` + `phone` + window), never in the list query; realtime inserts one row from the payload.  (why: docs/adr/2026-10-08-pedido-detail-shows-source-messages.md)
+- `/pedidos` reads ONLY through `features/pedidos/api/fonte.ts` (server page and browser): 10 per tab with infinite scroll, server search with debounce, counts from `pedidos_contagens`, and a `handoffs` event fetches ONE conversation queue or one request, never the lists. Order and search live in SQL and in `features/pedidos/regras.ts`; keep them equal.  (why: docs/adr/2026-10-02-pedidos-paginated-single-source.md)
 - The `msg1 | msg2` storage (n8n joins a multi-message turn with `" | "` in one row) is a known debt, deferred on purpose because it is hot flow. Split on `" | "` when displaying; do not change the storage without the owner.

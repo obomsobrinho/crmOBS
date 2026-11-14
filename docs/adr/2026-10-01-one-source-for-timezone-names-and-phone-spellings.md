@@ -15,7 +15,7 @@ The 01/10/2026 audit (R-39, R-57, R-58) found the same rule written many times: 
 
 ## Consequences
 - Behavior is unchanged. `e2e/dedup-lib.design.spec.ts` keeps the OLD implementations as references and proves old == new near the Sao Paulo midnight, for names ("Voce", empty, precedence) and for phones (with and without 55 and the ninth digit, JIDs).
-- Still outside this change (other fronts owned the files): `lib/painel*.ts`, `components/Pedidos.tsx` and `lib/guardrail.ts` (its own digit stripping is a different rule, not a spelling builder).
+- Still outside this change (other fronts owned the files): `lib/painel*.ts`, `features/pedidos/components/Pedidos.tsx` and `lib/guardrail.ts` (its own digit stripping is a different rule, not a spelling builder).
 
 ## Evidence
 Audit items STRUCT-06, STRUCT-08, STRUCT-09, STRUCT-10, UI-19.

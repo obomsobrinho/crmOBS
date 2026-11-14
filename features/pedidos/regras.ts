@@ -5,10 +5,10 @@
 // função. Nada aqui fecha pedido: quem fecha são as rotas de sempre
 // (orientar, resolve e send), todas por `fecharPedido` (lib/handoffs.ts).
 
-import { nomeDoContato } from "./inbox";
-import type { LinhaRpc } from "./supabase/schema";
-import { semNumeroDeAvisos } from "./avisos";
-import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "./solucoes";
+import { nomeDoContato } from "@/lib/inbox";
+import type { LinhaRpc } from "@/lib/supabase/schema";
+import { semNumeroDeAvisos } from "@/lib/avisos";
+import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
 
 export interface PedidoLinha {
   id: number;
@@ -194,7 +194,7 @@ export function casaMotivo(p: { motivo: string | null }, motivo: string | null |
 // ---------------------------------------------------------------------------
 // PAGINAÇÃO (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
 // A página lê `public.pedidos_pagina` (10 por vez, busca no banco) por UMA fonte
-// (`lib/pedidos-fonte.ts`). Aqui moram as peças puras: a linha do banco virando
+// (`features/pedidos/api/fonte.ts`). Aqui moram as peças puras: a linha do banco virando
 // pedido, a ORDEM e o encaixe da linha que o realtime acabou de mexer.
 //
 // ⚠️ A ordem existe em dois lugares: aqui (`ordemAbertos`, `ordemResolvidos`) e
