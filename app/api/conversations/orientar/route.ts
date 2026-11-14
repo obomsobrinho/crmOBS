@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoOrientar } from "@/features/pedidos/schemas";
 import { headersN8n } from "@/lib/n8n";
 import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
@@ -36,20 +37,10 @@ export async function POST(req: Request) {
   if ("erro" in r) return r.erro;
   const client = r.mine;
 
-  let body: { phone?: string; instruction?: string; pedidoId?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  const instruction = typeof body.instruction === "string" ? body.instruction.trim() : "";
-  if (!phone || !instruction) {
-    return NextResponse.json(
-      { error: "phone e instruction são obrigatórios" },
-      { status: 400 }
-    );
-  }
+  // O corpo cruza o esquema (docs/plano-dados-e-estado.md, 2.9), com a frase de antes.
+  const lido = await lerCorpo(req, corpoDoOrientar, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const { phone, instruction, pedidoId } = lido.dados;
 
   const svc = createServiceClient();
   const agora = new Date().toISOString();
@@ -68,7 +59,7 @@ export async function POST(req: Request) {
     fechado = await fecharPedido(svc, {
       clientId: client.id,
       phone,
-      id: typeof body.pedidoId === "number" ? body.pedidoId : null,
+      id: pedidoId,
       solucao: SOLUCAO_DA_PORTA.orientar,
       por: client.userId,
       instrucao: instruction,

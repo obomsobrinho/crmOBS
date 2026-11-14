@@ -707,3 +707,24 @@ test.describe("Página de pedidos redesenhada (/design/pedidos)", () => {
     expect(texto).not.toMatch(/[—–]/);
   });
 });
+
+// PASSO 3a de docs/plano-dados-e-estado.md: aba, busca e pedido aberto na URL.
+test.describe("Pedidos na URL (/design/pedidos)", () => {
+  test("refresh e voltar mantêm a aba, a busca e o pedido aberto", async ({ page }) => {
+    await page.goto("/design/pedidos");
+    await expect(page.locator('[data-slot="pedido-linha"]').first()).toBeVisible();
+    await page.getByRole("tab", { name: /Resolvidos/ }).click();
+    await expect(page).toHaveURL(/aba=resolvidos/);
+    await page.getByLabel("Buscar pedidos").fill("Carlos");
+    await expect(page).toHaveURL(/q=Carlos/);
+    await page.reload();
+    await expect(page.getByRole("tab", { name: /Resolvidos/ })).toHaveAttribute("data-state", "active");
+    await expect(page.getByLabel("Buscar pedidos")).toHaveValue("Carlos");
+    await expect(page.locator('[data-slot="pedido-linha"]')).toHaveCount(1);
+    await page.locator('[data-slot="pedido-linha"] button').first().click();
+    await expect(page).toHaveURL(/abrir=7/);
+    await page.goBack();
+    await expect(page).not.toHaveURL(/abrir=/);
+    await expect(page.locator('[data-slot="pedido-nenhum"]')).toBeVisible();
+  });
+});

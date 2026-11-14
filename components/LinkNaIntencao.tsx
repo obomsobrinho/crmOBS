@@ -3,6 +3,16 @@
 import Link from "next/link";
 import { useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.shared-runtime";
+
+/**
+ * Rotas de área MIGRADA (o bloco "State" de .claude/rules/dados-estado-desempenho.md):
+ * a página não lê o banco no servidor (D8), então o gesto pré-carrega a rota INTEIRA
+ * (`kind: "full"`, a mesma da prop `prefetch={true}` do `Link`), e o clique abre sem
+ * nenhuma requisição (B2). As outras continuam até a moldura (`loading.tsx`): um
+ * pré-carregamento inteiro delas leria o banco. Campanhas fica fora (D16: lê no servidor).
+ */
+const PRE_CARGA_INTEIRA = new Set(["/pedidos"]);
 
 /**
  * Link que só pré-carrega na INTENÇÃO (decisão do dono, 14/11/2026, D9 de
@@ -31,7 +41,17 @@ export default function LinkNaIntencao({
   const pretender = () => {
     if (feito.current) return;
     feito.current = true;
-    if (typeof props.href === "string") router.prefetch(props.href);
+    if (typeof props.href !== "string") return aoPretender?.();
+    if (PRE_CARGA_INTEIRA.has(props.href)) {
+      // O menu fica montado o dia todo: quando o Next descarta o pré-carregamento (5 min),
+      // o próximo gesto pede outro.
+      router.prefetch(props.href, {
+        kind: "full" as PrefetchOptions["kind"],
+        onInvalidate: () => {
+          feito.current = false;
+        },
+      });
+    } else router.prefetch(props.href);
     aoPretender?.();
   };
   return (

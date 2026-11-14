@@ -17,7 +17,14 @@ const B1_MS = 300;
 const ROTAS_COM_MOLDURA = ["/pipeline", "/pedidos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
 
 /** Áreas migradas (o bloco "State" de .claude/rules/dados-estado-desempenho.md). */
-const AREAS_MIGRADAS: string[] = [];
+// Campanhas fica fora por decisão do dono (D16): continua lendo no servidor.
+const AREAS_MIGRADAS: string[] = ["/pedidos"];
+
+/**
+ * Área migrada pré-carrega a rota INTEIRA na intenção (`LinkNaIntencao`): o clique
+ * mostra a tela de uma vez, sem passar pela moldura. Ela conta como "apareceu" aqui.
+ */
+const TELA_PRONTA: Record<string, string> = { "/pedidos": '[data-slot="pedidos-coluna-lista"]' };
 
 /** B8, em kB comprimidos. Campanhas e Nova busca descem para 340 no passo 2. */
 const TETO_KB: Record<string, number> = {
@@ -73,7 +80,8 @@ test.describe("B1: a moldura aparece no clique", () => {
       ligar(true);
       const t0 = Date.now();
       await link.click();
-      await page.locator('[data-slot="moldura-carregando"]').first().waitFor({ state: "visible", timeout: ATRASO_RSC_MS });
+      const apareceu = TELA_PRONTA[rota] ? `[data-slot="moldura-carregando"], ${TELA_PRONTA[rota]}` : '[data-slot="moldura-carregando"]';
+      await page.locator(apareceu).first().waitFor({ state: "visible", timeout: ATRASO_RSC_MS });
       const ms = Date.now() - t0;
       ligar(false);
       test.info().annotations.push({ type: "B1", description: `${rota}: ${ms} ms` });

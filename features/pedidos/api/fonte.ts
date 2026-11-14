@@ -39,6 +39,7 @@ import {
   type LinhaHistoria,
 } from "../historia";
 import { MANUAL } from "@/lib/mensagem";
+import { fetchMembers, type Member } from "@/lib/team";
 
 // DE ONDE A PÁGINA DE PEDIDOS TIRA OS DADOS (02/10/2026, auditoria F3, R-07).
 //
@@ -81,6 +82,13 @@ export interface FontePedidos {
    * nunca na lista. Três consultas pequenas por `client_id` + `phone` + janela.
    */
   historia(p: PedidoItem): Promise<HistoriaComRegra>;
+  /** A equipe do tenant (`tenant_members`), para dizer quem resolveu. */
+  membros(): Promise<Member[]>;
+  /**
+   * Só o /design: a memória fecha o pedido como o banco fecharia, para a releitura
+   * depois do "Resolvido" do preview não trazê-lo de volta.
+   */
+  fecharNaMemoria?(p: PedidoResolvido): void;
 }
 
 /**
@@ -130,6 +138,7 @@ export function fonteDoBanco(supabase: Supa, clientId: string): FontePedidos {
         ? { abertos: Number(c.abertos) || 0, resolvidos: Number(c.resolvidos) || 0 }
         : CONTAGENS_PEDIDOS_VAZIAS;
     },
+    membros: () => fetchMembers(supabase),
     async historia(p) {
       const janela = janelaDoPedido(p);
       // A base das três leituras: as linhas desta conversa, colunas explícitas.
@@ -194,10 +203,12 @@ export function fonteDaMemoria(
   /** As linhas falsas de `chat_messages`, por telefone (a história do pedido). */
   mensagens: Record<string, LinhaHistoria[]> = {},
   /** Pedidos cuja orientação já virou regra (id -> quando). */
-  regrasSalvas: Record<number, string> = {}
+  regrasSalvas: Record<number, string> = {},
+  /** A equipe falsa. */
+  membros: Member[] = []
 ): FontePedidos {
-  const abertos = montarFila(abertosRaw, contatos, avisos);
-  const resolvidos = montarResolvidos(resolvidosRaw, contatos, avisos);
+  let abertos = montarFila(abertosRaw, contatos, avisos);
+  let resolvidos = montarResolvidos(resolvidosRaw, contatos, avisos);
   return {
     async pagina(p, depois, n = PAGINA_PEDIDOS) {
       const lista: PedidoItem[] = (p.aba === "abertos" ? abertos : resolvidos).filter(
@@ -222,6 +233,13 @@ export function fonteDaMemoria(
         abertos: abertos.filter((x) => casaMotivo(x, motivo)).length,
         resolvidos: resolvidos.filter((x) => casaMotivo(x, motivo)).length,
       };
+    },
+    async membros() {
+      return membros;
+    },
+    fecharNaMemoria(p) {
+      abertos = abertos.filter((x) => x.id !== p.id);
+      resolvidos = [p, ...resolvidos.filter((x) => x.id !== p.id)];
     },
     async historia(p) {
       const linhas = mensagens[p.phone] ?? [];

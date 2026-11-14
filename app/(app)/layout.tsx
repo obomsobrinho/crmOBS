@@ -12,6 +12,7 @@ import { agoraMs } from "@/lib/periodo";
 import { ProvedorDeDados } from "@/lib/query/provedor";
 import { ProvedorDeSessao } from "@/lib/sessao";
 import AvisoGlobal from "@/components/AvisoGlobal";
+import PonteDoRealtime from "@/lib/realtime/PonteDoRealtime";
 import NovidadesModal from "@/components/NovidadesModal";
 import { notaAtual, novidadeParaMostrar } from "@/lib/novidades";
 import { inicioDoDiaSP } from "@/lib/fuso";
@@ -122,6 +123,10 @@ export default async function AppLayout({
           mostra e grava o "já vi". Conta criada depois da nota não vê. */}
       <NovidadesModal nota={novidadeDoUsuario(client.criadaEm, client.novidadesVista)} dono={client.role === "dono"} />
       <AvisoGlobal />
+      {/* Os eventos do canal do tenant entram no cache aqui, uma vez por aba, em qualquer
+          tela (docs/plano-dados-e-estado.md, 2.7): nunca numa tela, que perderia os
+          eventos de quando a pessoa está em outra. */}
+      <PonteDoRealtime />
     </div>
     </ProvedorDeDados>
     </ProvedorDeSessao>

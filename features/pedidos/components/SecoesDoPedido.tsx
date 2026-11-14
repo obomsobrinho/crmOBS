@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bot, MessageCircle, MessageSquareText, Paperclip, UserRound, type LucideIcon } from "lucide-react";
 import { cardVariants } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -8,14 +9,15 @@ import { StatRotulo } from "@/components/ui/stat";
 import { horaNoDiaDe } from "@/lib/fuso";
 import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ehAberto, type PedidoItem } from "@/features/pedidos/regras";
-import type { FontePedidos } from "@/features/pedidos/api/fonte";
+import type { FontePedidos, HistoriaComRegra } from "@/features/pedidos/api/fonte";
+import { chavesDePedidos } from "@/features/pedidos/api/chaves";
+import { useHistoriaDoPedido } from "@/features/pedidos/hooks/usePedidos";
 import {
   HISTORIA_VAZIA,
   encaixarNaHistoria,
   fimDepois,
   janelaDoPedido,
   montarSecoes,
-  type HistoriaDoPedido,
   type LinhaHistoria,
   type MensagemDaSecao,
 } from "@/features/pedidos/historia";
@@ -32,13 +34,12 @@ import { cn } from "@/lib/utils";
 // Motivo, horários e solução NÃO aparecem aqui: moram só na faixa de fatos.
 // Nunca balão de conversa (decisão de 30/09/2026); quem quer a conversa abre.
 //
-// CARREGA só quando o pedido é aberto (`fonte.historia`, três consultas
+// CARREGA só quando o pedido é aberto, pelo cache (`useHistoriaDoPedido`: `fonte.historia`, três consultas
 // limitadas). TEMPO REAL: enquanto o pedido espera ou a janela do "depois" está aberta, o
 // canal da conversa (`useCanalConversa`, `chat_messages` filtrado pelo telefone
 // no servidor) encaixa a LINHA que chegou pelo payload, zero consulta; reconectar
 // ou voltar o foco relê só este pedido.
 
-type Estado = { carregando: boolean; erro: boolean; historia: HistoriaDoPedido; regraSalvaEm: string | null };
 
 export default function SecoesDoPedido({
   p,
@@ -63,39 +64,24 @@ export default function SecoesDoPedido({
   /** O "agora" da tela (fixado a cada minuto pelo pai): ler o relógio no render é impuro. */
   agora: number;
 }) {
+  const qc = useQueryClient();
   const closedAt = ehAberto(p) ? null : p.closedAt;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- a janela muda só com a abertura e o fechamento
   const janela = useMemo(() => janelaDoPedido(p), [p.openedAt, closedAt]);
   // O número de avisos nunca é conversa (lib/avisos.ts): nada a buscar.
   const ehAvisos = ehNumeroDeAvisos(p.phone, numeroAvisos);
-  const [estado, setEstado] = useState<Estado>({
-    carregando: !ehAvisos,
-    erro: false,
-    historia: HISTORIA_VAZIA,
-    regraSalvaEm: null,
-  });
+  // A história vem do cache (passo 3a): reabrir o pedido não lê de novo por 30 s.
+  const lida = useHistoriaDoPedido(fonte, p, !ehAvisos);
+  const chave = chavesDePedidos.historia(p.id, closedAt);
+  const estado = {
+    carregando: !ehAvisos && lida.isPending,
+    erro: lida.isError,
+    historia: lida.data ?? HISTORIA_VAZIA,
+    regraSalvaEm: lida.data?.regraSalvaEm ?? null,
+  };
 
-  const carregar = useCallback(async () => {
-    if (ehAvisos) return;
-    try {
-      const { regraSalvaEm, ...historia } = await fonte.historia(p);
-      setEstado({ carregando: false, erro: false, historia, regraSalvaEm });
-    } catch (e) {
-      console.error("mensagens do pedido:", e);
-      setEstado((s) => ({ ...s, carregando: false, erro: true }));
-    }
-    // O pedido muda de objeto a cada evento da lista; o que importa é ele e a janela.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fonte, p.id, p.phone, janela, ehAvisos]);
-
-  // IIFE de propósito: o lint (react-hooks/set-state-in-effect) recusa `void carregar()` direto no efeito.
-  useEffect(() => {
-    void (async () => {
-      await carregar();
-    })();
-  }, [carregar]);
-
-  // Só escuta enquanto o "depois" ainda pode crescer (pedido velho não muda).
+  // Só escuta enquanto o "depois" ainda pode crescer (pedido velho não muda). O canal
+  // PRÓPRIO do item aberto fica aqui e escreve na chave dele (a exceção de lib/realtime/).
   const vivo = !!clientId && !preview && !ehAvisos && (closedAt == null || Date.parse(fimDepois(janela)) > agora);
   useCanalConversa({
     nome: "pedido-secoes",
@@ -103,15 +89,16 @@ export default function SecoesDoPedido({
     filtro: `phone=eq.${p.phone}`,
     modo: "aplicar",
     ativo: vivo,
-    revalidar: () => void carregar(),
+    revalidar: () => void qc.invalidateQueries({ queryKey: chave, exact: true }),
     aoEvento: (ev) => {
       if (ev.tipo === "DELETE" || !ev.novo || ev.novo.client_id !== clientId) return;
       // A linha do payload é a do banco (mesmo cast de `useMensagensDaConversa`).
       const linha = ev.novo as LinhaHistoria;
-      // Linha igual à que já está na tela (UPDATE sem mudança): mesmo estado, sem render.
-      setEstado((s) => {
-        const historia = encaixarNaHistoria(s.historia, linha, janela);
-        return historia === s.historia ? s : { ...s, historia };
+      // Linha igual à que já está na tela (UPDATE sem mudança): mesmo valor, sem render.
+      qc.setQueryData<HistoriaComRegra>(chave, (d) => {
+        if (!d) return d;
+        const historia = encaixarNaHistoria(d, linha, janela);
+        return historia === d ? d : { ...d, ...historia };
       });
     },
   });

@@ -1,6 +1,6 @@
 # Plan: data and state, one pattern for the whole app
 
-Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). **Step 2 delivered on 14/11/2026** (its section). The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
+Status: **Decisions closed by the owner on 11/11/2026** (section 9). Written 10/11/2026. **External review done on 11/11/2026** (owner's vault, `assets/atenda/revisao-spec-2026-11-11/`); its findings 1 to 22 are applied below, with the owner's choices of the same day. **Step 0 delivered on 13/11/2026** (results in its section and in `docs/handoff.md`; the Supabase dashboard check (a) is left with the owner). **Step 1 delivered on 14/11/2026** (its section). **Step 2 delivered on 14/11/2026** (its section). **Step 3a delivered on 14/11/2026** (its section; 3b not started). The current step and the migrated areas are tracked in the "State" block of `.claude/rules/dados-estado-desempenho.md`.
 
 **Performance is the first goal of this plan.** The budget in section 3 is the acceptance criterion of every step and stays a rule after the plan ends. This document is the single roadmap for data, state and performance; the documentation map is in section 6.
 
@@ -514,6 +514,17 @@ Acceptance:
 - Refresh and back keep tab and search.
 
 **Exit gate**: if any criterion fails, 3b does not start.
+
+**Delivered (14/11/2026):**
+- Move commit: `components/Pedidos.tsx` and `SecoesDoPedido.tsx` to `features/pedidos/components/`, `lib/pedidos-fonte.ts` to `features/pedidos/api/fonte.ts`, `lib/pedidos.ts` to `features/pedidos/regras.ts`, `lib/historia-do-pedido.ts` to `features/pedidos/historia.ts`. `lib/fila-de-pedidos.ts` stays (the brain uses it).
+- The page reads no database (D8): `app/(app)/pedidos/page.tsx` is `GuardaDaTela` plus `TelaDePedidos` (session from `lib/sessao.tsx`). Every block reads through the cache (`features/pedidos/hooks/usePedidos.ts`, keys in `api/chaves.ts`): the tab list on `useInfiniteQuery`, the tab counters, the team (`fonte.membros`), the `?abrir=` request by id, and the request history. Orientar and Resolvido keep calling the same routes and wait for their answer, as before; the result goes into the cache (`concluirNoCache`).
+- The realtime bridge (`lib/realtime/PonteDoRealtime.tsx`, mounted once in the `(app)` layout; `features/pedidos/api/ponte.ts` plus `sincronizar.ts`, loaded on the first event): a `handoffs` event re-reads one conversation queue and places it with the screen's own rules; a list nobody observes is only marked stale. The open request's messages keep their own channel, writing to the history key. Decision in `docs/adr/2026-11-14-realtime-bridge-and-full-prefetch-for-migrated-areas.md`.
+- URL (nuqs): `?aba=`, `?q=`, `?motivo=`, `?abrir=` (`features/pedidos/components/na-url.ts`); opening a request and changing tab push, search and reason replace.
+- Intent prefetch of the whole route for migrated areas (`PRE_CARGA_INTEIRA` in `components/LinkNaIntencao.tsx`, `kind: "full"`), so coming back makes no request at all.
+- Zod: `POST /api/conversations/resolve` and `/orientar` read their bodies through `features/pedidos/schemas.ts` with the sentences they had. The Asaas webhook stays in shadow mode: its week of data ends on 21/11/2026.
+- Measured: B1 Pedidos 111 ms (the screen itself, not the frame); B2 "A, B, back to Pedidos" 0 requests; B8 Pedidos 337 kB (ceiling 340), the other routes within 1 to 3 kB of before. A help request opened with the screen open shows with ONE `pedidos_pagina` call, the conversation queue (`e2e/pedidos.serial.spec.ts`). Refresh keeps tab and search; back from an opened request keeps them.
+- Gate suites: before, `realtime.serial`, `atendimento.serial` and `pedidos.serial` 17/17, `test:e2e:n8n` 9/10 (the known "conversa marcada é agendar"); after, the same three 19/19 with the 2 new tests (the URL test, rewritten after its first run, passed in its own run; one real-brain journey passed on its retry), `test:e2e:n8n` 10/10. Gate passed.
+- Not done: 3b. After the full logged suite of the afternoon the database stopped answering (connection timeouts on a plain SELECT at about 17h10), so no suite of 3b could run its baseline (`docs/handoff.md`).
 
 #### Step 3b: Contatos, Pipeline, Painel, Agenda
 

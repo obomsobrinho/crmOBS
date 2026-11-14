@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, HandHelping, MessagesSquare } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
@@ -18,43 +18,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { CabecalhoBloco } from "@/components/ContactFields";
-// eslint-disable-next-line no-restricted-imports -- move commit of Step 3a; the behavior commit moves the reads into the area source
-import { createClient } from "@/lib/supabase/client";
-import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, prettyPhone } from "@/lib/format";
 import { diaMesCurtoHoraSP, horaNoDiaDe, mesmoDiaSP } from "@/lib/fuso";
 import { foraDaLista } from "@/lib/inbox-lista";
-import { ehNumeroDeAvisos } from "@/lib/avisos";
 import { ESPERA_AVISO_MS } from "@/lib/painel";
-import { memberName, type Member } from "@/lib/team";
+import { memberName } from "@/lib/team";
 import { useDebounce } from "@/lib/use-debounce";
-import { usePaginada } from "@/lib/use-paginada";
 import {
   DIAS_DE_RESOLVIDOS,
-  PAGINA_PEDIDOS,
   ehAberto,
-  encaixarAbertosDaConversa,
-  encaixarResolvido,
-  casaMotivo,
   podeVirarRegra,
-  type ContatoLinha,
   type PedidoAberto,
   type PedidoItem,
-  type PedidoLinha,
   type PedidoResolvido,
-  type PedidoResolvidoLinha,
 } from "@/features/pedidos/regras";
+import type { FontePedidos } from "@/features/pedidos/api/fonte";
 import {
-  fonteDaMemoria,
-  fonteDoBanco,
-  type AbaPedidos,
-  type ContagensPedidos,
-  type FontePedidos,
-  type ParamsPedidos,
-} from "@/features/pedidos/api/fonte";
+  useConcluirPedido,
+  useContagensDePedidos,
+  useFimDaLista,
+  useListaDePedidos,
+  useMembrosDePedidos,
+  usePedidoPorId,
+} from "@/features/pedidos/hooks/usePedidos";
+import { usePedidosNaUrl } from "./na-url";
 import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
 import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
-import type { LinhaHistoria } from "@/features/pedidos/historia";
 import { cn } from "@/lib/utils";
 import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
 
@@ -86,34 +75,23 @@ async function postar(url: string, corpo: unknown): Promise<Response | null> {
 /** "30 set, 14:05", sempre no fuso de São Paulo (lib/fuso.ts). */
 const quando = diaMesCurtoHoraSP;
 
-// PAGINAÇÃO E REALTIME (02/10/2026, auditoria F3, R-07; docs/plano-carregamento.md).
-// A lista da aba ativa vem de UMA fonte (`features/pedidos/api/fonte.ts`, a mesma da
-// página do servidor): 10 por vez, mais ao rolar, busca no banco depois de 300ms
-// parado. Trocar de aba troca o recorte (primeira página dela). O realtime não
-// refaz lista: um evento de `handoffs` busca SÓ a fila da conversa que mexeu (ou
-// o pedido que fechou) e encaixa no lugar; os números das abas são agregado.
+// DADOS (passo 3a de docs/plano-dados-e-estado.md): a tela não recebe nada do servidor.
+// Cada bloco lê pelo cache (`hooks/usePedidos.ts`): a lista infinita da aba, os
+// números das abas, a equipe, o pedido do link, a história do pedido aberto. O
+// realtime não mora aqui: a ponte do layout (`lib/realtime/`) encaixa no cache a
+// fila da conversa que mexeu, e a tela só desenha o que está nele. Aba, busca,
+// motivo e o pedido aberto ficam na URL (`na-url.ts`).
 export default function Pedidos({
-  inicial,
-  members,
+  fonte,
   clientId,
   numeroAvisos,
   readOnly = false,
   dono = false,
-  previewDados,
   preview = false,
 }: {
-  /** O que o servidor já buscou: a primeira página da aba que abre, os números e o `?abrir=`. */
-  inicial: {
-    aba: AbaPedidos;
-    itens: PedidoItem[];
-    temMais: boolean;
-    contagens: ContagensPedidos;
-    /** `?abrir=` do link do aviso: o pedido que já nasce selecionado. */
-    abrir: PedidoItem | null;
-  };
-  /** Para nomear quem resolveu. */
-  members: Member[];
-  /** Tenant logado: o realtime escuta só ele. Ausente no /design. */
+  /** De onde vêm os dados: o banco (a página) ou a memória (/design). */
+  fonte: FontePedidos;
+  /** Tenant logado. Ausente no /design. */
   clientId?: string;
   /** Destino dos avisos: esse número nunca é pedido (lib/avisos.ts). */
   numeroAvisos: string | null;
@@ -124,179 +102,70 @@ export default function Pedidos({
    * `agent-rules` barra o atendente de novo; esconder não é barrar.
    */
   dono?: boolean;
-  /** /design: as linhas falsas de onde a fonte de memória tira os pedidos. */
-  previewDados?: {
-    abertos: PedidoLinha[];
-    resolvidos: PedidoResolvidoLinha[];
-    contatos: ContatoLinha[];
-    /** Linhas falsas de `chat_messages` por telefone (a história de cada pedido). */
-    mensagens?: Record<string, LinhaHistoria[]>;
-    /** Pedidos cuja orientação já virou regra (id -> quando). */
-    regrasSalvas?: Record<number, string>;
-  };
   /** /design: sem banco, e as ações só simulam. */
   preview?: boolean;
 }) {
-  const [dadosPreview, setDadosPreview] = useState(previewDados);
-  const fonte = useMemo<FontePedidos>(
-    () =>
-      clientId && !preview
-        ? fonteDoBanco(createClient(), clientId)
-        : fonteDaMemoria(
-            dadosPreview?.abertos ?? [],
-            dadosPreview?.resolvidos ?? [],
-            dadosPreview?.contatos ?? [],
-            numeroAvisos,
-            dadosPreview?.mensagens ?? {},
-            dadosPreview?.regrasSalvas ?? {}
-          ),
-    [clientId, preview, dadosPreview, numeroAvisos]
-  );
   const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
-
-  const [aba, setAba] = useState<Aba>(inicial.aba);
-  const [selecionado, setSelecionado] = useState<PedidoItem | null>(inicial.abrir);
-  const [q, setQ] = useState("");
-  // Filtro por motivo (06/10/2026, lib/motivos.ts): vai ao SERVIDOR como a
-  // busca, e os números das abas seguem ele.
-  const [motivo, setMotivo] = useState<string | null>(null);
-  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  const url = usePedidosNaUrl();
+  // O campo segue o que se digita; a URL e a leitura, o texto parado há 300 ms.
+  const [q, setQ] = useState(url.q);
   const busca = useDebounce(q.trim(), 300);
+  useEffect(() => {
+    if (busca !== url.q) void url.setU({ q: busca || null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só o texto parado escreve na URL
+  }, [busca]);
+  const motivo = url.motivo;
   const [resultado, setResultado] = useState<Resultado | null>(null);
-  const [contagens, setContagens] = useState(inicial.contagens);
   // "Agora" do cálculo da espera, fixado a cada minuto: ler `Date.now()` no
   // render é impuro, e a espera é grossa (minutos, horas).
   const [agora, setAgora] = useState(() => Date.now());
+  useEffect(() => {
+    if (preview) return;
+    const relogio = setInterval(() => setAgora(Date.now()), 60_000);
+    return () => clearInterval(relogio);
+  }, [preview]);
 
-  const params = useMemo<ParamsPedidos>(() => ({ aba, busca, fora, motivo }), [aba, busca, fora, motivo]);
-  const { itens, setItens, temMais, carregando, fimRef, revalidar } = usePaginada<PedidoItem, ParamsPedidos>({
-    inicial: inicial.itens,
-    temMaisInicial: inicial.temMais,
-    params,
-    buscar: (p, depois, n) => fonte.pagina(p, depois, n),
-    chave: (p) => p.id,
-    tamanho: PAGINA_PEDIDOS,
-    // Voltar o foco é com o canal (`useCanalTenant`), que também recontar.
-    revalidarAoVoltar: false,
-  });
+  // O pedido do link (`?abrir=`): se está resolvido e a URL não diz a aba, a tela
+  // abre em Resolvidos, como antes.
+  const doLink = usePedidoPorId(fonte, fora, url.abrir, false);
+  const pedidoDoLink = doLink.data ?? null;
+  const aba: Aba = url.aba ?? (pedidoDoLink && !ehAberto(pedidoDoLink) ? "resolvidos" : "abertos");
+  // Com link, a lista espera saber a aba (senão leria Abertos e trocaria em seguida).
+  const esperaLink = url.aba == null && url.abrir != null && doLink.isPending;
+
+  const lista = useListaDePedidos(fonte, fora, { aba, busca, motivo }, !esperaLink);
+  const contagens = useContagensDePedidos(fonte, fora, motivo);
+  const members = useMembrosDePedidos(fonte);
+  const concluirNoCache = useConcluirPedido(fonte, fora, !preview);
   // Trocou de aba e a primeira página dela ainda não chegou: o que está na
   // lista é da outra, e não pode aparecer.
-  const linhas = useMemo(() => itens.filter((p) => ehAberto(p) === (aba === "abertos")), [itens, aba]);
+  const linhas = useMemo(() => lista.itens.filter((p) => ehAberto(p) === (aba === "abertos")), [lista.itens, aba]);
+  const carregando = esperaLink || lista.isPending || lista.isFetchingNextPage || (lista.isPlaceholderData && lista.isFetching);
+  const fimRef = useFimDaLista(lista.hasNextPage, lista.isFetchingNextPage, () => void lista.fetchNextPage());
 
   const nomeDeQuem = useMemo(() => {
     const m = new Map(members.map((x) => [x.userId, memberName(x.email)]));
     return (id: string | null) => (id ? m.get(id) ?? null : null);
   }, [members]);
 
-  // O detalhe segue a linha da lista quando ela existe (o realtime a atualiza);
-  // se a busca a tirou da lista, a ficha continua com o que estava na tela.
-  const atual = selecionado ? (itens.find((p) => p.id === selecionado.id) ?? selecionado) : null;
+  // O detalhe segue a linha da lista quando ela existe (a ponte do realtime a
+  // atualiza); fora da lista (busca, outra aba), o pedido lido pelo id.
+  const atual = url.abrir != null ? (lista.itens.find((p) => p.id === url.abrir) ?? pedidoDoLink) : null;
   const aberto = atual && ehAberto(atual) ? atual : null;
   const resolvido = atual && !ehAberto(atual) ? atual : null;
 
-  const recontar = useCallback(async () => {
-    try {
-      setContagens(await fonte.contagens(fora, motivo));
-    } catch (e) {
-      console.error("contagens de pedidos:", e);
-    }
-  }, [fonte, fora, motivo]);
-
-  /** Trocou o filtro: a lista recarrega (params) e os números das abas acompanham. */
-  function trocarMotivo(v: string) {
-    const novo = ehMotivo(v) ? v : null;
-    setMotivo(novo);
-    fonte
-      .contagens(fora, novo)
-      .then(setContagens)
-      .catch((e) => console.error("contagens de pedidos:", e));
+  function selecionar(p: PedidoItem | null) {
+    void url.setU({ abrir: p?.id ?? null }, { history: "push" });
   }
 
-  // O que o realtime precisa saber sem refazer o canal a cada render.
-  const vivo = useRef({ aba, busca, motivo, temMais, selecionado });
-  useEffect(() => {
-    vivo.current = { aba, busca, motivo, temMais, selecionado };
-  });
-
-  /**
-   * Encaixa na lista o que mudou numa conversa: a fila aberta dela (posição e
-   * total refeitos) quando a aba é a dos abertos, ou os pedidos que fecharam
-   * quando é a dos resolvidos. UMA consulta pequena por conversa, nunca a lista.
-   */
-  const sincronizar = useCallback(
-    async (phone: string, ids: number[]) => {
-      const v = vivo.current;
-      try {
-        if (v.aba === "abertos") {
-          const novos = (await fonte.abertosDoFone(fora, phone)).filter((p) => casaMotivo(p, v.motivo));
-          setItens((cur) => encaixarAbertosDaConversa(cur, phone, novos, v.busca, v.temMais));
-        } else {
-          const lidos = await Promise.all(ids.map((id) => fonte.porId(fora, id).then((i) => [id, i] as const)));
-          setItens((cur) =>
-            lidos.reduce(
-              (acc, [id, i]) =>
-                encaixarResolvido(acc, id, i && casaMotivo(i, v.motivo) ? i : null, v.busca, v.temMais, Date.now()),
-              cur
-            )
-          );
-        }
-        if (v.selecionado && v.selecionado.phone === phone) {
-          const novo = await fonte.porId(fora, v.selecionado.id);
-          if (novo) setSelecionado(novo);
-        }
-        void recontar();
-      } catch (e) {
-        console.error("pedido do realtime:", e);
-      }
-    },
-    [fonte, fora, setItens, recontar]
-  );
-
-  // Uma rajada de eventos vira UMA busca por conversa, depois de 400ms parado.
-  const pendentesRef = useRef(new Map<string, Set<number>>());
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const descarregar = useCallback(() => {
-    const todos = [...pendentesRef.current.entries()];
-    pendentesRef.current.clear();
-    for (const [phone, ids] of todos) void sincronizar(phone, [...ids]);
-  }, [sincronizar]);
-  useEffect(() => {
-    if (!clientId || preview) return;
-    const relogio = setInterval(() => setAgora(Date.now()), 60_000);
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      clearInterval(relogio);
-    };
-  }, [clientId, preview]);
-
-  // Tempo real: o canal do tenant (`useCanalTenant`) cuida do status, da volta
-  // do foco e da aba escondida; daqui sai só o que é desta tela. Revalidar
-  // (reassinatura, volta ao foco) é o ÚNICO lugar que relê a lista inteira.
-  useCanalTenant({
-    clientId,
-    ativo: !!clientId && !preview,
-    tabelas: ["handoffs"],
-    aoEvento: (ev) => {
-      const fone = foneDoEvento(ev);
-      if (!fone || ehNumeroDeAvisos(fone, numeroAvisos)) return;
-      const ids = pendentesRef.current.get(fone) ?? new Set<number>();
-      const id = Number((ev.novo ?? ev.antigo)?.id);
-      // Pedido que fechou (ou sumiu) pode ser da aba dos resolvidos.
-      if (Number.isFinite(id) && (ev.tipo === "DELETE" || ev.novo?.closed_at != null)) ids.add(id);
-      pendentesRef.current.set(fone, ids);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(descarregar, 400);
-    },
-    revalidar: () => {
-      void revalidar();
-      void recontar();
-    },
-  });
+  function trocarMotivo(v: string) {
+    void url.setU({ motivo: ehMotivo(v) ? v : null });
+  }
 
   /**
    * O pedido saiu dos abertos: vira resolvido na tela, com a solução que a ROTA
    * gravou (lib/solucoes.ts). `null` quando esta tela não sabe (outra aba já tinha
-   * fechado): o realtime e o `sincronizar` trazem a linha de verdade.
+   * fechado): a ponte do realtime traz a linha de verdade.
    */
   function concluir(p: PedidoAberto, r: Resultado, solucao: Solucao | null, orientacao: string | null) {
     setResultado(r);
@@ -314,38 +183,10 @@ export default function Pedidos({
       orientacao,
       porQuem: null,
     };
-    setItens((cur) => {
-      const sem = cur.filter((x) => x.id !== p.id);
-      return aba === "resolvidos" ? [fechado, ...sem] : sem;
-    });
-    setContagens((c) => ({ abertos: Math.max(0, c.abertos - 1), resolvidos: c.resolvidos + 1 }));
-    setSelecionado(null);
-    if (preview) {
-      // O preview não tem banco: a fonte de memória é que precisa saber.
-      setDadosPreview((d) =>
-        d && {
-          ...d,
-          abertos: d.abertos.filter((x) => x.id !== p.id),
-          resolvidos: [
-            {
-              id: p.id,
-              phone: p.phone,
-              opened_at: p.openedAt,
-              summary: p.summary,
-              instruction: orientacao,
-              closed_at: fechado.closedAt,
-              atualizado_em: p.atualizadoEm,
-              solucao,
-              closed_by: null,
-            },
-            ...d.resolvidos,
-          ],
-        }
-      );
-    } else {
-      // O realtime também vai chegar; aqui a fila da conversa é refeita já.
-      void sincronizar(p.phone, [p.id]);
-    }
+    // O preview não tem banco: a fonte de memória é que precisa saber.
+    fonte.fecharNaMemoria?.(fechado);
+    concluirNoCache(fechado);
+    selecionar(null);
   }
 
   async function orientar(p: PedidoAberto, texto: string) {
@@ -430,8 +271,7 @@ export default function Pedidos({
               <Tabs
                 value={aba}
                 onValueChange={(v) => {
-                  setAba(v as Aba);
-                  setSelecionado(null);
+                  void url.setU({ aba: v as Aba, abrir: null }, { history: "push" });
                 }}
               >
                 <TabsList variant="painel" className="bg-canvas" aria-label="Pedidos">
@@ -524,19 +364,17 @@ export default function Pedidos({
                     key={p.id}
                     p={p}
                     agora={agora}
-                    ativa={p.id === selecionado?.id}
+                    ativa={p.id === url.abrir}
                     onSelecionar={() => {
                       setResultado(null);
-                      setSelecionado(p);
+                      selecionar(p);
                     }}
                   />
                 ))}
                 {/* O fim da lista: quando aparece, vem a próxima página. */}
-                {temMais && (
+                {lista.hasNextPage && (
                   <li
-                    ref={(el) => {
-                      fimRef.current = el;
-                    }}
+                    ref={fimRef}
                     data-slot="pedidos-mais"
                     aria-hidden
                     className="h-px"
@@ -569,7 +407,7 @@ export default function Pedidos({
               clientId={clientId}
               preview={preview}
               numeroAvisos={numeroAvisos}
-              onVoltar={() => setSelecionado(null)}
+              onVoltar={() => selecionar(null)}
               onOrientar={(t) => orientar(aberto, t)}
               onResolvido={() => marcarResolvido(aberto)}
             />
@@ -585,7 +423,7 @@ export default function Pedidos({
               numeroAvisos={numeroAvisos}
               quemResolveu={nomeDeQuem(resolvido.porQuem)}
               podeSalvarRegra={dono && !readOnly}
-              onVoltar={() => setSelecionado(null)}
+              onVoltar={() => selecionar(null)}
             />
           ) : (
             <EstadoVazio

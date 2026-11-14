@@ -22,8 +22,8 @@ paths:
 The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). This file holds only the rules, and says which ones apply now and which apply from a given step.
 
 ## State (updated in the commit that closes each step)
-- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner), Step 1, the Base (14/11/2026), and Step 2, Campanhas (14/11/2026; the Apify webhook and the cron have no body to put in shadow mode, spec Step 2).
-- Areas migrated: Campanhas (`features/campanhas/`).
+- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner), Step 1, the Base (14/11/2026), Step 2, Campanhas (14/11/2026; the Apify webhook and the cron have no body to put in shadow mode, spec Step 2), and Step 3a, Pedidos, the tenant pilot (14/11/2026).
+- Areas migrated: Campanhas (`features/campanhas/`), Pedidos (`features/pedidos/`).
 
 **Which pattern new code follows**: in an area not migrated yet, new code follows that area's current pattern (`data.md`, `realtime.md`, `engineering.md` as written, e.g. a new list in Contatos uses `usePaginada` until Contatos migrates). A new screen or a wholly new area is born in the new pattern, from the step whose tooling it needs. A migrated area is one listed above; its files live in `features/<area>/`.
 
@@ -46,3 +46,5 @@ The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). Th
 
 ## Applies from Step 3a (the realtime bridge)
 - Realtime callbacks of a migrated area write to the cache through the bridge registered once in the `(app)` layout, never from a screen. UPDATE patches the row by id comparing `new` with the cached row (never depends on `old`). INSERT follows the per-list table of spec 2.7: tenant lists keep today's behavior (fetch one row and place it, e.g. `encaixar`, or patch); only counters and lists without a placement rule invalidate, debounced 500 ms. A DELETE of an id not in the cache is ignored. No echo suppression: applying by id is idempotent.  (why: docs/plano-dados-e-estado.md)
+- The bridge is `lib/realtime/PonteDoRealtime.tsx`, one hook per area (`usePonteDePedidos`). What a bridge imports enters the JS of every route: keep its heavy part (source, placement rules) behind `import()`, loaded on the first event. A list nobody observes is only marked stale (`refetchType: "none"`), and a reconnect cuts each list to its first page before invalidating. The one exception is an open item's own channel (`useCanalConversa`, e.g. the messages of an open request), which stays in the component that opens it and writes to that item's key.  (why: docs/adr/2026-11-14-realtime-bridge-and-full-prefetch-for-migrated-areas.md)
+- A migrated route goes into `PRE_CARGA_INTEIRA` (`components/LinkNaIntencao.tsx`: the intent prefetch is the whole route, so coming back makes 0 requests, B2) and into `AREAS_MIGRADAS`/`TELA_PRONTA` of `e2e/desempenho.orcamento.spec.ts`. Never a route whose page still reads the database: its full prefetch would run those reads.  (why: docs/adr/2026-11-14-realtime-bridge-and-full-prefetch-for-migrated-areas.md)
