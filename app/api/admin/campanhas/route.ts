@@ -1,6 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehSituacaoDaCampanha, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
-import { campanhasComEnvio, falhou, paginaDeCampanhas, torto } from "@/lib/campanhas-servidor";
+import { ehSituacaoDaCampanha, paginaDe, textoDe } from "@/features/campanhas/pedidos";
+import { campanhasComEnvio, falhou, paginaDeCampanhas, torto } from "@/features/campanhas/server/campanhas";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 

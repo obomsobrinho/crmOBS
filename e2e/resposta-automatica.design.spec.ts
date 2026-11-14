@@ -7,7 +7,7 @@ import {
   sinaisDaResposta,
   temPadraoDeAutomacao,
 } from "../lib/resposta-automatica";
-import { ehPedidoParaParar, respostasDosEnvios } from "../lib/prospeccao";
+import { ehPedidoParaParar, respostasDosEnvios } from "../features/campanhas/regras";
 
 // A trava do robô de menu (07/11/2026): 2 de 3 sinais (rápida, padrão, repetida).
 // Puro, sem banco.

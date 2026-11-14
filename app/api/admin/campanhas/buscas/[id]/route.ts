@@ -1,5 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { apagarBusca, buscaPorId, falhou } from "@/lib/campanhas-servidor";
+import { apagarBusca, buscaPorId, falhou } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // GET: uma busca (o topo do detalhe da busca). DELETE: apaga a lista (suave); 409 enquanto ela

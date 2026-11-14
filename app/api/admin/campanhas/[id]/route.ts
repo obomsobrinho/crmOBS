@@ -1,6 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { rascunhoDe } from "@/lib/campanhas-pedidos";
-import { apagarCampanha, campanhaAberta, falhou, salvarRascunho, torto } from "@/lib/campanhas-servidor";
+import { rascunhoDe } from "@/features/campanhas/pedidos";
+import { apagarCampanha, campanhaAberta, falhou, salvarRascunho, torto } from "@/features/campanhas/server/campanhas";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 

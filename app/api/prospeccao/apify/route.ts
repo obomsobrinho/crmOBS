@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { ehId } from "@/lib/campanhas-pedidos";
-import { fecharBusca } from "@/lib/campanhas-servidor";
-import { fonteApify } from "@/lib/fonte-apify";
+import { ehId } from "@/features/campanhas/pedidos";
+import { fecharBusca } from "@/features/campanhas/server/campanhas";
+import { fonteApify } from "@/features/campanhas/server/apify";
 import { segredoConfere } from "@/lib/segredo";
 import { createServiceClient } from "@/lib/supabase/service";
 

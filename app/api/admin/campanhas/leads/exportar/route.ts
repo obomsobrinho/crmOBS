@@ -1,7 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { recorteDe } from "@/lib/campanhas-pedidos";
-import { falhou, torto } from "@/lib/campanhas-servidor";
-import { planilhaDosLeads } from "@/lib/planilha-servidor";
+import { recorteDe } from "@/features/campanhas/pedidos";
+import { falhou, torto } from "@/features/campanhas/server/campanhas";
+import { planilhaDosLeads } from "@/features/campanhas/server/planilha";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // EXPORTAR para Excel os leads do recorte que está na tela (os mesmos filtros da

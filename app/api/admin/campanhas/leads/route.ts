@@ -1,6 +1,6 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { paginaDe, recorteDe } from "@/lib/campanhas-pedidos";
-import { categoriasDoRecorte, cidadesDosLeads, falhou, paginaDeLeads, torto } from "@/lib/campanhas-servidor";
+import { paginaDe, recorteDe } from "@/features/campanhas/pedidos";
+import { categoriasDoRecorte, cidadesDosLeads, falhou, paginaDeLeads, torto } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // A tabela de leads (toda a base, ou `?busca=`): 10 por página, busca pelo nome

@@ -448,7 +448,7 @@ Out: migrating any screen; enforcing any schema on a machine caller; `lib/use-ca
 Starts only after the `importar-planilha` work is merged into `main` (it edits `components/admin/campanhas`).
 
 Scope:
-- Move commit first: `components/admin/campanhas/**`, `lib/campanhas-fonte.ts`, `lib/campanhas-servidor.ts`, `lib/prospeccao.ts` and the other Campanhas-only `lib/` files into `features/campanhas/`. Only `git mv` and imports change.
+- Move commit first: `features/campanhas/components/**`, `features/campanhas/api/fonte.ts`, `features/campanhas/server/campanhas.ts`, `features/campanhas/regras.ts` and the other Campanhas-only `lib/` files into `features/campanhas/`. Only `git mv` and imports change.
 - `useLeitura`/`usePaginaDaFonte` replaced by the area hooks (queries through the admin API routes).
 - No double read: the server stops pre-reading data the client will query; the page keeps only the gate and the frame.
 - Optimistic writes for remove lead, delete list, delete campaign and mark lead (`nao_encontrado` on delete is success inside the source).
@@ -456,7 +456,7 @@ Scope:
 - prefetch on intent on the Campanhas menu link; `refetchOnWindowFocus` on (no realtime in this area).
 - Nova busca frame in `loading.tsx`.
 - The cron (D12): `prospeccao_apagar_antigos` runs in one tick a day, at dawn (São Paulo), not in every 5 min tick.
-- JS weight: find what weighs in Campanhas and Nova busca (the recharts charts in `components/admin/campanhas/graficos.tsx` and the spreadsheet importer are the suspects) and load it on demand, to the 340 kB ceiling of the other routes (B8).
+- JS weight: find what weighs in Campanhas and Nova busca (the recharts charts in `features/campanhas/components/graficos.tsx` and the spreadsheet importer are the suspects) and load it on demand, to the 340 kB ceiling of the other routes (B8).
 - Zod and the single error shape in `app/api/admin/campanhas/**`; the Apify webhook and the Campanhas cron in shadow mode.
 
 Files: `features/campanhas/**` (after the move), `app/(app)/campanhas/**`, `app/api/admin/campanhas/**`, `app/api/prospeccao/**`, `e2e/campanhas*.spec.ts`.
@@ -474,10 +474,10 @@ Acceptance (measured):
 Out: the other admin screens; the `/clientes` central (it keeps `lembrar` until Step 5).
 
 **Delivered (14/11/2026, partly):**
-- Reads: `useLeitura` (`components/admin/campanhas/tabela.tsx`) now runs on the query cache with the same signature, so the 20 reads of the area changed in one place. The same key does not read again for 30 s: switching tabs and coming back from Nova busca open from the cache. What the server already read enters as fresh data, so the browser no longer reads it again (B3, the double read). The server's first data is used only for the key it read (with the cache, passing it to every page made page 2 show page 1, caught by `campanhas.design.spec.ts`). Focus return re-reads (no realtime here); no retry (the 20 s limit stays the only wait).
-- Writes: `mudou` became an invalidation of the `["campanhas"]` prefix that waits for a pending write (the `versao` stays 0 until the move commit). Removing a lead, deleting a list and deleting a campaign are optimistic (`components/admin/campanhas/Apagar.tsx` over `opcoesDeTirar`): the row and the total leave at the confirm, the dialog closes at once, a refusal shows its reason in the app notice and the final re-read brings the row back; only the last pending write re-reads. "Não encontrado" on a delete is success inside the source (`lib/campanhas-fonte.ts`). Marking a lead was already a local patch and stayed.
-- URL: tab, open list and open campaign (`?aba=`, `?lista=`, `?campanha=&vista=`) through nuqs (`components/admin/campanhas/tela-na-url.ts`); opening pushes a history entry. The preview's in-page Nova busca stays out of the URL (the real one is its own route).
-- Cron (D12): `prospeccao_apagar_antigos` runs only in the 03h00 tick (`ehHoraDaLimpeza`, `lib/prospeccao.ts`, Vitest).
+- Reads: `useLeitura` (`features/campanhas/components/tabela.tsx`) now runs on the query cache with the same signature, so the 20 reads of the area changed in one place. The same key does not read again for 30 s: switching tabs and coming back from Nova busca open from the cache. What the server already read enters as fresh data, so the browser no longer reads it again (B3, the double read). The server's first data is used only for the key it read (with the cache, passing it to every page made page 2 show page 1, caught by `campanhas.design.spec.ts`). Focus return re-reads (no realtime here); no retry (the 20 s limit stays the only wait).
+- Writes: `mudou` became an invalidation of the `["campanhas"]` prefix that waits for a pending write (the `versao` stays 0 until the move commit). Removing a lead, deleting a list and deleting a campaign are optimistic (`features/campanhas/components/Apagar.tsx` over `opcoesDeTirar`): the row and the total leave at the confirm, the dialog closes at once, a refusal shows its reason in the app notice and the final re-read brings the row back; only the last pending write re-reads. "Não encontrado" on a delete is success inside the source (`features/campanhas/api/fonte.ts`). Marking a lead was already a local patch and stayed.
+- URL: tab, open list and open campaign (`?aba=`, `?lista=`, `?campanha=&vista=`) through nuqs (`features/campanhas/components/tela-na-url.ts`); opening pushes a history entry. The preview's in-page Nova busca stays out of the URL (the real one is its own route).
+- Cron (D12): `prospeccao_apagar_antigos` runs only in the 03h00 tick (`ehHoraDaLimpeza`, `features/campanhas/regras.ts`, Vitest).
 - JS: the assistant, the campaign detail, Nova busca and the spreadsheet importer load on demand; Campanhas went from 483 kB (over the 480 ceiling after the Base) to 472 kB.
 - Tests: `e2e/campanhas-dados.design.spec.ts` (refresh and back keep tab and list; three leads removed in a row, each gone at the click, no "já saiu da lista", total minus 3); the Campanhas design suites pass (108); `npm run test:orcamento` 20/20.
 - **Left for the owner:**

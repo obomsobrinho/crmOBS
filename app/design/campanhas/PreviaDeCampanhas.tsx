@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo } from "react";
-import CentralDeCampanhas from "@/components/admin/campanhas/CentralDeCampanhas";
+import CentralDeCampanhas from "@/features/campanhas/components/CentralDeCampanhas";
 import { ProvedorDeDados } from "@/lib/query/provedor";
-import type { FonteDeCampanhas, InicialDaCentral, Tela } from "@/components/admin/campanhas/tipos";
-import { VARIANTES_SUGERIDAS } from "@/lib/prospeccao";
+import type { FonteDeCampanhas, InicialDaCentral, Tela } from "@/features/campanhas/components/tipos";
+import { VARIANTES_SUGERIDAS } from "@/features/campanhas/regras";
 import { dadosDeMentira } from "./dados";
 import { fonteDeMentira } from "./fonte-de-mentira";
 

@@ -23,7 +23,7 @@ The step itself also hid the spreadsheet behind a link and a modal, and the sour
   the file picker, the existing preview and the confirm). On success the tab switches back to the list
   with the new list selected.
 - A new campaign starts with no source: `FiltroDeContatos.buscaId = ""`. `temListaEscolhida`
-  (`lib/prospeccao.ts`) is the rule: with nothing chosen "Quem entra" shows no count, the step does
+  (`features/campanhas/regras.ts`) is the rule: with nothing chosen "Quem entra" shows no count, the step does
   not advance, `previaDoFiltro` answers zero without the database, and `problemasParaIniciar` refuses
   on the server before the SQL (which would fail casting "" to uuid). "Todas as listas" stays as an
   explicit option, never preselected: old drafts and the "quem não respondeu" flow store `"todas"`.

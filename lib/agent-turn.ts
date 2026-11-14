@@ -73,8 +73,8 @@ import type {
   RagMatchDiag,
   PersonaOrigem,
 } from "@/lib/agent-diagnostics";
-import { blocoDeOrigem, type OrigemDaCampanha } from "@/lib/prospeccao";
-import { origemDaCampanha } from "@/lib/campanhas-origem";
+import { blocoDeOrigem, type OrigemDaCampanha } from "@/features/campanhas/regras";
+import { origemDaCampanha } from "@/features/campanhas/server/origem";
 import { decisaoDoTurno, PEDIDO_AO_ROBO, type DecisaoDoRobo } from "@/lib/resposta-automatica";
 import {
   blocoDeMidias,

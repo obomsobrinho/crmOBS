@@ -1,0 +1,177 @@
+import type {
+  Busca,
+  BuscaDaTabela,
+  CampanhaAberta,
+  CampanhaDaTabela,
+  CategoriaDoRecorte,
+  ConexaoDisponivel,
+  FonteDeCampanhas,
+  LeadDaTabela,
+  LeadNaCampanha,
+  Pagina,
+  PontoNoMapa,
+  PreviaDoFiltro,
+  Resultados,
+  RespostaDaEscrita,
+  RespostaDeIniciar,
+  Totais,
+} from "@/features/campanhas/components/tipos";
+import { recorteParaQuery } from "../pedidos";
+import type { PreviaDaPlanilha } from "../planilha-de-leads";
+import { RECUSA_DA_ESCRITA, type MarcacaoDoLead, type ResumoDobrado, type SituacaoDaCampanha } from "../regras";
+
+// DE ONDE A TELA DE CAMPANHAS TIRA OS DADOS na página de verdade: as rotas
+// `/api/admin/campanhas/*` (service_role no servidor, contas no SQL, páginas de
+// 10). O navegador nunca fala com o banco nem com a fonte de leads; o preview
+// usa a MESMA interface com dados de mentira (`app/design/campanhas`).
+
+const BASE = "/api/admin/campanhas";
+
+/**
+ * Quanto uma leitura da tela espera antes de virar falha com "Tentar de novo" (bug do
+ * refresh de 30/10/2026: uma leitura sem prazo deixava a tela em "Carregando" para
+ * sempre). Vale para o pedido HTTP (aborta) e para a tela (`useLeitura`).
+ */
+export const LIMITE_DA_LEITURA_MS = 20_000;
+
+class FalhaDaRota extends Error {
+  constructor(
+    readonly status: number,
+    readonly motivo: string | null,
+  ) {
+    super(`campanhas: ${status}${motivo ? ` (${motivo})` : ""}`);
+  }
+}
+
+async function pedir<T>(caminho: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${caminho}`, {
+    ...init,
+    signal: AbortSignal.timeout(LIMITE_DA_LEITURA_MS),
+    // Um formulário (a planilha) leva o próprio Content-Type, com a fronteira das partes.
+    headers: typeof init?.body === "string" ? { "Content-Type": "application/json" } : undefined,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const corpo: unknown = await res.json().catch(() => null);
+    const motivo = corpo !== null && typeof corpo === "object" && typeof (corpo as { error?: unknown }).error === "string" ? (corpo as { error: string }).error : null;
+    throw new FalhaDaRota(res.status, motivo);
+  }
+  return res.json() as Promise<T>;
+}
+
+const q = (p: Record<string, string | number | null | undefined>) => {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(p)) if (v !== null && v !== undefined && v !== "") s.set(k, String(v));
+  const t = s.toString();
+  return t ? `?${t}` : "";
+};
+
+/** Um 404 vira null (a campanha ou a busca não existe mais). */
+async function nuloSe404<T>(p: Promise<T>): Promise<T | null> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof FalhaDaRota && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/** Uma recusa com motivo (4xx) vira `{ ok: false, erro }`, para a tela mostrar a frase; o resto lança. */
+async function recusaSe4xx<T>(p: Promise<T>): Promise<{ ok: true; valor: T } | { ok: false; erro: string }> {
+  try {
+    return { ok: true, valor: await p };
+  } catch (e) {
+    if (e instanceof FalhaDaRota && e.status < 500 && e.motivo) return { ok: false, erro: e.motivo };
+    throw e;
+  }
+}
+
+/** O recorte da tabela de leads na query (o mesmo que `recorteDe` confere na rota). */
+const recorteNaQuery = recorteParaQuery;
+
+const enviar = (corpo: unknown, method = "PUT"): RequestInit => ({ method, body: JSON.stringify(corpo) });
+
+/** O arquivo da planilha no formulário da rota; com `nome`, o pedido de gravar (sem, a prévia). */
+function formularioDaPlanilha(arquivo: File, nome?: string): FormData {
+  const f = new FormData();
+  f.set("arquivo", arquivo);
+  if (nome !== undefined) {
+    f.set("confirmar", "1");
+    f.set("nome", nome);
+  }
+  return f;
+}
+
+/** A fonte de verdade: uma instância por página (sem estado; cada leitura é uma rota). */
+export function fonteDasRotas(): FonteDeCampanhas {
+  const acao = async (id: string, a: "iniciar" | "pausar" | "retomar") =>
+    (await pedir<{ situacao: SituacaoDaCampanha }>(`/${id}/acao`, enviar({ acao: a }))).situacao;
+  const escrever = async (caminho: string, init: RequestInit = { method: "DELETE" }): Promise<RespostaDaEscrita> => {
+    const r = await recusaSe4xx(pedir<{ ok: true }>(caminho, init));
+    // Já não existe (outra aba, um clique duplo): o fim é o mesmo de apagar, então é sucesso
+    // (passo 2 de docs/plano-dados-e-estado.md; era o "Este lead já saiu da lista.").
+    if (!r.ok && init.method === "DELETE" && (r.erro === RECUSA_DA_ESCRITA.nao_encontrado || r.erro === RECUSA_DA_ESCRITA.nao_encontrada)) return { ok: true };
+    return r.ok ? { ok: true } : r;
+  };
+  return {
+    totais: () => pedir<Totais>("/totais"),
+    conexoes: () => pedir<ConexaoDisponivel[]>("/conexoes"),
+    buscas: (p) => pedir<Pagina<BuscaDaTabela>>(`/buscas${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
+    buscasParaEscolher: () => pedir<Busca[]>("/buscas?escolher=1"),
+    busca: (id) => nuloSe404(pedir<Busca>(`/buscas/${id}`)),
+    novaBusca: async (opcoes) => {
+      const r = await recusaSe4xx(pedir<{ id: string }>("/buscas", enviar({ opcoes }, "POST")));
+      return r.ok ? { ok: true } : r;
+    },
+    leads: (p) => pedir<Pagina<LeadDaTabela>>(`/leads${q({ ...recorteNaQuery(p), pagina: p.pagina })}`),
+    paginaDoLead: async (p, leadId) => (await pedir<{ pagina: number | null }>(`/leads/${leadId}${q(recorteNaQuery(p))}`)).pagina,
+    pontosDaBusca: (buscaId) => pedir<PontoNoMapa[]>(`/buscas/${buscaId}/pontos`),
+    cidades: (buscaId) => pedir<string[]>(`/leads${q({ cidades: 1, busca: buscaId })}`),
+    categorias: (buscaId) => pedir<CategoriaDoRecorte[]>(`/leads${q({ categoriasDoRecorte: 1, busca: buscaId })}`),
+    linkDaExportacao: (recorte) => `${BASE}/leads/exportar${q(recorteNaQuery(recorte))}`,
+    previaDaPlanilha: async (arquivo) => {
+      const r = await recusaSe4xx(pedir<PreviaDaPlanilha>("/planilha", { method: "POST", body: formularioDaPlanilha(arquivo) }));
+      return r.ok ? { ok: true, previa: r.valor } : r;
+    },
+    importarPlanilha: async (arquivo, nome) => {
+      const r = await recusaSe4xx(pedir<{ buscaId: string }>("/planilha", { method: "POST", body: formularioDaPlanilha(arquivo, nome) }));
+      return r.ok ? { ok: true, buscaId: r.valor.buscaId } : r;
+    },
+    marcar: async (id, marcacao) => (await pedir<{ marcacao: MarcacaoDoLead }>(`/leads/${id}`, enviar({ marcacao }))).marcacao,
+    removerLead: (id, buscaId) => escrever(`/leads/${id}${q({ busca: buscaId })}`),
+    apagarBusca: (id) => escrever(`/buscas/${id}`),
+    editarTelefone: (id, celular) => escrever(`/leads/${id}`, enviar({ telefone: celular }, "PATCH")),
+    painelDaBase: (buscaId) => pedir<ResumoDobrado>(`/resumo${q({ busca: buscaId })}`),
+    campanhas: (p) => pedir<Pagina<CampanhaDaTabela>>(`${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
+    campanhasComEnvio: () => pedir<{ id: string; nome: string }[]>("?com_envio=1"),
+    resultados: (p) => pedir<Resultados>(`/resultados${q({ campanha: p.campanhaId, periodo: p.periodo })}`),
+    campanha: (id) => nuloSe404(pedir<CampanhaAberta>(`/${id}`)),
+    leadsDaCampanha: (id, p) => pedir<Pagina<LeadNaCampanha>>(`/${id}/leads${q({ texto: p.texto, situacao: p.situacao, pagina: p.pagina })}`),
+    previaDoFiltro: (f) =>
+      pedir<PreviaDoFiltro>(
+        `/previa${q({
+          busca: f.buscaId,
+          bons: f.soMarcadosComoBons ? 1 : null,
+          sem_site: f.soSemSiteProprio ? 1 : null,
+          origem: f.quemNaoRespondeuDe,
+        })}`,
+      ),
+    salvar: async (c) => {
+      const corpo = { nome: c.nome, conexaoId: c.conexaoId, agendadaPara: c.agendadaPara, filtro: c.filtro, passo: c.passo, variantes: c.variantes };
+      try {
+        return (await pedir<{ salvaEm: number }>(`/${c.id}`, enviar(corpo))).salvaEm;
+      } catch (e) {
+        // Já começou (outra aba iniciou): o rascunho não muda mais, e não é uma falha a mostrar.
+        if (e instanceof FalhaDaRota && e.status === 409) return c.salvaEm;
+        throw e;
+      }
+    },
+    apagarCampanha: (id) => escrever(`/${id}`),
+    iniciar: async (id): Promise<RespostaDeIniciar> => {
+      const r = await recusaSe4xx(acao(id, "iniciar"));
+      return r.ok ? { ok: true, situacao: r.valor } : r;
+    },
+    pausar: (id) => acao(id, "pausar"),
+    retomar: (id) => acao(id, "retomar"),
+  };
+}

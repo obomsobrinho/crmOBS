@@ -1,8 +1,8 @@
-import CampanhasAoVivo from "@/components/admin/campanhas/CampanhasAoVivo";
-import type { InicialDaCentral } from "@/components/admin/campanhas/tipos";
+import CampanhasAoVivo from "@/features/campanhas/components/CampanhasAoVivo";
+import type { InicialDaCentral } from "@/features/campanhas/components/tipos";
 import { adminDaPagina } from "@/lib/admin";
 import { ehUuid } from "@/lib/admin-acesso";
-import { painelDaBase, paginaDeBuscas, paginaDeCampanhas, totais } from "@/lib/campanhas-servidor";
+import { painelDaBase, paginaDeBuscas, paginaDeCampanhas, totais } from "@/features/campanhas/server/campanhas";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 

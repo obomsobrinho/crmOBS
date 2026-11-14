@@ -11,7 +11,7 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
 
 ## Decision
 - **Filter**: the leads table gets a Telefone group with three states, `situacaoDoTelefone`
-  (`lib/prospeccao.ts`): com celular, só fixo, sem telefone (an invalid number counts as none). The labels
+  (`features/campanhas/regras.ts`): com celular, só fixo, sem telefone (an invalid number counts as none). The labels
   say which one enters a campaign. Nothing is hidden by default. `p_telefone` in `prospeccao_leads_pagina`
   and `prospeccao_pagina_do_lead` repeats the rule.
 - **Edit**: the lead sheet edits the phone, and only the phone. `prospeccao_editar_telefone` is one SQL
@@ -20,7 +20,7 @@ the mobile key and stays null for a landline, which lives in `telefone_original`
 - **Only a lead with no history** (`leadSemHistorico`) changes number: the cron reads replies and SAIR by the
   lead's number, so changing it after a send would lose them.
 - **Discard**: a search with no term brings every place in the area, so `Todas as empresas mutum mg`
-  (02/11/2026, 1 km) brought squares and bus stops. `CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`, the
+  (02/11/2026, 1 km) brought squares and bus stops. `CATEGORIAS_DESCARTADAS` (`features/campanhas/apify-campos.ts`, the
   names are the source's) drops four real categories, by the MAIN category only, so a snack bar whose second
   category is "Marco histórico" stays. Left out because they can drop good clients: Jardim, Escola,
   Pré-escola, Apartamentos. Squares, churches and the city hall need the source's real category name:

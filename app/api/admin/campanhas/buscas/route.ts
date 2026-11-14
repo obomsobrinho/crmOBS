@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe, ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/lib/campanhas-pedidos";
-import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas, torto } from "@/lib/campanhas-servidor";
-import { fonteApify } from "@/lib/fonte-apify";
-import { problemasDaBusca } from "@/lib/prospeccao";
+import { campoDe, ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/features/campanhas/pedidos";
+import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas, torto } from "@/features/campanhas/server/campanhas";
+import { fonteApify } from "@/features/campanhas/server/apify";
+import { problemasDaBusca } from "@/features/campanhas/regras";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // GET: a tabela de buscas (10 por página, busca por segmento ou cidade, filtro por

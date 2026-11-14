@@ -1,5 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { falhou, totais } from "@/lib/campanhas-servidor";
+import { falhou, totais } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // As contagens do topo (as abas Leads e Campanhas) e dos botões de filtro.

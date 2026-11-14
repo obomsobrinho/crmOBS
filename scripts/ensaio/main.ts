@@ -5,7 +5,7 @@ import { compilarDoTenant, LIMITS } from "@/lib/agent-prompt";
 import { agendaDoTurno } from "@/lib/agenda-servidor";
 import { horarioCadastrado } from "@/lib/horarios";
 import { processTurn } from "@/lib/agent-turn";
-import { blocoDeOrigem, textoParaLead, VARIANTES_SUGERIDAS, type OrigemDaCampanha } from "@/lib/prospeccao";
+import { blocoDeOrigem, textoParaLead, VARIANTES_SUGERIDAS, type OrigemDaCampanha } from "@/features/campanhas/regras";
 import { AGENT_MODEL, type ChatTurn } from "@/lib/agent";
 import { escritasBarradas } from "./servico-somente-leitura";
 import { carregarDocumentos } from "./rag-em-memoria";

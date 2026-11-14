@@ -1,8 +1,8 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe } from "@/lib/campanhas-pedidos";
-import { falhou, iniciarCampanha, pausarCampanha, retomarCampanha, torto } from "@/lib/campanhas-servidor";
+import { campoDe } from "@/features/campanhas/pedidos";
+import { falhou, iniciarCampanha, pausarCampanha, retomarCampanha, torto } from "@/features/campanhas/server/campanhas";
 import { agoraMs } from "@/lib/periodo";
-import { problemasParaIniciar } from "@/lib/prospeccao";
+import { problemasParaIniciar } from "@/features/campanhas/regras";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Iniciar (ou agendar), pausar e retomar: `{ acao: "iniciar" | "pausar" | "retomar" }`.

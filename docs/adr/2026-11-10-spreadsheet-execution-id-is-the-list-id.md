@@ -24,11 +24,11 @@ The screen showed the generic message because the route answered 500 `falha ao i
 and the browser source (`recusaSe4xx`) only turns a 4xx with a reason into a sentence.
 
 ## Decision
-- `gravarPlanilha` (`lib/planilha-servidor.ts`) passes the new list's own id as `execucao`. No
+- `gravarPlanilha` (`features/campanhas/server/planilha.ts`) passes the new list's own id as `execucao`. No
   migration: the index stays, and the existing row (`fonte_execucao_id = 'planilha'`) is unique and
   untouched.
 - The spreadsheet route answers a database refusal (an error with a Postgres/PostgREST `code`) with
-  `falhouComMotivo` (`lib/campanhas-servidor.ts`): 422 and "Não deu para importar a planilha. O banco
+  `falhouComMotivo` (`features/campanhas/server/campanhas.ts`): 422 and "Não deu para importar a planilha. O banco
   respondeu: ...". Campanhas is the owner's own tool, so showing the database sentence is better than
   "tente de novo" with the cause only in the log. Anything else (network, timeout) keeps the generic
   message and the log (a network failure arrives with an empty `code` and stays generic).

@@ -50,8 +50,8 @@ The campaign cron also counted the bot's menu as the lead's reply ("respondeu").
 4. **Measured in `agent_turns`**: `silenced = 'resposta_automatica'`, with `messages_sent` 1 (fixed
    message) or 0 (silence); `diagnostics.respostaAutomatica` = `pedir` | `silenciar`. No migration
    (`silenced` is free text).
-5. **The cron uses the same rule.** `mensagensRecebidas` (`lib/prospeccao-cron.ts`) now reads our rows too
-   (`bot_message`, marked `nossa`), and `respostasDosEnvios` (`lib/prospeccao.ts`) judges each phone's
+5. **The cron uses the same rule.** `mensagensRecebidas` (`features/campanhas/server/cron.ts`) now reads our rows too
+   (`bot_message`, marked `nossa`), and `respostasDosEnvios` (`features/campanhas/regras.ts`) judges each phone's
    conversation with `respostasAutomaticas` (campaign sends count as ours): an auto-reply never sets
    `respondeu_em`; a stop request (SAIR) always counts.
 6. The bot instructions left the v12 prompt candidate (they became code).

@@ -312,7 +312,7 @@ export async function runAgent(params: {
    * `blocoDaAgenda` (lib/agenda.ts), ou nada quando a agenda está desligada.
    */
   agenda?: string | null;
-  /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (lib/prospeccao.ts), ou nada. */
+  /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (features/campanhas/regras.ts), ou nada. */
   origem?: string | null;
   /**
    * `### MÍDIAS PARA ENVIAR` (`blocoDeMidias`, lib/midias.ts) e as chaves do enum

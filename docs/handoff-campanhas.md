@@ -5,7 +5,7 @@
 Decisões e porquê: `docs/adr/2026-11-05-campanhas-phone-filter-and-lead-phone-edit.md`. Migration
 `20261105135447` aplicada, tipos regenerados.
 
-`CATEGORIAS_DESCARTADAS` (`lib/apify-campos.ts`) tem 10 categorias, as 6 últimas cortadas pelo Franck a partir
+`CATEGORIAS_DESCARTADAS` (`features/campanhas/apify-campos.ts`) tem 10 categorias, as 6 últimas cortadas pelo Franck a partir
 dos nomes reais do dataset `OKDFBgFUOJDxSXlR7`. Ficam de fora: Jardim, Escola de educação geral, Pré-escola,
 Apartamentos e Complexo habitacional. Prefeitura não tem categoria conhecida e não entra por palpite.
 
@@ -164,7 +164,7 @@ do Supabase).
   "O centro está em Lajinha" (pela sede mais próxima), sem bloquear. Com ajuste vai `customGeolocation`
   (longitude primeiro, como no run `Rfb0VfmDckdMIbiwT`) e não vai `locationQuery`; sem ajuste, "Cidade, UF,
   Brasil". O centro e o raio ficam no `opcoes` da busca (sem DDL) e o detalhe diz "Mutum, MG · raio de 5 km".
-  O mapa da Nova busca é o mesmo componente do detalhe (`components/admin/campanhas/Mapa.tsx`).
+  O mapa da Nova busca é o mesmo componente do detalhe (`features/campanhas/components/Mapa.tsx`).
 - **Menu:** o CRM como antes (Painel, Pedidos, Conversas, Contatos, Pipeline, Agente, Equipe, Follow-up em
   breve) e, no fim, a seção "Gestão da OBS" com Campanhas e Clientes, só admin; no celular o mesmo grupo
   dentro de "Mais". O título é `BRAND.secaoDoDono` em `lib/brand.ts`: trocar é uma linha.
@@ -219,7 +219,7 @@ O que dá para ver no protótipo:
    `lat numeric`, `lng numeric`, `reivindicado boolean`, `horarios jsonb`, `distribuicao_notas jsonb`,
    `fotos int`, `categorias text[]`, `instagram text`. Sem isto a página de verdade não tem pinos, ficha
    completa nem o filtro de perfil. A pontuação dos leads já gravados continua a antiga até uma nova busca.
-3. **Lista de cidades:** gerei `lib/dados/municipios.json` a partir do espelho `kelvins/municipios-brasileiros`
+3. **Lista de cidades:** gerei `features/campanhas/dados/municipios.json` a partir do espelho `kelvins/municipios-brasileiros`
    (os mesmos códigos do IBGE; 5.571 cidades), porque a rede desta sessão bloqueia
    servicodados.ibge.gov.br. O script versionado (`scripts/gerar-municipios.mjs`) usa a API do IBGE por
    padrão; rode uma vez numa máquina com acesso (`node scripts/gerar-municipios.mjs`) e veja se o diff
@@ -230,7 +230,7 @@ O que dá para ver no protótipo:
 5. **Conferir com a busca de 30/10** (o JSON de um item do dataset ajuda): o nome dos dias e o formato das
    horas em `openingHours` com `language: pt-BR` (o leitor aceita português e inglês, "08:00–18:00", "8 AM
    to 6 PM", "Fechado", "Aberto 24 horas"), e os nomes das categorias sugeridas (lista provisória em
-   `CATEGORIAS_SUGERIDAS`, `lib/prospeccao.ts`).
+   `CATEGORIAS_SUGERIDAS`, `features/campanhas/regras.ts`).
 
 ### Decisões que tomei nesta rodada
 - **Filtrar do nosso lado** nota, site, categoria e avaliações (pediu para preferir isso quando o dado já
@@ -267,7 +267,7 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
    valores de `placeMinimumStars` (usamos `threeAndHalf`, `four`, `fourAndHalf`) e `website` (`allPlaces`,
    `withoutWebsite`, `withWebsite`) foram aceitos; (c) os leads chegam com telefone, nota, site, bairro e
    cidade. Se algum campo vier vazio, me mande o JSON de UM item do dataset (sem dados de terceiros, se
-   preferir) e eu ajusto `lib/apify-campos.ts`. Mesmo que o actor ignore um filtro, aplicamos nota, site e
+   preferir) e eu ajusto `features/campanhas/apify-campos.ts`. Mesmo que o actor ignore um filtro, aplicamos nota, site e
    fechadas do nosso lado (`filtrarPelasOpcoes`).
 6. **Ensaio com o seu celular como único lead**: hoje só um lead vindo de uma busca entra numa campanha. Faça
    uma busca que ache a sua empresa (ou me peça um modo seguro de inserir só o seu número; NÃO fiz isso).
@@ -290,7 +290,7 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
 - Fase 0 e 1 (Cursor): decisões D1 a D9; DDL aditivo APLICADO em produção (`20261030034211_prospeccao_do_dono.sql`).
 - Fase 2: fonte Apify revisada e corrigida (ver "Revisão do trabalho da noite"); `data.md` com as envs.
 - Fase 3: `/campanhas` (só admin, `adminDaPagina`), link "Campanhas" no topo da central Clientes. As telas
-  aprovadas leem de `FonteDeCampanhas`: `lib/campanhas-fonte.ts` (rotas) na página de verdade, memória no
+  aprovadas leem de `FonteDeCampanhas`: `features/campanhas/api/fonte.ts` (rotas) na página de verdade, memória no
   preview. Layout igual ao aprovado (conferido por captura de tela em 1440x900).
 - Fase 4: 13 rotas em `/api/admin/campanhas/*` (lista, totais, conexões, buscas, leads e marcação, painel da
   base, resultados, prévia do recorte, rascunho, detalhe e leads, iniciar/pausar/retomar). O servidor confere
@@ -349,7 +349,7 @@ agent (night of 29 to 30/10/2026); phases 2 to 7 by Claude Code in the cloud on 
 
 - Unificar `useLeitura` (Campanhas) com `useCarga` (central): mexeria nas abas da central já aprovadas.
 - Trocar o "Tentar de novo" das tabelas por `FalhaAoLer`: muda o visual dentro da tabela aprovada.
-- Dia da semana, plural e taxa repetidos em `lib/prospeccao.ts` (vêm do protótipo aprovado): limpeza para
+- Dia da semana, plural e taxa repetidos em `features/campanhas/regras.ts` (vêm do protótipo aprovado): limpeza para
   depois, sem mudança de comportamento.
 - Provar os agregados SQL contra o banco de verdade: o teste puro prova a dobra; uma prova contra
   `prospeccao_resultados` real cabe na suíte com login (não rodada aqui).

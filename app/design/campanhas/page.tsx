@@ -1,5 +1,5 @@
 import NavRail from "@/components/NavRail";
-import type { Tela } from "@/components/admin/campanhas/tipos";
+import type { Tela } from "@/features/campanhas/components/tipos";
 import { agoraMs } from "@/lib/periodo";
 import PreviaDeCampanhas from "./PreviaDeCampanhas";
 import { dadosDeMentira } from "./dados";

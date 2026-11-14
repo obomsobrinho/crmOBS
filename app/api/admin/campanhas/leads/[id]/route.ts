@@ -1,7 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe, ehId, recorteDe } from "@/lib/campanhas-pedidos";
-import { editarTelefone, falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/lib/campanhas-servidor";
-import { problemaDoCelular, telefoneDoLead } from "@/lib/prospeccao";
+import { campoDe, ehId, recorteDe } from "@/features/campanhas/pedidos";
+import { editarTelefone, falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/features/campanhas/server/campanhas";
+import { problemaDoCelular, telefoneDoLead } from "@/features/campanhas/regras";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Em que página do recorte (`?busca=&texto=&cidade=&filtros=`) o lead está: o pino
