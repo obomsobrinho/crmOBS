@@ -11,14 +11,16 @@ import { chavesDePedidos } from "./chaves";
 const ATRASO_DA_CONVERSA_MS = 400;
 
 /**
- * Reconectou ou voltou o foco: tudo de Pedidos fica velho. As listas voltam à
- * primeira página antes (`soPrimeiraPagina`), para reler uma página e não todas.
+ * Reconectou ou voltou o foco: as listas e os números ficam velhos, como a tela fazia
+ * antes (a equipe é configuração, e a história do pedido aberto relê pelo canal dela).
+ * As listas voltam à primeira página antes (`soPrimeiraPagina`), para reler uma e não todas.
  */
 export function revalidarPedidos(qc: QueryClient): void {
   for (const q of qc.getQueryCache().findAll({ queryKey: chavesDePedidos.listas() })) {
     qc.setQueryData<ListaNoCache>(q.queryKey, soPrimeiraPagina);
   }
-  invalidarComAtraso(qc, chavesDePedidos.tudo);
+  invalidarComAtraso(qc, chavesDePedidos.listas());
+  invalidarComAtraso(qc, chavesDePedidos.contagens());
 }
 
 /**

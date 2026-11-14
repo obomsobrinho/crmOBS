@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, HandHelping, MessagesSquare } from "lucide-react";
 import AvatarContato from "@/components/AvatarContato";
@@ -33,6 +34,7 @@ import {
   type PedidoResolvido,
 } from "@/features/pedidos/regras";
 import type { FontePedidos } from "@/features/pedidos/api/fonte";
+import { chavesDePedidos } from "@/features/pedidos/api/chaves";
 import {
   useConcluirPedido,
   useContagensDePedidos,
@@ -105,6 +107,7 @@ export default function Pedidos({
   /** /design: sem banco, e as ações só simulam. */
   preview?: boolean;
 }) {
+  const qc = useQueryClient();
   const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
   const url = usePedidosNaUrl();
   // O campo segue o que se digita; a URL e a leitura, o texto parado há 300 ms.
@@ -154,8 +157,11 @@ export default function Pedidos({
   const aberto = atual && ehAberto(atual) ? atual : null;
   const resolvido = atual && !ehAberto(atual) ? atual : null;
 
-  function selecionar(p: PedidoItem | null) {
-    void url.setU({ abrir: p?.id ?? null }, { history: "push" });
+  // Abrir um pedido da lista já deixa a linha dele no cache do detalhe: a tela não
+  // lê de novo o que está desenhando (antes do passo 3a, selecionar não lia nada).
+  function selecionar(p: PedidoItem | null, historico: "push" | "replace" = "push") {
+    if (p) qc.setQueryData(chavesDePedidos.detalhe(p.id), p);
+    void url.setU({ abrir: p?.id ?? null }, { history: historico });
   }
 
   function trocarMotivo(v: string) {
@@ -186,7 +192,7 @@ export default function Pedidos({
     // O preview não tem banco: a fonte de memória é que precisa saber.
     fonte.fecharNaMemoria?.(fechado);
     concluirNoCache(fechado);
-    selecionar(null);
+    selecionar(null, "replace");
   }
 
   async function orientar(p: PedidoAberto, texto: string) {
