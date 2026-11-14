@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe, ehSituacaoDaBusca, opcoesDe, paginaDe, textoDe } from "@/features/campanhas/pedidos";
-import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas, torto } from "@/features/campanhas/server/campanhas";
+import { erroDaRota, lerConsulta, lerCorpo } from "@/lib/rota";
+import { consultaDasBuscas, corpoDaNovaBusca } from "@/features/campanhas/schemas";
+import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas } from "@/features/campanhas/server/campanhas";
 import { fonteApify } from "@/features/campanhas/server/apify";
-import { problemasDaBusca } from "@/features/campanhas/regras";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // GET: a tabela de buscas (10 por página, busca por segmento ou cidade, filtro por
@@ -13,15 +13,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 // `/api/prospeccao/apify`, com o segredo num header) e grava a linha "buscando".
 export const GET = rotaDoAdmin(
   async ({ req }) => {
-    const q = req.nextUrl.searchParams;
+    const lido = lerConsulta(req, consultaDasBuscas, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const { escolher, texto, situacao, pagina } = lido.dados;
     const svc = createServiceClient();
     try {
-      if (q.get("escolher") === "1") return Response.json(await buscasParaEscolher(svc));
-      const pagina = paginaDe(q.get("pagina"));
-      const situacao = q.get("situacao");
-      if (pagina === null) return torto("página inválida");
-      if (situacao !== null && !ehSituacaoDaBusca(situacao)) return torto("situação inválida");
-      return Response.json(await paginaDeBuscas(svc, { texto: textoDe(q.get("texto")), situacao, pagina }));
+      if (escolher === "1") return Response.json(await buscasParaEscolher(svc));
+      return Response.json(await paginaDeBuscas(svc, { texto, situacao, pagina }));
     } catch (e) {
       return falhou("listar as buscas", e);
     }
@@ -31,14 +29,12 @@ export const GET = rotaDoAdmin(
 
 export const POST = rotaDoAdmin(
   async ({ req, admin }: { req: NextRequest; admin: string }) => {
-    const corpo: unknown = await req.json().catch(() => null);
-    const opcoes = opcoesDe(campoDe(corpo, "opcoes"));
-    if (!opcoes) return torto("opções da busca inválidas");
-    const problemas = problemasDaBusca(opcoes);
-    if (problemas.length > 0) return torto(problemas[0]);
+    const lido = await lerCorpo(req, corpoDaNovaBusca, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const opcoes = lido.dados;
     const segredo = process.env.APIFY_WEBHOOK_SECRET;
     if (!process.env.APIFY_TOKEN || !segredo) {
-      return Response.json({ error: "A fonte de leads ainda não está configurada no servidor." }, { status: 503 });
+      return erroDaRota(503, "A fonte de leads ainda não está configurada no servidor.", "sem_configuracao");
     }
     const id = randomUUID();
     const url = `${req.nextUrl.origin}/api/prospeccao/apify?busca=${id}`;

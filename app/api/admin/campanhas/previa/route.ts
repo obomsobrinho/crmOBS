@@ -1,22 +1,17 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { filtroDe } from "@/features/campanhas/pedidos";
-import { falhou, previaDoFiltro, torto } from "@/features/campanhas/server/campanhas";
+import { lerConsulta } from "@/lib/rota";
+import { consultaDaPrevia } from "@/features/campanhas/schemas";
+import { falhou, previaDoFiltro } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Quem entra pelo recorte do passo Contatos (a mesma regra que monta a fila ao
 // iniciar): `?busca=todas|<id>&bons=1&sem_site=1&origem=<id>`.
 export const GET = rotaDoAdmin(
   async ({ req }) => {
-    const q = req.nextUrl.searchParams;
-    const filtro = filtroDe({
-      buscaId: q.get("busca") ?? "todas",
-      soMarcadosComoBons: q.get("bons") === "1",
-      soSemSiteProprio: q.get("sem_site") === "1",
-      quemNaoRespondeuDe: q.get("origem"),
-    });
-    if (!filtro) return torto("recorte inválido");
+    const lido = lerConsulta(req, consultaDaPrevia, { motivo: true });
+    if ("erro" in lido) return lido.erro;
     try {
-      return Response.json(await previaDoFiltro(createServiceClient(), filtro));
+      return Response.json(await previaDoFiltro(createServiceClient(), lido.dados));
     } catch (e) {
       return falhou("contar quem entra", e);
     }

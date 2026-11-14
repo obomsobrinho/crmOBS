@@ -87,41 +87,67 @@ export function erroDaRota(status: number, frase: string, codigo?: string): Next
 const FRASE_ENTRADA_INVALIDA = "Os dados enviados não estão no formato esperado.";
 
 /**
+ * Como a recusa chega à tela. Padrão: a frase genérica (o detalhe vai para o log).
+ * `motivo: true`: a mensagem do primeiro problema do esquema, para a área que já
+ * mostra ao usuário o porquê (Campanhas: "O arquivo passa de 4 MB", o celular
+ * inválido); o esquema então escreve cada mensagem como frase de tela.
+ */
+export interface OpcoesDaLeitura {
+  motivo?: boolean;
+}
+
+/**
  * Lê o corpo JSON da requisição pelo esquema Zod da área (2.9). O tipo vem do
  * esquema. Falhou: `{ erro }` pronto (400, `entrada_invalida`), que a rota só
- * repassa, como em `sessaoDaRota`.
+ * repassa, como em `sessaoDaRota`. Com `motivo`, um corpo que não é JSON chega
+ * ao esquema como `null` (o esquema diz a frase).
  */
 export async function lerCorpo<S extends z.ZodType>(
   req: Request,
-  esquema: S
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
 ): Promise<{ dados: z.infer<S> } | { erro: NextResponse }> {
   let bruto: unknown;
   try {
     bruto = await req.json();
   } catch {
-    return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+    if (!opcoes.motivo) return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+    bruto = null;
   }
-  return validar(esquema, bruto, new URL(req.url).pathname);
+  return validar(esquema, bruto, new URL(req.url).pathname, opcoes);
 }
 
 /** O mesmo para a query string (`?x=...`), lida como objeto de textos. */
 export function lerConsulta<S extends z.ZodType>(
   req: Request,
-  esquema: S
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
 ): { dados: z.infer<S> } | { erro: NextResponse } {
   const url = new URL(req.url);
-  return validar(esquema, Object.fromEntries(url.searchParams), url.pathname);
+  return validar(esquema, Object.fromEntries(url.searchParams), url.pathname, opcoes);
+}
+
+/** O mesmo para um formulário (`multipart/form-data`), lido como objeto de campos (texto ou arquivo). */
+export async function lerFormulario<S extends z.ZodType>(
+  req: Request,
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
+): Promise<{ dados: z.infer<S> } | { erro: NextResponse }> {
+  const form = await req.formData().catch(() => null);
+  return validar(esquema, form ? Object.fromEntries(form.entries()) : {}, new URL(req.url).pathname, opcoes);
 }
 
 function validar<S extends z.ZodType>(
   esquema: S,
   bruto: unknown,
-  onde: string
+  onde: string,
+  opcoes: OpcoesDaLeitura
 ): { dados: z.infer<S> } | { erro: NextResponse } {
   const r = esquema.safeParse(bruto);
   if (r.success) return { dados: r.data };
   console.warn("entrada recusada:", onde, r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
-  return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+  const primeira = r.error.issues[0]?.message;
+  return { erro: erroDaRota(400, opcoes.motivo && primeira ? primeira : FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
 }
 
 /**

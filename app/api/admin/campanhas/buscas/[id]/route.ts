@@ -1,4 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
+import { erroDaRota } from "@/lib/rota";
 import { apagarBusca, buscaPorId, falhou } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -7,7 +8,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 export const GET = rotaDoAdmin(async ({ id }) => {
   try {
     const busca = await buscaPorId(createServiceClient(), id);
-    return busca ? Response.json(busca) : Response.json({ error: "busca não encontrada" }, { status: 404 });
+    return busca ? Response.json(busca) : erroDaRota(404, "busca não encontrada", "nao_encontrado");
   } catch (e) {
     return falhou("ler a busca", e);
   }

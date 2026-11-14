@@ -60,6 +60,7 @@ import {
 } from "../regras";
 import type { Json } from "@/lib/database.types";
 import type { Supa } from "@/lib/supabase/tipos";
+import { erroDaRota } from "@/lib/rota";
 
 // O LADO SERVIDOR DE CAMPANHAS (a prospecção do dono do produto,
 // docs/plano-campanhas.md): leituras e escritas das rotas `/api/admin/campanhas/*`,
@@ -754,8 +755,9 @@ function respostaDaEscrita({ data, error }: { data: string | null; error: unknow
   if (error) throw error;
   if (data === "ok") return Response.json({ ok: true });
   const recusa = Object.entries(RECUSA_DA_ESCRITA).find(([chave]) => chave === data);
-  const status = data === "nao_encontrada" || data === "nao_encontrado" ? 404 : 409;
-  return Response.json({ error: recusa?.[1] ?? "Não deu para fazer isso agora." }, { status });
+  const sumiu = data === "nao_encontrada" || data === "nao_encontrado";
+  // `codigo`: a razão de máquina (2.9); a fonte reconhece o "já não existe" por ele, não pela frase.
+  return erroDaRota(sumiu ? 404 : 409, recusa?.[1] ?? "Não deu para fazer isso agora.", sumiu ? "nao_encontrado" : (recusa?.[0] ?? "recusada"));
 }
 
 /** Apaga a campanha (suave): ativa recusa; a fila sai dela; quem recebeu segue marcado (a proteção da segunda mensagem e do SAIR). */
@@ -846,7 +848,7 @@ export async function concluir(svc: Supa, buscaId: string, itens: ReturnType<typ
 /** A resposta de uma leitura ou escrita que falhou no banco ou na fonte (o detalhe só no log). */
 export function falhou(onde: string, e: unknown): Response {
   console.error(`campanhas, ${onde}:`, e);
-  return Response.json({ error: `falha ao ${onde}` }, { status: 500 });
+  return erroDaRota(500, `falha ao ${onde}`);
 }
 
 /**
@@ -859,8 +861,8 @@ export function falhouComMotivo(onde: string, e: unknown): Response {
   // Sem código (uma falha de rede chega com code ""), é o genérico "tente de novo".
   if (typeof pg?.code !== "string" || !pg.code || typeof pg.message !== "string" || !pg.message) return falhou(onde, e);
   console.error(`campanhas, ${onde}:`, e);
-  return Response.json({ error: `Não deu para ${onde}. O banco respondeu: ${pg.message}` }, { status: 422 });
+  return erroDaRota(422, `Não deu para ${onde}. O banco respondeu: ${pg.message}`, "recusa_do_banco");
 }
 
 /** 400 com o motivo (parâmetro torto). */
-export const torto = (motivo: string): Response => Response.json({ error: motivo }, { status: 400 });
+export const torto = (motivo: string): Response => erroDaRota(400, motivo, "entrada_invalida");

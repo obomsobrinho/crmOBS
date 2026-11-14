@@ -1,6 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { ehSituacaoDaCampanha, paginaDe, textoDe } from "@/features/campanhas/pedidos";
-import { campanhasComEnvio, falhou, paginaDeCampanhas, torto } from "@/features/campanhas/server/campanhas";
+import { lerConsulta } from "@/lib/rota";
+import { consultaDasCampanhas } from "@/features/campanhas/schemas";
+import { campanhasComEnvio, falhou, paginaDeCampanhas } from "@/features/campanhas/server/campanhas";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -8,15 +9,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 // com `?com_envio=1`, as campanhas que já começaram (o seletor do painel).
 export const GET = rotaDoAdmin(
   async ({ req }) => {
-    const q = req.nextUrl.searchParams;
+    const lido = lerConsulta(req, consultaDasCampanhas, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const { com_envio, texto, situacao, pagina } = lido.dados;
     const svc = createServiceClient();
     try {
-      if (q.get("com_envio") === "1") return Response.json(await campanhasComEnvio(svc));
-      const pagina = paginaDe(q.get("pagina"));
-      const situacao = q.get("situacao");
-      if (pagina === null) return torto("página inválida");
-      if (situacao !== null && !ehSituacaoDaCampanha(situacao)) return torto("situação inválida");
-      return Response.json(await paginaDeCampanhas(svc, { texto: textoDe(q.get("texto")), situacao, pagina }, agoraMs()));
+      if (com_envio === "1") return Response.json(await campanhasComEnvio(svc));
+      return Response.json(await paginaDeCampanhas(svc, { texto, situacao, pagina }, agoraMs()));
     } catch (e) {
       return falhou("listar as campanhas", e);
     }

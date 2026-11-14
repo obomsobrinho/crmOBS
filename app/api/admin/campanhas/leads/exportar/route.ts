@@ -1,6 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { recorteDe } from "@/features/campanhas/pedidos";
-import { falhou, torto } from "@/features/campanhas/server/campanhas";
+import { lerConsulta } from "@/lib/rota";
+import { recorte } from "@/features/campanhas/schemas";
+import { falhou } from "@/features/campanhas/server/campanhas";
 import { planilhaDosLeads } from "@/features/campanhas/server/planilha";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -9,10 +10,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 // num pedido (leads são poucos milhares no máximo); só leitura.
 export const GET = rotaDoAdmin(
   async ({ req }) => {
-    const recorte = recorteDe(req.nextUrl.searchParams);
-    if (typeof recorte === "string") return torto(recorte);
+    const lido = lerConsulta(req, recorte, { motivo: true });
+    if ("erro" in lido) return lido.erro;
     try {
-      const arquivo = await planilhaDosLeads(createServiceClient(), recorte);
+      const arquivo = await planilhaDosLeads(createServiceClient(), lido.dados);
       return new Response(arquivo, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
