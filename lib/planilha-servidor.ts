@@ -160,7 +160,9 @@ export async function gravarPlanilha(svc: Supa, a: { admin: string; nome: string
     id,
     opcoes: { ...OPCOES_PADRAO, nome: a.nome, cidade, ignorarFechados: false },
     fonte: FONTE_PLANILHA,
-    execucao: FONTE_PLANILHA,
+    // A "execução" de uma planilha é a própria lista: o banco não deixa dois (fonte, execução) iguais
+    // (`prospeccao_buscas_execucao`), e com um valor fixo só a primeira planilha entrava (10/11/2026).
+    execucao: id,
   });
   await concluir(svc, id, a.leitura.validas.map((v) => itemParaOBanco(itemDaPlanilha(v))), null);
   return id;

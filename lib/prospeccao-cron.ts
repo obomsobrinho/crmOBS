@@ -26,8 +26,9 @@ import type { Supa } from "./supabase/tipos";
 //    quem entrou há 12 meses e nunca respondeu;
 // 2. fecha as buscas que o webhook da fonte não fechou;
 // 3. manda UMA mensagem por campanha que está na vez (`proximo_envio_em`), pelo
-//    `enviarMensagemAtiva`, com a linha de saída posta pelo código
-//    (`textoParaLead`), e marca o próximo envio (`proximoEnvioEm`);
+//    `enviarMensagemAtiva`, com o nome limpo, a saudação da hora e a linha de saída
+//    postos pelo código (`textoParaLead`), grava o texto que saiu e marca o próximo
+//    envio (`proximoEnvioEm`);
 // 4. lê `chat_messages` (SÓ leitura) atrás das respostas e dos pedidos para parar,
 //    e pausa a campanha com pedidos demais no dia (D6).
 // Nada aqui escreve em tabela de conversa; nada aqui toca o n8n.
@@ -176,7 +177,13 @@ async function vezDaCampanha(
   }
   if (vez.situacao !== "enviar" || !vez.lead_id || !vez.telefone || !vez.client_id) return "nada";
   const lead = vez.lead_id;
-  const registrar = (resultado: "enviado" | "falhou" | "devolver", variante: number, erro: string | null, proximo: number) =>
+  const registrar = (
+    resultado: "enviado" | "falhou" | "devolver",
+    variante: number,
+    erro: string | null,
+    proximo: number,
+    texto?: string,
+  ) =>
     chamar(
       svc.rpc("prospeccao_registrar_envio", {
         p_campanha: campanhaId,
@@ -185,6 +192,8 @@ async function vezDaCampanha(
         p_variante: variante,
         p_erro: erro,
         p_proximo: new Date(proximo).toISOString(),
+        // O texto exato que saiu (11/11/2026): a origem do contato mostra ao agente o que o lead recebeu.
+        p_texto: texto,
       }),
     );
 
@@ -214,15 +223,19 @@ async function vezDaCampanha(
     }
     const variantes = vez.variantes ?? [];
     const variante = varianteDaOrdem(vez.ordem ?? 0, variantes.length);
+    // A cidade do lead sai do fim do nome (`nomeParaMensagem`): uma leitura pela PK.
+    const { data: doLead, error: eLead } = await svc.from("prospeccao_leads").select("cidade").eq("id", lead).maybeSingle();
+    if (eLead) throw eLead;
+    const texto = textoParaLead(variantes[variante] ?? "", empresa, { em: agora, cidade: doLead?.cidade });
     entregueAEvolution = true;
     const resultado = await enviarMensagemAtiva({
       instancia: vez.instancia,
       telefone: vez.telefone,
-      texto: textoParaLead(variantes[variante] ?? "", empresa),
+      texto,
       numeroDeAvisos: vez.avisos,
     });
     if (resultado === "enviado") {
-      await registrar("enviado", variante, null, proximoEnvioEm(agora, hoje + 1));
+      await registrar("enviado", variante, null, proximoEnvioEm(agora, hoje + 1), texto);
       return "enviado";
     }
     // Sem confirmação da Evolution (recusa, erro ou tempo esgotado: a mensagem pode até

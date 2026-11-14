@@ -120,7 +120,7 @@ test.describe("Campanhas no preview", () => {
     await expect(page.locator('[data-secao="quem"]')).toContainText(/\d+ leads?, \d+ dias?/);
     await page.locator('[data-slot="assistente-continuar"]').click();
     const variante = page.getByRole("textbox", { name: "Texto da variante 1" });
-    await expect(page.getByText("Se não quiser receber mais mensagens, é só responder SAIR.").first()).toBeVisible();
+    await expect(page.getByText("Se não fizer sentido pra vocês, é só me avisar que eu não mando mais.").first()).toBeVisible();
     await variante.fill("Oi, tudo bem? Posso te mostrar uma coisa?");
     await expect(page.getByText("Falta {empresa} no texto.")).toBeVisible();
     await expect(page.locator('[data-slot="assistente-continuar"]')).toBeDisabled();
@@ -170,6 +170,26 @@ test.describe("Campanhas no preview", () => {
     await expect(page.locator('[data-campo="assistente-busca"]')).toContainText("contatos_sem_cidade");
     // Lista sem cidade: nada de "· " sobrando.
     await expect(page.locator('[data-campo="assistente-busca"]')).not.toContainText("·");
+  });
+
+  test("Leads: Importar planilha ao lado da Nova busca usa a mesma importação e abre a lista nova", async ({ page }) => {
+    await page.goto("/design/campanhas?tela=leads");
+    await expect(page.locator('[data-slot="leads-nova-busca"]')).toBeVisible();
+    await page.locator('[data-slot="leads-importar-planilha"]').click();
+    await expect(page.locator('[data-slot="planilha-formato"]')).toContainText("Sim, só celular");
+    await page.locator('[data-slot="planilha-arquivo"]').setInputFiles({
+      name: "leads-lajinha.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      buffer: Buffer.from("x"),
+    });
+    await expect(page.locator('[data-slot="planilha-previa"]')).toContainText("contatos entram");
+    await page.locator('[data-slot="planilha-importar"]').click();
+    await expect(page.locator('[data-slot="busca-detalhe"] h2')).toContainText("leads-lajinha");
+    // Voltar da importação sem importar devolve a home da aba.
+    await page.locator('[data-slot="detalhe-voltar"]').click();
+    await page.locator('[data-slot="leads-importar-planilha"]').click();
+    await page.locator('[data-slot="detalhe-voltar"]').click();
+    await expect(page.locator('[data-slot="leads-nova-busca"]')).toBeVisible();
   });
 
   test("o detalhe pausa e retoma", async ({ page }) => {

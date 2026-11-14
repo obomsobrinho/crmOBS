@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { falhou, torto } from "@/lib/campanhas-servidor";
+import { falhouComMotivo, torto } from "@/lib/campanhas-servidor";
 import { MAXIMO_DO_ARQUIVO_BYTES } from "@/lib/planilha-de-leads";
 import { gravarPlanilha, lerPlanilha, situacaoNaBase } from "@/lib/planilha-servidor";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -31,7 +31,7 @@ export const POST = rotaDoAdmin(
       }
       return Response.json({ buscaId: await gravarPlanilha(svc, { admin, nome, leitura: lida.leitura }) });
     } catch (e) {
-      return falhou(confirmar ? "importar a planilha" : "ler a planilha", e);
+      return falhouComMotivo(confirmar ? "importar a planilha" : "ler a planilha", e);
     }
   },
   { revalidar: true, semId: true },

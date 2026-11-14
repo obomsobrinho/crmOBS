@@ -5,7 +5,7 @@ import { comEnvioDaCampanha, semLoteAtual } from "../lib/mensagem";
 // A origem de campanha no turno do agente (03/11/2026): a seção do prompt e o
 // envio no histórico. Puro, sem banco.
 
-const texto = textoParaLead("Oi! Achei a {empresa} no Google.", "Clínica Sorriso");
+const texto = textoParaLead("Oi! Achei a {empresa} no Google.", "Clínica Sorriso", { em: Date.parse("2026-11-04T13:30:00Z") });
 
 test.describe("Origem de campanha para o agente", () => {
   test("a seção diz que a empresa procurou primeiro, com a data em São Paulo e o texto exato", () => {

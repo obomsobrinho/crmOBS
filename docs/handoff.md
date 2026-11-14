@@ -389,6 +389,16 @@ limpo.
 
 **Desde 10/11/2026, dados, estado e desempenho seguem `docs/plano-dados-e-estado.md`** (decisões fechadas em 11/11/2026; revisão externa do spec feita em 11/11/2026, passo 0 liberado): passos 0 a 5, orçamento de desempenho na seção 3, e a frente de design só depois do passo 5 (seção 7). A leitura semanal do orçamento (B5 a B9) é registrada aqui.
 
+**12/11/2026 (campanhas):** o pacote da Campanha Lajinha está em produção (merge `7e05f55`; ADR
+`2026-11-11-campaign-lock-phrases-clean-names-and-sent-text.md`): trava do robô ampliada, nome limpo,
+`{saudacao}`, linha de saída nova, frases de parada novas, texto exato gravado no envio. O prompt da
+OBS foi publicado com o exemplo do golpe novo (15.830 caracteres; a bancada e as regras salvas
+voltaram a passar). "Campanha Lajinha primeira" está pausada; o dono cria a "Lajinha segunda" com a
+mesma lista. Pendentes: tirar o fallback `prospeccao_texto_antigo` de `prospeccao_registrar_envio`
+quando nenhum cron antigo puder mais chamar sem `p_texto`; decisões do dono sobre "retornarei" rápido
+de uma pessoa travar e sobre "não faz sentido" no meio da conversa parar a campanha. No ensaio, o Tony
+responde "Não faz sentido pra gente" agradecendo, sem confirmar que não manda mais.
+
 O plano inteiro está em `docs/proximos-passos.md`, seção **"Plano da demo"**. O grupo que exigia o
 dono na sala **fechou em 17/09/2026** (ver a seção 3).
 

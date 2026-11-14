@@ -36,8 +36,34 @@ const PAUSA_ENTRE_MENSAGENS_MS = 1_000;
  */
 const TAMANHO_MINIMO_REPETIDA = 12;
 
-/** Palavras de automação (lista do dono, 07/11/2026), já sem acento e em caixa baixa. */
-const PALAVRAS_DE_AUTOMACAO = [/\bdigite\b/, /\bopca?o(es)?\b/, /\baguarde\b/, /\bmensagem automatica\b/, /\bretornaremos\b/];
+/** Frases de automação (lista do dono, 07/11/2026, ampliada em 11/11/2026), já sem acento e em caixa baixa. */
+const PALAVRAS_DE_AUTOMACAO = [
+  /\bdigite\b/,
+  /\bopca?o(es)?\b/,
+  /\baguarde\b/,
+  /\bmensagem automatica\b/,
+  /\bretornaremos\b/,
+  // Ausência e saudação do WhatsApp Business (campanha de Lajinha, 10 e 11/11/2026: as 7 passaram pela trava).
+  /\bretornarei\b/,
+  /\bentraremos em contato\b/,
+  /\bentrarei em contato\b/,
+  /\bno momento nao (estou|estamos) disponive(l|is)\b/,
+  /\bnao (estou|estamos) disponive(l|is) no momento\b/,
+  /\bagradece (o|seu|pelo) contato\b/,
+  /\bobrigad[oa] (pelo|por seu|pelo seu) contato\b/,
+  /\brecebemos (a )?sua mensagem\b/,
+  /\bestarei te respondendo\b/,
+  /\bseja bem vind[oa]\b/,
+  /\bfora do (nosso )?horario de atendimento\b/,
+];
+
+/**
+ * Linha de menu sem número: começa com emoji ou marcador ("✅Pediatra", "• Vendas",
+ * "- Horários"). 3 ou mais delas contam como menu (dono, 11/11/2026). "*" e "-" só
+ * com espaço depois, para um "*negrito*" no começo da linha não contar.
+ */
+const LINHA_DE_LISTA = /^\s*(?:[•▪◦‣]|[*-]\s|\p{Extended_Pictographic})/u;
+const LINHAS_DE_LISTA_PARA_MENU = 3;
 
 /**
  * Marcador de opção numerada: "1 para", "1 -", "1)", "1:", "1. " ou o emoji 1️⃣,
@@ -52,10 +78,11 @@ function textoComparavel(texto: string): string {
     .trim();
 }
 
-/** O sinal (b): o texto tem opções numeradas (2 ou mais) ou uma palavra de automação. */
+/** O sinal (b): o texto tem opções numeradas (2 ou mais), um menu de marcadores ou uma frase de automação. */
 export function temPadraoDeAutomacao(texto: string): boolean {
   const opcoes = new Set([...texto.toLowerCase().matchAll(MARCADOR_DE_OPCAO)].map((m) => m[1]));
   if (opcoes.size >= 2) return true;
+  if (texto.split("\n").filter((l) => LINHA_DE_LISTA.test(l)).length >= LINHAS_DE_LISTA_PARA_MENU) return true;
   const t = textoComparavel(texto);
   return PALAVRAS_DE_AUTOMACAO.some((p) => p.test(t));
 }
