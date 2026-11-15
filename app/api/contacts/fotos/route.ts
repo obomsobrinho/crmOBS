@@ -9,7 +9,7 @@ import { atualizarFotos } from "@/lib/fotos-servidor";
 // Best-effort: responde na hora e confere depois (`after`); nunca vira erro de tela.
 // Qualquer membro pode pedir (a conferência é por empresa e carimba quem já pegou), e
 // conta bloqueada também, como o layout fazia: exceção registrada em
-// .claude/rules/dados-estado-desempenho.md, à espera da confirmação do dono.
+// .claude/rules/dados-estado-desempenho.md, confirmada pelo dono em 15/11/2026.
 export async function POST() {
   const r = await sessaoDaRota();
   if ("erro" in r) return r.erro;
