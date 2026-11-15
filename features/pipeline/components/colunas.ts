@@ -1,4 +1,4 @@
-import { compararCards, type ContagensPipeline } from "@/lib/pipeline-fonte";
+import { compararCards, type ContagensPipeline } from "@/features/pipeline/api/fonte";
 import type { PipelineCard } from "@/lib/pipeline";
 
 /** Os cards já carregados de uma coluna. */

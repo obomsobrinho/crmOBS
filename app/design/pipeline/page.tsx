@@ -1,6 +1,6 @@
 import NavRail from "@/components/NavRail";
-import PipelineBoard from "@/components/PipelineBoard";
-import { fontePipelineDaMemoria, paramsPipeline, primeirasColunas } from "@/lib/pipeline-fonte";
+import PipelineBoard from "@/features/pipeline/components/PipelineBoard";
+import { fontePipelineDaMemoria, paramsPipeline, primeirasColunas } from "@/features/pipeline/api/fonte";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 

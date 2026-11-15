@@ -2,20 +2,20 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { type ContagensPipeline } from "@/lib/pipeline-fonte";
+import { type ContagensPipeline } from "@/features/pipeline/api/fonte";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import type { ColunaCarregada } from "./pipeline/colunas";
-import { ColunaDoPipeline } from "./pipeline/ColunaDoPipeline";
-import { FaixaDeEstagios } from "./pipeline/FaixaDeEstagios";
-import { MoverSheet } from "./pipeline/MoverSheet";
-import { PipelineFiltros } from "./pipeline/PipelineFiltros";
-import { StageManager } from "./pipeline/StageManager";
-import { useGestaoDeEstagios } from "./pipeline/useGestaoDeEstagios";
-import { usePipelineDados } from "./pipeline/usePipelineDados";
+import type { ColunaCarregada } from "./colunas";
+import { ColunaDoPipeline } from "./ColunaDoPipeline";
+import { FaixaDeEstagios } from "./FaixaDeEstagios";
+import { MoverSheet } from "./MoverSheet";
+import { PipelineFiltros } from "./PipelineFiltros";
+import { StageManager } from "./StageManager";
+import { useGestaoDeEstagios } from "../api/useGestaoDeEstagios";
+import { usePipelineDados } from "../api/usePipelineDados";
 
 export type { ColunaCarregada };
 

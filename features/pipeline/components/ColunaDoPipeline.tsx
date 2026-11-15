@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { stageColor, resumoDosNumeros, type PipelineCard, type Stage } from "@/lib/pipeline";
-import type { ContagensPipeline } from "@/lib/pipeline-fonte";
+import type { ContagensPipeline } from "@/features/pipeline/api/fonte";
 import type { Member } from "@/lib/team";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
 import { EstadoVazio } from "@/components/ui/estado-vazio";

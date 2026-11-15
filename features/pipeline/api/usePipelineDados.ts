@@ -12,10 +12,10 @@ import {
   paramsPipeline,
   type ContagensPipeline,
   type FontePipeline,
-} from "@/lib/pipeline-fonte";
+} from "@/features/pipeline/api/fonte";
 import { fetchMembers, type Member } from "@/lib/team";
 import { rowToStage, type PipelineCard, type Stage, type StageRow } from "@/lib/pipeline";
-import { encaixarCard, moverNosNumeros, type ColunaCarregada } from "./colunas";
+import { encaixarCard, moverNosNumeros, type ColunaCarregada } from "../components/colunas";
 
 const STAGE_SELECT =
   "id, key, name, position, is_canonical, is_default, archived, color";

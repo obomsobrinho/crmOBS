@@ -5,11 +5,11 @@ import { formatEspera, prettyPhone } from "@/lib/format";
 import { memberName, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { idadeEmDias, origemDoCard, type PipelineCard } from "@/lib/pipeline";
-import AvatarContato from "../AvatarContato";
-import AvatarMembro from "../AvatarMembro";
+import AvatarContato from "@/components/AvatarContato";
+import AvatarMembro from "@/components/AvatarMembro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import QuemAtendeBadge, { quemAtendeTexto } from "../QuemAtendeBadge";
+import QuemAtendeBadge, { quemAtendeTexto } from "@/components/QuemAtendeBadge";
 
 export function CardItem({
   card,

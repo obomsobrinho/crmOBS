@@ -2,7 +2,7 @@
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { stageColor, type Stage } from "@/lib/pipeline";
-import type { ContagensPipeline } from "@/lib/pipeline-fonte";
+import type { ContagensPipeline } from "@/features/pipeline/api/fonte";
 
 /** Celular: a faixa de estágios, um por vez (Tabs da base, lista `faixa`). */
 export function FaixaDeEstagios({

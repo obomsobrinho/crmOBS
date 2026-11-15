@@ -6,9 +6,9 @@ import {
   fontePipelineDoBanco,
   paramsPipeline,
   primeirasColunas,
-} from "@/lib/pipeline-fonte";
+} from "@/features/pipeline/api/fonte";
 import { foraDaLista } from "@/lib/inbox-lista";
-import PipelineBoard from "@/components/PipelineBoard";
+import PipelineBoard from "@/features/pipeline/components/PipelineBoard";
 
 export const dynamic = "force-dynamic";
 

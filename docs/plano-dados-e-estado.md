@@ -192,7 +192,7 @@ INSERT per list (review finding 4). In an infinite list, invalidating re-reads e
 | Conversas list (Step 4) | fetch the row and place it with `encaixar` (`lib/inbox-lista.ts`), as today | pure placement rule exists |
 | Open conversation messages (Step 4) | append the new message from the event payload, skipping an id already present; never invalidates the message list | a message must show at once; ids make the append idempotent |
 | Contatos (Step 3b) | today's behavior of `features/contatos/api/fonte.ts` and its screen | default |
-| Pipeline columns (Step 3b) | today's behavior of `lib/pipeline-fonte.ts`; a stage change by the AI moves the row between the cached columns, no column re-read | default |
+| Pipeline columns (Step 3b) | today's behavior of `features/pipeline/api/fonte.ts`; a stage change by the AI moves the row between the cached columns, no column re-read | default |
 | Pedidos (Step 3a) | today's behavior of the Pedidos screen | default |
 | Notes, tags (with their screen) | patch from the payload, as today | default |
 | Counters (NavRail, Pedidos tabs, Painel blocks) | debounced invalidation | an aggregate has no row to place |

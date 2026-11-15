@@ -1,8 +1,8 @@
 import type { Supa } from "@/lib/supabase/tipos";
 import type { LinhaRpc } from "@/lib/supabase/schema";
-import { nomeDoContato } from "./inbox";
-import { normalizar } from "./clientes";
-import type { PipelineCard, Stage } from "./pipeline";
+import { nomeDoContato } from "@/lib/inbox";
+import { normalizar } from "@/lib/clientes";
+import type { PipelineCard, Stage } from "@/lib/pipeline";
 
 // DE ONDE O PIPELINE TIRA OS CARDS (01/10/2026, docs/plano-carregamento.md,
 // fase 5). Cada COLUNA busca os próprios cards, 10 por vez (`pipeline_coluna`),
