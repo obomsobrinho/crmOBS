@@ -59,6 +59,7 @@ import { prettyPhone } from "@/lib/format";
 import { ROTULO_CHAVES, fillDoRotulo } from "@/lib/rotulos";
 import { feriadoDoDia } from "@/lib/feriados";
 import { cn } from "@/lib/utils";
+import { useSemanaNaUrl } from "./na-url";
 
 // A tela da AGENDA PRÓPRIA (revisão do dono, 28/10/2026): GRADE SEMANAL no
 // estilo Google Agenda (referência: Clinic Radar), colunas por dia com
@@ -105,7 +106,10 @@ function corDoServico(servicoId: number | null): string {
 
 export default function Agenda(p: PropsAgenda) {
   const hoje = diaIsoSP(p.agora);
-  const [semana, setSemana] = useState(p.inicial.semana);
+  // A semana exibida mora na URL (passo 3b): sem `?semana=`, a que a tela abriu.
+  const [semanaNaUrl, setSemanaNaUrl] = useSemanaNaUrl();
+  const semana = semanaNaUrl ? segundaDaSemana(semanaNaUrl) : p.inicial.semana;
+  const setSemana = (d: string) => void setSemanaNaUrl(d === segundaDaSemana(hoje) ? null : d);
   const [diaCelular, setDiaCelular] = useState(hoje);
   const [itens, setItens] = useState(p.inicial.itens);
   const [bloqueios, setBloqueios] = useState(p.inicial.bloqueios);
@@ -130,14 +134,16 @@ export default function Agenda(p: PropsAgenda) {
     }
   }, [p.fonte, semana]);
 
-  // A primeira semana veio do servidor; as outras, a fonte lê ao navegar.
+  // A primeira semana veio pronta (`inicial`); as outras, a fonte lê ao navegar. Se a
+  // URL abriu noutra semana que a de `inicial` (o preview lê sempre a de hoje), lê já.
   const primeira = useRef(true);
   useEffect(() => {
     if (primeira.current) {
       primeira.current = false;
-      return;
+      if (semana === p.inicial.semana) return;
     }
     void recarregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `recarregar` já muda com a semana; a comparação vale só na primeira vez
   }, [recarregar]);
   // Voltar para a aba revalida (sem realtime nesta versão).
   useEffect(() => {

@@ -18,7 +18,7 @@ const ROTAS_COM_MOLDURA = ["/pipeline", "/pedidos", "/contatos", "/agenda", "/pa
 
 /** Áreas migradas (o bloco "State" de .claude/rules/dados-estado-desempenho.md). */
 // Campanhas fica fora por decisão do dono (D16): continua lendo no servidor.
-const AREAS_MIGRADAS: string[] = ["/pedidos", "/contatos", "/pipeline", "/painel"];
+const AREAS_MIGRADAS: string[] = ["/pedidos", "/contatos", "/pipeline", "/painel", "/agenda"];
 
 /**
  * Área migrada pré-carrega a rota INTEIRA na intenção (`LinkNaIntencao`): o clique
@@ -30,6 +30,7 @@ const TELA_PRONTA: Record<string, string> = {
   "/contatos": 'section[aria-label="Contatos"]',
   "/pipeline": '[data-slot="pipeline-cabecalho"]',
   "/painel": '[data-slot="painel-grade"]',
+  "/agenda": '[data-agenda="tela"], [data-agenda="indisponivel"]',
 };
 
 /** B8, em kB comprimidos. Campanhas e Nova busca descem para 340 no passo 2. */

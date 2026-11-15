@@ -22,8 +22,8 @@ paths:
 The roadmap and the reasons are in `docs/plano-dados-e-estado.md` (the spec). This file holds only the rules, and says which ones apply now and which apply from a given step.
 
 ## State (updated in the commit that closes each step)
-- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner), Step 1, the Base (14/11/2026), Step 2, Campanhas (14/11/2026; the Apify webhook and the cron have no body to put in shadow mode, spec Step 2), Step 3a, Pedidos, the tenant pilot (14/11/2026); Step 3b in progress (Contatos, Pipeline and Painel done on 15/11/2026; Agenda left).
-- Areas migrated: Campanhas (`features/campanhas/`), Pedidos (`features/pedidos/`), Contatos (`features/contatos/`), Pipeline (`features/pipeline/`), Painel (`features/painel/`, the blocks stay in `components/painel/`, shared with the central).
+- Steps done: Step 0 (13/11/2026; the Supabase dashboard check (a) is left with the owner), Step 1, the Base (14/11/2026), Step 2, Campanhas (14/11/2026; the Apify webhook and the cron have no body to put in shadow mode, spec Step 2), Step 3a, Pedidos, the tenant pilot (14/11/2026); Step 3b, the other tenant screens (15/11/2026: Contatos, Pipeline, Painel, Agenda).
+- Areas migrated: Campanhas (`features/campanhas/`), Pedidos (`features/pedidos/`), Contatos (`features/contatos/`), Pipeline (`features/pipeline/`), Painel (`features/painel/`, the blocks stay in `components/painel/`, shared with the central), Agenda (`features/agenda/`; `/agenda/configuracoes` still reads on the server).
 
 **Which pattern new code follows**: in an area not migrated yet, new code follows that area's current pattern (`data.md`, `realtime.md`, `engineering.md` as written, e.g. a new list in Contatos uses `usePaginada` until Contatos migrates). A new screen or a wholly new area is born in the new pattern, from the step whose tooling it needs. A migrated area is one listed above; its files live in `features/<area>/`.
 

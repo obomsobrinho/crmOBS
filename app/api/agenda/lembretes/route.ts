@@ -1,4 +1,6 @@
 import { NextResponse, after } from "next/server";
+import { conferirNaSombra } from "@/lib/rota";
+import { consultaDoCronDeLembretes } from "@/features/agenda/schemas";
 import { segredoConfere } from "@/lib/segredo";
 import { createServiceClient } from "@/lib/supabase/service";
 import { execucaoDoDia, janelaDoLembrete, normalizarConfigDaAgenda, textoDoLembrete } from "@/lib/agenda";
@@ -63,7 +65,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
   const t0 = Date.now();
-  const continuacao = new URL(req.url).searchParams.get("continuacao") === "1";
+  // Modo sombra (2.9): a query cruza o esquema e a diferença só vai para o log.
+  const consulta = new URL(req.url).searchParams;
+  conferirNaSombra(consultaDoCronDeLembretes, Object.fromEntries(consulta), "agenda/lembretes");
+  const continuacao = consulta.get("continuacao") === "1";
   const svc = createServiceClient();
   const hoje = diaIsoSP(t0);
   const resumo = { empresas: 0, enviados: 0, recusados: 0, pulados: 0, erros: 0, faltou: false };
