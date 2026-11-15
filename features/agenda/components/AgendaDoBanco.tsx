@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import Agenda, { type PropsAgenda } from "./Agenda";
+// eslint-disable-next-line no-restricted-imports -- move commit of Step 3b; the behavior commit moves this into the area source
 import { createClient } from "@/lib/supabase/client";
-import { fonteDoBancoAgenda } from "@/lib/agenda-fonte";
+import { fonteDoBancoAgenda } from "@/features/agenda/api/fonte";
 import { foraDaLista } from "@/lib/inbox-lista";
 
 // A tela da agenda com a fonte do BANCO, montada no navegador (função não

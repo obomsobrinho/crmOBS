@@ -52,7 +52,7 @@ import {
 import type { AgentConfig } from "@/lib/agent-prompt";
 import type { KnowledgeDoc } from "@/lib/crm";
 import { problemaDosServicos, type AgendaConfig, type ServicoDaAgenda } from "@/lib/agenda";
-import { fonteDoBancoAgenda } from "@/lib/agenda-fonte";
+import { fonteDoBancoAgenda } from "@/features/agenda/api/fonte";
 import { createClient } from "@/lib/supabase/client";
 import { ItemAgenda, ListaDeServicos, paraEditar, paraSalvar, type ServicoEditavel } from "./agenda/CamposDaAgenda";
 

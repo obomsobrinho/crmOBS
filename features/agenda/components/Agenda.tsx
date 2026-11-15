@@ -51,7 +51,7 @@ import {
   type AgendaConfig,
   type ServicoDaAgenda,
 } from "@/lib/agenda";
-import { inicioDoDia, type BloqueioAgenda, type ContatoDaBusca, type FonteAgenda, type LinhaAgenda } from "@/lib/agenda-fonte";
+import { inicioDoDia, type BloqueioAgenda, type ContatoDaBusca, type FonteAgenda, type LinhaAgenda } from "@/features/agenda/api/fonte";
 import { useDebounce } from "@/lib/use-debounce";
 import { CampoBusca } from "@/components/ui/campo-busca";
 import { diaIsoSP, mesAnoDoDia, somarDias, somarMes } from "@/lib/fuso";

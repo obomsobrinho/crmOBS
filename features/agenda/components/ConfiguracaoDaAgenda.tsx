@@ -23,7 +23,7 @@ import {
   type InicioDosHorarios,
   type ServicoDaAgenda,
 } from "@/lib/agenda";
-import type { FonteAgenda } from "@/lib/agenda-fonte";
+import type { FonteAgenda } from "@/features/agenda/api/fonte";
 import { feriadosDoAno } from "@/lib/feriados";
 import { diaIsoSP, diaMes, somarDias } from "@/lib/fuso";
 

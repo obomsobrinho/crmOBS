@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import AgendaDoBanco from "@/components/agenda/AgendaDoBanco";
+import AgendaDoBanco from "@/features/agenda/components/AgendaDoBanco";
 import { getMyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { agendaDoTenant } from "@/lib/agenda-servidor";
-import { fonteDoBancoAgenda } from "@/lib/agenda-fonte";
+import { fonteDoBancoAgenda } from "@/features/agenda/api/fonte";
 import { AGENDA_PADRAO, horarioDaAgenda, segundaDaSemana } from "@/lib/agenda";
 import { horarioCadastrado } from "@/lib/horarios";
 import { diaIsoSP, inicioDoDiaSP } from "@/lib/fuso";
@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 // AGENDA PRÓPRIA (28/10/2026, docs/plano-agenda.md). O servidor traz a semana
 // atual (agendamentos e bloqueios); as outras o navegador lê pela MESMA fonte
-// (`lib/agenda-fonte.ts`). Agenda desligada: a página não existe para o tenant
+// (`features/agenda/api/fonte.ts`). Agenda desligada: a página não existe para o tenant
 // (vai para as configurações, se dono, ou para as conversas). Sem a migration
 // aplicada as tabelas não existem: a tela diz que a agenda não está disponível.
 //

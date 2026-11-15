@@ -1,9 +1,9 @@
 // Dados FALSOS do preview da Agenda (docs/plano-agenda.md). Nada aqui fala com
 // o banco. A conta de horário livre é a de verdade (`lib/agenda.ts`, pela
-// fonte em memória de `lib/agenda-fonte.ts`).
+// fonte em memória de `features/agenda/api/fonte.ts`).
 
 import { AGENDA_PADRAO, type AgendaConfig, type ServicoDaAgenda } from "@/lib/agenda";
-import type { BloqueioAgenda, LinhaAgenda } from "@/lib/agenda-fonte";
+import type { BloqueioAgenda, LinhaAgenda } from "@/features/agenda/api/fonte";
 import type { BusinessHours } from "@/lib/agent-prompt";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 
