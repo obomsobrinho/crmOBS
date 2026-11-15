@@ -1,14 +1,14 @@
 import type { Supa } from "@/lib/supabase/tipos";
 import type { LinhaRpc } from "@/lib/supabase/schema";
-import { nomeDoContato } from "./inbox";
-import { inicioDeDias } from "./inbox-lista";
+import { nomeDoContato } from "@/lib/inbox";
+import { inicioDeDias } from "@/lib/inbox-lista";
 import {
   LIMIAR_FRIO_DIAS,
   casaBusca,
   passaFiltro,
   type ClienteItem,
   type FiltroClientes,
-} from "./clientes";
+} from "@/lib/clientes";
 
 // DE ONDE A TELA DE CLIENTES TIRA OS DADOS (fase 3 do plano de carregamento).
 // O banco (`clientes_pagina`/`clientes_contagens`, 10 por vez, busca e filtro

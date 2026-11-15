@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import ListaClientes from "@/components/ListaClientes";
+import ListaClientes from "@/features/contatos/components/ListaClientes";
 import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { getMyClient } from "@/lib/auth";
@@ -10,7 +10,7 @@ import {
   PAGINA_CLIENTES,
   fonteClientesDoBanco,
   paramsClientes,
-} from "@/lib/clientes-fonte";
+} from "@/features/contatos/api/fonte";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { agoraMs } from "@/lib/periodo";
 

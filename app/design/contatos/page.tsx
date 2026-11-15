@@ -1,11 +1,11 @@
 import NavRail from "@/components/NavRail";
 import BannerLimiteIa from "@/components/BannerLimiteIa";
 import FichaContato from "@/components/FichaContato";
-import ListaClientes from "@/components/ListaClientes";
+import ListaClientes from "@/features/contatos/components/ListaClientes";
 import { Card } from "@/components/ui/card";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { agoraMs } from "@/lib/periodo";
-import { PAGINA_CLIENTES, fonteClientesDaMemoria, paramsClientes } from "@/lib/clientes-fonte";
+import { PAGINA_CLIENTES, fonteClientesDaMemoria, paramsClientes } from "@/features/contatos/api/fonte";
 import { diasSemContato, montarClientes, type ContatoClienteRow, type ConversaClienteRow, type TagClienteRow } from "@/lib/clientes";
 
 // Preview da tela de CONTATOS (dev-only, liberado pelo proxy). Sem banco.

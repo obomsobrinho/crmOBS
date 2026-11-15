@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { quemAtende, tagColor } from "@/lib/crm";
 import { agoraMs } from "@/lib/periodo";
+// eslint-disable-next-line no-restricted-imports -- move commit of Step 3b; the behavior commit moves the reads into the area source
 import { createClient } from "@/lib/supabase/client";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { useDebounce } from "@/lib/use-debounce";
@@ -32,7 +33,7 @@ import {
   type ContagensClientes,
   type FonteClientes,
   type ParamsClientes,
-} from "@/lib/clientes-fonte";
+} from "@/features/contatos/api/fonte";
 import {
   DADOS_DO_CADASTRO,
   LIMIAR_FRIO_DIAS,
@@ -46,7 +47,7 @@ import {
 } from "@/lib/clientes";
 
 // O diálogo só pesa quando alguém clica em "Novo cliente" (R-30): chunk à parte.
-const NovoClienteDialog = dynamic(() => import("@/components/NovoClienteDialog"));
+const NovoClienteDialog = dynamic(() => import("@/features/contatos/components/NovoClienteDialog"));
 
 // LISTA DE CLIENTES (30/09/2026, docs/plano-clientes.md; paginada em 01/10/2026,
 // docs/plano-carregamento.md, fase 3).

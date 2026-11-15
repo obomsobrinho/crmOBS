@@ -8,7 +8,7 @@ import {
 } from "@/lib/agenda";
 import type { BusinessHours } from "@/lib/agent-prompt";
 import { inicioDoDiaSP } from "@/lib/fuso";
-import { fonteClientesDoBanco, paramsClientes } from "@/lib/clientes-fonte";
+import { fonteClientesDoBanco, paramsClientes } from "@/features/contatos/api/fonte";
 
 // A ÚNICA porta da tela `/agenda` para os dados (docs/plano-agenda.md). Duas
 // implementações com a mesma interface: o banco (leitura com a sessão do
