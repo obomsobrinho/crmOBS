@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -19,21 +19,12 @@ import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { quemAtende, tagColor } from "@/lib/crm";
 import { agoraMs } from "@/lib/periodo";
-// eslint-disable-next-line no-restricted-imports -- move commit of Step 3b; the behavior commit moves the reads into the area source
-import { createClient } from "@/lib/supabase/client";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { useDebounce } from "@/lib/use-debounce";
-import { usePaginada } from "@/lib/use-paginada";
-import { ouvirContato } from "@/lib/contato-bus";
-import {
-  PAGINA_CLIENTES,
-  fonteClientesDaMemoria,
-  fonteClientesDoBanco,
-  paramsClientes,
-  type ContagensClientes,
-  type FonteClientes,
-  type ParamsClientes,
-} from "@/features/contatos/api/fonte";
+import { fonteClientesDaMemoria, type FonteClientes } from "@/features/contatos/api/fonte";
+import { fonteDeContatosDoNavegador } from "@/features/contatos/api/navegador";
+import { useContagensDeContatos, useFimDaLista, useListaDeContatos } from "@/features/contatos/hooks/useContatos";
+import { useContatosNaUrl } from "./na-url";
 import {
   DADOS_DO_CADASTRO,
   LIMIAR_FRIO_DIAS,
@@ -60,7 +51,6 @@ const NovoClienteDialog = dynamic(() => import("@/features/contatos/components/N
 // ⚠️ Sem realtime: a lista revalida ao voltar o foco (no máximo a cada 10s), a
 // mesma regra das outras telas.
 export default function ListaClientes({
-  inicial,
   clientId,
   previewTodos,
   numeroAvisos = null,
@@ -69,8 +59,6 @@ export default function ListaClientes({
   podeCadastrar = true,
   simular = false,
 }: {
-  /** A primeira página e as contagens, que o servidor já buscou. */
-  inicial: { itens: ClienteItem[]; contagens: ContagensClientes; temMais: boolean };
   /** Tenant logado. Sem ele (preview /design) a lista roda sobre `previewTodos`. */
   clientId?: string;
   previewTodos?: ClienteItem[];
@@ -86,10 +74,16 @@ export default function ListaClientes({
   hrefModelo?: string;
 }) {
   const pathname = usePathname();
-  const [q, setQ] = useState("");
-  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  // Filtro e busca na URL (refresh e voltar mantêm). A busca vai à URL a cada tecla
+  // (o nuqs junta as escritas), e só a LEITURA espera 300 ms parado: gravar a URL
+  // depois do atraso atropelava a navegação de quem digitava e já clicava num contato
+  // (o `replaceState` da busca chegava no meio da ida para a ficha).
+  const url = useContatosNaUrl();
+  const filtro = url.filtro;
+  const setFiltro = (f: FiltroClientes) => void url.setU({ filtro: f === "todos" ? null : f });
+  const q = url.q;
+  const setQ = (v: string) => void url.setU({ q: v || null });
   const busca = useDebounce(q.trim(), 300);
-  const [filtro, setFiltro] = useState<FiltroClientes>("todos");
   const [novoAberto, setNovoAberto] = useState(false);
   // O diálogo (chunk à parte) monta na primeira abertura e fica: fechar não perde o rascunho.
   const [novoMontado, setNovoMontado] = useState(false);
@@ -102,55 +96,21 @@ export default function ListaClientes({
   const agora = useMemo(() => agoraMs(), []);
   const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
 
+  // DADOS (passo 3b de docs/plano-dados-e-estado.md): a lista e os números leem pelo
+  // cache (`hooks/useContatos.ts`), sem nada vindo do servidor; a fonte é o banco pelo
+  // navegador (RLS) ou a memória do /design.
   const fonte = useMemo<FonteClientes>(
-    () =>
-      clientId
-        ? fonteClientesDoBanco(createClient(), clientId)
-        : fonteClientesDaMemoria(previewTodos ?? inicial.itens, agora),
-    [clientId, previewTodos, inicial.itens, agora]
+    () => (clientId ? fonteDeContatosDoNavegador(clientId) : fonteClientesDaMemoria(previewTodos ?? [], agora)),
+    [clientId, previewTodos, agora]
   );
-  const params = useMemo(
-    () => paramsClientes(filtro, busca, fora, agora),
-    [filtro, busca, fora, agora]
-  );
+  const { contagens: contagem, carregou: contou } = useContagensDeContatos(fonte, fora);
+  const lista = useListaDeContatos(fonte, fora, { filtro, busca });
+  const itens = lista.itens;
+  const carregando = lista.isPending || lista.isFetchingNextPage || (lista.isPlaceholderData && lista.isFetching);
+  const fimRef = useFimDaLista(lista.hasNextPage, lista.isFetchingNextPage, () => void lista.fetchNextPage());
 
-  const [contagem, setContagem] = useState<ContagensClientes>(inicial.contagens);
-  const [contagemVista, setContagemVista] = useState(inicial.contagens);
-  if (inicial.contagens !== contagemVista) {
-    setContagemVista(inicial.contagens);
-    setContagem(inicial.contagens);
-  }
-  const recontar = useCallback(() => {
-    void fonte
-      .contagens(params)
-      .then(setContagem)
-      .catch((e) => console.error("contagens de clientes:", e));
-  }, [fonte, params]);
-
-  const {
-    itens,
-    temMais,
-    carregando,
-    fimRef,
-    revalidar,
-  } = usePaginada<ClienteItem, ParamsClientes>({
-    inicial: inicial.itens,
-    temMaisInicial: inicial.temMais,
-    params,
-    buscar: (p, depois, n) => fonte.pagina(p, depois, n),
-    chave: (c) => c.id,
-    tamanho: PAGINA_CLIENTES,
-    revalidarAoVoltar: !!clientId,
-    aoRevalidar: clientId ? recontar : undefined,
-  });
-
-  // Contato renomeado ou cadastrado NESTA aba (R-15): a lista não tem realtime,
-  // então busca de novo as linhas que já tem na tela (uma função do banco), em
-  // vez de a tela chamar `router.refresh()` e refazer a página inteira.
-  useEffect(() => {
-    if (!clientId) return;
-    return ouvirContato(() => void revalidar());
-  }, [clientId, revalidar]);
+  // Contato renomeado ou cadastrado NESTA aba (R-15): a ponte de Contatos do layout
+  // (`features/contatos/api/ponte.ts`) deixa a lista velha, e esta tela relê.
 
   // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
   // some (por CSS, como a lista de conversas), e quem volta é o "voltar".
@@ -244,7 +204,7 @@ export default function ListaClientes({
         </div>
 
         <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
-          {contagem.todos === 0 && !carregando ? (
+          {contou && contagem.todos === 0 && !carregando ? (
             <Vazio
               titulo="Ainda não há contatos"
               texto="Quem escrever para o seu WhatsApp aparece aqui sozinho, com telefone e nome."
@@ -301,11 +261,9 @@ export default function ListaClientes({
                 />
               ))}
               {/* O fim da lista: quando aparece, vem a próxima página. */}
-              {temMais && (
+              {lista.hasNextPage && (
                 <li
-                  ref={(el) => {
-                    fimRef.current = el;
-                  }}
+                  ref={fimRef}
                   data-slot="clientes-mais"
                   aria-hidden
                   className="h-px"

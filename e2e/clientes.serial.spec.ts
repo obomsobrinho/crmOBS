@@ -175,7 +175,9 @@ test.describe("Clientes paginado", () => {
     await page.goto("/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
     await expect(itens).toHaveCount(10, { timeout: 30_000 });
-    expect(chamadas.pagina, "a primeira página veio do servidor").toBe(0);
+    // Desde o passo 3b (docs/plano-dados-e-estado.md) o layout não lê nada: a primeira
+    // página vem do navegador, UMA leitura, a mesma que o servidor fazia antes.
+    expect(chamadas.pagina, "a primeira página: uma leitura").toBe(1);
 
     const area = page.locator('[data-slot="clientes-lista"]').locator("xpath=..");
     for (let i = 0; i < 6 && (await page.locator('[data-slot="clientes-mais"]').count()) > 0; i++) {

@@ -551,6 +551,15 @@ Acceptance:
 
 Out: Conversas, NavRail counters.
 
+**Delivered (15/11/2026, Contatos; Pipeline, Painel and Agenda not started):**
+- Move commit: `components/ListaClientes.tsx` and `NovoClienteDialog.tsx` to `features/contatos/components/`, `lib/clientes-fonte.ts` to `features/contatos/api/fonte.ts`. `lib/clientes.ts` (shared rules), `components/FichaContato.tsx` (the same ficha as Conversas) and `lib/contato-bus.ts` stay.
+- `contatos/layout.tsx` reads nothing (D8): `GuardaDaTela` plus `ListaDaSessao`. The list is a `useInfiniteQuery` and the filter counts a query (`features/contatos/hooks/useContatos.ts`, keys in `api/chaves.ts`), from the browser through RLS; Contatos has no realtime: focus return (at most every 10 s) and `contato-bus` go through the Contatos bridge in the layout, which cuts each cached list to its first page before invalidating (the infinite query would re-read every scrolled page, one read each; `usePaginada` re-read once). Filter and search live in the URL (`?filtro=`, `?q=`); the search goes to the URL at each key (nuqs batches) and only the READ waits 300 ms: writing the URL after the delay overran a navigation already started (type, then click a contact; the same fix went into Pedidos).
+- The ficha page (`/contatos/[id]`) only checks the id; `FichaDaRota` reads the same five things in the browser (`api/ficha.ts`), shows a skeleton, and a missing contact still gives the not-found page.
+- `contato-bus` (a contact saved here or in Conversas, a new contact) marks lists, counts and fichas stale through that bridge (`features/contatos/api/ponte.ts`), so a ficha edited elsewhere is never shown from an old cache.
+- The profile photo check the layout ran with `after()` (it needed the session from the database on every click) is now `POST /api/contacts/fotos`, asked by the screen after it opens, at most once every 10 minutes per tab (a photo is re-checked only after days anyway).
+- `/contatos` joins `PRE_CARGA_INTEIRA`, `AREAS_MIGRADAS` and `TELA_PRONTA`; no `loading.tsx`: the layout no longer reads, so it is the frame itself.
+- Measured: B1 Contatos 86 ms; B2 "A, B, back to Contatos" 0 blocking requests (the B2 harness no longer counts `/_next/static/` files: one run caught a lazy chunk of the middle screen, Painel, still loading); B8 Contatos 317 kB (was 309). `clientes.serial` 5/5 (the first page is now one browser read, the same one the server made; the paginated test counts only its own contacts, see the commit), `realtime.serial` 10/10, `pedidos.serial` 5/5.
+
 ### Step 4: Conversas, last, with the n8n battery before and after
 
 Scope:

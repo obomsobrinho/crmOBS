@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { FRESCO_CONFIG_MS } from "@/lib/query/cliente";
 import { invalidarComAtraso } from "@/lib/query/invalidar";
@@ -97,21 +97,4 @@ export function useConcluirPedido(fonte: FontePedidos, fora: string[], aoVivo: b
   return useCallback((fechado: PedidoResolvido) => concluirNoCache(qc, fonte, fora, fechado, aoVivo), [qc, fonte, fora, aoVivo]);
 }
 
-/** O fim da lista: quando aparece na tela, pede a próxima página. */
-export function useFimDaLista(temMais: boolean, buscando: boolean, proxima: () => void) {
-  // O elemento entra e sai com a lista (vazia, carregando): estado, não ref, para o efeito saber.
-  const [el, setEl] = useState<HTMLElement | null>(null);
-  const proximaRef = useRef(proxima);
-  useEffect(() => {
-    proximaRef.current = proxima;
-  });
-  useEffect(() => {
-    if (!el || !temMais || buscando) return;
-    const obs = new IntersectionObserver((e) => {
-      if (e.some((x) => x.isIntersecting)) proximaRef.current();
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [el, temMais, buscando]);
-  return setEl;
-}
+export { useFimDaLista } from "@/lib/use-fim-da-lista";

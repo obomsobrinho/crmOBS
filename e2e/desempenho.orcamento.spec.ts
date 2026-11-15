@@ -14,17 +14,21 @@ const ATRASO_RSC_MS = 3_000;
 const B1_MS = 300;
 
 /** Rotas com moldura própria (passo 0). Perfil não tem item no menu do computador. */
-const ROTAS_COM_MOLDURA = ["/pipeline", "/pedidos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
+const ROTAS_COM_MOLDURA = ["/pipeline", "/pedidos", "/contatos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
 
 /** Áreas migradas (o bloco "State" de .claude/rules/dados-estado-desempenho.md). */
 // Campanhas fica fora por decisão do dono (D16): continua lendo no servidor.
-const AREAS_MIGRADAS: string[] = ["/pedidos"];
+const AREAS_MIGRADAS: string[] = ["/pedidos", "/contatos"];
 
 /**
  * Área migrada pré-carrega a rota INTEIRA na intenção (`LinkNaIntencao`): o clique
  * mostra a tela de uma vez, sem passar pela moldura. Ela conta como "apareceu" aqui.
  */
-const TELA_PRONTA: Record<string, string> = { "/pedidos": '[data-slot="pedidos-coluna-lista"]' };
+const TELA_PRONTA: Record<string, string> = {
+  "/pedidos": '[data-slot="pedidos-coluna-lista"]',
+  // O layout de Contatos não lê nada: ele é a moldura (o cabeçalho da lista aparece no clique).
+  "/contatos": 'section[aria-label="Contatos"]',
+};
 
 /** B8, em kB comprimidos. Campanhas e Nova busca descem para 340 no passo 2. */
 const TETO_KB: Record<string, number> = {
@@ -105,7 +109,9 @@ test.describe("B2: voltar a uma área migrada não espera nada", () => {
       await page.waitForLoadState("networkidle");
       const pedidos: string[] = [];
       page.on("request", (r) => {
-        if (!r.headers()["next-router-prefetch"]) pedidos.push(r.url());
+        // Arquivo estático (`/_next/static/`) não bloqueia a tela: é o JS de uma peça que a
+        // tela do meio ainda carregava sob demanda. Conta a navegação e os dados.
+        if (!r.headers()["next-router-prefetch"] && !r.url().includes("/_next/static/")) pedidos.push(r.url());
       });
       await link.click();
       await page.waitForURL((u) => u.pathname === rota);

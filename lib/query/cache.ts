@@ -91,3 +91,15 @@ export function remendarLinha<T extends ComId>(id: T["id"], remendo: Partial<T> 
     return valor;
   };
 }
+
+/**
+ * Antes de reler uma lista infinita inteira (volta do foco, reconexão), fica só a
+ * primeira página: o TanStack relê TODA página carregada, uma leitura cada, e a regra
+ * de hoje (`usePaginada`) relia uma vez só. Quem rolar pede o resto de novo.
+ */
+export function soAPrimeiraPagina(valor: unknown): unknown {
+  if (!valor || typeof valor !== "object") return valor;
+  const v = valor as { pages?: unknown[]; pageParams?: unknown[] };
+  if (!Array.isArray(v.pages) || !Array.isArray(v.pageParams) || v.pages.length <= 1) return valor;
+  return { ...v, pages: v.pages.slice(0, 1), pageParams: v.pageParams.slice(0, 1) };
+}

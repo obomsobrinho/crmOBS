@@ -28,3 +28,10 @@ Step 3a is the first tenant area on the query cache: reads straight from the bro
 - A help request opened while the screen is open shows with exactly one `pedidos_pagina` call, the conversation queue (`e2e/pedidos.serial.spec.ts`).
 - Found, not fixed: going back in the browser to a history entry created BEFORE a reload keeps the screen as it was (Next does not re-sync that `popstate`, and neither does nuqs). Back from an entry pushed after the reload works. Campanhas has the same behavior. Recorded in `docs/handoff.md`.
 - Each new migrated area adds its hook to `PonteDoRealtime` (keeping its heavy part behind `import()`) and its route to `PRE_CARGA_INTEIRA` and to `AREAS_MIGRADAS`/`TELA_PRONTA` in the budget spec.
+
+## Addendum, 15/11/2026 (Contatos, Step 3b)
+
+- Contatos has no realtime; its bridge (`features/contatos/api/ponte.ts`) listens to `contato-bus` and marks lists, counts and fichas stale, so a contact edited in the Conversas ficha is never shown from an old cache in Contatos.
+- A layout that did server work only to call `after()` (the profile photo check) loses it when it stops reading: the work becomes a small route the screen asks for after opening (`POST /api/contacts/fotos`), throttled per tab, so coming back stays at 0 requests.
+- The B2 harness ignores `/_next/static/` files: a lazy chunk of the middle screen still loading does not block the destination.
+- Search in the URL: the URL is written at each key and only the read is debounced; a URL write after the delay cancelled a navigation already started (rule line in `dados-estado-desempenho.md`).

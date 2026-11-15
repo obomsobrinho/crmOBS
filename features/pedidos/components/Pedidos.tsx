@@ -110,13 +110,11 @@ export default function Pedidos({
   const qc = useQueryClient();
   const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
   const url = usePedidosNaUrl();
-  // O campo segue o que se digita; a URL e a leitura, o texto parado há 300 ms.
-  const [q, setQ] = useState(url.q);
+  // A busca vai à URL a cada tecla (o nuqs junta as escritas) e só a LEITURA espera
+  // 300 ms parado: gravar a URL depois do atraso atropelava uma navegação já começada.
+  const q = url.q;
+  const setQ = (v: string) => void url.setU({ q: v || null });
   const busca = useDebounce(q.trim(), 300);
-  useEffect(() => {
-    if (busca !== url.q) void url.setU({ q: busca || null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só o texto parado escreve na URL
-  }, [busca]);
   const motivo = url.motivo;
   const [resultado, setResultado] = useState<Resultado | null>(null);
   // "Agora" do cálculo da espera, fixado a cada minuto: ler `Date.now()` no

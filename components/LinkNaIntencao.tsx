@@ -12,7 +12,7 @@ import type { PrefetchOptions } from "next/dist/shared/lib/app-router-context.sh
  * nenhuma requisição (B2). As outras continuam até a moldura (`loading.tsx`): um
  * pré-carregamento inteiro delas leria o banco. Campanhas fica fora (D16: lê no servidor).
  */
-const PRE_CARGA_INTEIRA = new Set(["/pedidos"]);
+const PRE_CARGA_INTEIRA = new Set(["/pedidos", "/contatos"]);
 
 /**
  * Link que só pré-carrega na INTENÇÃO (decisão do dono, 14/11/2026, D9 de
