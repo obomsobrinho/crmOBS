@@ -6,7 +6,8 @@ import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { KanbanSquare, X } from "lucide-react";
+import MolduraDeCarregamento from "@/components/MolduraDeCarregamento";
 import type { ColunaCarregada } from "./colunas";
 import { ColunaDoPipeline } from "./ColunaDoPipeline";
 import { FaixaDeEstagios } from "./FaixaDeEstagios";
@@ -62,6 +63,7 @@ export default function PipelineBoard({
   const [buscaAberta, setBuscaAberta] = useState(false);
 
   const {
+    carregandoInicio,
     quadroPronto,
     supabase,
     stages,
@@ -123,6 +125,12 @@ export default function PipelineBoard({
     null;
 
   const shownCount = columns.reduce((n, c) => n + numerosDe(c.stage.key).total, 0);
+
+  // A primeira leitura (estágios e quadro) chega do navegador: até lá, a moldura do
+  // Pipeline, a mesma do clique (`loading.tsx`).
+  if (carregandoInicio) {
+    return <MolduraDeCarregamento icone={KanbanSquare} titulo="Pipeline" barra="alta" controles={3} corpo="colunas" />;
+  }
 
   return (
     // `data-quadro`: os cards chegam do navegador depois das colunas (passo 3b); quem

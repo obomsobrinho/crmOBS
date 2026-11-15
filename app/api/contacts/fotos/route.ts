@@ -7,7 +7,9 @@ import { atualizarFotos } from "@/lib/fotos-servidor";
 // fazia isso no servidor, mas para isso lia a sessão no banco a cada clique; a tela
 // migrada não lê banco no clique (D8), então pede aqui, fora do caminho da navegação.
 // Best-effort: responde na hora e confere depois (`after`); nunca vira erro de tela.
-// Qualquer membro pode pedir (a conferência é por empresa e carimba quem já pegou).
+// Qualquer membro pode pedir (a conferência é por empresa e carimba quem já pegou), e
+// conta bloqueada também, como o layout fazia: exceção registrada em
+// .claude/rules/dados-estado-desempenho.md, à espera da confirmação do dono.
 export async function POST() {
   const r = await sessaoDaRota();
   if ("erro" in r) return r.erro;

@@ -23,7 +23,8 @@ import { foraDaLista } from "@/lib/inbox-lista";
 import { useDebounce } from "@/lib/use-debounce";
 import { fonteClientesDaMemoria, type FonteClientes } from "@/features/contatos/api/fonte";
 import { fonteDeContatosDoNavegador } from "@/features/contatos/api/navegador";
-import { useContagensDeContatos, useFimDaLista, useListaDeContatos } from "@/features/contatos/hooks/useContatos";
+import { useContagensDeContatos, useListaDeContatos } from "@/features/contatos/hooks/useContatos";
+import { useFimDaLista } from "@/lib/use-fim-da-lista";
 import { useContatosNaUrl } from "./na-url";
 import {
   DADOS_DO_CADASTRO,

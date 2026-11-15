@@ -9,9 +9,14 @@ import { chavesDePipeline } from "./chaves";
 /** Uma rajada de eventos vira UMA busca por conversa, depois de 500 ms parado (o de antes). */
 const ATRASO_MS = 500;
 
-/** Reconectou ou voltou o foco: o quadro, os números e os estágios relêem (como a tela fazia). */
+/**
+ * Reconectou ou voltou o foco: o quadro, os números e os estágios relêem, como a tela
+ * fazia (a equipe não: é configuração, e a tela não a relia).
+ */
 export function revalidarPipeline(qc: QueryClient): void {
-  invalidarComAtraso(qc, chavesDePipeline.tudo);
+  invalidarComAtraso(qc, chavesDePipeline.quadros());
+  invalidarComAtraso(qc, chavesDePipeline.contagens());
+  invalidarComAtraso(qc, chavesDePipeline.estagios());
 }
 
 /**

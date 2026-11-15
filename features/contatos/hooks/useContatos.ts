@@ -43,5 +43,3 @@ export function useContagensDeContatos(fonte: FonteClientes, fora: string[]): { 
 export function useFichaDoContato(id: number, ler: (id: number) => Promise<FichaDoContato | null>) {
   return useQuery({ queryKey: chavesDeContatos.ficha(id), queryFn: () => ler(id) });
 }
-
-export { useFimDaLista } from "@/lib/use-fim-da-lista";

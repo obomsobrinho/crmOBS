@@ -38,12 +38,12 @@ import { chavesDePedidos } from "@/features/pedidos/api/chaves";
 import {
   useConcluirPedido,
   useContagensDePedidos,
-  useFimDaLista,
   useListaDePedidos,
   useMembrosDePedidos,
   usePedidoPorId,
 } from "@/features/pedidos/hooks/usePedidos";
 import { usePedidosNaUrl } from "./na-url";
+import { useFimDaLista } from "@/lib/use-fim-da-lista";
 import { MOTIVOS, ehMotivo, rotuloDoMotivo } from "@/lib/motivos";
 import { SOLUCAO_DA_PORTA, solucaoDoBanco, type Solucao } from "@/lib/solucoes";
 import { cn } from "@/lib/utils";

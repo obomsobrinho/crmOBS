@@ -96,5 +96,3 @@ export function useConcluirPedido(fonte: FontePedidos, fora: string[], aoVivo: b
   const qc = useQueryClient();
   return useCallback((fechado: PedidoResolvido) => concluirNoCache(qc, fonte, fora, fechado, aoVivo), [qc, fonte, fora, aoVivo]);
 }
-
-export { useFimDaLista } from "@/lib/use-fim-da-lista";

@@ -220,6 +220,11 @@ export function usePipelineDados({
   );
 
   return {
+    /**
+     * Primeira leitura ainda a caminho (estágios, ou o quadro com estágios ativos): a
+     * tela mostra a moldura, nunca "Nenhum estágio" nem "Nenhuma conversa aqui" de mentira.
+     */
+    carregandoInicio: estagiosQ.isPending || (params != null && quadroQ.data === undefined),
     /** O quadro do recorte atual já chegou (o primeiro desenho e a cada recorte novo). */
     quadroPronto: quadroQ.data !== undefined && !quadroQ.isPlaceholderData && !contagensQ.isPlaceholderData,
     supabase,
