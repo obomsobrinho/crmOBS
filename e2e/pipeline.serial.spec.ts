@@ -19,6 +19,8 @@ test.describe("Pipeline (escreve estágio)", () => {
 
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
     // As colunas chegam no HTML do servidor ANTES de o botão funcionar: clicar
     // antes da hidratação perde o clique (era a intermitência conhecida deste
     // teste, "criar e arquivar estágio").

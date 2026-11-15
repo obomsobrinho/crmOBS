@@ -1,6 +1,6 @@
 import NavRail from "@/components/NavRail";
 import PipelineBoard from "@/features/pipeline/components/PipelineBoard";
-import { fontePipelineDaMemoria, paramsPipeline, primeirasColunas } from "@/features/pipeline/api/fonte";
+import { ProvedorDeDados } from "@/lib/query/provedor";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 
@@ -72,26 +72,23 @@ const CARDS: PipelineCard[] = [
 ];
 
 export default async function DesignPipelinePage() {
-  // Paginado por coluna (01/10/2026): a primeira página de cada coluna sai da
-  // memória pela mesma regra do banco, como o servidor faria.
+  // Paginado por coluna (01/10/2026): cada coluna lê da memória pela mesma regra do
+  // banco, pelo cache, como a página de verdade (passo 3b).
   const todos = CARDS.map((c, i) => ({ ...c, id: i + 1 }));
-  const inicial = await primeirasColunas(
-    fontePipelineDaMemoria(todos),
-    paramsPipeline(STAGES, { busca: "", atendente: "all", soEsperando: false, fora: [] })
-  );
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pipeline" role="dono" />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <ProvedorDeDados identidade="design-pipeline">
         <PipelineBoard
           clientId="cc"
           myRole="dono"
           initialStages={STAGES}
-          inicial={inicial}
           previewCards={todos}
           preview
           previewMembers={MEMBERS}
         />
+        </ProvedorDeDados>
       </div>
     </div>
   );

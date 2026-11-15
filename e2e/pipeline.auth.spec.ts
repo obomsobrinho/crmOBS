@@ -87,6 +87,8 @@ test.describe("Pipeline", () => {
   }) => {
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
 
     expect(
       await page.locator(COLUNA).count(),
@@ -113,6 +115,8 @@ test.describe("Pipeline", () => {
   test("buscar filtra os cards sem mexer nas colunas", async ({ page }) => {
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
 
     const colunasAntes = await page.locator(COLUNA).count();
     const cardsAntes = await page.locator(CARD).count();
@@ -143,6 +147,8 @@ test.describe("Pipeline", () => {
   }) => {
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
 
     const cards = page.locator(CARD);
     test.skip((await cards.count()) === 0, "sem card no tenant");
@@ -176,6 +182,8 @@ test.describe("Pipeline", () => {
     // joga fora o estado do browser e obriga o servidor a responder.
     await page.reload();
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
     expect(
       await stageDoCard(page, phone),
       "o estágio tem que sobreviver ao recarregamento"
@@ -191,6 +199,8 @@ test.describe("Pipeline", () => {
   test("clicar no card abre a conversa dele", async ({ page }) => {
     await page.goto("/pipeline");
     await page.waitForSelector(COLUNA, { timeout: 20_000 });
+    // Os cards chegam do navegador depois das colunas (passo 3b de docs/plano-dados-e-estado.md).
+    await page.waitForSelector('[data-quadro="pronto"]', { timeout: 20_000 });
 
     const cards = page.locator(CARD);
     test.skip((await cards.count()) === 0, "sem card no tenant");

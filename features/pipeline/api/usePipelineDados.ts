@@ -1,20 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
-import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { foraDaLista } from "@/lib/inbox-lista";
+import { invalidarComAtraso } from "@/lib/query/invalidar";
+import { FRESCO_CONFIG_MS } from "@/lib/query/cliente";
 import { useDebounce } from "@/lib/use-debounce";
 import {
+  CONTAGENS_PIPELINE_VAZIAS,
   PAGINA_PIPELINE,
   fontePipelineDaMemoria,
-  fontePipelineDoBanco,
   paramsPipeline,
+  primeirasColunas,
   type ContagensPipeline,
   type FontePipeline,
-} from "@/features/pipeline/api/fonte";
+} from "./fonte";
+import { fontePipelineDoNavegador } from "./sincronizar";
+import { chavesDePipeline, type RecorteDoQuadro } from "./chaves";
 import { fetchMembers, type Member } from "@/lib/team";
-import { rowToStage, type PipelineCard, type Stage, type StageRow } from "@/lib/pipeline";
+import { rowToStage, type PipelineCard, type Stage } from "@/lib/pipeline";
 import { encaixarCard, moverNosNumeros, type ColunaCarregada } from "../components/colunas";
 
 const STAGE_SELECT =
@@ -22,14 +27,20 @@ const STAGE_SELECT =
 
 /**
  * Os dados do funil: estágios, cards de cada coluna (10 por vez), os números do
- * banco, os membros do time, o tempo real (UM card ou UMA coluna por evento) e o
- * arrastar-soltar otimista. Quem desenha é o `PipelineBoard`.
+ * banco, os membros do time e o arrastar-soltar otimista. Quem desenha é o
+ * `PipelineBoard`.
+ *
+ * Passo 3b de docs/plano-dados-e-estado.md: tudo mora no cache de dados, lido do
+ * navegador pelo RLS (a página não lê nada no servidor, D8). O quadro (a primeira
+ * página de cada coluna, e o que a rolagem acrescentou) é UMA chave por recorte; o
+ * tempo real (UM card por evento, UMA linha de estágio por evento) chega pela ponte do
+ * layout (`ponte.ts`), nunca daqui. A interface devolvida é a de antes, para o quadro
+ * e as colunas não mudarem.
  */
 export function usePipelineDados({
   clientId,
   preview,
   initialStages,
-  inicial,
   previewCards,
   previewMembers,
   numeroAvisos,
@@ -40,8 +51,8 @@ export function usePipelineDados({
 }: {
   clientId: string;
   preview: boolean;
+  /** /design: os estágios falsos (a página de verdade lê do banco). */
   initialStages: Stage[];
-  inicial: { colunas: Record<string, ColunaCarregada>; contagens: ContagensPipeline };
   previewCards?: PipelineCard[];
   previewMembers: Member[];
   numeroAvisos: string | null;
@@ -50,84 +61,88 @@ export function usePipelineDados({
   soEsperando: boolean;
   setError: Dispatch<SetStateAction<string | null>>;
 }) {
+  const qc = useQueryClient();
   const supabase = useMemo(() => (preview ? null : createClient()), [preview]);
-
-  const [stages, setStages] = useState<Stage[]>(initialStages);
-  // PIPELINE PAGINADO POR COLUNA (01/10/2026, docs/plano-carregamento.md, fase
-  // 5): cada coluna tem os próprios cards (10 por vez, mais ao rolar a coluna) e
-  // os números vêm do banco. Antes eram até 500 conversas, todos os contatos e
-  // 300 resumos, recarregados a cada mudança em qualquer conversa.
-  const [colunas, setColunas] = useState<Record<string, ColunaCarregada>>(inicial.colunas);
-  const [contagens, setContagens] = useState<ContagensPipeline>(inicial.contagens);
   const fonte = useMemo<FontePipeline>(
-    () => (supabase ? fontePipelineDoBanco(supabase, clientId) : fontePipelineDaMemoria(previewCards ?? [])),
+    () => (supabase ? fontePipelineDoNavegador(clientId) : fontePipelineDaMemoria(previewCards ?? [])),
     [supabase, clientId, previewCards]
   );
   const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
-  /** Todos os cards na tela, de todas as colunas (para achar um pelo telefone). */
-  const cards = useMemo(() => Object.values(colunas).flatMap((c) => c.cards), [colunas]);
-  const [membersById, setMembersById] = useState<Record<string, Member>>(
-    Object.fromEntries(previewMembers.map((m) => [m.userId, m]))
-  );
 
-  // O recorte (estágios ativos, busca com debounce, filtros) e um ref dele
-  // para o realtime e a rolagem lerem o valor atual.
+  // ESTÁGIOS: configuração (muda pouco); o realtime põe a linha que mudou (ponte).
+  const estagiosQ = useQuery({
+    queryKey: chavesDePipeline.estagios(),
+    queryFn: async (): Promise<Stage[]> => {
+      if (!supabase) return initialStages;
+      const { data, error } = await supabase.from("pipeline_stages").select(STAGE_SELECT).order("position");
+      if (error) throw error;
+      return (data ?? []).map(rowToStage);
+    },
+    initialData: preview ? initialStages : undefined,
+    staleTime: FRESCO_CONFIG_MS,
+  });
+  const stages = useMemo(() => estagiosQ.data ?? [], [estagiosQ.data]);
+  const setStages = useCallback<Dispatch<SetStateAction<Stage[]>>>(
+    (u) => qc.setQueryData<Stage[]>(chavesDePipeline.estagios(), (cur) => (typeof u === "function" ? u(cur ?? []) : u)),
+    [qc]
+  );
+  const refetchStages = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: chavesDePipeline.estagios() });
+  }, [qc]);
+
+  // O RECORTE: estágios ativos, busca com debounce e filtros.
   const busca = useDebounce(search.trim(), 300);
   const params = useMemo(
     () => paramsPipeline(stages, { busca, atendente: attFilter, soEsperando, fora }),
     [stages, busca, attFilter, soEsperando, fora]
   );
-  const paramsRef = useRef(params);
-  const colunasRef = useRef(colunas);
-  useEffect(() => {
-    paramsRef.current = params;
-    colunasRef.current = colunas;
+  const recorte = useMemo<RecorteDoQuadro>(
+    () => ({ busca, atendente: attFilter, soEsperando, colunas: params ? `${params.ativos.join(",")}|${params.padrao}` : "" }),
+    [busca, attFilter, soEsperando, params]
+  );
+  const chaveDoQuadro = chavesDePipeline.quadro(recorte);
+
+  // O QUADRO: a primeira página de cada coluna; a rolagem acrescenta na mesma chave.
+  const quadroQ = useQuery({
+    queryKey: chaveDoQuadro,
+    queryFn: async () => (await primeirasColunas(fonte, params)).colunas,
+    enabled: params != null,
+    placeholderData: keepPreviousData,
   });
-  const versaoRef = useRef(0);
+  const contagensQ = useQuery({
+    queryKey: chavesDePipeline.contagem(recorte),
+    queryFn: () => (params ? fonte.contagens(params) : Promise.resolve(CONTAGENS_PIPELINE_VAZIAS)),
+    enabled: params != null,
+    placeholderData: keepPreviousData,
+  });
+  const colunas = useMemo<Record<string, ColunaCarregada>>(() => quadroQ.data ?? {}, [quadroQ.data]);
+  const contagens: ContagensPipeline = contagensQ.data ?? CONTAGENS_PIPELINE_VAZIAS;
+  /** Todos os cards na tela, de todas as colunas (para achar um pelo telefone). */
+  const cards = useMemo(() => Object.values(colunas).flatMap((c) => c.cards), [colunas]);
 
-  const recontar = useCallback(async () => {
-    const p = paramsRef.current;
-    if (!p) return;
-    try {
-      setContagens(await fonte.contagens(p));
-    } catch (e) {
-      console.error("números do pipeline:", e);
-    }
-  }, [fonte]);
+  // MEMBROS do time (para nomear o atendente de cada card). Configuração.
+  const membrosQ = useQuery({
+    queryKey: chavesDePipeline.membros(),
+    queryFn: () => (supabase ? fetchMembers(supabase) : Promise.resolve(previewMembers)),
+    initialData: preview ? previewMembers : undefined,
+    staleTime: FRESCO_CONFIG_MS,
+  });
+  const members = useMemo(() => membrosQ.data ?? [], [membrosQ.data]);
+  const membersById = useMemo<Record<string, Member>>(() => Object.fromEntries(members.map((m) => [m.userId, m])), [members]);
 
-  /** Primeira página de TODAS as colunas (recorte novo, estágios mudaram, voltou à aba). */
-  const recarregarTudo = useCallback(async () => {
-    const p = paramsRef.current;
-    if (!p) return;
-    const v = ++versaoRef.current;
-    try {
-      const [listas] = await Promise.all([
-        Promise.all(p.ativos.map((k) => fonte.coluna(p, k, null))),
-        recontar(),
-      ]);
-      if (v !== versaoRef.current) return;
-      setColunas(
-        Object.fromEntries(
-          p.ativos.map((k, i) => [k, { cards: listas[i], temMais: listas[i].length === PAGINA_PIPELINE, carregando: false }])
-        )
-      );
-    } catch (e) {
-      console.error("pipeline:", e);
-    }
-  }, [fonte, recontar]);
-
-  /** A próxima página de UMA coluna (o marcador do fim dela apareceu). */
+  /** A próxima página de UMA coluna (o marcador do fim dela apareceu), na chave do quadro. */
+  const [carregandoMais, setCarregandoMais] = useState<Record<string, boolean>>({});
   const carregarMais = useCallback(
     async (key: string) => {
-      const p = paramsRef.current;
-      const col = colunasRef.current[key];
-      if (!p || !col || !col.temMais || col.carregando || col.cards.length === 0) return;
-      const v = versaoRef.current;
-      setColunas((cs) => ({ ...cs, [key]: { ...cs[key], carregando: true } }));
+      const col = colunas[key];
+      if (!params || !col || !col.temMais || col.carregando || carregandoMais[key] || col.cards.length === 0) return;
+      const chave = chaveDoQuadro;
+      setCarregandoMais((c) => ({ ...c, [key]: true }));
+      qc.setQueryData<Record<string, ColunaCarregada>>(chave, (cs) => cs && { ...cs, [key]: { ...cs[key], carregando: true } });
       try {
-        const mais = await fonte.coluna(p, key, col.cards[col.cards.length - 1]);
-        if (v !== versaoRef.current) return;
-        setColunas((cs) => {
+        const mais = await fonte.coluna(params, key, col.cards[col.cards.length - 1]);
+        qc.setQueryData<Record<string, ColunaCarregada>>(chave, (cs) => {
+          if (!cs?.[key]) return cs;
           const atual = cs[key];
           const vistos = new Set(atual.cards.map((c) => c.phone));
           return {
@@ -141,104 +156,15 @@ export function usePipelineDados({
         });
       } catch (e) {
         console.error("mais cards:", e);
-        setColunas((cs) => ({ ...cs, [key]: { ...cs[key], carregando: false } }));
+        qc.setQueryData<Record<string, ColunaCarregada>>(chave, (cs) => cs?.[key] && { ...cs, [key]: { ...cs[key], carregando: false } });
+      } finally {
+        setCarregandoMais((c) => ({ ...c, [key]: false }));
       }
     },
-    [fonte]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a chave do quadro nasce do recorte
+    [colunas, params, recorte, fonte, qc, carregandoMais]
   );
 
-  // Trocou o recorte: primeira página de cada coluna. A primeira renderização
-  // veio do servidor.
-  const primeiraRef = useRef(true);
-  useEffect(() => {
-    if (primeiraRef.current) {
-      primeiraRef.current = false;
-      return;
-    }
-    void recarregarTudo();
-  }, [params, recarregarTudo]);
-
-  // REALTIME LINHA A LINHA: o evento anota QUAL conversa mudou; um debounce
-  // junta a rajada; busca-se SÓ o card dele, que sai de onde estava e entra na
-  // coluna certa. Aba escondida não busca: o canal (`useCanalTenant`) anota e
-  // revalida tudo ao voltar, ao reconectar e ao voltar o foco.
-  const pendentesRef = useRef<Set<string>>(new Set());
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const processarPendentes = useCallback(async () => {
-    const fones = [...pendentesRef.current];
-    pendentesRef.current.clear();
-    const p = paramsRef.current;
-    if (!p || fones.length === 0) return;
-    const v = versaoRef.current;
-    try {
-      const achados = await Promise.all(fones.map((f) => fonte.card(p, f).then((c) => [f, c] as const)));
-      if (v !== versaoRef.current) return;
-      setColunas((cs) => achados.reduce((acc, [f, c]) => encaixarCard(acc, f, c), cs));
-      void recontar();
-    } catch (e) {
-      console.error("card do pipeline:", e);
-    }
-  }, [fonte, recontar]);
-  const anotar = useCallback(
-    (phone: string | null | undefined) => {
-      if (!phone) return;
-      pendentesRef.current.add(phone);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => void processarPendentes(), 500);
-    },
-    [processarPendentes]
-  );
-  const refetchStages = useCallback(async () => {
-    if (!supabase) return;
-    const { data } = await supabase
-      .from("pipeline_stages")
-      .select(STAGE_SELECT)
-      .order("position");
-    if (data) setStages(data.map(rowToStage));
-  }, [supabase]);
-
-  // Realtime: conversas, contatos e resumos mudam UM card; pipeline_stages muda
-  // UMA coluna (a linha do payload entra no lugar, sem reler a lista). Canal do
-  // tenant compartilhado (02/10/2026, R-03/R-22). Reconectou, voltou o foco ou a
-  // aba ficou para trás: recarrega as colunas e as etapas.
-  useEffect(() => () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-  }, []);
-  useCanalTenant({
-    clientId,
-    ativo: !!supabase,
-    tabelas: ["conversations", "dados_cliente", "conversation_qualifications", "pipeline_stages"],
-    revalidar: () => {
-      void recarregarTudo();
-      void refetchStages();
-    },
-    aoEvento: (ev) => {
-      if (ev.tabela !== "pipeline_stages") return anotar(foneDoEvento(ev));
-      if (ev.tipo === "DELETE") {
-        const id = ev.antigo?.id as number | undefined;
-        if (id != null) setStages((cur) => cur.filter((st) => st.id !== id));
-        return;
-      }
-      if (!ev.novo) return;
-      const nova = rowToStage(ev.novo as StageRow);
-      setStages((cur) =>
-        cur.some((st) => st.id === nova.id)
-          ? cur.map((st) => (st.id === nova.id ? nova : st))
-          : [...cur, nova]
-      );
-    },
-  });
-
-  // Membros do time (para nomear o atendente de cada card).
-  useEffect(() => {
-    if (!supabase) return;
-    void (async () => {
-      const list = await fetchMembers(supabase);
-      setMembersById(Object.fromEntries(list.map((m) => [m.userId, m])));
-    })();
-  }, [supabase]);
-
-  const members = useMemo(() => Object.values(membersById), [membersById]);
   const activeStages = useMemo(
     () =>
       stages.filter((s) => !s.archived).sort((a, b) => a.position - b.position),
@@ -264,12 +190,14 @@ export function usePipelineDados({
       const currentKey = estagioDoCard(card);
       if (currentKey === toKey) return;
 
-      const prev = colunas;
-      const prevNumeros = contagens;
-      // Otimista: sai da coluna de origem, entra na de destino na ordem, e os
-      // números das duas acompanham.
-      setColunas((cs) => encaixarCard(cs, phone, { ...card, stage: toKey }));
-      setContagens((ct) => moverNosNumeros(ct, currentKey, toKey, !!card.handoffAt));
+      // Otimista (2.6): sai da coluna de origem, entra na de destino na ordem, e os
+      // números das duas acompanham, em todo quadro e todo número guardado.
+      qc.setQueriesData<Record<string, ColunaCarregada>>({ queryKey: chavesDePipeline.quadros() }, (cs) =>
+        cs ? encaixarCard(cs, phone, { ...card, stage: toKey }) : cs
+      );
+      qc.setQueriesData<ContagensPipeline>({ queryKey: chavesDePipeline.contagens() }, (ct) =>
+        ct ? moverNosNumeros(ct, currentKey, toKey, !!card.handoffAt) : ct
+      );
       if (!supabase) return; // preview: só memória
       const { error: err } = await supabase
         .from("conversations")
@@ -281,15 +209,19 @@ export function usePipelineDados({
         .eq("client_id", clientId)
         .eq("phone", phone);
       if (err) {
-        setColunas(prev); // reverte
-        setContagens(prevNumeros);
+        // A recusa diz o motivo e a releitura traz o card de volta (2.6): nunca restaura
+        // uma cópia do quadro inteiro, que apagaria outros movimentos em andamento.
         setError("não foi possível mover o card. Tente de novo.");
+        invalidarComAtraso(qc, chavesDePipeline.quadros());
+        invalidarComAtraso(qc, chavesDePipeline.contagens());
       }
     },
-    [cards, colunas, contagens, estagioDoCard, supabase, clientId, setError]
+    [cards, estagioDoCard, supabase, clientId, setError, qc]
   );
 
   return {
+    /** O quadro do recorte atual já chegou (o primeiro desenho e a cada recorte novo). */
+    quadroPronto: quadroQ.data !== undefined && !quadroQ.isPlaceholderData && !contagensQ.isPlaceholderData,
     supabase,
     stages,
     setStages,

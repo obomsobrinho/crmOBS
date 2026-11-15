@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { type ContagensPipeline } from "@/features/pipeline/api/fonte";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 import { Card } from "@/components/ui/card";
@@ -16,6 +15,7 @@ import { PipelineFiltros } from "./PipelineFiltros";
 import { StageManager } from "./StageManager";
 import { useGestaoDeEstagios } from "../api/useGestaoDeEstagios";
 import { usePipelineDados } from "../api/usePipelineDados";
+import { usePipelineNaUrl } from "./na-url";
 
 export type { ColunaCarregada };
 
@@ -23,7 +23,6 @@ export default function PipelineBoard({
   clientId,
   myRole,
   initialStages,
-  inicial,
   previewCards,
   preview = false,
   previewMembers = [],
@@ -32,8 +31,6 @@ export default function PipelineBoard({
   clientId: string;
   myRole: string | null;
   initialStages: Stage[];
-  /** As primeiras páginas de cada coluna e os números, que o servidor já buscou. */
-  inicial: { colunas: Record<string, ColunaCarregada>; contagens: ContagensPipeline };
   /** Preview /design: todos os cards na memória, paginados pela mesma regra. */
   previewCards?: PipelineCard[];
   /** No /design (sem login) usa mocks e simula as ações em memória. */
@@ -49,13 +46,12 @@ export default function PipelineBoard({
   // 5): cada coluna tem os próprios cards (10 por vez, mais ao rolar a coluna) e
   // os números vêm do banco. Antes eram até 500 conversas, todos os contatos e
   // 300 resumos, recarregados a cada mudança em qualquer conversa.
-  const [search, setSearch] = useState("");
-  const [attFilter, setAttFilter] = useState<string>("all"); // all | none | userId
-  const [stageFilter, setStageFilter] = useState<string>("all");
+  // Os filtros moram na URL (refresh e voltar mantêm), passo 3b.
+  const { search, setSearch, attFilter, setAttFilter, stageFilter, setStageFilter, soEsperando, setSoEsperando } =
+    usePipelineNaUrl(); // atendente: all | none | userId
   // Recorte por "esperando você" (handoff em aberto). É o mesmo conceito do
   // filtro "Precisa de você" da lista de conversas, com o mesmo dado, para as
   // duas telas não contarem coisas diferentes com o mesmo nome.
-  const [soEsperando, setSoEsperando] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +62,7 @@ export default function PipelineBoard({
   const [buscaAberta, setBuscaAberta] = useState(false);
 
   const {
+    quadroPronto,
     supabase,
     stages,
     setStages,
@@ -82,7 +79,6 @@ export default function PipelineBoard({
     clientId,
     preview,
     initialStages,
-    inicial,
     previewCards,
     previewMembers,
     numeroAvisos,
@@ -129,7 +125,9 @@ export default function PipelineBoard({
   const shownCount = columns.reduce((n, c) => n + numerosDe(c.stage.key).total, 0);
 
   return (
-    <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    // `data-quadro`: os cards chegam do navegador depois das colunas (passo 3b); quem
+    // precisa do quadro completo (os testes) espera por "pronto".
+    <Card variant="pagina" data-quadro={quadroPronto ? "pronto" : "carregando"} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PipelineFiltros
         shownCount={shownCount}
         isOwner={isOwner}

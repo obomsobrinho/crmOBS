@@ -53,7 +53,7 @@ export function PipelineFiltros({
   return (
     <>
       {/* Cabeçalho + filtros */}
-      <div className="flex flex-wrap items-center gap-3 border-b border-line p-4 max-md:gap-2 max-md:px-4 max-md:py-3">
+      <div data-slot="pipeline-cabecalho" className="flex flex-wrap items-center gap-3 border-b border-line p-4 max-md:gap-2 max-md:px-4 max-md:py-3">
         <div className="mr-1 flex items-center gap-2 max-md:mr-auto">
           <KanbanSquare size={20} className="text-brand-ink" />
           <h1 className="text-titulo">Pipeline</h1>
