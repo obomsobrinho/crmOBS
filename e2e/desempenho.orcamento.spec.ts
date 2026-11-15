@@ -33,18 +33,22 @@ const TELA_PRONTA: Record<string, string> = {
   "/agenda": '[data-agenda="tela"], [data-agenda="indisponivel"]',
 };
 
-/** B8, em kB comprimidos. Campanhas e Nova busca descem para 340 no passo 2. */
+/**
+ * B8, em kB comprimidos. As telas dos tenants têm teto de 360 desde 15/11/2026 (D18 do
+ * plano, decisão do dono: a diferença é pequena e as telas já carregam sob demanda o
+ * que pesa); antes era 340.
+ */
 const TETO_KB: Record<string, number> = {
   "/login": 240,
-  "/painel": 340,
-  "/inbox": 340,
-  "/contatos": 340,
-  "/pipeline": 340,
-  "/pedidos": 340,
-  "/agenda": 340,
-  "/agente": 340,
-  "/equipe": 340,
-  "/perfil": 340,
+  "/painel": 360,
+  "/inbox": 360,
+  "/contatos": 360,
+  "/pipeline": 360,
+  "/pedidos": 360,
+  "/agenda": 360,
+  "/agente": 360,
+  "/equipe": 360,
+  "/perfil": 360,
   // Exceção do dono (D15, 14/11/2026): os gráficos de Campanhas ficam na abertura.
   "/campanhas": 480,
   "/campanhas/buscas/nova": 480,
