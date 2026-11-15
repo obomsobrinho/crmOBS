@@ -188,8 +188,11 @@ test.describe("Clientes paginado", () => {
 
     chamadas.pagina = 0;
     await page.getByLabel("Buscar contatos").pressSequentially("paginado 17", { delay: 40 });
-    await expect(itens).toHaveCount(1, { timeout: 15_000 });
-    await expect(itens.first()).toContainText("Cliente paginado 17");
+    // A busca também casa pelos dígitos do telefone ("17"): um contato real do tenant de
+    // teste com 17 no número aparece junto (14/11/2026). Conta só os contatos deste teste.
+    const deste = itens.filter({ hasText: "Cliente paginado" });
+    await expect(deste).toHaveCount(1, { timeout: 15_000 });
+    await expect(deste.first()).toContainText("Cliente paginado 17");
     expect(chamadas.pagina, "uma busca, não uma por letra").toBe(1);
   });
 });

@@ -137,13 +137,30 @@ test("o motivo aparece na linha e o filtro por motivo vai ao banco", async ({ pa
 // cache o pedido que a IA abriu, com UMA leitura da fila da conversa (`pedidos_pagina`
 // com `p_telefone`), nunca relendo as páginas carregadas.
 test("pedido aberto pela IA aparece na lista sem reler as páginas", async ({ page }) => {
-  await page.goto("/pedidos");
-  await expect(page.locator('[data-slot="pedidos-carregando"]')).toHaveCount(0, { timeout: 20_000 });
+  // A busca deixa na tela só o que interessa: a fila de Abertos do tenant de teste pode
+  // ter mais de uma página, e um pedido aberto "6 h atrás" (a semente) cairia depois
+  // da página carregada, onde ele corretamente não entra.
+  const marca = `estacionamento ponte ${Date.now()}`;
+  // O pedido só pode nascer depois de o canal do tenant assinar: antes disso o evento se
+  // perde (a primeira assinatura não relê nada, regra de realtime.md).
+  const assinou = new Promise<void>((ok) =>
+    page.on("websocket", (ws) =>
+      ws.on("framereceived", (q) => {
+        const t = String(q.payload);
+        if (t.includes("realtime:tenant-") && t.includes("phx_reply") && t.includes('"status":"ok"')) ok();
+      })
+    )
+  );
+  await page.goto(`/pedidos?q=${encodeURIComponent(marca)}`);
+  await assinou;
+  // A escuta do banco fica pronta um pouco depois da resposta da assinatura.
+  await page.waitForTimeout(3_000);
+  await expect(page.locator('[data-slot="pedidos-vazio"]')).toBeVisible({ timeout: 20_000 });
   const leituras: Record<string, unknown>[] = [];
   page.on("request", (r) => {
     if (r.url().includes("/rest/v1/rpc/pedidos_pagina")) leituras.push(JSON.parse(r.postData() ?? "{}"));
   });
-  const id = await abrirPedido("Quer saber se tem estacionamento (ponte e2e)");
+  const id = await abrirPedido(`Quer saber do ${marca}`);
   await expect(page.locator(`[data-pedido="${id}"]`)).toBeVisible({ timeout: 20_000 });
   expect(leituras.length, "uma leitura, a da fila desta conversa").toBe(1);
   expect(leituras[0].p_telefone, "a leitura é da conversa, não a lista").toBe(FONE_TESTE);
