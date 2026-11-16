@@ -586,7 +586,7 @@ Acceptance:
 
 Out: any change to n8n workflows or to the brain's behavior.
 
-**Delivered (16/11/2026, partly):**
+**Delivered (16/11/2026):**
 - Move commit: the list, the open conversation, the composer and the list source into `features/conversas/` (`lib/inbox-lista.ts` and `lib/inbox.ts` stay: shared pure rules cited by the rule files).
 - The list: `inbox/layout.tsx` reads nothing (D8). `ContactSidebar` reads through `features/conversas/hooks/useConversas.ts`: one cache key per cut (period, chip, search) holding the loaded rows; a re-read asks again for the rows already on screen (up to 50), so the scroll is kept; "load more" appends to the same key. Coming back to Conversas shows the kept list at once.
 - List realtime on the layout bridge (`features/conversas/api/ponte.ts`, registered in `lib/realtime/PonteDoRealtime.tsx`): the event only notes WHICH conversation changed, a burst becomes one read per conversation after 500 ms, the read is of that ROW with the cut of each list someone is looking at, placed with `encaixar`; a kept list nobody looks at is only marked stale (no read). Reconnect and focus return re-read what is on screen.
@@ -595,7 +595,9 @@ Out: any change to n8n workflows or to the brain's behavior.
 - The reply draft is kept per conversation in the tab (`sessionStorage`), so it survives a reload and the 401 redirect (2.9).
 - Profile photos: the check the layout did with `after()` is asked by the screen, at most every 10 minutes (`/api/contacts/fotos`, as in Contatos).
 - Numbers: B1 `/inbox` passes (frame at the click), B2 0 requests on the way back, B8 within 360 kB; `npm run test:orcamento` 28 passed. `realtime.serial` 11/11 after its counters were moved to start after the opening (opening now reads one page and one count from the browser, where it read none; every other count is unchanged: a new message reads only its row, a hidden tab reads nothing, focus re-reads once per 10 s, a search is one read). New `e2e/conversas-dados.design.spec.ts`.
-- **Not done yet:** Zod (validate and log) on the n8n webhooks (`/api/agent`, `/api/inbound-media`, `by-instance`); the NavRail counters stay on `useContagemAoVivo` on purpose (the rail never unmounts, so the cache brings nothing there); `atendimento.serial` and `npm run test:e2e:n8n` before and after were not run (paid, needs the owner's go); the `HydrationBoundary` re-evaluation needs production numbers.
+- n8n webhooks in shadow mode (`features/conversas/schemas.ts`, Vitest): `/api/agent`, `/api/inbound-media` and `by-instance` check what they receive against a schema made only of the fields each route already reads, log a mismatch (paths and reasons, never values) and never refuse; the routes decide exactly as before.
+- Gate: `atendimento.serial` 4/4 (one test now accepts the list cut in the conversation URL) and `npm run test:e2e:n8n` 10/10 on 16/11 with the area migrated; in the n8n execution opened (a full turn for a DDD 00 phone) the `Telefone real? (envio)` guard ran and no Evolution send node did. The battery talks to the brain deployed in production, not to this branch: it proves attendance is healthy next to the new screen; the branch code is proven by the serials and the budget.
+- **Left on purpose:** the NavRail counters stay on `useContagemAoVivo` (the rail never unmounts, so the cache brings nothing there); the `HydrationBoundary` re-evaluation needs production numbers after the deploy; the messages of the open conversation keep their own hook (it already appends from the event by id).
 
 ### Step 5: the central and the last routes
 
