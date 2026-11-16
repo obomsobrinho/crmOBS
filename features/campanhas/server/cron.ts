@@ -34,6 +34,11 @@ import type { Supa } from "@/lib/supabase/tipos";
 // 4. lê `chat_messages` (SÓ leitura) atrás das respostas e dos pedidos para parar,
 //    e pausa a campanha com pedidos demais no dia (D6).
 // Nada aqui escreve em tabela de conversa; nada aqui toca o n8n.
+//
+// O job do banco (`prospeccao_tick_5m`) só chama esta rota quando há trabalho: campanha
+// rodando ou agendada, envio em observação, busca buscando, ou a janela da limpeza. A
+// condição está em SQL (migração `prospeccao_cron_so_com_trabalho`) e repete o que este
+// arquivo faz: um trabalho novo aqui precisa entrar lá, senão o job não chama.
 
 /** Quanto tempo a vez de uma campanha fica reservada para esta execução (uma que morrer devolve sozinha). */
 const RESERVA_MS = 4 * 60_000;
