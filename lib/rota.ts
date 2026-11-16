@@ -94,6 +94,11 @@ const FRASE_ENTRADA_INVALIDA = "Os dados enviados não estão no formato esperad
  */
 export interface OpcoesDaLeitura {
   motivo?: boolean;
+  /**
+   * A frase de um corpo que não é JSON, para a rota que já respondia uma frase própria e
+   * entrega o corpo inteiro a uma regra pura (que tem a sua frase para um `null`).
+   */
+  semJson?: string;
 }
 
 /**
@@ -111,6 +116,7 @@ export async function lerCorpo<S extends z.ZodType>(
   try {
     bruto = await req.json();
   } catch {
+    if (opcoes.semJson) return { erro: erroDaRota(400, opcoes.semJson, "entrada_invalida") };
     if (!opcoes.motivo) return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
     bruto = null;
   }

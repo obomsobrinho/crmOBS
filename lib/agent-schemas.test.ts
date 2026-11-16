@@ -28,6 +28,7 @@ describe("corpos das rotas do agente, com as frases de antes", () => {
   it("publish: enabled precisa ser booleano", () => {
     expect(corpoDoPublicar.parse({ enabled: false })).toEqual({ enabled: false });
     expect(motivo(corpoDoPublicar.safeParse({ enabled: "true" }))).toBe("informe enabled");
+    expect(motivo(corpoDoPublicar.safeParse({}))).toBe("informe enabled");
   });
   it("os campos que o handler confere passam como vieram", () => {
     expect(corpoDasRegras.parse({ texto: 5, pedidoId: "x" })).toEqual({ texto: 5, pedidoId: "x" });

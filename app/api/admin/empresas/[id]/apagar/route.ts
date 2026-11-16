@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { apagarCliente, rotaDoAdmin } from "@/lib/admin";
 import { respostaDoApagar } from "@/lib/admin-conta";
 import { createServiceClient } from "@/lib/supabase/service";
+import { lerCorpo } from "@/lib/rota";
+import { corpoDoApagar } from "@/features/central/schemas";
 
 // Storage em lotes, gateway e o banco de um cliente inteiro: pode demorar.
 export const maxDuration = 300;
@@ -18,15 +20,10 @@ export const maxDuration = 300;
 // genérico abaixo só acontece antes de qualquer efeito.
 export const POST = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    let corpo: { nome?: unknown };
-    try {
-      corpo = (await req.json()) as { nome?: unknown };
-    } catch {
-      return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-    }
-    if (typeof corpo.nome !== "string" || corpo.nome.trim() === "") {
-      return NextResponse.json({ error: "digite o nome do cliente para confirmar" }, { status: 400 });
-    }
+    // O corpo cruza o esquema (`features/central/schemas.ts`), com as frases de antes.
+    const lido = await lerCorpo(req, corpoDoApagar, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const corpo = lido.dados;
     try {
       const r = await apagarCliente(createServiceClient(), { admin, id, nome: corpo.nome });
       if (r.resultado === "ok") return NextResponse.json({ ok: true, pendencias: r.pendencias });

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { empresaEFinanceiro, mudarConta, rotaDoAdmin } from "@/lib/admin";
-import { pedidoDeAcao, respostaDoSql } from "@/lib/admin-conta";
+import { respostaDoSql } from "@/lib/admin-conta";
 import { AGENT_MODEL } from "@/lib/agent";
 import { alinharMarcasDoMes } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
+import { lerCorpo } from "@/lib/rota";
+import { corpoDaConta } from "@/features/central/schemas";
 
 // PUT /api/admin/empresas/[id]/conta: uma ação da central do dono sobre a conta
 // de um cliente (docs/plano-central-clientes.md, entrega 2). Corpo
@@ -20,14 +22,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 // `recarregue: true` (a mudança está gravada; só a tela ficou velha).
 export const PUT = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    let corpo: unknown;
-    try {
-      corpo = await req.json();
-    } catch {
-      return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-    }
-    const pedido = pedidoDeAcao(corpo);
-    if ("erro" in pedido) return NextResponse.json({ error: pedido.erro }, { status: 400 });
+    // O corpo cruza o esquema (`features/central/schemas.ts`, sobre `pedidoDeAcao`), com as frases de antes.
+    const lido = await lerCorpo(req, corpoDaConta, { motivo: true, semJson: "JSON inválido" });
+    if ("erro" in lido) return lido.erro;
+    const pedido = lido.dados;
 
     const svc = createServiceClient();
     let resultado: string;

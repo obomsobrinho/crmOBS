@@ -11,6 +11,7 @@ describe("corpos das rotas de equipe, com as frases de antes", () => {
     expect(motivo(corpoDoConvite.safeParse({ role: "dono" }))).toBe("e-mail inválido");
     expect(motivo(corpoDoConvite.safeParse([]))).toBe("e-mail inválido");
     expect(motivo(corpoDoConvite.safeParse({ email: "a@b.co", role: "admin" }))).toBe("papel inválido");
+    expect(motivo(corpoDoConvite.safeParse({ email: "a@b.co" }))).toBe("papel inválido");
     // O e-mail vem antes do papel, como na rota.
     expect(motivo(corpoDoConvite.safeParse({ email: "x", role: "x" }))).toBe("e-mail inválido");
   });
