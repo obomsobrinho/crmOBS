@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Handoff } from "../HandoffCard";
 import { SOLUCAO_DA_PORTA, type Solucao } from "@/lib/solucoes";
-import MessageComposer from "../MessageComposer";
+import MessageComposer from "@/features/conversas/components/MessageComposer";
 import { mmss } from "./apoio";
 
 /**

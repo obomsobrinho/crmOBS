@@ -21,7 +21,7 @@ nota interna, orientar ia), tá meio exagerado."
 **Onde mora:** a pele é a variante **`acao`** do `TabsTrigger`, em
 `components/ui/tabs.tsx` (procurar `acao:`). Hoje: `h-[34px] ... px-3 text-apoio
 font-semibold`, mais `gap-2` para o ícone de 15px. A faixa que as contém é a
-`TabsList` em `components/MessageComposer.tsx` (`flex-wrap gap-[7px]
+`TabsList` em `features/conversas/components/MessageComposer.tsx` (`flex-wrap gap-[7px]
 border-b border-line-soft px-3 py-2`).
 
 **Cuidados:**

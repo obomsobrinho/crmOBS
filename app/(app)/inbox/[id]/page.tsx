@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import ConversationView from "@/components/ConversationView";
+import ConversationView from "@/features/conversas/components/ConversationView";
 import { PAGINA_MENSAGENS } from "@/lib/mensagem";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Thread from "./Thread";
-import type { Handoff } from "./HandoffCard";
-import FichaContato from "./FichaContato";
+import type { Handoff } from "@/components/HandoffCard";
+import FichaContato from "@/components/FichaContato";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
-import { createClient } from "@/lib/supabase/client";
+import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { anunciarIa } from "@/lib/ia-bus";
 import { useNomeDoContato } from "@/lib/use-nome-contato";

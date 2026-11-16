@@ -27,7 +27,7 @@ paths:
   - "features/pedidos/components/Pedidos.tsx"
   - "features/pedidos/components/SecoesDoPedido.tsx"
   - "components/SolucaoBadge.tsx"
-  - "components/MessageComposer.tsx"
+  - "features/conversas/components/MessageComposer.tsx"
   - "components/HandoffCard.tsx"
   - "lib/custo-ia.ts"
   - "lib/consumo-ia.ts"

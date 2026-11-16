@@ -12,7 +12,7 @@ import {
 } from "../lib/midias";
 import { MIDIA_DA_IA, ehMidiaDaIa, respostaDaIa, respostaHumana } from "../lib/mensagem";
 import { TABELAS_DO_CLIENTE } from "../lib/admin-purga";
-import { rowsToBubbles } from "../components/thread/bolhas";
+import { rowsToBubbles } from "../features/conversas/components/thread/bolhas";
 
 // Mídias do agente (04/11/2026, lib/midias.ts): o modelo escolhe pela descrição,
 // o código confere o catálogo e manda cada mídia no máximo uma vez por conversa.

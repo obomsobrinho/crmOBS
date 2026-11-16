@@ -1,13 +1,13 @@
 import NavRail from "@/components/NavRail";
-import ContactSidebar from "@/components/ContactSidebar";
+import ContactSidebar from "@/features/conversas/components/ContactSidebar";
 import { Card } from "@/components/ui/card";
-import ConversationView from "@/components/ConversationView";
+import ConversationView from "@/features/conversas/components/ConversationView";
 import type { Member } from "@/lib/team";
 import type { ChatRow, InboxItem } from "@/lib/types";
 import type { ArquivoDoContato } from "@/lib/arquivos";
 import { JANELA_PADRAO } from "@/lib/inbox";
 import { PAGINA_INBOX, inicioDaJanela, type ItemLista } from "@/lib/inbox-lista";
-import { fonteDaMemoria } from "@/lib/inbox-fonte";
+import { fonteDaMemoria } from "@/features/conversas/api/fonte";
 import { agoraMs } from "@/lib/periodo";
 import { diaIsoSP } from "@/lib/fuso";
 

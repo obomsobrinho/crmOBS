@@ -17,7 +17,7 @@ com borda visível, em vez de uma sombra. Ele diz que acontece nos dois lugares:
 conversa e na área de mensagens.
 
 **Onde mora:**
-- `components/Thread.tsx`, duas aplicações: `sombra-rolagem` no `<header>` quando `rolou`, e
+- `features/conversas/components/Thread.tsx`, duas aplicações: `sombra-rolagem` no `<header>` quando `rolou`, e
   `sombra-rolagem-topo` no bloco do composer quando `temMais`.
 - `app/globals.css`, tokens `--sombra-rolagem` e `--sombra-rolagem-topo` (valores diferentes por tema).
 - `components/ui/scroll-area.tsx`, a máscara `fade` (gradiente com `ESMAECIMENTO`), que atua na MESMA
@@ -59,7 +59,7 @@ pelo filtro de tempo.** Uma conversa com handoff aberto desde ontem tem que apar
 "Hoje", senão o recorte esconde exatamente o que o produto existe para não deixar esquecer. O grupo
 "Esperando você" ignora a janela; os outros dois grupos a respeitam.
 
-**Onde mora:** `components/ContactSidebar.tsx` (o `results` e a barra de filtros). O dado é
+**Onde mora:** `features/conversas/components/ContactSidebar.tsx` (o `results` e a barra de filtros). O dado é
 `InboxItem.lastMessageAt` mais `handoffAt`.
 
 **Cuidados:**
@@ -134,7 +134,7 @@ coisas. O dono: "se eu ativei o atendimento da IA isso fica com ela e não comig
 já se comporta.
 
 **Onde mora:**
-- `components/ConversationView.tsx`: `assign` (atribuir) e `toggleIa` (chave da IA).
+- `features/conversas/components/ConversationView.tsx`: `assign` (atribuir) e `toggleIa` (chave da IA).
 - `lib/crm.ts`: `quemAtende` já devolve `ia` quando não está pausada, então a REGRA de exibição já
   está certa; o que muda é o estado no banco.
 - Escrita: `dados_cliente.atendimento_ia` (browser, grant de coluna) e `conversations.assigned_user_id`

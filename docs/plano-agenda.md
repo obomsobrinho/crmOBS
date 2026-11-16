@@ -242,7 +242,7 @@ sends by itself once the env var exists.
   contact card ("Confirmado").
 - Done (owner approved, "Pode mandar"): the reminder route inserts the sent text into
   `chat_messages` with `message_type = 'lembrete'`. The team sees it in the conversation with the
-  label "Lembrete automático" (`components/thread/bolhas.ts`, `BubbleView`) and the AI has it in
+  label "Lembrete automático" (`features/conversas/components/thread/bolhas.ts`, `BubbleView`) and the AI has it in
   the history (`processTurn` reads `chat_messages`; nothing in n8n). `lembrete` is neither an AI
   nor a team reply: `lib/mensagem.ts` (`ehLembrete`, `respostaDaIa`), the SQL copies in the NEW
   migration `20261028193556_lembrete_nao_e_resposta.sql` (`painel_janelas`, `painel_series`,

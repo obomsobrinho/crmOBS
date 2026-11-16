@@ -1241,7 +1241,7 @@ promovidos de "Candidatos novos".
 - [x] **Handoff "coach" (copiloto).** `conversations.pending_instruction` (grant de coluna, browser
       direto) guarda a orientação do operador; `/api/agent` consome no próximo turno e limpa (a IA
       retoma sozinha). No inbox, orientar é a aba "Orientar" da caixa de escrita
-      (`components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
+      (`features/conversas/components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
       consumida, ela aparece colada no topo da própria caixa, com a opção de cancelar.
       ⚠️ O "handoff silencioso" que esta fase introduziu (em `action=pausar`, `messages` vazio mais
       a IA se pausando) foi **revertido em 20/08/2026**: ver "Handoff sem pausa" abaixo.

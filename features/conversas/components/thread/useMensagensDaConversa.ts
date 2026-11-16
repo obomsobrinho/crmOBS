@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, useEffect, type RefObject } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
 import { useCanalConversa } from "@/lib/use-canal-ao-vivo";
 import { ehManual, PAGINA_MENSAGENS } from "@/lib/mensagem";
 import type { Bubble, ChatRow } from "@/lib/types";

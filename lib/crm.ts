@@ -50,7 +50,7 @@ export function qualReasonLabel(action: QualAction): string {
  *
  * ⚠️ Desde 19/09/2026 a invariante vale no BANCO nos DOIS sentidos, e não só no
  * envio: **atribuir pausa a IA** e **religar a IA larga o responsável**
- * (`components/ConversationView.tsx`, mais o `POST /api/conversations/resolve`).
+ * (`features/conversas/components/ConversationView.tsx`, mais o `POST /api/conversations/resolve`).
  * Antes disso, esta função era a única coisa impedindo a tela de mostrar as duas
  * coisas ao mesmo tempo, e o banco guardava o estado contraditório assim mesmo.
  *

@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
-import type { Handoff } from "../HandoffCard";
+import type { Handoff } from "@/components/HandoffCard";
 import { solucaoDoBanco } from "@/lib/solucoes";
 
 /**

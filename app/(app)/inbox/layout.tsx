@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import ContactSidebar from "@/components/ContactSidebar";
+import ContactSidebar from "@/features/conversas/components/ContactSidebar";
 import { atualizarFotos } from "@/lib/fotos-servidor";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
@@ -13,7 +13,7 @@ import {
   type Contagens,
   type ItemLista,
 } from "@/lib/inbox-lista";
-import { fonteDoBanco } from "@/lib/inbox-fonte";
+import { fonteDoBanco } from "@/features/conversas/api/fonte";
 import { agoraMs } from "@/lib/periodo";
 
 export const dynamic = "force-dynamic";

@@ -31,10 +31,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
 import { formatEspera } from "@/lib/format";
 import { rotuloDoMotivo } from "@/lib/motivos";
-import type { Handoff } from "./HandoffCard";
+import type { Handoff } from "@/components/HandoffCard";
 
 export type OutgoingMedia = {
   bucket: string;

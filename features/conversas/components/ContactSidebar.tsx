@@ -23,7 +23,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
+import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
 import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
@@ -46,13 +46,13 @@ import {
   fonteDoBanco,
   type FonteInbox,
   type ParamsLista,
-} from "@/lib/inbox-fonte";
+} from "@/features/conversas/api/fonte";
 import { useDebounce } from "@/lib/use-debounce";
 import { agoraMs } from "@/lib/periodo";
 import { fetchMembers, memberName, type Member } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { ouvirIa } from "@/lib/ia-bus";
-import QuemAtendeBadge, { quemAtendeTexto } from "./QuemAtendeBadge";
+import QuemAtendeBadge, { quemAtendeTexto } from "@/components/QuemAtendeBadge";
 import type { InboxItem } from "@/lib/types";
 
 function isPaused(state: string | null | undefined): boolean {

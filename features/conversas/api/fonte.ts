@@ -8,8 +8,8 @@ import {
   type Cursor,
   type FiltroInbox,
   type ItemLista,
-} from "./inbox-lista";
-import { normalizar } from "./clientes";
+} from "@/lib/inbox-lista";
+import { normalizar } from "@/lib/clientes";
 
 // DE ONDE A LISTA DE CONVERSAS TIRA OS DADOS (fase 1 do plano de carregamento).
 //

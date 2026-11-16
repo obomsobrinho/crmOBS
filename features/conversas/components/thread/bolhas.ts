@@ -3,7 +3,7 @@ import { formatTime } from "@/lib/format";
 import { dataLongaSP } from "@/lib/fuso";
 import { diaSP } from "@/lib/inbox";
 import type { Bubble, ChatRow } from "@/lib/types";
-import type { Handoff } from "../HandoffCard";
+import type { Handoff } from "@/components/HandoffCard";
 
 export function rowsToBubbles(rows: ChatRow[]): Bubble[] {
   const bubbles: Bubble[] = [];

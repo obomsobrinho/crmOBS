@@ -32,7 +32,7 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
 - ✅ **1. Conversas:** `public.inbox_pagina` (10 por vez, cursor `(grupo, last_message_at, id)`,
   recorte, filtro e busca no banco, incluindo o conteúdo das mensagens) e `public.inbox_contagens`
   (chips e cabeçalhos de grupo), as duas `security invoker`. No navegador: `lib/inbox-lista.ts`
-  (puro: item, ordem, `encaixar`, início da janela), `lib/inbox-fonte.ts` (banco ou memória para o
+  (puro: item, ordem, `encaixar`, início da janela), `features/conversas/api/fonte.ts` (banco ou memória para o
   preview), rolagem infinita por `IntersectionObserver`, busca com `useDebounce` (300ms), realtime
   filtrado pelo tenant que busca SÓ a linha (debounce de 500ms), aba escondida parada, revalidação
   ao voltar o foco no máximo a cada 10s. Provado em `e2e/realtime.serial.spec.ts` (25 conversas
