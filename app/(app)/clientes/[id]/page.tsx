@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import DetalheCliente from "@/features/central/components/DetalheCliente";
 import { adminDaPagina, detalheDoCliente } from "@/lib/admin";
-import { ehAbaDoCliente } from "@/lib/admin-cliente";
 import { AGENT_MODEL } from "@/lib/agent";
 import { cotacaoPtax } from "@/lib/cambio-servidor";
 import { agoraMs } from "@/lib/periodo";
@@ -16,18 +15,12 @@ export const metadata = { title: "Cliente", robots: { index: false } };
 // própria pessoa (link antigo de Contatos) e a `/contatos` em qualquer outro
 // caso, sem revelar que a central existe. Um id que não é de cliente (os
 // contatos têm id numérico) segue esse caminho também para o admin, para o link
-// antigo dele continuar valendo.
-export default async function ClienteDetalhePage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ aba?: string }>;
-}) {
+// antigo dele continuar valendo. A aba e os filtros das abas vivem na URL e a
+// tela os lê (`features/central/components/na-url.ts`).
+export default async function ClienteDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   await adminDaPagina(id);
 
-  const { aba } = await searchParams;
   // A cotação do dólar (PTAX do Banco Central) NÃO segura a página: segue como promessa, a tela abre em US$
   // e troca para reais quando ela chega (`useCambio`). Sem cotação fica em US$ e a nota diz que está indisponível.
   const agora = agoraMs();
@@ -35,5 +28,5 @@ export default async function ClienteDetalhePage({
   const detalhe = await detalheDoCliente(createServiceClient(), id, agora, AGENT_MODEL);
   if (!detalhe) notFound();
 
-  return <DetalheCliente detalhe={detalhe} cambio={cambio} abaInicial={ehAbaDoCliente(aba) ? aba : "visao"} />;
+  return <DetalheCliente detalhe={detalhe} cambio={cambio} />;
 }

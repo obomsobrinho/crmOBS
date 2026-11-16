@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AreaRolavel } from "@/components/ui/dissolver-rolagem";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { EstadoDoWhatsApp } from "@/lib/admin-alertas";
 import { ehAbaDoCliente, type AbaDoCliente, type DetalheDoCliente } from "@/lib/admin-cliente";
 import {
   fonteDoClienteDaApi,
@@ -22,6 +21,9 @@ import type { PedidoDeAcao } from "@/lib/admin-conta";
 import { alertasDaEmpresa, comLimite } from "@/lib/admin-empresas";
 import { custoEstimadoUsd } from "@/lib/custo-ia";
 import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
+import { chavesDaCentral } from "@/features/central/api/chaves";
+import { useAdiantarDaCentral, useInvalidarCentral, useWhatsappDoCliente } from "@/features/central/hooks/useCentral";
+import { useAbaNaUrl } from "./na-url";
 import AbaVisaoGeral from "@/features/central/components/AbaVisaoGeral";
 import AbaFinanceiro from "@/features/central/components/AbaFinanceiro";
 import AbaAcoes from "@/features/central/components/AbaAcoes";
@@ -51,7 +53,6 @@ const AbaAtendimento = dynamic(carregarAbaAtendimento);
 export default function DetalheCliente({
   detalhe,
   cambio: cambioDaTela,
-  abaInicial = "visao",
   preview,
   hrefLista = "/clientes",
 }: {
@@ -61,19 +62,24 @@ export default function DetalheCliente({
    * buscada (a página não espera por ela: abre em US$ e troca para reais quando chega, `useCambio`).
    */
   cambio: CambioDaTela;
-  abaInicial?: AbaDoCliente;
   /** Preview `/design/clientes/detalhe`: tudo roda sobre a memória e editar não grava. */
   preview?: PreviewDoCliente;
   hrefLista?: string;
 }) {
   const { cambio, buscando: cambioBuscando } = useCambio(cambioDaTela);
   const [empresaDaRota, setEmpresa] = useState(detalhe.empresa);
-  const [aba, setAba] = useState<AbaDoCliente>(abaInicial);
-  const [visitadas, setVisitadas] = useState<Set<AbaDoCliente>>(() => new Set([abaInicial]));
+  // A aba vive na URL (`?aba=`): recarregar, voltar e um link abrem a mesma aba. Trocar de aba
+  // continua sem rota nova nem leitura (o nuqs troca só o endereço, modo raso).
+  const [aba, setAbaNaUrl] = useAbaNaUrl();
+  const setAba = useCallback((v: AbaDoCliente) => void setAbaNaUrl(v), [setAbaNaUrl]);
+  const [visitadas, setVisitadas] = useState<Set<AbaDoCliente>>(() => new Set([aba]));
+  // Uma aba aberta pela URL (voltar, link) também passa a ficar montada.
+  if (!visitadas.has(aba)) setVisitadas(new Set(visitadas).add(aba));
   /** A caixa do limite de IA: aberta (com o valor já preenchido, ou `null` em branco) ou fechada (`false`). */
   const [editando, setEditando] = useState<{ sugestao: number | null } | false>(false);
-  const [whatsapp, setWhatsapp] = useState<EstadoDoWhatsApp | null>(null);
   const [financeiro, setFinanceiro] = useState(detalhe.financeiro);
+  const invalidarCentral = useInvalidarCentral();
+  const adiantar = useAdiantarDaCentral();
   /** Aviso no topo quando a ação não deixa a tela se explicar sozinha (preview, ou gravou e a releitura falhou). */
   const [recado, setRecado] = useState<string | null>(null);
   const [apagado, setApagado] = useState<Extract<RespostaDoApagar, { ok: true }> | null>(null);
@@ -90,22 +96,14 @@ export default function DetalheCliente({
     [preview, detalhe.empresa.id],
   );
 
-  const consultarWhatsapp = useCallback(() => {
-    // A fonte nunca rejeita (falha vira `desconhecido` lá, uma vez só).
-    void fonte.whatsapp().then(setWhatsapp);
-  }, [fonte]);
-
-  // Uma consulta ao abrir (`null` já quer dizer "checando"). Só quem tem
-  // instância tem o que consultar; os outros mostram "Sem WhatsApp".
-  const temInstancia = detalhe.empresa.temInstancia;
-  useEffect(() => {
-    if (temInstancia) consultarWhatsapp();
-  }, [temInstancia, consultarWhatsapp]);
+  // Uma consulta ao abrir (`null` quer dizer "checando"); a fonte nunca rejeita (falha vira
+  // `desconhecido`). Só quem tem instância tem o que consultar; os outros mostram "Sem WhatsApp".
+  const { whatsapp, checarDeNovo } = useWhatsappDoCliente(detalhe.empresa.id, detalhe.empresa.temInstancia, fonte.whatsapp);
 
   // Adianta os pedaços de CÓDIGO das abas pesadas quando o navegador está ocioso. Os DADOS (os dois agregados)
   // não: ler os dois a cada cliente aberto custava dois agregados no banco mesmo quando o dono só olhava a
   // Visão geral. Eles saem quando ele mostra a intenção (`lerDaAba`: mouse sobre o gatilho, foco ou aperto),
-  // dezenas de milissegundos antes da aba abrir; a fonte lembra a resposta, e a aba a usa na hora.
+  // dezenas de milissegundos antes da aba abrir; o cache de dados guarda a resposta, e a aba a usa na hora.
   useEffect(() => {
     const aquecer = () => {
       void carregarAbaUsoDeIa();
@@ -125,18 +123,14 @@ export default function DetalheCliente({
 
   // A leitura dos dados de uma aba, no instante em que o dono mostra que vai abri-la. Falha aqui é silenciosa: a
   // aba lê de novo quando abrir e mostra o "tentar de novo" se ainda falhar.
+  const idDoCliente = detalhe.empresa.id;
   const lerDaAba = useCallback(
     (aba: AbaDoCliente) => {
-      if (aba === "uso") fonte.uso().catch(() => {});
-      if (aba === "atendimento") fonte.atendimento().catch(() => {});
+      if (aba === "uso") adiantar(chavesDaCentral.uso(idDoCliente), fonte.uso);
+      if (aba === "atendimento") adiantar(chavesDaCentral.atendimento(idDoCliente), fonte.atendimento);
     },
-    [fonte],
+    [adiantar, fonte, idDoCliente],
   );
-
-  const checarDeNovo = useCallback(() => {
-    setWhatsapp(null);
-    consultarWhatsapp();
-  }, [consultarWhatsapp]);
 
   const alertas = useMemo(
     () => alertasDaEmpresa(empresa, detalhe.agora, whatsapp ?? undefined),
@@ -155,6 +149,8 @@ export default function DetalheCliente({
     async (pedido: PedidoDeAcao): Promise<string | null> => {
       const r = await fonte.mudarConta(pedido);
       if (!r.ok) return r.erro;
+      // Gravou: a linha da lista e as abas lidas deste cliente ficam velhas.
+      invalidarCentral();
       if ("simulado" in r) {
         setRecado("Preview: nada foi gravado.");
         return null;
@@ -168,13 +164,23 @@ export default function DetalheCliente({
       setRecado(null);
       return null;
     },
-    [fonte],
+    [fonte, invalidarCentral],
   );
 
   const abrirEdicaoDoLimite = useCallback((sugestao?: number) => setEditando({ sugestao: sugestao ?? null }), []);
   const limiteMudou = useCallback(
-    (limite: number | null) => setEmpresa((cur) => comLimite(cur, limite, detalhe.agora)),
-    [detalhe.agora],
+    (limite: number | null) => {
+      setEmpresa((cur) => comLimite(cur, limite, detalhe.agora));
+      invalidarCentral();
+    },
+    [detalhe.agora, invalidarCentral],
+  );
+  const foiApagado = useCallback(
+    (r: Extract<RespostaDoApagar, { ok: true }>) => {
+      setApagado(r);
+      invalidarCentral();
+    },
+    [invalidarCentral],
   );
 
   /**
@@ -186,7 +192,7 @@ export default function DetalheCliente({
     setAba("atendimento");
     setVisitadas((cur) => (cur.has("atendimento") ? cur : new Set(cur).add("atendimento")));
     setRolarAtePedidos((n) => n + 1);
-  }, []);
+  }, [setAba]);
 
   function mudarAba(v: string) {
     if (!ehAbaDoCliente(v)) return;
@@ -310,6 +316,7 @@ export default function DetalheCliente({
               <TabsContent value="atendimento" forceMount>
                 {visitadas.has("atendimento") && (
                   <AbaAtendimento
+                    id={empresa.id}
                     fonte={fonte}
                     pedidos={detalhe.pedidos}
                     agora={detalhe.agora}
@@ -334,7 +341,7 @@ export default function DetalheCliente({
                     empresa={empresa}
                     fonte={fonte}
                     executar={executar}
-                    onApagado={setApagado}
+                    onApagado={foiApagado}
                     onEditarLimite={abrirEdicaoDoLimite}
                     aoMudarLimite={limiteMudou}
                   />
@@ -351,9 +358,10 @@ export default function DetalheCliente({
             sugestao={editando.sugestao}
             fonte={fonte}
             onFechar={() => setEditando(false)}
-            onSalvo={(id, limite) =>
-              setEmpresa((cur) => (cur.id === id ? comLimite(cur, limite, detalhe.agora) : cur))
-            }
+            onSalvo={(id, limite) => {
+              setEmpresa((cur) => (cur.id === id ? comLimite(cur, limite, detalhe.agora) : cur));
+              invalidarCentral();
+            }}
           />
         )}
       </section>

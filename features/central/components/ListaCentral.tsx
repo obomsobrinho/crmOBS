@@ -15,7 +15,9 @@ import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem"
 import { cn } from "@/lib/utils";
 import { diaMesHoraSP } from "@/lib/fuso";
 import { useDebounce } from "@/lib/use-debounce";
-import { usePaginada } from "@/lib/use-paginada";
+import { useFimDaLista } from "@/lib/use-fim-da-lista";
+import { useListaDaCentral, type PrimeiraDoServidor } from "@/features/central/hooks/useCentral";
+import { useListaNaUrl } from "./na-url";
 import { custoCurto, type Cambio } from "@/lib/cambio";
 import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
 import {
@@ -25,7 +27,6 @@ import {
   type FiltroDeSituacao,
 } from "@/lib/admin-alertas";
 import {
-  PAGINA_EMPRESAS,
   fonteEmpresasDaApi,
   fonteEmpresasDaMemoria,
   type EmpresaItem,
@@ -43,8 +44,9 @@ import {
 
 // LISTA DE CLIENTES DA CENTRAL DO DONO (docs/plano-central-clientes.md, entrega 1).
 //
-// 10 por vez, mais ao rolar (`usePaginada`), busca por nome e filtro de situação
-// no SERVIDOR (busca com debounce). Sem realtime (decisão do plano): o botão
+// 10 por vez, mais ao rolar (`useListaDaCentral`, cache de dados), busca por nome e filtro de situação
+// na URL (`?q=`, `?situacao=`) e lidos
+// no SERVIDOR (busca com debounce). Sem realtime (decisão do plano): a volta do foco e o botão
 // "Atualizar" revalida o que está na tela. A linha inteira abre o detalhe. O
 // limite de IA se edita no detalhe, na aba "Ações".
 //
@@ -59,8 +61,8 @@ export default function ListaCentral({
   hrefModelo = "/clientes/{id}",
   cambio: cambioDaTela = null,
 }: {
-  /** A primeira página, que o servidor já buscou. */
-  inicial: { itens: EmpresaItem[]; temMais: boolean };
+  /** A primeira página que o servidor já buscou, e para qual recorte (a busca e o filtro da URL). */
+  inicial: PrimeiraDoServidor;
   /** Preview `/design/clientes`: a lista roda sobre a memória. */
   previewTodas?: EmpresaItem[];
   /** Para onde a linha leva; o preview aponta para o detalhe de mentira. */
@@ -71,27 +73,27 @@ export default function ListaCentral({
    */
   cambio?: CambioDaTela;
 }) {
-  const simular = !!previewTodas;
   const { cambio, buscando: cambioBuscando } = useCambio(cambioDaTela);
-  const [q, setQ] = useState("");
+  // A busca vai para a URL a cada tecla (o nuqs junta as escritas) e só a LEITURA espera o atraso:
+  // escrever a URL depois do atraso cancelaria uma navegação já começada (Contatos, 15/11/2026).
+  const { q, situacao, setU } = useListaNaUrl();
+  const setQ = (v: string) => void setU({ q: v || null });
+  const setSituacao = (v: FiltroDeSituacao | null) => void setU({ situacao: v });
   const busca = useDebounce(q.trim(), 300);
-  const [situacao, setSituacao] = useState<FiltroDeSituacao | null>(null);
 
   const fonte = useMemo<FonteEmpresas>(
     () => (previewTodas ? fonteEmpresasDaMemoria(previewTodas) : fonteEmpresasDaApi()),
     [previewTodas]
   );
   const params = useMemo<ParamsEmpresas>(() => ({ busca, situacao }), [busca, situacao]);
+  // O que o servidor leu vale só para o recorte que ele leu (e só na primeira montagem).
+  const [doServidor] = useState(inicial);
 
-  const { itens, temMais, carregando, fimRef, revalidar } = usePaginada<EmpresaItem, ParamsEmpresas>({
-    inicial: inicial.itens,
-    temMaisInicial: inicial.temMais,
-    params,
-    buscar: (p, depois, n) => fonte.pagina(p, depois, n),
-    chave: (e) => e.id,
-    tamanho: PAGINA_EMPRESAS,
-    revalidarAoVoltar: !simular,
-  });
+  const lista = useListaDaCentral(fonte, params, doServidor);
+  const { itens, hasNextPage: temMais } = lista;
+  const carregando = lista.isFetching;
+  const fimRef = useFimDaLista(lista.hasNextPage, lista.isFetchingNextPage, () => void lista.fetchNextPage());
+  const revalidar = () => lista.refetch();
 
   const temBusca = busca.length > 0;
 
@@ -204,9 +206,7 @@ export default function ListaCentral({
               ))}
               {temMais && (
                 <li
-                  ref={(el) => {
-                    fimRef.current = el;
-                  }}
+                  ref={fimRef}
                   data-slot="central-mais"
                   aria-hidden
                   className="h-px"

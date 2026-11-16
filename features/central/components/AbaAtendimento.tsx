@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import {
   Bar,
   BarChart,
@@ -28,7 +28,7 @@ import { EstadoVazio } from "@/components/ui/estado-vazio";
 import { numeroBR, pct, plural } from "@/lib/format";
 import { calcularDelta, deltaDuracao } from "@/lib/delta";
 import { formatDuration } from "@/lib/metrics";
-import { PERIODOS, PERIODO_PADRAO, type PeriodoKey } from "@/lib/periodo";
+import { PERIODOS, type PeriodoKey } from "@/lib/periodo";
 import {
   fatiasDasSolucoes,
   quebrarRotulo,
@@ -39,7 +39,9 @@ import {
   type FatiaDeSolucao,
 } from "@/lib/admin-cliente";
 import type { FonteDoCliente } from "@/features/central/api/fonte";
-import { useCarga } from "@/lib/use-carga";
+import { useLeituraDaCentral } from "@/features/central/hooks/useCentral";
+import { chavesDaCentral } from "@/features/central/api/chaves";
+import { useAtendimentoNaUrl } from "./na-url";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
 import BlocoDePedidos from "@/features/central/components/BlocoDePedidos";
 import { FalhaAoLer, Indicador } from "@/features/central/components/pecas";
@@ -57,11 +59,14 @@ import IndicadorComparado from "@/features/central/components/IndicadorComparado
 // painel (`lib/periodo.ts`) chegam numa leitura só; trocar de período não busca
 // nada.
 function AbaAtendimento({
+  id,
   fonte,
   pedidos,
   agora,
   rolarAtePedidos,
 }: {
+  /** O id do cliente (a chave da leitura no cache). */
+  id: string;
   fonte: FonteDoCliente;
   /** A seção "Pedidos em aberto" (do detalhe, sem período). */
   pedidos: DetalheDoCliente["pedidos"];
@@ -69,8 +74,10 @@ function AbaAtendimento({
   /** Muda quando o cartão da Visão geral pede para ver os pedidos. */
   rolarAtePedidos: number;
 }) {
-  const [periodo, setPeriodo] = useState<PeriodoKey>(PERIODO_PADRAO);
-  const { dados, erro, tentarDeNovo } = useCarga<AtendimentoPorPeriodo>(fonte.atendimento);
+  // O período vive na URL (`?atendimento=`).
+  const [periodo, setPeriodoNaUrl] = useAtendimentoNaUrl();
+  const setPeriodo = (p: PeriodoKey) => void setPeriodoNaUrl(p);
+  const { dados, erro, tentarDeNovo } = useLeituraDaCentral<AtendimentoPorPeriodo>(chavesDaCentral.atendimento(id), fonte.atendimento);
 
   return (
     <div data-slot="central-aba-atendimento" className="flex flex-col gap-4">

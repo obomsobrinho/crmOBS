@@ -263,7 +263,7 @@ export function linhaDoPlano(e: Pick<EmpresaItem, "plano">): string {
   return e.plano ? `Plano ${e.plano}` : "Sem plano";
 }
 
-/** A leitura de uma aba falhou: o texto e o "tentar de novo" (`useCarga`). */
+/** A leitura de uma aba falhou: o texto e o "tentar de novo" (`useLeituraDaCentral`). */
 export function FalhaAoLer({ texto, aoTentar }: { texto: string; aoTentar: () => void }) {
   return (
     <Card variant="secao" data-bloco="central-falha">

@@ -84,39 +84,16 @@ async function enviar(url: string, metodo: "PUT" | "POST", corpo: unknown): Prom
 const FALHA = "Não deu para concluir agora. Tente de novo.";
 
 /**
- * Lembra a leitura que deu certo (uma falha NÃO fica lembrada, para o "tentar de novo" ler de
- * verdade). É o que deixa o detalhe adiantar a leitura de uma aba em segundo plano
- * (`aquecer`): quando a aba abre, a resposta já está aqui e a troca não espera a rede.
+ * Navegador: as rotas do admin. A fonte só lê: quem lembra a resposta (e deixa o detalhe
+ * adiantar a leitura de uma aba no gesto de intenção) é o cache de dados
+ * (`hooks/useCentral.ts`, chaves em `api/chaves.ts`).
  */
-function lembrar<T>(ler: () => Promise<T>): () => Promise<T> {
-  let p: Promise<T> | null = null;
-  return () => {
-    if (!p) {
-      p = ler().catch((e) => {
-        p = null;
-        throw e;
-      });
-    }
-    return p;
-  };
-}
-
-/** Navegador: as rotas do admin. */
 export function fonteDoClienteDaApi(id: string): FonteDoCliente {
   const base = `/api/admin/empresas/${id}`;
-  const historico = new Map<string, () => Promise<UsoHistorico>>();
   return {
-    uso: lembrar(() => lerJson<UsoDoCliente>(`${base}/uso`, "uso")),
-    usoHistorico(selecao) {
-      const { consulta } = descricaoDaSelecao(selecao);
-      let ler = historico.get(consulta);
-      if (!ler) {
-        ler = lembrar(() => lerJson<UsoHistorico>(`${base}/uso?${consulta}`, "uso"));
-        historico.set(consulta, ler);
-      }
-      return ler();
-    },
-    atendimento: lembrar(() => lerJson<AtendimentoPorPeriodo>(`${base}/atendimento`, "atendimento")),
+    uso: () => lerJson<UsoDoCliente>(`${base}/uso`, "uso"),
+    usoHistorico: (selecao) => lerJson<UsoHistorico>(`${base}/uso?${descricaoDaSelecao(selecao).consulta}`, "uso"),
+    atendimento: () => lerJson<AtendimentoPorPeriodo>(`${base}/atendimento`, "atendimento"),
     async whatsapp() {
       try {
         const corpo = await lerJson<{ estado?: EstadoDoWhatsApp }>(`${base}/whatsapp`, "whatsapp");

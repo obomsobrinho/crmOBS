@@ -14,7 +14,7 @@ const ATRASO_RSC_MS = 3_000;
 const B1_MS = 300;
 
 /** Rotas com moldura própria (passo 0). Perfil não tem item no menu do computador. */
-const ROTAS_COM_MOLDURA = ["/inbox", "/pipeline", "/pedidos", "/contatos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
+const ROTAS_COM_MOLDURA = ["/inbox", "/pipeline", "/pedidos", "/contatos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas", "/clientes"];
 
 /** Áreas migradas (o bloco "State" de .claude/rules/dados-estado-desempenho.md). */
 // Campanhas fica fora por decisão do dono (D16): continua lendo no servidor.
@@ -51,6 +51,8 @@ const TETO_KB: Record<string, number> = {
   "/agente": 360,
   "/equipe": 360,
   "/perfil": 360,
+  // A central do dono (passo 5): o mesmo teto das telas dos tenants.
+  "/clientes": 360,
   // Exceção do dono (D15, 14/11/2026): os gráficos de Campanhas ficam na abertura.
   "/campanhas": 480,
   "/campanhas/buscas/nova": 480,

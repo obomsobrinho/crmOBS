@@ -24,7 +24,8 @@ import {
 } from "@/lib/admin-conta";
 import type { EmpresaItem } from "@/lib/admin-empresas";
 import type { FonteDoCliente } from "@/features/central/api/fonte";
-import { useCarga } from "@/lib/use-carga";
+import { useLeituraDaCentral } from "@/features/central/hooks/useCentral";
+import { chavesDaCentral } from "@/features/central/api/chaves";
 import { Medidor } from "@/components/ui/medidor";
 import { Stat, StatFrase, StatLegenda, StatRotulo, StatTopo, StatValor } from "@/components/ui/stat";
 import { Dado, FalhaAoLer, IndicadorDaSituacao, IndicadorDoPlano } from "@/features/central/components/pecas";
@@ -48,8 +49,8 @@ function dataCurta(iso: string | null): string {
   return iso ? diaMesHoraSP(iso) : "Não";
 }
 
-function Cobrancas({ fonte }: { fonte: FonteDoCliente }) {
-  const { dados, erro, tentarDeNovo } = useCarga<Cobranca[] | null>(fonte.cobrancas);
+function Cobrancas({ id, fonte }: { id: string; fonte: FonteDoCliente }) {
+  const { dados, erro, tentarDeNovo } = useLeituraDaCentral<Cobranca[] | null>(chavesDaCentral.cobrancas(id), fonte.cobrancas);
   if (erro) return <FalhaAoLer texto="Não deu para ler as cobranças no Asaas agora." aoTentar={tentarDeNovo} />;
   if (dados === null) return <p className="text-apoio text-ink-3">Lendo as cobranças…</p>;
   if (dados.length === 0) {
@@ -321,7 +322,7 @@ function AbaFinanceiro({
       <Card variant="secao" data-bloco="financeiro-cobrancas">
         <h2 className="text-rotulo uppercase text-ink-3">Cobranças no Asaas</h2>
         {financeiro.temAssinatura ? (
-          <Cobrancas fonte={fonte} />
+          <Cobrancas id={empresa.id} fonte={fonte} />
         ) : (
           <EstadoVazio tamanho="compacto" data-slot="financeiro-sem-assinatura" texto={textoSemAssinatura(conta)} />
         )}

@@ -38,8 +38,9 @@ import { numeroBR, pct, plural } from "@/lib/format";
 import { ROTULO_ESTADO_DA_IA, tokensCurto } from "@/lib/custo-ia";
 import { custoCurto, custoDoPonto, custoNaMoeda, notaDoCambio, type Cambio } from "@/lib/cambio";
 import { calcularDelta } from "@/lib/delta";
-import { PERIODO_PADRAO } from "@/lib/periodo";
-import { useCarga } from "@/lib/use-carga";
+import { useLeituraDaCentral } from "@/features/central/hooks/useCentral";
+import { chavesDaCentral } from "@/features/central/api/chaves";
+import { useUsoNaUrl } from "./na-url";
 import { janelaDoChip, janelaDoIntervalo, resumoDePicos, type BarraDePico, type DadosDePicos, type JanelaDePicos } from "@/lib/picos";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
 import {
@@ -73,7 +74,7 @@ import IndicadorComparado from "@/features/central/components/IndicadorComparado
 // `lib/custo-ia.ts` e de `lib/picos.ts` (puro, vai para o painel dos tenants), o agregado é do banco
 // (`admin_cliente_uso`, `_horas`, `_meses`, `admin_cliente_picos`). Os QUATRO chips chegam numa leitura
 // só, então trocar de chip não busca nada; um mês, "Todo o período" ou um intervalo busca uma vez (a
-// fonte lembra a resposta). O limite se edita na aba "Ações".
+// cache de dados lembra a resposta). O limite se edita na aba "Ações".
 function AbaUsoDeIa({
   fonte,
   empresa,
@@ -93,9 +94,11 @@ function AbaUsoDeIa({
   /** A cotação ainda está sendo buscada (a página não espera por ela): os custos estão em US$ por enquanto. */
   cambioBuscando?: boolean;
 }) {
-  const [selecao, setSelecao] = useState<SelecaoDeUso>({ tipo: "periodo", periodo: PERIODO_PADRAO });
+  // O filtro da aba vive na URL (`?uso=`): recarregar, voltar e um link abrem o mesmo recorte.
+  const [selecao, setSelecaoNaUrl] = useUsoNaUrl();
+  const setSelecao = useCallback((s: SelecaoDeUso) => void setSelecaoNaUrl(s), [setSelecaoNaUrl]);
   const [dialogo, setDialogo] = useState(false);
-  const { dados: uso, erro, tentarDeNovo } = useCarga<UsoDoCliente>(fonte.uso);
+  const { dados: uso, erro, tentarDeNovo } = useLeituraDaCentral<UsoDoCliente>(chavesDaCentral.uso(empresa.id), fonte.uso);
   const hoje = diaIsoSP(agora);
 
   const descricao = descricaoDaSelecao(selecao);
@@ -183,7 +186,7 @@ interface PropsDoConteudo {
   primeira: string | null;
 }
 
-/** Um mês, "Todo o período" ou um intervalo: busca uma vez (a fonte lembra) e desenha como qualquer período. */
+/** Um mês, "Todo o período" ou um intervalo: busca uma vez (o cache de dados lembra) e desenha como qualquer período. */
 function HistoricoDeUso({
   fonte,
   selecao,
@@ -193,7 +196,8 @@ function HistoricoDeUso({
   selecao: SelecaoHistorica;
 }) {
   const buscar = useCallback((): Promise<UsoHistorico> => fonte.usoHistorico(selecao), [fonte, selecao]);
-  const { dados, erro, tentarDeNovo } = useCarga<UsoHistorico>(buscar);
+  const chave = chavesDaCentral.usoHistorico(comum.empresa.id, descricaoDaSelecao(selecao).consulta);
+  const { dados, erro, tentarDeNovo } = useLeituraDaCentral<UsoHistorico>(chave, buscar);
   if (erro) return <FalhaAoLer texto="Não deu para ler o uso de IA agora." aoTentar={tentarDeNovo} />;
   if (!dados) return <Carregando />;
   return <ConteudoDoUso {...comum} uso={dados.uso} picos={dados.picos} janela={dados.janela} />;
