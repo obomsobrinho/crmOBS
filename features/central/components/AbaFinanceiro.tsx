@@ -23,12 +23,12 @@ import {
   type PedidoDeAcao,
 } from "@/lib/admin-conta";
 import type { EmpresaItem } from "@/lib/admin-empresas";
-import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
+import type { FonteDoCliente } from "@/features/central/api/fonte";
 import { useCarga } from "@/lib/use-carga";
 import { Medidor } from "@/components/ui/medidor";
 import { Stat, StatFrase, StatLegenda, StatRotulo, StatTopo, StatValor } from "@/components/ui/stat";
-import { Dado, FalhaAoLer, IndicadorDaSituacao, IndicadorDoPlano } from "@/components/admin/pecas";
-import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
+import { Dado, FalhaAoLer, IndicadorDaSituacao, IndicadorDoPlano } from "@/features/central/components/pecas";
+import DialogoDaAcao from "@/components/DialogoDaAcao";
 
 // ABA "FINANCEIRO" do detalhe de um cliente (central do dono, entrega 2): plano,
 // estado da assinatura, prazos, ids do gateway MASCARADOS no servidor, assentos e

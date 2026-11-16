@@ -38,12 +38,12 @@ import {
   type DetalheDoCliente,
   type FatiaDeSolucao,
 } from "@/lib/admin-cliente";
-import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
+import type { FonteDoCliente } from "@/features/central/api/fonte";
 import { useCarga } from "@/lib/use-carga";
 import SeletorDePeriodo from "@/components/painel/SeletorDePeriodo";
-import BlocoDePedidos from "@/components/admin/BlocoDePedidos";
-import { FalhaAoLer, Indicador } from "@/components/admin/pecas";
-import IndicadorComparado from "@/components/admin/IndicadorComparado";
+import BlocoDePedidos from "@/features/central/components/BlocoDePedidos";
+import { FalhaAoLer, Indicador } from "@/features/central/components/pecas";
+import IndicadorComparado from "@/features/central/components/IndicadorComparado";
 
 // ABA "ATENDIMENTO" do detalhe de um cliente (central do dono): o que melhorar ou
 // oferecer. Quatro números (conversas, quanto a IA atendeu sozinha, respostas da

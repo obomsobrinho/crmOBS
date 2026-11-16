@@ -17,24 +17,24 @@ import {
   type FonteDoCliente,
   type PreviewDoCliente,
   type RespostaDoApagar,
-} from "@/lib/admin-cliente-fonte";
+} from "@/features/central/api/fonte";
 import type { PedidoDeAcao } from "@/lib/admin-conta";
 import { alertasDaEmpresa, comLimite } from "@/lib/admin-empresas";
 import { custoEstimadoUsd } from "@/lib/custo-ia";
 import { useCambio, type CambioDaTela } from "@/lib/use-cambio";
-import AbaVisaoGeral from "@/components/admin/AbaVisaoGeral";
-import AbaFinanceiro from "@/components/admin/AbaFinanceiro";
-import AbaAcoes from "@/components/admin/AbaAcoes";
-import { AvatarCliente, ChipAlerta, SeloSituacao } from "@/components/admin/pecas";
+import AbaVisaoGeral from "@/features/central/components/AbaVisaoGeral";
+import AbaFinanceiro from "@/features/central/components/AbaFinanceiro";
+import AbaAcoes from "@/features/central/components/AbaAcoes";
+import { AvatarCliente, ChipAlerta, SeloSituacao } from "@/features/central/components/pecas";
 
 // O diálogo do limite só pesa quando o dono clica em editar (chunk à parte). As abas de gráfico
 // (Recharts) só entram no pacote quando a aba abre: a Visão geral não paga por elas. Os três chunks
 // são pedidos em segundo plano logo depois que o detalhe abre (`aquecer`), então a primeira troca de
 // aba não espera o download. Os DADOS das abas, ao contrário, só são lidos quando o dono mostra que vai
 // abrir uma (passar o mouse, focar ou apertar o gatilho: `lerDaAba`), e não a cada cliente aberto.
-const carregarEditarLimite = () => import("@/components/admin/EditarLimiteDialog");
-const carregarAbaUsoDeIa = () => import("@/components/admin/AbaUsoDeIa");
-const carregarAbaAtendimento = () => import("@/components/admin/AbaAtendimento");
+const carregarEditarLimite = () => import("@/features/central/components/EditarLimiteDialog");
+const carregarAbaUsoDeIa = () => import("@/features/central/components/AbaUsoDeIa");
+const carregarAbaAtendimento = () => import("@/features/central/components/AbaAtendimento");
 const EditarLimiteDialog = dynamic(carregarEditarLimite);
 const AbaUsoDeIa = dynamic(carregarAbaUsoDeIa);
 const AbaAtendimento = dynamic(carregarAbaAtendimento);

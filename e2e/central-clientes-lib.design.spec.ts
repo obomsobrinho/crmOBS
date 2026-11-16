@@ -777,7 +777,7 @@ test.describe("Trava por rota da central", () => {
   });
 
   test("a central nunca importa o service_role em componente", () => {
-    for (const arq of achar("components/admin", /\.tsx$/)) {
+    for (const arq of achar("features/central/components", /\.tsx$/)) {
       expect(ler(arq)).not.toContain("lib/supabase/service");
     }
   });

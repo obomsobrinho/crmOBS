@@ -1,5 +1,5 @@
 import NavRail from "@/components/NavRail";
-import ListaCentral from "@/components/admin/ListaCentral";
+import ListaCentral from "@/features/central/components/ListaCentral";
 import { PAGINA_EMPRESAS, fonteEmpresasDaMemoria } from "@/lib/admin-empresas";
 import { agoraMs } from "@/lib/periodo";
 import { cambioDoPreview, clientesFalsos } from "./dados";

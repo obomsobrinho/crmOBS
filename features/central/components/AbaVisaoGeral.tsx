@@ -20,7 +20,7 @@ import {
   IndicadorDoPlano,
   RotuloDoUso,
   textoDoAgente,
-} from "@/components/admin/pecas";
+} from "@/features/central/components/pecas";
 import { MessageCircleWarning } from "lucide-react";
 import { Aviso } from "@/components/ui/aviso";
 import { cn } from "@/lib/utils";

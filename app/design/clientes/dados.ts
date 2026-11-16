@@ -12,7 +12,7 @@ import {
 import type { Cambio } from "@/lib/cambio";
 import type { CambioDaTela } from "@/lib/use-cambio";
 import { janelaDoChip, picosDeHistorico, type DadosDePicos } from "@/lib/picos";
-import type { PreviewDoCliente } from "@/lib/admin-cliente-fonte";
+import type { PreviewDoCliente } from "@/features/central/api/fonte";
 import { financeiroDe, type Cobranca } from "@/lib/admin-conta";
 import { PLAN_ORDER, PLANS } from "@/lib/billing";
 import type { EstadoDoWhatsApp, PedidosEmAberto } from "@/lib/admin-alertas";

@@ -12,8 +12,8 @@ import { limiteDaEmpresa, tokensCurto } from "@/lib/custo-ia";
 import { PLAN_ORDER, PLANS } from "@/lib/billing";
 import { nomeConfere, type PedidoDeAcao } from "@/lib/admin-conta";
 import type { EmpresaItem } from "@/lib/admin-empresas";
-import type { FonteDoCliente, RespostaDoApagar } from "@/lib/admin-cliente-fonte";
-import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
+import type { FonteDoCliente, RespostaDoApagar } from "@/features/central/api/fonte";
+import DialogoDaAcao from "@/components/DialogoDaAcao";
 
 // ABA "AÇÕES" do detalhe de um cliente (central do dono, entrega 2): a zona de
 // perigo, separada de propósito. Dois passos (docs/adr/2026-10-15-two-step-company-deletion.md):

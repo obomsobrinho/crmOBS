@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import NavRail from "@/components/NavRail";
-import DetalheCliente from "@/components/admin/DetalheCliente";
+import DetalheCliente from "@/features/central/components/DetalheCliente";
 import { ehAbaDoCliente } from "@/lib/admin-cliente";
 import { cambioDoPreview, idFalso, clientesFalsos, detalheFalso, previewDoCliente } from "../dados";
 import type { EstadoDoWhatsApp } from "@/lib/admin-alertas";

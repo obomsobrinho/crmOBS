@@ -61,9 +61,9 @@ import {
   type UsoHistorico,
 } from "@/lib/admin-cliente";
 import type { EmpresaItem } from "@/lib/admin-empresas";
-import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
-import { FalhaAoLer, Indicador, RitmoDoLimite, RotuloDoUso } from "@/components/admin/pecas";
-import IndicadorComparado from "@/components/admin/IndicadorComparado";
+import type { FonteDoCliente } from "@/features/central/api/fonte";
+import { FalhaAoLer, Indicador, RitmoDoLimite, RotuloDoUso } from "@/features/central/components/pecas";
+import IndicadorComparado from "@/features/central/components/IndicadorComparado";
 
 // ABA "USO DE IA" do detalhe de um cliente (central do dono). UM filtro de período manda em tudo: os
 // chips do painel (`lib/periodo.ts`), um seletor ao lado deles (meses passados, "Todo o período" e um

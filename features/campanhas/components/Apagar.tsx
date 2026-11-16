@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import DialogoDaAcao from "@/components/admin/DialogoDaAcao";
+import DialogoDaAcao from "@/components/DialogoDaAcao";
 import { mostrarAvisoGlobal } from "@/lib/query/aviso-global";
 import { ErroDaApi } from "@/lib/query/erro";
 import { opcoesDeTirar } from "@/lib/query/escrita";

@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import DetalheCliente from "@/components/admin/DetalheCliente";
+import DetalheCliente from "@/features/central/components/DetalheCliente";
 import { adminDaPagina, detalheDoCliente } from "@/lib/admin";
 import { ehAbaDoCliente } from "@/lib/admin-cliente";
 import { AGENT_MODEL } from "@/lib/agent";

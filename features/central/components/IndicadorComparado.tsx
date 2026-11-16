@@ -3,7 +3,7 @@
 import { ChartSparkline, type PontoDeTendencia } from "@/components/ui/chart";
 import { Selo } from "@/components/painel/pecas";
 import type { Delta } from "@/lib/delta";
-import { Indicador, type PropsDoIndicador } from "@/components/admin/pecas";
+import { Indicador, type PropsDoIndicador } from "@/features/central/components/pecas";
 
 // O INDICADOR COM COMPARAÇÃO das abas de gráfico (Uso de IA e Atendimento): o cartão de `Indicador`, o selo de
 // variação contra o período anterior (`Selo` do painel, sobre `lib/delta.ts`), a frase "comparado com ..." na

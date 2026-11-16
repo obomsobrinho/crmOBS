@@ -1,4 +1,4 @@
-import ListaCentral from "@/components/admin/ListaCentral";
+import ListaCentral from "@/features/central/components/ListaCentral";
 import { adminDaPagina, paginaDeClientes } from "@/lib/admin";
 import { PAGINA_EMPRESAS, type EmpresaItem } from "@/lib/admin-empresas";
 import { AGENT_MODEL } from "@/lib/agent";

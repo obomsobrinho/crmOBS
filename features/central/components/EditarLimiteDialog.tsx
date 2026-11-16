@@ -13,7 +13,7 @@ import {
 import { numeroBR } from "@/lib/format";
 import { limiteDaEmpresa, tokensCurto } from "@/lib/custo-ia";
 import { limiteDigitado, type EmpresaItem } from "@/lib/admin-empresas";
-import type { FonteDoCliente } from "@/lib/admin-cliente-fonte";
+import type { FonteDoCliente } from "@/features/central/api/fonte";
 
 // EDITAR O LIMITE DE IA DE UM CLIENTE (aba "Ações" da central, "Valor personalizado"). O campo é SEMPRE em
 // milhões de tokens ("10", "2,5" ou "2.5"); embaixo dele, os tokens que vão ser

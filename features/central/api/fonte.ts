@@ -1,4 +1,4 @@
-import type { EstadoDoWhatsApp } from "./admin-alertas";
+import type { EstadoDoWhatsApp } from "@/lib/admin-alertas";
 import {
   descricaoDaSelecao,
   leituraDoHistorico,
@@ -9,12 +9,12 @@ import {
   type SelecaoHistorica,
   type UsoDoCliente,
   type UsoHistorico,
-} from "./admin-cliente";
-import { diaIsoSP } from "./fuso";
-import { picosDeHistorico } from "./picos";
-import type { Cobranca, FinanceiroDoCliente, PedidoDeAcao } from "./admin-conta";
-import type { EmpresaItem } from "./admin-empresas";
-import { PAGINA_PEDIDOS_DA_CENTRAL, consultaDoCursor, ordenarPedidos, type PedidoDaCentral } from "./admin-pedidos";
+} from "@/lib/admin-cliente";
+import { diaIsoSP } from "@/lib/fuso";
+import { picosDeHistorico } from "@/lib/picos";
+import type { Cobranca, FinanceiroDoCliente, PedidoDeAcao } from "@/lib/admin-conta";
+import type { EmpresaItem } from "@/lib/admin-empresas";
+import { PAGINA_PEDIDOS_DA_CENTRAL, consultaDoCursor, ordenarPedidos, type PedidoDaCentral } from "@/lib/admin-pedidos";
 
 // DE ONDE O DETALHE DE UM CLIENTE LE AS ABAS (central do dono). Dois formatos, o
 // mesmo contrato: o navegador chama as rotas do admin (o service_role nunca sai

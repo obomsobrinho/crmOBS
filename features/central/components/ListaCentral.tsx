@@ -39,7 +39,7 @@ import {
   SeloSituacao,
   linhaDoPlano,
   textoDoAgente,
-} from "@/components/admin/pecas";
+} from "@/features/central/components/pecas";
 
 // LISTA DE CLIENTES DA CENTRAL DO DONO (docs/plano-central-clientes.md, entrega 1).
 //
