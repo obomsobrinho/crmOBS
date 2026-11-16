@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDaConfigDaAgenda } from "@/features/agenda/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { DURACAO_MAX, DURACAO_MIN, normalizarConfigDaAgenda } from "@/lib/agenda";
 import { horarioCadastrado } from "@/lib/horarios";
@@ -14,12 +15,10 @@ export async function PUT(req: Request) {
   if ("erro" in r) return r.erro;
   const mine = r.mine;
 
-  let body: { config?: unknown; servicos?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/agenda/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDaConfigDaAgenda, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const config = normalizarConfigDaAgenda(body.config);
   const lista = Array.isArray(body.servicos) ? body.servicos.slice(0, 20) : [];
   const servicos: { id: number | null; nome: string; duracaoMin: number }[] = [];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { corpoDaMidiaRecebida, corpoDoAgente, parametroDaInstancia } from "./schemas";
+import { corpoDaMidiaRecebida, corpoDoAgente, corpoDoEnvioManual, parametroDaInstancia } from "./schemas";
 
 // Os esquemas em sombra dos webhooks do n8n: o que a rota já aceita hoje tem de bater
 // (senão o log enche de falso alarme), e o que ela recusa hoje tem de aparecer.
@@ -49,5 +49,13 @@ describe("parâmetro do by-instance", () => {
   it("exige um nome com conteúdo", () => {
     expect(parametroDaInstancia.safeParse({ instanceName: "obs" }).success).toBe(true);
     expect(parametroDaInstancia.safeParse({ instanceName: " " }).success).toBe(false);
+  });
+});
+
+describe("o envio manual (varredura do passo 5)", () => {
+  it("corpo que não é JSON diz 'JSON inválido'; os campos passam como vieram", () => {
+    const r = corpoDoEnvioManual.safeParse(null);
+    expect(r.success ? null : r.error.issues[0]?.message).toBe("JSON inválido");
+    expect(corpoDoEnvioManual.parse({ phone: "55", text: "oi", pedidoId: 3 })).toEqual({ phone: "55", text: "oi", pedidoId: 3 });
   });
 });

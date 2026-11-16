@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDaMudancaDoAgendamento } from "@/features/agenda/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { conflita } from "@/lib/agenda";
 import {
@@ -20,12 +21,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ error: "id inválido" }, { status: 400 });
   }
-  let body: { acao?: unknown; inicio?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/agenda/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDaMudancaDoAgendamento, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const svc = createServiceClient();
 
   if (body.acao === "cancelar") {

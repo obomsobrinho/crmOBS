@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoAgendamento } from "@/features/agenda/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { conflita } from "@/lib/agenda";
 import { jidDoNumero, normalizarNumero } from "@/lib/avisos";
@@ -14,12 +15,10 @@ export async function POST(req: Request) {
   if ("erro" in r) return r.erro;
   const mine = r.mine;
 
-  let body: { phone?: unknown; nome?: unknown; servicoId?: unknown; inicio?: unknown; resumo?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/agenda/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoAgendamento, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const bruto = typeof body.phone === "string" ? body.phone.trim() : "";
   const digitos = bruto.includes("@") ? bruto.replace(/@.*$/, "").replace(/\D/g, "") : normalizarNumero(bruto) ?? "";
   const nome = typeof body.nome === "string" && body.nome.trim() ? body.nome.trim().slice(0, 80) : null;

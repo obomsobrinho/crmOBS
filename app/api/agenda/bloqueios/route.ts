@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerConsulta, lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoBloqueio, consultaDoBloqueio } from "@/features/agenda/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Bloquear um trecho da agenda (almoço, folga, compromisso fora do sistema).
@@ -8,12 +9,10 @@ export async function POST(req: Request) {
   const r = await sessaoDaRota({ ativa: true });
   if ("erro" in r) return r.erro;
   const mine = r.mine;
-  let body: { inicio?: unknown; fim?: unknown; motivo?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/agenda/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoBloqueio, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const inicio = typeof body.inicio === "string" ? Date.parse(body.inicio) : NaN;
   const fim = typeof body.fim === "string" ? Date.parse(body.fim) : NaN;
   if (!Number.isFinite(inicio) || !Number.isFinite(fim) || fim <= inicio) {
@@ -42,7 +41,10 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const r = await sessaoDaRota({ ativa: true });
   if ("erro" in r) return r.erro;
-  const id = Number(new URL(req.url).searchParams.get("id"));
+  // A consulta cruza o esquema (`features/agenda/schemas.ts`); o id é conferido abaixo, como antes.
+  const lido = lerConsulta(req, consultaDoBloqueio);
+  if ("erro" in lido) return lido.erro;
+  const id = Number(lido.dados.id ?? null);
   if (!Number.isInteger(id) || id <= 0) return NextResponse.json({ error: "id inválido" }, { status: 400 });
   const svc = createServiceClient();
   const { error } = await svc.from("agenda_bloqueios").delete().eq("id", id).eq("client_id", r.mine.id);

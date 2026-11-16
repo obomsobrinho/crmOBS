@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoEnvioManual } from "@/features/conversas/schemas";
 import { headersN8n } from "@/lib/n8n";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
@@ -81,20 +82,10 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: {
-    phone?: string;
-    text?: string;
-    /** "Eu respondo" (27/09/2026): o pedido de ajuda que esta resposta resolve. */
-    pedidoId?: number;
-    /** "Esta pessoa sabe que eu vou escrever" (Clientes, fatia B, 01/10/2026). */
-    aceite?: boolean;
-    media?: { bucket?: string; path?: string; type?: string; mime?: string; filename?: string };
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/conversas/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoEnvioManual, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const { phone, text, media } = body;
   const hasMedia = !!(media && media.path);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { campo, corpoJson } from "@/lib/esquema";
 
 // OS WEBHOOKS DO N8N EM MODO SOMBRA (docs/plano-dados-e-estado.md, 2.9 e passo 4). O n8n
 // é produção e é o cano do atendimento: estes esquemas SÓ registram o que fugir deles
@@ -35,3 +36,21 @@ export const corpoDaMidiaRecebida = z
 
 /** `GET /api/clients/by-instance/[instanceName]`: o nome da instância na Evolution. */
 export const parametroDaInstancia = z.object({ instanceName: textoComConteudo });
+
+/**
+ * `POST /api/send` (varredura do passo 5): o envio manual da tela. O esquema decide o JSON
+ * e entrega os campos como vieram; texto, mídia, aceite e o pedido continuam conferidos no
+ * handler, com as frases de antes.
+ */
+export const corpoDoEnvioManual = corpoJson(
+  {
+    phone: campo<string>(),
+    text: campo<string>(),
+    /** "Eu respondo": o pedido de ajuda que esta resposta resolve. */
+    pedidoId: campo<number>(),
+    /** "Esta pessoa sabe que eu vou escrever". */
+    aceite: campo<boolean>(),
+    media: campo<{ bucket?: string; path?: string; type?: string; mime?: string; filename?: string }>(),
+  },
+  "JSON inválido",
+);
