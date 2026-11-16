@@ -183,3 +183,10 @@ export const formularioDaPlanilha = z
     confirmar: f.confirmar === "1",
     nome: String(f.nome ?? "").trim().slice(0, 80) || `Planilha ${f.arquivo.name}`.slice(0, 80),
   }));
+
+/**
+ * A query do webhook do Apify (`POST /api/prospeccao/apify?busca=<id>`): o endereço é
+ * montado por nós ao criar a execução, então este é o formato real. MODO SOMBRA
+ * (`conferirNaSombra`): só registra; a rota continua recusando a busca torta como antes.
+ */
+export const consultaDoWebhookDoApify = z.object({ busca: z.string().refine(ehId, "busca inválida") });

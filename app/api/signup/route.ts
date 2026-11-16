@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { conferirNaSombra } from "@/lib/rota";
+import { corpoDoCadastro } from "@/lib/cadastro-schemas";
 import { TRIAL_DAYS, trialEndsAtFrom } from "@/lib/billing";
 
 // Cadastro self-service: cria o login, o tenant e o vínculo de dono.
@@ -46,6 +48,8 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+  // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema, nunca recusa.
+  conferirNaSombra(corpoDoCadastro, body, "/api/signup");
 
   const companyName = (body.companyName ?? "").trim().replace(/\s+/g, " ");
   const email = (body.email ?? "").trim().toLowerCase();

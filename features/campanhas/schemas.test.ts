@@ -74,3 +74,11 @@ describe("corpos", () => {
     expect(formularioDaPlanilha.parse({ arquivo: new File(["x"], "b.xlsx"), confirmar: "1" })).toMatchObject({ confirmar: true, nome: "Planilha b.xlsx" });
   });
 });
+
+describe("webhook do Apify (modo sombra)", () => {
+  it("a busca que nós montamos bate; outra coisa é diferença (só para o log)", async () => {
+    const { consultaDoWebhookDoApify } = await import("./schemas");
+    expect(consultaDoWebhookDoApify.safeParse({ busca: "00000000-0000-4000-8000-000000000001" }).success).toBe(true);
+    expect(consultaDoWebhookDoApify.safeParse({}).success).toBe(false);
+  });
+});
