@@ -8,6 +8,7 @@ import { agendaAtivaDoTenant } from "@/lib/agenda-servidor";
 import { normalizarConfigDaAgenda, problemaDosServicos } from "@/lib/agenda";
 import { compilePersona, normalizarRegras, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
+import { envDoServidor } from "@/lib/env";
 
 // Bancada de teste (playground), dono-only. Fala direto com o cérebro REAL
 // (processTurn, o mesmo do /api/agent) em modo dryRun: não persiste nada (nem
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
     personaOverride = r.persona;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "o agente precisa de OPENAI_API_KEY configurada no servidor" },

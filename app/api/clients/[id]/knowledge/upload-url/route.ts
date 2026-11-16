@@ -4,6 +4,7 @@ import { corpoDoEnvioDeArquivo } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { KNOWLEDGE_MAX_BYTES, KNOWLEDGE_MAX_LABEL } from "@/lib/crm";
 import { EMBEDDING_MODEL } from "@/lib/rag";
+import { envDoServidor } from "@/lib/env";
 
 // Passo 1 do upload da base de conhecimento (padrão gatekeeper). Cria o registro
 // do documento (status processing) e devolve uma URL assinada para o navegador
@@ -28,7 +29,7 @@ export async function POST(
   if ("erro" in r) return r.erro;
 
   // Sem a chave, o /process não conseguiria embedar; falha cedo.
-  if (!process.env.OPENAI_API_KEY) {
+  if (!envDoServidor("OPENAI_API_KEY")) {
     return NextResponse.json(
       { error: "a base de conhecimento precisa de OPENAI_API_KEY no servidor" },
       { status: 501 }

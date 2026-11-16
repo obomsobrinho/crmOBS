@@ -13,6 +13,7 @@ import {
   logoutInstance,
   setWebhook,
 } from "@/lib/evolution";
+import { envDoServidor } from "@/lib/env";
 
 /**
  * Número de WhatsApp em só dígitos, com DDI. Aceita o que a pessoa digitar
@@ -40,7 +41,7 @@ export async function POST(
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  const webhookUrl = process.env.N8N_BOT_WEBHOOK_URL;
+  const webhookUrl = envDoServidor("N8N_BOT_WEBHOOK_URL");
   if (!webhookUrl) {
     return NextResponse.json(
       { error: "N8N_BOT_WEBHOOK_URL não configurado" },

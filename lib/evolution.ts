@@ -1,9 +1,10 @@
 import "server-only";
+import { envDoServidor } from "@/lib/env";
 
 // Wrapper mínimo da Evolution API (server-only). Usa a apikey GLOBAL, que
 // autoriza operações em qualquer instância.
-const BASE = process.env.EVOLUTION_API_URL;
-const KEY = process.env.EVOLUTION_API_KEY;
+const BASE = envDoServidor("EVOLUTION_API_URL");
+const KEY = envDoServidor("EVOLUTION_API_KEY");
 
 function ensureEnv() {
   if (!BASE || !KEY) {

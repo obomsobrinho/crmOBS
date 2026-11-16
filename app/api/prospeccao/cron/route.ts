@@ -3,6 +3,7 @@ import { agoraMs } from "@/lib/periodo";
 import { tickProspeccao } from "@/features/campanhas/server/cron";
 import { segredoConfere } from "@/lib/segredo";
 import { createServiceClient } from "@/lib/supabase/service";
+import { envDoServidor } from "@/lib/env";
 
 export const maxDuration = 120;
 
@@ -12,7 +13,7 @@ export const maxDuration = 120;
 // de admin. O que cada execução faz está em `features/campanhas/server/cron.ts`.
 export async function GET(req: Request) {
   const recebido = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!segredoConfere(recebido, process.env.CRON_SECRET)) {
+  if (!segredoConfere(recebido, envDoServidor("CRON_SECRET"))) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
   try {

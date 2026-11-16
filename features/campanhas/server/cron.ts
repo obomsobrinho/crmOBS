@@ -20,6 +20,7 @@ import {
 } from "../regras";
 import { partesDaLinha } from "@/lib/resposta-automatica";
 import type { Supa } from "@/lib/supabase/tipos";
+import { envDoServidor } from "@/lib/env";
 
 // O CRON DA PROSPECÇÃO (docs/plano-campanhas.md, seção 5.2): `GET
 // /api/prospeccao/cron` a cada 5 minutos, chamado pelo pg_cron do Supabase (D3:
@@ -137,7 +138,7 @@ async function chamar(p: PromiseLike<{ error: unknown }>) {
 }
 
 async function fecharBuscasPresas(svc: Supa, agora: number) {
-  if (!process.env.APIFY_TOKEN) return;
+  if (!envDoServidor("APIFY_TOKEN")) return;
   const { data, error } = await svc
     .from("prospeccao_buscas")
     .select("id, criada_em")

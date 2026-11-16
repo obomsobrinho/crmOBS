@@ -1,3 +1,4 @@
+import { envDoServidor } from "@/lib/env";
 // QUEM É ADMIN (decisão do dono, 29/09/2026, docs/proximos-passos.md, seção Admin).
 //
 // Módulo PURO: o `proxy.ts`, a página `/admin`, as rotas `/api/admin/*` e o
@@ -27,7 +28,7 @@ export function ehAdmin(
 
 /** A variável do servidor (lista separada por vírgula). Nunca `NEXT_PUBLIC`. */
 export function listaDeAdmins(): string {
-  return process.env.ADMIN_USER_IDS ?? "";
+  return envDoServidor("ADMIN_USER_IDS") ?? "";
 }
 
 /** `ehAdmin` contra a lista do ambiente (proxy, página e rotas usam esta). */

@@ -1,8 +1,9 @@
 import { createBrowserClient } from "@supabase/ssr";
 import type { DatabaseApp } from "@/lib/supabase/schema";
+import { envPublico } from "@/lib/env";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const url = envPublico.supabaseUrl;
+const anonKey = envPublico.supabaseAnonKey;
 
 if (!url || !anonKey) {
   throw new Error(

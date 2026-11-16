@@ -3,6 +3,7 @@ import { lerCorpo, sessaoDaRota } from "@/lib/rota";
 import { corpoDoDocumento } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extractText, chunkText, embedTexts, toVector, RagError } from "@/lib/rag";
+import { envDoServidor } from "@/lib/env";
 
 // Passo 2 do upload da base de conhecimento. Baixa o arquivo do Storage (já subido
 // pelo navegador via URL assinada), extrai o texto, quebra em trechos, gera os
@@ -25,7 +26,7 @@ export async function POST(
   const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento", ativa: true });
   if ("erro" in r) return r.erro;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "a base de conhecimento precisa de OPENAI_API_KEY no servidor" },

@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { segredoConfere } from "@/lib/segredo";
 import { conferirNaSombra } from "@/lib/rota";
 import { parametroDaInstancia } from "@/features/conversas/schemas";
+import { envDoServidor } from "@/lib/env";
 
 // Descobre o tenant a partir do instanceName do payload da Evolution. Protegido
 // por segredo compartilhado.
@@ -14,7 +15,7 @@ export async function GET(
   req: NextRequest,
   ctx: RouteContext<"/api/clients/by-instance/[instanceName]">
 ) {
-  const secret = process.env.N8N_LOOKUP_SECRET;
+  const secret = envDoServidor("N8N_LOOKUP_SECRET");
   if (!segredoConfere(req.headers.get("x-lookup-secret"), secret)) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }

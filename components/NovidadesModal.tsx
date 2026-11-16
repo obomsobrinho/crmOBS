@@ -21,6 +21,7 @@ import { CHAVE_DA_NOVIDADE_VISTA, notaAtual, type Novidade } from "@/lib/novidad
 // - `?novidades=ver` mostra a nota atual para qualquer conta, e fechar NÃO grava.
 // - `?novidades=zerar` apaga o "já vi" deste usuário (a regra volta a decidir).
 
+// eslint-disable-next-line no-restricted-properties -- NODE_ENV stays literal: the bundler folds it and drops dev-only code (B8, lib/env.ts)
 const EM_DEV = process.env.NODE_ENV !== "production";
 
 export default function NovidadesModal({

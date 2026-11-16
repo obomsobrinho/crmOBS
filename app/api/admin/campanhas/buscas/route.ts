@@ -6,6 +6,7 @@ import { consultaDasBuscas, corpoDaNovaBusca } from "@/features/campanhas/schema
 import { buscasParaEscolher, criarBusca, falhou, paginaDeBuscas } from "@/features/campanhas/server/campanhas";
 import { fonteApify } from "@/features/campanhas/server/apify";
 import { createServiceClient } from "@/lib/supabase/service";
+import { envDoServidor } from "@/lib/env";
 
 // GET: a tabela de buscas (10 por página, busca por segmento ou cidade, filtro por
 // situação), ou, com `?escolher=1`, as buscas do seletor do assistente.
@@ -32,8 +33,8 @@ export const POST = rotaDoAdmin(
     const lido = await lerCorpo(req, corpoDaNovaBusca, { motivo: true });
     if ("erro" in lido) return lido.erro;
     const opcoes = lido.dados;
-    const segredo = process.env.APIFY_WEBHOOK_SECRET;
-    if (!process.env.APIFY_TOKEN || !segredo) {
+    const segredo = envDoServidor("APIFY_WEBHOOK_SECRET");
+    if (!envDoServidor("APIFY_TOKEN") || !segredo) {
       return erroDaRota(503, "A fonte de leads ainda não está configurada no servidor.", "sem_configuracao");
     }
     const id = randomUUID();

@@ -6,6 +6,7 @@ import { segredoConfere } from "@/lib/segredo";
 import { conferirNaSombra } from "@/lib/rota";
 import { consultaDoWebhookDoApify } from "@/features/campanhas/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
+import { envDoServidor } from "@/lib/env";
 
 // O WEBHOOK DA FONTE DE LEADS (Apify, fim de uma execução). Fora de `/api/admin`
 // porque o `proxy.ts` responde 404 ali a quem não tem sessão de admin. Confere o
@@ -14,7 +15,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 // corpo do webhook não decide nada. Idempotente (webhook repetido, ou o cron ao
 // mesmo tempo): uma busca que já saiu de "buscando" volta como está.
 export async function POST(req: Request) {
-  if (!segredoConfere(req.headers.get("x-apify-secret"), process.env.APIFY_WEBHOOK_SECRET)) {
+  if (!segredoConfere(req.headers.get("x-apify-secret"), envDoServidor("APIFY_WEBHOOK_SECRET"))) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
   const consulta = Object.fromEntries(new URL(req.url).searchParams);

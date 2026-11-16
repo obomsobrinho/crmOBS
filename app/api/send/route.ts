@@ -6,6 +6,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
 import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 import { telefoneImpossivel } from "@/lib/avisos";
+import { envDoServidor } from "@/lib/env";
 
 // Único bucket de que esta rota assina arquivo (o privado de mídia do WhatsApp).
 const BUCKET_MIDIA = "whatsapp-media";
@@ -61,7 +62,7 @@ async function assumirConversa(
 // Multi-tenant: anexa a `instance` do tenant logado para o n8n rotear o envio
 // pela instância Evolution correta.
 export async function POST(req: Request) {
-  const webhookUrl = process.env.N8N_SEND_WEBHOOK_URL;
+  const webhookUrl = envDoServidor("N8N_SEND_WEBHOOK_URL");
   if (!webhookUrl) {
     return NextResponse.json(
       { error: "N8N_SEND_WEBHOOK_URL não configurado" },

@@ -1,6 +1,7 @@
 import "server-only";
 import { ACTOR_APIFY, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../apify-campos";
 import type { FonteDeLeads } from "../fonte-de-leads";
+import { envDoServidor } from "@/lib/env";
 
 // A FONTE DE LEADS DE HOJE: o actor `compass/crawler-google-places` no Apify
 // (docs/plano-campanhas.md, seção 6). Só a chamada HTTP mora aqui; os campos e a
@@ -11,7 +12,7 @@ const API = "https://api.apify.com/v2";
 const ACTOR_NA_URL = ACTOR_APIFY.replace("/", "~");
 
 async function apify(caminho: string, init: RequestInit = {}): Promise<unknown> {
-  const token = process.env.APIFY_TOKEN;
+  const token = envDoServidor("APIFY_TOKEN");
   if (!token) throw new Error("APIFY_TOKEN ausente");
   const res = await fetch(`${API}${caminho}`, {
     ...init,

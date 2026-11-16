@@ -217,6 +217,30 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // process.env only in lib/env.ts (docs/plano-dados-e-estado.md, 2.9, enforced since
+  // 16/11/2026 against the Vercel list). ERROR: zero occurrences in app code.
+  // Tests, scripts and configs read their own variables and stay out.
+  {
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+      "features/**/*.{ts,tsx}",
+      "proxy.ts",
+    ],
+    ignores: ["lib/env.ts", "**/*.test.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "process",
+          property: "env",
+          message:
+            "Read environment variables only through lib/env.ts (envDoServidor, envPublico; process.env.NODE_ENV stays literal with a disable comment). A new variable goes into its lists first.",
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

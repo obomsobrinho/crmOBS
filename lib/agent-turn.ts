@@ -87,6 +87,7 @@ import {
   type MidiaDoTurno,
 } from "@/lib/midias";
 import { ehMidiaDaIa, MIDIA_DA_IA } from "@/lib/mensagem";
+import { envDoServidor } from "@/lib/env";
 
 // Orquestração de um turno do agente. STATELESS por turno; reaproveitável pelas
 // duas rotas: /api/agent (n8n, autenticado pelo segredo) e a bancada de teste
@@ -1064,7 +1065,7 @@ async function midiaParaEnviar(
  * o aviso sai sem a linha "Abrir" em vez de apontar para lugar nenhum.
  */
 function linkDoPedido(pedidoId: number | null): string | null {
-  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  const host = envDoServidor("VERCEL_PROJECT_PRODUCTION_URL")?.trim();
   if (!host) return null;
   const base = `https://${host.replace(/^https?:\/\//, "")}/pedidos`;
   return pedidoId ? `${base}?abrir=${pedidoId}` : base;

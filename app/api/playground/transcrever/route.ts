@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { erroDaRota, sessaoDaRota } from "@/lib/rota";
 import { formularioDoAudio } from "@/lib/agent-schemas";
+import { envDoServidor } from "@/lib/env";
 
 // Transcreve o áudio gravado na bancada de teste (26/09/2026). Dono-only, como o
 // `/api/playground`.
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   const r = await sessaoDaRota({ dono: "acesso negado", ativa: true });
   if ("erro" in r) return r.erro;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "transcrição indisponível neste ambiente" },

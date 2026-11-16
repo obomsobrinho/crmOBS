@@ -5,6 +5,7 @@ import { segredoConfere } from "@/lib/segredo";
 import type { Json } from "@/lib/database.types";
 import { esquemaDoEventoAsaas } from "@/lib/asaas-esquema";
 import { conferirNaSombra } from "@/lib/rota";
+import { envDoServidor } from "@/lib/env";
 
 // Webhook do Asaas: é ele que muda o estado da assinatura de um tenant.
 //
@@ -36,7 +37,7 @@ interface EventoAsaas {
 }
 
 export async function POST(req: NextRequest) {
-  const esperado = process.env.ASAAS_WEBHOOK_TOKEN;
+  const esperado = envDoServidor("ASAAS_WEBHOOK_TOKEN");
   if (!esperado) {
     console.error("webhook do Asaas chamado sem ASAAS_WEBHOOK_TOKEN configurado");
     return NextResponse.json({ error: "não configurado" }, { status: 500 });

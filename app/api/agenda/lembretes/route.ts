@@ -10,6 +10,7 @@ import { horarioCadastrado } from "@/lib/horarios";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
 import { nomeDoContato } from "@/lib/inbox";
 import { LEMBRETE } from "@/lib/mensagem";
+import { envDoServidor } from "@/lib/env";
 
 // LEMBRETE DA AGENDA (decisões do dono, 28/10/2026): UMA execução por dia, às
 // 9h de São Paulo, pelo Vercel Cron (`vercel.json`, "0 12 * * *" em UTC; no
@@ -61,7 +62,7 @@ interface Fila {
 
 export async function GET(req: Request) {
   const recebido = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!segredoConfere(recebido, process.env.CRON_SECRET)) {
+  if (!segredoConfere(recebido, envDoServidor("CRON_SECRET"))) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
   const t0 = Date.now();
@@ -135,7 +136,7 @@ export async function GET(req: Request) {
     const proxima = new URL("/api/agenda/lembretes?continuacao=1", req.url).toString();
     after(async () => {
       try {
-        await fetch(proxima, { headers: { authorization: `Bearer ${process.env.CRON_SECRET ?? ""}` } });
+        await fetch(proxima, { headers: { authorization: `Bearer ${envDoServidor("CRON_SECRET") ?? ""}` } });
       } catch (e) {
         console.error("lembretes: falha ao chamar a continuação:", e);
       }
