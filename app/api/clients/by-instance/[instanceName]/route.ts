@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { segredoConfere } from "@/lib/segredo";
+import { conferirNaSombra } from "@/lib/rota";
+import { parametroDaInstancia } from "@/features/conversas/schemas";
 
 // Descobre o tenant a partir do instanceName do payload da Evolution. Protegido
 // por segredo compartilhado.
@@ -18,6 +20,8 @@ export async function GET(
   }
 
   const { instanceName } = await ctx.params;
+  // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema, nunca recusa.
+  conferirNaSombra(parametroDaInstancia, { instanceName }, "/api/clients/by-instance");
 
   const svc = createServiceClient();
   const { data, error } = await svc

@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { segredoConfere } from "@/lib/segredo";
 import { caminhoDaMidia, lerPedidoDeMidia } from "@/lib/midia-recebida";
+import { conferirNaSombra } from "@/lib/rota";
+import { corpoDaMidiaRecebida } from "@/features/conversas/schemas";
 
 // Chamado pelo n8n quando chega mídia do contato. Devolve o caminho no bucket
 // privado whatsapp-media, que o n8n grava em chat_messages.media_url (o CRM
@@ -32,6 +34,9 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ path: null, type: null });
   }
+
+  // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema, nunca recusa.
+  conferirNaSombra(corpoDaMidiaRecebida, body, "/api/inbound-media");
 
   const pedido = lerPedidoDeMidia(body);
   if (pedido.modo === "nada") {

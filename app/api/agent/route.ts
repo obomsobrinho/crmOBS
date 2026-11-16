@@ -2,6 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { segredoConfere } from "@/lib/segredo";
+import { conferirNaSombra } from "@/lib/rota";
+import { corpoDoAgente } from "@/features/conversas/schemas";
 
 // Cérebro do agente, chamado pelo n8n (que virou só o cano). STATELESS por turno.
 // Recebe { client_id, phone, instance, message, nomewpp? }, e a orquestração
@@ -40,6 +42,9 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
+
+  // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema, nunca recusa.
+  conferirNaSombra(corpoDoAgente, body, "/api/agent");
 
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   const phone = typeof body.phone === "string" ? body.phone : "";
