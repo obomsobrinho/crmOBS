@@ -17,6 +17,9 @@
 //  5. Evolution webhook (27/10/2026): lib/evolution.ts asks for `base64: true` and
 //     never `base64: false` (n8n reads media from `data.message.base64`; with false,
 //     no audio, image or document of a CRM-created instance ever reached the AI).
+//  6. Every app/api route that reads a body, form or query crosses a schema
+//     (lerCorpo, lerConsulta, lerFormulario, conferirNaSombra or a .safeParse);
+//     a route that reads no input is in ISENTAS with the reason.
 import fs from "node:fs";
 import path from "node:path";
 
@@ -147,9 +150,50 @@ const varrer = (dir) => {
       erros.push(`${rel}: control character in a text file (a regex \\b written by a script becomes backspace)`);
   }
 };
-for (const d of ["app", "components", "lib", "e2e", "scripts", "docs", "supabase", ".claude/rules"]) {
+for (const d of ["app", "components", "features", "lib", "e2e", "scripts", "docs", "supabase", ".claude/rules"]) {
   if (fs.existsSync(path.join(raiz, d))) varrer(d);
 }
+
+// 6. Toda rota que lê entrada cruza um esquema (passo 5 de docs/plano-dados-e-estado.md,
+// 2.9): uma rota de `app/api` que lê corpo, formulário ou query precisa usar `lerCorpo`,
+// `lerConsulta`, `lerFormulario`, `conferirNaSombra` (máquina, modo sombra) ou um
+// `.safeParse(` de esquema. Rota que não lê entrada nenhuma (só a sessão e o `[id]` da
+// rota) fica na lista de isentas, com o motivo; uma isenta que passar a ler entrada, ou
+// uma rota nova sem esquema, reprova aqui.
+const ISENTAS = new Map([
+  ["app/api/admin/campanhas/buscas/[id]/pontos/route.ts", "GET só com o id da rota, conferido no handler"],
+  ["app/api/admin/campanhas/buscas/[id]/route.ts", "GET e DELETE só com o id da rota, conferido no handler"],
+  ["app/api/admin/campanhas/conexoes/route.ts", "GET sem entrada"],
+  ["app/api/admin/campanhas/totais/route.ts", "GET sem entrada"],
+  ["app/api/admin/empresas/[id]/atendimento/route.ts", "GET só com o id da rota (rotaDoAdmin confere o uuid)"],
+  ["app/api/admin/empresas/[id]/cobrancas/route.ts", "GET só com o id da rota (rotaDoAdmin confere o uuid)"],
+  ["app/api/admin/empresas/[id]/exportar/route.ts", "GET só com o id da rota (rotaDoAdmin confere o uuid)"],
+  ["app/api/admin/empresas/[id]/whatsapp/route.ts", "GET só com o id da rota (rotaDoAdmin confere o uuid)"],
+  ["app/api/clients/[id]/disconnect-whatsapp/route.ts", "POST sem corpo; o id da rota é conferido por sessaoDaRota"],
+  ["app/api/clients/[id]/notify-target/teste/route.ts", "POST sem corpo; o destino vem do banco"],
+  ["app/api/clients/[id]/whatsapp-status/route.ts", "GET sem entrada; o id da rota é conferido por sessaoDaRota"],
+  ["app/api/contacts/fotos/route.ts", "POST sem corpo"],
+  ["app/api/fotos/[...path]/route.ts", "GET só com o caminho da rota, conferido pelo prefixo {client_id}/"],
+  ["app/api/prospeccao/cron/route.ts", "sem corpo e sem query, só o Bearer do cron"],
+]);
+const LE_ENTRADA = /\b(req|request)\.(json|formData|text)\(|searchParams|nextUrl/;
+const TEM_ESQUEMA = /\b(lerCorpo|lerConsulta|lerFormulario|conferirNaSombra)\(|\.safeParse\(/;
+const rotas = [];
+const acharRotas = (dir) => {
+  for (const ent of fs.readdirSync(path.join(raiz, dir), { withFileTypes: true })) {
+    const rel = `${dir}/${ent.name}`;
+    if (ent.isDirectory()) acharRotas(rel);
+    else if (ent.name === "route.ts") rotas.push(rel);
+  }
+};
+acharRotas("app/api");
+for (const r of rotas) {
+  const texto = ler(r);
+  if (TEM_ESQUEMA.test(texto)) continue;
+  if (LE_ENTRADA.test(texto)) erros.push(`${r}: reads a body, form or query without a schema (lerCorpo, lerConsulta, lerFormulario, conferirNaSombra)`);
+  else if (!ISENTAS.has(r)) erros.push(`${r}: route without a schema and not in the exempt list (add it to ISENTAS with the reason)`);
+}
+for (const r of ISENTAS.keys()) if (!rotas.includes(r)) erros.push(`${r}: in the exempt list but does not exist`);
 
 for (const e of erros) console.error(`erro: ${e}`);
 console.log(`checagens: ${erros.length} erro(s)`);
