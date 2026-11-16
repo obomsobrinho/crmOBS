@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoConectar } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { TablesUpdate } from "@/lib/database.types";
 import { buildFallbackPersona } from "@/lib/agent-prompt";
@@ -51,12 +52,10 @@ export async function POST(
   const instanceName = mine.evolution_instance ?? `crm_${id.replace(/-/g, "").slice(0, 12)}`;
 
   // Corpo opcional: sem ele é o fluxo de sempre, pelo QR.
-  let corpo: { number?: unknown } = {};
-  try {
-    corpo = await req.json();
-  } catch {
-    // sem corpo = QR
-  }
+  // Sem corpo (ou corpo torto) = QR, como antes (`corpoDoConectar`, `lib/agent-schemas.ts`).
+  const lido = await lerCorpo(req, corpoDoConectar, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const corpo = lido.dados;
   const pedeNumero = corpo.number !== undefined && corpo.number !== null && corpo.number !== "";
   const number = pedeNumero ? normalizarNumero(corpo.number) : null;
   if (pedeNumero && !number) {

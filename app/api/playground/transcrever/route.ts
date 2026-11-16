@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { erroDaRota, sessaoDaRota } from "@/lib/rota";
+import { formularioDoAudio } from "@/lib/agent-schemas";
 
 // Transcreve o áudio gravado na bancada de teste (26/09/2026). Dono-only, como o
 // `/api/playground`.
@@ -33,17 +34,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let audio: File | null = null;
+  // O formulário torto continua dizendo "envio inválido"; o campo `audio` cruza o esquema
+  // (`formularioDoAudio`, `lib/agent-schemas.ts`), e o tamanho (413) segue abaixo.
+  let form: FormData;
   try {
-    const form = await req.formData();
-    const f = form.get("audio");
-    if (f instanceof File) audio = f;
+    form = await req.formData();
   } catch {
     return NextResponse.json({ error: "envio inválido" }, { status: 400 });
   }
-  if (!audio || audio.size === 0) {
-    return NextResponse.json({ error: "áudio vazio" }, { status: 400 });
-  }
+  const lido = formularioDoAudio.safeParse({ audio: form.get("audio") });
+  if (!lido.success) return erroDaRota(400, "áudio vazio", "entrada_invalida");
+  const audio = lido.data.audio;
   if (audio.size > MAX_BYTES) {
     return NextResponse.json({ error: "áudio longo demais" }, { status: 413 });
   }

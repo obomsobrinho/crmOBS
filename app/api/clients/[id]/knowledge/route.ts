@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoDocumento } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Base de conhecimento: remover um documento. O upload virou dois passos
@@ -17,12 +18,10 @@ export async function DELETE(
   const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento", ativa: true });
   if ("erro" in r) return r.erro;
 
-  let body: { document_id?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`); o resto é conferido abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoDocumento, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const documentId = typeof body.document_id === "string" ? body.document_id : "";
   if (!documentId) {
     return NextResponse.json({ error: "document_id obrigatório" }, { status: 400 });

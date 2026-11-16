@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoEnvioDeArquivo } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // URL assinada para o navegador subir mídia DIRETO pro bucket whatsapp-media
@@ -25,12 +26,10 @@ export async function POST(
   const r = await sessaoDaRota({ id, ativa: true });
   if ("erro" in r) return r.erro;
 
-  let body: { filename?: string; mime?: string; size?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`); o resto é conferido abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoEnvioDeArquivo, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const filename = typeof body.filename === "string" ? body.filename : "";
   const size = typeof body.size === "number" ? body.size : 0;
   if (!filename) {
