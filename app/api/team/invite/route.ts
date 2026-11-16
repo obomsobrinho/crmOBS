@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoConvite } from "@/lib/team-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { invalidarMembros } from "@/lib/team-servidor";
 import {
@@ -16,28 +17,16 @@ import {
 //   define a própria pelo link do e-mail (fluxo /auth/confirm -> /definir-senha).
 // Write via service_role: user_clients não tem policy de INSERT para
 // authenticated (o browser afetaria 0 linhas em silêncio).
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(req: NextRequest) {
   const r = await sessaoDaRota({ dono: "só o dono pode convidar membros", ativa: true, revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: { email?: string; role?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
-  const email = body.email?.trim().toLowerCase() ?? "";
-  if (!EMAIL_RE.test(email)) {
-    return NextResponse.json({ error: "e-mail inválido" }, { status: 400 });
-  }
-  if (body.role !== "dono" && body.role !== "atendente") {
-    return NextResponse.json({ error: "papel inválido" }, { status: 400 });
-  }
-  const role = body.role;
+  // O corpo cruza o esquema (`lib/team-schemas.ts`): as mesmas frases de antes.
+  const lido = await lerCorpo(req, corpoDoConvite, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const { email, role } = lido.dados;
 
   const svc = createServiceClient();
 

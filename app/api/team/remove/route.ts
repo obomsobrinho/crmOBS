@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoRemover } from "@/lib/team-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { invalidarMembros } from "@/lib/team-servidor";
 
@@ -13,17 +14,10 @@ export async function POST(req: NextRequest) {
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: { userId?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
-  const userId = body.userId?.trim();
-  if (!userId) {
-    return NextResponse.json({ error: "userId é obrigatório" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/team-schemas.ts`): as mesmas frases de antes.
+  const lido = await lerCorpo(req, corpoDoRemover, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const { userId } = lido.dados;
   if (userId === mine.userId) {
     return NextResponse.json(
       { error: "você não pode remover a si mesmo" },
