@@ -55,6 +55,27 @@ function mediaTypeFromMime(mime: string): OutgoingMedia["type"] {
   return "document";
 }
 
+const chaveDoRascunho = (conversa: string) => `rascunho:${conversa}`;
+
+function lerRascunho(conversa: string | undefined): string {
+  if (!conversa || typeof window === "undefined") return "";
+  try {
+    return window.sessionStorage.getItem(chaveDoRascunho(conversa)) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function guardarRascunho(conversa: string | undefined, texto: string): void {
+  if (!conversa || typeof window === "undefined") return;
+  try {
+    if (texto) window.sessionStorage.setItem(chaveDoRascunho(conversa), texto);
+    else window.sessionStorage.removeItem(chaveDoRascunho(conversa));
+  } catch {
+    // Armazenamento cheio ou bloqueado: o rascunho só não sobrevive ao recarregar.
+  }
+}
+
 export default function MessageComposer({
   onSend,
   onSendMedia,
@@ -67,6 +88,7 @@ export default function MessageComposer({
   clientId,
   readOnly,
   atende,
+  rascunhoDe,
 }: {
   onSend: (text: string) => void | Promise<void>;
   onSendMedia?: (media: OutgoingMedia) => void | Promise<void>;
@@ -100,13 +122,23 @@ export default function MessageComposer({
    * lugar de Ana"). O desktop segue com o aviso de sempre.
    */
   atende?: { quem: "ia" | "ninguem" | "voce" | "outro"; nome?: string };
+  /**
+   * A conversa dona do RASCUNHO (passo 4 de docs/plano-dados-e-estado.md, 2.9): o que a
+   * pessoa está digitando fica guardado nesta aba, por conversa, e volta ao campo se a
+   * tela recarregar ou a sessão vencer e ela entrar de novo. Ausente = sem rascunho.
+   */
+  rascunhoDe?: string;
 }) {
   const supabase = createClient();
   // Com pedido aberto a caixa ABRE em orientar: é a resposta que o pedido espera.
   // Quem troca de pedido remonta a caixa (`key` no Thread), e o modo volta a ele.
   const [mode, setMode] = useState<Mode>(pedido ? "orientar" : "responder");
   const [resolvendo, setResolvendo] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setTextCru] = useState(() => lerRascunho(rascunhoDe));
+  const setText = (v: string) => {
+    setTextCru(v);
+    guardarRascunho(rascunhoDe, v);
+  };
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [attachError, setAttachError] = useState<string | null>(null);

@@ -14,17 +14,19 @@ const ATRASO_RSC_MS = 3_000;
 const B1_MS = 300;
 
 /** Rotas com moldura própria (passo 0). Perfil não tem item no menu do computador. */
-const ROTAS_COM_MOLDURA = ["/pipeline", "/pedidos", "/contatos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
+const ROTAS_COM_MOLDURA = ["/inbox", "/pipeline", "/pedidos", "/contatos", "/agenda", "/painel", "/equipe", "/agente", "/campanhas"];
 
 /** Áreas migradas (o bloco "State" de .claude/rules/dados-estado-desempenho.md). */
 // Campanhas fica fora por decisão do dono (D16): continua lendo no servidor.
-const AREAS_MIGRADAS: string[] = ["/pedidos", "/contatos", "/pipeline", "/painel", "/agenda"];
+const AREAS_MIGRADAS: string[] = ["/pedidos", "/contatos", "/pipeline", "/painel", "/agenda", "/inbox"];
 
 /**
  * Área migrada pré-carrega a rota INTEIRA na intenção (`LinkNaIntencao`): o clique
  * mostra a tela de uma vez, sem passar pela moldura. Ela conta como "apareceu" aqui.
  */
 const TELA_PRONTA: Record<string, string> = {
+  // O layout de Conversas não lê nada: a coluna da lista (com o período) aparece no clique.
+  "/inbox": '[data-slot="inbox-periodo"]',
   "/pedidos": '[data-slot="pedidos-coluna-lista"]',
   // O layout de Contatos não lê nada: ele é a moldura (o cabeçalho da lista aparece no clique).
   "/contatos": 'section[aria-label="Contatos"]',

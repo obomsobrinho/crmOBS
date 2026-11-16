@@ -1,7 +1,7 @@
 "use client";
 
 import AvatarContato from "@/components/AvatarContato";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Search } from "lucide-react";
@@ -23,8 +23,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { clienteDoNavegador as createClient } from "@/features/conversas/api/navegador";
-import { foneDoEvento, useCanalTenant } from "@/lib/use-canal-ao-vivo";
+import { equipeDoNavegador, fonteDeConversasDoNavegador } from "../api/navegador";
+import type { QuemLe, RecorteDaLista } from "../api/chaves";
+import { useContagensDeConversas, useEquipeDeConversas, useListaDeConversas } from "../hooks/useConversas";
+import { useComRecorte, useConversasNaUrl } from "./na-url";
 import { formatEspera, formatTime, prettyPhone } from "@/lib/format";
 import {
   JANELAS,
@@ -32,24 +34,13 @@ import {
   ORDEM_JANELAS,
   type JanelaKey,
 } from "@/lib/inbox";
-import {
-  PAGINA_INBOX,
-  cursorDe,
-  encaixar,
-  foraDaLista,
-  inicioDaJanela,
-  type Contagens,
-  type ItemLista,
-} from "@/lib/inbox-lista";
+import type { Contagens, ItemLista } from "@/lib/inbox-lista";
 import {
   fonteDaMemoria,
-  fonteDoBanco,
   type FonteInbox,
-  type ParamsLista,
 } from "@/features/conversas/api/fonte";
 import { useDebounce } from "@/lib/use-debounce";
-import { agoraMs } from "@/lib/periodo";
-import { fetchMembers, memberName, type Member } from "@/lib/team";
+import { memberName } from "@/lib/team";
 import { quemAtende } from "@/lib/crm";
 import { ouvirIa } from "@/lib/ia-bus";
 import QuemAtendeBadge, { quemAtendeTexto } from "@/components/QuemAtendeBadge";
@@ -179,8 +170,8 @@ export default function ContactSidebar({
   myUserId,
   numeroAvisos = null,
 }: {
-  /** A primeira página e as contagens, que o servidor já buscou. */
-  inicial: { itens: ItemLista[]; contagens: Contagens; temMais: boolean };
+  /** Só do preview /design: a primeira página e as contagens já prontas. Na tela de verdade a lista lê pelo cache. */
+  inicial?: { itens: ItemLista[]; contagens: Contagens; temMais: boolean };
   /** Tenant logado. Sem ele (preview /design) a lista roda sobre `previewTodos`. */
   clientId?: string;
   previewTodos?: ItemLista[];
@@ -192,42 +183,43 @@ export default function ContactSidebar({
   /** Destino dos avisos: esse número nunca é conversa (lib/avisos.ts). */
   numeroAvisos?: string | null;
 }) {
-  const supabase = useMemo(() => createClient(), []);
   // DE ONDE VÊM AS CONVERSAS (01/10/2026, docs/plano-carregamento.md): o banco,
   // 10 por vez, com recorte, filtro e busca aplicados LÁ (`inbox_pagina`). O
   // preview /design usa a mesma regra sobre uma lista na memória.
   const fonte = useMemo<FonteInbox>(
     () =>
       clientId
-        ? fonteDoBanco(supabase, clientId)
-        : fonteDaMemoria(previewTodos ?? inicial.itens, previewMensagens),
-    [clientId, supabase, previewTodos, previewMensagens, inicial.itens]
+        ? fonteDeConversasDoNavegador(clientId)
+        : fonteDaMemoria(previewTodos ?? inicial?.itens ?? [], previewMensagens),
+    [clientId, previewTodos, previewMensagens, inicial]
   );
-  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+  const quem = useMemo<QuemLe>(() => ({ eu: myUserId ?? null, avisos: numeroAvisos }), [myUserId, numeroAvisos]);
 
-  const [items, setItems] = useState<ItemLista[]>(inicial.itens);
-  const [temMais, setTemMais] = useState(inicial.temMais);
-  const [contagens, setContagens] = useState<Contagens>(inicial.contagens);
-  const [carregando, setCarregando] = useState(false);
   // A chave da IA mudada AGORA nesta aba (ver `ouvirIa`), por cima do banco.
   const [iaLocal, setIaLocal] = useState<Record<string, string | null>>({});
-  const [membersById, setMembersById] = useState<Record<string, Member>>({});
-  const [query, setQuery] = useState("");
-  // A busca vai ao SERVIDOR, e só depois de a pessoa parar de digitar.
+  // O RECORTE NA URL (passo 4 de docs/plano-dados-e-estado.md): período, chip e busca
+  // ficam no endereço, então recarregar e voltar mantêm. A busca vai à URL a cada
+  // tecla e ao SERVIDOR só depois de a pessoa parar de digitar.
+  const url = useConversasNaUrl();
+  const comRecorte = useComRecorte();
+  const query = url.q;
+  const setQuery = (v: string) => void url.setU({ q: v || null });
   const busca = useDebounce(query.trim(), 300);
   // "unanswered" = a última mensagem foi do contato, ou seja, a bola está com a
   // gente. É o corte que o operador realmente faz ao abrir a tela.
-  const [filter, setFilter] = useState<FiltroKey>("all");
+  const filter: FiltroKey = url.filtro;
+  const setFilter = (k: FiltroKey) => void url.setU({ filtro: k === "all" ? null : k });
   // Recorte de TEMPO, que é outra pergunta que a de estado: os chips dizem "o
   // que está acontecendo", este diz "de quando". Abre em "Hoje" por decisão do
   // dono em 19/09/2026: a lista dele abria com 48 conversas e ele disse "não faz
   // sentido eu querer ficar vendo todas as conversas".
-  const [janela, setJanela] = useState<JanelaKey>(JANELA_PADRAO);
+  const janela: JanelaKey = url.periodo;
+  const setJanela = (j: JanelaKey) => void url.setU({ periodo: j === JANELA_PADRAO ? null : j });
   const pathname = usePathname();
   // No CELULAR a lista e a conversa não dividem a tela (plano do mobile, fase
   // 1): com uma conversa aberta a lista some, e quem volta é a seta do
   // cabeçalho da conversa. Por CSS (`max-md:hidden`) e não desmontando: o
-  // desktop continua com a MESMA árvore, e a assinatura de realtime não reabre.
+  // desktop continua com a MESMA árvore.
   const conversaAberta = !!activePhone || /^\/inbox\/[^/]+/.test(pathname);
   const {
     ref: chipsRef,
@@ -235,96 +227,21 @@ export default function ContactSidebar({
     onScroll: chipsOnScroll,
   } = useDissolverLateral<HTMLDivElement>();
 
-  // O recorte de agora. Fica também num ref, para o realtime e a rolagem lerem
-  // o valor atual sem reassinar o canal a cada troca de filtro.
-  const params = useMemo<ParamsLista>(
-    () => ({
-      inicio: inicioDaJanela(janela, agoraMs()),
-      filtro: filter,
-      busca,
-      eu: myUserId ?? null,
-      fora,
-    }),
-    [janela, filter, busca, myUserId, fora]
+  // OS DADOS, PELO CACHE (`hooks/useConversas.ts`): uma chave por recorte. Voltar a
+  // Conversas mostra a lista guardada na hora; reler (foco, reconexão, lista velha)
+  // busca de novo as linhas que já estão na tela, sem jogar a rolagem fora. O REALTIME
+  // é da ponte do layout (`api/ponte.ts`): o evento anota QUAL conversa mudou, a busca
+  // é da LINHA, encaixada no lugar (`encaixar`); aba escondida não busca nada.
+  const recorte = useMemo<RecorteDaLista>(() => ({ janela, filtro: filter, busca }), [janela, filter, busca]);
+  const ehPadrao = janela === JANELA_PADRAO && filter === "all" && busca === "";
+  const lista = useListaDeConversas(
+    fonte,
+    quem,
+    recorte,
+    inicial && ehPadrao ? { itens: inicial.itens, temMais: inicial.temMais } : undefined
   );
-  const paramsRef = useRef(params);
-  const estadoRef = useRef({ items, temMais });
-  useEffect(() => {
-    paramsRef.current = params;
-    estadoRef.current = { items, temMais };
-  });
-  // Resposta de um recorte antigo (a pessoa trocou de filtro no meio) é jogada fora.
-  const versaoRef = useRef(0);
-  const carregandoRef = useRef(false);
-
-  const recarregarContagens = useCallback(
-    async (p: ParamsLista) => {
-      try {
-        setContagens(await fonte.contagens({ inicio: p.inicio, eu: p.eu, fora: p.fora }));
-      } catch (e) {
-        console.error("contagens da lista:", e);
-      }
-    },
-    [fonte]
-  );
-
-  /**
-   * Busca de novo o que já está na tela (as N primeiras linhas), sem jogar a
-   * rolagem fora. É o "revalidar": depois de o realtime cair, ao voltar para a
-   * aba, ou ao trocar de recorte (aí com N = 1 página).
-   */
-  const revalidar = useCallback(
-    async (p: ParamsLista, quantas?: number) => {
-      const v = ++versaoRef.current;
-      const n = Math.min(50, Math.max(PAGINA_INBOX, quantas ?? estadoRef.current.items.length));
-      setCarregando(true);
-      try {
-        const [pagina] = await Promise.all([fonte.pagina(p, null, n), recarregarContagens(p)]);
-        if (v !== versaoRef.current) return;
-        setItems(pagina);
-        setTemMais(pagina.length === n);
-      } catch (e) {
-        console.error("lista de conversas:", e);
-      } finally {
-        if (v === versaoRef.current) setCarregando(false);
-      }
-    },
-    [fonte, recarregarContagens]
-  );
-
-  const carregarMais = useCallback(async () => {
-    const { items: atuais, temMais: mais } = estadoRef.current;
-    if (!mais || carregandoRef.current || atuais.length === 0) return;
-    const v = versaoRef.current;
-    carregandoRef.current = true;
-    setCarregando(true);
-    try {
-      const pagina = await fonte.pagina(paramsRef.current, cursorDe(atuais[atuais.length - 1]));
-      if (v !== versaoRef.current) return;
-      setItems((cur) => {
-        const vistos = new Set(cur.map((i) => i.phone));
-        return [...cur, ...pagina.filter((i) => !vistos.has(i.phone))];
-      });
-      setTemMais(pagina.length === PAGINA_INBOX);
-    } catch (e) {
-      console.error("mais conversas:", e);
-    } finally {
-      carregandoRef.current = false;
-      if (v === versaoRef.current) setCarregando(false);
-    }
-  }, [fonte]);
-
-  // Trocou recorte, filtro ou busca: primeira página do recorte novo. A
-  // PRIMEIRA renderização é pulada: ela já veio do servidor, com o recorte
-  // padrão, e buscar de novo seria jogar a consulta fora.
-  const primeiraRef = useRef(true);
-  useEffect(() => {
-    if (primeiraRef.current) {
-      primeiraRef.current = false;
-      return;
-    }
-    void revalidar(params, PAGINA_INBOX);
-  }, [params, revalidar]);
+  const contagens = useContagensDeConversas(fonte, quem, janela, janela === JANELA_PADRAO ? inicial?.contagens : undefined);
+  const { itens: items, temMais, carregando, carregarMais } = lista;
 
   // ROLAGEM INFINITA: um marcador no fim da lista; quando ele aparece, vem a
   // próxima página. O observador é refeito a cada página nova, e é isso que
@@ -343,82 +260,14 @@ export default function ContactSidebar({
     return () => obs.disconnect();
   }, [items.length, temMais, carregarMais]);
 
-  // REALTIME, LINHA A LINHA (01/10/2026). Antes cada mensagem que chegava fazia
-  // a lista buscar TUDO de novo (500 conversas, todos os contatos, 300 resumos),
-  // em toda aba aberta, inclusive escondida. Agora:
-  // 1. o canal só escuta o tenant (`client_id=eq.`), não o banco inteiro;
-  // 2. o evento só anota QUAL conversa mudou, e um debounce junta a rajada de
-  //    um lote (4 mensagens e a resposta viram uma busca por conversa);
-  // 3. a busca é da LINHA, com o recorte de agora, e ela é encaixada no lugar
-  //    (`encaixar`) sem tocar no resto;
-  // 4. aba escondida não busca nada: o canal (`useCanalTenant`) anota que ficou
-  //    para trás e revalida quando a pessoa voltar.
-  const pendentesRef = useRef<Set<string>>(new Set());
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const processarPendentes = useCallback(async () => {
-    const fones = [...pendentesRef.current];
-    pendentesRef.current.clear();
-    if (fones.length === 0) return;
-    const v = versaoRef.current;
-    const p = paramsRef.current;
-    try {
-      const linhas = await Promise.all(
-        fones.map((f) => fonte.linha(p, f).then((l) => [f, l] as const))
-      );
-      if (v !== versaoRef.current) return;
-      setItems((cur) =>
-        linhas.reduce((acc, [f, l]) => encaixar(acc, f, l, estadoRef.current.temMais), cur)
-      );
-      void recarregarContagens(p);
-    } catch (e) {
-      console.error("linha da lista:", e);
-    }
-  }, [fonte, recarregarContagens]);
-
-  const anotar = useCallback(
-    (phone: string | null | undefined) => {
-      if (!phone) return;
-      pendentesRef.current.add(phone);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => void processarPendentes(), 500);
-    },
-    [processarPendentes]
-  );
-
-  // ⚠️ O REALTIME CAI, E A LISTA PRECISA SABER DISSO (31/08/2026). A regra
-  // inteira (pular a primeira `SUBSCRIBED`, revalidar nas seguintes e ao voltar
-  // para a aba, no máximo a cada 10s) mora em `useCanalTenant`, que é por onde
-  // toda assinatura passa desde 02/10/2026. Daqui sai só o que é da lista: qual
-  // linha buscar e como revalidar o recorte inteiro.
-  useEffect(
-    () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    },
-    []
-  );
-  useCanalTenant({
-    clientId,
-    tabelas: ["conversations", "dados_cliente", "conversation_qualifications"],
-    aoEvento: (ev) => anotar(foneDoEvento(ev)),
-    revalidar: () => void revalidar(paramsRef.current),
-  });
-
   // A chave da IA virou AGORA, no cabeçalho da conversa. O realtime também vai
   // chegar, mas depois de ir ao Postgres e voltar; aqui a correção é imediata.
   useEffect(() => ouvirIa(({ phone, estado }) => {
     setIaLocal((m) => (m[phone] === estado ? m : { ...m, [phone]: estado }));
   }), []);
 
-  // Membros do time (para nomear o atendente de cada conversa). Mudam raramente;
-  // uma busca no mount basta (a navegação entre páginas revalida).
-  useEffect(() => {
-    if (!clientId) return;
-    void (async () => {
-      const list = await fetchMembers(supabase);
-      setMembersById(Object.fromEntries(list.map((m) => [m.userId, m])));
-    })();
-  }, [supabase, clientId]);
+  // Membros do time (para nomear o atendente de cada conversa). Mudam raramente.
+  const membersById = useEquipeDeConversas(clientId ? equipeDoNavegador : null);
 
   const contagem: Record<FiltroKey, number> = {
     all: contagens.todas,
@@ -712,7 +561,7 @@ export default function ContactSidebar({
                 )}
               <li>
                 <Link
-                  href={href}
+                  href={comRecorte(href)}
                   data-slot="inbox-item"
                   aria-current={active ? "page" : undefined}
                   className={cn(

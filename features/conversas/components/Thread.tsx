@@ -291,6 +291,7 @@ export default function Thread({
         <MessageComposer
           // Trocar de pedido remonta a caixa, e ela volta a abrir em orientar.
           key={pedidoAtual ? `pedido-${pedidoAtual.id}` : "normal"}
+          rascunhoDe={phone}
           pedido={
             pedidoAtual && !readOnly
               ? {

@@ -9,6 +9,7 @@ import { JANELA_PADRAO } from "@/lib/inbox";
 import { PAGINA_INBOX, inicioDaJanela, type ItemLista } from "@/lib/inbox-lista";
 import { fonteDaMemoria } from "@/features/conversas/api/fonte";
 import { agoraMs } from "@/lib/periodo";
+import { ProvedorDeDados } from "@/lib/query/provedor";
 import { diaIsoSP } from "@/lib/fuso";
 
 // Página de PREVIEW de design (só em desenvolvimento — bloqueada em produção
@@ -206,6 +207,7 @@ export default async function DesignPreview({
   ]);
 
   return (
+    <ProvedorDeDados identidade="design-conversas">
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       {/* Com conversa aberta o preview finge estar em /inbox/[id]: é o que
           esconde a barra de abas no celular, como na rota real. */}
@@ -286,5 +288,6 @@ export default async function DesignPreview({
         </div>
       </div>
     </div>
+    </ProvedorDeDados>
   );
 }

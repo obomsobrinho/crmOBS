@@ -1,6 +1,7 @@
 "use client";
 
 import { usePonteDeContatos } from "@/features/contatos/api/ponte";
+import { usePonteDeConversas } from "@/features/conversas/api/ponte";
 import { usePonteDePedidos } from "@/features/pedidos/api/ponte";
 import { usePonteDePipeline } from "@/features/pipeline/api/ponte";
 import { useSessao } from "@/lib/sessao";
@@ -24,5 +25,6 @@ export default function PonteDoRealtime() {
   usePonteDePedidos(sessao);
   usePonteDeContatos();
   usePonteDePipeline(sessao);
+  usePonteDeConversas(sessao);
   return null;
 }

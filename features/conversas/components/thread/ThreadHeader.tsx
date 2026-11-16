@@ -12,6 +12,7 @@ import {
   PanelRight,
 } from "lucide-react";
 import Link from "next/link";
+import { useComRecorte } from "../na-url";
 import AvatarMembro from "@/components/AvatarMembro";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,8 @@ export function ThreadHeader({
   contextOpen?: boolean;
 }) {
   const [assignOpen, setAssignOpen] = useState(false);
+  // A seta de voltar (celular) leva o recorte da lista junto: período, chip e busca.
+  const comRecorte = useComRecorte();
   return (
     <>
       {/* Cabeçalho em DUAS faixas. Antes o nome, o telefone, o estado da IA e a
@@ -96,7 +99,7 @@ export function ThreadHeader({
           {/* Celular: a conversa é uma tela só, e voltar para a lista é esta
               seta (a barra de abas some aqui dentro). */}
           <Link
-            href="/inbox"
+            href={comRecorte("/inbox")}
             aria-label="Voltar para as conversas"
             data-slot="conversa-voltar"
             className="flex size-11 shrink-0 items-center justify-center rounded-lg text-ink-2 md:hidden"
