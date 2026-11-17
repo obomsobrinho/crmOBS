@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
-import Agenda from "@/components/agenda/Agenda";
-import ConfiguracaoDaAgenda from "@/components/agenda/ConfiguracaoDaAgenda";
-import { fonteDaMemoriaAgenda } from "@/lib/agenda-fonte";
+import Agenda from "@/features/agenda/components/Agenda";
+import ConfiguracaoDaAgenda from "@/features/agenda/components/ConfiguracaoDaAgenda";
+import { fonteDaMemoriaAgenda } from "@/features/agenda/api/fonte";
 import { segundaDaSemana } from "@/lib/agenda";
 import { diaIsoSP } from "@/lib/fuso";
 import { CONFIG, CONTATOS, EMPRESA, EXPEDIENTE, HORARIOS_DE_TESTE, SERVICOS, bloqueios, linhas } from "./dados";

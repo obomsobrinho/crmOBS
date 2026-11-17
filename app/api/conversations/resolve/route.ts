@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoResolver } from "@/features/pedidos/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
 import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
@@ -37,16 +38,10 @@ export async function POST(req: Request) {
   if ("erro" in r) return r.erro;
   const client = r.mine;
 
-  let body: { phone?: string; pedidoId?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  if (!phone) {
-    return NextResponse.json({ error: "phone é obrigatório" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (docs/plano-dados-e-estado.md, 2.9), com a frase de antes.
+  const lido = await lerCorpo(req, corpoDoResolver, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const { phone, pedidoId } = lido.dados;
 
   const svc = createServiceClient();
 
@@ -60,7 +55,7 @@ export async function POST(req: Request) {
     fechado = await fecharPedido(svc, {
       clientId: client.id,
       phone,
-      id: typeof body.pedidoId === "number" ? body.pedidoId : null,
+      id: pedidoId,
       solucao: SOLUCAO_DA_PORTA.resolver,
       por: client.userId,
     });

@@ -1,5 +1,6 @@
 import { Users } from "lucide-react";
 import TeamManager from "@/components/TeamManager";
+import TituloDaPagina from "@/components/TituloDaPagina";
 import { Card } from "@/components/ui/card";
 import { requireActiveTenant } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -15,13 +16,12 @@ export default async function EquipePage() {
 
   return (
     <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4">
-      <div className="mb-1 flex items-center gap-2">
-        <Users size={20} className="text-brand-ink" />
-        <h1 className="text-titulo">Equipe</h1>
-      </div>
-      <p className="mb-5 text-apoio text-ink-2">
-        Quem pode atender pela conta {client?.name ?? ""}.
-      </p>
+      <TituloDaPagina
+        icone={Users}
+        titulo="Equipe"
+        apoio={<>Quem pode atender pela conta {client?.name ?? ""}.</>}
+        className="mb-5"
+      />
 
       <TeamManager
         initialMembers={members}

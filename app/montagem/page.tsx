@@ -6,6 +6,7 @@ import { requireActiveTenant } from "@/lib/auth";
 import MontagemWizard from "@/components/MontagemCliente";
 import { validateConfig, type AgentConfig } from "@/lib/agent-prompt";
 import type { KnowledgeDoc } from "@/lib/crm";
+import { envDoServidor } from "@/lib/env";
 
 // O assistente de montagem. Tela cheia, sem o menu, e por isso FORA do route
 // group `(app)`, como `/connect` e `/assinatura`.
@@ -92,7 +93,7 @@ export default async function MontagemPage() {
       // disso quem manda é o que a pessoa escreveu.
       prefillCompanyName={initialConfig ? null : client.name}
       knowledgeDocs={docs}
-      knowledgeKeyConfigured={!!process.env.OPENAI_API_KEY}
+      knowledgeKeyConfigured={!!envDoServidor("OPENAI_API_KEY")}
       stageNames={stageNames}
       passoDoServidor={client.montagem.passo}
       agendaInicial={agenda}

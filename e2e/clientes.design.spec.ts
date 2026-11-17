@@ -382,3 +382,25 @@ test("conversa vazia do cadastro não aparece em Conversas nem no Pipeline (buil
   );
   expect(items.map((i) => i.phone)).toEqual(["5511900000001@s.whatsapp.net"]);
 });
+
+// PASSO 3b de docs/plano-dados-e-estado.md: filtro e busca de Contatos na URL.
+test.describe("Contatos na URL (/design/contatos)", () => {
+  test("refresh mantém o filtro e a busca, e voltar desfaz o filtro", async ({ page }) => {
+    await page.goto("/design/contatos");
+    const itens = page.locator('[data-slot="clientes-item"]');
+    await expect(itens).toHaveCount(10);
+    await page.getByLabel("Buscar contatos").fill("souza");
+    await expect(page).toHaveURL(/q=souza/);
+    await expect(itens).toHaveCount(1);
+    await page.reload();
+    await expect(page.getByLabel("Buscar contatos")).toHaveValue("souza");
+    await expect(itens).toHaveCount(1);
+    await page.getByLabel("Limpar busca").click();
+    await expect(page).not.toHaveURL(/q=/);
+    await filtrar(page, "Em conversa");
+    await expect(page).toHaveURL(/filtro=conversa/);
+    await expect(itens).toHaveCount(2);
+    await page.reload();
+    await expect(itens).toHaveCount(2);
+  });
+});

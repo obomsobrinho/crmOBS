@@ -7,7 +7,7 @@
 The owner's test campaign of 04/11/2026 sent to two of his numbers; both replied (one asked for more
 information, the other wrote "Sair"), but the campaign showed 0 replies and the SAIR was never
 recorded (`prospeccao_leads.parou_em` stayed null). The cron (`prospeccao_tick_5m`) ran every 5
-minutes with HTTP 200. `mensagensRecebidas` (`lib/prospeccao-cron.ts`) filtered `chat_messages.phone`
+minutes with HTTP 200. `mensagensRecebidas` (`features/campanhas/server/cron.ts`) filtered `chat_messages.phone`
 by digits only (`grafiasDeDigitos`), while n8n stores `phone` as a JID: all 484 rows of the table
 were `55...@s.whatsapp.net`. For the lead who wrote "Sair", the cron's filter found 0 rows, and the
 same filter with the JID found 1. The unit tests used digit only phones, so they never saw it.

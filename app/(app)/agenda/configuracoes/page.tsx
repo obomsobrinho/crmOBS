@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import ConfiguracaoDoBanco from "@/components/agenda/ConfiguracaoDoBanco";
+import ConfiguracaoDoBanco from "@/features/agenda/components/ConfiguracaoDoBanco";
 import { getMyClient } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import { AGENDA_PADRAO } from "@/lib/agenda";

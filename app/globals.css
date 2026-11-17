@@ -1355,7 +1355,7 @@ select:focus-visible,
   }
 }
 
-/* ── O mapa de uma busca de leads (Leaflet, components/admin/campanhas/MapaDaBusca.tsx).
+/* ── O mapa de uma busca de leads (Leaflet, features/campanhas/components/MapaDaBusca.tsx).
    O pino é um SVG do Leaflet: a cor vem por classe, porque atributo SVG não lê var().
    No escuro os tiles do OpenStreetMap passam por um filtro (inverte e devolve o
    matiz), para o mapa não acender um retângulo branco no meio da tela. */
@@ -1416,7 +1416,7 @@ select:focus-visible,
 [data-theme="dark"] .mapa-da-busca .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6);
 }
-/* O centro arrastável e o raio da "Nova busca" (components/admin/campanhas/Mapa.tsx). */
+/* O centro arrastável e o raio da "Nova busca" (features/campanhas/components/Mapa.tsx). */
 .mapa-da-busca .pino-central {
   border-radius: 9999px;
   background: var(--brand-fill);

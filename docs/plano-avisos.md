@@ -76,7 +76,7 @@ Estado hoje:
   antes do modelo e do RAG (flag nova `diagnostics.numeroDeAvisos`). Motivo: o aviso sai do número
   do agente, a Evolution devolve como `fromMe` e o n8n trata como conversa; se alguém do time
   responder, sem a regra a IA atenderia o time como cliente.
-- Esconder esse número de Conversas (`components/ContactSidebar.tsx`), Pipeline
+- Esconder esse número de Conversas (`features/conversas/components/ContactSidebar.tsx`), Pipeline
   (`app/(app)/pipeline/page.tsx` / `PipelineBoard`) e Painel (`app/(app)/painel/page.tsx`,
   `lib/metrics.ts`). Um helper puro só (`ehNumeroDeAvisos(phone, jid)` em `lib/inbox.ts`), usado
   nos três, para não virar três regras.

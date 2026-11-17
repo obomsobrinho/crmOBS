@@ -40,7 +40,7 @@ import { EMPTY_CONFIG, GOALS, compilePersona, validateConfig, type BusinessHours
 import { inicioDoDiaSP } from "../lib/fuso";
 import { feriadoDoDia, feriadosDoAno, pascoa } from "../lib/feriados";
 import { ehLembrete, respostaDaIa, respostaHumana } from "../lib/mensagem";
-import { rowsToBubbles } from "../components/thread/bolhas";
+import { rowsToBubbles } from "../features/conversas/components/thread/bolhas";
 
 // AGENDA PRÓPRIA (docs/plano-agenda.md): as regras do dono de 28/10/2026, puras
 // e com relógio FIXO. Quarta, 28/10/2026, 08:00 em São Paulo.

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { erroDaRota, sessaoDaRota } from "@/lib/rota";
+import { formularioDoAudio } from "@/lib/agent-schemas";
+import { envDoServidor } from "@/lib/env";
 
 // Transcreve o áudio gravado na bancada de teste (26/09/2026). Dono-only, como o
 // `/api/playground`.
@@ -22,10 +24,10 @@ export const maxDuration = 60;
 const MAX_BYTES = 4 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
-  const r = await sessaoDaRota({ dono: "acesso negado" });
+  const r = await sessaoDaRota({ dono: "acesso negado", ativa: true });
   if ("erro" in r) return r.erro;
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "transcrição indisponível neste ambiente" },
@@ -33,17 +35,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let audio: File | null = null;
+  // O formulário torto continua dizendo "envio inválido"; o campo `audio` cruza o esquema
+  // (`formularioDoAudio`, `lib/agent-schemas.ts`), e o tamanho (413) segue abaixo.
+  let form: FormData;
   try {
-    const form = await req.formData();
-    const f = form.get("audio");
-    if (f instanceof File) audio = f;
+    form = await req.formData();
   } catch {
     return NextResponse.json({ error: "envio inválido" }, { status: 400 });
   }
-  if (!audio || audio.size === 0) {
-    return NextResponse.json({ error: "áudio vazio" }, { status: 400 });
-  }
+  const lido = formularioDoAudio.safeParse({ audio: form.get("audio") });
+  if (!lido.success) return erroDaRota(400, "áudio vazio", "entrada_invalida");
+  const audio = lido.data.audio;
   if (audio.size > MAX_BYTES) {
     return NextResponse.json({ error: "áudio longo demais" }, { status: 413 });
   }

@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDaConfigDoAgente } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Json, TablesUpdate } from "@/lib/database.types";
 import { paraJson } from "@/lib/json";
@@ -23,31 +24,14 @@ export async function PUT(
   const { id } = await ctx.params;
 
   // Só o dono edita o agente (atendente não tem acesso ao /agente).
-  const r = await sessaoDaRota({ id, dono: "só o dono pode editar o agente", revalidar: true });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode editar o agente", ativa: true, revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: {
-    mode?: string;
-    config?: unknown;
-    persona?: string;
-    confirmOverwrite?: boolean;
-    /** Só no mode "horario". */
-    hours?: unknown;
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
-  if (
-    body.mode !== "guiado" &&
-    body.mode !== "avancado" &&
-    body.mode !== "horario"
-  ) {
-    return NextResponse.json({ error: "modo inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`): JSON e modo, com as frases de antes.
+  const lido = await lerCorpo(req, corpoDaConfigDoAgente, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const svc = createServiceClient();
 

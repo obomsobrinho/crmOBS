@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { falhouComMotivo, torto } from "@/lib/campanhas-servidor";
-import { MAXIMO_DO_ARQUIVO_BYTES } from "@/lib/planilha-de-leads";
-import { gravarPlanilha, lerPlanilha, situacaoNaBase } from "@/lib/planilha-servidor";
+import { falhouComMotivo, torto } from "@/features/campanhas/server/campanhas";
+import { lerFormulario } from "@/lib/rota";
+import { formularioDaPlanilha } from "@/features/campanhas/schemas";
+import { gravarPlanilha, lerPlanilha, situacaoNaBase } from "@/features/campanhas/server/planilha";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // IMPORTAR UMA PLANILHA (.xlsx) de contatos numa campanha (dono, 02/11/2026). O
@@ -13,13 +14,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 // id, que a campanha passa a usar.
 export const POST = rotaDoAdmin(
   async ({ req, admin }: { req: NextRequest; admin: string }) => {
-    const form = await req.formData().catch(() => null);
-    const arquivo = form?.get("arquivo");
-    if (!(arquivo instanceof File)) return torto("falta o arquivo");
-    if (arquivo.size > MAXIMO_DO_ARQUIVO_BYTES) return torto("O arquivo passa de 4 MB. Divida a planilha em partes.");
-    if (!/\.xlsx$/i.test(arquivo.name)) return torto("Envie uma planilha do Excel (.xlsx).");
-    const confirmar = form?.get("confirmar") === "1";
-    const nome = String(form?.get("nome") ?? "").trim().slice(0, 80) || `Planilha ${arquivo.name}`.slice(0, 80);
+    const lido = await lerFormulario(req, formularioDaPlanilha, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const { arquivo, confirmar, nome } = lido.dados;
     try {
       const lida = await lerPlanilha(await arquivo.arrayBuffer());
       if (!lida.ok) return torto(lida.erro);

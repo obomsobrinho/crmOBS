@@ -1,5 +1,6 @@
 import "server-only";
 import { NextResponse } from "next/server";
+import type { z } from "zod";
 import { getMyClient, type MyClient } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -70,4 +71,104 @@ export async function sessaoDaRota(
     return { erro: NextResponse.json({ error: mine.access.message }, { status: 402 }) };
   }
   return { mine };
+}
+
+/**
+ * O formato único de erro das rotas que o app chama (docs/plano-dados-e-estado.md,
+ * 2.9): status HTTP mais `{ error, codigo? }`. `error` é a frase que a tela mostra
+ * (português), `codigo` é o motivo para a máquina (`nao_encontrado`, `entrada_invalida`).
+ * Rota de webhook continua respondendo o que o chamador espera.
+ */
+export function erroDaRota(status: number, frase: string, codigo?: string): NextResponse {
+  return NextResponse.json(codigo ? { error: frase, codigo } : { error: frase }, { status });
+}
+
+/** A frase de entrada recusada. O detalhe vai para o log, não para a tela. */
+const FRASE_ENTRADA_INVALIDA = "Os dados enviados não estão no formato esperado.";
+
+/**
+ * Como a recusa chega à tela. Padrão: a frase genérica (o detalhe vai para o log).
+ * `motivo: true`: a mensagem do primeiro problema do esquema, para a área que já
+ * mostra ao usuário o porquê (Campanhas: "O arquivo passa de 4 MB", o celular
+ * inválido); o esquema então escreve cada mensagem como frase de tela.
+ */
+export interface OpcoesDaLeitura {
+  motivo?: boolean;
+  /**
+   * A frase de um corpo que não é JSON, para a rota que já respondia uma frase própria e
+   * entrega o corpo inteiro a uma regra pura (que tem a sua frase para um `null`).
+   */
+  semJson?: string;
+}
+
+/**
+ * Lê o corpo JSON da requisição pelo esquema Zod da área (2.9). O tipo vem do
+ * esquema. Falhou: `{ erro }` pronto (400, `entrada_invalida`), que a rota só
+ * repassa, como em `sessaoDaRota`. Com `motivo`, um corpo que não é JSON chega
+ * ao esquema como `null` (o esquema diz a frase).
+ */
+export async function lerCorpo<S extends z.ZodType>(
+  req: Request,
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
+): Promise<{ dados: z.infer<S> } | { erro: NextResponse }> {
+  let bruto: unknown;
+  try {
+    bruto = await req.json();
+  } catch {
+    if (opcoes.semJson) return { erro: erroDaRota(400, opcoes.semJson, "entrada_invalida") };
+    if (!opcoes.motivo) return { erro: erroDaRota(400, FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+    bruto = null;
+  }
+  return validar(esquema, bruto, new URL(req.url).pathname, opcoes);
+}
+
+/** O mesmo para a query string (`?x=...`), lida como objeto de textos. */
+export function lerConsulta<S extends z.ZodType>(
+  req: Request,
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
+): { dados: z.infer<S> } | { erro: NextResponse } {
+  const url = new URL(req.url);
+  return validar(esquema, Object.fromEntries(url.searchParams), url.pathname, opcoes);
+}
+
+/** O mesmo para um formulário (`multipart/form-data`), lido como objeto de campos (texto ou arquivo). */
+export async function lerFormulario<S extends z.ZodType>(
+  req: Request,
+  esquema: S,
+  opcoes: OpcoesDaLeitura = {}
+): Promise<{ dados: z.infer<S> } | { erro: NextResponse }> {
+  const form = await req.formData().catch(() => null);
+  return validar(esquema, form ? Object.fromEntries(form.entries()) : {}, new URL(req.url).pathname, opcoes);
+}
+
+function validar<S extends z.ZodType>(
+  esquema: S,
+  bruto: unknown,
+  onde: string,
+  opcoes: OpcoesDaLeitura
+): { dados: z.infer<S> } | { erro: NextResponse } {
+  const r = esquema.safeParse(bruto);
+  if (r.success) return { dados: r.data };
+  console.warn("entrada recusada:", onde, r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+  const primeira = r.error.issues[0]?.message;
+  return { erro: erroDaRota(400, opcoes.motivo && primeira ? primeira : FRASE_ENTRADA_INVALIDA, "entrada_invalida") };
+}
+
+/**
+ * Modo sombra para chamador de máquina (Asaas, Apify, crons; 2.9): confere o corpo
+ * pelo esquema e REGISTRA a diferença, sem recusar nada. Só depois de uma semana
+ * sem diferença a rota passa a usar `lerCorpo`. Devolve se bateu, para a contagem.
+ */
+export function conferirNaSombra(esquema: z.ZodType, bruto: unknown, onde: string): boolean {
+  const r = esquema.safeParse(bruto);
+  if (!r.success) {
+    console.warn(
+      "[sombra] entrada fora do esquema:",
+      onde,
+      r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+    );
+  }
+  return r.success;
 }

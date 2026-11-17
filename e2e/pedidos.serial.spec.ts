@@ -132,3 +132,59 @@ test("o motivo aparece na linha e o filtro por motivo vai ao banco", async ({ pa
   );
   expect(motivos.every((m) => m === "preco")).toBe(true);
 });
+
+// PASSO 3a de docs/plano-dados-e-estado.md: a ponte do realtime no layout encaixa no
+// cache o pedido que a IA abriu, com UMA leitura da fila da conversa (`pedidos_pagina`
+// com `p_telefone`), nunca relendo as páginas carregadas.
+test("pedido aberto pela IA aparece na lista sem reler as páginas", async ({ page }) => {
+  // A busca deixa na tela só o que interessa: a fila de Abertos do tenant de teste pode
+  // ter mais de uma página, e um pedido aberto "6 h atrás" (a semente) cairia depois
+  // da página carregada, onde ele corretamente não entra.
+  const marca = `estacionamento ponte ${Date.now()}`;
+  // O pedido só pode nascer depois de o canal do tenant assinar: antes disso o evento se
+  // perde (a primeira assinatura não relê nada, regra de realtime.md).
+  const assinou = new Promise<void>((ok) =>
+    page.on("websocket", (ws) =>
+      ws.on("framereceived", (q) => {
+        const t = String(q.payload);
+        if (t.includes("realtime:tenant-") && t.includes("phx_reply") && t.includes('"status":"ok"')) ok();
+      })
+    )
+  );
+  await page.goto(`/pedidos?q=${encodeURIComponent(marca)}`);
+  await assinou;
+  // A escuta do banco fica pronta um pouco depois da resposta da assinatura.
+  await page.waitForTimeout(3_000);
+  await expect(page.locator('[data-slot="pedidos-vazio"]')).toBeVisible({ timeout: 20_000 });
+  const leituras: Record<string, unknown>[] = [];
+  page.on("request", (r) => {
+    if (r.url().includes("/rest/v1/rpc/pedidos_pagina")) leituras.push(JSON.parse(r.postData() ?? "{}"));
+  });
+  const id = await abrirPedido(`Quer saber do ${marca}`);
+  await expect(page.locator(`[data-pedido="${id}"]`)).toBeVisible({ timeout: 20_000 });
+  expect(leituras.length, "uma leitura, a da fila desta conversa").toBe(1);
+  expect(leituras[0].p_telefone, "a leitura é da conversa, não a lista").toBe(FONE_TESTE);
+});
+
+test("refresh e voltar mantêm a aba e a busca na URL", async ({ page }) => {
+  // Um pedido resolvido desta conversa, para a busca ter o que mostrar em Resolvidos.
+  const id = await abrirPedido("Quer saber o horário de sábado (URL e2e)");
+  await servico().from("handoffs").update({ closed_at: new Date().toISOString(), solucao: "time_resolveu" }).eq("id", id);
+  await page.goto("/pedidos");
+  await page.getByRole("tab", { name: /Resolvidos/ }).click();
+  await expect(page).toHaveURL(/aba=resolvidos/);
+  await page.getByLabel("Buscar pedidos").fill("horário de sábado");
+  await expect(page).toHaveURL(/q=hor/, { timeout: 5_000 });
+  await page.reload();
+  await expect(page.getByRole("tab", { name: /Resolvidos/ })).toHaveAttribute("data-state", "active");
+  await expect(page.getByLabel("Buscar pedidos")).toHaveValue("horário de sábado");
+  const linha = page.locator(`[data-pedido="${id}"]`);
+  await expect(linha).toBeVisible({ timeout: 15_000 });
+  await linha.getByRole("button").first().click();
+  await expect(page).toHaveURL(new RegExp(`abrir=${id}`));
+  // O voltar fecha o pedido e fica na mesma aba e na mesma busca.
+  await page.goBack();
+  await expect(page).not.toHaveURL(/abrir=/);
+  await expect(page.getByRole("tab", { name: /Resolvidos/ })).toHaveAttribute("data-state", "active");
+  await expect(page.getByLabel("Buscar pedidos")).toHaveValue("horário de sábado");
+});

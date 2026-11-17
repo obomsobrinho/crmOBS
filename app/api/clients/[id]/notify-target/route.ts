@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoDestinoDosAvisos } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fetchGroups, ownerNumber } from "@/lib/evolution";
 import {
@@ -29,16 +30,14 @@ export async function PUT(
   ctx: RouteContext<"/api/clients/[id]/notify-target">
 ) {
   const { id } = await ctx.params;
-  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos", revalidar: true });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode configurar os avisos", ativa: true, revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: { numero?: unknown; grupo?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`); número e grupo são conferidos abaixo.
+  const lido = await lerCorpo(req, corpoDoDestinoDosAvisos, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const numero = typeof body.numero === "string" ? body.numero.trim() : "";
   const grupo = typeof body.grupo === "string" ? body.grupo.trim() : "";

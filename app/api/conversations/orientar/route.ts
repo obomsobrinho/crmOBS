@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoOrientar } from "@/features/pedidos/schemas";
 import { headersN8n } from "@/lib/n8n";
 import { processTurn } from "@/lib/agent-turn";
 import { fecharPedido } from "@/lib/handoffs";
@@ -8,6 +9,7 @@ import { telefoneImpossivel } from "@/lib/avisos";
 import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 import { estadoDaEmpresaNoMes } from "@/lib/consumo-ia";
 import { TEXTO_ORIENTAR_NO_LIMITE } from "@/lib/custo-ia";
+import { envDoServidor } from "@/lib/env";
 
 // ORIENTAR UM PEDIDO DE AJUDA É RESOLVÊ-LO, E A IA RESPONDE NA HORA
 // (27/09/2026, pedido do dono testando com o chip: "se eu já orientei, esse
@@ -36,20 +38,10 @@ export async function POST(req: Request) {
   if ("erro" in r) return r.erro;
   const client = r.mine;
 
-  let body: { phone?: string; instruction?: string; pedidoId?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-  const phone = typeof body.phone === "string" ? body.phone.trim() : "";
-  const instruction = typeof body.instruction === "string" ? body.instruction.trim() : "";
-  if (!phone || !instruction) {
-    return NextResponse.json(
-      { error: "phone e instruction são obrigatórios" },
-      { status: 400 }
-    );
-  }
+  // O corpo cruza o esquema (docs/plano-dados-e-estado.md, 2.9), com a frase de antes.
+  const lido = await lerCorpo(req, corpoDoOrientar, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const { phone, instruction, pedidoId } = lido.dados;
 
   const svc = createServiceClient();
   const agora = new Date().toISOString();
@@ -68,7 +60,7 @@ export async function POST(req: Request) {
     fechado = await fecharPedido(svc, {
       clientId: client.id,
       phone,
-      id: typeof body.pedidoId === "number" ? body.pedidoId : null,
+      id: pedidoId,
       solucao: SOLUCAO_DA_PORTA.orientar,
       por: client.userId,
       instrucao: instruction,
@@ -129,8 +121,8 @@ async function responderAgora(
   phone: string,
   instruction: string
 ): Promise<{ ok: true } | { ok: false; motivo: string }> {
-  const webhookUrl = process.env.N8N_IA_SEND_WEBHOOK_URL;
-  const apiKey = process.env.OPENAI_API_KEY;
+  const webhookUrl = envDoServidor("N8N_IA_SEND_WEBHOOK_URL");
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!webhookUrl) return { ok: false, motivo: "envio_nao_configurado" };
   if (!apiKey) return { ok: false, motivo: "modelo_nao_configurado" };
   if (!instance) return { ok: false, motivo: "sem_whatsapp" };

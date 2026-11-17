@@ -76,6 +76,13 @@ function contar(page: Page) {
   return c;
 }
 
+/** Zera a contagem: a abertura lê uma página e uma contagem do navegador (passo 4 do plano de dados). */
+function zerar(c: { pagina: number; linha: number; contagens: number }) {
+  c.pagina = 0;
+  c.linha = 0;
+  c.contagens = 0;
+}
+
 const itens = (page: Page) =>
   page.locator('[data-slot="inbox-item"]', { hasText: "Conversa paginada" });
 
@@ -86,10 +93,14 @@ async function abrir(page: Page) {
   await page.waitForTimeout(3_000);
 }
 
-test("abrir a lista não busca nada; ela chega do servidor com 10", async ({ page }) => {
+// Até o passo 4 do plano de dados a lista vinha do servidor e abrir não buscava nada.
+// Agora a página não lê o banco (D8) e o navegador lê UMA vez: uma página e uma contagem.
+test("abrir a lista lê uma vez só do navegador, e ela chega com 10", async ({ page }) => {
   const c = contar(page);
   await abrir(page);
-  expect(c.pagina + c.linha + c.contagens, "o servidor acabou de entregar a lista").toBe(0);
+  expect(c.pagina, "uma página, nunca duas").toBe(1);
+  expect(c.contagens, "uma contagem").toBe(1);
+  expect(c.linha).toBe(0);
   await expect(page.locator('[data-slot="inbox-item"]')).toHaveCount(10);
   await expect(itens(page).first()).toContainText(NOME(1));
 });
@@ -98,6 +109,7 @@ test("rolar até o fim traz de 10 em 10, sem repetir nem pular", async ({ page }
   await page.setViewportSize({ width: 1440, height: 700 });
   const c = contar(page);
   await abrir(page);
+  zerar(c);
   const lista = page.locator("aside [data-radix-scroll-area-viewport]").first();
   // Rola até não haver mais página (o marcador do fim some).
   for (let i = 0; i < 6 && (await page.locator('[data-slot="inbox-mais"]').count()) > 0; i++) {
@@ -118,6 +130,7 @@ test("rolar até o fim traz de 10 em 10, sem repetir nem pular", async ({ page }
 test("mensagem nova atualiza SÓ a linha dela, que sobe para o topo", async ({ page }) => {
   const c = contar(page);
   await abrir(page);
+  zerar(c);
   await servico()
     .from("conversations")
     .update({ last_message_at: new Date().toISOString(), last_message_preview: "acabou de chegar" })
@@ -133,6 +146,7 @@ test("mensagem nova atualiza SÓ a linha dela, que sobe para o topo", async ({ p
 test("aba escondida não busca; ao voltar, revalida uma vez", async ({ page }) => {
   const c = contar(page);
   await abrir(page);
+  zerar(c);
   await page.evaluate(() => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
     document.dispatchEvent(new Event("visibilitychange"));
@@ -156,6 +170,7 @@ test("aba escondida não busca; ao voltar, revalida uma vez", async ({ page }) =
 test("voltar o foco revalida (rede de segurança do realtime), no máximo uma vez a cada 10s", async ({ page }) => {
   const c = contar(page);
   await abrir(page);
+  zerar(c);
   await page.waitForTimeout(8_000); // passa a janela de 10s desde a abertura
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect.poll(() => c.pagina, { timeout: 10_000 }).toBe(1);
@@ -170,6 +185,7 @@ test("voltar o foco revalida (rede de segurança do realtime), no máximo uma ve
 test("a busca vai ao servidor só depois de parar de digitar, e ignora a janela", async ({ page }) => {
   const c = contar(page);
   await abrir(page);
+  zerar(c);
   await page.getByLabel("Buscar conversas e mensagens").pressSequentially("paginada 23", { delay: 40 });
   await expect(itens(page)).toHaveCount(1, { timeout: 15_000 });
   await expect(itens(page).first()).toContainText(NOME(23));

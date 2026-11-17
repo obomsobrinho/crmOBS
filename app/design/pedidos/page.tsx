@@ -1,15 +1,13 @@
 import NavRail from "@/components/NavRail";
-import Pedidos from "@/components/Pedidos";
+import PreviaDePedidos from "@/features/pedidos/components/PreviaDePedidos";
 import { agoraMs } from "@/lib/periodo";
-import { PAGINA_PEDIDOS, ehAberto } from "@/lib/pedidos";
-import type { ContatoLinha, PedidoLinha, PedidoResolvidoLinha } from "@/lib/pedidos";
-import { fonteDaMemoria } from "@/lib/pedidos-fonte";
-import type { LinhaHistoria } from "@/lib/historia-do-pedido";
+import type { ContatoLinha, PedidoLinha, PedidoResolvidoLinha } from "@/features/pedidos/regras";
+import type { LinhaHistoria } from "@/features/pedidos/historia";
 
 // Preview da página de PEDIDOS (abertos e resolvidos) (dev-only, liberado pelo proxy). Sem
 // banco: três pedidos em duas conversas, um deles acima de 2h (âmbar), três
 // resolvidos (um de cada solução, lib/solucoes.ts) e as mensagens falsas de cada
-// conversa, para a história do pedido (lib/historia-do-pedido.ts). As ações só
+// conversa, para a história do pedido (features/pedidos/historia.ts). As ações só
 // simulam. `?vazio=1` mostra a página sem pedido; `?abrir=` abre a
 // linha como o link do aviso faz.
 export const dynamic = "force-dynamic";
@@ -21,7 +19,8 @@ export default async function DesignPedidosPage({
 }: {
   searchParams: Promise<{ vazio?: string; abrir?: string; muitos?: string; papel?: string; regra?: string }>;
 }) {
-  const { vazio, abrir, muitos, papel, regra } = await searchParams;
+  // `?abrir=` é lido pela tela, na URL (como na página de verdade).
+  const { vazio, muitos, papel, regra } = await searchParams;
   const agora = agoraMs();
   const iso = (msAtras: number) => new Date(agora - msAtras).toISOString();
 
@@ -134,30 +133,24 @@ export default async function DesignPedidosPage({
   // A mesma fonte do navegador, sobre as linhas falsas (só a primeira página).
   // `?regra=1`: a orientação do pedido 7 já virou regra (mostra "Salva como regra").
   const regrasSalvas: Record<number, string> = regra === "1" ? { 7: iso(26 * H) } : {};
-  const fonte = fonteDaMemoria(pedidos, resolvidos, contatos, null, mensagens, regrasSalvas);
-  const idDoLink = Number(abrir);
-  const pedidoDoLink = Number.isInteger(idDoLink) && idDoLink > 0 ? await fonte.porId([], idDoLink) : null;
-  const aba = pedidoDoLink && !ehAberto(pedidoDoLink) ? "resolvidos" : "abertos";
-  const itens = await fonte.pagina({ aba, busca: "", fora: [] }, null, PAGINA_PEDIDOS);
 
+  // A tela lê tudo pelo cache, como a de verdade (passo 3a): aqui só as linhas falsas.
   return (
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/pedidos" role="dono" />
-      <Pedidos
-        key={`${vazio}-${abrir}-${muitos}-${papel}-${regra}`}
-        inicial={{
-          aba,
-          itens,
-          temMais: itens.length === PAGINA_PEDIDOS,
-          contagens: await fonte.contagens([]),
-          abrir: pedidoDoLink,
+      <PreviaDePedidos
+        // Um cliente de dados por cenário: trocar o cenário não herda o cache do outro.
+        identidade={`design:${vazio}-${muitos}-${papel}-${regra}`}
+        dados={{
+          abertos: pedidos,
+          resolvidos,
+          contatos,
+          mensagens,
+          regrasSalvas,
+          membros: [{ userId: "u1", email: "franck@exemplo.com", role: "dono" }],
         }}
-        previewDados={{ abertos: pedidos, resolvidos, contatos, mensagens, regrasSalvas }}
-        members={[{ userId: "u1", email: "franck@exemplo.com", role: "dono" }]}
-        numeroAvisos={null}
         // `?papel=atendente` prova que o atendente não vê "Salvar como regra".
         dono={papel !== "atendente"}
-        preview
       />
     </div>
   );

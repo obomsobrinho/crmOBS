@@ -1,7 +1,7 @@
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "@/lib/fuso";
-import arquivoDeMunicipios from "@/lib/dados/municipios.json";
-import { municipiosDoArquivo } from "@/lib/municipios";
-import { OPCOES_PADRAO, VARIANTES_SUGERIDAS, diaDaSemanaSP, varianteDaOrdem, type DetalhesDoLead } from "@/lib/prospeccao";
+import arquivoDeMunicipios from "@/features/campanhas/dados/municipios.json";
+import { municipiosDoArquivo } from "@/features/campanhas/municipios";
+import { OPCOES_PADRAO, VARIANTES_SUGERIDAS, diaDaSemanaSP, varianteDaOrdem, type DetalhesDoLead } from "@/features/campanhas/regras";
 import {
   leadsDoFiltro,
   type Busca,
@@ -9,7 +9,7 @@ import {
   type ConexaoDisponivel,
   type EnvioDaCampanha,
   type Lead,
-} from "@/components/admin/campanhas/tipos";
+} from "@/features/campanhas/components/tipos";
 
 // DADOS DE MENTIRA do preview de Campanhas (`/design/campanhas`). Empresas,
 // telefones e respostas inventados: nada aqui existe, nada é enviado e nenhuma

@@ -2,6 +2,8 @@
 
 Roadmap de produto. Análise de mercado completa em [estrategia-2026-07.md](estrategia-2026-07.md).
 
+**Dados, estado e desempenho (10/11/2026):** o roteiro único é [plano-dados-e-estado.md](plano-dados-e-estado.md) (decisões fechadas em 11/11/2026; revisão externa feita em 11/11/2026; passo 0 entregue em 13/11/2026, próximo é o passo 1): passos 0 a 5 e o orçamento de desempenho, que vale como critério de aceite de toda entrega. A frente de design vem depois do passo 5 (seção 7 dele).
+
 Última revisão: 29/09/2026 (plano vigente com as prioridades aprovadas pelo dono, logo abaixo da
 direção travada).
 
@@ -24,6 +26,9 @@ direção travada).
   não menos). A lentidão percebida no dev era compile sob demanda (some em produção) + render
   dinâmico, mitigada com `loading.tsx`; não é motivo de troca de stack. Reavaliar só se o produto
   virar uma SPA pura com backend próprio à parte (não é o caso).
+  *Atualização de 10/11/2026:* a decisão de stack continua, mas o `loading.tsx` sozinho não bastou
+  (medido: toda tela ainda esperava o banco, até 14,8 s num pico). O caminho é o
+  [plano-dados-e-estado.md](plano-dados-e-estado.md).
 
 ## Anotado para a semana de 09/11/2026: levar o peso do login para as outras telas
 
@@ -32,6 +37,11 @@ ver, o login acertou em cheio, e isso precisa ser replicado nas outras páginas.
 clientes usa Light, e o desenho vinha focado demais no Dark. Light é o padrão desde 05/11/2026
 (`docs/adr/2026-11-05-light-is-the-default-theme.md`). Antes de começar: confirmar com o dono por
 quais telas ir primeiro e o que exatamente levar do login.
+
+*Adiado em 10/11/2026 (decisão do dono):* a frente de design (este item, auditoria de componentes,
+acessibilidade, texto dos estados) só começa depois de o
+[plano-dados-e-estado.md](plano-dados-e-estado.md) estar executado inteiro; a ordem está na seção 7
+dele.
 
 ## ⭐ PLANO VIGENTE: prioridades aprovadas pelo dono em 29/09/2026
 
@@ -1231,7 +1241,7 @@ promovidos de "Candidatos novos".
 - [x] **Handoff "coach" (copiloto).** `conversations.pending_instruction` (grant de coluna, browser
       direto) guarda a orientação do operador; `/api/agent` consome no próximo turno e limpa (a IA
       retoma sozinha). No inbox, orientar é a aba "Orientar" da caixa de escrita
-      (`components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
+      (`features/conversas/components/MessageComposer.tsx`), que grava e reativa a IA; enquanto a orientação não foi
       consumida, ela aparece colada no topo da própria caixa, com a opção de cancelar.
       ⚠️ O "handoff silencioso" que esta fase introduziu (em `action=pausar`, `messages` vazio mais
       a IA se pausando) foi **revertido em 20/08/2026**: ver "Handoff sem pausa" abaixo.

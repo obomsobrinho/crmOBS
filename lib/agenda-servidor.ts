@@ -1,4 +1,5 @@
 import "server-only";
+import { lerAgendaDoTenant, type AgendaDoTenant } from "@/lib/agenda-leitura";
 import { cache } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { BusinessHours } from "@/lib/agent-prompt";
@@ -23,33 +24,11 @@ type Svc = ReturnType<typeof createServiceClient>;
 
 const MIN = 60_000;
 
-export interface AgendaDoTenant {
-  config: AgendaConfig;
-  servicos: ServicoDaAgenda[];
-}
+export type { AgendaDoTenant } from "@/lib/agenda-leitura";
 
-/** Config e serviços ativos, ou null quando não há agenda (ou a tabela não existe). */
+/** Config e serviços ativos, ou null quando não há agenda (a consulta mora em `lib/agenda-leitura.ts`). */
 export async function agendaDoTenant(svc: Svc, clientId: string): Promise<AgendaDoTenant | null> {
-  try {
-    const [{ data: c, error: cErr }, { data: s, error: sErr }] = await Promise.all([
-      svc.from("clients").select("agenda_config").eq("id", clientId).maybeSingle(),
-      svc
-        .from("agenda_servicos")
-        .select("id, nome, duracao_min")
-        .eq("client_id", clientId)
-        .eq("ativo", true)
-        .order("ordem")
-        .order("id")
-        .limit(50),
-    ]);
-    if (cErr || sErr) return null;
-    return {
-      config: normalizarConfigDaAgenda(c?.agenda_config ?? null),
-      servicos: (s ?? []).map((x) => ({ id: x.id, nome: x.nome, duracaoMin: x.duracao_min })),
-    };
-  } catch {
-    return null;
-  }
+  return lerAgendaDoTenant(svc, clientId);
 }
 
 /**

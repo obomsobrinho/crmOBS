@@ -25,7 +25,7 @@ Before the first real campaign two problems were found by reading code and the n
    A message id registry for n8n to skip would add a lookup to every outgoing event for an event that
    does not happen. If Evolution ever starts echoing API sends, this decision is reopened (the symptom:
    an AI that answers once per conversation).
-2. **`### ORIGEM DESTE CONTATO`** (`blocoDeOrigem`, `SECAO_ORIGEM`, `lib/prospeccao.ts`): when the phone
+2. **`### ORIGEM DESTE CONTATO`** (`blocoDeOrigem`, `SECAO_ORIGEM`, `features/campanhas/regras.ts`): when the phone
    (any ninth digit spelling) received a campaign message from THIS company, `processTurn` adds a facts
    only section after AGORA/CALENDÁRIO/AGENDA: the company started the conversation, date and time in São
    Paulo, the exact text, and the stop request date when there is one. No tone or conduct: that is the
@@ -37,7 +37,7 @@ Before the first real campaign two problems were found by reading code and the n
    separate decision for the owner.
 4. The text is rebuilt, not stored: `textoParaLead(variant, lead name)`, the same function the cron
    sends with; variants only change while the campaign is a draft (`origemDaCampanha`,
-   `lib/campanhas-origem.ts`, read only, best-effort: a failed read drops the section, never the turn).
+   `features/campanhas/server/origem.ts`, read only, best-effort: a failed read drops the section, never the turn).
 5. **Prompt rehearsal** (`scripts/ensaio-do-prompt.mjs`): a candidate persona plus a JSON of scenarios
    run through `processTurn` in `dryRun` with the real model, the real tenant config and agenda, and a
    service client whose writes are no-ops (`scripts/ensaio/servico-somente-leitura.ts`), so neither
@@ -57,6 +57,6 @@ The default variants of 07/11/2026 no longer mention Google, and the persona ans
 number?" by reading the sent text ("cita Google" or not), so a Google lead would hear "a list". The section
 now carries the fact: `Origem do contato: busca no Google.` / `planilha.` / `não registrada.`, from the lead
 list source (`prospeccao_buscas.fonte`: `compass/crawler-google-places` or `planilha`, mapped by
-`origemDoContato` in `lib/campanhas-origem.ts`; an unknown source is "não registrada", never a guess). The
+`origemDoContato` in `features/campanhas/server/origem.ts`; an unknown source is "não registrada", never a guess). The
 persona says how to word it. Rehearsal: Google 3/3 and spreadsheet 3/3; "não registrada" still made the model
 say "a list" in 3/3, which is unreachable today (`busca_id` is NOT NULL and only those two sources exist).

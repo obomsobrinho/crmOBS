@@ -212,3 +212,31 @@ roda esta consulta. É limitação assumida (notificar exigiria mexer no n8n, qu
 produção), e o preço dela é real: um relato urgente pode ficar dias parado.
 Rodar isto junto com as outras quatro, na mesma sessão, é o que substitui o
 aviso.
+
+---
+
+## 6. Desempenho do banco por hora (B9 do plano de dados)
+
+Leitura semanal do orçamento B9 de `docs/plano-dados-e-estado.md` (seção 3): o tempo que o Supabase
+leva para responder as leituras do app (`/rest/v1/*`), por hora, nos logs da borda. Não é SQL do
+banco: roda nos **logs** (Supabase, Logs Explorer, ou a ferramenta `query_logs` do MCP), com janela
+de no máximo 24 h por consulta. O resultado vai para `docs/handoff.md` uma vez por semana.
+
+```sql
+select
+  toStartOfHour(timestamp) as hora,
+  count(*) as leituras,
+  round(quantile(0.5)(toFloat64OrZero(log_attributes['response.origin_time']))) as p50_ms,
+  round(quantile(0.9)(toFloat64OrZero(log_attributes['response.origin_time']))) as p90_ms,
+  round(quantile(0.99)(toFloat64OrZero(log_attributes['response.origin_time']))) as p99_ms,
+  countIf(toInt32OrZero(log_attributes['response.status_code']) >= 500) as erros_5xx
+from logs
+where source = 'edge_logs' and log_attributes['request.path'] like '/rest/v1/%'
+group by hora
+order by hora
+```
+
+**Como ler.** A meta é p90 ≤ 300 ms e p99 ≤ 1 s nas horas de atendimento. Hora acima da meta: ver na
+mesma janela se houve cron pesado (`prospeccao_tick_5m`), migração aplicada (recarga do cache de
+esquema do PostgREST) ou suíte de teste com login rodando. Em 10/11/2026 o pior minuto (14,8 s) foi
+espera numa fila, não consulta: o `statement_timeout` do `authenticated` é 8 s (passo 0 do plano).

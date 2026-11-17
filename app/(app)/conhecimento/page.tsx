@@ -4,6 +4,7 @@ import { requireActiveTenant } from "@/lib/auth";
 import KnowledgeManager from "@/components/KnowledgeManager";
 import { Card } from "@/components/ui/card";
 import type { KnowledgeDoc } from "@/lib/crm";
+import { envDoServidor } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export default async function ConhecimentoPage() {
       <KnowledgeManager
         clientId={client.id}
         initialDocs={docs}
-        keyConfigured={!!process.env.OPENAI_API_KEY}
+        keyConfigured={!!envDoServidor("OPENAI_API_KEY")}
       />
     </Card>
   );

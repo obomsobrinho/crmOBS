@@ -105,9 +105,29 @@ que ele sempre foi semanticamente.
 
 ## 12. Mobile
 
+⚠️ **Desatualizado (nota de 10/11/2026):** este item é de 30/08/2026. O plano do mobile foi
+executado em 23/09/2026 (`docs/arquivo/relatorio-mobile.md`); o que ainda falta não foi conferido.
+Reconferir na auditoria de componentes da frente de design (`docs/plano-dados-e-estado.md`, 7.2).
+
 O único dos seis problemas do diagnóstico anterior que **não foi resolvido**. Continua valendo o
 fato que o torna caro de ignorar: 38% dos micro empreendedores brasileiros não têm computador.
 
 Há um furo conhecido e assumido: quem abre o passo 1 da montagem no telefone não consegue ler o QR
 na própria tela, e este projeto não tem conexão por código de telefone. A tela diz isso; não
 inventar pareamento que não existe.
+
+## 13. O Light sem peso nas telas além do login ⏸️ ADIADO
+
+Fala do dono em 06/11/2026 (registrada em `docs/proximos-passos.md`): o login novo acertou o peso do
+Light e isso precisa ir para as outras telas. Light é o padrão desde 05/11/2026
+(`docs/adr/2026-11-05-light-is-the-default-theme.md`). **Adiado em 10/11/2026 pelo dono:** entra na
+frente de design, que só começa depois de o `docs/plano-dados-e-estado.md` estar executado inteiro
+(ordem na seção 7.2 dele).
+
+## 14. Estados de tela novos (esqueleto, erro e item que some e volta) ⏳ NA BASE
+
+A migração de dados cria estados que a camada base não tem: não existe esqueleto em
+`components/ui/` (o `app/(app)/loading.tsx` desenha `animate-pulse` com classes soltas), não existe
+erro por bloco, e não existe a transição de item que some e volta numa escrita otimista. O padrão
+único deles é definido no passo 1 do `docs/plano-dados-e-estado.md` (seção 7.1) e documentado em
+`camada-base.md`; o polimento visual fica para a frente de design.

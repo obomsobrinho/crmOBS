@@ -339,3 +339,18 @@ test("configurações: serviço com erro fica vermelho, com a mensagem no bloco,
   await ultimo.fill("Retorno");
   await expect(bloco.locator('[data-agenda="servicos"]')).not.toHaveAttribute("data-erro", "");
 });
+
+// PASSO 3b de docs/plano-dados-e-estado.md: a semana exibida fica na URL.
+test("a semana fica na URL: refresh mantém, e voltar para hoje limpa", async ({ page }) => {
+  await abrir(page);
+  const mes = page.locator('[data-agenda="mes"]');
+  await page.getByRole("button", { name: "Próxima semana" }).click();
+  await expect(page).toHaveURL(/semana=\d{4}-\d{2}-\d{2}/);
+  const naUrl = new URL(page.url()).searchParams.get("semana");
+  await page.reload();
+  await expect(page).toHaveURL(new RegExp(`semana=${naUrl}`));
+  await expect(page.getByRole("button", { name: "Hoje" })).toBeEnabled();
+  await page.getByRole("button", { name: "Hoje" }).click();
+  await expect(page).not.toHaveURL(/semana=/);
+  await expect(mes).toBeVisible();
+});

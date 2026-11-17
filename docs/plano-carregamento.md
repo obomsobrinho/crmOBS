@@ -1,5 +1,7 @@
 # Plano: carregamento de dados para produção
 
+> Still binding: the six owner rules and the database work below. The browser layer (`lib/use-paginada.ts` and the per-screen fetch hooks) is superseded, area by area, by `docs/plano-dados-e-estado.md` (Proposed, 10/11/2026).
+
 Decidido pelo dono em **01/10/2026**, depois de o banco (plano free do Supabase) travar por falta de
 memória. A decisão dele, que vale para todo o resto: **estrutura de produção, não de beta.** "Depois,
 em produção com 30 clientes, não tem como fazer alterações estruturais com facilidade."
@@ -30,7 +32,7 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
 - ✅ **1. Conversas:** `public.inbox_pagina` (10 por vez, cursor `(grupo, last_message_at, id)`,
   recorte, filtro e busca no banco, incluindo o conteúdo das mensagens) e `public.inbox_contagens`
   (chips e cabeçalhos de grupo), as duas `security invoker`. No navegador: `lib/inbox-lista.ts`
-  (puro: item, ordem, `encaixar`, início da janela), `lib/inbox-fonte.ts` (banco ou memória para o
+  (puro: item, ordem, `encaixar`, início da janela), `features/conversas/api/fonte.ts` (banco ou memória para o
   preview), rolagem infinita por `IntersectionObserver`, busca com `useDebounce` (300ms), realtime
   filtrado pelo tenant que busca SÓ a linha (debounce de 500ms), aba escondida parada, revalidação
   ao voltar o foco no máximo a cada 10s. Provado em `e2e/realtime.serial.spec.ts` (25 conversas
@@ -47,13 +49,13 @@ em produção com 30 clientes, não tem como fazer alterações estruturais com 
   - `inbox_pagina`/`inbox_contagens` viraram plpgsql (plano guardado): 1,5 ms e 0,1 ms por chamada.
 - ✅ **3. Clientes:** `public.clientes_pagina`/`clientes_contagens` (plpgsql, `security invoker`;
   busca em nome, e-mail, tags, campos e telefone com e sem o nono dígito, igual a `casaBusca`),
-  `lib/clientes-fonte.ts` (banco ou memória) e o gancho genérico `lib/use-paginada.ts` (primeira
+  `features/contatos/api/fonte.ts` (banco ou memória) e o gancho genérico `lib/use-paginada.ts` (primeira
   página do servidor, marcador do fim, revalidar ao voltar). O teto de 2.000 e o aviso de lista
   cortada saíram. Provado em `e2e/clientes.serial.spec.ts` (25 contatos semeados).
 - **4. Conversa aberta:** últimas 30 mensagens, as antigas ao rolar para cima, mensagem nova pela
   linha do realtime.
 - ✅ **5. Pipeline:** `public.pipeline_coluna`/`pipeline_contagens` (coluna efetiva = a de
-  `stageColumns`), `lib/pipeline-fonte.ts`; cada coluna com os próprios 10 cards e o marcador do
+  `stageColumns`), `features/pipeline/api/fonte.ts`; cada coluna com os próprios 10 cards e o marcador do
   fim; números e subtítulo da coluna do banco (`resumoDosNumeros`); mover é otimista entre colunas;
   realtime busca SÓ o card. ⚠️ Achado: `pipeline_stages` e `conversation_notes` nunca estiveram na
   publicação do realtime; o Supabase recusava a assinatura e derrubava o canal INTEIRO (o realtime do

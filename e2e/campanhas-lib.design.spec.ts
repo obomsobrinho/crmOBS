@@ -58,15 +58,15 @@ import {
   type OpcoesDaBusca,
   maximoDaBusca,
   nomeDaBusca,
-} from "../lib/prospeccao";
-import { CATEGORIAS_DESCARTADAS, TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../lib/apify-campos";
-import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../lib/planilha-de-leads";
-import { filtrarPelasOpcoes, itemParaOBanco } from "../lib/fonte-de-leads";
-import arquivoDeMunicipios from "../lib/dados/municipios.json";
-import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../lib/municipios";
+} from "../features/campanhas/regras";
+import { CATEGORIAS_DESCARTADAS, TODAS_AS_EMPRESAS, entradaApify, itemDoApify, leituraDoStatus, tetoDeGastoUsd, webhooksDaExecucao } from "../features/campanhas/apify-campos";
+import { amostraDosNumeros, colunasDaPlanilha, itemDaPlanilha, lerLinhas, nomeDaColuna } from "../features/campanhas/planilha-de-leads";
+import { filtrarPelasOpcoes, itemParaOBanco } from "../features/campanhas/fonte-de-leads";
+import arquivoDeMunicipios from "../features/campanhas/dados/municipios.json";
+import { buscarCidades, cidadeDoCodigo, cidadeMaisProxima, distanciaKm, localDaBusca, municipiosDoArquivo } from "../features/campanhas/municipios";
 import { grafiasDoTelefone, normalizar } from "../lib/clientes";
-import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, recorteParaQuery, textoDe } from "../lib/campanhas-pedidos";
-import { RECORTE_LIVRE, localDaUltimaBusca } from "../components/admin/campanhas/tipos";
+import { areaDe, filtroDe, opcoesDe, paginaDe, rascunhoDe, recorteDe, recorteParaQuery, textoDe } from "../features/campanhas/pedidos";
+import { RECORTE_LIVRE, localDaUltimaBusca } from "../features/campanhas/components/tipos";
 import { diaIsoSP, inicioDoDiaSP, somarDias } from "../lib/fuso";
 import { dadosDeMentira } from "../app/design/campanhas/dados";
 
@@ -391,7 +391,7 @@ test.describe("Respostas (respostasDosEnvios, o cron só lê chat_messages)", ()
 
   test("a mensagem como o n8n grava (JID, sem o nono dígito): o cron busca essa grafia e ela casa com o lead (04/11/2026)", () => {
     // O bug: o cron buscava só dígitos e `chat_messages.phone` é `55...@s.whatsapp.net`; nenhuma
-    // resposta nem SAIR era registrado. A busca usa `grafiasDoTelefone` (lib/prospeccao-cron.ts).
+    // resposta nem SAIR era registrado. A busca usa `grafiasDoTelefone` (features/campanhas/server/cron.ts).
     expect(grafiasDoTelefone("5533999990001")).toContain("553399990001@s.whatsapp.net");
     expect(
       respostasDosEnvios([envio()], [{ telefone: "553399990001@s.whatsapp.net", texto: "Sair", em: as(HOJE, 10) }]),
@@ -558,7 +558,7 @@ test.describe("Gêmeos do SQL (resultadoDasLinhas, serieDasLinhas, resumoDasLinh
   });
 });
 
-test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () => {
+test.describe("Fonte Apify (features/campanhas/apify-campos.ts) e o filtro do nosso lado", () => {
   const opcoes: OpcoesDaBusca = { ...OPCOES_PADRAO, termos: ["clínica de estética", " estética "], cidade: "Mutum", uf: "MG", notaMinima: 4.5, site: "sem_site" };
 
   test("a entrada do actor: termos aparados, \"Cidade, UF, Brasil\", teto por termo; nota, site e avaliações ficam de fora", () => {
@@ -798,7 +798,7 @@ test.describe("Fonte Apify (lib/apify-campos.ts) e o filtro do nosso lado", () =
   });
 });
 
-test.describe("Pedidos das rotas (lib/campanhas-pedidos.ts): o que não confere é 400", () => {
+test.describe("Pedidos das rotas (features/campanhas/pedidos.ts): o que não confere é 400", () => {
   test("página, texto e opções da busca", () => {
     expect(paginaDe(null)).toBe(1);
     expect(paginaDe("3")).toBe(3);
@@ -1033,7 +1033,7 @@ test.describe("Área da busca no mapa (revisão de 30/10/2026, formato confirmad
   });
 });
 
-test.describe("Planilha de leads (lib/planilha-de-leads.ts, 02/11/2026)", () => {
+test.describe("Planilha de leads (features/campanhas/planilha-de-leads.ts, 02/11/2026)", () => {
   test("o modelo para baixar (04/11/2026) tem só o cabeçalho, e a leitura acha as quatro colunas nele", async () => {
     const ExcelJS = (await import("exceljs")).default;
     const wb = new ExcelJS.Workbook();

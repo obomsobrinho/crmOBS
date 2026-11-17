@@ -14,7 +14,7 @@ import {
 } from "../lib/agent-prompt";
 import { applyGuardrail } from "../lib/guardrail";
 import type { AgentOutput } from "../lib/agent";
-import { podeVirarRegra, type PedidoResolvido } from "../lib/pedidos";
+import { podeVirarRegra, type PedidoResolvido } from "../features/pedidos/regras";
 
 // ORIENTAÇÃO VIRA REGRA (P1 item 5, 13/10/2026; ADR
 // docs/adr/2026-10-13-orientation-saved-as-agent-rule.md).
@@ -167,7 +167,7 @@ test.describe("Guardrail e regras salvas (lib/guardrail.ts)", () => {
   });
 });
 
-test.describe("Qual pedido pode virar regra (lib/pedidos.ts)", () => {
+test.describe("Qual pedido pode virar regra (features/pedidos/regras.ts)", () => {
   const base: PedidoResolvido = {
     id: 1,
     phone: "5511912345678",

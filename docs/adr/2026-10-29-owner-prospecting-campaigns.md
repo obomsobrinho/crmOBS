@@ -54,9 +54,9 @@ o plano para ja mandarmos ver".
 - **Replies**: land in the inbox of the sending company and its AI answers (n8n and `processTurn`
   unchanged). The cron reads the first inbound message after the send to mark "respondeu" and its hour;
   "não quero" / "pare" (provisional list) marks "pediu para parar".
-- **Source behind a module** (`lib/fonte-de-leads.ts` + server-only `lib/fonte-apify.ts`), async with an
+- **Source behind a module** (`features/campanhas/fonte-de-leads.ts` + server-only `features/campanhas/server/apify.ts`), async with an
   Apify webhook or polling; dedupe by phone. `APIFY_TOKEN` is set by the owner in Vercel.
-- **Rules in one pure module**: `lib/prospeccao.ts` (phone, site class, score, statuses, eligibility,
+- **Rules in one pure module**: `features/campanhas/regras.ts` (phone, site class, score, statuses, eligibility,
   variants, stop phrases, schedule, results), used by the screens, the routes and the cron.
 - Data: `prospeccao_buscas`, `prospeccao_leads` (unique phone), `prospeccao_busca_leads`,
   `prospeccao_campanhas`, `prospeccao_variantes`, `prospeccao_campanha_leads`; RLS on, service role only;
@@ -98,12 +98,12 @@ line (risk 4 and D4 in the plan).
   anything other than the place id; kept as a swap behind the source module.
 
 ## Implementation notes (backend, 30/10/2026)
-- The screens read from ONE interface, `FonteDeCampanhas` (`components/admin/campanhas/tipos.ts`): the
-  real page through `/api/admin/campanhas/*` (`lib/campanhas-fonte.ts`), the preview from memory
+- The screens read from ONE interface, `FonteDeCampanhas` (`features/campanhas/components/tipos.ts`): the
+  real page through `/api/admin/campanhas/*` (`features/campanhas/api/fonte.ts`), the preview from memory
   (`app/design/campanhas/fonte-de-mentira.ts`). Pages of 10 with a count and the search run on the
   server; no list of leads or campaigns ever reaches the browser whole.
 - The dashboards come from SQL in long format, folded by pure twins (`resultadoDasLinhas`,
-  `serieDasLinhas`, `resumoDasLinhas` in `lib/prospeccao.ts`); `e2e/campanhas-lib.design.spec.ts` proves
+  `serieDasLinhas`, `resumoDasLinhas` in `features/campanhas/regras.ts`); `e2e/campanhas-lib.design.spec.ts` proves
   the fold equals the in-memory math for every fake campaign.
 - Evidence of the review of the overnight phase 2: (1) the Apify ad hoc webhook was sent inside the POST
   body, which Apify treats as the actor input, so the run's end would never reach the CRM; it goes in

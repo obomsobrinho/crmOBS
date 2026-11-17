@@ -1,14 +1,14 @@
-import NovaBuscaAoVivo from "@/components/admin/campanhas/NovaBuscaAoVivo";
+import NovaBuscaAoVivo from "@/features/campanhas/components/NovaBuscaAoVivo";
 import { adminDaPagina } from "@/lib/admin";
 import { ehUuid } from "@/lib/admin-acesso";
-import { areasAnteriores, cidadeDaUltimaBusca } from "@/lib/campanhas-servidor";
+import { areasAnteriores, cidadeDaUltimaBusca } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Nova busca", robots: { index: false } };
 
 // A NOVA BUSCA de leads (revisão do dono de 31/10/2026): uma página, com o mapa
-// grande e os campos ao lado (`components/admin/campanhas/NovaBusca.tsx`), só para
+// grande e os campos ao lado (`features/campanhas/components/NovaBusca.tsx`), só para
 // `ADMIN_USER_IDS` (quem não é admin vai para `/contatos`, nunca um 404). O mapa
 // abre na cidade da última busca, lida aqui no servidor; sem busca (ou se a leitura
 // falhar), na cidade da OBS. Os círculos das buscas já feitas vêm junto (uma leitura

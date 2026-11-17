@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerConsulta, sessaoDaRota } from "@/lib/rota";
+import { consultaDosHorarios } from "@/features/agenda/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { horarioDaAgenda, horariosDoTime } from "@/lib/agenda";
 import { agendaDoTenant, ocupadosDoTenant } from "@/lib/agenda-servidor";
@@ -19,11 +20,14 @@ export async function GET(req: Request) {
   const r = await sessaoDaRota();
   if ("erro" in r) return r.erro;
   const mine = r.mine;
-  const url = new URL(req.url);
-  const servicoId = Number(url.searchParams.get("servico"));
-  const dia = url.searchParams.get("dia") ?? "";
-  const ignorar = Number(url.searchParams.get("ignorar")) || undefined;
-  const fora = url.searchParams.get("fora") === "1";
+  // A consulta cruza o esquema (`features/agenda/schemas.ts`); os valores são conferidos abaixo, como antes.
+  const lido = lerConsulta(req, consultaDosHorarios);
+  if ("erro" in lido) return lido.erro;
+  const q = lido.dados;
+  const servicoId = Number(q.servico ?? null);
+  const dia = q.dia ?? "";
+  const ignorar = Number(q.ignorar ?? null) || undefined;
+  const fora = q.fora === "1";
   if (!Number.isInteger(servicoId) || !/^\d{4}-\d{2}-\d{2}$/.test(dia)) {
     return NextResponse.json({ error: "serviço e dia são obrigatórios" }, { status: 400 });
   }

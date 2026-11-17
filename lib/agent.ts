@@ -5,6 +5,7 @@ import type { BusinessHours } from "./agent-prompt";
 import { MOTIVOS_DO_MODELO, motivosParaPrompt } from "./motivos";
 import { acoesDoTurno, type SaidaDaAgenda } from "./agenda";
 import { campoMidiaDoEsquema, midiaDaSaida } from "./midias";
+import { envDoServidor } from "@/lib/env";
 
 // Cérebro do agente. Função pura de servidor (recebe a chave, não lê env), para
 // ser reaproveitável fora da rota (ex.: um futuro playground server-side, cron).
@@ -74,7 +75,7 @@ export const DEIXA_RETOMADA =
   "Nota interna do sistema: o cliente NÃO mandou mensagem nova. O time acabou de responder ao pedido de ajuda que você abriu nesta conversa (veja a ORIENTAÇÃO DO OPERADOR). Retome a conversa agora, por iniciativa sua, e dê ao cliente o retorno que você prometeu, seguindo a orientação. Não cumprimente de novo como se fosse o começo da conversa.";
 
 // Modelo usado hoje no nó "OpenAI Chat Model" do n8n. Configurável por env.
-export const AGENT_MODEL = process.env.OPENAI_AGENT_MODEL || "gpt-5.4-mini";
+export const AGENT_MODEL = envDoServidor("OPENAI_AGENT_MODEL") || "gpt-5.4-mini";
 
 // Bloco AGORA, igual ao que o nó Atendente anexa ao systemMessage hoje
 // (Luxon: "cccc, dd 'de' LLLL 'de' yyyy, HH:mm", fuso de São Paulo). Assim o
@@ -312,7 +313,7 @@ export async function runAgent(params: {
    * `blocoDaAgenda` (lib/agenda.ts), ou nada quando a agenda está desligada.
    */
   agenda?: string | null;
-  /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (lib/prospeccao.ts), ou nada. */
+  /** `### ORIGEM DESTE CONTATO` já montado por `blocoDeOrigem` (features/campanhas/regras.ts), ou nada. */
   origem?: string | null;
   /**
    * `### MÍDIAS PARA ENVIAR` (`blocoDeMidias`, lib/midias.ts) e as chaves do enum

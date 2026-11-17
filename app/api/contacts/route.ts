@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoNovoContato } from "@/features/contatos/schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { numeroNoWhatsApp } from "@/lib/evolution";
 import { ehNumeroDeAvisos, telefoneImpossivel } from "@/lib/avisos";
@@ -35,12 +36,10 @@ export async function POST(req: Request) {
   if ("erro" in r) return r.erro;
   const client = r.mine;
 
-  let body: { telefone?: unknown; nome?: unknown; email?: unknown; nascimento?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/contatos/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoNovoContato, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const tel = telefoneDoCadastro(typeof body.telefone === "string" ? body.telefone : "");
   if (!tel.ok) {

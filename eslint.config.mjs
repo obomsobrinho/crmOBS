@@ -129,6 +129,20 @@ const conjunto = ({ fuso = true, mensagem = true, refresh = true } = {}) => [
   ...(mensagem ? regraDeMensagem : []),
   ...(refresh ? regraDeRefresh : []),
 ];
+// Data layer rules (docs/plano-dados-e-estado.md, section 5, guardrail 6). ERROR in
+// features/** (the path says the area migrated), never applied to legacy code.
+const regrasDeDados = [
+  {
+    selector: "Property[key.name=/^(queryKey|mutationKey)$/] > ArrayExpression",
+    message:
+      "No query or mutation key written inline: build it with the area's key factory (docs/plano-dados-e-estado.md, 2.5).",
+  },
+  {
+    selector: "CallExpression[callee.name='useEffect'] CallExpression[callee.name='fetch']",
+    message:
+      "No useEffect that fetches: browser reads go through an area hook on TanStack Query (docs/plano-dados-e-estado.md, 2.2).",
+  },
+];
 // router.refresh() is legitimate on login, logout and account switch.
 const REFRESH_PERMITIDO = [
   "app/login/page.tsx",
@@ -160,6 +174,30 @@ const eslintConfig = defineConfig([
     files: REFRESH_PERMITIDO,
     rules: { "no-restricted-syntax": ["warn", ...conjunto({ refresh: false })] },
   },
+  // Migrated areas (features/**): the project rules plus the data rules, as ERRORS.
+  {
+    files: ["features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": ["error", ...conjunto(), ...regrasDeDados],
+    },
+  },
+  {
+    files: ["features/**/components/**/*.{ts,tsx}", "features/**/hooks/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/supabase/*", "@supabase/*"],
+              message:
+                "A component or hook never talks to Supabase: the area source does (docs/plano-dados-e-estado.md, 2.11).",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // service_role never enters code that runs in the browser. ERROR, not warning:
   // there are zero occurrences today.
   {
@@ -175,6 +213,30 @@ const eslintConfig = defineConfig([
                 "service_role is server-only: never import lib/supabase/service from a component (.claude/rules/engineering.md).",
             },
           ],
+        },
+      ],
+    },
+  },
+  // process.env only in lib/env.ts (docs/plano-dados-e-estado.md, 2.9, enforced since
+  // 16/11/2026 against the Vercel list). ERROR: zero occurrences in app code.
+  // Tests, scripts and configs read their own variables and stay out.
+  {
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+      "features/**/*.{ts,tsx}",
+      "proxy.ts",
+    ],
+    ignores: ["lib/env.ts", "**/*.test.ts"],
+    rules: {
+      "no-restricted-properties": [
+        "error",
+        {
+          object: "process",
+          property: "env",
+          message:
+            "Read environment variables only through lib/env.ts (envDoServidor, envPublico; process.env.NODE_ENV stays literal with a disable comment). A new variable goes into its lists first.",
         },
       ],
     },

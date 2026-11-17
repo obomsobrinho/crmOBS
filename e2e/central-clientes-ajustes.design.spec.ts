@@ -1165,7 +1165,7 @@ test.describe("Ajustes da central: Financeiro e Ações", () => {
   });
 
   test("depois de uma ação não aparece 'Feito. A ação ficou registrada.'; só o aviso do preview", async ({ page }) => {
-    const fonte = fs.readFileSync(path.join(process.cwd(), "components/admin/DetalheCliente.tsx"), "utf8");
+    const fonte = fs.readFileSync(path.join(process.cwd(), "features/central/components/DetalheCliente.tsx"), "utf8");
     expect(fonte).not.toContain("A ação ficou registrada");
     await page.goto(detalhe(1, "financeiro"));
     await page.locator('[data-slot="financeiro-bloqueio-botao"]').click();
@@ -1212,7 +1212,7 @@ test.describe("Ajustes da central: cabeçalho, Visão geral e peças", () => {
     await expect(ze).toContainText("Plano Essencial");
     await expect(ze).not.toContainText("beta");
     // O código da tela também não lê a coluna.
-    for (const arq of ["components/admin/pecas.tsx", "components/admin/AbaVisaoGeral.tsx", "components/admin/DetalheCliente.tsx", "components/admin/ListaCentral.tsx", "lib/admin-empresas.ts", "app/design/clientes/dados.ts"]) {
+    for (const arq of ["features/central/components/pecas.tsx", "features/central/components/AbaVisaoGeral.tsx", "features/central/components/DetalheCliente.tsx", "features/central/components/ListaCentral.tsx", "lib/admin-empresas.ts", "app/design/clientes/dados.ts"]) {
       expect(fs.readFileSync(path.join(process.cwd(), arq), "utf8")).not.toContain("account_type");
     }
   });

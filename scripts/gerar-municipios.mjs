@@ -1,4 +1,4 @@
-// Generates lib/dados/municipios.json: every Brazilian municipality per UF, with its IBGE code and the
+// Generates features/campanhas/dados/municipios.json: every Brazilian municipality per UF, with its IBGE code and the
 // coordinates of its seat, for the "Nova busca" city picker of Campanhas (no external call on screen).
 //
 // Sources:
@@ -18,7 +18,7 @@ import path from "node:path";
 
 const IBGE = "https://servicodados.ibge.gov.br/api/v1/localidades/municipios?view=nivelado";
 const KELVINS = "https://raw.githubusercontent.com/kelvins/municipios-brasileiros/main/csv/municipios.csv";
-const SAIDA = path.join(process.cwd(), "lib", "dados", "municipios.json");
+const SAIDA = path.join(process.cwd(), "features", "campanhas", "dados", "municipios.json");
 
 const UF_DO_CODIGO = {
   11: "RO", 12: "AC", 13: "AM", 14: "RR", 15: "PA", 16: "AP", 17: "TO", 21: "MA", 22: "PI", 23: "CE", 24: "RN",

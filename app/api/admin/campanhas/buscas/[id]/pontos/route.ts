@@ -1,5 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { falhou, pontosDaBusca } from "@/lib/campanhas-servidor";
+import { falhou, pontosDaBusca } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Os pinos do mapa de uma busca: os leads dela com coordenadas e a cor do estado (no máximo 2000, no SQL).

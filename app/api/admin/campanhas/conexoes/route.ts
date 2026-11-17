@@ -1,5 +1,5 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { conexoesDoAdmin, falhou } from "@/lib/campanhas-servidor";
+import { conexoesDoAdmin, falhou } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Os números que podem enviar (as empresas do próprio admin com instância), com o

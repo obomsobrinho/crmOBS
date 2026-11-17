@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDaAssinatura, corpoDoCancelamento } from "@/lib/billing-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
-import { PLANS, planFor, type PlanKey } from "@/lib/billing";
+import { PLANS, planFor } from "@/lib/billing";
 import { alinharMarcasDoMes } from "@/lib/consumo-ia";
 import { agoraMs } from "@/lib/periodo";
 import {
@@ -31,18 +32,12 @@ export async function POST(req: NextRequest) {
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: { plan?: string; cpfCnpj?: string; name?: string; email?: string };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-
+  // O corpo cruza o esquema (`lib/billing-schemas.ts`): JSON e plano, com as frases de antes.
+  const lido = await lerCorpo(req, corpoDaAssinatura, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const plan = body.plan;
-  if (plan !== "essencial" && plan !== "profissional" && plan !== "avancado") {
-    return NextResponse.json({ error: "plano inválido" }, { status: 400 });
-  }
-  const plano = PLANS[plan as PlanKey];
+  const plano = PLANS[plan];
 
   const svc = createServiceClient();
   const { data: atual, error: readErr } = await svc
@@ -185,13 +180,11 @@ export async function DELETE(req: NextRequest) {
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let motivo = "";
-  try {
-    const body = (await req.json()) as { motivo?: string };
-    motivo = (body.motivo ?? "").trim().slice(0, 500);
-  } catch {
-    // Motivo é opcional: cancelar não pode depender de a pessoa explicar.
-  }
+  // Motivo é opcional: cancelar não pode depender de a pessoa explicar. Corpo ausente ou
+  // torto vale motivo vazio (`corpoDoCancelamento`, `lib/billing-schemas.ts`), como antes.
+  const lidoDoCancelamento = await lerCorpo(req, corpoDoCancelamento, { motivo: true });
+  if ("erro" in lidoDoCancelamento) return lidoDoCancelamento.erro;
+  const { motivo } = lidoDoCancelamento.dados;
 
   const svc = createServiceClient();
   const { data: atual } = await svc

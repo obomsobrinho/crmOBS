@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoEnvioManual } from "@/features/conversas/schemas";
 import { headersN8n } from "@/lib/n8n";
 import { createServiceClient } from "@/lib/supabase/service";
 import { fecharPedido } from "@/lib/handoffs";
 import { SOLUCAO_DA_PORTA } from "@/lib/solucoes";
 import { telefoneImpossivel } from "@/lib/avisos";
+import { envDoServidor } from "@/lib/env";
 
 // Único bucket de que esta rota assina arquivo (o privado de mídia do WhatsApp).
 const BUCKET_MIDIA = "whatsapp-media";
@@ -60,7 +62,7 @@ async function assumirConversa(
 // Multi-tenant: anexa a `instance` do tenant logado para o n8n rotear o envio
 // pela instância Evolution correta.
 export async function POST(req: Request) {
-  const webhookUrl = process.env.N8N_SEND_WEBHOOK_URL;
+  const webhookUrl = envDoServidor("N8N_SEND_WEBHOOK_URL");
   if (!webhookUrl) {
     return NextResponse.json(
       { error: "N8N_SEND_WEBHOOK_URL não configurado" },
@@ -81,20 +83,10 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: {
-    phone?: string;
-    text?: string;
-    /** "Eu respondo" (27/09/2026): o pedido de ajuda que esta resposta resolve. */
-    pedidoId?: number;
-    /** "Esta pessoa sabe que eu vou escrever" (Clientes, fatia B, 01/10/2026). */
-    aceite?: boolean;
-    media?: { bucket?: string; path?: string; type?: string; mime?: string; filename?: string };
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`features/conversas/schemas.ts`); os campos são conferidos abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoEnvioManual, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const { phone, text, media } = body;
   const hasMedia = !!(media && media.path);

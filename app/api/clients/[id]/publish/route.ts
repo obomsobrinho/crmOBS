@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoPublicar } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { TablesUpdate } from "@/lib/database.types";
 import { publishBlockers } from "@/lib/onboarding";
@@ -48,19 +49,14 @@ export async function PUT(
 ) {
   const { id } = await ctx.params;
 
-  const r = await sessaoDaRota({ id, dono: "só o dono pode publicar o agente", revalidar: true });
+  const r = await sessaoDaRota({ id, dono: "só o dono pode publicar o agente", ativa: true, revalidar: true });
   if ("erro" in r) return r.erro;
   const { mine } = r;
 
-  let body: { enabled?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
-  if (typeof body.enabled !== "boolean") {
-    return NextResponse.json({ error: "informe enabled" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`), com as frases de antes.
+  const lido = await lerCorpo(req, corpoDoPublicar, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const primeiraVez = !mine.agentPublishedAt;
 

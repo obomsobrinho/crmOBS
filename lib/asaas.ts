@@ -1,4 +1,5 @@
 import "server-only";
+import { envDoServidor } from "@/lib/env";
 
 // Cliente da API do Asaas. SÓ NO SERVIDOR: a chave é um segredo de conta
 // inteira (cria cobrança, move dinheiro), então nunca pode chegar no browser.
@@ -27,18 +28,18 @@ export class AsaasError extends Error {
 }
 
 export function asaasBaseUrl(): string {
-  return process.env.ASAAS_ENV === "producao" ? PRODUCAO : SANDBOX;
+  return envDoServidor("ASAAS_ENV") === "producao" ? PRODUCAO : SANDBOX;
 }
 
 export function asaasIsSandbox(): boolean {
-  return process.env.ASAAS_ENV !== "producao";
+  return envDoServidor("ASAAS_ENV") !== "producao";
 }
 
 async function call<T>(
   path: string,
   init?: { method?: string; body?: unknown }
 ): Promise<T> {
-  const key = process.env.ASAAS_API_KEY;
+  const key = envDoServidor("ASAAS_API_KEY");
   if (!key) {
     throw new AsaasError(500, "o pagamento precisa de ASAAS_API_KEY no servidor");
   }

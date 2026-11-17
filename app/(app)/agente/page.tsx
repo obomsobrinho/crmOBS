@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { normalizarRegras, validateConfig, type AgentConfig } from "@/lib/agent-prompt";
 import { publishBlockers } from "@/lib/onboarding";
 import type { KnowledgeDoc } from "@/lib/crm";
+import { envDoServidor } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -97,7 +98,7 @@ export default async function AgentePage() {
         initialNotifyJid={notifyGroup}
         stageNames={stageNames}
         knowledgeDocs={docs}
-        knowledgeKeyConfigured={!!process.env.OPENAI_API_KEY}
+        knowledgeKeyConfigured={!!envDoServidor("OPENAI_API_KEY")}
         // Atendendo agora = já foi ao ar alguma vez E está ligado na chave.
         agentEnabled={!!client!.agentPublishedAt && client!.agentEnabled}
         // Só muda a frase do rodapé (salvar já publica, ou ainda não vai ao ar).

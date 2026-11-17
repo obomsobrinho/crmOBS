@@ -2,7 +2,7 @@
 
 import NavRail from "@/components/NavRail";
 import BillingBanner from "@/components/BillingBanner";
-import MessageComposer from "@/components/MessageComposer";
+import MessageComposer from "@/features/conversas/components/MessageComposer";
 import { Card } from "@/components/ui/card";
 import { accessState } from "@/lib/billing";
 

@@ -1,4 +1,5 @@
 import "server-only";
+import { envDoServidor } from "@/lib/env";
 
 /**
  * Headers das chamadas do app aos webhooks do n8n ("CRM Envio Manual" e
@@ -11,7 +12,7 @@ import "server-only";
  * deploy: app, depois n8n).
  */
 export function headersN8n(): Record<string, string> {
-  const segredo = process.env.N8N_WEBHOOK_SECRET;
+  const segredo = envDoServidor("N8N_WEBHOOK_SECRET");
   return {
     "Content-Type": "application/json",
     ...(segredo ? { "x-webhook-secret": segredo } : {}),

@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDoEnvioDeArquivo } from "@/lib/agent-schemas";
 import { createServiceClient } from "@/lib/supabase/service";
 import { KNOWLEDGE_MAX_BYTES, KNOWLEDGE_MAX_LABEL } from "@/lib/crm";
 import { EMBEDDING_MODEL } from "@/lib/rag";
+import { envDoServidor } from "@/lib/env";
 
 // Passo 1 do upload da base de conhecimento (padrão gatekeeper). Cria o registro
 // do documento (status processing) e devolve uma URL assinada para o navegador
@@ -23,23 +25,21 @@ export async function POST(
 ) {
   const { id } = await ctx.params;
 
-  const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento" });
+  const r = await sessaoDaRota({ id, dono: "só o dono gerencia a base de conhecimento", ativa: true });
   if ("erro" in r) return r.erro;
 
   // Sem a chave, o /process não conseguiria embedar; falha cedo.
-  if (!process.env.OPENAI_API_KEY) {
+  if (!envDoServidor("OPENAI_API_KEY")) {
     return NextResponse.json(
       { error: "a base de conhecimento precisa de OPENAI_API_KEY no servidor" },
       { status: 501 }
     );
   }
 
-  let body: { filename?: string; mime?: string; size?: number };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`); o resto é conferido abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDoEnvioDeArquivo, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
   const filename = safeName(typeof body.filename === "string" ? body.filename : "");
   const size = typeof body.size === "number" ? body.size : 0;
   if (!filename) {

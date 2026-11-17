@@ -54,7 +54,7 @@ export const LEMBRETE = "lembrete";
  * Mídia que a IA mandou (04/11/2026, `lib/midias.ts`): o n8n grava a linha com
  * `media_url` e SEM `bot_message`, então ela não é resposta da IA nem do time em
  * nenhuma conta (a frase que acompanha já é a resposta). Na conversa vira balão
- * enviado da IA (`components/thread/bolhas.ts`), e na ficha não entra em Arquivos
+ * enviado da IA (`features/conversas/components/thread/bolhas.ts`), e na ficha não entra em Arquivos
  * (que lista os tipos recebidos). As cópias em SQL não mudam: todas exigem
  * `bot_message` não vazio.
  */

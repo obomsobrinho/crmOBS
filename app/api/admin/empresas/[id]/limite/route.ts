@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { rotaDoAdmin } from "@/lib/admin";
-import { limiteValido } from "@/lib/admin-empresas";
 import { agoraMs } from "@/lib/periodo";
 import { limiaresDaEmpresa, mesSP } from "@/lib/custo-ia";
 import { createServiceClient } from "@/lib/supabase/service";
+import { lerCorpo } from "@/lib/rota";
+import { corpoDoLimite } from "@/features/central/schemas";
 
 // PUT /api/admin/empresas/[id]/limite: o admin muda o teto de tokens de IA do
 // mês de uma empresa (P1 item 6). Corpo `{ limite: number | null }` (tokens;
@@ -19,19 +20,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 // turno (a checagem lê o teto a cada mensagem).
 export const PUT = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    let body: { limite?: unknown };
-    try {
-      body = (await req.json()) as { limite?: unknown };
-    } catch {
-      return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-    }
-    const limite = body.limite;
-    if (!limiteValido(limite)) {
-      return NextResponse.json(
-        { error: "limite inválido: um número inteiro de tokens maior que zero, ou null para o padrão" },
-        { status: 400 }
-      );
-    }
+    // O corpo cruza o esquema (`features/central/schemas.ts`, sobre `limiteValido`), com as frases de antes.
+    const lido = await lerCorpo(req, corpoDoLimite, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const { limite } = lido.dados;
 
     // Sem limite gravado (null) vale o do PLANO da empresa: os limiares saem do teto que passa a valer.
     const svc = createServiceClient();

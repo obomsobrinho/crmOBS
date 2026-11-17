@@ -6,6 +6,8 @@ import { diaIsoSP } from "@/lib/fuso";
 import { janelaDoIntervalo } from "@/lib/picos";
 import { agoraMs } from "@/lib/periodo";
 import { createServiceClient } from "@/lib/supabase/service";
+import { lerConsulta } from "@/lib/rota";
+import { consultaDoUso } from "@/features/central/schemas";
 
 // GET /api/admin/empresas/[id]/uso: o uso de IA de UM cliente para a aba "Uso de IA" da central do dono.
 // Só o admin (`ADMIN_USER_IDS`, guarda `rotaDoAdmin`: 404 para outro login, 400 para id torto). O
@@ -22,11 +24,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 // As três últimas devolvem `{ uso, picos, janela }`. Parâmetro torto é 400, nunca 500.
 export const GET = rotaDoAdmin(async ({ id, req }) => {
   const agora = agoraMs();
-  const params = req.nextUrl.searchParams;
-  const mes = params.get("mes");
-  const tudo = params.get("tudo");
-  const de = params.get("de");
-  const ate = params.get("ate");
+  // A consulta cruza o esquema (`features/central/schemas.ts`); a conferência depende do relógio e segue aqui.
+  const lido = lerConsulta(req, consultaDoUso, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const mes = lido.dados.mes ?? null;
+  const tudo = lido.dados.tudo ?? null;
+  const de = lido.dados.de ?? null;
+  const ate = lido.dados.ate ?? null;
   const pedidos = [mes !== null, tudo !== null, de !== null || ate !== null].filter(Boolean).length;
   if (
     pedidos > 1 ||

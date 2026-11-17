@@ -4,12 +4,12 @@
 - Area: data, realtime
 
 ## Context
-Audit F3 (R-07, RT-03, STRUCT-03). `app/(app)/pedidos/page.tsx` and `components/Pedidos.tsx` each wrote the same handoffs query plus the contact-names query. The "Resolvidos" tab (30 days) was not paginated, the "Abertos" number was `abertos.length`, and every realtime event on `handoffs` refetched three queries (open, resolved, names) for the whole list.
+Audit F3 (R-07, RT-03, STRUCT-03). `app/(app)/pedidos/page.tsx` and `features/pedidos/components/Pedidos.tsx` each wrote the same handoffs query plus the contact-names query. The "Resolvidos" tab (30 days) was not paginated, the "Abertos" number was `abertos.length`, and every realtime event on `handoffs` refetched three queries (open, resolved, names) for the whole list.
 
 ## Decision
-- ONE fetch module, `lib/pedidos-fonte.ts`, with two implementations of the same contract: the database (`public.pedidos_pagina` / `public.pedidos_contagens`, `security invoker`) and memory (only for the `/design` preview). The server page reads the first 10 of the opening tab, the tab counts and the `?abrir=` request through it; the browser reads the next pages, search and single rows through the same functions.
+- ONE fetch module, `features/pedidos/api/fonte.ts`, with two implementations of the same contract: the database (`public.pedidos_pagina` / `public.pedidos_contagens`, `security invoker`) and memory (only for the `/design` preview). The server page reads the first 10 of the opening tab, the tab counts and the `?abrir=` request through it; the browser reads the next pages, search and single rows through the same functions.
 - Both tabs paginate 10 at a time (`usePaginada`, infinite scroll) and search goes to the server after a 300ms debounce (name, or what was asked, or phone digits, accent and case insensitive). The tab is part of the params: switching tabs reads the first page of the other one.
-- Order stays: Abertos oldest first (`opened_at, id`), Resolvidos newest first within 30 days (`closed_at desc, id desc`). It lives in the SQL `order by` and in `ordemAbertos` / `ordemResolvidos` (`lib/pedidos.ts`); change both.
+- Order stays: Abertos oldest first (`opened_at, id`), Resolvidos newest first within 30 days (`closed_at desc, id desc`). It lives in the SQL `order by` and in `ordemAbertos` / `ordemResolvidos` (`features/pedidos/regras.ts`); change both.
 - "2 of 3 in this conversation" is computed in SQL over the whole open queue (window functions), not over the rows that arrived.
 - Counts are an aggregate (`pedidos_contagens`), never `rows.length`.
 - Realtime goes through `useCanalTenant`. An event on `handoffs` is debounced (400ms) and fetches ONE conversation's open queue (`abertosDoFone`) or the one request that closed (`porId`); `encaixarAbertosDaConversa` / `encaixarResolvido` place it. A row that sorts after the last loaded one while more pages exist is not inserted (it arrives by scroll). The reassubscription and focus return call `revalidar`, the only place that rereads the loaded rows.

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { blocoDeOrigem, SECAO_ORIGEM, textoParaLead } from "../lib/prospeccao";
+import { blocoDeOrigem, SECAO_ORIGEM, textoParaLead } from "../features/campanhas/regras";
 import { comEnvioDaCampanha, semLoteAtual } from "../lib/mensagem";
 
 // A origem de campanha no turno do agente (03/11/2026): a seção do prompt e o

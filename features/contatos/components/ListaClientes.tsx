@@ -1,0 +1,448 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Plus, UsersRound } from "lucide-react";
+import AvatarContato from "@/components/AvatarContato";
+import BotaoDeFiltro from "@/components/BotaoDeFiltro";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EstadoVazio } from "@/components/ui/estado-vazio";
+import { CampoBusca } from "@/components/ui/campo-busca";
+import {
+  AreaRolavel,
+  DISSOLVER_LISTA,
+} from "@/components/ui/dissolver-rolagem";
+import { cn } from "@/lib/utils";
+import { formatTime, prettyPhone } from "@/lib/format";
+import { quemAtende, tagColor } from "@/lib/crm";
+import { agoraMs } from "@/lib/periodo";
+import { foraDaLista } from "@/lib/inbox-lista";
+import { useDebounce } from "@/lib/use-debounce";
+import { fonteClientesDaMemoria, type FonteClientes } from "@/features/contatos/api/fonte";
+import { fonteDeContatosDoNavegador } from "@/features/contatos/api/navegador";
+import { useContagensDeContatos, useListaDeContatos } from "@/features/contatos/hooks/useContatos";
+import { useFimDaLista } from "@/lib/use-fim-da-lista";
+import { useContatosNaUrl } from "./na-url";
+import {
+  DADOS_DO_CADASTRO,
+  LIMIAR_FRIO_DIAS,
+  ROTULO_FILTRO,
+  diasSemContato,
+  emConversa,
+  preenchidos,
+  textoUltimoContato,
+  type ClienteItem,
+  type FiltroClientes,
+} from "@/lib/clientes";
+
+// O diálogo só pesa quando alguém clica em "Novo cliente" (R-30): chunk à parte.
+const NovoClienteDialog = dynamic(() => import("@/features/contatos/components/NovoClienteDialog"));
+
+// LISTA DE CLIENTES (30/09/2026, docs/plano-clientes.md; paginada em 01/10/2026,
+// docs/plano-carregamento.md, fase 3).
+//
+// 10 por vez, mais ao rolar. Busca (com debounce) e filtros rodam no BANCO
+// (`clientes_pagina`), com a mesma regra de `casaBusca`/`passaFiltro`; as
+// contagens dos chips também (`clientes_contagens`). Antes a tela baixava até
+// 2.000 contatos com todas as conversas e todas as tags para filtrar aqui.
+//
+// ⚠️ Sem realtime: a lista revalida ao voltar o foco (no máximo a cada 10s), a
+// mesma regra das outras telas.
+export default function ListaClientes({
+  clientId,
+  previewTodos,
+  numeroAvisos = null,
+  selecionadoId = null,
+  hrefModelo = "/contatos/{id}",
+  podeCadastrar = true,
+  simular = false,
+}: {
+  /** Tenant logado. Sem ele (preview /design) a lista roda sobre `previewTodos`. */
+  clientId?: string;
+  previewTodos?: ClienteItem[];
+  /** Destino dos avisos: nunca é cliente (lib/avisos.ts). */
+  numeroAvisos?: string | null;
+  /** Conta bloqueada (modo leitura) não cadastra. */
+  podeCadastrar?: boolean;
+  /** Preview `/design/contatos`: o "Novo cliente" valida e não grava. */
+  simular?: boolean;
+  /** Para o preview `/design/contatos`, que não tem rota por contato. */
+  selecionadoId?: number | null;
+  /** Endereço de cada linha, com `{id}` no lugar do id. O preview troca. */
+  hrefModelo?: string;
+}) {
+  const pathname = usePathname();
+  // Filtro e busca na URL (refresh e voltar mantêm). A busca vai à URL a cada tecla
+  // (o nuqs junta as escritas), e só a LEITURA espera 300 ms parado: gravar a URL
+  // depois do atraso atropelava a navegação de quem digitava e já clicava num contato
+  // (o `replaceState` da busca chegava no meio da ida para a ficha).
+  const url = useContatosNaUrl();
+  const filtro = url.filtro;
+  const setFiltro = (f: FiltroClientes) => void url.setU({ filtro: f === "todos" ? null : f });
+  const q = url.q;
+  const setQ = (v: string) => void url.setU({ q: v || null });
+  const busca = useDebounce(q.trim(), 300);
+  const [novoAberto, setNovoAberto] = useState(false);
+  // O diálogo (chunk à parte) monta na primeira abertura e fica: fechar não perde o rascunho.
+  const [novoMontado, setNovoMontado] = useState(false);
+  const [novoTelefone, setNovoTelefone] = useState("");
+  const abrirNovo = (telefone = "") => {
+    setNovoTelefone(telefone);
+    setNovoMontado(true);
+    setNovoAberto(true);
+  };
+  const agora = useMemo(() => agoraMs(), []);
+  const fora = useMemo(() => foraDaLista(numeroAvisos), [numeroAvisos]);
+
+  // DADOS (passo 3b de docs/plano-dados-e-estado.md): a lista e os números leem pelo
+  // cache (`hooks/useContatos.ts`), sem nada vindo do servidor; a fonte é o banco pelo
+  // navegador (RLS) ou a memória do /design.
+  const fonte = useMemo<FonteClientes>(
+    () => (clientId ? fonteDeContatosDoNavegador(clientId) : fonteClientesDaMemoria(previewTodos ?? [], agora)),
+    [clientId, previewTodos, agora]
+  );
+  const { contagens: contagem, carregou: contou } = useContagensDeContatos(fonte, fora);
+  const lista = useListaDeContatos(fonte, fora, { filtro, busca });
+  const itens = lista.itens;
+  const carregando = lista.isPending || lista.isFetchingNextPage || (lista.isPlaceholderData && lista.isFetching);
+  const fimRef = useFimDaLista(lista.hasNextPage, lista.isFetchingNextPage, () => void lista.fetchNextPage());
+
+  // Contato renomeado ou cadastrado NESTA aba (R-15): a ponte de Contatos do layout
+  // (`features/contatos/api/ponte.ts`) deixa a lista velha, e esta tela relê.
+
+  // No CELULAR, lista e ficha não dividem a tela: com uma ficha aberta a lista
+  // some (por CSS, como a lista de conversas), e quem volta é o "voltar".
+  const abertoPelaRota = pathname.match(/^\/contatos\/(\d+)/)?.[1];
+  const ativo = selecionadoId ?? (abertoPelaRota ? Number(abertoPelaRota) : null);
+
+  const linhas = itens;
+  const temBusca = busca.length > 0;
+  const chipsVisiveis = (Object.keys(ROTULO_FILTRO) as FiltroClientes[]).filter(
+    (k) => k === "todos" || k === filtro || contagem[k] > 0
+  );
+
+  return (
+    <Card
+      asChild
+      variant="pagina"
+      className={cn(
+        "flex min-w-0 flex-1 flex-col overflow-hidden",
+        ativo != null && "max-md:hidden"
+      )}
+    >
+      <section aria-label="Contatos">
+        <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-titulo">Contatos</h1>
+            <span
+              data-slot="clientes-total"
+              className="text-apoio font-semibold tabular-nums text-ink-3"
+            >
+              {contagem.todos}
+            </span>
+            {podeCadastrar && (
+              <Button
+                variant="outline"
+                size="control"
+                data-slot="clientes-novo"
+                onClick={() => abrirNovo()}
+                className="ml-auto"
+              >
+                <Plus size={14} />
+                Novo contato
+              </Button>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <CampoBusca
+              className="min-w-0 flex-1 md:max-w-[420px]"
+              valor={q}
+              aoMudar={setQ}
+              placeholder="Buscar por nome, telefone ou dado"
+              rotulo="Buscar contatos"
+              aoLimpar={() => setQ("")}
+              mostrarLimpar={temBusca}
+            />
+            {/* O filtro igual ao da central (29/10/2026, dono). A MESMA regra da lista de
+                conversas (D4, 30/09/2026): opção com zero some, menos "Todos" e a ligada;
+                com uma opção só, o botão some. */}
+            {chipsVisiveis.length > 1 && (
+              <BotaoDeFiltro
+                slot="clientes-filtro"
+                ativos={filtro === "todos" ? 0 : 1}
+                rotulo={filtro === "todos" ? "Filtrar contatos" : `Filtrar contatos: ${ROTULO_FILTRO[filtro]}`}
+                grupos={[
+                  {
+                    titulo: "Mostrar",
+                    opcoes: chipsVisiveis.map((k) => ({
+                      chave: k,
+                      rotulo: ROTULO_FILTRO[k],
+                      contagem: contagem[k],
+                      marcado: filtro === k,
+                      aoEscolher: () => setFiltro(k),
+                    })),
+                  },
+                ]}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Cabeçalho das colunas: só no computador. No celular cada linha é um
+            bloco só, com o último contato embaixo do nome. */}
+        <div
+          aria-hidden
+          className="grid grid-cols-[minmax(0,1fr)_150px_72px] gap-3 border-b border-line-soft px-5 py-2 text-rotulo uppercase text-ink-3 max-md:hidden xl:grid-cols-[minmax(0,1fr)_150px_minmax(0,180px)_72px]"
+        >
+          <span>Contato</span>
+          <span>Último contato</span>
+          <span className="max-xl:hidden">Tags</span>
+          <span className="text-right">Cadastro</span>
+        </div>
+
+        <AreaRolavel tamanho={DISSOLVER_LISTA} className="min-h-0 flex-1">
+          {contou && contagem.todos === 0 && !carregando ? (
+            <Vazio
+              titulo="Ainda não há contatos"
+              texto="Quem escrever para o seu WhatsApp aparece aqui sozinho, com telefone e nome."
+            />
+          ) : linhas.length === 0 && !carregando ? (
+            temBusca ? (
+              <Vazio
+                titulo={`Nenhum contato para “${busca}”`}
+                texto="A busca olha nome, telefone, e-mail, tags e os campos que você criou."
+              >
+                {podeCadastrar && (
+                  <Button
+                    variant="outline"
+                    size="control"
+                    data-slot="clientes-vazio-novo"
+                    className="mt-2"
+                    onClick={() => abrirNovo(/\d{8,}/.test(q.replace(/\D/g, "")) ? q : "")}
+                  >
+                    <Plus size={14} />
+                    Cadastrar novo contato
+                  </Button>
+                )}
+              </Vazio>
+            ) : filtro === "conversa" ? (
+              <Vazio
+                titulo="Ninguém em conversa hoje"
+                texto="Quem escrever hoje aparece aqui."
+              />
+            ) : filtro === "nunca" ? (
+              <Vazio
+                titulo="Todo mundo já escreveu"
+                texto="Quem você cadastrar e ainda não tiver escrito aparece aqui."
+              />
+            ) : filtro === "frio" ? (
+              <Vazio
+                titulo="Ninguém esfriou"
+                texto={`Nenhum contato passou ${LIMIAR_FRIO_DIAS} dias sem falar com você.`}
+              />
+            ) : (
+              <Vazio
+                titulo="Todos os cadastros estão completos"
+                texto="Nome, nascimento e e-mail preenchidos em todos."
+              />
+            )
+          ) : (
+            <ul data-slot="clientes-lista">
+              {linhas.map((it) => (
+                <Linha
+                  key={it.id}
+                  it={it}
+                  agora={agora}
+                  ativa={it.id === ativo}
+                  href={hrefModelo.replace("{id}", String(it.id))}
+                />
+              ))}
+              {/* O fim da lista: quando aparece, vem a próxima página. */}
+              {lista.hasNextPage && (
+                <li
+                  ref={fimRef}
+                  data-slot="clientes-mais"
+                  aria-hidden
+                  className="h-px"
+                />
+              )}
+              {carregando && (
+                <li data-slot="clientes-carregando" className="px-5 py-3 text-legenda text-ink-3">
+                  Carregando…
+                </li>
+              )}
+            </ul>
+          )}
+        </AreaRolavel>
+        {novoMontado && (
+          <NovoClienteDialog
+            aberto={novoAberto}
+            onFechar={() => setNovoAberto(false)}
+            telefoneInicial={novoTelefone}
+            simular={simular}
+          />
+        )}
+      </section>
+    </Card>
+  );
+}
+
+function Linha({
+  it,
+  agora,
+  ativa,
+  href,
+}: {
+  it: ClienteItem;
+  agora: number;
+  ativa: boolean;
+  href: string;
+}) {
+  const hoje = emConversa(it.lastMessageAt, agora);
+  const quem = quemAtende({ pausada: it.pausada, temAtendente: it.temAtendente });
+  const cheios = preenchidos(it);
+  const n = cheios.filter(Boolean).length;
+  const titulo = it.name ?? prettyPhone(it.phone);
+
+  const frio = diasSemContato(it.lastMessageAt, agora);
+  const contato = !it.lastMessageAt
+    ? { texto: "Nunca escreveu", sub: null }
+    : frio != null
+      ? { texto: `Sem contato há ${frio} dias`, sub: null }
+      : hoje
+      ? {
+          texto: `Hoje, ${formatTime(it.lastMessageAt)}`,
+          sub:
+            quem === "ia"
+              ? "IA atendendo"
+              : quem === "pessoa"
+                ? "Time atendendo"
+                : "Ninguém atendendo",
+        }
+      : { texto: textoUltimoContato(it.lastMessageAt, agora), sub: null };
+
+  return (
+    <li>
+      <Link
+        href={href}
+        data-slot="clientes-item"
+        data-frio={frio != null ? "sim" : undefined}
+        aria-current={ativa ? "page" : undefined}
+        className={cn(
+          "relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-line-soft py-2.5 pl-4 pr-4 transition-colors duration-100 md:grid-cols-[minmax(0,1fr)_150px_72px] md:pl-5 md:pr-5 xl:grid-cols-[minmax(0,1fr)_150px_minmax(0,180px)_72px]",
+          ativa ? "bg-[var(--sel-bg)]" : "hover:bg-[var(--active-bg)]"
+        )}
+      >
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-y-0 left-0 w-[3px]",
+            ativa ? "bg-[var(--sel-bar)]" : "bg-transparent"
+          )}
+        />
+        <span className="flex min-w-0 items-center gap-2.5">
+          <AvatarContato size="md" phone={it.phone} name={it.name} fotoPath={it.fotoPath} />
+          <span className="flex min-w-0 flex-col gap-px">
+            <span data-slot="clientes-nome" className="truncate text-corpo font-semibold text-ink">
+              {titulo}
+            </span>
+            <span className="truncate text-legenda text-ink-3">
+              {it.name ? prettyPhone(it.phone) : "Sem nome"}
+            </span>
+            {/* No celular o último contato ganha LINHA PRÓPRIA: colado ao
+                telefone ele era cortado justo no número de dias, que é o que
+                o contato frio existe para dizer. */}
+            <span
+              data-slot="clientes-contato-celular"
+              className="truncate text-legenda text-ink-2 md:hidden"
+              suppressHydrationWarning
+            >
+              {contato.texto}
+            </span>
+          </span>
+        </span>
+
+        <span className="flex min-w-0 flex-col gap-px max-md:hidden">
+          <span
+            className="flex items-center gap-1.5 truncate text-apoio text-ink-2"
+            suppressHydrationWarning
+          >
+            {hoje && (
+              <span
+                aria-hidden
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  quem === "ia" ? "bg-brand-ink" : quem === "pessoa" ? "bg-human-ink" : "bg-ink-faint"
+                )}
+              />
+            )}
+            {contato.texto}
+          </span>
+          {contato.sub && (
+            <span className="truncate text-legenda text-ink-3">{contato.sub}</span>
+          )}
+        </span>
+
+        <span className="flex min-w-0 flex-wrap gap-1 max-xl:hidden">
+          {it.tags.slice(0, 3).map((t) => (
+            <span
+              key={t.name}
+              className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-line px-1.5 py-px text-legenda text-ink-2"
+            >
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: tagColor(t.color ?? "gray") }}
+              />
+              <span className="truncate">{t.name}</span>
+            </span>
+          ))}
+          {it.tags.length > 3 && (
+            <span className="text-legenda text-ink-3">+{it.tags.length - 3}</span>
+          )}
+        </span>
+
+        {/* O MEDIDOR DE CADASTRO: um traço por dado (Nome, Nascimento, E-mail).
+            Convida sem cobrar: cinza cheio e cinza vazio, nunca cor de aviso. */}
+        <span
+          data-slot="clientes-medidor"
+          title={n === 3 ? "Cadastro completo" : `${n} de 3 dados preenchidos`}
+          aria-label={n === 3 ? "Cadastro completo" : `${n} de 3 dados preenchidos`}
+          className="flex items-center justify-end gap-[3px]"
+        >
+          {cheios.map((on, i) => (
+            <span
+              key={DADOS_DO_CADASTRO[i]}
+              className={cn("h-1.5 w-3 rounded-full", on ? "bg-ink-2" : "bg-[var(--line-strong)]")}
+            />
+          ))}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+function Vazio({
+  titulo,
+  texto,
+  children,
+}: {
+  titulo: string;
+  texto: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <EstadoVazio
+      data-slot="clientes-vazio"
+      icone={UsersRound}
+      titulo={titulo}
+      texto={texto}
+    >
+      {children}
+    </EstadoVazio>
+  );
+}

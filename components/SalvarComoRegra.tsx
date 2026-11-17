@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 // docs/adr/2026-10-13-orientation-saved-as-agent-rule.md).
 //
 // Mora dentro de "Orientação do time", no detalhe de um pedido RESOLVIDO pela
-// orientação (`podeVirarRegra`, lib/pedidos.ts). Só o dono vê; a rota
+// orientação (`podeVirarRegra`, features/pedidos/regras.ts). Só o dono vê; a rota
 // `agent-rules` recusa o atendente de novo (403), porque esconder não é barrar.
 //
 // O editor abre PREENCHIDO com a orientação, para o dono generalizar antes de

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { caminhoDoAdmin, ehAdminPeloAmbiente } from "@/lib/admin-acesso";
+import { envPublico } from "@/lib/env";
 
 // Next 16: o antigo "middleware" agora se chama "proxy". Renova a sessão do
 // Supabase a cada request e protege as rotas do app (exige login).
@@ -8,8 +9,8 @@ export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    envPublico.supabaseUrl!,
+    envPublico.supabaseAnonKey!,
     {
       cookies: {
         getAll() {
@@ -55,6 +56,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith("/recuperar-senha") ||
     pathname.startsWith("/auth") ||
     // Página de preview de design — só existe em desenvolvimento.
+    // eslint-disable-next-line no-restricted-properties -- NODE_ENV stays literal: the bundler folds it and drops dev-only code (B8, lib/env.ts)
     (process.env.NODE_ENV !== "production" && pathname.startsWith("/design")) ||
     // Route Handlers cuidam da própria autenticação (sessão ou secret do n8n).
     pathname.startsWith("/api");

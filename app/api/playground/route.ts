@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { sessaoDaRota } from "@/lib/rota";
-import { AgentError, type ChatTurn } from "@/lib/agent";
+import { lerCorpo, sessaoDaRota } from "@/lib/rota";
+import { corpoDaBancada } from "@/lib/agent-schemas";
+import { AgentError } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { createServiceClient } from "@/lib/supabase/service";
 import { agendaAtivaDoTenant } from "@/lib/agenda-servidor";
 import { normalizarConfigDaAgenda, problemaDosServicos } from "@/lib/agenda";
 import { compilePersona, normalizarRegras, type BusinessHours } from "@/lib/agent-prompt";
 import { horarioCadastrado } from "@/lib/horarios";
+import { envDoServidor } from "@/lib/env";
 
 // Bancada de teste (playground), dono-only. Fala direto com o cérebro REAL
 // (processTurn, o mesmo do /api/agent) em modo dryRun: não persiste nada (nem
@@ -33,46 +35,10 @@ export async function POST(req: NextRequest) {
   if ("erro" in r) return r.erro;
   const client = r.mine;
 
-  let body: {
-    message?: string;
-    history?: ChatTurn[];
-    currentStage?: string | null;
-    stageSource?: string | null;
-    instruction?: string | null;
-    /**
-     * A bancada orientou um pedido de ajuda (29/09/2026): a IA responde SEM
-     * mensagem nova do cliente, como no atendimento de verdade.
-     */
-    retomada?: { instruction?: string } | null;
-    /** Pedidos de ajuda abertos na conversa de teste. */
-    pedidosAbertos?: string[];
-    /** Configuração em edição: "guiado" usa `config`, "avancado" usa `persona`. */
-    mode?: string;
-    config?: unknown;
-    persona?: string;
-    /** Base do aviso de handoff em edição (só usada no modo avançado). */
-    handoffNotice?: string;
-    /** Regras salvas pelo time (os dois modos). Ausente = as do tenant, do banco. */
-    regrasSalvas?: unknown;
-    /** Hora fixa do turno (ISO), para a bateria de testes de data e horário. */
-    agoraTeste?: string;
-    /**
-     * Horário fixo no modo avançado (o guiado traz o seu em `config.hours`).
-     * Existe para a bateria (`e2e/bateria/`) não depender do horário salvo no
-     * tenant. A rota é sempre dryRun, então nunca chega ao atendimento.
-     */
-    hours?: unknown;
-    /**
-     * Agenda ligada de teste (`{ config, servicos }`), para a suíte paga
-     * conversar com a agenda sem ligar a do tenant. A rota é sempre dryRun.
-     */
-    agendaTeste?: { config?: unknown; servicos?: unknown };
-  };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
-  }
+  // O corpo cruza o esquema (`lib/agent-schemas.ts`); o resto é conferido abaixo, como antes.
+  const lido = await lerCorpo(req, corpoDaBancada, { motivo: true });
+  if ("erro" in lido) return lido.erro;
+  const body = lido.dados;
 
   const message = typeof body.message === "string" ? body.message.trim() : "";
   const retomada =
@@ -155,7 +121,7 @@ export async function POST(req: NextRequest) {
     personaOverride = r.persona;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "o agente precisa de OPENAI_API_KEY configurada no servidor" },

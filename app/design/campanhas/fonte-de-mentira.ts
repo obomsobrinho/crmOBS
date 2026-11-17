@@ -21,7 +21,7 @@ import {
   nomeDaBusca,
   telefoneDoLead,
   type EnvioParaResultado,
-} from "@/lib/prospeccao";
+} from "@/features/campanhas/regras";
 import {
   leadsDoFiltro,
   sinaisDoLead,
@@ -35,13 +35,13 @@ import {
   type Pagina,
   type RecorteDosLeads,
   type Resultados,
-} from "@/components/admin/campanhas/tipos";
-import { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA } from "@/lib/campanhas-pedidos";
+} from "@/features/campanhas/components/tipos";
+import { SITUACOES_DA_BUSCA, SITUACOES_DA_CAMPANHA } from "@/features/campanhas/pedidos";
 import { CONEXOES_DE_MENTIRA, resultadoDaBuscaDeMentira, type DadosDeMentira } from "./dados";
 
 // A FONTE DE MENTIRA do preview (`/design/campanhas`): a MESMA interface da
 // página de verdade (`FonteDeCampanhas`), respondendo de dados inventados em
-// memória com as regras puras de `lib/prospeccao.ts` (o SQL de verdade tem os
+// memória com as regras puras de `features/campanhas/regras.ts` (o SQL de verdade tem os
 // gêmeos dessas contas). Buscar, marcar, salvar e iniciar mudam só a memória da
 // página; nada é gravado, nenhuma busca paga é chamada, nenhuma mensagem sai.
 

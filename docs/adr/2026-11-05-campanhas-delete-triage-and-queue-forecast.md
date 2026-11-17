@@ -31,7 +31,7 @@ campaign would make contacted leads look new again.
 - **Triage**: "bom" stays the only positive mark, now a heart toggle with a "Só os bons" shortcut over the
   table. `marcacao` accepts only `bom` and `descartado`; a second level for "reasonable" would be a new
   value, which is the owner's call.
-- **Forecast**: `previsaoDaFila` (`lib/prospeccao.ts`) walks the cron's own `proximoEnvioEm` with the draw at
+- **Forecast**: `previsaoDaFila` (`features/campanhas/regras.ts`) walks the cron's own `proximoEnvioEm` with the draw at
   the middle of the band, from the stored `proximo_envio_em`, resetting the count each day. The table is
   already in cron order (`ordem`); `prospeccao_leads_da_campanha` now also returns `ordem` and
   `posicao_na_fila`. A paused campaign shows no time: nothing goes out until it resumes.

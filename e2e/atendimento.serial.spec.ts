@@ -75,7 +75,8 @@ test("handoff: entra em Esperando, a caixa vira a fila, e Resolvido fecha um de 
   await expect(item).toBeVisible();
   await item.click();
   // No dev a conversa compila na primeira visita: esperar a navegação acabar.
-  await page.waitForURL(`**/inbox/${FONE_TESTE}`);
+  // O link leva o recorte da lista junto (`?filtro=needs`, passo 4 do plano de dados).
+  await page.waitForURL(`**/inbox/${FONE_TESTE}?*`);
   await page.waitForLoadState("networkidle");
 
   // Na CONVERSA (27/09/2026): o pedido é a CAIXA DE ESCRITA, o mais antigo

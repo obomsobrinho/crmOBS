@@ -3,6 +3,9 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { atualizacaoDoEvento } from "@/lib/billing";
 import { segredoConfere } from "@/lib/segredo";
 import type { Json } from "@/lib/database.types";
+import { esquemaDoEventoAsaas } from "@/lib/asaas-esquema";
+import { conferirNaSombra } from "@/lib/rota";
+import { envDoServidor } from "@/lib/env";
 
 // Webhook do Asaas: é ele que muda o estado da assinatura de um tenant.
 //
@@ -34,7 +37,7 @@ interface EventoAsaas {
 }
 
 export async function POST(req: NextRequest) {
-  const esperado = process.env.ASAAS_WEBHOOK_TOKEN;
+  const esperado = envDoServidor("ASAAS_WEBHOOK_TOKEN");
   if (!esperado) {
     console.error("webhook do Asaas chamado sem ASAAS_WEBHOOK_TOKEN configurado");
     return NextResponse.json({ error: "não configurado" }, { status: 500 });
@@ -48,6 +51,8 @@ export async function POST(req: NextRequest) {
   try {
     bruto = (await req.json()) as Json;
     corpo = bruto as EventoAsaas;
+    // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema.
+    conferirNaSombra(esquemaDoEventoAsaas, bruto, "/api/billing/webhook");
   } catch {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }

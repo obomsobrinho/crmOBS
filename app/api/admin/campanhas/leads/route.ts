@@ -1,6 +1,7 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { paginaDe, recorteDe } from "@/lib/campanhas-pedidos";
-import { categoriasDoRecorte, cidadesDosLeads, falhou, paginaDeLeads, torto } from "@/lib/campanhas-servidor";
+import { lerConsulta } from "@/lib/rota";
+import { consultaDosLeads } from "@/features/campanhas/schemas";
+import { categoriasDoRecorte, cidadesDosLeads, falhou, paginaDeLeads, torto } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // A tabela de leads (toda a base, ou `?busca=`): 10 por página, busca pelo nome
@@ -10,14 +11,13 @@ import { createServiceClient } from "@/lib/supabase/service";
 // vieram nos leads do escopo, com a contagem (o filtro "Categoria").
 export const GET = rotaDoAdmin(
   async ({ req }) => {
-    const q = req.nextUrl.searchParams;
+    const lido = lerConsulta(req, consultaDosLeads, { motivo: true });
+    if ("erro" in lido) return lido.erro;
+    const { recorte, cidades, categorias, pagina } = lido.dados;
     const svc = createServiceClient();
     try {
-      const recorte = recorteDe(q);
-      if (typeof recorte === "string") return torto(recorte);
-      if (q.get("cidades") === "1") return Response.json(await cidadesDosLeads(svc, recorte.buscaId));
-      if (q.get("categoriasDoRecorte") === "1") return Response.json(await categoriasDoRecorte(svc, recorte.buscaId));
-      const pagina = paginaDe(q.get("pagina"));
+      if (cidades) return Response.json(await cidadesDosLeads(svc, recorte.buscaId));
+      if (categorias) return Response.json(await categoriasDoRecorte(svc, recorte.buscaId));
       if (pagina === null) return torto("página inválida");
       return Response.json(await paginaDeLeads(svc, { ...recorte, pagina }));
     } catch (e) {

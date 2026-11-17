@@ -770,14 +770,14 @@ test.describe("Trava por rota da central", () => {
 
   test("as rotas de Campanhas fora de /api/admin (webhook da fonte e cron) conferem um segredo em tempo constante", () => {
     const webhook = ler("app/api/prospeccao/apify/route.ts");
-    expect(webhook).toContain('segredoConfere(req.headers.get("x-apify-secret"), process.env.APIFY_WEBHOOK_SECRET)');
+    expect(webhook).toContain('segredoConfere(req.headers.get("x-apify-secret"), envDoServidor("APIFY_WEBHOOK_SECRET"))');
     const cron = ler("app/api/prospeccao/cron/route.ts");
-    expect(cron).toContain("segredoConfere(recebido, process.env.CRON_SECRET)");
+    expect(cron).toContain('segredoConfere(recebido, envDoServidor("CRON_SECRET"))');
     expect(achar("app/api/prospeccao", /^route\.ts$/)).toEqual(["app/api/prospeccao/apify/route.ts", "app/api/prospeccao/cron/route.ts"]);
   });
 
   test("a central nunca importa o service_role em componente", () => {
-    for (const arq of achar("components/admin", /\.tsx$/)) {
+    for (const arq of achar("features/central/components", /\.tsx$/)) {
       expect(ler(arq)).not.toContain("lib/supabase/service");
     }
   });

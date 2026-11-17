@@ -54,9 +54,9 @@ Facts read from the actor's public API on 02/11/2026 (`/v2/acts/compass~crawler-
    number; only the Evolution instance name).
 
 ## Consequences
-- `lib/prospeccao.ts`: `nome` in `OpcoesDaBusca`, `nomeDaBusca`, caps up to 500, FREE tier prices.
-  `lib/apify-campos.ts`: `TODAS_AS_EMPRESAS`, `tetoDeGastoUsd`. `lib/planilha-de-leads.ts` (pure) and
-  `lib/planilha-servidor.ts` (exceljs, server). Routes `POST /api/admin/campanhas/planilha` and
+- `features/campanhas/regras.ts`: `nome` in `OpcoesDaBusca`, `nomeDaBusca`, caps up to 500, FREE tier prices.
+  `features/campanhas/apify-campos.ts`: `TODAS_AS_EMPRESAS`, `tetoDeGastoUsd`. `features/campanhas/planilha-de-leads.ts` (pure) and
+  `features/campanhas/server/planilha.ts` (exceljs, server). Routes `POST /api/admin/campanhas/planilha` and
   `GET /api/admin/campanhas/leads/exportar`, both in the guard list.
 - Migration `20261102184345_prospeccao_busca_ampla.sql` (functions only, backwards compatible: new
   parameters with defaults), applied before the deploy.

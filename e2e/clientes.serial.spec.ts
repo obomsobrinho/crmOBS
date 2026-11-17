@@ -175,7 +175,9 @@ test.describe("Clientes paginado", () => {
     await page.goto("/contatos");
     const itens = page.locator('[data-slot="clientes-item"]');
     await expect(itens).toHaveCount(10, { timeout: 30_000 });
-    expect(chamadas.pagina, "a primeira página veio do servidor").toBe(0);
+    // Desde o passo 3b (docs/plano-dados-e-estado.md) o layout não lê nada: a primeira
+    // página vem do navegador, UMA leitura, a mesma que o servidor fazia antes.
+    expect(chamadas.pagina, "a primeira página: uma leitura").toBe(1);
 
     const area = page.locator('[data-slot="clientes-lista"]').locator("xpath=..");
     for (let i = 0; i < 6 && (await page.locator('[data-slot="clientes-mais"]').count()) > 0; i++) {
@@ -188,8 +190,11 @@ test.describe("Clientes paginado", () => {
 
     chamadas.pagina = 0;
     await page.getByLabel("Buscar contatos").pressSequentially("paginado 17", { delay: 40 });
-    await expect(itens).toHaveCount(1, { timeout: 15_000 });
-    await expect(itens.first()).toContainText("Cliente paginado 17");
+    // A busca também casa pelos dígitos do telefone ("17"): um contato real do tenant de
+    // teste com 17 no número aparece junto (14/11/2026). Conta só os contatos deste teste.
+    const deste = itens.filter({ hasText: "Cliente paginado" });
+    await expect(deste).toHaveCount(1, { timeout: 15_000 });
+    await expect(deste.first()).toContainText("Cliente paginado 17");
     expect(chamadas.pagina, "uma busca, não uma por letra").toBe(1);
   });
 });

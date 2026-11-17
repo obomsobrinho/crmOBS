@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AgentError, type ChatTurn } from "@/lib/agent";
 import { processTurn, TurnError } from "@/lib/agent-turn";
 import { segredoConfere } from "@/lib/segredo";
+import { conferirNaSombra } from "@/lib/rota";
+import { corpoDoAgente } from "@/features/conversas/schemas";
+import { envDoServidor } from "@/lib/env";
 
 // Cérebro do agente, chamado pelo n8n (que virou só o cano). STATELESS por turno.
 // Recebe { client_id, phone, instance, message, nomewpp? }, e a orquestração
@@ -19,7 +22,7 @@ import { segredoConfere } from "@/lib/segredo";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  const secret = process.env.N8N_LOOKUP_SECRET;
+  const secret = envDoServidor("N8N_LOOKUP_SECRET");
   if (!segredoConfere(req.headers.get("x-lookup-secret"), secret)) {
     return NextResponse.json({ error: "não autorizado" }, { status: 401 });
   }
@@ -41,6 +44,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
+  // Modo sombra (2.9 do plano de dados): só registra o que fugir do esquema, nunca recusa.
+  conferirNaSombra(corpoDoAgente, body, "/api/agent");
+
   const clientId = typeof body.client_id === "string" ? body.client_id : "";
   const phone = typeof body.phone === "string" ? body.phone : "";
   const message = typeof body.message === "string" ? body.message.trim() : "";
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = envDoServidor("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json(
       { error: "o agente precisa de OPENAI_API_KEY configurada no servidor" },

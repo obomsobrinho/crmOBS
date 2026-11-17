@@ -1,16 +1,16 @@
 import { rotaDoAdmin } from "@/lib/admin";
-import { campoDe, ehId, recorteDe } from "@/lib/campanhas-pedidos";
-import { editarTelefone, falhou, marcarLead, paginaDoLead, removerLead, torto } from "@/lib/campanhas-servidor";
-import { problemaDoCelular, telefoneDoLead } from "@/lib/prospeccao";
+import { erroDaRota, lerConsulta, lerCorpo } from "@/lib/rota";
+import { consultaDaBusca, corpoDaMarcacao, corpoDoTelefone, recorte } from "@/features/campanhas/schemas";
+import { editarTelefone, falhou, marcarLead, paginaDoLead, removerLead } from "@/features/campanhas/server/campanhas";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // Em que página do recorte (`?busca=&texto=&cidade=&filtros=`) o lead está: o pino
 // clicado no mapa leva a tabela até ele. `{ pagina: null }` = fora do recorte.
 export const GET = rotaDoAdmin(async ({ req, id }) => {
-  const recorte = recorteDe(req.nextUrl.searchParams);
-  if (typeof recorte === "string") return torto(recorte);
+  const lido = lerConsulta(req, recorte, { motivo: true });
+  if ("erro" in lido) return lido.erro;
   try {
-    return Response.json({ pagina: await paginaDoLead(createServiceClient(), recorte, id) });
+    return Response.json({ pagina: await paginaDoLead(createServiceClient(), lido.dados, id) });
   } catch (e) {
     return falhou("achar a página do lead", e);
   }
@@ -19,12 +19,11 @@ export const GET = rotaDoAdmin(async ({ req, id }) => {
 // Marca o lead: `{ marcacao: "bom" | "descartado" | null }` (uma função SQL, com a linha em admin_acoes).
 export const PUT = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    const corpo: unknown = await req.json().catch(() => null);
-    const marcacao = campoDe(corpo, "marcacao");
-    if (marcacao !== null && marcacao !== "bom" && marcacao !== "descartado") return torto("marcação inválida");
+    const lido = await lerCorpo(req, corpoDaMarcacao, { motivo: true });
+    if ("erro" in lido) return lido.erro;
     try {
-      const r = await marcarLead(createServiceClient(), admin, id, marcacao);
-      return r ? Response.json(r) : Response.json({ error: "lead não encontrado" }, { status: 404 });
+      const r = await marcarLead(createServiceClient(), admin, id, lido.dados.marcacao);
+      return r ? Response.json(r) : erroDaRota(404, "lead não encontrado", "nao_encontrado");
     } catch (e) {
       return falhou("marcar o lead", e);
     }
@@ -35,14 +34,10 @@ export const PUT = rotaDoAdmin(
 // Põe um celular no lead: `{ telefone }`, com a mesma conferência da tela (`problemaDoCelular`).
 export const PATCH = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    const corpo: unknown = await req.json().catch(() => null);
-    const digitado = campoDe(corpo, "telefone");
-    if (typeof digitado !== "string") return torto("telefone inválido");
-    const problema = problemaDoCelular(digitado);
-    const celular = telefoneDoLead(digitado);
-    if (problema || !celular) return torto(problema ?? "telefone inválido");
+    const lido = await lerCorpo(req, corpoDoTelefone, { motivo: true });
+    if ("erro" in lido) return lido.erro;
     try {
-      return await editarTelefone(createServiceClient(), admin, id, celular);
+      return await editarTelefone(createServiceClient(), admin, id, lido.dados);
     } catch (e) {
       return falhou("editar o lead", e);
     }
@@ -53,10 +48,10 @@ export const PATCH = rotaDoAdmin(
 // Tira o lead de uma lista (`?busca=`), ou da base inteira (sem `busca`).
 export const DELETE = rotaDoAdmin(
   async ({ req, admin, id }) => {
-    const busca = req.nextUrl.searchParams.get("busca");
-    if (busca !== null && !ehId(busca)) return torto("busca inválida");
+    const lido = lerConsulta(req, consultaDaBusca, { motivo: true });
+    if ("erro" in lido) return lido.erro;
     try {
-      return await removerLead(createServiceClient(), admin, id, busca);
+      return await removerLead(createServiceClient(), admin, id, lido.dados.busca);
     } catch (e) {
       return falhou("tirar o lead", e);
     }
