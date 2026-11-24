@@ -1,6 +1,6 @@
 # Campaign origin embed fixed, first-reply window, silence for bots and the human-reply notice
 
-Status: Accepted (owner, 23/11/2026, option B of the diagnosis; branch `claude/trava-robo-origem`, not merged, the owner reviews and tests in production as a lead)
+Status: Accepted (owner, 23/11/2026, option B of the diagnosis; deployed on 24/11/2026 at the owner's request, who tests in production as a lead)
 Area: agent-ai, admin, data
 
 ## Context
@@ -18,7 +18,7 @@ Why no test caught (1): the lock tests are pure (`e2e/resposta-automatica.design
 ## Decision
 
 - **Origin**: embed disambiguated by the FK, `prospeccao_buscas!prospeccao_leads_busca_id_fkey(fonte)` (the lead's entry search). `OrigemDaCampanha` also carries `empresa` (the lead name) for the notice.
-- **Failure visible**: a failed origin read goes to `diagnostics.origemErro` (the error message, no contact data), not only to the console. It is in the `/api/agent` response (n8n execution) and in the bench; `agent_turns` has no column for it (adding one is a migration, the owner's call).
+- **Failure visible**: a failed origin read goes to `diagnostics.origemErro` (the error message, no contact data), not only to the console, and to `agent_turns.origem_erro` (migration `20261124154124_agent_turns_origem_erro.sql`, owner's go on 24/11/2026, applied during attendance hours by his choice). The column is written only when there is an error. Check: `select count(*) from agent_turns where origem_erro is not null and created_at > now() - interval '1 day'` must be 0.
 - **First-reply window** (`lib/resposta-automatica.ts`, pure, used by `processTurn` through `decisaoDoTurno` and by the cron through `respostasDosEnvios`): for each campaign send, the received messages from 5 s before the send to 120 s after (`JANELA_PRIMEIRA_RESPOSTA_MS`), and before any other message of ours, are judged as ONE batch. It is a bot when no message is audio and at least one has the look of automation (`temCaraDeAutomacao`: the 07/11 pattern, 80 characters or more, `TAMANHO_DE_AUTOMACAO`, or a link). Outside the window the 2-of-3 rule stays. **Audio is never a bot**, in both rules (`message_type = 'audio'`; an audio without transcription still counts as a person and as a reply in the cron).
 - **Silence**: with a bot the turn sends nothing (`silenced = resposta_automatica`, `messages_sent = 0`). `PEDIDO_AO_ROBO` was removed: the campaign message is already what a person will read when they open the chat, and any extra message only feeds bots that answer every message (Sanglard, Palermo/Saipos, Alvim/anota.ai).
 - **Notice "Lead da campanha respondeu"** (text `textoDoAvisoDeLeadDaCampanha`, `lib/avisos.ts`, owner's wording): `Lead da campanha respondeu: {empresa}. Mensagem: "{texto}". Abrir: {link da conversa}`. Sent once per lead and send, with no new column: the turn attends, the conversation has a campaign origin and there is no message of ours after the send (`ehPrimeiraRespostaAoEnvio`). Single sender `processTurn`, via `after()`, to the sending company's `notify_group_jid`; never in `dryRun` (the bench branch never sets it), never to a DDD 00 phone. The link is `/inbox/{JID}` on `VERCEL_PROJECT_PRODUCTION_URL`; off Vercel the "Abrir" part is dropped. Tony keeps attending (no pause, no help request). A "Sair" is also a person answering, so it notifies too. No second notice when Tony sends the trial link (owner: not now).
@@ -29,6 +29,8 @@ Why no test caught (1): the lock tests are pure (`e2e/resposta-automatica.design
 - Accepted risk of option B: a person who answers within 2 minutes with a long text or a link gets no reply to that batch (and a person writing in the same batch as a bot inside the window too); their next message is attended. Both are written as tests (cases 23 and "lote com uma pessoa no meio DENTRO da janela").
 - The cron counts fewer "respondeu": bots inside the window no longer count. Sends already marked `respondeu` are not reprocessed (the cron skips `situacao = respondeu` for the first reply), so old campaign numbers do not move.
 - The rehearsal script's default interval became 30 min (a person, outside both windows) instead of 60 s.
+- Residual: a bot that first answers more than 2 minutes after the send falls to the 2-of-3 rule and may still get a reply. The rehearsal of 24/11/2026 with 10 real bot texts arriving 5 min late (ORIGEM present): no "não consegui entender" any more, Tony picks up the campaign question, but in Sanglard he asked the bot's question back ("pode me dizer seu nome?"). The real bots answered in 1 to 58 s.
+- `test:e2e:n8n` has two campaign scenarios ("conversa de campanha"): the test phone becomes, for the scenario only, a lead of a deleted campaign of the test tenant; the bot gets silence and no model call, the person gets a reply without "não consegui entender", and `origem_erro` stays null.
 
 ## Evidence
 

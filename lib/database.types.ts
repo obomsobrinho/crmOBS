@@ -313,6 +313,7 @@ export type Database = {
           latency_ms: number
           messages_sent: number
           model: string | null
+          origem_erro: string | null
           output_tokens: number | null
           phone: string
           rag_matches: number
@@ -333,6 +334,7 @@ export type Database = {
           latency_ms: number
           messages_sent?: number
           model?: string | null
+          origem_erro?: string | null
           output_tokens?: number | null
           phone: string
           rag_matches?: number
@@ -353,6 +355,7 @@ export type Database = {
           latency_ms?: number
           messages_sent?: number
           model?: string | null
+          origem_erro?: string | null
           output_tokens?: number | null
           phone?: string
           rag_matches?: number

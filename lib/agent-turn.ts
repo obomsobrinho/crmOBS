@@ -1291,6 +1291,9 @@ async function registrarTurno(
       // `?? null` cobre os dois casos sem número: turno silencioso (não chama o
       // modelo) e resposta que não trouxe o campo.
       cached_input_tokens: t.usage?.cachedInputTokens ?? null,
+      // A leitura da origem de campanha falhou (24/11/2026): sem a coluna ela falhou 16
+      // dias só no console. Vai só quando há erro (a mensagem, nunca dado do contato).
+      ...(t.diagnostics.origemErro ? { origem_erro: t.diagnostics.origemErro.slice(0, 500) } : {}),
     });
     if (error) console.error("falha ao registrar o turno:", error.message);
   } catch (e) {

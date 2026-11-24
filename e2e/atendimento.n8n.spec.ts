@@ -285,3 +285,106 @@ test("a mesma mensagem entregue duas vezes vira uma linha só", async () => {
   await respostaUnica(8000);
   expect(recebidas(await linhas())).toHaveLength(1);
 });
+
+// ── CONVERSA DE CAMPANHA DE PONTA A PONTA (24/11/2026) ───────────────────────────
+// A trava de robô nunca tinha rodado em produção: a leitura da origem falhava em
+// todo turno e nenhum teste usava um lead de campanha (o DDD 00 não era lead).
+// Aqui o telefone de teste vira, só durante o cenário, um lead de uma campanha
+// APAGADA (`apagada_em`, fora das telas) do tenant de teste, com o envio gravado; no
+// fim tudo é removido. O aviso "Lead da campanha respondeu" nunca sai para DDD 00
+// (`telefoneImpossivel`). docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md
+test.describe("conversa de campanha", () => {
+  const TEXTO_DA_CAMPANHA =
+    "Boa tarde, Cliente de teste! Tudo bem? Sou o Tony, da OBS. Hoje, quando chega mensagem no WhatsApp com vocês ocupados, quem responde?\n\nSe não fizer sentido pra vocês, é só me avisar que eu não mando mais.";
+  // A saudação real de um robô de pizzaria (campanha de Lajinha, 16/11/2026), com o link trocado.
+  const ROBO =
+    "Boa noite 😄 Bem vindo(a) ao atendimento da *Pizzaria Teste!* Você pode visualizar nosso CARDÁPIO 🍕 e pedir através desse link: \n\n*Peça aqui 👉*• pizzariateste.saipos.com\n\nTenha garantia de prioridade pedindo por esse link e receba sua pizza em casa em até 30 minutos ☺️✨";
+  let ids: { busca: string; lead: string; campanha: string } | null = null;
+
+  async function semearCampanha(enviadoHaMs: number) {
+    const svc = servico();
+    const { data: busca, error: e1 } = await svc
+      .from("prospeccao_buscas")
+      .insert({ termo: "e2e trava de robô", cidade: "", fonte: "planilha", status: "pronta", apagada_em: new Date().toISOString() })
+      .select("id")
+      .single();
+    expect(e1, "semeou a lista").toBeNull();
+    const { data: lead, error: e2 } = await svc
+      .from("prospeccao_leads")
+      .insert({ busca_id: busca!.id, nome: NOME_TESTE, telefone: FONE_TESTE })
+      .select("id")
+      .single();
+    expect(e2, "semeou o lead").toBeNull();
+    const campanha = crypto.randomUUID();
+    const { error: e3 } = await svc.from("prospeccao_campanhas").insert({
+      id: campanha,
+      client_id: clientId,
+      nome: "e2e trava de robô (apagada no fim)",
+      status: "concluida",
+      apagada_em: new Date().toISOString(),
+    });
+    expect(e3, "semeou a campanha").toBeNull();
+    const enviadoEm = new Date(Date.now() - enviadoHaMs).toISOString();
+    const { error: e4 } = await svc.from("prospeccao_campanha_leads").insert({
+      campanha_id: campanha,
+      lead_id: lead!.id,
+      ordem: 0,
+      status: "enviado",
+      variante: 0,
+      tentado_em: enviadoEm,
+      enviado_em: enviadoEm,
+      texto: TEXTO_DA_CAMPANHA,
+    });
+    expect(e4, "semeou o envio").toBeNull();
+    ids = { busca: busca!.id, lead: lead!.id, campanha };
+  }
+
+  async function apagarCampanha() {
+    if (!ids) return;
+    const svc = servico();
+    await svc.from("prospeccao_campanha_leads").delete().eq("campanha_id", ids.campanha);
+    await svc.from("prospeccao_campanhas").delete().eq("id", ids.campanha);
+    await svc.from("prospeccao_busca_leads").delete().eq("lead_id", ids.lead);
+    await svc.from("prospeccao_leads").delete().eq("id", ids.lead);
+    await svc.from("prospeccao_buscas").delete().eq("id", ids.busca);
+    ids = null;
+  }
+
+  test.afterEach(async () => {
+    await apagarCampanha();
+  });
+
+  async function turnos() {
+    const { data } = await servico()
+      .from("agent_turns")
+      .select("silenced, messages_sent, origem_erro")
+      .eq("client_id", clientId)
+      .like("phone", `${FONE_TESTE}%`)
+      .eq("dry_run", false);
+    return data ?? [];
+  }
+
+  test("o robô que responde na hora fica sem resposta (silêncio, sem modelo)", async () => {
+    await semearCampanha(3_000);
+    await texto(ROBO);
+    await expect.poll(async () => (await turnos()).length, { timeout: 90_000, intervals: [3000] }).toBeGreaterThanOrEqual(1);
+    await espera(10_000);
+    const t = await turnos();
+    expect(t.map((x) => x.silenced)).toEqual(["resposta_automatica"]);
+    expect(t[0].messages_sent).toBe(0);
+    expect(t[0].origem_erro ?? null).toBeNull();
+    expect(respostas(await linhas()), "nenhuma mensagem ao robô").toHaveLength(0);
+  });
+
+  test("a pessoa que responde depois é atendida com a campanha em mente, sem \"não consegui entender\"", async () => {
+    await semearCampanha(30 * 60_000);
+    await texto("Faz sim, mas no sábado fica corrido. O que vocês fazem?");
+    const l = await respostaUnica();
+    const resposta = respostas(l)[0].bot_message ?? "";
+    console.log(`[lead] Faz sim, mas no sábado fica corrido. O que vocês fazem?\n[tony] ${resposta}`);
+    expect(resposta).not.toMatch(/não consegui entender|pode repetir/i);
+    const t = await turnos();
+    expect(t.map((x) => x.silenced)).toEqual([null]);
+    expect(t[0].origem_erro ?? null).toBeNull();
+  });
+});
