@@ -1,0 +1,400 @@
+{
+  "fonte": "Campanha 'Lajinha segunda campanha complementar' (12 a 17/11/2026), lida em 23/11/2026 (SELECT). Telefones omitidos; números dentro dos textos trocados por 00000000000. 'segundos' = depois do envio da campanha.",
+  "casos": [
+    {
+      "empresa": "Jr Cabeleireiros",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1.5,
+          "tipo": "text",
+          "texto": "Agradecemos sua mensagem. Não estamos disponíveis no momento, mas entraremos em contato assim que possível.atendimento de terça a sábado de 09:00 às 16:00h."
+        },
+        {
+          "de": "lead",
+          "segundos": 1.5,
+          "tipo": "text",
+          "texto": "Jr Salao agradece seu contato. Como podemos ajudar?"
+        },
+        {
+          "de": "tony",
+          "segundos": 31.3,
+          "tipo": "text",
+          "texto": "Hoje vocês atendem de terça a sábado, das 09h às 16h?"
+        }
+      ]
+    },
+    {
+      "empresa": "Laryssa Barçante",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 4.8,
+          "tipo": "text",
+          "texto": "Olá. Agradeço pelo contato. \n\nNo momento não estou disponível. Se é seu primeiro contato, por favor, *informe seu nome e como posso te ajudar.* \n\n⚠️ Esclareço que as mensagens serão respondidas em ATÉ 24 horas.\n\nEm caso de urgência *(PRISÃO ou MORTE)*, ligue. \n\nAtenciosamente,\nLaryssa Barçante."
+        },
+        {
+          "de": "tony",
+          "segundos": 30.2,
+          "tipo": "text",
+          "texto": "Olá! Sem problema, Laryssa. Me passa seu nome e me diz no que você quer ajuda?"
+        }
+      ]
+    },
+    {
+      "empresa": "MedCenter Saúde",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1.3,
+          "tipo": "text",
+          "texto": "Olá! Seja bem vindo(a) a clínica MedCenter Saúde! Med Center saúde agradece seu contato. \nPara agilizar seu atendimento, me diga em que posso te ajudar! E aguarde que já lhe atenderemos. \n\n 🩺Especialidades: \n📍Clínico geral\n📍Dentista\n📍Depilação a laser \n📍Dermatologista \n📍Endocrinologista \n📍Ginecologista \n📍Neurologista\n📍Nutricionista \n📍Ortopedista \n📍Pediatra 00000000000\n📍Psiquiatra\n📍Ultrassonografia \n📍 Otorrinolaringologista \n📍 Nefrologista \n\n⏰ 08:00 as 18:00"
+        },
+        {
+          "de": "lead",
+          "segundos": 1.3,
+          "tipo": "text",
+          "texto": "Agradecemos sua mensagem. Não estamos disponíveis no momento, mas responderemos assim que possível.\nPara pediatra e clínico geral pode chamar no número 00000000000"
+        },
+        {
+          "de": "tony",
+          "segundos": 30.1,
+          "tipo": "text",
+          "texto": "Não consigo ajudar com isso por aqui. A OBS atende empresas no WhatsApp com o Atenda, que responde na hora com o que foi ensinado e chama alguém do time quando precisa."
+        }
+      ]
+    },
+    {
+      "empresa": "Moreira e Oliveira Advocacia",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1.4,
+          "tipo": "text",
+          "texto": "Olá!\n\nÉ um prazer receber seu contato.\n\nSe você chegou até aqui, busca uma solução jurídica clara e segura. Faço questão de dar atenção pessoal a cada demanda. \n\nPor isso, quero realizar uma análise individual e te entregar um diagnóstico estratégico detalhado, sem custo.\n\nComo dedico um tempo exclusivo para cada caso, os horários desta semana são limitados. Garanta o seu no link:\n\n👉https://calendar.app.google/Xz4Tn7nnt7KQo3XVA\n\nOu escreva em poucas linhas o seu caso por aqui.\n\nUm abraço,\n\nDr. Lucas Moreira"
+        },
+        {
+          "de": "tony",
+          "segundos": 30.6,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode repetir?"
+        }
+      ]
+    },
+    {
+      "empresa": "MR Clínica Médica",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 2.2,
+          "tipo": "text",
+          "texto": "Olá! 💚 Você entrou em contato com a MR Clínica Médica.\n\nNo momento, nossa equipe está fora do horário de atendimento.\n\n⏰ Nosso funcionamento:\n\nSegunda a sexta: 09h às 18h.\nSábado: 09h às 12h.\nDomingo: fechado.\n\nSua mensagem foi recebida! Nossa equipe retornará assim que possível no próximo período de atendimento.\n\n📍 Unidades: Lajinha, Manhuaçu, Chalé e Durandé.\n\nAgradecemos sua compreensão!\n\nMR Clínica Médica 💚"
+        },
+        {
+          "de": "tony",
+          "segundos": 35.8,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode repetir?"
+        }
+      ]
+    },
+    {
+      "empresa": "Ótica Focus",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 2.9,
+          "tipo": "text",
+          "texto": "Olá tudo bem?\nAqui é da ótica focu's de lajinha.\nEm que podemos te ajudar hoje?\nNossos horários de atendimento é de segunda à sexta-feira das 8:30 às 18:00 , não fechamos para horário de almoço. No sábado é de 8:00 ao 12:00 .\nAqui marcamos consulta com o oftalmologista Dr. Fabrício, ele atende somente na  quarta-feira, o valor da consulta é 330,00 porém marcando aqui conosco você ganha desconto e sua consulta sai por 280,00. A forma para pagamento da sua consulta é no Pix ou dinheiro. \nTenha um ótimo dia 😘"
+        },
+        {
+          "de": "tony",
+          "segundos": 38.4,
+          "tipo": "text",
+          "texto": "Olá! Vocês já têm um atendimento no WhatsApp para responder cliente na hora e marcar consulta com o Dr. Fabrício, sem precisar esperar no balcão?"
+        }
+      ]
+    },
+    {
+      "empresa": "Quiropraxia e Massoterapia Romildo Oliveira",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 2.6,
+          "tipo": "text",
+          "texto": "👋 Olá! Seja bem-vindo(a).\nObrigado pelo contato.\n\nPara agilizar seu atendimento, envie:\n• Nome completo\n• Cidade\n• Qual é sua principal dor ou queixa\n\nAssim que possível, retornarei sua mensagem.\n\n📍 Atendimentos em Lajinha/MG, Ibatiba/ES, Venda Nova do Imigrante/ES, Manhuaçu/MG e Durandé/MG."
+        },
+        {
+          "de": "tony",
+          "segundos": 37.9,
+          "tipo": "text",
+          "texto": "Oi! Posso te ajudar com o atendimento do WhatsApp ou com um projeto sob medida, como site, sistema ou automação. O que você quer resolver?"
+        }
+      ]
+    },
+    {
+      "empresa": "Rosy Ferreira",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1.3,
+          "tipo": "text",
+          "texto": "*Olá  Que Ótimo Ter você por aqui! *😍\n\n*Estarei te enviando um link de  agendamentos* E nele você irá escolher as datas e horários que você precisa ,  e la  irá aparecer  para você   Todas as datas e horários que ainda se encontra disponíveis! \nQualquer dúvida sobre o agendamento pode me chamar,  E  assim que for possível entrarei para  dar uma assistência a você  😉 \nhttps://maapp.com.br/RosyFerreira \n*O ESPAÇO ROSY FERREIRA STUDIO DE BELEZA AGRADECE PELA PREFERÊNCIA* \n😁😘"
+        },
+        {
+          "de": "tony",
+          "segundos": 35.3,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode repetir?"
+        }
+      ]
+    },
+    {
+      "empresa": "Sanglard Hermisdorff Advocacia",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 8,
+          "tipo": "text",
+          "texto": "🤖 Estamos implementando uma *Assistente Virtual que te fará algumas perguntas rápidas* para entender melhor o seu caso e lhe transferir para o setor específico!"
+        },
+        {
+          "de": "lead",
+          "segundos": 12,
+          "tipo": "text",
+          "texto": "Vamos criar seu cadastro em nosso sistema para que no próximo contato seja mais simples e rápido seu atendimento!\n\nBasta responder as perguntas a seguir:"
+        },
+        {
+          "de": "lead",
+          "segundos": 18,
+          "tipo": "text",
+          "texto": "Qual é o seu nome?\n\n*escreva seu nome abaixo* 👇"
+        },
+        {
+          "de": "tony",
+          "segundos": 45,
+          "tipo": "text",
+          "texto": "Não consigo criar cadastro por aqui, mas posso te ajudar no atendimento agora. Qual é o seu nome?"
+        },
+        {
+          "de": "lead",
+          "segundos": 55,
+          "tipo": "text",
+          "texto": "Você confirma que seu nome é *Não consigo criar cadastro por aqui, mas posso te ajudar no atendimento agora. Qual é o seu nome?*\n\n*Digite abaixo para confirmar ou alterar o seu nome*\n\n\n_Digite o número correspondente a opção desejada_\n\n1. ✅ Confirmado\n2. ❌ Desejo Alterar"
+        },
+        {
+          "de": "tony",
+          "segundos": 79.4,
+          "tipo": "text",
+          "texto": "Não consigo confirmar esse nome, porque ele não é o meu. Digite seu nome correto para seguir."
+        },
+        {
+          "de": "lead",
+          "segundos": 86,
+          "tipo": "text",
+          "texto": "Ops... parece que você digitou uma opção inválida.\n\n*Por favor digite apenas o número correspondente a opção desejada.*\n\n1. ✅ Confirmado\n2. ❌ Desejo Alterar"
+        },
+        {
+          "de": "tony",
+          "segundos": 111.9,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode repetir?"
+        },
+        {
+          "de": "lead",
+          "segundos": 119,
+          "tipo": "text",
+          "texto": "Ops... parece que você digitou uma opção inválida.\n\n*Por favor digite apenas o número correspondente a opção desejada.*\n\n1. ✅ Confirmado\n2. ❌ Desejo Alterar"
+        },
+        {
+          "de": "tony",
+          "segundos": 141,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode repetir?"
+        }
+      ]
+    },
+    {
+      "empresa": "Studio Mais Cachos Vivianni Gonzaga",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 5.3,
+          "tipo": "text",
+          "texto": "Olá 👋,Bem-Vinda ao Studio Mais Cachos VG um SALÃO ESPECIALIZADO em cabelos Ondulados, Cacheados e Crespos.\n\nAlgumas informações importantes:\n-⏰FUNCIONAMENTO⏰-\nTerça a Sábado 8h às 19h \n-📍Lajinha-Av.Natal Rodrigues Pereira,442, acima da papelaria Papecor, perto do supermercado juvenil.\n-✨Nosso atendimento personalizado,trabalhamos com    produtos,acessórios e agendamentos para todas as curvaturas.\n\nProfissionais Especializados \n✅ Cortes\n✅ Coloração \n✅ Botox\n✅ Sobrancelha \n✅ Depilação\n✅ Alongamento de gel\n✅ Banho de gel \n✅ Manicure e pedicure \n✅ Cachoterapia \n✅ Terapia Capilar \n✅ Produtos e acessórios \n\ncaso deseje ver nosso trabalho este é o nosso Instagram: 👇🏼\nhttps://www.instagram.com/studio_mais_cachos_vg?igsh=M3o1cngzcTZ6Nzg4\n\n👉🏼Para melhorar nossa comunicação,qual o seu nome e como podemos te ajudar?\nhttps://wa.me/message/CQHUVKULKOMGF1"
+        },
+        {
+          "de": "tony",
+          "segundos": 31.7,
+          "tipo": "text",
+          "texto": "Olá! O que você quer resolver no salão?"
+        }
+      ]
+    },
+    {
+      "empresa": "Taíssa Borges Studio",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 3.2,
+          "tipo": "text",
+          "texto": "Olá! Studio Taíssa Borges ✨ Fico feliz por sua mensagem!💅🏻\n\nEm que posso te ajudar ? \n🔹Deixe seu nome e o serviço que necessita Data e horário melhor para você !\n🔹No momento estou em atendimento, a sua resposta pode demorar um pouco.\n\nUm beijo e até logo 🩷🌸"
+        },
+        {
+          "de": "tony",
+          "segundos": 39.3,
+          "tipo": "text",
+          "texto": "Não consegui entender direito, pode me dizer o que você quer resolver?"
+        }
+      ]
+    },
+    {
+      "empresa": "ABC da Construção",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 9.5,
+          "tipo": "text",
+          "texto": "✨ Bem-vindo à Casa Brasil Acabamentos / Abc da Construção! ✨\n\nSerá um prazer te ajudar a escolher os melhores produtos para sua obra ou reforma. 🏡✨\nDigite sua mensagem para iniciarmos o atendimento. 👇"
+        },
+        {
+          "de": "tony",
+          "segundos": 42.9,
+          "tipo": "text",
+          "texto": "Oi! Hoje, quando alguém chama no WhatsApp de vocês, consegue responder na hora aí?"
+        }
+      ]
+    },
+    {
+      "empresa": "Bear King Food Park",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 3,
+          "tipo": "text",
+          "texto": "Boa tarde, O Bom Sobrinho! 👋\n\nNo momento estamos *fechados* e não estamos recebendo pedidos.\n\n🕒 *Nossos horários de funcionamento:*\n🔴 Estamos fechados no momento.\n➡ Sábado: 18:30 às 23:00\n\nProgramação Completa: \nDomingo: 18:30 às 23:00\nSegunda-feira: 18:30 às 23:00\nTerça-feira: Fechado\nQuarta-feira: Fechado\nQuinta-feira: 18:30 às 23:00\nSexta-feira: 18:30 às 23:00\n\nAssim que abrirmos, será um prazer atender você!"
+        },
+        {
+          "de": "tony",
+          "segundos": 28.7,
+          "tipo": "text",
+          "texto": "Boa tarde! No momento a OBS está fechada e a próxima abertura é segunda-feira, 16/11, às 8h. | Se quiser, me diz o que você precisa e eu já deixo encaminhado por aqui."
+        }
+      ]
+    },
+    {
+      "empresa": "Belizário Supermercado",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 146.5,
+          "tipo": "audio",
+          "texto": "Boa tarde, esse número não é do Mercado Benezaro, eu tentei fazer um cadastro, mas não ficou, não consegui tirar, meu amigo. Aí ficou o número, não sei o número lá do Mercado Benezaro, tá bom, meu amigo?"
+        },
+        {
+          "de": "tony",
+          "segundos": 180.5,
+          "tipo": "text",
+          "texto": "Boa tarde. Tá tudo certo, eu não vou continuar por aqui. Se precisar de algo depois, pode chamar novamente."
+        }
+      ]
+    },
+    {
+      "empresa": "Burger Josué",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 3.2,
+          "tipo": "text",
+          "texto": "Olá! Seja bem vindo ao *Burger Josué. Como podemos ajudar??"
+        },
+        {
+          "de": "tony",
+          "segundos": 31,
+          "tipo": "text",
+          "texto": "Oi! Hoje, quando um cliente chama no WhatsApp e demora a resposta, vocês conseguem atender na hora aí?"
+        }
+      ]
+    },
+    {
+      "empresa": "Chucky Burguer",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 2.5,
+          "tipo": "text",
+          "texto": "*Infelizmente recebemos sua mensagem fora do nosso horário de funcionamento, CHUCKY BURGUER agradece pela sua preferência.*\n\n*NOSSO HORÁRIO DE FUNCIONAMENTO.* 👇\n *•DE QUARTA  A SEGUNDA* 🗓️\n *•DAS 18:00 hrs*\n*às 23:00 hrs* ⏰\n\n*Lamentamos não poder atendê-lo (a) no momento, mas não fique chateado (a), em breve estaremos de volta!🤝*"
+        },
+        {
+          "de": "tony",
+          "segundos": 36.2,
+          "tipo": "text",
+          "texto": "Funcionamento à noite, né. Quer que eu veja se a OBS responde esse tipo de mensagem automática no WhatsApp do seu negócio?"
+        }
+      ]
+    },
+    {
+      "empresa": "Lanchonete do Alvim",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 57.8,
+          "tipo": "text",
+          "texto": "Boa noite! Estamos trabalhando para agilizar seu pedido, entre em nosso link: https://pedido.anota.ai/loja/lanchonete-do-alvim"
+        },
+        {
+          "de": "tony",
+          "segundos": 84.8,
+          "tipo": "text",
+          "texto": "Boa noite! Esse link é de vocês ou vocês querem entender como resolver o atendimento no WhatsApp da lanchonete?"
+        }
+      ]
+    },
+    {
+      "empresa": "Lolostore Cosmeticos",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1891.8,
+          "tipo": "text",
+          "texto": "Faz sim"
+        },
+        {
+          "de": "tony",
+          "segundos": 1916.4,
+          "tipo": "text",
+          "texto": "Perfeito, então o caminho é pelo Atenda, que responde seus clientes no WhatsApp na hora e chama alguém do time quando precisa. | Dá pra testar 7 dias grátis aqui: https://www.obomsobrinho.com.br/atenda"
+        },
+        {
+          "de": "lead",
+          "segundos": 1948.8,
+          "tipo": "text",
+          "texto": "Ok"
+        },
+        {
+          "de": "tony",
+          "segundos": 1970.2,
+          "tipo": "text",
+          "texto": "Perfeito, tá aqui o link pra testar 7 dias grátis: https://www.obomsobrinho.com.br/atenda"
+        }
+      ]
+    },
+    {
+      "empresa": "Palermo Forneria",
+      "conversa": [
+        {
+          "de": "lead",
+          "segundos": 1.2,
+          "tipo": "text",
+          "texto": "Boa noite 😄 Bem vindo(a) ao atendimento da *Palermo Forneria!* Você pode visualizar nosso CARDÁPIO 🍕 e pedir através desse link: \n\n*Peça aqui 👉*• Palermolajinha.saipos.com\n\nTenha garantia de prioridade pedindo por esse link e receba sua pizza em casa em até 30 minutos ☺️✨"
+        },
+        {
+          "de": "tony",
+          "segundos": 37,
+          "tipo": "text",
+          "texto": "Boa noite! Posso ajudar com algum pedido ou informação sobre a Palermo Forneria?"
+        }
+      ]
+    }
+  ]
+}

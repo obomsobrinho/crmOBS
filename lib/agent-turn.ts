@@ -20,6 +20,7 @@ import {
   ehNumeroDeAvisos,
   telefoneImpossivel,
   textoDoAviso,
+  textoDoAvisoDeLeadDaCampanha,
 } from "@/lib/avisos";
 import { nomeDoContato } from "@/lib/inbox";
 import { diaMesHoraSP } from "@/lib/fuso";
@@ -75,7 +76,7 @@ import type {
 } from "@/lib/agent-diagnostics";
 import { blocoDeOrigem, type OrigemDaCampanha } from "@/features/campanhas/regras";
 import { origemDaCampanha } from "@/features/campanhas/server/origem";
-import { decisaoDoTurno, PEDIDO_AO_ROBO, type DecisaoDoRobo } from "@/lib/resposta-automatica";
+import { decisaoDoTurno, ehPrimeiraRespostaAoEnvio, type DecisaoDoRobo } from "@/lib/resposta-automatica";
 import {
   blocoDeMidias,
   catalogoDasLinhas,
@@ -200,7 +201,8 @@ export interface ProcessTurnParams {
   /**
    * Só no dryRun, com `origemOverride`: quanto tempo depois da nossa última
    * mensagem a atual chegou (ms), para o script de ensaio provar a trava do robô
-   * (`lib/resposta-automatica.ts`). Sem ele, a resposta conta como lenta.
+   * (`lib/resposta-automatica.ts`). Sem ele, 30 min: fora da janela da primeira
+   * resposta (120 s) e da janela rápida.
    */
   intervaloDaRespostaMs?: number;
 }
@@ -512,11 +514,21 @@ export async function processTurn(
   let origem: OrigemDaCampanha | null = null;
   // A conversa de campanha caiu num robô de menu (`decisaoDoTurno`): "atender" é o turno normal.
   let robo: DecisaoDoRobo = "atender";
+  // A leitura da origem falhou (best-effort): o motivo vai ao diagnóstico do turno.
+  // De 07 a 23/11/2026 ela falhou em TODO turno só no console, e a trava nunca rodou.
+  let origemErro: string | null = null;
+  // A primeira resposta de uma pessoa a um envio de campanha: o aviso ao dono.
+  let primeiraAoEnvio = false;
   if (dryRun) {
     // O histórico do chamador já traz o envio (o script de ensaio o põe primeiro).
     origem = params.origemOverride ?? null;
     history = sanitizeHistory(params.history);
-    if (origem && !retomada) robo = decisaoDoTurno(linhasDeEnsaio(history, message, params.intervaloDaRespostaMs), 1);
+    if (origem && !retomada) {
+      const ensaio = linhasDeEnsaio(history, message, params.intervaloDaRespostaMs);
+      // O envio é a linha mais antiga (o script o põe primeiro), com a hora inventada do ensaio.
+      const envio = ensaio[ensaio.length - 1];
+      robo = decisaoDoTurno(ensaio, 1, envio?.bot_message ? envio.created_at : null);
+    }
     instruction = retomada
       ? retomada.instruction.trim()
       : typeof params.instruction === "string" && params.instruction.trim()
@@ -559,13 +571,17 @@ export async function processTurn(
         .eq("phone", phone)
         .is("closed_at", null)
         .order("opened_at", { ascending: true }),
-      origemDaCampanha(svc, clientId, phone).catch((e) => {
-        console.error("falha ao ler a origem de campanha:", e);
-        return null;
-      }),
+      origemDaCampanha(svc, clientId, phone).then(
+        (o) => ({ o, erro: null }),
+        (e: unknown) => {
+          console.error("falha ao ler a origem de campanha:", e);
+          return { o: null, erro: mensagemDoErro(e) };
+        }
+      ),
     ]);
     if (histErr) throw new TurnError(500, "falha ao carregar o histórico");
-    origem = daCampanha;
+    origem = daCampanha.o;
+    origemErro = daCampanha.erro;
     // O envio da campanha não é linha de chat_messages (o cron manda direto pela
     // Evolution): entra no histórico no lugar dele, para a IA ver o que a empresa disse.
     const linhas = origem ? comEnvioDaCampanha(rows ?? [], origem, HISTORY_ROWS) : (rows ?? []);
@@ -576,7 +592,10 @@ export async function processTurn(
     const { catalogo: doCatalogo } = await midiasP;
     const passado = retomada ? linhas : semLoteAtual(linhas, Date.now(), message);
     // Resposta automática (`lib/resposta-automatica.ts`): só em conversa de campanha.
-    if (origem && !retomada) robo = decisaoDoTurno(linhas, linhas.length - passado.length);
+    if (origem && !retomada) {
+      robo = decisaoDoTurno(linhas, linhas.length - passado.length, origem.enviadoEm);
+      primeiraAoEnvio = robo === "atender" && ehPrimeiraRespostaAoEnvio(linhas, origem.enviadoEm);
+    }
     history = buildHistory(passado, doCatalogo);
     resolvidos = pedidosResolvidos(rows, pedidos);
     abertos = fila ?? [];
@@ -590,13 +609,13 @@ export async function processTurn(
   }
 
   // RESPOSTA AUTOMÁTICA (07/11/2026, decisão do dono): a campanha caiu num robô de
-  // menu. ANTES do RAG e do modelo: na primeira vez, uma mensagem fixa pedindo uma
-  // pessoa; depois, silêncio. Nunca abre pedido de ajuda, nunca mexe no card, e o
-  // cron da campanha usa a mesma regra para não contar o robô como "respondeu".
-  // Uma mensagem que não bate com os sinais volta ao atendimento normal.
+  // menu. ANTES do RAG e do modelo: silêncio (24/11/2026; antes saía uma mensagem
+  // fixa pedindo uma pessoa, que só dava ao robô mais uma para responder). Nunca
+  // abre pedido de ajuda, nunca mexe no card, e o cron da campanha usa a mesma
+  // regra para não contar o robô como "respondeu". Uma mensagem que não bate com
+  // a regra volta ao atendimento normal.
   if (robo !== "atender") {
     const t = silentTurn(t0, { respostaAutomatica: robo });
-    if (robo === "pedir") t.output.messages = [PEDIDO_AO_ROBO];
     await logTurn(svc, {
       clientId,
       phone,
@@ -608,6 +627,26 @@ export async function processTurn(
       usage: null,
     });
     return t;
+  }
+
+  // LEAD DA CAMPANHA RESPONDEU (24/11/2026, decisão do dono): a primeira resposta
+  // de uma pessoa a um envio de campanha avisa o destino de avisos da empresa que
+  // enviou, uma vez por lead e envio (`ehPrimeiraRespostaAoEnvio`: depois da
+  // resposta da IA não vale mais). A IA segue atendendo; quem decide entrar é o
+  // dono. Só em produção (o ramo do dryRun nunca liga `primeiraAoEnvio`), nunca
+  // DDD 00 (`avisarLeadDaCampanha`).
+  if (primeiraAoEnvio && origem) {
+    avisarLeadDaCampanha({
+      phone,
+      instancia: (client.evolution_instance as string | null) ?? null,
+      destino: avisos,
+      texto: textoDoAvisoDeLeadDaCampanha({
+        empresa: origem.empresa ?? null,
+        phone,
+        mensagem: message,
+        abrir: linkDaConversa(phone),
+      }),
+    });
   }
 
   // Retrieval da base de conhecimento (RAG). Best-effort e só leitura, então
@@ -954,6 +993,8 @@ export async function processTurn(
     ...(atualizacao.tipo === "atualizar" ? { pedidoAtualizado: true } : {}),
     ...(avisoAgendado ? { avisoAgendado: true } : {}),
     ...(diagAgenda ? { agenda: diagAgenda } : {}),
+    ...(origemErro ? { origemErro } : {}),
+    ...(primeiraAoEnvio ? { avisoLeadDaCampanha: true } : {}),
   };
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado
@@ -1065,10 +1106,52 @@ async function midiaParaEnviar(
  * o aviso sai sem a linha "Abrir" em vez de apontar para lugar nenhum.
  */
 function linkDoPedido(pedidoId: number | null): string | null {
-  const host = envDoServidor("VERCEL_PROJECT_PRODUCTION_URL")?.trim();
-  if (!host) return null;
-  const base = `https://${host.replace(/^https?:\/\//, "")}/pedidos`;
+  const origem = origemDoSite();
+  if (!origem) return null;
+  const base = `${origem}/pedidos`;
   return pedidoId ? `${base}?abrir=${pedidoId}` : base;
+}
+
+/** O domínio de produção (`VERCEL_PROJECT_PRODUCTION_URL`, ver `linkDoPedido`), ou null fora da Vercel. */
+function origemDoSite(): string | null {
+  const host = envDoServidor("VERCEL_PROJECT_PRODUCTION_URL")?.trim();
+  return host ? `https://${host.replace(/^https?:\/\//, "")}` : null;
+}
+
+/** A conversa aberta no CRM (`/inbox/[id]`, o id é o JID), ou null fora da Vercel. */
+function linkDaConversa(phone: string): string | null {
+  const origem = origemDoSite();
+  return origem ? `${origem}/inbox/${encodeURIComponent(phone)}` : null;
+}
+
+/** A mensagem de um erro qualquer (o do PostgREST não é `Error`), para o diagnóstico do turno. */
+function mensagemDoErro(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null && "message" in e && typeof e.message === "string") return e.message;
+  return String(e);
+}
+
+/**
+ * O aviso "lead da campanha respondeu" (24/11/2026), DEPOIS da resposta (`after`),
+ * no molde de `avisarAgenda`: best-effort, nunca derruba o turno, e a conversa de
+ * teste (DDD 00) nunca avisa ninguém. Remetente único deste aviso.
+ */
+function avisarLeadDaCampanha(a: { phone: string; instancia: string | null; destino: string | null; texto: string }): void {
+  if (!a.instancia || !a.destino) return;
+  if (telefoneImpossivel(a.phone)) return;
+  const { instancia, destino, texto } = a;
+  try {
+    after(async () => {
+      try {
+        const ok = await sendText(instancia, destino, texto);
+        if (!ok) console.error("aviso de lead da campanha recusado pela Evolution");
+      } catch (e) {
+        console.error("falha ao mandar o aviso de lead da campanha:", e);
+      }
+    });
+  } catch (e) {
+    console.error("falha ao agendar o aviso de lead da campanha:", e);
+  }
 }
 
 /**
@@ -1142,7 +1225,8 @@ async function logTurn(
     messagesSent: number;
     /**
      * Por que o turno não passou pelo modelo. `resposta_automatica` (07/11/2026)
-     * é a trava do robô: `messages_sent` 1 = mandou `PEDIDO_AO_ROBO`, 0 = silêncio.
+     * é a trava do robô: silêncio (`messages_sent` 0). Até 23/11/2026 o 1 era o
+     * pedido fixo a uma pessoa, que saiu (24/11/2026).
      */
     silenced: "nao_publicado" | "assinatura" | "numero_de_avisos" | "limite_ia" | "desativada" | "resposta_automatica" | null;
     model: string | null;
@@ -1207,6 +1291,9 @@ async function registrarTurno(
       // `?? null` cobre os dois casos sem número: turno silencioso (não chama o
       // modelo) e resposta que não trouxe o campo.
       cached_input_tokens: t.usage?.cachedInputTokens ?? null,
+      // A leitura da origem de campanha falhou (24/11/2026): sem a coluna ela falhou 16
+      // dias só no console. Vai só quando há erro (a mensagem, nunca dado do contato).
+      ...(t.diagnostics.origemErro ? { origem_erro: t.diagnostics.origemErro.slice(0, 500) } : {}),
     });
     if (error) console.error("falha ao registrar o turno:", error.message);
   } catch (e) {
@@ -1263,7 +1350,8 @@ function silentTurn(
 /**
  * As linhas que `decisaoDoTurno` lê, montadas do histórico do dryRun (que não tem
  * hora): uma linha por minuto, e a mensagem atual `intervaloMs` depois da última
- * (60 s sem ele). Da mais NOVA para a mais antiga, como `chat_messages`.
+ * (30 min sem ele: uma pessoa, fora das janelas da trava). Da mais NOVA para a
+ * mais antiga, como `chat_messages`.
  */
 function linhasDeEnsaio(history: ChatTurn[], message: string, intervaloMs: number | undefined) {
   const base = Date.UTC(2026, 0, 1);
@@ -1273,7 +1361,7 @@ function linhasDeEnsaio(history: ChatTurn[], message: string, intervaloMs: numbe
     created_at: new Date(base + i * 60_000).toISOString(),
   }));
   const ultima = base + Math.max(0, history.length - 1) * 60_000;
-  const atual = { user_message: message, bot_message: null, created_at: new Date(ultima + (intervaloMs ?? 60_000)).toISOString() };
+  const atual = { user_message: message, bot_message: null, created_at: new Date(ultima + (intervaloMs ?? 30 * 60_000)).toISOString() };
   return [atual, ...passadas.reverse()];
 }
 

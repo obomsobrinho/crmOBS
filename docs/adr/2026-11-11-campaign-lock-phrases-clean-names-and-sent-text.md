@@ -1,6 +1,6 @@
 # Campaign package: bot lock phrases, clean names, human opening and the sent text stored
 
-Status: Accepted (owner, 11/11/2026)
+Status: Accepted (owner, 11/11/2026). Note of 24/11/2026: the evidence below measured only the pure function. In production the lock never ran: `origemDaCampanha` failed on every turn from 07/11 (ambiguous PostgREST embed) and the error was swallowed, so the real cause of the bots passing was the origin, not the missing phrases. See docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md.
 Area: admin, agent-ai, data
 
 ## Context

@@ -329,7 +329,7 @@ async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], 
   for (;;) {
     let q = svc
       .from("chat_messages")
-      .select("id, phone, user_message, bot_message, created_at")
+      .select("id, phone, user_message, bot_message, created_at, message_type")
       .eq("client_id", clientId)
       // O n8n grava `phone` como JID (`55...@s.whatsapp.net`): só dígitos nunca casava, e
       // nenhuma resposta nem SAIR era registrado (teste de 04/11/2026).
@@ -344,7 +344,8 @@ async function mensagensRecebidas(svc: Supa, clientId: string, fones: string[], 
       const em = Date.parse(m.created_at);
       // A nossa só serve à janela rápida: o texto não é lido.
       if (m.bot_message?.trim()) recebidas.push({ telefone: m.phone, texto: "", em, nossa: true, partes: partesDaLinha(m.bot_message) });
-      else if (m.user_message) recebidas.push({ telefone: m.phone, texto: m.user_message, em });
+      else if (m.user_message || m.message_type === "audio")
+        recebidas.push({ telefone: m.phone, texto: m.user_message ?? "", em, audio: m.message_type === "audio" });
     }
     const ultima = data?.[data.length - 1];
     if (!data || data.length < MENSAGENS_POR_PAGINA || !ultima?.created_at) return recebidas;

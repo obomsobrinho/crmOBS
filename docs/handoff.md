@@ -39,6 +39,12 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
+### 24/11/2026: TRAVA DE ROBÔ CONSERTADA E NO AR (pedido do dono)
+- A origem de campanha falhava em todo turno desde 07/11 (embed ambíguo), então a trava nunca rodou e o Tony nunca viu a seção ORIGEM. Consertado, com a janela da primeira resposta (opção B), silêncio para robô e o aviso "Lead da campanha respondeu". Tudo em docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md.
+- Provado: 19 casos reais e os sintéticos em `e2e/resposta-automatica.design.spec.ts`, a consulta real em `e2e/campanhas-origem.auth.spec.ts`. Ensaio do Tony com ORIGEM no cofre do dono, junto do diagnóstico (`ensaio-origem-2026-11-24.md`).
+- Duas falhas fora desta mudança na verificação (01h30 a 02h): `central-clientes-ajustes.design` "os chips mandam nos picos" falha também em `main` (parece depender da hora: o "Dia" de madrugada); `atendimento.serial` jornada 1 (cérebro real, telefone que não é lead) deu `pausar` em vez de `none` 3 vezes no branch e depois passou 2 de 2, contra 3 de 3 em `main`; para quem não é lead a origem é nula e o caminho do turno não mudou.
+- No ar no mesmo dia, com a coluna `agent_turns.origem_erro` (migração aplicada às 12h40 por escolha do dono) e dois cenários de campanha no `test:e2e:n8n`. Falta o dono testar como lead de verdade (o aviso "Lead da campanha respondeu" só sai para telefone real).
+
 ### 23/10/2026: MONTAGEM MAIS CLARA, SEM COMMIT, ESPERANDO O DONO REVISAR
 
 - Brief do dono (vault, `projetos/atenda.md`, secao "Montagem mais clara"). A tela "Guia" (`/guia`) construida antes no mesmo dia foi desfeita a pedido dele, sem commit. Detalhe em `docs/adr/2026-10-23-montagem-clear-from-start-to-end.md`: abertura com o mapa dos passos e o computador, destaques (modelo, horario, documentos, avisos), revisao antes de ativar com painel dos campos do `/agente`, parada "Continue no computador" no celular, dica no cadastro.

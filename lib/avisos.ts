@@ -145,6 +145,29 @@ export function textoDoAviso(a: {
   return blocos.join("\n\n");
 }
 
+/** Até quantos caracteres da mensagem do lead entram no aviso de campanha. */
+const MENSAGEM_NO_AVISO_DE_CAMPANHA = 500;
+
+/**
+ * O aviso "lead da campanha respondeu" (24/11/2026, texto do dono): a primeira
+ * resposta de uma pessoa a um envio de campanha. Sem nome do lead, o número
+ * formatado; sem link (fora da Vercel), a parte "Abrir" some. Remetente único:
+ * `processTurn` (`avisarLeadDaCampanha`).
+ */
+export function textoDoAvisoDeLeadDaCampanha(a: {
+  empresa: string | null;
+  phone: string;
+  mensagem: string;
+  abrir: string | null;
+}): string {
+  const empresa = a.empresa?.trim() || formatarNumero(a.phone.replace(/\D/g, ""));
+  const texto = a.mensagem.trim();
+  const curta = texto.length > MENSAGEM_NO_AVISO_DE_CAMPANHA ? `${texto.slice(0, MENSAGEM_NO_AVISO_DE_CAMPANHA).trimEnd()}...` : texto;
+  const partes = [`Lead da campanha respondeu: ${empresa}.`, `Mensagem: "${curta}".`];
+  if (a.abrir) partes.push(`Abrir: ${a.abrir}`);
+  return partes.join(" ");
+}
+
 /**
  * O aviso de uso de IA do mês (P1 item 6, docs/plano-custo-ia.md). Dois níveis,
  * cada um mandado UMA vez por empresa e mês (`consumo_ia_avisos`): `aviso` aos

@@ -27,7 +27,7 @@ interface Cenario {
   mensagens?: string[];
   /**
    * Com `mensagens` e campanha: quantos segundos depois da linha anterior da
-   * conversa cada fala chegou (a trava do robô, `lib/resposta-automatica.ts`). Sem ele, 60 s.
+   * conversa cada fala chegou (a trava do robô, `lib/resposta-automatica.ts`). Sem ele, 30 min.
    */
   segundos?: number[];
   /** Ou uma pessoa simulada por outro modelo (scripts/ensaio/lead-simulado.ts). */
@@ -184,7 +184,7 @@ export async function ensaiar(args: string[]): Promise<void> {
         if (d.midia) linha.push(`midia: ${d.midia.enviada ?? "nenhuma"}${d.midia.pedida && d.midia.pedida !== d.midia.enviada ? ` (pediu ${d.midia.pedida}, recusada)` : ""}`);
         if (d.guardrail.blocked) linha.push(`guardrail barrou: ${d.guardrail.reason ?? ""}`);
         if (d.limiteIa) linha.push("TURNO SILENCIADO: teto mensal de IA da empresa");
-        if (d.respostaAutomatica) linha.push(`trava do robô: ${d.respostaAutomatica === "pedir" ? "mandou o pedido fixo, sem modelo" : "silêncio, sem modelo"}`);
+        if (d.respostaAutomatica) linha.push("trava do robô: silêncio, sem modelo");
         saida.push("", `\`${linha.join(" · ")}\``, "");
         if (d.ragSearched) {
           saida.push(d.ragMatches.length ? "Trechos da base:" : "Trechos da base: nenhum.");
