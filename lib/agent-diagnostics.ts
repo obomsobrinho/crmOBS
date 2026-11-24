@@ -77,9 +77,16 @@ export interface TurnDiagnostics {
   // true = a conta foi DESATIVADA pelo dono do produto (central "Clientes"):
   // silêncio antes de tudo, também na bancada.
   contaDesativada?: boolean;
-  // A trava do robô de menu (`lib/resposta-automatica.ts`, 07/11/2026): "pedir" =
-  // mandou a mensagem fixa pedindo uma pessoa, "silenciar" = já tinha pedido.
+  // A trava do robô de menu (`lib/resposta-automatica.ts`, 07/11/2026): "silenciar" =
+  // a conversa de campanha caiu num robô e o turno não mandou nada (24/11/2026).
   respostaAutomatica?: Exclude<DecisaoDoRobo, "atender">;
+  // A leitura da origem de campanha falhou (`origemDaCampanha`, best-effort): a
+  // mensagem do erro, sem dado do contato. Sem origem não há trava nem seção ORIGEM.
+  // De 07 a 23/11/2026 ela falhou em todo turno só no console (23/11/2026).
+  origemErro?: string;
+  // true = primeira resposta de uma pessoa a um envio de campanha: o aviso ao
+  // destino de avisos foi AGENDADO (`after`); se saiu mesmo, só o log diz.
+  avisoLeadDaCampanha?: boolean;
   // true = o turno abriu pedido de ajuda e o aviso ao time foi AGENDADO (sai
   // depois da resposta, por `after`). Se a mensagem saiu mesmo, só o log diz.
   avisoAgendado?: boolean;

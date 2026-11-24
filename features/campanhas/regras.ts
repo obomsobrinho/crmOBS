@@ -538,6 +538,8 @@ export function nomeParaMensagem(nome: string, cidade?: string | null): string {
 export interface OrigemDaCampanha {
   /** Quando saiu (ISO). */
   enviadoEm: string;
+  /** O nome do lead na lista (a empresa procurada), para o aviso de resposta humana. */
+  empresa?: string;
   /** O texto exato que o lead recebeu (`textoParaLead`). */
   texto: string;
   /** Quando o lead pediu para parar (ISO), ou null. */
@@ -1462,6 +1464,8 @@ export interface MensagemRecebida {
   em: number;
   nossa?: boolean;
   partes?: number;
+  /** A recebida é áudio (`message_type = 'audio'`; o texto é a transcrição): áudio nunca é robô. */
+  audio?: boolean;
 }
 
 export interface RespostaAchada {
@@ -1505,9 +1509,9 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
         m,
         linha: m.nossa
           ? { nossa: true as const, em: m.em, partes: m.partes ?? 1 }
-          : { nossa: false as const, em: m.em, texto: m.texto },
+          : { nossa: false as const, em: m.em, texto: m.texto, audio: m.audio },
       })),
-      ...(enviosPorFone.get(fone) ?? []).map((e) => ({ m: null, linha: { nossa: true as const, em: e.enviadoEm, partes: 1 } })),
+      ...(enviosPorFone.get(fone) ?? []).map((e) => ({ m: null, linha: { nossa: true as const, em: e.enviadoEm, partes: 1, campanha: true } })),
     ].sort((a, b) => a.linha.em - b.linha.em);
     const flags = respostasAutomaticas(linhas.map((l) => l.linha));
     linhas.forEach((l, i) => {
@@ -1521,7 +1525,7 @@ export function respostasDosEnvios(envios: EnvioObservado[], mensagens: Mensagem
       .filter((t) => t > e.enviadoEm)
       .reduce((a, b) => Math.min(a, b), Infinity);
     const delas = (porFone.get(chaveTelefone(e.telefone)) ?? [])
-      .filter((m) => !m.nossa && m.em > e.enviadoEm && m.em < proximo && m.texto.trim() !== "")
+      .filter((m) => !m.nossa && m.em > e.enviadoEm && m.em < proximo && (m.texto.trim() !== "" || m.audio))
       .sort((a, b) => a.em - b.em);
     if (delas.length === 0) continue;
     const parada = delas.find((m) => ehPedidoParaParar(m.texto));

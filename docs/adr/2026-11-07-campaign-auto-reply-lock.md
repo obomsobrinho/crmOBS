@@ -1,6 +1,6 @@
 # Auto-reply lock for campaign conversations (menu bots)
 - Date: 2026-11-07
-- Status: Accepted (owner's go on 07/11/2026, "Aprovado, pode fazer"; not deployed, the owner sees it first)
+- Status: Accepted (owner's go on 07/11/2026, "Aprovado, pode fazer"; not deployed, the owner sees it first). Amended on 24/11/2026: the fixed message `PEDIDO_AO_ROBO` was removed (silence only) and a first-reply window was added; the lock had never run in production (docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md).
 - Area: agent-ai, admin, product
 
 ## Context

@@ -29,7 +29,11 @@ export function origemDoContato(fonte: string | null | undefined): OrigemDoConta
 export async function origemDaCampanha(svc: Supa, clientId: string, phone: string): Promise<OrigemDaCampanha | null> {
   const { data: leads, error } = await svc
     .from("prospeccao_leads")
-    .select("id, nome, cidade, parou_em, prospeccao_buscas(fonte)")
+    // ⚠️ O embed DESAMBIGUADO pela FK (23/11/2026): existem dois caminhos entre as
+    // tabelas (a FK `busca_id`, a busca de entrada do lead, e a ligação
+    // `prospeccao_busca_leads`). Sem o `!fk` o PostgREST devolve erro em TODO turno
+    // e a trava de robô nunca rodou (docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md).
+    .select("id, nome, cidade, parou_em, prospeccao_buscas!prospeccao_leads_busca_id_fkey(fonte)")
     .in("telefone", grafiasDeDigitos(phone.replace(/\D/g, "")));
   if (error) throw error;
   if (!leads || leads.length === 0) return null;
@@ -51,6 +55,7 @@ export async function origemDaCampanha(svc: Supa, clientId: string, phone: strin
   if (!texto) return null;
   return {
     enviadoEm: envio.enviado_em,
+    empresa: lead.nome,
     texto,
     parouEm: lead.parou_em,
     deOnde: origemDoContato(lead.prospeccao_buscas?.fonte),

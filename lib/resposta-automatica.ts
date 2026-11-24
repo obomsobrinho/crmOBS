@@ -8,14 +8,31 @@ import { normalizar } from "./clientes";
 // uma mensagem). A trava vem ANTES do modelo, em `processTurn`, e o cron da
 // campanha usa a MESMA regra para não contar o robô como resposta.
 //
-// É resposta automática quando aparecem pelo menos 2 de 3 sinais:
-//   (a) rápida: chega até 5 s depois da ENTREGA da nossa última mensagem;
-//   (b) padrão de menu ou automação no texto;
-//   (c) o mesmo texto, normalizado, já tinha chegado antes na conversa.
+// Duas regras, e basta uma:
+//   1. JANELA DA PRIMEIRA RESPOSTA (24/11/2026, opção B do dono): o que chega até
+//      120 s depois do envio da campanha, antes de qualquer mensagem nossa, é robô
+//      quando nenhuma mensagem é áudio e pelo menos uma tem cara de automação
+//      (padrão abaixo, 80 caracteres ou mais, ou um link). Os 17 robôs reais de
+//      Lajinha chegaram de 1 a 58 s; a pessoa mais rápida, em 146 s, por áudio.
+//      Risco aceito: uma pessoa que responde em 2 min com texto longo fica sem
+//      resposta naquele lote; a próxima mensagem dela é atendida.
+//   2. Pelo menos 2 de 3 sinais (07/11/2026), para o resto da conversa:
+//      (a) rápida: chega até 5 s depois da ENTREGA da nossa última mensagem;
+//      (b) padrão de menu ou automação no texto;
+//      (c) o mesmo texto, normalizado, já tinha chegado antes na conversa.
+// Áudio nunca é robô. Com robô a IA fica em SILÊNCIO (24/11/2026): o pedido de uma
+// pessoa que saía uma vez só dava ao robô mais uma mensagem para responder.
 // Puro: sem I/O, servidor e testes usam o mesmo.
+// (why: docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md)
 
-/** A única mensagem que a IA manda a um robô, uma vez por conversa. Texto do dono (07/11/2026). */
-export const PEDIDO_AO_ROBO = "Queria falar com quem cuida do atendimento aí. Pode me responder por aqui quando der.";
+/** Regra 1: até quanto tempo depois do envio da campanha a primeira resposta pode ser robô (dono, 24/11/2026). */
+export const JANELA_PRIMEIRA_RESPOSTA_MS = 120_000;
+
+/** Regra 1: um texto deste tamanho (caracteres, sem as pontas) tem cara de automação (dono, 24/11/2026). */
+export const TAMANHO_DE_AUTOMACAO = 80;
+
+/** Um link no texto: endereço com protocolo, com www ou um domínio comum ("anota.ai", "saipos.com"). */
+const TEM_LINK = /\bhttps?:\/\/\S|\bwww\.\S|\b[a-z0-9-]+\.(?:com|br|ai|app|me|link|ly|site|online|net|org)\b/i;
 
 /** O sinal (a): até quanto tempo depois da entrega da nossa mensagem a resposta conta como rápida. */
 const JANELA_RAPIDA_MS = 5_000;
@@ -130,21 +147,57 @@ export function ehRespostaAutomatica(s: SinaisDaResposta): boolean {
   return Number(s.rapida) + Number(s.padrao) + Number(s.repetida) >= 2;
 }
 
-/** Uma linha da conversa em ordem cronológica: nossa (com quantas partes) ou recebida. */
-type LinhaDaConversa = { nossa: true; em: number; partes: number } | { nossa: false; em: number; texto: string };
+/** Regra 1: o texto tem cara de automação (padrão, tamanho ou link). */
+export function temCaraDeAutomacao(texto: string): boolean {
+  const t = texto.trim();
+  return t.length >= TAMANHO_DE_AUTOMACAO || TEM_LINK.test(t) || temPadraoDeAutomacao(t);
+}
+
+/**
+ * Regra 1 para um lote já dentro da janela: nenhum áudio e pelo menos uma
+ * mensagem com cara de automação. Um robô manda saudação e ausência juntas, e a
+ * curta das duas ("Como podemos ajudar?") vai junto com a longa.
+ */
+export function ehLoteDeRoboNaPrimeiraResposta(lote: { texto: string; audio?: boolean }[]): boolean {
+  return lote.length > 0 && lote.every((m) => !m.audio) && lote.some((m) => temCaraDeAutomacao(m.texto));
+}
+
+/**
+ * Uma linha da conversa em ordem cronológica: nossa (com quantas partes; `campanha`
+ * = o envio da campanha) ou recebida (`audio` = a pessoa mandou áudio; o texto é a
+ * transcrição).
+ */
+export type LinhaDaConversa =
+  | { nossa: true; em: number; partes: number; campanha?: boolean }
+  | { nossa: false; em: number; texto: string; audio?: boolean };
 
 /**
  * Para cada linha (em ordem cronológica), se é uma resposta automática. Linhas
- * nossas são sempre `false`. Cada recebida é julgada com o que veio antes dela
- * (as nossas de toda a conversa contam para a janela rápida, porque uma resposta
- * do robô pode chegar antes de o envio da campanha ser gravado).
+ * nossas e áudios são sempre `false`. Primeiro a regra 1: para cada envio de
+ * campanha, as recebidas da janela (5 s antes do envio, porque o robô pode
+ * responder antes de o envio ser gravado, até 120 s depois) que vieram antes de
+ * qualquer outra mensagem nossa são julgadas como UM lote. Depois a regra 2, cada
+ * recebida com o que veio antes dela (as nossas de toda a conversa contam para a
+ * janela rápida).
  */
 export function respostasAutomaticas(linhas: LinhaDaConversa[]): boolean[] {
   const nossas = linhas.flatMap((l) => (l.nossa ? [{ em: l.em, partes: l.partes }] : []));
+  const naPrimeira = new Set<number>();
+  linhas.forEach((c, k) => {
+    if (!c.nossa || !c.campanha) return;
+    const outra = linhas
+      .filter((l, j) => j !== k && l.nossa && l.em > c.em)
+      .reduce((min, l) => Math.min(min, l.em), Infinity);
+    const grupo = linhas.flatMap((l, j) =>
+      !l.nossa && l.em >= c.em - JANELA_RAPIDA_MS && l.em <= c.em + JANELA_PRIMEIRA_RESPOSTA_MS && l.em < outra ? [j] : []
+    );
+    const lote = grupo.map((j) => linhas[j] as Extract<LinhaDaConversa, { nossa: false }>);
+    if (ehLoteDeRoboNaPrimeiraResposta(lote)) grupo.forEach((j) => naPrimeira.add(j));
+  });
   const anteriores = new Set<string>();
-  return linhas.map((l) => {
+  return linhas.map((l, k) => {
     if (l.nossa) return false;
-    const auto = ehRespostaAutomatica(sinaisDaResposta(l, { nossas, anteriores }));
+    const auto = !l.audio && (naPrimeira.has(k) || ehRespostaAutomatica(sinaisDaResposta(l, { nossas, anteriores })));
     anteriores.add(textoComparavel(l.texto));
     return auto;
   });
@@ -159,21 +212,27 @@ export function partesDaLinha(botMessage: string): number {
   return Math.max(1, botMessage.split(" | ").filter((s) => s.trim()).length);
 }
 
-/** O que o turno faz: `atender` (normal), `pedir` (manda `PEDIDO_AO_ROBO`, a primeira vez) ou `silenciar` (já pediu). */
-export type DecisaoDoRobo = "atender" | "pedir" | "silenciar";
+/** O que o turno faz: `atender` (normal) ou `silenciar` (robô: nenhuma mensagem, nenhum modelo). */
+export type DecisaoDoRobo = "atender" | "silenciar";
+
+/** Uma linha de `chat_messages` como a trava lê. */
+type LinhaDoChat = { user_message: string | null; bot_message: string | null; created_at: string | null; message_type?: string | null };
+
+/** A linha nossa é o envio da campanha (`comEnvioDaCampanha` a põe com a hora do envio). */
+function ehOEnvio(l: LinhaDoChat, envioEm: number | null): boolean {
+  return envioEm !== null && !!l.bot_message?.trim() && Date.parse(l.created_at ?? "") === envioEm;
+}
 
 /**
  * A decisão do turno a partir das linhas de `chat_messages` (da mais NOVA para a
- * mais antiga, com o envio da campanha já no lugar dele, `comEnvioDaCampanha`) e
- * de quantas das primeiras são o lote que está sendo respondido (`semLoteAtual`).
- * Só é robô se TODAS as recebidas do lote forem automáticas: uma pessoa no meio
- * volta ao atendimento normal. Linha sem texto (mídia sem legenda) não entra na
- * conta. `jaPedimos` olha a janela do histórico.
+ * mais antiga, com o envio da campanha já no lugar dele, `comEnvioDaCampanha`), de
+ * quantas das primeiras são o lote que está sendo respondido (`semLoteAtual`) e da
+ * hora do envio da campanha (ISO). Só é robô se TODAS as recebidas do lote forem
+ * automáticas: uma pessoa no meio volta ao atendimento normal. Linha sem texto
+ * (mídia sem legenda) não entra na conta, menos o áudio, que sempre é uma pessoa.
  */
-export function decisaoDoTurno(
-  linhas: { user_message: string | null; bot_message: string | null; created_at: string | null }[],
-  tamanhoDoLote: number
-): DecisaoDoRobo {
+export function decisaoDoTurno(linhas: LinhaDoChat[], tamanhoDoLote: number, envioDaCampanha: string | null): DecisaoDoRobo {
+  const envioEm = envioDaCampanha ? Date.parse(envioDaCampanha) : null;
   const cronologicas: { doLote: boolean; linha: LinhaDaConversa }[] = [];
   for (let i = linhas.length - 1; i >= 0; i--) {
     const l = linhas[i];
@@ -181,11 +240,25 @@ export function decisaoDoTurno(
     if (!Number.isFinite(em)) continue;
     const bot = l.bot_message?.trim() ?? "";
     const user = l.user_message?.trim() ?? "";
-    if (bot) cronologicas.push({ doLote: false, linha: { nossa: true, em, partes: partesDaLinha(bot) } });
-    else if (user) cronologicas.push({ doLote: i < tamanhoDoLote, linha: { nossa: false, em, texto: user } });
+    const audio = l.message_type === "audio";
+    if (bot) cronologicas.push({ doLote: false, linha: { nossa: true, em, partes: partesDaLinha(bot), campanha: ehOEnvio(l, envioEm) } });
+    else if (user || audio) cronologicas.push({ doLote: i < tamanhoDoLote, linha: { nossa: false, em, texto: user, audio } });
   }
   const flags = respostasAutomaticas(cronologicas.map((c) => c.linha));
   const doLote = cronologicas.flatMap((c, k) => (c.doLote ? [flags[k]] : []));
-  if (doLote.length === 0 || doLote.some((a) => !a)) return "atender";
-  return linhas.some((l) => (l.bot_message ?? "").includes(PEDIDO_AO_ROBO)) ? "silenciar" : "pedir";
+  return doLote.length > 0 && doLote.every(Boolean) ? "silenciar" : "atender";
+}
+
+/**
+ * A PRIMEIRA resposta de uma pessoa a um envio de campanha (o aviso ao dono, 24/11/2026):
+ * nenhuma mensagem nossa depois do envio (nem da IA, nem do time). Com a IA em
+ * silêncio para o robô, a primeira pessoa depois dele também é a primeira. Uma vez
+ * por lead e envio, sem coluna nova: depois da resposta da IA a regra não vale mais.
+ */
+export function ehPrimeiraRespostaAoEnvio(linhas: LinhaDoChat[], envioDaCampanha: string): boolean {
+  const envioEm = Date.parse(envioDaCampanha);
+  return !linhas.some((l) => {
+    const em = Date.parse(l.created_at ?? "");
+    return !!l.bot_message?.trim() && em > envioEm;
+  });
 }

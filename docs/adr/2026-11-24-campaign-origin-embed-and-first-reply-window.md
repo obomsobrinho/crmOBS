@@ -1,0 +1,37 @@
+# Campaign origin embed fixed, first-reply window, silence for bots and the human-reply notice
+
+Status: Accepted (owner, 23/11/2026, option B of the diagnosis; branch `claude/trava-robo-origem`, not merged, the owner reviews and tests in production as a lead)
+Area: agent-ai, admin, data
+
+## Context
+
+The second real campaign ("Lajinha segunda campanha complementar", 12 to 17/11/2026) sent 43 messages and got 19 conversations with an answer: 17 bots, 1 wrong number (Belizário, an audio, 146 s after the send) and 1 person (Lolô, 32 min after). Tony talked to every bot ("Não consegui entender direito, pode repetir?", "Me passa seu nome", a 4-turn loop with the Sanglard virtual assistant), and nobody knew that Lolô had answered.
+
+The diagnosis of 23/11/2026 (owner's vault, `assets/atenda/agente-robo-2026-11-23/diagnostico.md`) found three causes:
+
+1. **The bot lock never ran in production.** `origemDaCampanha` (`features/campanhas/server/origem.ts`) embedded `prospeccao_buscas(fonte)` in `prospeccao_leads`. There are two relationships between those tables (the FK `prospeccao_leads.busca_id` and the junction `prospeccao_busca_leads`, migration `20261030034211`), and PostgREST refuses an ambiguous embed: "Could not embed because more than one relationship was found for 'prospeccao_leads' and 'prospeccao_buscas'". `processTurn` caught it (best-effort), logged `console.error` and went on with `origem = null`: no lock, no `### ORIGEM DESTE CONTATO`, no campaign send in the history. The bug was born on 07/11/2026 at 23:30 (commit `34fe563`), 21 minutes after the lock (`ae737d5`). In `agent_turns` from 21/10 to 20/11 there were **0** turns with `silenced = 'resposta_automatica'`; the same query against production failed in 23 of 23 campaign turns. With the persona reading "Só sem ORIGEM: a pessoa chamou a OBS", Tony treated each greeting as a customer asking for service.
+2. **The 2-of-3 rule is too tight for real bots.** With the origin fixed (read only test), it would have caught 9 of 17. In a first reply the "repeated" signal never exists, so it needs both "fast" (5 s after our delivery, about 7.5 s after the send) and "pattern". Sanglard (8 to 18 s), ABC da Construção (9.5 s) and Lanchonete do Alvim (58 s) were not fast; Dr. Lucas, Rosy, Taíssa, Palermo and Ótica Focus had no listed phrase.
+3. **No notice for a real reply.** Lolô answered, Tony sent the trial link twice, and the owner never saw it.
+
+Why no test caught (1): the lock tests are pure (`e2e/resposta-automatica.design.spec.ts`), the prompt rehearsal runs in `dryRun` with `origemOverride` (skips the read) and `test:e2e:n8n` uses a DDD 00 phone that is not a lead. Nothing ran the real query against the real schema.
+
+## Decision
+
+- **Origin**: embed disambiguated by the FK, `prospeccao_buscas!prospeccao_leads_busca_id_fkey(fonte)` (the lead's entry search). `OrigemDaCampanha` also carries `empresa` (the lead name) for the notice.
+- **Failure visible**: a failed origin read goes to `diagnostics.origemErro` (the error message, no contact data), not only to the console. It is in the `/api/agent` response (n8n execution) and in the bench; `agent_turns` has no column for it (adding one is a migration, the owner's call).
+- **First-reply window** (`lib/resposta-automatica.ts`, pure, used by `processTurn` through `decisaoDoTurno` and by the cron through `respostasDosEnvios`): for each campaign send, the received messages from 5 s before the send to 120 s after (`JANELA_PRIMEIRA_RESPOSTA_MS`), and before any other message of ours, are judged as ONE batch. It is a bot when no message is audio and at least one has the look of automation (`temCaraDeAutomacao`: the 07/11 pattern, 80 characters or more, `TAMANHO_DE_AUTOMACAO`, or a link). Outside the window the 2-of-3 rule stays. **Audio is never a bot**, in both rules (`message_type = 'audio'`; an audio without transcription still counts as a person and as a reply in the cron).
+- **Silence**: with a bot the turn sends nothing (`silenced = resposta_automatica`, `messages_sent = 0`). `PEDIDO_AO_ROBO` was removed: the campaign message is already what a person will read when they open the chat, and any extra message only feeds bots that answer every message (Sanglard, Palermo/Saipos, Alvim/anota.ai).
+- **Notice "Lead da campanha respondeu"** (text `textoDoAvisoDeLeadDaCampanha`, `lib/avisos.ts`, owner's wording): `Lead da campanha respondeu: {empresa}. Mensagem: "{texto}". Abrir: {link da conversa}`. Sent once per lead and send, with no new column: the turn attends, the conversation has a campaign origin and there is no message of ours after the send (`ehPrimeiraRespostaAoEnvio`). Single sender `processTurn`, via `after()`, to the sending company's `notify_group_jid`; never in `dryRun` (the bench branch never sets it), never to a DDD 00 phone. The link is `/inbox/{JID}` on `VERCEL_PROJECT_PRODUCTION_URL`; off Vercel the "Abrir" part is dropped. Tony keeps attending (no pause, no help request). A "Sair" is also a person answering, so it notifies too. No second notice when Tony sends the trial link (owner: not now).
+
+## Consequences
+
+- The ORIGEM rules of the Tony persona (do not introduce again, pick up the campaign question, "where did you get my number") reach production for the first time. Rehearsed before the merge (below).
+- Accepted risk of option B: a person who answers within 2 minutes with a long text or a link gets no reply to that batch (and a person writing in the same batch as a bot inside the window too); their next message is attended. Both are written as tests (cases 23 and "lote com uma pessoa no meio DENTRO da janela").
+- The cron counts fewer "respondeu": bots inside the window no longer count. Sends already marked `respondeu` are not reprocessed (the cron skips `situacao = respondeu` for the first reply), so old campaign numbers do not move.
+- The rehearsal script's default interval became 30 min (a person, outside both windows) instead of 60 s.
+
+## Evidence
+
+- `node scripts/conferir-origem.mjs` (read-only service client of the rehearsal): before the fix `{"ok":false,...,"erro":"Could not embed because more than one relationship was found for 'prospeccao_leads' and 'prospeccao_buscas'"}`; after, `{"ok":true,"temEnvio":true,"origem":true,"mesmoEnvio":true,"deOnde":"planilha"}`. It runs in `logado` as `e2e/campanhas-origem.auth.spec.ts`.
+- The 19 real cases (`e2e/fixtures/campanha-robos-2026-11.json`, no phones) in `e2e/resposta-automatica.design.spec.ts`: 17 of 17 bots silent (batch at once and message by message), Belizário and Lolô attended; the cron counts exactly those 2 as "respondeu"; Lolô's "Faz sim" notifies and the "Ok" after Tony's reply does not. Synthetic cases 20 to 24 of the diagnosis included. Before: 0 of 17 in production (origin broken), 9 of 17 with only the origin fixed.
+- Rehearsal of the OBS persona with ORIGEM (`dryRun`, 8 scenarios: Lolô, Belizário, "Oi, quem é?" in 5 s, "Sair", reception, "golpe?", bot then person 20 min later, Palermo control): transcripts in the owner's vault next to the diagnosis (`ensaio-origem-2026-11-24.md`).
