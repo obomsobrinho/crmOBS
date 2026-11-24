@@ -60,7 +60,10 @@ type Linha = {
 
 async function limpar() {
   const svc = servico();
-  for (const t of ["handoffs", "conversation_qualifications", "agent_turns", "chat_messages", "conversations"]) {
+  // `agendamentos` (24/11/2026): o cenário de agendamento MARCA de verdade na agenda própria
+  // do tenant de teste; sem apagar, a rodada seguinte no mesmo dia encontra o horário ocupado
+  // e a IA oferece outro (o cenário falhou assim às 12h de 24/11 depois da rodada das 01h52).
+  for (const t of ["agendamentos", "handoffs", "conversation_qualifications", "agent_turns", "chat_messages", "conversations"]) {
     await svc.from(t).delete().eq("client_id", clientId).like("phone", `${FONE_TESTE}%`);
   }
   await svc.from("dados_cliente").delete().eq("client_id", clientId).like("telefone", `${FONE_TESTE}%`);
@@ -305,13 +308,13 @@ test.describe("conversa de campanha", () => {
     const svc = servico();
     const { data: busca, error: e1 } = await svc
       .from("prospeccao_buscas")
-      .insert({ termo: "e2e trava de robô", cidade: "", fonte: "planilha", status: "pronta", apagada_em: new Date().toISOString() })
+      .insert({ id: crypto.randomUUID(), termo: "e2e trava de robô", cidade: "", fonte: "planilha", status: "pronta", apagada_em: new Date().toISOString() })
       .select("id")
       .single();
     expect(e1, "semeou a lista").toBeNull();
     const { data: lead, error: e2 } = await svc
       .from("prospeccao_leads")
-      .insert({ busca_id: busca!.id, nome: NOME_TESTE, telefone: FONE_TESTE })
+      .insert({ id: crypto.randomUUID(), busca_id: busca!.id, nome: NOME_TESTE, telefone: FONE_TESTE })
       .select("id")
       .single();
     expect(e2, "semeou o lead").toBeNull();

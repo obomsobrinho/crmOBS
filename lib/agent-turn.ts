@@ -635,8 +635,9 @@ export async function processTurn(
   // resposta da IA não vale mais). A IA segue atendendo; quem decide entrar é o
   // dono. Só em produção (o ramo do dryRun nunca liga `primeiraAoEnvio`), nunca
   // DDD 00 (`avisarLeadDaCampanha`).
+  let avisoLeadAgendado = false;
   if (primeiraAoEnvio && origem) {
-    avisarLeadDaCampanha({
+    avisoLeadAgendado = avisarLeadDaCampanha({
       phone,
       instancia: (client.evolution_instance as string | null) ?? null,
       destino: avisos,
@@ -994,7 +995,7 @@ export async function processTurn(
     ...(avisoAgendado ? { avisoAgendado: true } : {}),
     ...(diagAgenda ? { agenda: diagAgenda } : {}),
     ...(origemErro ? { origemErro } : {}),
-    ...(primeiraAoEnvio ? { avisoLeadDaCampanha: true } : {}),
+    ...(avisoLeadAgendado ? { avisoLeadDaCampanha: true } : {}),
   };
 
   // Registro do turno. Inclui o dryRun (o token foi gasto de verdade), marcado
@@ -1134,11 +1135,12 @@ function mensagemDoErro(e: unknown): string {
 /**
  * O aviso "lead da campanha respondeu" (24/11/2026), DEPOIS da resposta (`after`),
  * no molde de `avisarAgenda`: best-effort, nunca derruba o turno, e a conversa de
- * teste (DDD 00) nunca avisa ninguém. Remetente único deste aviso.
+ * teste (DDD 00) nunca avisa ninguém. Remetente único deste aviso. Devolve se agendou
+ * (o diagnóstico `avisoLeadDaCampanha` diz isso, não só que era a primeira resposta).
  */
-function avisarLeadDaCampanha(a: { phone: string; instancia: string | null; destino: string | null; texto: string }): void {
-  if (!a.instancia || !a.destino) return;
-  if (telefoneImpossivel(a.phone)) return;
+function avisarLeadDaCampanha(a: { phone: string; instancia: string | null; destino: string | null; texto: string }): boolean {
+  if (!a.instancia || !a.destino) return false;
+  if (telefoneImpossivel(a.phone)) return false;
   const { instancia, destino, texto } = a;
   try {
     after(async () => {
@@ -1149,8 +1151,10 @@ function avisarLeadDaCampanha(a: { phone: string; instancia: string | null; dest
         console.error("falha ao mandar o aviso de lead da campanha:", e);
       }
     });
+    return true;
   } catch (e) {
     console.error("falha ao agendar o aviso de lead da campanha:", e);
+    return false;
   }
 }
 
