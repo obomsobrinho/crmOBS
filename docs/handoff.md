@@ -39,10 +39,10 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
-### 25/11/2026: PESO E COR DO LOGIN NO APP (variante C, aprovada pelo dono)
+### 25/11/2026: PESO E COR DO LOGIN NO APP (variante C, aprovada pelo dono, no ar: c5a731d)
 - O claro ganhou o peso do login: título de página `text-pagina` 28/700 sem ícone, canvas `#ebebeb`, borda 12%, `--ink-3` `#525252`. Cor por massa: manchete do Painel no roxo do login, indicadores azul, ciano e rosa, "Precisa de você" em âmbar quando há fila, motivos e etiquetas coloridos, cabeçalho do funil na cor do estágio, aba ativa lilás. Menu igual. Tudo em docs/adr/2026-11-24-light-weight-and-color-from-the-login.md.
 - Orçamento B8: Campanhas estava em 480,42 kB e a entrega somou 90 bytes (481 arredondado, acima do teto). As classes do `Stat` tingido foram para `app/globals.css` (`stat-tinto`) e o `Medidor` ficou com um tom só de paleta (`--medidor-cor`): Campanhas 480,46 kB. Continua a uns 40 bytes do teto; qualquer peça nova da camada base estoura.
-- Verificação: tipos, lint (0 erros), 57 unitários, build, orçamento 30 passaram; `sem-login` 1.025 (a falha de picos do "Dia" de madrugada também falha em `main`).
+- Verificação: tipos, lint (0 erros), 57 unitários, build, orçamento 30 passaram; `sem-login` 1.025 (a falha de picos do "Dia" de madrugada também falha em `main`). Com login, a partir de 00h55: 85 passaram, 8 pulados (conta de atendente fora do `.env.e2e.local`), 4 seriais falharam com `AuthRetryableFetchError: fetch failed` do Supabase; rodados de novo sozinhos, todos passaram (dois do `realtime.serial` caíram na segunda rodada e passaram na terceira). Merge `c5a731d` e push da main às 01h10; às 01h19 o CSS de produção já servia `--canvas:#ebebeb`, `stat-tinto` e `text-pagina`.
 - Em aberto: Conversas pede uma rodada própria; etiquetas de motivo em Pedidos neutras; o lado direito vazio de Contatos e Pedidos no computador.
 
 ### 24/11/2026: TRAVA DE ROBÔ CONSERTADA E NO AR (pedido do dono)
