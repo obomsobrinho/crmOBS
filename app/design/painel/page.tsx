@@ -1,4 +1,4 @@
-import { LayoutDashboard } from "lucide-react";
+import TituloDaPagina from "@/components/TituloDaPagina";
 import {
   AreaRolavel,
   DISSOLVER_LISTA,
@@ -357,15 +357,7 @@ export default function DesignPainelPage() {
         className="flex min-h-0 flex-1 flex-col gap-5 pr-1 max-md:px-4 max-md:pb-6 max-md:pt-4"
       >
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2">
-              <LayoutDashboard size={20} className="text-brand-ink" />
-              <h1 className="text-titulo">Painel</h1>
-            </div>
-            <p className="text-apoio text-ink-2">
-              O que a IA fez pela conta Ótica Vision.
-            </p>
-          </div>
+          <TituloDaPagina titulo="Painel" apoio="O que a IA fez pela conta Ótica Vision." />
         </div>
 
         {/* ⚠️ GRADE DE LINHAS COMPARTILHADAS, e não duas colunas independentes.

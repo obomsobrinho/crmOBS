@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { formatTime, prettyPhone } from "@/lib/format";
 import { quemAtende, tagColor } from "@/lib/crm";
+import { coresDoRotulo } from "@/lib/rotulos";
 import { agoraMs } from "@/lib/periodo";
 import { foraDaLista } from "@/lib/inbox-lista";
 import { useDebounce } from "@/lib/use-debounce";
@@ -136,7 +137,7 @@ export default function ListaClientes({
       <section aria-label="Contatos">
         <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
           <div className="flex items-center gap-2">
-            <h1 className="text-titulo">Contatos</h1>
+            <h1 className="text-pagina">Contatos</h1>
             <span
               data-slot="clientes-total"
               className="text-apoio font-semibold tabular-nums text-ink-3"
@@ -145,7 +146,7 @@ export default function ListaClientes({
             </span>
             {podeCadastrar && (
               <Button
-                variant="outline"
+                variant="brand"
                 size="control"
                 data-slot="clientes-novo"
                 onClick={() => abrirNovo()}
@@ -391,7 +392,10 @@ function Linha({
           {it.tags.slice(0, 3).map((t) => (
             <span
               key={t.name}
-              className="inline-flex max-w-full items-center gap-1 truncate rounded-md border border-line px-1.5 py-px text-legenda text-ink-2"
+              // Etiqueta preenchida na cor dela (24/11/2026, decisão do dono): a
+              // cor é escolha da pessoa, e a bolinha sozinha sumia na lista.
+              className="inline-flex max-w-full items-center gap-1 truncate rounded-md px-1.5 py-px text-legenda font-semibold"
+              style={{ background: coresDoRotulo(t.color ?? "gray").surface, color: coresDoRotulo(t.color ?? "gray").ink }}
             >
               <span
                 aria-hidden

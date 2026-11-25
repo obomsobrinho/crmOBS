@@ -11,6 +11,7 @@ import {
   TAG_COLOR_KEYS,
   type Tag,
 } from "@/lib/crm";
+import { coresDoRotulo } from "@/lib/rotulos";
 
 /**
  * Geometria do chip de tag, medida no desenho aprovado: 23px de altura, 8px de
@@ -124,8 +125,8 @@ export default function ContactTags({
     <div className="flex min-w-0 flex-col gap-2">
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         {appliedTags.map((t) => (
-          /* Chip na superfície da marca com a tinta da marca (`surface`/`ink`,
-             nunca `fill` como tinta), que é o par do desenho.
+          /* Chip na superfície e na tinta da cor da tag (`surface`/`ink`, nunca
+             `fill` como tinta). Até 24/11/2026 era o roxo da marca para todas.
              ⚠️ O PONTO COLORIDO ficou, e o desenho não tem. O desenho pinta
              todos os chips de roxo porque não modelou cor de tag; aqui a cor é
              DADO: a pessoa escolheu uma para cada rótulo quando criou. Jogar
@@ -134,7 +135,10 @@ export default function ContactTags({
           <span
             key={t.id}
             data-slot="painel-tag"
-            className={cn(CHIP, "group gap-1.5 bg-brand-surface text-brand-ink")}
+            className={cn(CHIP, "group gap-1.5")}
+            // Na cor da própria tag (24/11/2026, decisão do dono): todas em roxo
+            // escondiam a cor que a pessoa escolheu e somavam mais roxo à tela.
+            style={{ background: coresDoRotulo(t.color).surface, color: coresDoRotulo(t.color).ink }}
           >
             <span
               className="h-1.5 w-1.5 shrink-0 rounded-full"

@@ -1,4 +1,4 @@
-import { Users } from "lucide-react";
+import TituloDaPagina from "@/components/TituloDaPagina";
 import NavRail from "@/components/NavRail";
 import TeamManager from "@/components/TeamManager";
 import { Card } from "@/components/ui/card";
@@ -20,13 +20,7 @@ export default function DesignEquipePage() {
     <div className="flex h-dvh flex-col bg-canvas md:flex-row md:gap-3 md:p-3">
       <NavRail clientName="Ótica Vision" activeHref="/equipe" role="dono" />
       <Card variant="pagina" className="flex min-w-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4">
-        <div className="mb-1 flex items-center gap-2">
-          <Users size={20} className="text-brand-ink" />
-          <h1 className="text-titulo">Equipe</h1>
-        </div>
-        <p className="mb-5 text-apoio text-ink-2">
-          Quem pode atender pela conta Ótica Vision.
-        </p>
+        <TituloDaPagina titulo="Equipe" apoio="Quem pode atender pela conta Ótica Vision." className="mb-5" />
         <TeamManager initialMembers={MOCK} myRole="dono" myUserId={ME} preview />
       </Card>
     </div>

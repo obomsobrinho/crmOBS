@@ -17,7 +17,8 @@ Piso absoluto da interface: **12px**.
 
 | papel | tamanho / entrelinha | peso | uso |
 | --- | --- | --- | --- |
-| `text-titulo` | 18 / 24, `-0.01em` | 600 | **título da PÁGINA** ("Painel", "Pipeline", "Agente de IA") |
+| `text-pagina` | 28 / 34, `-0.025em` | 700 | **título da PÁGINA** ("Painel", "Pipeline", "Agente de IA"), sem ícone, desde 24/11/2026 |
+| `text-titulo` | 18 / 24, `-0.01em` | 600 | título de diálogo, de tela de entrada sem casca e numeral compacto (era o título de página até 24/11/2026) |
 | `text-cartao` | 16 / 22 | 600 | **título de CARTÃO ou de bloco** ("Movimento", "A operação") |
 | `text-corpo` | 15 / 22 | herda | texto de leitura, mensagem |
 | `text-apoio` | 13 / 18 | herda | o mais usado da interface |
@@ -30,7 +31,7 @@ Piso absoluto da interface: **12px**.
 
 Esta é a regra que o painel fechou em 30/08/2026, e vale no produto inteiro:
 
-1. **`text-titulo` (18)** = título da página. Um por tela.
+1. **`text-pagina` (28/700)** = título da página. Um por tela, sem ícone ao lado ([ADR](../adr/2026-11-24-light-weight-and-color-from-the-login.md)).
 2. **`text-cartao` (16, caixa normal, `--ink`)** = título de um bloco **com estrutura própria**:
    faixa de cabeçalho com divisor, lista, gráfico. Ex.: "Movimento", "Assuntos em alta",
    "A operação".

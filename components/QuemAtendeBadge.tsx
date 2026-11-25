@@ -59,8 +59,10 @@ export default function QuemAtendeBadge({
   //    uma caixa de linha e aumentaria a altura do container em 6px medidos, e a
   //    marca desceria junto. Com o absoluto por fora, nada do que o `envolver`
   //    devolve participa do fluxo. Daí também o `leading-none`.
+  // 3. Um terço para FORA do canto (24/11/2026, crítica de design): rente ao
+  //    canto, a marca cobria a segunda inicial do avatar ("FA" virava "F").
   return (
-    <span className="absolute bottom-0 right-0 leading-none">
+    <span className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 leading-none">
       {envolver ? envolver(conteudo) : conteudo}
     </span>
   );

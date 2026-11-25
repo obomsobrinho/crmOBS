@@ -1,6 +1,6 @@
 "use client";
 
-import { KanbanSquare, Search, Settings2 } from "lucide-react";
+import { Search, Settings2 } from "lucide-react";
 import { memberName, type Member } from "@/lib/team";
 import type { Stage } from "@/lib/pipeline";
 import { cn } from "@/lib/utils";
@@ -55,8 +55,7 @@ export function PipelineFiltros({
       {/* Cabeçalho + filtros */}
       <div data-slot="pipeline-cabecalho" className="flex flex-wrap items-center gap-3 border-b border-line p-4 max-md:gap-2 max-md:px-4 max-md:py-3">
         <div className="mr-1 flex items-center gap-2 max-md:mr-auto">
-          <KanbanSquare size={20} className="text-brand-ink" />
-          <h1 className="text-titulo">Pipeline</h1>
+          <h1 className="text-pagina">Pipeline</h1>
           <span className="text-legenda tabular-nums text-ink-3">{shownCount}</span>
         </div>
 

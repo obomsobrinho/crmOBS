@@ -58,9 +58,8 @@ const listaVariants = cva("flex items-center gap-1", {
     variant: {
       sublinhado: "",
       /**
-       * A do painel: bandeja com moldura, e a aba ativa na superfície de BLOCO,
-       * nunca no fill da marca. Roxo cheio num seletor de período roubaria a cor
-       * da série, que no painel é a única cor categórica que existe.
+       * A do painel: bandeja com moldura, e a aba ativa na superfície da MARCA,
+       * nunca no fill. Roxo cheio num seletor de período roubaria a cor da série.
        *
        * A bandeja nasce na cor do CARTÃO, que é onde a operação a usa (ela
        * flutua sobre o canvas). Dentro de um cartão ela precisa recuar para o
@@ -111,10 +110,13 @@ const gatilhoVariants = cva(
           "text-ink-3 hover:text-ink-2",
           "data-[state=active]:font-semibold data-[state=active]:text-ink",
         ],
+        // A ativa no tom da marca (24/11/2026, decisão do dono: o sistema mais
+        // vivo). Superfície e tinta da marca, nunca o fill cheio: o fill roubaria
+        // a cor da série do gráfico ao lado.
         painel: [
           "items-center rounded-[7px] px-3 py-[5px] text-apoio font-medium",
           "text-ink-2 hover:bg-bloco hover:text-ink",
-          "data-[state=active]:bg-bloco data-[state=active]:font-semibold data-[state=active]:text-ink",
+          "data-[state=active]:bg-brand-surface data-[state=active]:font-semibold data-[state=active]:text-brand-ink",
         ],
         /** `chip`: a aba em pílula da faixa do celular; a ativa vira tinta cheia. */
         chip: [

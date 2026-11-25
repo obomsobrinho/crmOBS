@@ -613,7 +613,7 @@ test.describe("Central: detalhe de um cliente", () => {
       // A coluna cresce na entrada; espera ela chegar a uma altura de verdade antes de medir.
       await expect.poll(async () => (await barra.boundingBox())?.height ?? 0).toBeGreaterThan(20);
       const marca = modo === "light" ? "rgb(107, 33, 232)" : "rgb(123, 53, 240)";
-      const tinta = modo === "light" ? "rgb(110, 110, 110)" : "rgb(140, 140, 140)";
+      const tinta = modo === "light" ? "rgb(82, 82, 82)" : "rgb(140, 140, 140)"; // --ink-3 claro = #525252 desde 24/11/2026
       const cores = await page.evaluate(() => {
         const barra = document.querySelector('[data-slot="central-grafico"] .recharts-rectangle');
         const eixo = document.querySelector('[data-slot="central-grafico"] .recharts-cartesian-axis-tick-value');

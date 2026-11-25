@@ -1,4 +1,3 @@
-import { User } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/auth";
 import ChangePassword from "@/components/ChangePassword";
@@ -39,7 +38,7 @@ export default async function PerfilPage() {
 
   return (
     <div className={cn(cardVariants({ variant: "pagina" }), "flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4")}>
-      <TituloDaPagina icone={User} titulo="Perfil" apoio="Dados da sua conta." className="mb-5" />
+      <TituloDaPagina titulo="Perfil" apoio="Dados da sua conta." className="mb-5" />
 
       <AreaRolavel className="min-h-0 flex-1 space-y-5">
         <div className="max-w-xl rounded-xl border border-line bg-bloco">

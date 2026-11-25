@@ -1,4 +1,3 @@
-import { HandHelping } from "lucide-react";
 import MolduraDeCarregamento from "@/components/MolduraDeCarregamento";
 import { cardVariants } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -9,7 +8,6 @@ export default function Loading() {
   return (
     <div className="flex min-h-0 flex-1 md:gap-3">
       <MolduraDeCarregamento
-        icone={HandHelping}
         titulo="Pedidos de ajuda"
         controles={1}
         controlesAbaixo

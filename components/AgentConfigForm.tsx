@@ -206,8 +206,7 @@ export default function AgentConfigForm({
         </Link>
         <div className="min-w-0 max-md:flex-1">
           <div className="flex items-center gap-2">
-            <Sparkles size={20} className="text-brand-ink max-md:hidden" />
-            <h1 className="text-titulo max-md:truncate">Agente de IA</h1>
+            <h1 className="text-pagina max-md:truncate">Agente de IA</h1>
           </div>
           <p className="text-apoio text-ink-2 max-md:hidden">
             Configure como o agente atende no WhatsApp.

@@ -197,8 +197,7 @@ export default function Agenda(p: PropsAgenda) {
     <Card variant="pagina" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-agenda="tela">
       <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3 max-md:px-4">
         <div className="flex min-w-0 items-center gap-2">
-          <CalendarDays size={20} className="shrink-0 text-brand-ink" />
-          <h1 className="text-titulo">Agenda</h1>
+          <h1 className="text-pagina">Agenda</h1>
           <div className="ml-2 flex items-center gap-1">
             <Button variant="ghost" size="icon-control" aria-label="Semana anterior" onClick={() => irPara(somarDias(semana, -7))}>
               <ChevronLeft size={16} />
@@ -486,12 +485,14 @@ function ColunaDoDia({
             onClick={() => onAbrir(l)}
             className={cn(
               "absolute inset-x-1 z-10 flex-col items-start justify-center overflow-hidden rounded-md border border-line bg-raised pl-2.5 pr-1.5 text-left shadow-[var(--panel-shadow)] hover:border-line-strong",
-              passou && "opacity-60"
+              // Horário passado recua pelo FUNDO e pela barra, nunca pelo texto:
+              // com o cartão a 60% o texto caía para 2,4:1 (crítica de 24/11/2026).
+              passou && "bg-bloco shadow-none"
             )}
             // Um horário que passa da meia-noite para no fim da grade (24h), como os bloqueios.
             style={{ top: topo(l.inicio), height: Math.min(altura(l.inicio, l.fim), Math.max(20, alturaTotal - topo(l.inicio))) }}
           >
-            <span className="absolute inset-y-0 left-0 w-1" style={{ background: corDoServico(l.servicoId) }} aria-hidden />
+            <span className={cn("absolute inset-y-0 left-0 w-1", passou && "opacity-40")} style={{ background: corDoServico(l.servicoId) }} aria-hidden />
             <span className="flex w-full items-center gap-1 truncate text-legenda font-semibold text-ink">
               {l.origem === "ia" && <Sparkles size={11} className="shrink-0 text-brand-ink" aria-label="Marcado pela IA" />}
               {l.confirmadoEm && <CheckCircle2 size={11} className="shrink-0 text-human-ink" aria-label="Presença confirmada" data-agenda="cartao-confirmado" />}

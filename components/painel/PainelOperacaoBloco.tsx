@@ -99,14 +99,20 @@ export default function PainelOperacaoBloco({
           uma coluna só: quatro cartões empilhados empurrariam o movimento para
           fora da primeira tela, que é regra fechada do desenho. */}
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-        <Stat variant="elevado" className="painel-cartao">
+        {/* Cada indicador na sua cor da paleta de rótulos (24/11/2026, decisão
+            do dono). E o selo de variação ao lado do NUMERAL, não do rótulo: na
+            linha do rótulo ele espremia o texto em três linhas e, em 1440, o
+            "13s mais rápido" vazava 43px para o cartão vizinho. */}
+        <Stat variant="azul" className="painel-cartao">
           <StatTopo tamanho="operacao">
             <StatRotulo>Atendidas sem você</StatRotulo>
-            <Selo delta={deltaAutonomia} />
           </StatTopo>
-          <StatValor>
-            <NumeroAnimado valor={m.semIntervencao} />
-          </StatValor>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <StatValor>
+              <NumeroAnimado valor={m.semIntervencao} />
+            </StatValor>
+            <Selo delta={deltaAutonomia} />
+          </div>
           <StatFrase>
             A conversa seguiu sem ninguém do time precisar entrar
           </StatFrase>
@@ -118,24 +124,26 @@ export default function PainelOperacaoBloco({
         </Stat>
 
         <Stat
-          variant="elevado"
+          variant="ciano"
           className="painel-cartao"
           style={{ "--passo": 1 } as React.CSSProperties}
         >
           <StatTopo tamanho="operacao">
-            <StatRotulo>Tempo de 1a resposta</StatRotulo>
-            <Selo delta={deltaResposta} />
+            <StatRotulo>Tempo da primeira resposta</StatRotulo>
           </StatTopo>
-          <StatValor>
-            {m.primeiraRespostaMs === null ? (
-              formatDuration(null)
-            ) : (
-              <NumeroAnimado
-                valor={m.primeiraRespostaMs}
-                formatar={formatDuration}
-              />
-            )}
-          </StatValor>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <StatValor>
+              {m.primeiraRespostaMs === null ? (
+                formatDuration(null)
+              ) : (
+                <NumeroAnimado
+                  valor={m.primeiraRespostaMs}
+                  formatar={formatDuration}
+                />
+              )}
+            </StatValor>
+            <Selo delta={deltaResposta} />
+          </div>
           <StatFrase>Mediana, contando só as respostas da IA</StatFrase>
           {/* O tamanho da amostra vai na legenda: mediana de 3 atendimentos e
               mediana de 138 não são o mesmo número, e o cartão precisa dizer
@@ -164,17 +172,19 @@ export default function PainelOperacaoBloco({
         />
 
         <Stat
-          variant="elevado"
+          variant="rosa"
           className="painel-cartao"
           style={{ "--passo": 3 } as React.CSSProperties}
         >
           <StatTopo tamanho="operacao">
             <StatRotulo>Preferiu confirmar</StatRotulo>
-            <Selo delta={deltaConfirmar} />
           </StatTopo>
-          <StatValor>
-            <NumeroAnimado valor={m.preferiuConfirmar} />
-          </StatValor>
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <StatValor>
+              <NumeroAnimado valor={m.preferiuConfirmar} />
+            </StatValor>
+            <Selo delta={deltaConfirmar} />
+          </div>
           {/* Em zero a frase VIRA a leitura positiva em vez de o cartão sumir:
               zero escalada num período com movimento é notícia boa, e esconder o
               cartão faria o número reaparecer do nada na semana seguinte. */}

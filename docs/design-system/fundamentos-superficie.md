@@ -4,7 +4,7 @@
 
 | token | claro | escuro | papel |
 | --- | --- | --- | --- |
-| `--canvas` | `#f4f4f4` | `#0a0a0a` | o fundo da janela |
+| `--canvas` | `#ebebeb` (era `#f4f4f4` até 24/11/2026) | `#0a0a0a` | o fundo da janela |
 | `--sunken` | `#ececec` | `#0d0d0d` | recuado: menu, área de mensagens |
 | `--raised` | `#ffffff` | `#171717` | elevado: cartão |
 | `--inset` | `#f4f4f4` | `#1f1f1f` | encaixado: campo, bloco dentro do cartão |

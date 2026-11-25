@@ -62,6 +62,7 @@ export default function PainelMotivos({
           className="px-6 py-5"
           data-slot="painel-motivos-lista"
           atributoDoItem="data-motivo"
+          colorido
           itens={itens.map((it) => ({
             chave: it.motivo ?? "sem",
             rotulo: it.rotulo,
