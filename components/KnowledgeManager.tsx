@@ -407,7 +407,7 @@ export default function KnowledgeManager({
       <div>
         <div className="flex items-center gap-2">
           <BookOpen size={20} className="text-brand-ink" />
-          <h1 className="text-titulo">Base de conhecimento</h1>
+          <h1 className="text-pagina">Base de conhecimento</h1>
         </div>
         <p className="text-apoio text-ink-2">
           Envie documentos (produtos, tabelas, perguntas frequentes) para o agente

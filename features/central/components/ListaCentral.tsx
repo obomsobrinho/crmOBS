@@ -102,7 +102,7 @@ export default function ListaCentral({
       <section aria-label="Clientes">
         <div className="border-b border-line px-4 pb-3 pt-4 md:px-5">
           <div className="flex items-center gap-2">
-            <h1 className="text-titulo">Clientes</h1>
+            <h1 className="text-pagina">Clientes</h1>
             <Button asChild variant="outline" size="control" className="ml-auto" data-slot="central-campanhas">
               <Link href="/campanhas">
                 <Megaphone size={14} />

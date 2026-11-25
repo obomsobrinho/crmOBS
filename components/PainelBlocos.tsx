@@ -19,10 +19,11 @@ import { ESPERA_AVISO_MS } from "@/lib/painel";
  * A IDADE vem junto da contagem porque ela é a informação: "3" é uma fila,
  * "a mais antiga há 12 minutos" é um problema.
  *
- * ⚠️ NEUTRA ATÉ `ESPERA_AVISO_MS`, ÂMBAR DEPOIS. O limiar está em lib/painel.ts,
- * nomeado, porque veio da ferramenta de desenho e não do dono do produto: âmbar
- * em toda fila ensinaria a ignorar o âmbar. Na versão âmbar a caixa e a altura
- * são AS MESMAS; o que muda é fundo, borda e tinta.
+ * COR (24/11/2026, decisão do dono, a tela de referência do design): com gente
+ * esperando, o cartão é ÂMBAR (gente esperando é o estado que o âmbar significa,
+ * como o número de Pedidos no menu) e o botão é a ação cheia da tela, na marca.
+ * Depois de `ESPERA_AVISO_MS` (lib/painel.ts) o botão também vira âmbar cheio:
+ * é o degrau de urgência. Fila vazia ou sem medida: cartão neutro.
  *
  * Sem selo de variação de propósito: é foto de AGORA e não período, e comparar
  * "agora" com "agora da semana passada" não significa nada.
@@ -42,26 +43,23 @@ export function PainelFilaCartao({
   espera: string;
   href?: string;
 }) {
-  const urgente =
-    quantas !== null &&
-    quantas > 0 &&
-    esperaMs !== null &&
-    esperaMs >= ESPERA_AVISO_MS;
+  const temFila = quantas !== null && quantas > 0;
+  const urgente = temFila && esperaMs !== null && esperaMs >= ESPERA_AVISO_MS;
 
   return (
     <section
       data-slot="painel-fila"
       data-urgente={urgente ? "sim" : "nao"}
       className={`rounded-xl border p-6 ${
-        urgente
-          ? "border-warn-line bg-warn-surface"
+        temFila
+          ? "border-warn-line bg-cartao-aviso shadow-[var(--panel-shadow)]"
           : "border-line bg-raised shadow-[var(--panel-shadow)]"
       }`}
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2
           className={`text-rotulo uppercase ${
-            urgente ? "text-warn-ink" : "text-ink-3"
+            temFila ? "text-warn-ink" : "text-ink-3"
           }`}
         >
           Precisa de você
@@ -88,7 +86,7 @@ export function PainelFilaCartao({
           <p className="mb-1.5 mt-2.5 flex items-baseline gap-2.5">
             <span
               className={`font-display text-numero tabular-nums ${
-                urgente ? "text-warn-ink" : "text-ink"
+                temFila ? "text-warn-ink" : "text-ink"
               }`}
             >
               {quantas}
@@ -110,11 +108,9 @@ export function PainelFilaCartao({
               botão só mudaria junto se alguém lembrasse dele. */}
           <Button
             asChild
-            variant={urgente ? "warn" : "outline"}
+            variant={urgente ? "warn" : "brand"}
             size="primary"
-            className={`painel-pressiona mt-3.5 w-full justify-center ${
-              urgente ? "" : "bg-bloco"
-            }`}
+            className="painel-pressiona mt-3.5 w-full justify-center"
           >
             <Link href={href}>
               Ver quem está esperando
@@ -198,10 +194,12 @@ export function PainelUltimaResposta({
     // fora da primeira tela. Quem cede é a citação, e só ela.
     <section
       data-slot="painel-ultima-resposta"
-      className="flex flex-col overflow-hidden rounded-xl border border-line bg-raised p-6 shadow-[var(--panel-shadow)]"
+      // No tom da marca (24/11/2026): roxo é "foi a IA", e este cartão é a IA
+      // falando. A pergunta do cliente fica num balão claro por cima.
+      className="flex flex-col overflow-hidden rounded-xl border border-brand-line bg-cartao-marca p-6 shadow-[var(--panel-shadow)]"
     >
       <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-2">
-        <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-ink-3">
+        <h2 className="flex items-center gap-1.5 text-rotulo uppercase text-brand-ink">
           <MessageSquareQuote size={13} aria-hidden />A última resposta do agente
         </h2>
         <span className="shrink-0 text-legenda text-ink-3">{etiqueta}</span>
@@ -213,7 +211,7 @@ export function PainelUltimaResposta({
           <p className="text-legenda text-ink-3">
             {nome} perguntou{perguntaHora ? `, às ${perguntaHora}` : ""}
           </p>
-          <p className="mt-1.5 rounded-lg border border-line bg-bloco px-3 py-2 text-apoio text-ink-2">
+          <p className="mt-1.5 rounded-lg border border-line bg-raised px-3 py-2 text-apoio text-ink-2">
             {pergunta}
           </p>
         </>

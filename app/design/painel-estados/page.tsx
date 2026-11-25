@@ -44,7 +44,7 @@ export default function DesignPainelEstadosPage() {
 
         <Stat variant="elevado">
           <StatTopo tamanho="operacao">
-            <StatRotulo>Tempo de 1a resposta</StatRotulo>
+            <StatRotulo>Tempo da primeira resposta</StatRotulo>
             <span className="text-legenda text-ink-3">
               primeira semana medida
             </span>

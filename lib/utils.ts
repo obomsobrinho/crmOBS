@@ -51,6 +51,8 @@ const twMerge = extendTailwindMerge({
             // grande (24/30), pelo mesmo motivo.
             "entrada",
             "marca",
+            // Título de página (28/34), pelo mesmo motivo.
+            "pagina",
           ],
         },
       ],

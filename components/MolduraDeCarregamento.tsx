@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import TituloDaPagina from "@/components/TituloDaPagina";
 import { cardVariants } from "@/components/ui/card";
 import { Esqueleto } from "@/components/ui/esqueleto";
@@ -23,7 +22,6 @@ import { cn } from "@/lib/utils";
 type Corpo = "lista" | "colunas" | "grade" | "formulario" | "semana";
 
 export default function MolduraDeCarregamento({
-  icone,
   titulo,
   cabecalho = "barra",
   apoio = false,
@@ -35,7 +33,6 @@ export default function MolduraDeCarregamento({
   cartao = true,
   className,
 }: {
-  icone?: LucideIcon;
   titulo?: string;
   /** `solto`: título com a linha de apoio, como Painel, Equipe e Perfil; `barra`: a faixa de cima com borda. */
   cabecalho?: "solto" | "barra";
@@ -54,7 +51,6 @@ export default function MolduraDeCarregamento({
   cartao?: boolean;
   className?: string;
 }) {
-  const Icone = icone;
   const linhaDeApoio = apoio ? <Esqueleto className="mt-1 h-4 w-56" /> : undefined;
   return (
     <div
@@ -69,7 +65,7 @@ export default function MolduraDeCarregamento({
       )}
     >
       {cabecalho === "solto" ? (
-        Icone && titulo && <TituloDaPagina icone={Icone} titulo={titulo} apoio={linhaDeApoio} className={cartao ? "mb-5" : undefined} />
+        titulo && <TituloDaPagina titulo={titulo} apoio={linhaDeApoio} className={cartao ? "mb-5" : undefined} />
       ) : (
         <div
           className={cn(
@@ -78,13 +74,7 @@ export default function MolduraDeCarregamento({
           )}
         >
           {voltar && <Esqueleto className="size-9 rounded-lg" />}
-          {Icone && titulo && (
-            <div className="flex min-w-0 items-center gap-2">
-              <Icone size={20} className="shrink-0 text-brand-ink" />
-              <h1 className="text-titulo">{titulo}</h1>
-            </div>
-          )}
-          {!Icone && titulo && <h1 className="text-titulo">{titulo}</h1>}
+          {titulo && <h1 className="text-pagina">{titulo}</h1>}
           {controles > 0 && (
             <div className={cn("flex flex-wrap items-center gap-3", controlesAbaixo && "basis-full")}>
               {Array.from({ length: controles }, (_, i) => (

@@ -1,4 +1,3 @@
-import { Users } from "lucide-react";
 import TeamManager from "@/components/TeamManager";
 import TituloDaPagina from "@/components/TituloDaPagina";
 import { Card } from "@/components/ui/card";
@@ -17,7 +16,6 @@ export default async function EquipePage() {
   return (
     <Card variant="pagina" className="flex min-h-0 flex-1 flex-col overflow-hidden p-6 max-md:p-4">
       <TituloDaPagina
-        icone={Users}
         titulo="Equipe"
         apoio={<>Quem pode atender pela conta {client?.name ?? ""}.</>}
         className="mb-5"

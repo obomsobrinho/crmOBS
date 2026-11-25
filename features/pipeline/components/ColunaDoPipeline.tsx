@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { stageColor, resumoDosNumeros, type PipelineCard, type Stage } from "@/lib/pipeline";
+import { coresDoRotulo } from "@/lib/rotulos";
 import type { ContagensPipeline } from "@/features/pipeline/api/fonte";
 import type { Member } from "@/lib/team";
 import { AreaRolavel, DISSOLVER_LISTA } from "@/components/ui/dissolver-rolagem";
@@ -78,7 +79,13 @@ export function ColunaDoPipeline({
         escondidaNoCelular && "max-md:hidden"
       )}
     >
-      <div className="border-b border-line px-3 py-2.5 max-md:px-4">
+      {/* Cabeçalho no tom do estágio (24/11/2026, decisão do dono: o sistema mais
+          vivo). A cor é a que o dono escolheu para o estágio, da paleta de
+          rótulos: identidade, nunca estado. */}
+      <div
+        className="rounded-t-xl border-b border-line px-3 py-2.5 max-md:rounded-none max-md:px-4"
+        style={{ background: coresDoRotulo(stage.color).surface }}
+      >
         {/* O nome já está na faixa de cima; no celular fica só o
             resumo do estágio. */}
         <div className="flex items-center gap-2 max-md:hidden">
@@ -87,7 +94,7 @@ export function ColunaDoPipeline({
             style={{ background: stageColor(stage.color) }}
             aria-hidden
           />
-          <span className="truncate text-apoio font-semibold">
+          <span className="truncate text-apoio font-semibold" style={{ color: coresDoRotulo(stage.color).ink }}>
             {stage.name}
           </span>
           <span className="ml-auto text-legenda tabular-nums text-ink-3">

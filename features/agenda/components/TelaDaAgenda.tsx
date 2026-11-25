@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarDays } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import MolduraDeCarregamento from "@/components/MolduraDeCarregamento";
 import { ErroDoBloco } from "@/components/ui/erro-do-bloco";
@@ -61,7 +60,7 @@ export default function TelaDaAgenda() {
   if (q.isError && !q.data) {
     return <ErroDoBloco frase="Não deu para abrir a agenda agora." aoTentar={() => void q.refetch()} tentando={q.isFetching} className="m-auto" />;
   }
-  if (!q.data || desligada) return <MolduraDeCarregamento icone={CalendarDays} titulo="Agenda" controles={2} corpo="semana" />;
+  if (!q.data || desligada) return <MolduraDeCarregamento titulo="Agenda" controles={2} corpo="semana" />;
   const d = q.data;
   const config = d.agenda?.config ?? AGENDA_PADRAO;
   return (

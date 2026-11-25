@@ -65,6 +65,24 @@
   --color-campo: var(--s-campo);
   --color-bloco: var(--s-bloco);
 
+  /* CARTÃO TINGIDO (24/11/2026, decisão do dono: o sistema mais vivo, a cor
+     destacando o que importa). Um cartão inteiro no tom de um matiz, misturado
+     com `--raised` e não com branco: assim vira sozinho no escuro. Só para
+     cartão (nunca texto); a borda é o mesmo matiz a 25%. Indicadores usam a
+     paleta de rótulos (identidade, não estado); `marca` é "foi a IA"; `aviso`
+     é gente esperando. */
+  --color-cartao-azul: color-mix(in srgb, var(--rotulo-blue-fill) 11%, var(--raised));
+  --color-cartao-ciano: color-mix(in srgb, var(--rotulo-cyan-fill) 11%, var(--raised));
+  --color-cartao-rosa: color-mix(in srgb, var(--rotulo-pink-fill) 9%, var(--raised));
+  --color-cartao-marca: color-mix(in srgb, var(--brand-fill) 6%, var(--raised));
+  --color-cartao-aviso: color-mix(in srgb, var(--warn-fill) 14%, var(--raised));
+  --color-borda-azul: color-mix(in srgb, var(--rotulo-blue-fill) 25%, transparent);
+  --color-borda-ciano: color-mix(in srgb, var(--rotulo-cyan-fill) 25%, transparent);
+  --color-borda-rosa: color-mix(in srgb, var(--rotulo-pink-fill) 25%, transparent);
+  --color-tinta-azul: var(--rotulo-blue-ink);
+  --color-tinta-ciano: var(--rotulo-cyan-ink);
+  --color-tinta-rosa: var(--rotulo-pink-ink);
+
   /* Tinta. */
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -112,6 +130,15 @@
      consumidores. Ele nasceu quando o painel usava 24px em dez números ao mesmo
      tempo; a hierarquia de numeral (68/44/32) resolveu aquilo e o papel ficou
      órfão. Papel que ninguém usa é convite a alguém usar sem saber por quê. */
+  /* TÍTULO DE PÁGINA, 28/34 700 (24/11/2026, decisão do dono): o peso do título
+     do login levado para dentro do app. Era `titulo` 18/600 com ícone roxo, e a
+     página não tinha cabeça. `titulo` segue para diálogo, bloco e telas de
+     entrada sem casca. */
+  --text-pagina: 28px;
+  --text-pagina--line-height: 34px;
+  --text-pagina--letter-spacing: -0.025em;
+  --text-pagina--font-weight: 700;
+
   --text-titulo: 18px;
   --text-titulo--line-height: 24px;
   --text-titulo--letter-spacing: -0.01em;
@@ -245,7 +272,10 @@
   /* ── Superfícies, do fundo para cima ──
      Menu e conversa em `sunken`, lista e painel em `raised` com sombra,
      campos em `inset`. É a hierarquia do escuro, invertida. */
-  --canvas: #f4f4f4;
+  /* Um degrau abaixo de `--s-bloco` (24/11/2026, decisão do dono): com #f4f4f4 o
+     cartão branco só se separava do fundo por uma borda de 8% e o claro lia sem
+     peso. */
+  --canvas: #ebebeb;
   --sunken: #ececec;
   --raised: #ffffff;
   --inset: #f4f4f4;
@@ -316,7 +346,10 @@
   /* ── Tinta ── */
   --ink: #171717; /* 15,8:1 */
   --ink-2: #525252; /* 8,1:1, texto secundário */
-  --ink-3: #6e6e6e; /* 5,5:1, piso de texto (mínimo 12px) */
+  /* Piso de texto igual a `--ink-2` no claro (24/11/2026, decisão do dono): eram
+     72 textos de 12px em #6e6e6e só na primeira dobra do painel, e era esse cinza
+     que deixava o tema apagado. O papel continua (o escuro mantém dois degraus). */
+  --ink-3: #525252; /* 8,1:1, piso de texto (mínimo 12px) */
   --ink-faint: #a3a3a3; /* NUNCA texto: ícone e divisor */
   /* Aliases legados. */
   --ink-muted: #525252;
@@ -390,7 +423,8 @@
   --danger-border: rgba(220, 38, 38, 0.3);
 
   /* ── Estrutura ── */
-  --line: oklch(0 0 0 / 8%);
+  /* 12% (era 8% até 24/11/2026): é o contorno do cartão sobre o canvas. */
+  --line: oklch(0 0 0 / 12%);
   /* Divisor INTERNO de cartão (a `--line2` da prancha): cabeçalho, rodapé e
      separador de lista. Mais fraco que `--line`, que é a borda do cartão, e a
      diferença é o que faz o cartão ter contorno sem parecer uma tabela. */
@@ -822,6 +856,63 @@ h3 {
     radial-gradient(55% 45% at 100% 0%, color-mix(in srgb, var(--brand-grad-mid) 80%, transparent), transparent 74%),
     linear-gradient(160deg, var(--brand-grad-mid), var(--painel-fundo) 62%);
   color: #fff;
+}
+
+/* SUPERFÍCIE DA MARCA DENTRO DO APP (24/11/2026, decisão do dono): a manchete do
+   painel no mesmo roxo do painel de entrada. Junto com `.brand-grad-painel`, esta
+   classe REDEFINE os tokens de tinta e linha para o lado de dentro, então os
+   componentes de dentro (rótulo, numeral, gráfico de horas, legenda) seguem
+   escrevendo `text-ink-2`, `bg-brand`, `border-line` e saem certos sobre o roxo,
+   sem uma segunda versão de cada classe. Igual nos dois temas, como o painel de
+   entrada. O balão do gráfico continua uma superfície clara por cima. */
+.superficie-marca {
+  --ink: var(--brand-on);
+  --ink-2: color-mix(in srgb, var(--brand-on) 84%, transparent);
+  --ink-3: color-mix(in srgb, var(--brand-on) 78%, transparent);
+  --ink-faint: color-mix(in srgb, var(--brand-on) 32%, transparent);
+  --brand-ink: var(--brand-on);
+  --brand-fill: var(--brand-on);
+  --line: color-mix(in srgb, var(--brand-on) 26%, transparent);
+  --line-soft: color-mix(in srgb, var(--brand-on) 18%, transparent);
+  --line-strong: color-mix(in srgb, var(--brand-on) 32%, transparent);
+  border-color: transparent;
+}
+.superficie-marca .painel-balao {
+  --ink: #171717;
+  --ink-3: #525252;
+  --brand-ink: #5b17d4;
+  --raised: #ffffff;
+  --line-strong: oklch(0 0 0 / 18%);
+}
+
+/* INDICADOR TINGIDO (`Stat` azul, ciano, rosa; components/ui/stat.tsx). Aqui e não
+   na string da variante porque o `Stat` entra no JS de toda rota que o usa, e
+   Campanhas estava no teto de 480 kB (B8, docs/plano-dados-e-estado.md): as três
+   strings de classe somaram 1 kB e passaram do teto (25/11/2026). O tom chega ao
+   rótulo e ao numeral por `--stat-tinta`, na regra sem camada logo abaixo: ela
+   vence o `text-ink-3` do rótulo, que mora na camada de utilitários. */
+.stat-tinto :is([data-slot="stat-rotulo"], [data-slot="stat-valor"]) {
+  color: var(--stat-tinta);
+}
+@utility stat-tinto {
+  box-shadow: var(--panel-shadow);
+  border-color: var(--stat-borda);
+  background-color: var(--stat-fundo);
+}
+@utility stat-azul {
+  --stat-borda: var(--color-borda-azul);
+  --stat-fundo: var(--color-cartao-azul);
+  --stat-tinta: var(--rotulo-blue-ink);
+}
+@utility stat-ciano {
+  --stat-borda: var(--color-borda-ciano);
+  --stat-fundo: var(--color-cartao-ciano);
+  --stat-tinta: var(--rotulo-cyan-ink);
+}
+@utility stat-rosa {
+  --stat-borda: var(--color-borda-rosa);
+  --stat-fundo: var(--color-cartao-rosa);
+  --stat-tinta: var(--rotulo-pink-ink);
 }
 
 /* Selo da marca: as duas artes ficam no DOM e o CSS escolhe pelo tema. O padrão

@@ -3,6 +3,7 @@ import { Clock, CalendarClock, Settings2 } from "lucide-react";
 import type { FraseValor, ValorResumo as Resumo } from "@/lib/valor";
 import type { BarraHora } from "@/lib/painel";
 import PainelHoras from "@/components/painel/PainelHoras";
+import { numeroBR } from "@/lib/format";
 import {
   Stat,
   StatTopo,
@@ -62,7 +63,7 @@ function Bloco({
  */
 function numeroOuNull(valor: string): string | null {
   const n = Number(valor);
-  return valor.trim() !== "" && Number.isFinite(n) ? n.toLocaleString("pt-BR") : null;
+  return valor.trim() !== "" && Number.isFinite(n) ? numeroBR(n) : null;
 }
 
 /**
@@ -148,7 +149,7 @@ export default function ValorResumo({
   // (mês) sem nenhum dos dois dizer de quando era.
   const escopo =
     resumoMostrado.recebidas > 0
-      ? `${rotuloPeriodo} · ${resumoMostrado.recebidas.toLocaleString("pt-BR")} mensagens recebidas`
+      ? `${rotuloPeriodo} · ${numeroBR(resumoMostrado.recebidas)} mensagens recebidas`
       : rotuloPeriodo;
 
   // O "resto" é só a grade das frases secundárias: sem manchete, sem o aviso de
@@ -225,14 +226,13 @@ export default function ValorResumo({
               32px da tela: é a frase que a pessoa precisa ler mesmo se não ler
               mais nada aqui. Antes ela tinha o mesmo tamanho de número dos outros
               nove blocos e se distinguia só pela cor de fundo. */}
-          {/* ⚠️ `elevado`, e NÃO `marca`. Até a rodada 2 a manchete tinha
-              superfície roxa de largura inteira; a rodada 3 tirou isso e a
-              deixou no MESMO cinza dos outros cartões (medido na prancha:
-              oklch(0.205 0 0), idêntico ao cartão de indicador). Quem carrega a
-              hierarquia agora é o numeral de 68px em tinta de marca, não o
-              fundo. Cartão roxo com número pequeno errava nas duas pontas. */}
+          {/* `marca-cheia` (24/11/2026, decisão do dono): o roxo do painel de
+              entrada, com o numeral de 68px em branco. A rodada 3 tinha tirado a
+              superfície roxa porque ela vinha com número pequeno; com o numeral
+              grande, o roxo cheio é o que dá peso e cor à tela clara. As tintas
+              de dentro viram por `.superficie-marca`. */}
           <Stat
-            variant="elevado"
+            variant="marca-cheia"
             tamanho="manchete"
             className="painel-cartao"
             // ⚠️ `data-manchete` e NÃO `data-slot`: o `Stat` escreve o
@@ -286,9 +286,7 @@ export default function ValorResumo({
                   // O escopo do gráfico no canto, como na prancha: de quando é
                   // e sobre quantas mensagens. Sem o total, "em que horas" não
                   // diz de que universo as barras são fatia.
-                  escopo={`${rotuloPeriodo} · ${resumoMostrado.recebidas.toLocaleString(
-                    "pt-BR"
-                  )} recebidas`}
+                  escopo={`${rotuloPeriodo} · ${numeroBR(resumoMostrado.recebidas)} recebidas`}
                 />
               )}
             </div>

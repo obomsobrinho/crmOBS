@@ -44,6 +44,23 @@ const statVariants = cva("flex flex-col rounded-xl border", {
       elevado: "border-line bg-raised shadow-[var(--panel-shadow)]",
       /** Manchete: a única frase que a pessoa precisa ler nesta tela. */
       marca: "border-brand-line bg-brand-surface",
+      /**
+       * Manchete no roxo do painel de entrada (24/11/2026, decisão do dono: levar
+       * o peso do login para o app). `.superficie-marca` (app/globals.css) vira
+       * as tintas e linhas para branco do lado de dentro, então o conteúdo não
+       * precisa saber que está sobre o roxo.
+       */
+      "marca-cheia": "brand-grad-painel superficie-marca",
+      /**
+       * INDICADOR TINGIDO (24/11/2026): cartão inteiro num matiz da paleta de
+       * rótulos, com rótulo e numeral na tinta do matiz. É identidade do número
+       * (cada indicador tem a sua cor), nunca estado: verde, âmbar e vermelho
+       * não entram aqui. As classes moram em app/globals.css (`stat-tinto`): em
+       * string aqui elas passavam Campanhas do teto de JS (B8).
+       */
+      azul: "stat-tinto stat-azul",
+      ciano: "stat-tinto stat-ciano",
+      rosa: "stat-tinto stat-rosa",
       /** Sem dado ainda. Tracejado é convite a preencher, não erro. */
       vazio: "border-dashed border-line-strong",
     },

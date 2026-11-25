@@ -104,7 +104,7 @@ test.describe("Painel: hierarquia de numeral", () => {
     // cartão precisa dizer qual dos dois ele é.
     const cartao = page
       .locator('[data-slot="stat"]')
-      .filter({ hasText: "Tempo de 1a resposta" })
+      .filter({ hasText: "Tempo da primeira resposta" })
       .first();
     await expect(cartao.locator('[data-slot="stat-legenda"]')).toHaveText(
       /\d+ atendimentos medidos/
@@ -220,7 +220,7 @@ test.describe("Painel: filtro de período", () => {
 
     const operacao = page.locator('[data-slot="stat"]').filter({
       hasText:
-        /Atendidas sem você|Tempo de 1a resposta|Preferiu confirmar|Pessoas novas/,
+        /Atendidas sem você|Tempo da primeira resposta|Preferiu confirmar|Pessoas novas/,
     });
     await expect(operacao.locator('[data-slot="badge"]')).toHaveCount(0);
     await expect(

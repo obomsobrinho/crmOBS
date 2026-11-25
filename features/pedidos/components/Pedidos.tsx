@@ -269,8 +269,7 @@ export default function Pedidos({
           <div className="border-b border-line px-4 pb-3 pt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <HandHelping size={20} className="text-brand-ink" />
-                <h1 className="text-titulo">Pedidos de ajuda</h1>
+                <h1 className="text-pagina">Pedidos de ajuda</h1>
               </div>
               <Tabs
                 value={aba}

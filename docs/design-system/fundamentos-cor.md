@@ -43,7 +43,7 @@ Não muda de significado em lugar nenhum:
 | --- | --- | --- | --- |
 | `--ink` | `#171717` (15,8:1) | `#f5f5f5` (15,0:1) | texto principal |
 | `--ink-2` | `#525252` (8,1:1) | `#b4b4b4` (9,3:1) | texto secundário |
-| `--ink-3` | `#6e6e6e` (5,5:1) | `#8c8c8c` (5,7:1) | **piso de texto**, mínimo 12px |
+| `--ink-3` | `#525252` (8,1:1, igual a `--ink-2` desde 24/11/2026) | `#8c8c8c` (5,7:1) | **piso de texto**, mínimo 12px |
 | `--ink-faint` | `#a3a3a3` | `#5c5c5c` | **NUNCA texto**: só ícone e divisor |
 
 Os nomes `text-ink-muted` e `text-ink-dim` **não existem mais** como utilitário: eram aliases e
@@ -71,13 +71,23 @@ claro daria 1,99:1.
 
 | token | claro | escuro | uso |
 | --- | --- | --- | --- |
-| `--line` | `oklch(0 0 0 / 8%)` | `oklch(1 0 0 / 10%)` | **borda de cartão** |
+| `--line` | `oklch(0 0 0 / 12%)` (8% até 24/11/2026) | `oklch(1 0 0 / 10%)` | **borda de cartão** |
 | `--line-soft` | `oklch(0 0 0 / 6%)` | `oklch(1 0 0 / 6%)` | **divisor interno**: cabeçalho, rodapé, separador de lista |
 | `--line-strong` | `oklch(0 0 0 / 18%)` | `oklch(1 0 0 / 22%)` | foco, hover de controle, guia, borda tracejada |
 | `--input-line` | `--line-strong` | `--line` | **moldura de campo**: no claro o campo é branco sobre cartão branco e a borda é o único sinal |
 
 `--line-soft` entrou em 30/08/2026 com o painel. A diferença entre ela e `--line` é o que faz um
 cartão ter contorno **sem parecer uma tabela**.
+
+## Cor que destaca (24/11/2026)
+
+O claro ganhou cor por MASSA, não por detalhe ([ADR](../adr/2026-11-24-light-weight-and-color-from-the-login.md)):
+
+- **Roxo cheio = resultado da IA.** A manchete do painel usa `Stat variant="marca-cheia"` (o mesmo fundo do painel de entrada, `.brand-grad-painel`) e `.superficie-marca` vira as tintas e linhas para branco do lado de dentro.
+- **Âmbar = gente esperando.** O cartão "Precisa de você" é `bg-cartao-aviso` sempre que a fila tem alguém.
+- **Paleta de rótulos = identidade.** Indicadores tingidos (`Stat variant="azul|ciano|rosa"`, tokens `--color-cartao-*`, `--color-borda-*`), motivos com uma cor por posição (`ListaDeContagens colorido`), etiquetas e cabeçalho de coluna do funil preenchidos na cor escolhida. Nunca verde, âmbar ou vermelho aqui.
+- **Ação principal sólida** (`Button variant="brand"`), uma por bloco. Aba ativa do seletor de período em `brand-surface`/`brand-ink`.
+- O menu ficou como estava: o item ativo em roxo cheio foi testado e recusado pelo dono.
 
 ## O azul
 

@@ -1,6 +1,5 @@
 "use client";
 
-import { LayoutDashboard } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import PainelOperacaoBloco from "@/components/painel/PainelOperacaoBloco";
 import PainelMovimento from "@/components/painel/PainelMovimento";
@@ -43,7 +42,7 @@ export default function TelaDoPainel() {
     );
   }
   if (!q.data) {
-    return <MolduraDeCarregamento icone={LayoutDashboard} titulo="Painel" cabecalho="solto" apoio cartao={false} corpo="grade" />;
+    return <MolduraDeCarregamento titulo="Painel" cabecalho="solto" apoio cartao={false} corpo="grade" />;
   }
   const d = q.data;
 
@@ -61,7 +60,6 @@ export default function TelaDoPainel() {
           ele precisa saber primeiro é se tem gente esperando. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
         <TituloDaPagina
-          icone={LayoutDashboard}
           titulo="Painel"
           apoio={<>O que a IA fez pela conta {s.nome}.</>}
         />

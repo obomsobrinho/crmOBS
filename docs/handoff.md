@@ -39,6 +39,12 @@ global de acesso livre.
 
 ## 3. Estado em 27/09/2026
 
+### 25/11/2026: PESO E COR DO LOGIN NO APP (variante C, aprovada pelo dono)
+- O claro ganhou o peso do login: título de página `text-pagina` 28/700 sem ícone, canvas `#ebebeb`, borda 12%, `--ink-3` `#525252`. Cor por massa: manchete do Painel no roxo do login, indicadores azul, ciano e rosa, "Precisa de você" em âmbar quando há fila, motivos e etiquetas coloridos, cabeçalho do funil na cor do estágio, aba ativa lilás. Menu igual. Tudo em docs/adr/2026-11-24-light-weight-and-color-from-the-login.md.
+- Orçamento B8: Campanhas estava em 480,42 kB e a entrega somou 90 bytes (481 arredondado, acima do teto). As classes do `Stat` tingido foram para `app/globals.css` (`stat-tinto`) e o `Medidor` ficou com um tom só de paleta (`--medidor-cor`): Campanhas 480,46 kB. Continua a uns 40 bytes do teto; qualquer peça nova da camada base estoura.
+- Verificação: tipos, lint (0 erros), 57 unitários, build, orçamento 30 passaram; `sem-login` 1.025 (a falha de picos do "Dia" de madrugada também falha em `main`).
+- Em aberto: Conversas pede uma rodada própria; etiquetas de motivo em Pedidos neutras; o lado direito vazio de Contatos e Pedidos no computador.
+
 ### 24/11/2026: TRAVA DE ROBÔ CONSERTADA E NO AR (pedido do dono)
 - A origem de campanha falhava em todo turno desde 07/11 (embed ambíguo), então a trava nunca rodou e o Tony nunca viu a seção ORIGEM. Consertado, com a janela da primeira resposta (opção B), silêncio para robô e o aviso "Lead da campanha respondeu". Tudo em docs/adr/2026-11-24-campaign-origin-embed-and-first-reply-window.md.
 - Provado: 19 casos reais e os sintéticos em `e2e/resposta-automatica.design.spec.ts`, a consulta real em `e2e/campanhas-origem.auth.spec.ts`. Ensaio do Tony com ORIGEM no cofre do dono, junto do diagnóstico (`ensaio-origem-2026-11-24.md`).

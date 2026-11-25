@@ -30,6 +30,12 @@ const cheioVariants = cva("block h-full rounded-full", {
       neutro: "bg-ink-3",
       aviso: "bg-warn",
       perigo: "bg-danger",
+      // Um matiz da paleta de rótulos (24/11/2026): identidade de CATEGORIA numa
+      // lista de contagens colorida, nunca estado. Quem chama passa a cor em
+      // `--medidor-cor` (o `fill` de `coresDoRotulo`, lib/rotulos.ts). Um tom só,
+      // e não um por matiz, porque o Medidor entra no JS de Campanhas, que está
+      // no teto de 480 kB (B8).
+      paleta: "bg-[var(--medidor-cor)]",
     },
   },
   defaultVariants: { tom: "marca" },

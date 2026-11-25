@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import type { Member } from "@/lib/team";
 import type { PipelineCard, Stage } from "@/lib/pipeline";
 import { Card } from "@/components/ui/card";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { KanbanSquare, X } from "lucide-react";
 import MolduraDeCarregamento from "@/components/MolduraDeCarregamento";
 import type { ColunaCarregada } from "./colunas";
 import { ColunaDoPipeline } from "./ColunaDoPipeline";
@@ -129,7 +129,7 @@ export default function PipelineBoard({
   // A primeira leitura (estágios e quadro) chega do navegador: até lá, a moldura do
   // Pipeline, a mesma do clique (`loading.tsx`).
   if (carregandoInicio) {
-    return <MolduraDeCarregamento icone={KanbanSquare} titulo="Pipeline" barra="alta" controles={3} corpo="colunas" />;
+    return <MolduraDeCarregamento titulo="Pipeline" barra="alta" controles={3} corpo="colunas" />;
   }
 
   return (

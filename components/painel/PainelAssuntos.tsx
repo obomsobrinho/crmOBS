@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, ArrowRight, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   AreaRolavel,
   DISSOLVER_LISTA,
@@ -162,8 +163,14 @@ export default function PainelAssuntos({
                       e texto, então não existe transbordo possível. */}
                   <span className="mt-[7px] flex items-center gap-2.5">
                     <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                      {/* 6px e o primeiro na marca, os outros em índigo
+                          (24/11/2026, decisão do dono): o assunto que mais pesa
+                          se destaca dos demais. */}
                       <span
-                        className="h-[3px] rounded-sm bg-brand"
+                        className={cn(
+                          "h-1.5 rounded-sm",
+                          i === 0 ? "bg-brand" : "bg-[var(--rotulo-indigo-fill)]"
+                        )}
                         style={{ flexGrow: it.contagem, flexBasis: 0 }}
                       />
                       {/* O trilho cinza só existe quando sobra o que marcar: no
@@ -171,7 +178,7 @@ export default function PainelAssuntos({
                           respiro de 10px, empurrando a variação. */}
                       {it.contagem < maior && (
                         <span
-                          className="h-[3px] rounded-sm bg-line-soft"
+                          className="h-1.5 rounded-sm bg-line-soft"
                           style={{ flexGrow: maior - it.contagem, flexBasis: 0 }}
                         />
                       )}

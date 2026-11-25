@@ -620,6 +620,14 @@ export default function DesignSistemaPage() {
             >
               <ol className="space-y-4">
                 <li>
+                  <p data-papel="pagina" className="font-display text-pagina text-ink">
+                    Painel
+                  </p>
+                  <p className="text-legenda text-ink-3">
+                    <code>text-pagina</code> · título da PÁGINA (28/700, desde 24/11/2026)
+                  </p>
+                </li>
+                <li>
                   <p
                     data-papel="titulo"
                     className="font-display text-titulo text-ink"
@@ -627,7 +635,7 @@ export default function DesignSistemaPage() {
                     Painel
                   </p>
                   <p className="text-legenda text-ink-3">
-                    <code>text-titulo</code> · título da PÁGINA · <span data-medida="titulo">{m.titulo}</span>
+                    <code>text-titulo</code> · título de diálogo e de tela de entrada · <span data-medida="titulo">{m.titulo}</span>
                   </p>
                 </li>
                 <li>
